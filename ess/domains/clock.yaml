@@ -14,7 +14,7 @@ types:
       - format == "roughtime-clock/1"
       - max_rate_error_ppm: {gte: 1, lte: 10000}
     # ESS-LIMIT: source correctness and the local timer's physical frequency bound
-    # are deployment trust assumptions (clock.md:14-19); ESS 0.36 has no construct
+    # are deployment trust assumptions (clock.md:14-19); ESS 0.40 has no construct
     # for an environmental trust assumption, so they are never schema-proven facts.
   - name: connectors.clock.Observation
     kind: struct
@@ -22,20 +22,25 @@ types:
       - {name: configuration_sha256, type: String}
       - {name: lower_unix_ms, type: Integer}
       - {name: upper_unix_ms, type: Integer}
-    # ESS-LIMIT: clock.md:84 bounds each value to 0..9007199254740991 Unix ms and
-    # orders them; the bounds are writable as invariants, but this type is a CLI
-    # output and ESS 0.36 `generate cli` refuses any invariant on a CLI type. The
-    # 4,000 ms width is arithmetic over two sibling fields; raw signature/nonce
-    # validation, process continuity,
-    # elapsed-time bounds, suspend rejection, TTL and outward rounding are runtime
-    # evidence. ESS 0.36 has no field-to-field arithmetic in a type invariant and no
-    # signature, monotonic-clock or process-continuity construct.
+    # ESS-LIMIT: clock.md:83-84 bounds each value to 0..9007199254740991 Unix ms,
+    # orders them and caps the width at 4,000 ms. The bounds are writable as
+    # invariants, but this type is a CLI output and ESS 0.40 `specify cli` refuses
+    # any invariant on a CLI type. The order compares two sibling fields, which an
+    # invariant cannot (ESS-ENTITY-002), and the width is arithmetic over them.
+    # Raw signature/nonce validation, process continuity, elapsed-time bounds,
+    # suspend rejection, TTL and outward rounding are runtime evidence: ESS 0.40
+    # has no signature, monotonic-clock or process-continuity construct.
 
 entities:
   - name: connectors.clock.LocalClockFloor
     identity: {name: owner, type: String}
     fields:
       - {name: lower_unix_ms, type: Integer}
+    # the host registry and mutation schemas check the floor >= 0. No upper bound is
+    # shipped: the registry floor holds a system-clock sample, not a clock.md
+    # observation.
+    invariants:
+      - lower_unix_ms >= 0
     lifecycle:
       initial: Recorded
       states: [Recorded]
@@ -66,6 +71,13 @@ commands:
       - {name: owner, type: String}
       - {name: lower_unix_ms, type: Integer}
     outcomes:
+      # docs/local-er-metadata.md:124-125: the floors are owner anti-regression
+      # observations. The host re-records the same value (er.rs advance), so an
+      # equal floor is accepted and only a lower one is refused.
+      - name: regressed
+        when_subject:
+          predicate: lower_unix_ms > input.lower_unix_ms
+        error: connectors.clock.ClockFloorRegressed
       - name: advanced
         moves: connectors.clock.LocalClockFloor.advance
         instance: owner
@@ -76,12 +88,6 @@ commands:
             lower_unix_ms: input.lower_unix_ms
         sets:
           lower_unix_ms: input.lower_unix_ms
-    # ESS-LIMIT: docs/local-er-metadata.md:124-125 calls these floors owner
-    # anti-regression observations, so an advance never lowers lower_unix_ms.
-    # Declaring that needs `input.<field>` as an operand in a `when_subject`
-    # predicate (ESS value-expressions E6, #157, ESS story
-    # subject-guard-input-and-case-folding), not implemented in ESS 0.36.0; the
-    # rule is held by the host owner.
 
 events:
   - name: connectors.clock.LocalClockFloorRecorded
@@ -90,3 +96,22 @@ events:
     fields:
       - {name: owner, type: String}
       - {name: lower_unix_ms, type: Integer}
+
+errors:
+  - name: connectors.clock.ClockFloorRegressed
+    fields: [{name: owner, type: String}]
+
+views:
+  - name: connectors.clock.LocalClockFloors
+    source: connectors.clock.LocalClockFloor
+    consistency: read_your_writes
+    fields:
+      - {name: owner, type: String}
+      - {name: lower_unix_ms, type: Integer}
+      - {name: state, type: connectors.clock.LocalClockFloor.State}
+
+actors:
+  - name: connectors.clock.LocalHost
+    may:
+      - connectors.clock.AdvanceLocalClockFloor
+      - connectors.clock.RecordLocalClockFloor

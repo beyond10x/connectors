@@ -110,8 +110,8 @@ is outside this boundary, as in the CLI contract.
 `setup check` observes only an already-running Secret Service on
 `/run/user/<uid>/bus`, or the private configuration's explicit local
 `secret_service_socket`: it verifies the socket's owner and kernel peer UID, then the
-unique service owner's UID, and inspects the default non-session collection's lock
-state. It never activates a service, opens a secret-transfer session, unlocks a
+unique service owner's UID, and inspects the lock state of the `login` collection, addressed by object path
+(never through the `default` alias). It never activates a service, opens a secret-transfer session, unlocks a
 collection or reads a secret. A missing service/collection, inaccessible bus or
 wrong owner reports `unavailable`; a locked collection reports `locked`.
 This initial profile does not use an environment-supplied D-Bus address or a remote bus.

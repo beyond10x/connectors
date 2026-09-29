@@ -2,7 +2,9 @@
 //! Canonical mutation commands run through ESS-generated ports and typestate moves.
 //! Discovery/eligibility actions inject fictional host facts, never caller authority.
 use connectors_types::{
-    auth_bindings as a, connection_admission as c, discovery_state as d, mutations as m,
+    auth_bindings as a, connection_admission as c, discovery_state as d,
+    idempotency::RequestFingerprint,
+    mutations as m,
     obligation::UnmetObligation,
     primitives::{Timestamp, Uuid},
 };
@@ -15,7 +17,6 @@ pub mod walkthrough;
 struct Attempts {
     current: Option<m::AttemptRecordSnapshot>,
     next: u32,
-    now: u64,
 }
 #[derive(Clone, Default)]
 pub struct Behaviors(Rc<RefCell<Attempts>>);
@@ -44,11 +45,15 @@ impl m::obligations::PrepareAttemptBehavior for Behaviors {
             operation_id: input.operation_id,
             connection_ref: input.connection_ref,
             input_digest: input.input_digest,
+            request_fingerprint: input.request_fingerprint,
             approval_mode,
             approval_ref: input.approval_ref,
             approval_subject: input.approval_subject,
             idempotency_key: input.idempotency_key,
+            owner_nonce: input.owner_nonce,
+            publication_fence: input.publication_fence,
             settled_at: None,
+            terminal_result_json: None,
         });
         store.current = Some(m::AttemptRecordSnapshot {
             state: record.state(),
@@ -63,8 +68,9 @@ impl m::obligations::PrepareAttemptBehavior for Behaviors {
     }
 }
 // The from-state and move method must compile against ESS's actual typestate API.
+// Each accepted move copies exactly the fields its command declares under `sets`.
 macro_rules! move_attempt {
-    ($trait:ident,$method:ident,$input:ident,$outcome:ident,$from:ident,$transition:ident,$accepted:ident,$field:ident,$event:ident) => {
+    ($trait:ident,$method:ident,$input:ident,$outcome:ident,$from:ident,$transition:ident,$accepted:ident,$field:ident,$event:ident $(,$sets:ident)*) => {
         impl m::obligations::$trait for Behaviors {
             fn $method(&mut self, input: m::$input) -> Result<m::$outcome, UnmetObligation> {
                 let mut store = self.0.borrow_mut();
@@ -73,26 +79,18 @@ macro_rules! move_attempt {
                     .as_ref()
                     .is_none_or(|r| r.data.attempt_id != input.attempt_id)
                 {
-                    return Err(unmet(stringify!($input)));
+                    return Ok(m::$outcome::WrongStateUnknownInstance);
                 }
                 let snapshot = store.current.take().expect("checked above");
                 match snapshot.refine() {
                     m::AnyAttemptRecord::$from(record) => {
                         let moved = record.$transition();
+                        #[allow(unused_mut)]
                         let mut snapshot = m::AttemptRecordSnapshot {
                             state: moved.state(),
                             data: moved.into_data(),
                         };
-                        if !matches!(
-                            snapshot.state,
-                            m::AttemptRecordState::Prepared | m::AttemptRecordState::Dispatching
-                        ) {
-                            snapshot.data.settled_at = Some(Timestamp(format!(
-                                "2026-01-01T00:{:02}:{:02}Z",
-                                store.now / 60,
-                                store.now % 60
-                            )));
-                        }
+                        $(snapshot.data.$sets = Some(input.$sets);)*
                         store.current = Some(snapshot);
                         Ok(m::$outcome::$accepted {
                             $field: m::$event {
@@ -132,7 +130,9 @@ move_attempt!(
     abort,
     Aborted,
     attempt_aborted,
-    AttemptAborted
+    AttemptAborted,
+    settled_at,
+    terminal_result_json
 );
 move_attempt!(
     RecordCompletionBehavior,
@@ -143,7 +143,9 @@ move_attempt!(
     complete,
     Completed,
     attempt_completed,
-    AttemptCompleted
+    AttemptCompleted,
+    settled_at,
+    terminal_result_json
 );
 move_attempt!(
     RecordRefusalBehavior,
@@ -154,7 +156,9 @@ move_attempt!(
     refuse,
     Refused,
     attempt_refused,
-    AttemptRefused
+    AttemptRefused,
+    settled_at,
+    terminal_result_json
 );
 move_attempt!(
     RecordUncertaintyBehavior,
@@ -165,7 +169,8 @@ move_attempt!(
     lose_outcome,
     Indeterminate,
     attempt_indeterminate,
-    AttemptIndeterminate
+    AttemptIndeterminate,
+    terminal_result_json
 );
 impl m::obligations::AttemptStatesQuery for Behaviors {
     fn attempt_states(&self) -> Result<Vec<m::AttemptStates>, UnmetObligation> {
@@ -177,6 +182,32 @@ impl m::obligations::AttemptStatesQuery for Behaviors {
             .map(|r| m::AttemptStates {
                 attempt_id: r.data.attempt_id.clone(),
                 approval_mode: r.data.approval_mode,
+                instance_id: r.data.instance_id.clone(),
+                request_id: r.data.request_id.clone(),
+                operation_id: r.data.operation_id.clone(),
+                connection_ref: r.data.connection_ref.clone(),
+                input_digest: r.data.input_digest.clone(),
+                approval_ref: r.data.approval_ref.clone(),
+                idempotency_key: r.data.idempotency_key.clone(),
+                publication_fence: r.data.publication_fence.clone(),
+                state: r.state,
+            })
+            .collect())
+    }
+}
+impl m::obligations::AttemptSettlementsQuery for Behaviors {
+    fn attempt_settlements(&self) -> Result<Vec<m::AttemptSettlements>, UnmetObligation> {
+        Ok(self
+            .0
+            .borrow()
+            .current
+            .iter()
+            .map(|r| m::AttemptSettlements {
+                attempt_id: r.data.attempt_id.clone(),
+                request_fingerprint: r.data.request_fingerprint.clone(),
+                approval_mode: r.data.approval_mode,
+                approval_subject: r.data.approval_subject.clone(),
+                settled_at: r.data.settled_at.clone(),
                 state: r.state,
             })
             .collect())
@@ -320,7 +351,6 @@ impl Lab {
             *self = Self::new(&self.scenario.clone());
             return self.snapshot();
         }
-        self.behavior.0.borrow_mut().now = self.now;
         match action {
             "discover" => {
                 if self.observation == Some(d::ResourceObservationState::Withdrawn) {
@@ -466,10 +496,18 @@ impl Lab {
                             self.sends += 1;
                             self.record(action,"dispatched_once","The generated dispatch transition succeeded. The example then sent one fictional request; the ledger gate alone would not prove a send.");
                         }
-                        Ok(m::OpenDispatchOutcome::WrongState { .. }) => self.record(
+                        Ok(
+                            m::OpenDispatchOutcome::WrongState { .. }
+                            | m::OpenDispatchOutcome::WrongStateUnknownInstance,
+                        ) => self.record(
                             action,
                             "wrong_state",
                             "This attempt cannot win another dispatch gate. No request was sent.",
+                        ),
+                        Ok(m::OpenDispatchOutcome::SubjectMissing { .. }) => self.record(
+                            action,
+                            "approval_subject_missing",
+                            "The attempt needs an approval and carries no captured subject. No request was sent.",
                         ),
                         Err(_) => self.record(
                             action,
@@ -535,22 +573,39 @@ impl Lab {
             );
             return;
         }
+        let input_digest = if action == "conflicting_input" {
+            "input-b"
+        } else {
+            "input-a"
+        };
         let input = m::PrepareAttempt {
             instance_id: "example-service".into(),
             request_id: "request-1".into(),
             operation_id: "example.change".into(),
             connection_ref: "example-connection".into(),
-            input_digest: if action == "conflicting_input" {
-                "input-b"
-            } else {
-                "input-a"
-            }
-            .into(),
+            input_digest: input_digest.into(),
+            // Fictional host-resolved coordinates; never caller authority.
+            request_fingerprint: RequestFingerprint {
+                operation_ref: "example-service/example-adapter/example.change".into(),
+                connection_ref: "example-connection".into(),
+                connection_revision: "revision-1".into(),
+                contract_ref: "operations/v1alpha1".into(),
+                profile: "mutation".into(),
+                descriptor_revision: "descriptor-1".into(),
+                configuration_revision: "configuration-1".into(),
+                canonicalization_version: "adapter-v1-canonical-json".into(),
+                input_digest: input_digest.into(),
+                route: None,
+            },
             approval_mode: m::ApprovalMode::Required,
             approval_ref: Some("fictional-approval-1".into()),
             // The fictional approval counter supplies no verified host subject.
             approval_subject: None,
             idempotency_key: Some("example-key".into()),
+            // Fixed by preparation: the one-shot owner and the connection's
+            // publication fence at that moment. This example has one of each.
+            owner_nonce: Uuid("00000000-0000-4000-8000-0000000000a1".into()),
+            publication_fence: "example-fence-1".into(),
         };
         self.system
             .contract_examples
@@ -565,12 +620,24 @@ impl Lab {
             self.record(action, "no_attempt", "There is no attempt to update.");
             return;
         };
+        // Known settlement fixes its time from the injected clock; an unknown
+        // outcome has no settlement time. The retained result is the bounded
+        // effect classification, since this example has no provider payload.
+        let settled_at = Timestamp(format!(
+            "2026-01-01T00:{:02}:{:02}Z",
+            self.now / 60,
+            self.now % 60
+        ));
+        let result = |classification: &str| json!({ "classification": classification }).to_string();
         let (accepted, outcome) = match action {
             "lose_response" => (
                 matches!(
                     self.system
                         .contract_examples
-                        .record_uncertainty(m::RecordUncertainty { attempt_id: id }),
+                        .record_uncertainty(m::RecordUncertainty {
+                            attempt_id: id,
+                            terminal_result_json: result("unknown"),
+                        }),
                     Ok(m::RecordUncertaintyOutcome::Indeterminate { .. })
                 ),
                 "outcome_unknown",
@@ -579,7 +646,11 @@ impl Lab {
                 matches!(
                     self.system
                         .contract_examples
-                        .record_completion(m::RecordCompletion { attempt_id: id }),
+                        .record_completion(m::RecordCompletion {
+                            attempt_id: id,
+                            settled_at,
+                            terminal_result_json: result("applied"),
+                        }),
                     Ok(m::RecordCompletionOutcome::Completed { .. })
                 ),
                 "known_success",
@@ -588,7 +659,11 @@ impl Lab {
                 matches!(
                     self.system
                         .contract_examples
-                        .abort_prepared(m::AbortPrepared { attempt_id: id }),
+                        .abort_prepared(m::AbortPrepared {
+                            attempt_id: id,
+                            settled_at,
+                            terminal_result_json: result("not_attempted"),
+                        }),
                     Ok(m::AbortPreparedOutcome::Aborted { .. })
                 ),
                 "not_attempted",
@@ -788,6 +863,13 @@ mod tests {
         assert_eq!(result["attempt"], "Indeterminate");
         assert_eq!(result["provider_sends"], 1);
         assert_eq!(result["approval_redemptions"], 1);
+        let store = lab.behavior.0.borrow();
+        let data = &store.current.as_ref().unwrap().data;
+        assert_eq!(data.settled_at, None);
+        assert_eq!(
+            data.terminal_result_json.as_deref(),
+            Some(r#"{"classification":"unknown"}"#)
+        );
     }
     #[test]
     fn known_replay_requires_current_admission() {

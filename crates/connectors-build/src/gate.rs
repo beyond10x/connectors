@@ -257,8 +257,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         }
         println!("gate: collected {count} authored scenarios from {directory}; exit=0");
     }
-    // Compile generated obligations and authored traces. This checks the model;
-    // the mutation and auth runtime conformance bindings remain subsequent work.
+    // Compile generated obligations and authored traces. This checks the model.
     execute(
         Command::new(ess)
             .current_dir(root)

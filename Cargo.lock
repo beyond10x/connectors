@@ -545,7 +545,7 @@ dependencies = [
 
 [[package]]
 name = "connectors"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "base64 0.23.1",
  "clap",
@@ -563,15 +563,18 @@ dependencies = [
 
 [[package]]
 name = "connectors-build"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "clap",
  "connectors-catalog",
  "connectors-catalog-provider",
  "connectors-spec",
+ "entity-core 0.25.1",
  "ess-compiler",
+ "ess-conformance",
  "ess-domain",
  "ess-entity-runtime",
+ "ess-primitives",
  "ess-service-contract",
  "ess-synth",
  "jsonschema",
@@ -585,7 +588,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "connectors-core",
  "hex",
@@ -599,7 +602,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog-provider"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -632,7 +635,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-client"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "connectors-core",
  "futures-util",
@@ -645,7 +648,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-conformance"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "clap",
  "connectors-cli-contract",
@@ -660,7 +663,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-contracts"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -668,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-core"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "hex",
  "serde",
@@ -679,7 +682,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-host"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -720,7 +723,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-kubernetes"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -745,7 +748,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sdk"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -762,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-spec"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "clap",
  "connectors-core",
@@ -778,7 +781,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sql"
-version = "0.14.0"
+version = "0.15.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1112,6 +1115,21 @@ dependencies = [
  "ess-primitives",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
+]
+
+[[package]]
+name = "ess-conformance"
+version = "0.40.0"
+source = "git+https://github.com/beyond10x/ess?tag=0.40.0#eea1558d77cf6542c030cd444cd8289228530260"
+dependencies = [
+ "ess-compiler",
+ "ess-domain",
+ "ess-gen",
+ "ess-primitives",
+ "serde",
+ "serde_json",
+ "serde_yaml",
  "sha2 0.11.0",
 ]
 
