@@ -247,7 +247,11 @@ views:
 # - Injective `(instance_id, audit_ref)` qualification (audit.md:17-19): no compound
 #   uniqueness constraint.
 # - Attempt and connection references agreeing with the anchor's instance and with
-#   the attempt's connection (audit.md:52-53): no cross-record equality guard.
+#   the attempt's connection (audit.md:52-53): the guard over another record's
+#   field is `when_related:`, added in ESS 0.41 at source format ess/18. This
+#   specification is ess/15, which refuses it (unsupported_format_version), and
+#   the ESS 0.45 Entity Runtime lowering refuses it at any format
+#   (RelatedGuardUnsupported).
 # - The byte-identical repeat returning the original acknowledgement (audit.md:91-92;
 #   crates/connectors-host/src/local/audit.rs `append`): a `when_subject` over
 #   `final_observation.*` members selecting a `preserves:` branch validates, but
@@ -255,9 +259,12 @@ views:
 #   refuses every outcome of the command, `recorded` included; the Entity Runtime
 #   lowering additionally needs a command `response:` for that preserve.
 #   `when_subject_state` cannot be combined with a subject-fact guard either.
-# - `observation_id` equal to `final_observation.observation_id`: a `when:` guard
-#   validates, but synthesis cannot build an input that satisfies it and then
-#   refuses `recorded`. A payload cannot read the dotted input path directly.
+# - `observation_id` equal to `final_observation.observation_id` is not declared.
+#   ESS 0.45 synthesizes `recorded` under that `when:` guard and the Entity Runtime
+#   lowering carries it. The host fills `observation_id` from the appended
+#   observation itself (metadata/er.rs `command_arguments`), so no request reaching
+#   the runtime can disagree. The field exists only because a payload cannot read
+#   the dotted input path `input.final_observation.observation_id` directly.
 # - Trusted fact derivation, durable acknowledgement, clocks, retention and dispatch
 #   order: no provenance, durable-storage or trusted-time construct.
 # An early_refusal cannot satisfy the execution gate; an admitted anchor alone
