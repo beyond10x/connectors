@@ -1,0 +1,54 @@
+---
+format: aep.planning-md/3
+id: story:catalog-confluence-reads
+kind: story
+status: draft
+title: Confluence Cloud pages by space, updated since, with body
+relations:
+- decomposes: epic:catalog-knowledge-sources
+- depends_on: story:catalog-basic-auth-profile
+- depends_on: story:catalog-zendesk-reads
+scope:
+- confidence: cited
+  path: adapters/atlassian/upstream/confluence-v1-search.json
+- confidence: cited
+  path: adapters/atlassian/upstream/confluence-v2.json
+- confidence: cited
+  path: adapters/catalog/generated/bundles/confluence.bundle.json
+- confidence: cited
+  path: adapters/catalog/generated/bundles/index.json
+- confidence: cited
+  path: adapters/catalog/providers/confluence/operations.json
+- confidence: cited
+  path: adapters/catalog/tests/confluence.rs
+- confidence: cited
+  path: docs/catalog-confluence.md
+revision: 5
+---
+## Source
+
+Confluence Cloud REST OpenAPI documents (v2 for pages, v1 for CQL search), pinned by digest under `adapters/atlassian/upstream/`. Provider id `confluence`. Auth: basic (`story:catalog-basic-auth-profile`).
+
+## Operations (read-only)
+
+| id | endpoint | paging | end condition | time filter |
+|---|---|---|---|---|
+| `pages.changed` | `GET /wiki/rest/api/search` with CQL `space = "<key>" and type = page and lastmodified >= "<t>"` | `start`, `limit` | no `_links.next` | CQL `lastmodified >= "<t>"` |
+| `space.pages` | `GET /wiki/api/v2/spaces/{id}/pages` | `cursor`, `limit` | no `_links.next` | none (v2 has no updated-since filter); deltas come from `pages.changed` |
+| `page.get` | `GET /wiki/api/v2/pages/{id}?body-format=storage` | single item | n/a | n/a |
+
+The fixture test for `page.get` asserts the request carries `body-format=storage`.
+
+## Shared surfaces
+
+- Own files: `adapters/catalog/providers/confluence/operations.json`, `adapters/catalog/generated/bundles/confluence.bundle.json`, `docs/catalog-confluence.md`, `adapters/catalog/tests/confluence.rs`, and the pinned source `adapters/atlassian/upstream/confluence-v2.json` and `adapters/atlassian/upstream/confluence-v1-search.json`.
+- Shared and serialized through `depends_on` (see the epic): `adapters/catalog/generated/bundles/index.json`, to which this story adds its row on top of the previous provider's.
+
+## Acceptance
+
+- `operations.json` exposes exactly the ids above, each `effect: read`; `adapters/catalog/tests/confluence.rs` pins that exact id list, so a renamed or dropped id fails the gate.
+- `operations.json` loads against the committed bundle, which refuses any `operation_id` the pinned document lacks; `docs/catalog-confluence.md` cites, per operation, the pinned document's `operationId` and path, so a difference from the table above shows as a changed row.
+- `docs/catalog-confluence.md` states, per list operation, its paging parameters, its end condition and its time-window filter (or how deltas are taken where there is none).
+- Per operation, a recorded-fixture test asserts the exact request the provider sends (path, query including the time filter, auth header) and that `operations invoke` returns the fixture body byte-identical.
+- For every list operation in the table, a paging test walks two fixture pages and asserts the walk stops at that operation's documented end condition.
+- `adapters/catalog/tests/bundle_drift.rs` reproduces this provider's bundle byte for byte; no live credential is needed for the gate.
