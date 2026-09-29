@@ -24,24 +24,27 @@ Otherwise the binding uses the absolute XDG configuration/state directories, or
 the corresponding directories beneath the user's home. There is no current
 directory search or migration from an existing installed Connectors deployment.
 
-Initialization creates an empty `connectors-local/1` TOML configuration bound to
+Initialization creates an empty `connectors-local/2` TOML configuration bound to
 the effective Linux UID, owner-only directories and a private SQLite database.
 It refuses an existing configuration without replacing it. Failed or uncertain
 filesystem publication is not reported as successful initialization. A database
 left by interrupted initialization contains no credentials or usable connection.
 
 Configured entries follow the
-[reviewed configuration example](../contracts/cli/v1alpha1/fixtures/config-valid.toml).
+[reviewed configuration example](../contracts/cli/v1alpha1/fixtures/config-valid.toml),
+a `connectors-local/1` file; an entry added to an initialized file also carries
+`private_protocol`, as described below.
 Use actual installed executable paths and digests when adding entries. The
 example's fictional executables are not runnable artifacts. Inspection never
 installs or starts an adapter, and `setup check` reports unavailable or changed
 artifacts as failed prerequisites. Credentials never belong in configuration or
 executable arguments.
 
-The parser also accepts an explicitly authored `connectors-local/2` configuration.
-Every adapter in that format requires `private_protocol`, exactly
-`connectors-private/1` or `connectors-private/2`. Version one refuses that field;
-setup still writes version one and loading never rewrites a file. An explicit
+Setup writes `connectors-local/2`, and the parser still accepts an existing
+`connectors-local/1` configuration. Every adapter in version two requires
+`private_protocol`, exactly `connectors-private/1` or `connectors-private/2`.
+Version one refuses that field and keeps its implicit private version one;
+loading never rewrites a file. An explicit
 selection changes the executable selection digest and requires fresh admission.
 Private version two supplies a bounded prepare/commit/cancel transport port with
 one-use pending writes. Production GitLab does not select it yet: approval issuance
