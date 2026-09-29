@@ -20,9 +20,11 @@ independent adapter-model compilation and AEP validation. It uses a task-owned t
 its `msrv/` subdirectory (default `target/msrv`). This local repository has no
 configured CI or publication target.
 
-The local Entity Runtime/Eventlog adapter rebuilds complete recorded snapshots
-while processing mutations. A long-lived fixture accumulates replay work, so
-unoptimized dev/test binaries can exhaust the synchronous bridge's 30-second
+The local Entity Runtime/Eventlog adapter replays the complete recorded store
+once per process and store; later opens and writes in that process read back
+only what was appended since. Every verified read and every batch execution
+still costs time that grows with the store, so a long-lived fixture can make
+unoptimized dev/test binaries exhaust the synchronous bridge's 30-second
 operation deadline. Both dev (including the actual CLI) and test profiles use
 `opt-level = 1`; debug assertions and overflow checks remain enabled. The
 release profile and the bridge deadline are unchanged.
