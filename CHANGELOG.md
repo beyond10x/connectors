@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.15.1 — 2026-09-29
+
+### Fixed
+
+- After a read use's expiry was recorded, every clock-only observation failed with
+  `metadata_unavailable`: `connections status`, `connections list`, and the observation
+  before `revalidate` and `operations invoke`. The observation check compared the SQL
+  projection, which drops expired read uses and cursors, with the full Entity Runtime
+  state. It now makes the same exception the write path already made. The defect came
+  in with the Entity Runtime metadata authority in 0.12.0.
+
+### Tests
+
+- `observation_after_a_recorded_read_use_expiry_is_admitted` reproduces the failure.
+- `the_same_identity_connects_again_after_revoke` pins that revoke ends one connection,
+  not the identity.
+
 ## 0.15.0 — 2026-09-29
 
 Hardened with six ESS hardening techniques and a design review of the 13 domains the
