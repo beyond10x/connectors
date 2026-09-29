@@ -1,6 +1,15 @@
 mod legacy;
 mod local;
 
+/// Answers the root `--version` and `-V`, and nothing else.
+///
+/// The grouped command tree is generated from the ESS CLI binding, whose format
+/// carries no version, so the version is declared here from this package's own.
+/// Every other argument list is declined to the generated parser unchanged.
+#[derive(clap::Parser)]
+#[command(name = "connectors", version, disable_help_flag = true)]
+struct VersionFlag;
+
 fn main() {
     let args: Vec<_> = std::env::args_os().collect();
     if args.get(1).is_some_and(|arg| arg == "__connectors-owner") {
@@ -15,6 +24,12 @@ fn main() {
             Err(connectors_host::local::owner::Code::InvalidInput.into())
         };
         std::process::exit(if result.is_ok() { 0 } else { 1 });
+    }
+    if let Err(error) = <VersionFlag as clap::Parser>::try_parse_from(&args)
+        && error.kind() == clap::error::ErrorKind::DisplayVersion
+    {
+        print!("{error}");
+        return;
     }
     if args
         .get(1)
