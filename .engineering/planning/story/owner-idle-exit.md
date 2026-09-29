@@ -2,8 +2,10 @@
 format: aep.planning-md/3
 id: story:owner-idle-exit
 kind: story
-status: draft
+status: active
 title: An owner with no work exits
+relations:
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: contracts/cli/v1alpha1/owner.md
@@ -13,7 +15,10 @@ scope:
   path: crates/connectors-host/src/local/owner/supervisor.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-29T21:31:57Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-09-29T21:31:57Z", actor: "human:timo", revision: 4}
 ---
 ## Problem
 Owners never exit when idle: on 2026-09-29 owners from 2026-09-12..14 sandbox runs had run 14-16 days.
