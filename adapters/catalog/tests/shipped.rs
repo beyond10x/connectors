@@ -72,3 +72,53 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         assert_eq!(engine.effect(id), Some(Effect::Read), "`{id}`");
     }
 }
+
+/// GitLab serves at most 100 items per page, so every shipped selection whose
+/// source operation takes a `per_page` query parameter bounds it at 100, and
+/// no other selection carries a bound. A list read added without its bound
+/// fails here, not in a caller's truncated walk.
+#[test]
+fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
+    use connectors_catalog::inventory::Location;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let shipped: Value = serde_json::from_slice(
+        &std::fs::read(root.join("providers/gitlab/operations.json")).unwrap(),
+    )
+    .unwrap();
+    let bundle = bundle::load(&root.join("generated/bundles"), "gitlab").unwrap();
+    let mut paged = Vec::new();
+    for selection in shipped["operations"].as_array().unwrap() {
+        let id = selection["id"].as_str().unwrap();
+        let operation = bundle
+            .inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == selection["operation_id"].as_str())
+            .unwrap();
+        let pages = operation
+            .parameters
+            .iter()
+            .any(|p| p.name == "per_page" && p.location == Location::Query);
+        let expected = if pages {
+            paged.push(id);
+            serde_json::json!({"per_page": {"minimum": 1, "maximum": 100}})
+        } else {
+            Value::Null
+        };
+        assert_eq!(selection["bounds"], expected, "`{id}`");
+    }
+    paged.sort();
+    assert_eq!(
+        paged,
+        [
+            "issues.list",
+            "merge_requests.list",
+            "pipeline.jobs",
+            "pipelines.list",
+            "project.events",
+            "projects.list",
+            "releases.list",
+            "tags.list",
+        ]
+    );
+}
