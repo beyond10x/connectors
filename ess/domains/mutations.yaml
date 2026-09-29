@@ -367,8 +367,13 @@ views:
 # approval spend (contracts/operations/v1alpha1/semantics.md:107) needs a guard on
 # another record's existence (an ApprovalRedemption for this attempt), and the
 # per-instance attempt capacity (docs/local-mutation-ledger.md:99-100) a count
-# across records; ESS 0.40 has neither (`affects:` sets fields on other rows but
-# does not select or refuse by them). Result byte bounds are host configuration.
+# across records. `when_related:` (ESS 0.41, source format ess/18) guards on
+# another row only by that row's identity, and an ApprovalRedemption is keyed by
+# its receipt_id, not by attempt_id; this specification is ess/15, which refuses
+# it (unsupported_format_version), and the ESS 0.45 Entity Runtime lowering
+# refuses it at any format (RelatedGuardUnsupported). ESS 0.45 has no count
+# across records (`affects:` sets fields on other rows but does not select or
+# refuse by them). Result byte bounds are host configuration.
 # ESS-LIMIT: Observation's classification mapping is the normative table in the
 # contract. ESS 0.40 has no derived-value expression that computes a field from
 # lifecycle state or transport data, so none derives it here.
