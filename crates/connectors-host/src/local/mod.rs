@@ -20,6 +20,8 @@ pub mod owner;
 pub mod protected;
 pub mod registry;
 pub mod runtime;
+#[cfg(test)]
+mod security_replay_tests;
 
 /// Closed, credential-free local failures. Never include OS, parser or DB text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
