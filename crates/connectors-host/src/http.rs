@@ -302,7 +302,9 @@ impl AuthenticatedWrite for ScopedWrite {
                 headers.insert(name.to_string(), value.to_owned());
             }
         }
-        let body = connectors_client::bounded(response).await?;
+        let body = connectors_client::bounded(response)
+            .await
+            .map_err(body_error)?;
         Ok(HttpResponse {
             status,
             headers,
@@ -354,7 +356,9 @@ impl AuthProbe for ScopedProbe {
                 headers.insert(name.to_string(), value.to_owned());
             }
         }
-        let body = connectors_client::bounded(response).await?;
+        let body = connectors_client::bounded(response)
+            .await
+            .map_err(body_error)?;
         Ok(HttpResponse {
             status,
             headers,
@@ -363,9 +367,25 @@ impl AuthProbe for ScopedProbe {
     }
 }
 
+/// The response's status and headers have arrived, so a deadline that passes
+/// while its body is read is the provider's timeout, like `provider_error`'s.
+fn body_error(error: Error) -> Error {
+    if error.code == ErrorCode::Timeout {
+        error.answered()
+    } else {
+        error
+    }
+}
+
 fn provider_error(error: reqwest::Error) -> Error {
     if error.is_timeout() {
-        Error::new(ErrorCode::Timeout, "provider request timed out")
+        let timeout = Error::new(ErrorCode::Timeout, "provider request timed out");
+        // A connection that never opened sent nothing to the provider.
+        if error.is_connect() {
+            timeout
+        } else {
+            timeout.answered()
+        }
     } else {
         Error::unavailable()
     }
@@ -381,7 +401,9 @@ impl AuthenticatedHttp for ScopedHttp {
             .iter()
             .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), v.to_owned())))
             .collect();
-        let body = connectors_client::bounded(response).await?;
+        let body = connectors_client::bounded(response)
+            .await
+            .map_err(body_error)?;
         Ok(HttpResponse {
             status,
             headers,
@@ -476,6 +498,46 @@ mod tests {
         }
         assert!(http.probe_capability(&["apis", "v1", "reviews"]).is_ok());
         assert!(http.probe_capability(&["a"; 16]).is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_sent_request_whose_deadline_passes_is_marked_as_the_providers_timeout() {
+        // A provider that accepts the request and never answers.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            drop(socket);
+        });
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let error = client
+            .post(format!("http://{address}/write"))
+            .body("{}")
+            .send()
+            .await
+            .unwrap_err();
+        let error = provider_error(error);
+        assert_eq!(error.code, ErrorCode::Timeout);
+        assert!(error.upstream_answer, "a sent request's timeout");
+        server.abort();
+        // Nothing listening: no request was sent, so no provider answered.
+        let closed = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = closed.local_addr().unwrap();
+        drop(closed);
+        let error = client
+            .get(format!("http://{address}/"))
+            .send()
+            .await
+            .unwrap_err();
+        let error = provider_error(error);
+        assert_eq!(error.code, ErrorCode::Unavailable);
+        assert!(!error.upstream_answer);
     }
 
     #[tokio::test]

@@ -471,30 +471,8 @@ pub(in crate::local::owner) fn execute(
         }
     };
     drop(control_guard);
-    let (classification, outcome) = match native_result.effect {
-        runtime::WriteEffect::Applied => (
-            Classification::Applied,
-            match native_result.result {
-                Ok(value) => StoredOutcome::Success { value },
-                Err(error) => safe_failure(Error::from(error).into()),
-            },
-        ),
-        runtime::WriteEffect::Refused => (
-            Classification::Refused,
-            safe_failure(
-                native_result
-                    .result
-                    .err()
-                    .map(Error::from)
-                    .unwrap_or_else(|| Code::ServiceFailure.into())
-                    .into(),
-            ),
-        ),
-        runtime::WriteEffect::Unknown => (
-            Classification::Unknown,
-            safe_failure(Code::OutcomeUnknown.into()),
-        ),
-    };
+    let (classification, outcome) = native_outcome(native_result);
+    let outcome = StoredOutcome::from(outcome);
     let payload = stored_value(&outcome)?;
     let settled = ledger.settle(
         attempt,
