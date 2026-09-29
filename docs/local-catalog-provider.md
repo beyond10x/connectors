@@ -90,6 +90,26 @@ The complete configuration used against the sandbox is
   the read that names the credential's subject, an optional read that lists its
   granted scopes, and the scopes the profile requires. The token itself enters
   through the usual protected entry and custody; the file never holds it.
+- `auth.scheme` is `token` when omitted: the protected entry is `{"token":"..."}`
+  and travels in `header`, prefixed `Bearer ` when `bearer` is true. `basic` is
+  HTTP basic for providers whose API tokens are used with an account name: the
+  protected entry is `{"account":"...","token":"..."}` and every request carries
+  `Authorization: Basic base64(account:token)`. A basic profile must state
+  `"header": "Authorization"` and `"bearer": false`, and names the account
+  prompt in `account_label`; the account may not contain a colon. The profile is
+  offered to the host as `http_basic` with the fields `account` and `token`.
+
+```json
+"auth": {
+  "profile": "tracker.api-token",
+  "scheme": "basic",
+  "header": "Authorization",
+  "bearer": false,
+  "account_label": "Account email",
+  "label": "API token",
+  "identity": {"path": "myself", "kind": "tracker.user", "subject_pointer": "/accountId"}
+}
+```
 - `operations_file` names a shipped selection set; its `provider` must match. An
   inline `operations` list is accepted as well and comes first. The selection
   ids, in either place, are what the host permits and the approval policy names.
@@ -159,7 +179,8 @@ args = ["--local-config", "/absolute/path/gitlab-catalog.json"]
 Credentials never belong in TOML, native configuration, executable arguments or
 environment variables. Connect with the hidden token prompt on your controlling
 terminal, or `--credential-file` / `--credential-stdin` carrying the protected
-`{"token":"..."}` document from an owner-only source:
+`{"token":"..."}` document (`{"account":"...","token":"..."}` for a basic
+profile) from an owner-only source:
 
 ```sh
 target/release/connectors --output json connections connect --adapter forge --profile gitlab.pat --credential-prompt
@@ -226,8 +247,10 @@ appeared, which opened merge request 11 at the moved head and was classified
   supplies it and validated only by the provider.
 - Header and cookie parameters are not carried; a selection whose operation
   requires one is refused at load.
-- One authentication profile per configuration, a token in one header. OAuth,
-  basic and signing profiles are not offered by this provider yet.
+- One authentication profile per configuration: a token in one header, or a
+  basic profile (`"scheme": "basic"`) sending an account and API token as HTTP
+  basic. OAuth and signing profiles are not offered by this provider yet. The
+  basic profile has run only against the local fixture, not a live provider.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
 - A guard compares scalars for equality. It cannot express "any of", ordering or

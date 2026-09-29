@@ -47,6 +47,7 @@ pub enum Code {
     StaleCursor,
     DescriptionUnavailable,
     ServiceFailure,
+    OwnerBuildMismatch,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -320,6 +321,10 @@ enum Request {
         challenge: String,
         configuration: PathBuf,
         authority: String,
+        /// SHA-256 of the caller's own executable. Absent only from callers built
+        /// before the build handshake; an owner that predates it refuses the field.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        build: Option<String>,
     },
     Begin {
         adapter: String,
@@ -354,6 +359,10 @@ enum Request {
     Shutdown {
         host_incarnation: String,
     },
+    /// Asks for the owner's executable digest after a greeting without `build`.
+    /// An owner from before the build handshake does not know this request and
+    /// closes the stream without a reply.
+    Build,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
@@ -363,6 +372,9 @@ enum Reply {
         challenge: String,
         host_incarnation: String,
         authority: String,
+        /// SHA-256 of the owner's own executable, returned only when asked.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        build: Option<String>,
     },
     Capture {
         acquisition: String,

@@ -7,7 +7,7 @@ title: Zendesk tickets and comments through the catalog provider
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-basic-auth-profile
-- depends_on: story:catalog-jira-cloud-reads
+- depends_on: story:catalog-grafana-reads
 scope:
 - confidence: cited
   path: adapters/catalog/generated/bundles/index.json

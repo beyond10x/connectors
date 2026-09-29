@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The catalog provider accepts an HTTP basic authentication profile: `auth.scheme: basic`
+  with `account_label`, and a credential document `{"account", "token"}` entered through
+  `--credential-file` or `--credential-stdin`. The provider sends
+  `Authorization: Basic base64(account:token)`. Token configurations serialize as before,
+  so existing configuration revisions do not move.
+- The CLI refuses an owner process that runs a different executable build with
+  `owner_build_mismatch` and next action `stop_owner`, including an owner from before
+  this handshake. It never stops or replaces the owner itself. A same-build owner at
+  capacity still answers `capacity`.
+
+### Tests
+
+- The repository gate runs the local metadata authority's synthesized conformance suite
+  against the definitions the host embeds: 285 scenarios, all passed, none unsupported
+  (previously 212 passed and 73 unsupported, 71 of them kernel invariant violations
+  caused by placeholder inputs).
+- `PrepareAttempt`, `ReserveKey`, `RecordApprovalRedemption` and `AcknowledgeAnchor`
+  declare `fixture_inputs`; the conformance target supplies each named fixture and
+  refuses an unknown name as an error rather than a default.
+- A kernel invariant violation, or an invariant the kernel cannot observe, during a
+  conformance run now fails the scenario instead of counting as unsupported.
+- The mutation audit of the component kills 176 of 176 live mutants (88 stillborn).
+
+### Specification
+
+- The `credential_evidence` admission and read-use views expose `request_id`,
+  `operation_ref`, `connection_ref`, `custody_version_ref` and `publication_fence`.
+
 ## 0.15.1 — 2026-09-29
 
 ### Fixed
