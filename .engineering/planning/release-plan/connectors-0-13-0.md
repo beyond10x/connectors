@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: release-plan:connectors-0-13-0
 kind: release-plan
-status: draft
+status: implemented
 title: 'Connectors 0.13.0: ess/13 and the newest ESS and AEP'
-revision: 1
+revision: 2
+transitions:
+- {from: "draft", to: "implemented", at: "2026-09-29T00:53:05Z", actor: "human:timo", revision: 2}
 ---
 ## Scope
 
