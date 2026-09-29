@@ -1850,6 +1850,18 @@ fn field_sql(fields: &Map<String, Value>, column: &Column) -> Result<SqlValue> {
     }
 }
 
+/// Only these two transient SQL rows disappear after their recorded expiry;
+/// their Entity Runtime history remains. Every other absence is a deletion.
+fn expired_transient(row: &RowImage) -> bool {
+    matches!(
+        (row.entity.as_str(), row.lifecycle_state.as_str()),
+        (
+            "connectors.cli.ConnectionListCursor" | "connectors.credential_evidence.ReadUse",
+            "Expired"
+        )
+    )
+}
+
 fn projects(table: &Table, row: &RowImage) -> bool {
     match table.table {
         "registry_clock" => row.fields.get("owner") == Some(&json!("registry")),
@@ -2533,6 +2545,7 @@ pub(super) fn persist(
                     current.fields != next.fields || current.lifecycle_state != next.lifecycle_state
                 }
                 (None, None) => false,
+                (Some(current), None) => !expired_transient(current),
                 _ => true,
             };
             changed && !runtime_record_key(key)
@@ -2550,6 +2563,7 @@ pub(super) fn persist(
                     current.fields != next.fields || current.lifecycle_state != next.lifecycle_state
                 }
                 (None, None) => false,
+                (Some(current), None) => !expired_transient(current),
                 _ => true,
             };
             changed && !registry_clock_key(key)
@@ -2592,14 +2606,7 @@ pub(super) fn persist(
                         &next,
                         command,
                     )?);
-                } else if !matches!(
-                    (current.entity.as_str(), current.lifecycle_state.as_str()),
-                    (
-                        "connectors.cli.ConnectionListCursor"
-                            | "connectors.credential_evidence.ReadUse",
-                        "Expired"
-                    )
-                ) {
+                } else if !expired_transient(current) {
                     // Only these two transient SQL rows disappear after their
                     // recorded expiry. Every other deletion would discard an
                     // authoritative subject without an authored command.
