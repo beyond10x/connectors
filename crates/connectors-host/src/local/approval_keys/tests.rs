@@ -484,7 +484,7 @@ fn production_cli_key_journey() {
     run(&["setup", "init"]);
     let original = std::fs::read_to_string(&config).unwrap();
     let configured = format!(
-        "secret_service_socket={}\n{original}\n[adapters.forge]\ninstance_id='fixture-instance'\nadapter_id='fixture-adapter'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.forge.executable]\npath='/not-installed/adapter'\nsha256='{}'\nargs=[]\n",
+        "secret_service_socket={}\n{original}\n[adapters.forge]\ninstance_id='fixture-instance'\nadapter_id='fixture-adapter'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='/not-installed/adapter'\nsha256='{}'\nargs=[]\n",
         toml::Value::String(f.socket.to_str().unwrap().into()),
         "a".repeat(64)
     );
