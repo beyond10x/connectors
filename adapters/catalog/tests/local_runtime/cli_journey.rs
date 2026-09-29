@@ -531,3 +531,109 @@ fn adversary_basic_cli_wrong_token_is_unauthorized_and_malformed_is_invalid_inpu
     );
     assert_eq!(provider.count(), before);
 }
+
+#[track_caller]
+fn refused_data(output: Output) -> Value {
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+    assert!(!String::from_utf8_lossy(&output.stderr).contains("fixture-pat-one"));
+    let value: Value = serde_json::from_slice(&output.stderr).unwrap();
+    value["error"]["data"].clone()
+}
+
+/// One connection reads a project the provider answers and a project the
+/// provider refuses. The provider's refusal is reported at `dispatch`; the
+/// host's own refusal of an operation the configuration does not grant still
+/// reads `admission`.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission() {
+    let provider = Provider::new();
+    let custody = Custody::new(provider.root.path());
+    let cli = Cli::new(provider.root.path());
+    configure(&cli, &provider, &custody);
+    let credential = provider.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let reference = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "gitlab",
+        "--profile",
+        "gitlab.pat",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let description = success(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "gitlab",
+        "--operation",
+        "project.get",
+    ]));
+    let schema = description["schema"].as_str().unwrap().to_owned();
+    let descriptor = description["revision"].as_str().unwrap().to_owned();
+    let read = |operation: &str, project: &str| {
+        let input = json!({"id": project}).to_string();
+        cli.run(&[
+            "operations",
+            "invoke",
+            "--adapter",
+            "gitlab",
+            "--connection",
+            &reference,
+            "--operation",
+            operation,
+            "--schema",
+            &schema,
+            "--revision",
+            &descriptor,
+            "--input-json",
+            &input,
+        ])
+    };
+
+    let answered = success(read("project.get", "org/project"));
+    assert_eq!(
+        serde_json::from_str::<Value>(answered["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        7
+    );
+
+    let before = provider.count();
+    let refused = refused_data(read("project.get", "org/fixture-refused"));
+    assert!(provider.count() > before, "the provider was asked");
+    assert_eq!(refused["code"], "forbidden", "{refused}");
+    assert_eq!(refused["stage"], "dispatch", "{refused}");
+    assert_eq!(refused["next_action"], "request_permission", "{refused}");
+
+    let missing = refused_data(read("project.get", "org/fixture-missing"));
+    assert_eq!(missing["stage"], "dispatch", "{missing}");
+    assert_eq!(missing["next_action"], "none", "{missing}");
+    assert_eq!(missing["code"], "service_failure", "{missing}");
+    assert_eq!(missing["service_code"], "not_found", "{missing}");
+
+    // The same connection still reads the answered project afterwards.
+    success(read("project.get", "org/project"));
+
+    let before = provider.count();
+    // `file.get` is not among the configuration's granted operations.
+    let admission = refused_data(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "gitlab",
+        "--operation",
+        "file.get",
+    ]));
+    assert_eq!(provider.count(), before, "the provider was never asked");
+    assert_eq!(admission["code"], "forbidden", "{admission}");
+    assert_eq!(admission["stage"], "admission", "{admission}");
+    assert_eq!(
+        admission["next_action"], "request_permission",
+        "{admission}"
+    );
+}
