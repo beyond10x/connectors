@@ -133,6 +133,9 @@ commands:
       - {name: descriptor_revision, type: "Optional<String>"}
       - {name: recorded_at, type: Timestamp}
       - {name: attempt_id, type: "Optional<connectors.mutations.AttemptId>"}
+    fixture_inputs:
+      stage: admission-stage
+      activity: invoke-activity
     outcomes:
       - name: anchored
         when: decision == allow

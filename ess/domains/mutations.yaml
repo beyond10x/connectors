@@ -180,6 +180,8 @@ commands:
       - {name: idempotency_key, type: "Optional<String>"}
       - {name: owner_nonce, type: Uuid}
       - {name: publication_fence, type: String}
+    fixture_inputs:
+      request_fingerprint: canonical-request-fingerprint
     outcomes:
       - name: prepared
         creates: connectors.mutations.AttemptRecord
