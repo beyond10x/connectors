@@ -49,6 +49,21 @@ pub enum Code {
     ServiceFailure,
     OwnerBuildMismatch,
 }
+/// Who refused. The same [`Code`] can be the host's own admission refusal or
+/// the provider's answer to a dispatched call; the CLI reports them at
+/// different stages.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Origin {
+    #[default]
+    Host,
+    Provider,
+}
+impl Origin {
+    fn is_host(&self) -> bool {
+        *self == Self::Host
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Error {
@@ -57,6 +72,8 @@ pub struct Error {
     pub acquisition: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_code: Option<connectors_core::ErrorCode>,
+    #[serde(default, skip_serializing_if = "Origin::is_host")]
+    pub origin: Origin,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -64,6 +81,7 @@ impl From<Code> for Error {
             code,
             acquisition: None,
             service_code: None,
+            origin: Origin::Host,
         }
     }
 }
@@ -107,7 +125,7 @@ impl From<runtime::Failure> for Error {
         let code = match e {
             F::InvalidConfiguration => Code::InvalidConfiguration,
             F::InvalidInput => Code::InvalidInput,
-            F::Forbidden => Code::Forbidden,
+            F::Forbidden | F::ProviderForbidden => Code::Forbidden,
             F::NotFound => Code::NotFound,
             F::Unavailable => Code::Unavailable,
             F::Timeout => Code::Timeout,
@@ -135,10 +153,21 @@ impl From<runtime::Failure> for Error {
             F::ProviderInternal => Some(connectors_core::ErrorCode::Internal),
             _ => None,
         };
+        // Provider only where the child reports the upstream's own answer to a
+        // dispatched call (see `Failure::from_provider`). A child's plain
+        // `Forbidden` is a refusal it raised from its own configuration before
+        // any request, or a connection probe's 403, and keeps reading as
+        // admission; the host's own admission refusals are owner codes that
+        // never pass through here.
+        let origin = match e {
+            F::ProviderForbidden | F::ProviderNotFound => Origin::Provider,
+            _ => Origin::Host,
+        };
         Self {
             code,
             acquisition: None,
             service_code,
+            origin,
         }
     }
 }

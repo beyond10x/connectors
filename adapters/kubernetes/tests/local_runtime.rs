@@ -1051,7 +1051,8 @@ fn an_out_of_scope_release_and_an_unreadable_namespace_are_distinct_from_an_empt
     assert_eq!(cluster.count(), before);
 
     // In scope, but the credential cannot read that namespace's release
-    // Secrets: the cluster is asked and answers with a denial.
+    // Secrets: the cluster is asked and answers with a denial, which is the
+    // provider's refusal and not the configured scope's.
     let before = cluster.count();
     assert_eq!(
         invoke(
@@ -1061,7 +1062,7 @@ fn an_out_of_scope_release_and_an_unreadable_namespace_are_distinct_from_an_empt
             &token(true),
             json!({"namespace":"denied","release":"api","limit":10})
         ),
-        Err(Failure::Forbidden)
+        Err(Failure::ProviderForbidden)
     );
     assert_eq!(cluster.count(), before + 1);
 
