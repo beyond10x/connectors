@@ -218,7 +218,7 @@ impl Registry {
     /// new retirement time or infer that unknown publication never happened.
     pub fn retirements(&self, now: u64) -> Result<Vec<Retirement>> {
         self.transaction(now, false, |tx, authority, now| {
-            let candidates = tx.prepare("SELECT m.version_id,m.retirement_fence,c.scope_id FROM registry_materials m JOIN registry_connections c ON c.connection_ref=m.connection_ref WHERE m.deleted=0 AND m.retirement_fence IS NOT NULL AND m.delete_not_before_ms<=?1 ORDER BY m.delete_not_before_ms LIMIT 16").map_err(db)?
+            let candidates = tx.prepare("SELECT m.version_id,m.retirement_fence,c.scope_id FROM registry_materials m JOIN registry_connections c ON c.connection_ref=m.connection_ref WHERE m.deleted=0 AND m.retirement_fence IS NOT NULL AND m.delete_not_before_ms<=?1 ORDER BY m.delete_not_before_ms,m.version_id LIMIT 16").map_err(db)?
                 .query_map([timestamp(now)?], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?))).map_err(db)?.collect::<std::result::Result<Vec<_>,_>>().map_err(db)?;
             let mut ready = Vec::new();
             for (id,fence,scope) in candidates {

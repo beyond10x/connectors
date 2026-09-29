@@ -77,7 +77,7 @@ types:
       - {name: adapter, type: String}
       - {name: observation, type: connectors.clock.Observation}
     # ESS-LIMIT: clock.md:84 orders an observation (upper >= lower). The comparison
-    # is writable here, but ESS 0.36 `generate cli` refuses any invariant on a CLI
+    # is writable here, but ESS 0.40 `specify cli` refuses any invariant on a CLI
     # type ("unsupported invariants or union semantics"), so it is not declared.
   - name: connectors.cli.ApprovalKeyState
     kind: enum
@@ -630,9 +630,12 @@ types:
     fields:
       - {name: result, type: "String"}
 
-# ESS-LIMIT executable obligations (ESS 0.36 has no file-system, process, terminal
+# ESS-LIMIT executable obligations (ESS 0.40 has no file-system, process, terminal
 # or OS-permission construct, no TOML/JSON reader-closure or codec construct, no
-# cross-record or multi-record-transaction construct and no redaction construct):
+# redaction construct, no count over the records of an entity, and no guard that
+# compares a subject field with a field of a related record; its only
+# multi-record effect, `affects:` (ess/16), sets fields and cannot take a
+# transition, and the Entity Runtime lowering refuses it (SetEffectUnsupported)):
 # context/path and selector resolution, bounds,
 # closed TOML decoding/defaults, JSON carrier parsing/duplicate-key/depth checks,
 # dynamic input/result schema resolution, status one-of, acquisition state/reason
@@ -677,6 +680,11 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
+    # contracts/cli/v1alpha1/semantics.md:294, docs/local-connection-registry.md:105-106;
+    # the host refuses any other limit before recording (registry/observation.rs `list`).
+    invariants:
+      - page_limit >= 1
+      - page_limit <= 500
     relations:
       - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
     lifecycle:
@@ -687,6 +695,11 @@ entities:
         - {name: expire, from: [Active], to: Expired}
     # This is the opaque cross-process stale-page fence. It grants no provider,
     # connection or dispatch authority and is retained after logical expiry.
+    # ESS-LIMIT: a cursor is stale when its registry_epoch differs from the
+    # ServiceConfiguration's, which publication, revoke and known invalidity advance
+    # (docs/local-connection-registry.md:107-108); the 300 s expiry and the 10,000
+    # live-cursor cap (:104) are host rules. ESS 0.40 has no guard over a related
+    # record's field, no count over an entity's records and no trusted time.
 
 errors:
   - name: connectors.cli.CursorStateConflict
@@ -802,3 +815,33 @@ events:
     fields: [{name: cursor_id, type: Uuid}]
   - name: connectors.cli.ConnectionListCursorExpired
     fields: [{name: cursor_id, type: Uuid}]
+
+views:
+  - name: connectors.cli.ConnectionListCursors
+    source: connectors.cli.ConnectionListCursor
+    consistency: read_your_writes
+    fields:
+      - {name: cursor_id, type: Uuid}
+      - {name: instance_id, type: String}
+      - {name: adapter_id, type: String}
+      - {name: configuration_revision, type: String}
+      - {name: registry_epoch, type: Integer}
+      - {name: last_connection_ref, type: String}
+      - {name: page_limit, type: Integer}
+      - {name: state, type: connectors.cli.ConnectionListCursor.State}
+  - name: connectors.cli.LocalRuntimeRecords
+    source: connectors.cli.LocalRuntimeRecord
+    consistency: read_your_writes
+    fields:
+      - {name: instance_id, type: String}
+      - {name: selection, type: "Optional<String>"}
+      - {name: state, type: connectors.cli.LocalRuntimeRecord.State}
+
+actors:
+  - name: connectors.cli.LocalHost
+    may:
+      - connectors.cli.ExpireConnectionListCursor
+      - connectors.cli.RecordConnectionListCursor
+      - connectors.cli.RecordLocalRuntime
+      - connectors.cli.RememberLocalRuntimeBootstrap
+      - connectors.cli.SetLocalRuntimeSuppression

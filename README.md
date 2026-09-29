@@ -25,7 +25,7 @@ separate steps.
 
 ## Where the project stands
 
-Source release **v0.14.0** keeps connection metadata in Entity Runtime over an
+Source release **v0.15.0** keeps connection metadata in Entity Runtime over an
 Eventlog SQLite store, specified at ESS source format `ess/14`, with GitLab served from its pinned OpenAPI source through
 the catalog provider. The [changelog](CHANGELOG.md) records its scope and
 remaining work.

@@ -1,6 +1,9 @@
 //! Owner-checked Secret Service transport. Inspection never activates a service,
 //! unlocks a collection, or reads credentials.
 pub mod custody;
+
+/// The persistent collection custody uses, addressed by object path.
+pub(crate) const LOGIN_COLLECTION: &str = "/org/freedesktop/secrets/collection/login";
 use std::{
     os::{
         fd::AsRawFd,
@@ -106,10 +109,13 @@ impl Service {
             "/org/freedesktop/secrets",
             "org.freedesktop.Secret.Service",
         )?;
-        let collection: zbus::zvariant::OwnedObjectPath =
-            service.call("ReadAlias", &("default",))?;
-        let session: zbus::zvariant::OwnedObjectPath = service.call("ReadAlias", &("session",))?;
-        if collection.as_str() == "/" || collection == session {
+        // The persistent `login` collection is addressed by its object path. The
+        // `default` alias belongs to every other application on the desktop, so it is
+        // never read, required or changed here.
+        let collection = zbus::zvariant::OwnedObjectPath::try_from(LOGIN_COLLECTION)?;
+        let collections: Vec<zbus::zvariant::OwnedObjectPath> =
+            service.get_property("Collections")?;
+        if !collections.contains(&collection) {
             return Err(zbus::Error::Failure("collection unavailable".into()));
         }
         drop(service);

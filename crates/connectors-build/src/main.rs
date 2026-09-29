@@ -17,6 +17,7 @@ mod cli;
 mod docs;
 mod ess_boundary;
 mod gate;
+mod metadata_conformance;
 mod metadata_entities;
 mod source_hashes;
 
@@ -66,6 +67,12 @@ enum Action {
         #[arg(long)]
         check: bool,
     },
+    /// Run synthesized ESS suites against the local metadata authority's committed
+    /// Entity Runtime definitions, or emit a component-scoped mutation audit for them.
+    MetadataConformance {
+        #[command(subcommand)]
+        action: MetadataConformanceAction,
+    },
     /// Build one provider bundle from its pinned OpenAPI source into a bundle
     /// directory, and index it there. Deterministic; never touches the network.
     Catalog {
@@ -98,6 +105,26 @@ enum Action {
         jobs: usize,
     },
 }
+#[derive(Subcommand)]
+enum MetadataConformanceAction {
+    /// Run one suite and write its `ess-conformance-report/2`.
+    Run {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        report_out: PathBuf,
+    },
+    /// Write `ess verify conform mutate --emit` output scoped to the local metadata authority.
+    Emit {
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Run every suite of an emission, writing `report.json` beside each.
+    RunEmission {
+        #[arg(long)]
+        dir: PathBuf,
+    },
+}
 fn run(command: &mut Command) -> Result<Output> {
     let output = command.output()?;
     if !output.status.success() {
@@ -123,6 +150,17 @@ fn main() -> Result<()> {
     if let Action::SourceHashes = args.command {
         source_hashes::run(&root)?;
         return Ok(());
+    }
+    if let Action::MetadataConformance { action } = args.command {
+        return match action {
+            MetadataConformanceAction::Run { suite, report_out } => {
+                metadata_conformance::run(&root, &suite, &report_out)
+            }
+            MetadataConformanceAction::Emit { out } => metadata_conformance::emit(&root, &out),
+            MetadataConformanceAction::RunEmission { dir } => {
+                metadata_conformance::run_emission(&root, &dir)
+            }
+        };
     }
     if let Action::MetadataEntities { check } = args.command {
         return metadata_entities::run(&root, check);

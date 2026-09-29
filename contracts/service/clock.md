@@ -30,7 +30,13 @@ Configuration is non-secret, private-owner-checked TOML. Its complete canonical
 digest identifies the clock selection. A sampled clock grants no key, caller,
 approval or dispatch authority; the consuming coordinator must retain/recheck its
 current clock trust selection alongside its current policy before admitting use.
-No SQLite migration, persistent clock cache or independent identity is introduced.
+The clock client itself adds no SQLite migration, persistent clock cache or
+independent identity. A consumer keeps its own anti-regression floor: the
+mutation ledger records the highest admitted `lower_unix_ms` in `mutation_clock`
+and refuses an observation below it. The connection registry's `registry_clock`
+floor guards wall-clock time, not this clock. Both floors are
+`connectors.clock.LocalClockFloor` records with distinct owner identities
+(`ess/domains/clock.yaml`, `docs/local-er-metadata.md`).
 
 ## Authenticated acquisition
 

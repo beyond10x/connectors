@@ -3221,6 +3221,27 @@ fn command_arguments(
     if input_schema.properties.contains_key("publication") {
         candidates.insert("publication".into(), publication_value(current, next, all)?);
     }
+    if binding.name == "connectors.execution_audit.AppendFinalObservation" {
+        // The owner-allocated id, flattened from the observation being appended
+        // (`ess/domains/execution_audit.yaml`, AppendFinalObservation).
+        let observation_id = next
+            .fields
+            .get("final_observation")
+            .and_then(|observation| observation.get("observation_id"))
+            .cloned()
+            .ok_or(Failure::MetadataUnavailable)?;
+        candidates.insert("observation_id".into(), observation_id);
+    }
+    if input_schema.properties.contains_key("expected_revision") {
+        // The revision CAS compares the caller's expectation with the stored
+        // revision; the host's expectation is the current row it changed.
+        let expected = current
+            .fields
+            .get("revision")
+            .cloned()
+            .ok_or(Failure::MetadataUnavailable)?;
+        candidates.insert("expected_revision".into(), expected);
+    }
     let mut input = Map::new();
     for (name, field) in &input_schema.properties {
         match candidates.get(name) {
@@ -3335,19 +3356,6 @@ fn slot_value(
             .or_else(|| next.fields.get(field))
             .or_else(|| current.fields.get(field))
             .cloned()
-    });
-    let field_value = field_value.or_else(|| {
-        if current.entity == "connectors.execution_audit.AuditRecord"
-            && slot.target == "event_field"
-            && slot.field.as_deref() == Some("observation_id")
-        {
-            return input
-                .get("final_observation")
-                .and_then(Value::as_object)
-                .and_then(|observation| observation.get("observation_id"))
-                .cloned();
-        }
-        None
     });
     let value = match slot.target.as_str() {
         "logical_identity" => Some(json!(logical_id)),
@@ -3711,7 +3719,7 @@ mod tests {
             "profile": "profile",
             "descriptor_revision": "descriptor",
             "configuration_revision": "configuration",
-            "canonicalization_version": "1",
+            "canonicalization_version": "adapter-v1-canonical-json",
             "input_digest": "digest",
         });
         RowImage {
@@ -4003,5 +4011,1994 @@ mod tests {
             .get(&(candidate.entity.clone(), candidate.id.clone()))
             .unwrap();
         assert_eq!(terminal.lifecycle_state, "Active");
+    }
+
+    // `AdvanceLocalClockFloor` refuses a floor lower than the recorded one and
+    // accepts the same value, which is what the host re-records
+    // (`ess/domains/clock.yaml`, outcome `regressed`).
+    #[test]
+    fn clock_floor_advance_refuses_a_lower_floor_and_accepts_the_same_one() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let recorded = RowImage {
+            entity: "connectors.clock.LocalClockFloor".into(),
+            id: "s:registry".into(),
+            revision: 1,
+            lifecycle_state: "Recorded".into(),
+            fields: json!({"owner": "registry", "lower_unix_ms": 1_000})
+                .as_object()
+                .unwrap()
+                .clone(),
+        };
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![recorded.clone()]).unwrap();
+        let mut lower = recorded.clone();
+        lower.revision = 2;
+        lower.fields.insert("lower_unix_ms".into(), json!(999));
+        assert!(
+            transition(
+                &authority,
+                &recorded,
+                &lower,
+                "connectors.clock.AdvanceLocalClockFloor"
+            )
+            .is_err(),
+            "a lower floor was recorded"
+        );
+        let mut same = recorded.clone();
+        same.revision = 2;
+        transition(
+            &authority,
+            &recorded,
+            &same,
+            "connectors.clock.AdvanceLocalClockFloor",
+        )
+        .unwrap();
+    }
+
+    const POLICY_ID: &str = "3f9c1a2b-6d4e-4f8a-9b1c-2e3d4f5a6b7c";
+    const MAX_SAFE: i64 = 9_007_199_254_740_991;
+    const REVISE_POLICY: &str = "connectors.local_approval_policy.ReviseLocalApprovalPolicy";
+
+    fn policy_row(policy_id: &str, revision: i64, operations: Value) -> RowImage {
+        RowImage {
+            entity: "connectors.local_approval_policy.LocalApprovalPolicy".into(),
+            id: format!("s:{policy_id}"),
+            revision: 1,
+            lifecycle_state: "Configured".into(),
+            fields: json!({
+                "policy_id": policy_id,
+                "instance_id": "instance",
+                "issuer_id": "2d9e6b1a-8c4f-4e7a-b3d5-0f1a2c3e4b5d",
+                "revision": revision,
+                "owner_uid": 1000,
+                "selection": {
+                    "configuration_revision": "configuration",
+                    "descriptor_revision": "descriptor",
+                    "executable_selection": "executable",
+                    "clock_configuration_sha256": "0".repeat(64),
+                },
+                "operations": operations,
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        }
+    }
+
+    // Record `row` through its creating command on an empty authority.
+    fn creates(row: RowImage) -> bool {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let (authority, _, _) = provision(&path, uuid::Uuid::new_v4(), 8, vec![]).unwrap();
+        let commands = definition_bundle()
+            .unwrap()
+            .commands
+            .into_iter()
+            .map(|entry| (entry.name.clone(), entry))
+            .collect::<BTreeMap<_, _>>();
+        let command = create_command(&row).unwrap();
+        let action = create_action(&registry().unwrap(), &commands, &row, command).unwrap();
+        authority
+            .facade
+            .execute_batch(
+                context("creation-test"),
+                BatchKey::Named(format!("creation-{}", uuid::Uuid::new_v4())),
+                vec![action],
+                call_wait(),
+            )
+            .is_ok()
+    }
+
+    // `ReviseLocalApprovalPolicy` is a revision CAS: the host's expected
+    // revision (its current row) must equal the stored one, and the new revision
+    // must advance (`ess/domains/local_approval_policy.yaml`, outcomes
+    // `revision-conflict` and `stale-revision`).
+    #[test]
+    fn approval_policy_revision_must_advance() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let configured = policy_row(POLICY_ID, 3, json!(["merge_request.merge"]));
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![configured.clone()]).unwrap();
+        let mut same = configured.clone();
+        same.revision = 2;
+        assert!(
+            transition(&authority, &configured, &same, REVISE_POLICY).is_err(),
+            "an unchanged revision was accepted"
+        );
+        let mut stale_expectation = configured.clone();
+        stale_expectation.fields.insert("revision".into(), json!(2));
+        let mut next = configured.clone();
+        next.revision = 2;
+        next.fields.insert("revision".into(), json!(4));
+        assert!(
+            transition(&authority, &stale_expectation, &next, REVISE_POLICY).is_err(),
+            "a revise against a stale expected revision was accepted"
+        );
+        transition(&authority, &configured, &next, REVISE_POLICY).unwrap();
+    }
+
+    // At 9007199254740991 a revise is refused (`ess/domains/local_approval_policy.yaml`,
+    // outcome `exhausted`, and the `revision` invariant behind it). Entity Runtime
+    // does not name the refusing outcome, so this cannot tell the two apart.
+    #[test]
+    fn approval_policy_exhausted_revision_is_refused() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let configured = policy_row(POLICY_ID, MAX_SAFE, json!([]));
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![configured.clone()]).unwrap();
+        let mut next = configured.clone();
+        next.revision = 2;
+        next.fields.insert("revision".into(), json!(MAX_SAFE + 1));
+        assert!(
+            transition(&authority, &configured, &next, REVISE_POLICY).is_err(),
+            "a revise past 9007199254740991 was accepted"
+        );
+    }
+
+    // The policy revision stays within 1..=9007199254740991
+    // (`ess/domains/local_approval_policy.yaml`, invariant on `revision`).
+    #[test]
+    fn approval_policy_revision_is_bounded() {
+        assert!(creates(policy_row(POLICY_ID, 1, json!([]))));
+        assert!(!creates(policy_row(POLICY_ID, 0, json!([]))));
+    }
+
+    // A policy lists at most 256 operations, on configure and on revise
+    // (`ess/domains/local_approval_policy.yaml`, outcomes `too-many-operations`).
+    #[test]
+    fn approval_policy_lists_at_most_256_operations() {
+        let operations =
+            |n: usize| json!((0..n).map(|i| format!("write.{i:03}")).collect::<Vec<_>>());
+        assert!(creates(policy_row(POLICY_ID, 1, operations(256))));
+        assert!(!creates(policy_row(POLICY_ID, 1, operations(257))));
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let configured = policy_row(POLICY_ID, 1, json!([]));
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![configured.clone()]).unwrap();
+        let mut next = policy_row(POLICY_ID, 2, operations(257));
+        next.revision = 2;
+        assert!(
+            transition(&authority, &configured, &next, REVISE_POLICY).is_err(),
+            "a revise listing 257 operations was accepted"
+        );
+    }
+
+    // A policy identity is never the nil UUID
+    // (`ess/domains/local_approval_policy.yaml`, outcome `nil-identity`).
+    #[test]
+    fn approval_policy_identity_is_not_nil() {
+        assert!(!creates(policy_row(
+            "00000000-0000-0000-0000-000000000000",
+            1,
+            json!([])
+        )));
+    }
+
+    // A clock floor is never negative (`ess/domains/clock.yaml`, invariant on
+    // `lower_unix_ms`; registry.sql and mutations.sql CHECK the same).
+    #[test]
+    fn clock_floor_is_never_negative() {
+        let floor = |lower: i64| RowImage {
+            entity: "connectors.clock.LocalClockFloor".into(),
+            id: "s:registry".into(),
+            revision: 1,
+            lifecycle_state: "Recorded".into(),
+            fields: json!({"owner": "registry", "lower_unix_ms": lower})
+                .as_object()
+                .unwrap()
+                .clone(),
+        };
+        assert!(creates(floor(0)));
+        assert!(!creates(floor(-1)));
+    }
+
+    const ISSUER_ID: &str = "2d9e6b1a-8c4f-4e7a-b3d5-0f1a2c3e4b5d";
+
+    fn issuer_row(revision: &str, issuer: &str, audience: &str) -> RowImage {
+        RowImage {
+            entity: "connectors.approval_issuers.ApprovalIssuer".into(),
+            id: format!("s:{ISSUER_ID}"),
+            revision: 1,
+            lifecycle_state: "Bound".into(),
+            fields: json!({
+                "issuer_id": ISSUER_ID,
+                "instance_id": "instance",
+                "issuer": issuer,
+                "audience": audience,
+                "revision": revision,
+                "custody_scope_ref": "9b8a7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        }
+    }
+
+    // `AdvanceIssuerRevision` requires the current revision and writes a fresh
+    // one (`ess/domains/approval_issuers.yaml`, outcomes `revision-conflict` and
+    // `revision-reused`).
+    #[test]
+    fn issuer_revision_advance_is_a_cas_to_a_fresh_revision() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let issuer = format!("connectors.local-issuer/{ISSUER_ID}");
+        let audience = format!("connectors.approval/{ISSUER_ID}");
+        let r1 = "11111111-1111-4111-8111-111111111111";
+        let r2 = "22222222-2222-4222-8222-222222222222";
+        let r3 = "33333333-3333-4333-8333-333333333333";
+        let bound = issuer_row(r1, &issuer, &audience);
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![bound.clone()]).unwrap();
+        let command = "connectors.approval_issuers.AdvanceIssuerRevision";
+        let mut reused = bound.clone();
+        reused.revision = 2;
+        assert!(
+            transition(&authority, &bound, &reused, command).is_err(),
+            "an unchanged issuer revision was accepted"
+        );
+        let stale_expectation = issuer_row(r3, &issuer, &audience);
+        let mut next = issuer_row(r2, &issuer, &audience);
+        next.revision = 2;
+        assert!(
+            transition(&authority, &stale_expectation, &next, command).is_err(),
+            "an issuer revision advance against a stale revision was accepted"
+        );
+        transition(&authority, &bound, &next, command).unwrap();
+    }
+
+    // Issuer and audience strings carry their public prefixes
+    // (`ess/domains/approval_issuers.yaml`, types `IssuerName`, `AudienceName`).
+    #[test]
+    fn issuer_and_audience_carry_their_prefixes() {
+        let r1 = "11111111-1111-4111-8111-111111111111";
+        let issuer = format!("connectors.local-issuer/{ISSUER_ID}");
+        let audience = format!("connectors.approval/{ISSUER_ID}");
+        assert!(creates(issuer_row(r1, &issuer, &audience)));
+        assert!(!creates(issuer_row(r1, ISSUER_ID, &audience)));
+        assert!(!creates(issuer_row(r1, &issuer, ISSUER_ID)));
+    }
+
+    // Signing-key validity bounds stay within [0, 9007199254740991]
+    // (`ess/domains/approval_issuers.yaml`, invariants on the key).
+    #[test]
+    fn signing_key_validity_bounds_are_enforced() {
+        let key = |not_before: i64, not_after: i64| RowImage {
+            entity: "connectors.approval_issuers.ApprovalSigningKey".into(),
+            id: "s:7a3d52c4-1f0b-4b8e-9d0a-5e2c6f1b3a47".into(),
+            revision: 1,
+            lifecycle_state: "Candidate".into(),
+            fields: json!({
+                "key_id": "7a3d52c4-1f0b-4b8e-9d0a-5e2c6f1b3a47",
+                "issuer_id": ISSUER_ID,
+                "public_key": "public-key",
+                "not_before_unix_ms": not_before,
+                "not_after_unix_ms": not_after,
+                "material_version": "c1e4a7b2-5d8f-4a3c-9e6b-1f2d3c4b5a69",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        assert!(creates(key(0, MAX_SAFE)));
+        assert!(!creates(key(-1, MAX_SAFE)));
+        assert!(!creates(key(0, MAX_SAFE + 1)));
+    }
+
+    // ESS hardening technique 4 (determinism). The same authored sequence,
+    // run twice against two fresh authorities, must record the same decisions:
+    // commands, arguments, changed fields, event payloads, responses and
+    // terminal rows. Envelope metadata (record ids, recorded_at, request and
+    // trace ids) is the shell's and is not compared; neither is a value the
+    // specification declares `{generated: true}`, which is masked.
+    fn determinism_row(entity: &str, id: &str, state: &str, fields: Value) -> RowImage {
+        RowImage {
+            entity: entity.into(),
+            id: format!("s:{id}"),
+            revision: 1,
+            lifecycle_state: state.into(),
+            fields: fields.as_object().unwrap().clone(),
+        }
+    }
+
+    fn generated_fields() -> BTreeMap<String, std::collections::BTreeSet<String>> {
+        let mut generated = BTreeMap::<String, std::collections::BTreeSet<String>>::new();
+        for command in definition_bundle().unwrap().commands {
+            for slot in &command.slots {
+                if slot.source == "generated"
+                    && slot.target != "logical_identity"
+                    && let Some(field) = &slot.field
+                {
+                    generated
+                        .entry(command.entity.clone())
+                        .or_default()
+                        .insert(field.clone());
+                }
+            }
+        }
+        generated
+    }
+
+    fn mask(value: &mut Value, names: &std::collections::BTreeSet<String>) {
+        match value {
+            Value::Object(map) => {
+                for (key, inner) in map.iter_mut() {
+                    if names.contains(key) {
+                        *inner = json!("<generated>");
+                    } else {
+                        mask(inner, names);
+                    }
+                }
+            }
+            Value::Array(items) => items.iter_mut().for_each(|item| mask(item, names)),
+            _ => {}
+        }
+    }
+
+    fn execute_one(authority: &ErAuthority, action: BatchAction) -> bool {
+        authority
+            .facade
+            .execute_batch(
+                context("determinism"),
+                BatchKey::Named(format!("determinism-{}", uuid::Uuid::new_v4())),
+                vec![action],
+                call_wait(),
+            )
+            .is_ok()
+    }
+
+    /// One fixed sequence: legacy import, two creations, seven moves and two
+    /// refusals across four entities. Returns every recorded decision in store
+    /// order, masked, plus each refusal's verdict.
+    fn determinism_sequence(path: &Path) -> Vec<Value> {
+        let authority_id = uuid::Uuid::parse_str("11111111-2222-4333-8444-555555555555").unwrap();
+        let attempt = prepared_attempt();
+        let cursor = determinism_row(
+            "connectors.cli.ConnectionListCursor",
+            "0b6f7f1c-4d0e-4a55-9a53-2d4f3c1e8a10",
+            "Active",
+            json!({
+                "cursor_id": "0b6f7f1c-4d0e-4a55-9a53-2d4f3c1e8a10",
+                "instance_id": "instance",
+                "adapter_id": "adapter",
+                "configuration_revision": "configuration",
+                "registry_epoch": 7,
+                "last_connection_ref": "connection",
+                "page_limit": 2,
+                "expires_at": "2026-09-17T00:00:00Z",
+            }),
+        );
+        let policy_id = "3f9c1a2b-6d4e-4f8a-9b1c-2e3d4f5a6b7c";
+        let policy = determinism_row(
+            "connectors.local_approval_policy.LocalApprovalPolicy",
+            policy_id,
+            "Configured",
+            json!({
+                "policy_id": policy_id,
+                "instance_id": "instance",
+                "issuer_id": "2d9e6b1a-8c4f-4e7a-b3d5-0f1a2c3e4b5d",
+                "revision": 3,
+                "owner_uid": 1000,
+                "selection": {
+                    "configuration_revision": "configuration",
+                    "descriptor_revision": "descriptor",
+                    "executable_selection": "executable",
+                    "clock_configuration_sha256": "0".repeat(64),
+                },
+                "operations": ["merge_request.merge"],
+            }),
+        );
+        let (mut authority, _, _) = provision(
+            path,
+            authority_id,
+            8,
+            vec![attempt.clone(), cursor.clone(), policy.clone()],
+        )
+        .unwrap();
+        let registry = registry().unwrap();
+        let commands = definition_bundle()
+            .unwrap()
+            .commands
+            .into_iter()
+            .map(|entry| (entry.name.clone(), entry))
+            .collect::<BTreeMap<_, _>>();
+        let mut verdicts = Vec::new();
+
+        // Creations.
+        let clock = determinism_row(
+            "connectors.clock.LocalClockFloor",
+            "registry",
+            "Recorded",
+            json!({"owner": "registry", "lower_unix_ms": 1_000}),
+        );
+        let second_cursor = determinism_row(
+            "connectors.cli.ConnectionListCursor",
+            "5a0e8b2c-3d4f-4a1b-8c9d-0e1f2a3b4c5d",
+            "Active",
+            json!({
+                "cursor_id": "5a0e8b2c-3d4f-4a1b-8c9d-0e1f2a3b4c5d",
+                "instance_id": "instance",
+                "adapter_id": "adapter",
+                "configuration_revision": "configuration",
+                "registry_epoch": 8,
+                "last_connection_ref": "connection-2",
+                "page_limit": 3,
+                "expires_at": "2026-09-18T00:00:00Z",
+            }),
+        );
+        for (row, command) in [
+            (&clock, "connectors.clock.RecordLocalClockFloor"),
+            (&second_cursor, "connectors.cli.RecordConnectionListCursor"),
+        ] {
+            let action = create_action(&registry, &commands, row, command).unwrap();
+            verdicts.push(json!([command, execute_one(&authority, action)]));
+        }
+
+        // Moves and refusals, in a fixed order.
+        let mut clock_lower = clock.clone();
+        clock_lower.revision = 2;
+        clock_lower
+            .fields
+            .insert("lower_unix_ms".into(), json!(999));
+        let mut clock_up = clock.clone();
+        clock_up.revision = 2;
+        clock_up.fields.insert("lower_unix_ms".into(), json!(1_500));
+        let mut dispatching = attempt.clone();
+        dispatching.lifecycle_state = "Dispatching".into();
+        dispatching.revision = 2;
+        let mut completed = dispatching.clone();
+        completed.lifecycle_state = "Completed".into();
+        completed.revision = 3;
+        completed
+            .fields
+            .insert("settled_at".into(), json!("2026-09-17T00:00:00Z"));
+        completed
+            .fields
+            .insert("terminal_result_json".into(), json!("{}"));
+        let mut expired = cursor.clone();
+        expired.lifecycle_state = "Expired".into();
+        expired.revision = 2;
+        let mut stale_policy = policy.clone();
+        stale_policy.revision = 2;
+        let mut revised = policy.clone();
+        revised.revision = 2;
+        revised.fields.insert("revision".into(), json!(4));
+        revised
+            .fields
+            .insert("operations".into(), json!(["a.write", "b.write"]));
+        for (current, next, command) in [
+            (
+                &clock,
+                &clock_lower,
+                "connectors.clock.AdvanceLocalClockFloor",
+            ),
+            (&clock, &clock_up, "connectors.clock.AdvanceLocalClockFloor"),
+            (&attempt, &dispatching, "connectors.mutations.OpenDispatch"),
+            (
+                &dispatching,
+                &completed,
+                "connectors.mutations.RecordCompletion",
+            ),
+            (
+                &cursor,
+                &expired,
+                "connectors.cli.ExpireConnectionListCursor",
+            ),
+            (
+                &policy,
+                &stale_policy,
+                "connectors.local_approval_policy.ReviseLocalApprovalPolicy",
+            ),
+            (
+                &policy,
+                &revised,
+                "connectors.local_approval_policy.ReviseLocalApprovalPolicy",
+            ),
+        ] {
+            verdicts.push(json!([
+                command,
+                transition(&authority, current, next, command).is_ok()
+            ]));
+        }
+
+        let generated = generated_fields();
+        let snapshot = authority.facade.complete_snapshot(call_wait()).unwrap();
+        let mut decisions = snapshot
+            .histories
+            .iter()
+            .flat_map(|subject| subject.history.records.iter())
+            .filter_map(|record| match &record.entry {
+                RecordedEntry::Decision(commit) => {
+                    let mut value = serde_json::to_value(&commit.envelope.record).unwrap();
+                    value.as_object_mut().unwrap().remove("definition");
+                    if let Some(names) = generated.get(&commit.envelope.record.entity) {
+                        mask(&mut value, names);
+                    }
+                    Some((record.position.store, value))
+                }
+                RecordedEntry::Observation(_) => None,
+            })
+            .collect::<Vec<_>>();
+        decisions.sort_by_key(|(position, _)| *position);
+        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        let mut out = verdicts;
+        out.extend(decisions.into_iter().map(|(_, value)| value));
+        out.extend(
+            visible_rows(&authority.baseline)
+                .into_iter()
+                .map(|((entity, id), (state, fields))| json!([entity, id, state, fields])),
+        );
+        out
+    }
+
+    #[test]
+    fn one_sequence_records_the_same_decisions_twice() {
+        let first_dir = tempfile::tempdir().unwrap();
+        let second_dir = tempfile::tempdir().unwrap();
+        let first = determinism_sequence(&first_dir.path().join("metadata.sqlite3"));
+        let second = determinism_sequence(&second_dir.path().join("metadata.sqlite3"));
+        // 9 verdicts, 7 recorded decisions (2 creations, 5 moves), 4 visible rows.
+        assert_eq!(first.len(), 20, "sequence shape changed: {first:#?}");
+        let verdicts = first[..9]
+            .iter()
+            .map(|v| v[1].as_bool().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            verdicts,
+            [true, true, false, true, true, true, true, false, true]
+        );
+        if let Some(index) =
+            (0..first.len().max(second.len())).find(|&index| first.get(index) != second.get(index))
+        {
+            panic!(
+                "runs diverge at item {index}\nfirst:  {}\nsecond: {}",
+                first.get(index).map_or("<none>".into(), Value::to_string),
+                second.get(index).map_or("<none>".into(), Value::to_string),
+            );
+        }
+    }
+
+    fn lowered_create_outcome(entity: &str, outcome: &str) -> Value {
+        let bundle: Value =
+            serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).unwrap();
+        bundle["definitions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["name"] == entity)
+            .unwrap()["definition"]["create"]["outcomes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|candidate| candidate["name"] == outcome)
+            .unwrap()
+            .clone()
+    }
+
+    fn assert_created_from_input(outcome: &Value, required: &[&str], optional: &[&str]) {
+        for field in required {
+            assert_eq!(
+                outcome["set"][field],
+                json!(format!("$args.input.{field}")),
+                "`{field}` is not set from the command input"
+            );
+        }
+        for field in optional {
+            assert_eq!(
+                outcome["set_if_present"][field]["argument"],
+                json!(format!("input.{field}")),
+                "`{field}` is not set from the command input"
+            );
+        }
+    }
+
+    fn create(
+        authority: &ErAuthority,
+        row: &RowImage,
+        command: &str,
+    ) -> std::result::Result<(), entity_eventlog::sync::SyncExecutionError> {
+        let bundle = definition_bundle().unwrap();
+        let commands = bundle
+            .commands
+            .into_iter()
+            .map(|entry| (entry.name.clone(), entry))
+            .collect::<BTreeMap<_, _>>();
+        let action = create_action(&registry().unwrap(), &commands, row, command).unwrap();
+        authority
+            .facade
+            .execute_batch(
+                context("create-test"),
+                BatchKey::Named(format!("create-{}", uuid::Uuid::new_v4())),
+                vec![action],
+                call_wait(),
+            )
+            .map(|_| ())
+    }
+
+    fn anchored_audit() -> RowImage {
+        let audit_record_ref = "audit-record-1";
+        RowImage {
+            entity: "connectors.execution_audit.AuditRecord".into(),
+            id: format!("s:{audit_record_ref}"),
+            revision: 1,
+            lifecycle_state: "Anchored".into(),
+            fields: json!({
+                "audit_record_ref": audit_record_ref,
+                "instance_id": "instance",
+                "audit_ref": "audit-1",
+                "anchor_kind": "admitted_execution",
+                "activity": "invoke",
+                "hop_role": "gateway",
+                "stage": "admission",
+                "principal_ref": "principal",
+                "operation_id": "write",
+                "recorded_at": "2026-09-17T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        }
+    }
+
+    // The anchor's immutable facts are the command's input, and an anchor
+    // carries no final observation (`ess/domains/execution_audit.yaml`,
+    // AcknowledgeAnchor `anchored`; contracts/service/audit.md:38).
+    #[test]
+    fn audit_anchor_fields_are_set_from_the_acknowledged_input() {
+        let outcome = lowered_create_outcome("connectors.execution_audit.AuditRecord", "anchored");
+        assert_created_from_input(
+            &outcome,
+            &[
+                "instance_id",
+                "audit_ref",
+                "anchor_kind",
+                "hop_role",
+                "stage",
+                "recorded_at",
+            ],
+            &[
+                "activity",
+                "request_id",
+                "principal_ref",
+                "operation_id",
+                "connection_ref",
+                "descriptor_revision",
+                "attempt_id",
+            ],
+        );
+        assert!(outcome["set"].get("final_observation").is_none());
+        assert!(outcome["set_if_present"].get("final_observation").is_none());
+    }
+
+    // The appended observation is stored as supplied and the event carries the
+    // owner-allocated observation_id, never a minted one
+    // (`ess/domains/execution_audit.yaml`, AppendFinalObservation `recorded`;
+    // contracts/service/audit.md:86-90).
+    #[test]
+    fn final_append_stores_the_observation_and_emits_the_owner_id() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let anchored = anchored_audit();
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![anchored.clone()]).unwrap();
+        let observation_id = "8d0c2f4e-1b3a-4c5d-9e6f-7a8b9c0d1e2f";
+        let observation = json!({
+            "observation_id": observation_id,
+            "outcome": "success",
+            "recorded_at": "2026-09-17T00:00:01Z",
+        });
+        let mut observed = anchored.clone();
+        observed.revision = 2;
+        observed.lifecycle_state = "FinalObserved".into();
+        observed
+            .fields
+            .insert("final_observation".into(), observation.clone());
+        transition(
+            &authority,
+            &anchored,
+            &observed,
+            "connectors.execution_audit.AppendFinalObservation",
+        )
+        .unwrap();
+        let snapshot = authority.facade.complete_snapshot(call_wait()).unwrap();
+        let history = snapshot
+            .histories
+            .iter()
+            .find(|subject| subject.terminal.id == anchored.id)
+            .unwrap();
+        assert_eq!(history.terminal.lifecycle_state, "FinalObserved");
+        assert_eq!(history.terminal.fields["final_observation"], observation);
+        let event = history
+            .history
+            .records
+            .iter()
+            .find_map(|record| match &record.entry {
+                RecordedEntry::Decision(commit) => commit.envelope.record.events.first(),
+                RecordedEntry::Observation(_) => None,
+            })
+            .unwrap();
+        assert_eq!(
+            event.event_type,
+            "connectors.execution_audit.FinalObservationRecorded"
+        );
+        assert_eq!(event.payload["observation_id"], json!(observation_id));
+    }
+
+    // audit.md:41-43, as `Anchor::validate` enforces them: an admitted anchor
+    // has a verified principal and an activity, an admitted invocation also has
+    // its operation, and a describe has neither an operation nor an attempt
+    // (`ess/domains/execution_audit.yaml`, AuditRecord invariants).
+    #[test]
+    fn audit_anchor_co_presence_is_enforced_at_acknowledgement() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let (authority, _, _) = provision(&path, uuid::Uuid::new_v4(), 8, Vec::new()).unwrap();
+        let command = "connectors.execution_audit.AcknowledgeAnchor";
+        let variant = |id: &str, change: &dyn Fn(&mut Map<String, Value>)| {
+            let mut row = anchored_audit();
+            row.id = format!("s:{id}");
+            row.fields.insert("audit_record_ref".into(), json!(id));
+            change(&mut row.fields);
+            row
+        };
+        let no_principal = variant("no-principal", &|fields| {
+            fields.remove("principal_ref");
+        });
+        assert!(
+            create(&authority, &no_principal, command).is_err(),
+            "an admitted anchor without a principal was acknowledged"
+        );
+        let no_operation = variant("no-operation", &|fields| {
+            fields.remove("operation_id");
+        });
+        assert!(
+            create(&authority, &no_operation, command).is_err(),
+            "an admitted invocation without an operation was acknowledged"
+        );
+        let describe_with_operation = variant("describe-operation", &|fields| {
+            fields.insert("activity".into(), json!("describe"));
+        });
+        assert!(
+            create(&authority, &describe_with_operation, command).is_err(),
+            "a describe anchor with an operation was acknowledged"
+        );
+        let describe = variant("describe", &|fields| {
+            fields.insert("activity".into(), json!("describe"));
+            fields.remove("operation_id");
+        });
+        create(&authority, &describe, command).unwrap();
+        let early_refusal = variant("early-refusal", &|fields| {
+            fields.insert("anchor_kind".into(), json!("early_refusal"));
+            fields.insert("stage".into(), json!("authentication"));
+            for name in ["activity", "principal_ref", "operation_id"] {
+                fields.remove(name);
+            }
+        });
+        create(&authority, &early_refusal, command).unwrap();
+        create(&authority, &anchored_audit(), command).unwrap();
+    }
+
+    // A read use retains its selected connection, generation, custody version,
+    // publication fence and original expiry as captured
+    // (`ess/domains/credential_evidence.yaml`, CaptureReadUse `captured`;
+    // docs/local-er-metadata.md:74-76).
+    #[test]
+    fn read_use_capture_sets_its_bindings_from_the_input() {
+        let outcome = lowered_create_outcome("connectors.credential_evidence.ReadUse", "captured");
+        assert_created_from_input(
+            &outcome,
+            &[
+                "connection_ref",
+                "generation_id",
+                "custody_version_ref",
+                "publication_fence",
+                "expires_at",
+            ],
+            &[],
+        );
+    }
+
+    // An inspected admission is matched to the exact generation, binding and
+    // evidence it was captured with (`ess/domains/credential_evidence.yaml`,
+    // InspectGeneration `inspected`; auth/evidence §4.2 steps 2 and 4).
+    #[test]
+    fn inspected_admission_sets_its_capture_from_the_input() {
+        let outcome = lowered_create_outcome(
+            "connectors.credential_evidence.DispatchAdmission",
+            "inspected",
+        );
+        assert_created_from_input(
+            &outcome,
+            &[
+                "request_id",
+                "operation_ref",
+                "generation_id",
+                "binding",
+                "expected_external_identity",
+                "evidence",
+            ],
+            &[],
+        );
+    }
+
+    // Dispatch refuses a generation other than the one the admission pinned
+    // (`ess/domains/credential_evidence.yaml`, DispatchGeneration
+    // `generation-changed`; auth/evidence §4.2 step 5).
+    #[test]
+    fn dispatch_refuses_a_generation_other_than_the_admitted_one() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let admission_id = "4c1e9a7b-2d3f-4e5a-8b6c-0d1e2f3a4b5c";
+        let generation_id = "6f2a8c1d-3e4b-4a5c-9d7e-1f2a3b4c5d6e";
+        let binding = json!({
+            "instance_id": "instance",
+            "connection_ref": "connection",
+            "profile_ref": "profile",
+            "provider_authority": "https://fixture.invalid",
+        });
+        // The admission is transient and has no SQL table, so it is created and
+        // admitted through its own commands rather than imported.
+        let inspected = RowImage {
+            entity: "connectors.credential_evidence.DispatchAdmission".into(),
+            id: format!("s:{admission_id}"),
+            revision: 1,
+            lifecycle_state: "Inspected".into(),
+            fields: json!({
+                "admission_id": admission_id,
+                "request_id": "request",
+                "operation_ref": "operation",
+                "generation_id": generation_id,
+                "binding": binding,
+                "expected_external_identity": {"kind": "account", "subject": "one"},
+                "evidence": {
+                    "generation_id": generation_id,
+                    "binding": binding,
+                    "checks": [],
+                },
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (authority, _, _) = provision(&path, uuid::Uuid::new_v4(), 8, Vec::new()).unwrap();
+        create(
+            &authority,
+            &inspected,
+            "connectors.credential_evidence.InspectGeneration",
+        )
+        .unwrap();
+        let mut admitted = inspected.clone();
+        admitted.revision = 2;
+        admitted.lifecycle_state = "Admitted".into();
+        transition(
+            &authority,
+            &inspected,
+            &admitted,
+            "connectors.credential_evidence.AdmitGeneration",
+        )
+        .unwrap();
+        let command = "connectors.credential_evidence.DispatchGeneration";
+        let mut changed = admitted.clone();
+        changed.revision = 3;
+        changed.lifecycle_state = "Dispatched".into();
+        changed.fields.insert(
+            "generation_id".into(),
+            json!("7a3b9d2e-4f5c-4b6d-8e8f-2a3b4c5d6e7f"),
+        );
+        assert!(
+            transition(&authority, &admitted, &changed, command).is_err(),
+            "a different generation was dispatched"
+        );
+        let mut dispatched = admitted.clone();
+        dispatched.revision = 3;
+        dispatched.lifecycle_state = "Dispatched".into();
+        transition(&authority, &admitted, &dispatched, command).unwrap();
+    }
+
+    // `AdvanceRegistryEpoch` refuses an epoch lower than the recorded one and
+    // accepts the same one (`ess/domains/declarations.yaml`, outcome `regressed`).
+    // The host only ever increments the epoch (registry/lifecycle.rs `bump`).
+    #[test]
+    fn registry_epoch_advance_refuses_a_lower_epoch_and_accepts_the_same_one() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let declared = RowImage {
+            entity: "connectors.declarations.ServiceConfiguration".into(),
+            id: "s:instance".into(),
+            revision: 1,
+            lifecycle_state: "Declared".into(),
+            fields: json!({
+                "instance_id": "instance",
+                "adapter_id": "adapter",
+                "revision": "configuration",
+                "registry_epoch": 7,
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![declared.clone()]).unwrap();
+        let command = "connectors.declarations.AdvanceRegistryEpoch";
+        let mut lower = declared.clone();
+        lower.revision = 2;
+        lower.fields.insert("registry_epoch".into(), json!(6));
+        assert!(
+            transition(&authority, &declared, &lower, command).is_err(),
+            "a lower registry epoch was recorded"
+        );
+        let mut same = declared.clone();
+        same.revision = 2;
+        transition(&authority, &declared, &same, command).unwrap();
+        let mut next = same.clone();
+        next.revision = 3;
+        next.fields.insert("registry_epoch".into(), json!(8));
+        transition(&authority, &same, &next, command).unwrap();
+    }
+
+    // `ConnectionListCursor.page_limit` is bounded to 1..=500
+    // (`ess/domains/cli.yaml` invariants), the bounds `Registry::list` refuses
+    // outside of before it records a cursor.
+    #[test]
+    fn connection_list_cursor_page_limit_is_bounded() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let (authority, _, _) = provision(&path, uuid::Uuid::new_v4(), 8, Vec::new()).unwrap();
+        let bundle = definition_bundle().unwrap();
+        let commands = bundle
+            .commands
+            .into_iter()
+            .map(|entry| (entry.name.clone(), entry))
+            .collect::<BTreeMap<_, _>>();
+        let record = |limit: i64| {
+            let cursor_id = uuid::Uuid::new_v4().to_string();
+            let row = RowImage {
+                entity: "connectors.cli.ConnectionListCursor".into(),
+                id: format!("s:{cursor_id}"),
+                revision: 1,
+                lifecycle_state: "Active".into(),
+                fields: json!({
+                    "cursor_id": cursor_id,
+                    "instance_id": "instance",
+                    "adapter_id": "adapter",
+                    "configuration_revision": "configuration",
+                    "registry_epoch": 7,
+                    "last_connection_ref": "connection",
+                    "page_limit": limit,
+                    "expires_at": "2026-09-17T00:00:00Z",
+                })
+                .as_object()
+                .unwrap()
+                .clone(),
+            };
+            let action = create_action(
+                &registry().unwrap(),
+                &commands,
+                &row,
+                "connectors.cli.RecordConnectionListCursor",
+            )
+            .unwrap();
+            authority.facade.execute_batch(
+                context("cursor-limit-test"),
+                BatchKey::Named(format!("cursor-limit-{}", uuid::Uuid::new_v4())),
+                vec![action],
+                call_wait(),
+            )
+        };
+        for refused in [0, 501] {
+            assert!(
+                record(refused).is_err(),
+                "a cursor with page_limit {refused} was recorded"
+            );
+        }
+        for accepted in [1, 500] {
+            record(accepted).unwrap();
+        }
+    }
+
+    // Creation through the recorded command binding, as a new SQL row reaches ER.
+    fn create_row(
+        authority: &ErAuthority,
+        row: &RowImage,
+    ) -> std::result::Result<(), entity_eventlog::sync::SyncExecutionError> {
+        let bundle = definition_bundle().unwrap();
+        let commands = bundle
+            .commands
+            .into_iter()
+            .map(|entry| (entry.name.clone(), entry))
+            .collect::<BTreeMap<_, _>>();
+        let action = create_action(
+            &registry().unwrap(),
+            &commands,
+            row,
+            create_command(row).unwrap(),
+        )
+        .unwrap();
+        authority
+            .facade
+            .execute_batch(
+                context("er-create-test"),
+                BatchKey::Named(format!("er-create-{}", uuid::Uuid::new_v4())),
+                vec![action],
+                call_wait(),
+            )
+            .map(|_| ())
+    }
+
+    fn empty_authority(directory: &tempfile::TempDir) -> ErAuthority {
+        let path = directory.path().join("metadata.sqlite3");
+        provision(&path, uuid::Uuid::new_v4(), 8, Vec::new())
+            .unwrap()
+            .0
+    }
+
+    // The ER representation of a direct canonical approval subject: null
+    // coordinates are absent (`approval_subject_for_er`).
+    fn direct_subject() -> Value {
+        json!({
+            "format": "connectors.approval-subject/v1",
+            "target": {
+                "instance": "instance",
+                "operation": "write",
+                "connection": "connection",
+                "connection_revision": "revision",
+                "contract": "contract",
+                "profile": "profile",
+                "descriptor_revision": "descriptor",
+                "configuration_revision": "configuration",
+            },
+            "authority": {"scope": {"caller": "principal"}},
+            "origin": {"kind": "direct", "authority_ref": "instance"},
+            "canonicalization": "adapter-v1-canonical-json",
+            "input_sha256": "0".repeat(64),
+            "approval_mode": "required",
+        })
+    }
+
+    fn federated_subject() -> Value {
+        let mut subject = direct_subject();
+        subject["origin"] = json!({"kind": "federated", "authority_ref": "gateway"});
+        subject["route"] = json!({
+            "gateway_instance": "gateway",
+            "route_id": "route",
+            "route_revision": "route-r1",
+        });
+        subject
+    }
+
+    fn redemption(subject: Value) -> RowImage {
+        let receipt_id = uuid::Uuid::new_v4().to_string();
+        RowImage {
+            entity: "connectors.delegation.ApprovalRedemption".into(),
+            id: format!("s:{receipt_id}"),
+            revision: 1,
+            lifecycle_state: "Spent".into(),
+            fields: json!({
+                "receipt_id": receipt_id,
+                "instance_id": "instance",
+                "issuer": "issuer",
+                "reference": "a".repeat(64),
+                "subject": subject,
+                "attempt_id": "5cff4e3d-a599-4ca5-9715-a92c22ced4fe",
+                "spent_at": "2026-09-17T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        }
+    }
+
+    // DG-1: a stored approval subject carries the fixed format tag
+    // (`ess/domains/delegation.yaml`, ApprovalRedemption invariants).
+    #[test]
+    fn approval_redemption_subject_carries_the_fixed_format() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        create_row(&authority, &redemption(direct_subject())).unwrap();
+        let mut subject = direct_subject();
+        subject["format"] = json!("connectors.approval-subject/v2");
+        assert!(
+            create_row(&authority, &redemption(subject)).is_err(),
+            "a subject with another format was recorded"
+        );
+    }
+
+    // DG-2: a direct origin names the executing instance and has no route; a
+    // federated origin has one and names its gateway.
+    #[test]
+    fn approval_redemption_subject_couples_origin_and_route() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        create_row(&authority, &redemption(direct_subject())).unwrap();
+        create_row(&authority, &redemption(federated_subject())).unwrap();
+        let mut routed = direct_subject();
+        routed["route"] = federated_subject()["route"].clone();
+        let mut elsewhere = direct_subject();
+        elsewhere["origin"]["authority_ref"] = json!("other");
+        let mut unrouted = federated_subject();
+        unrouted.as_object_mut().unwrap().remove("route");
+        let mut mismatched = federated_subject();
+        mismatched["origin"]["authority_ref"] = json!("other");
+        for (case, subject) in [
+            ("direct with a route", routed),
+            ("direct naming another instance", elsewhere),
+            ("federated without a route", unrouted),
+            ("federated naming another gateway", mismatched),
+        ] {
+            assert!(
+                create_row(&authority, &redemption(subject)).is_err(),
+                "{case} was recorded"
+            );
+        }
+    }
+
+    fn pending_reservation() -> RowImage {
+        let reservation_id = uuid::Uuid::new_v4().to_string();
+        RowImage {
+            entity: "connectors.idempotency.KeyReservation".into(),
+            id: format!("s:{reservation_id}"),
+            revision: 1,
+            lifecycle_state: "Pending".into(),
+            fields: json!({
+                "reservation_id": reservation_id,
+                "namespace": {
+                    "receiver_instance": "instance",
+                    "authority": {"caller": "principal"},
+                    "origin": {"kind": "direct", "authority_ref": "instance"},
+                },
+                "caller_key": "create-1",
+                "fingerprint": prepared_attempt().fields["request_fingerprint"].clone(),
+                "attempt_id": "5cff4e3d-a599-4ca5-9715-a92c22ced4fe",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        }
+    }
+
+    fn federated_reservation() -> RowImage {
+        let mut row = pending_reservation();
+        row.fields["namespace"]["origin"] =
+            json!({"kind": "federated", "authority_ref": "gateway"});
+        row.fields["fingerprint"]["route"] = json!({
+            "gateway_instance": "gateway",
+            "route_id": "route",
+            "route_revision": "route-r1",
+        });
+        row
+    }
+
+    // ID-5: a keyed reservation's caller key is nonempty.
+    #[test]
+    fn key_reservation_refuses_an_empty_caller_key() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        create_row(&authority, &pending_reservation()).unwrap();
+        let mut empty = pending_reservation();
+        empty.fields.insert("caller_key".into(), json!(""));
+        assert!(
+            create_row(&authority, &empty).is_err(),
+            "an empty caller key was reserved"
+        );
+    }
+
+    // ID-6: a direct origin is the receiver and has no route; a federated one
+    // has a route and names its gateway.
+    #[test]
+    fn key_reservation_couples_origin_and_route() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        create_row(&authority, &pending_reservation()).unwrap();
+        create_row(&authority, &federated_reservation()).unwrap();
+        let mut routed = pending_reservation();
+        routed.fields["fingerprint"]["route"] =
+            federated_reservation().fields["fingerprint"]["route"].clone();
+        let mut elsewhere = pending_reservation();
+        elsewhere.fields["namespace"]["origin"]["authority_ref"] = json!("other");
+        let mut unrouted = federated_reservation();
+        unrouted.fields["fingerprint"]
+            .as_object_mut()
+            .unwrap()
+            .remove("route");
+        let mut mismatched = federated_reservation();
+        mismatched.fields["namespace"]["origin"]["authority_ref"] = json!("other");
+        for (case, row) in [
+            ("direct with a route", routed),
+            ("direct naming another receiver", elsewhere),
+            ("federated without a route", unrouted),
+            ("federated naming another gateway", mismatched),
+        ] {
+            assert!(create_row(&authority, &row).is_err(), "{case} was reserved");
+        }
+    }
+
+    // ID-7: both stored fingerprints record the one canonicalization.
+    #[test]
+    fn fingerprints_record_the_adapter_v1_canonicalization() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        create_row(&authority, &pending_reservation()).unwrap();
+        let mut reservation = pending_reservation();
+        reservation.fields["fingerprint"]["canonicalization_version"] = json!("future-version");
+        assert!(
+            create_row(&authority, &reservation).is_err(),
+            "a reservation fingerprint with another canonicalization was reserved"
+        );
+        create_row(&authority, &prepared_attempt()).unwrap();
+        let mut attempt = prepared_attempt();
+        attempt.id = format!("s:{}", uuid::Uuid::new_v4());
+        attempt.fields.insert(
+            "attempt_id".into(),
+            json!(attempt.id.strip_prefix("s:").unwrap()),
+        );
+        attempt.fields["request_fingerprint"]["canonicalization_version"] = json!("future-version");
+        assert!(
+            create_row(&authority, &attempt).is_err(),
+            "an attempt fingerprint with another canonicalization was prepared"
+        );
+    }
+
+    // ID-4: only Replayable and Expired reservations carry settlement and expiry.
+    #[test]
+    fn key_reservation_settlement_exists_only_for_a_settled_known_result() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        let mut early = pending_reservation();
+        early
+            .fields
+            .insert("settled_at".into(), json!("2026-09-17T00:00:00Z"));
+        early
+            .fields
+            .insert("replay_expires_at".into(), json!("2026-09-18T00:00:00Z"));
+        assert!(
+            create_row(&authority, &early).is_err(),
+            "a Pending reservation was created with a settlement"
+        );
+        let pending = pending_reservation();
+        create_row(&authority, &pending).unwrap();
+        let mut quarantined = pending.clone();
+        for field in ["settled_at", "replay_expires_at"] {
+            quarantined
+                .fields
+                .insert(field.into(), early.fields[field].clone());
+        }
+        quarantined.lifecycle_state = "Quarantined".into();
+        quarantined.revision = 2;
+        assert!(
+            transition(
+                &authority,
+                &pending,
+                &quarantined,
+                "connectors.idempotency.QuarantineKey"
+            )
+            .is_err(),
+            "a Quarantined reservation kept a settlement"
+        );
+        let mut replayable = quarantined.clone();
+        replayable.lifecycle_state = "Replayable".into();
+        transition(
+            &authority,
+            &pending,
+            &replayable,
+            "connectors.idempotency.RetainResult",
+        )
+        .unwrap();
+        let mut expired = replayable.clone();
+        expired.lifecycle_state = "Expired".into();
+        expired.revision = 3;
+        expired.fields.remove("settled_at");
+        expired.fields.remove("replay_expires_at");
+        assert!(
+            transition(
+                &authority,
+                &replayable,
+                &expired,
+                "connectors.idempotency.ExpireResult"
+            )
+            .is_err(),
+            "an Expired reservation lost its settlement"
+        );
+    }
+
+    // ID-1, ID-2: the lowered commands store the reservation's key, fingerprint
+    // and attempt, and the retained settlement, from the command input rather
+    // than leaving them to host fulfilment.
+    #[test]
+    fn key_reservation_commands_store_their_inputs() {
+        let bundle: Value =
+            serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).unwrap();
+        let definition = &bundle["definitions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["name"] == "connectors.idempotency.KeyReservation")
+            .unwrap()["definition"];
+        let reserved = &definition["create"]["outcomes"][0];
+        for field in ["namespace", "caller_key", "fingerprint", "attempt_id"] {
+            assert_eq!(
+                reserved["set"][field],
+                json!(format!("$args.input.{field}")),
+                "ReserveKey does not store {field} from its input"
+            );
+        }
+        let retained =
+            &definition["operations"]["connectors.idempotency.RetainResult"]["outcomes"][0];
+        for field in ["settled_at", "replay_expires_at"] {
+            assert_eq!(
+                retained["set"][field],
+                json!(format!("$args.input.{field}")),
+                "RetainResult does not store {field} from its input"
+            );
+            assert!(retained["fulfills"].get(field).is_none());
+        }
+    }
+
+    // MU-1: only Aborted, Completed and Failed attempts have a settled timestamp.
+    #[test]
+    fn attempt_settlement_exists_only_for_a_known_terminal_outcome() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        let mut early = prepared_attempt();
+        early
+            .fields
+            .insert("settled_at".into(), json!("2026-09-17T00:00:00Z"));
+        assert!(
+            create_row(&authority, &early).is_err(),
+            "a Prepared attempt was created settled"
+        );
+        let prepared = prepared_attempt();
+        create_row(&authority, &prepared).unwrap();
+        let mut dispatching = prepared.clone();
+        dispatching.lifecycle_state = "Dispatching".into();
+        dispatching.revision = 2;
+        transition(
+            &authority,
+            &prepared,
+            &dispatching,
+            "connectors.mutations.OpenDispatch",
+        )
+        .unwrap();
+        let mut unknown = dispatching.clone();
+        unknown.lifecycle_state = "Indeterminate".into();
+        unknown.revision = 3;
+        unknown
+            .fields
+            .insert("terminal_result_json".into(), json!("{}"));
+        let mut settled_unknown = unknown.clone();
+        settled_unknown
+            .fields
+            .insert("settled_at".into(), json!("2026-09-17T00:00:00Z"));
+        assert!(
+            transition(
+                &authority,
+                &dispatching,
+                &settled_unknown,
+                "connectors.mutations.RecordUncertainty"
+            )
+            .is_err(),
+            "an Indeterminate attempt was settled"
+        );
+        transition(
+            &authority,
+            &dispatching,
+            &unknown,
+            "connectors.mutations.RecordUncertainty",
+        )
+        .unwrap();
+    }
+
+    // MU-2: a required-approval attempt without its captured subject cannot
+    // open dispatch; with the capture it can.
+    #[test]
+    fn required_approval_dispatch_needs_the_captured_subject() {
+        let directory = tempfile::tempdir().unwrap();
+        let authority = empty_authority(&directory);
+        let mut uncaptured = prepared_attempt();
+        uncaptured
+            .fields
+            .insert("approval_mode".into(), json!("required"));
+        uncaptured
+            .fields
+            .insert("approval_ref".into(), json!("a".repeat(64)));
+        create_row(&authority, &uncaptured).unwrap();
+        let mut opened = uncaptured.clone();
+        opened.lifecycle_state = "Dispatching".into();
+        opened.revision = 2;
+        assert!(
+            transition(
+                &authority,
+                &uncaptured,
+                &opened,
+                "connectors.mutations.OpenDispatch"
+            )
+            .is_err(),
+            "a required-approval attempt without its subject opened dispatch"
+        );
+        let mut captured = uncaptured.clone();
+        captured.id = format!("s:{}", uuid::Uuid::new_v4());
+        captured.fields.insert(
+            "attempt_id".into(),
+            json!(captured.id.strip_prefix("s:").unwrap()),
+        );
+        captured.fields.insert(
+            "owner_nonce".into(),
+            json!(uuid::Uuid::new_v4().to_string()),
+        );
+        captured
+            .fields
+            .insert("approval_subject".into(), direct_subject());
+        create_row(&authority, &captured).unwrap();
+        let mut opened = captured.clone();
+        opened.lifecycle_state = "Dispatching".into();
+        opened.revision = 2;
+        transition(
+            &authority,
+            &captured,
+            &opened,
+            "connectors.mutations.OpenDispatch",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn host_derived_commands_without_a_suite_caller_are_accepted() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let use_id = "7d1e4b52-9a0c-4e3f-8b21-5c6d7e8f9a01";
+        let captured = RowImage {
+            entity: "connectors.credential_evidence.ReadUse".into(),
+            id: format!("s:{use_id}"),
+            revision: 1,
+            lifecycle_state: "Captured".into(),
+            fields: json!({
+                "use_id": use_id,
+                "connection_ref": "connection",
+                "generation_id": "3a4b5c6d-7e8f-4a1b-9c2d-3e4f5a6b7c8d",
+                "custody_version_ref": "custody",
+                "publication_fence": "fence",
+                "expires_at": "2026-09-17T00:00:00Z",
+                "dispatch_opened": false,
+                "released": false,
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let cursor_id = "0b6f7f1c-4d0e-4a55-9a53-2d4f3c1e8a11";
+        let cursor = RowImage {
+            entity: "connectors.cli.ConnectionListCursor".into(),
+            id: format!("s:{cursor_id}"),
+            revision: 1,
+            lifecycle_state: "Active".into(),
+            fields: json!({
+                "cursor_id": cursor_id,
+                "instance_id": "instance",
+                "adapter_id": "adapter",
+                "configuration_revision": "configuration",
+                "registry_epoch": 7,
+                "last_connection_ref": "connection",
+                "page_limit": 2,
+                "expires_at": "2026-09-17T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let runtime = RowImage {
+            entity: "connectors.cli.LocalRuntimeRecord".into(),
+            id: "s:instance".into(),
+            revision: 1,
+            lifecycle_state: "Retained".into(),
+            fields: json!({
+                "instance_id": "instance",
+                "suppressed": false,
+                "selection": "selection-1",
+                "bootstrap": {
+                    "instance": "instance",
+                    "adapter": "adapter",
+                    "protocol": "v1alpha1",
+                    "configuration_revision": "configuration",
+                    "provider_authority": "authority",
+                    "descriptor": "{}",
+                    "profiles": [],
+                    "requirements": [],
+                },
+                "observed_at": "2026-09-17T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (authority, _, _) = provision(
+            &path,
+            uuid::Uuid::new_v4(),
+            8,
+            vec![captured.clone(), cursor.clone(), runtime.clone()],
+        )
+        .unwrap();
+
+        for current in [&captured, &cursor] {
+            let (command, mut next) = removal_command(current).unwrap().unwrap();
+            next.revision = 2;
+            transition(&authority, current, &next, command)
+                .unwrap_or_else(|error| panic!("{command} refused: {error:?}"));
+        }
+
+        let mut expired = captured.clone();
+        expired.lifecycle_state = "Expired".into();
+        expired.revision = 2;
+        for (state, command) in [
+            (
+                "Dispatched",
+                "connectors.credential_evidence.DispatchReadUse",
+            ),
+            ("Released", "connectors.credential_evidence.ReleaseReadUse"),
+        ] {
+            let mut next = expired.clone();
+            next.lifecycle_state = state.into();
+            next.revision = 3;
+            assert!(
+                transition(&authority, &expired, &next, command).is_err(),
+                "{command} from Expired was accepted"
+            );
+        }
+
+        let mut remembered = runtime.clone();
+        remembered.revision = 2;
+        remembered
+            .fields
+            .insert("selection".into(), json!("selection-2"));
+        remembered
+            .fields
+            .insert("observed_at".into(), json!("2026-09-18T00:00:00Z"));
+        let command = update_command(&runtime, &remembered).unwrap();
+        assert_eq!(command, "connectors.cli.RememberLocalRuntimeBootstrap");
+        transition(&authority, &runtime, &remembered, command)
+            .unwrap_or_else(|error| panic!("{command} refused: {error:?}"));
+    }
+
+    fn live_connection(connection_ref: &str) -> RowImage {
+        RowImage {
+            entity: "connectors.auth_bindings.Connection".into(),
+            id: format!("s:{connection_ref}"),
+            revision: 1,
+            lifecycle_state: "Live".into(),
+            fields: json!({
+                "connection_ref": connection_ref,
+                "instance_id": "instance",
+                "profile_record_ref": "profile",
+                "profile_ref": "fixture-token",
+                "owner_scope": "9b2f4c1e-3d5a-4e6b-8c7d-0a1b2c3d4e5f",
+                "actor": "connectors-host",
+                "provider_authority": "https://fixture.invalid/authority",
+                "access_mode": "credential",
+                "semantic_revision": "revision",
+                "publication_fence": "4d7e1a2b-5c3f-4a9e-8b6d-1f2e3d4c5b6a",
+                "enabled": true,
+                "published": false,
+                "superseded_custody_version_refs": [],
+                "created_at": "2026-09-17T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        }
+    }
+
+    // Builds the host's own request for this row change, lets the test alter
+    // its input, and executes it: the host always supplies consistent inputs,
+    // so a guard is only observable against a request it would not send.
+    fn execute_altered(
+        authority: &ErAuthority,
+        rows: &[&RowImage],
+        current: &RowImage,
+        next: &RowImage,
+        command: &str,
+        alter: impl FnOnce(&mut Map<String, Value>),
+    ) -> std::result::Result<(), entity_eventlog::sync::SyncExecutionError> {
+        let bundle = definition_bundle().unwrap();
+        let commands = bundle
+            .commands
+            .into_iter()
+            .map(|entry| (entry.name.clone(), entry))
+            .collect::<BTreeMap<_, _>>();
+        let all = rows
+            .iter()
+            .map(|row| ((row.entity.clone(), row.id.clone()), (*row).clone()))
+            .collect::<BTreeMap<_, _>>();
+        let mut action = command_action(
+            &registry().unwrap(),
+            &commands,
+            &all,
+            current,
+            next,
+            command,
+        )
+        .unwrap();
+        let BatchAction::Execute(request) = &mut action else {
+            panic!("{command} is not an update");
+        };
+        alter(request.arguments["input"].as_object_mut().unwrap());
+        authority
+            .facade
+            .execute_batch(
+                context("auth-binding-test"),
+                BatchKey::Named(format!("auth-binding-{}", uuid::Uuid::new_v4())),
+                vec![action],
+                call_wait(),
+            )
+            .map(|_| ())
+    }
+
+    // Every auth_bindings command stores the facts its input carries
+    // (`ess/domains/auth_bindings.yaml`): creation keys and references, the
+    // allocated fence, terminal reasons, and custody acknowledgement, invalidity
+    // and retirement facts. Without the `sets:` these fields are host-filled
+    // slots the definition does not tie to the command.
+    #[test]
+    fn auth_binding_commands_store_the_facts_they_carry() {
+        let bundle: Value =
+            serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).unwrap();
+        let definition = |entity: &str| {
+            bundle["definitions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|entry| entry["name"] == entity)
+                .unwrap()["definition"]
+                .clone()
+        };
+        let set = |entity: &str, operation: Option<&str>, outcome: &str| {
+            let definition = definition(entity);
+            let outcomes = match operation {
+                None => definition["create"]["outcomes"].clone(),
+                Some(operation) => definition["operations"][operation]["outcomes"].clone(),
+            };
+            outcomes
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|candidate| candidate["name"] == outcome)
+                .unwrap()["set"]
+                .clone()
+        };
+        let input = |field: &str| json!(format!("$args.input.{field}"));
+        // (entity, outcome if not the creation, command, expected field sources)
+        type Case<'a> = (&'a str, Option<&'a str>, &'a str, &'a [(&'a str, &'a str)]);
+        let cases: &[Case] = &[
+            (
+                "connectors.auth_bindings.AuthProfile",
+                None,
+                "recorded",
+                &[
+                    ("adapter_id", "adapter_id"),
+                    ("profile_id", "profile_id"),
+                    ("declaration_revision", "declaration_revision"),
+                ],
+            ),
+            (
+                "connectors.auth_bindings.Connection",
+                None,
+                "allocated",
+                &[
+                    ("instance_id", "instance_id"),
+                    ("profile_record_ref", "profile_record_ref"),
+                    ("owner_scope", "owner_scope"),
+                    ("access_mode", "access_mode"),
+                    ("publication_fence", "publication_fence"),
+                ],
+            ),
+            (
+                "connectors.auth_bindings.Acquisition",
+                None,
+                "pending",
+                &[
+                    ("instance_id", "instance_id"),
+                    ("profile_record_ref", "profile_record_ref"),
+                    ("target_connection_ref", "target_connection_ref"),
+                    ("expires_at", "expires_at"),
+                ],
+            ),
+            (
+                "connectors.auth_bindings.CustodyVersion",
+                None,
+                "candidate",
+                &[
+                    ("instance_id", "instance_id"),
+                    ("scope_ref", "scope_ref"),
+                    ("store_version", "store_version"),
+                    ("credential_set", "credential_set"),
+                ],
+            ),
+            (
+                "connectors.auth_bindings.Acquisition",
+                Some("connectors.auth_bindings.CompleteAcquisition"),
+                "completed",
+                &[("result_connection_ref", "result_connection_ref")],
+            ),
+            (
+                "connectors.auth_bindings.Acquisition",
+                Some("connectors.auth_bindings.FailAcquisition"),
+                "failed",
+                &[("terminal_reason", "reason")],
+            ),
+            (
+                "connectors.auth_bindings.CustodyVersion",
+                Some("connectors.auth_bindings.AcknowledgeCustodyWrite"),
+                "stored",
+                &[("acknowledged_at", "acknowledged_at")],
+            ),
+            (
+                "connectors.auth_bindings.CustodyVersion",
+                Some("connectors.auth_bindings.InvalidateCustodyVersion"),
+                "invalidated",
+                &[("invalid_reason", "reason")],
+            ),
+            (
+                "connectors.auth_bindings.CustodyVersion",
+                Some("connectors.auth_bindings.RetireCustodyVersion"),
+                "retiring",
+                &[
+                    ("retirement_fence", "retirement_fence"),
+                    ("retired_at", "retired_at"),
+                    ("retire_not_before", "retire_not_before"),
+                ],
+            ),
+        ];
+        for (entity, operation, outcome, fields) in cases {
+            let set = set(entity, *operation, outcome);
+            for (field, argument) in *fields {
+                assert_eq!(
+                    set[*field],
+                    input(argument),
+                    "{entity} {operation:?} {outcome} does not store {field}"
+                );
+            }
+        }
+        assert_eq!(
+            set(
+                "connectors.auth_bindings.Acquisition",
+                Some("connectors.auth_bindings.ExpireAcquisition"),
+                "expired"
+            )["terminal_reason"],
+            json!("expired")
+        );
+    }
+
+    // `PublishBinding` is compare-and-set on the private publication fence
+    // (`ess/domains/auth_bindings.yaml`, outcome `stale-fence`).
+    #[test]
+    fn binding_publication_refuses_a_stale_publication_fence() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let live = live_connection("conn-fence");
+        let (mut authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![live.clone()]).unwrap();
+        let mut published = live.clone();
+        published.revision = 2;
+        published.fields.insert("published".into(), json!(true));
+        published.fields.insert(
+            "publication_fence".into(),
+            json!("0e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b"),
+        );
+        let command = "connectors.auth_bindings.PublishBinding";
+        assert!(
+            execute_altered(
+                &authority,
+                &[&published],
+                &live,
+                &published,
+                command,
+                |input| {
+                    input.get_mut("publication").unwrap()["expected_publication_fence"] =
+                        json!("5f4e3d2c-1b0a-4f9e-8d7c-6b5a4f3e2d1c");
+                }
+            )
+            .is_err(),
+            "a publication under a stale fence was recorded"
+        );
+        execute_altered(
+            &authority,
+            &[&published],
+            &live,
+            &published,
+            command,
+            |_| {},
+        )
+        .unwrap();
+        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        let recorded = authority
+            .baseline
+            .get(&(live.entity.clone(), live.id.clone()))
+            .unwrap();
+        assert_eq!(
+            recorded.fields["publication_fence"],
+            published.fields["publication_fence"]
+        );
+    }
+
+    // `CompleteAcquisition` yields exactly its fixed target
+    // (`ess/domains/auth_bindings.yaml`, outcome `result-mismatch`).
+    #[test]
+    fn acquisition_completion_refuses_a_result_other_than_its_target() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let target = live_connection("conn-target");
+        let other = live_connection("conn-other");
+        let acquisition_ref = "acq-fixture";
+        let completing = RowImage {
+            entity: "connectors.auth_bindings.Acquisition".into(),
+            id: format!("s:{acquisition_ref}"),
+            revision: 1,
+            lifecycle_state: "Completing".into(),
+            fields: json!({
+                "acquisition_ref": acquisition_ref,
+                "instance_id": "instance",
+                "profile_record_ref": "profile",
+                "owner_scope": target.fields["owner_scope"],
+                "admitted_origin_ref": "local-static-entry",
+                "protected_correlation_ref": "c3b2a190-8f7e-4d6c-9b5a-4f3e2d1c0b9a",
+                "expires_at": "2026-09-17T00:05:00Z",
+                "expected_publication_fence": target.fields["publication_fence"],
+                "target_connection_ref": "conn-target",
+                "owner_token": "00000000-0000-4000-8000-000000000001",
+                "created_at": "2026-09-17T00:00:00Z",
+                "consumed_at": "2026-09-17T00:00:01Z",
+                "generation_id": "b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e",
+                "captured_snapshot_ref": "c3b2a190-8f7e-4d6c-9b5a-4f3e2d1c0b9a",
+                "candidate_custody_version_ref": "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f7a",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (authority, _, _) = provision(
+            &path,
+            uuid::Uuid::new_v4(),
+            8,
+            vec![target.clone(), other.clone(), completing.clone()],
+        )
+        .unwrap();
+        let command = "connectors.auth_bindings.CompleteAcquisition";
+        let completed = |result: &str| {
+            let mut completed = completing.clone();
+            completed.revision = 2;
+            completed.lifecycle_state = "Completed".into();
+            completed
+                .fields
+                .insert("result_connection_ref".into(), json!(result));
+            completed
+        };
+        let elsewhere = completed("conn-other");
+        assert!(
+            execute_altered(
+                &authority,
+                &[&target, &other, &elsewhere],
+                &completing,
+                &elsewhere,
+                command,
+                |_| {}
+            )
+            .is_err(),
+            "a completion yielded a Connection other than its target"
+        );
+        let exact = completed("conn-target");
+        execute_altered(
+            &authority,
+            &[&target, &other, &exact],
+            &completing,
+            &exact,
+            command,
+            |_| {},
+        )
+        .unwrap();
+    }
+
+    // Connection and CustodyVersion invariants (`ess/domains/auth_bindings.yaml`):
+    // active custody requires an active generation, and a recorded byte size is
+    // 1–65536.
+    #[test]
+    fn auth_binding_invariants_refuse_custody_without_generation_and_oversized_material() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let live = live_connection("conn-invariant");
+        let version_ref = "e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a8b";
+        let candidate = RowImage {
+            entity: "connectors.auth_bindings.CustodyVersion".into(),
+            id: format!("s:{version_ref}"),
+            revision: 1,
+            lifecycle_state: "Candidate".into(),
+            fields: json!({
+                "version_ref": version_ref,
+                "instance_id": "instance",
+                "scope_ref": live.fields["owner_scope"],
+                "store_version": version_ref,
+                "credential_set": {
+                    "kind": "local-static-entry",
+                    "material_handle": version_ref,
+                    "size_bytes": 12,
+                },
+                "byte_size": 12,
+                "connection_ref": "conn-invariant",
+                "acquisition_ref": "acq-invariant",
+                "generation_id": "f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b9c",
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (authority, _, _) = provision(
+            &path,
+            uuid::Uuid::new_v4(),
+            8,
+            vec![live.clone(), candidate.clone()],
+        )
+        .unwrap();
+
+        let publish = "connectors.auth_bindings.PublishBinding";
+        let mut custody_only = live.clone();
+        custody_only.revision = 2;
+        custody_only
+            .fields
+            .insert("active_custody_version_ref".into(), json!(version_ref));
+        assert!(
+            execute_altered(
+                &authority,
+                &[&custody_only],
+                &live,
+                &custody_only,
+                publish,
+                |_| {}
+            )
+            .is_err(),
+            "active custody was recorded without an active generation"
+        );
+        let mut both = custody_only.clone();
+        both.fields.insert(
+            "active_generation_id".into(),
+            candidate.fields["generation_id"].clone(),
+        );
+        execute_altered(&authority, &[&both], &live, &both, publish, |_| {}).unwrap();
+
+        let acknowledge = "connectors.auth_bindings.AcknowledgeCustodyWrite";
+        let stored = |byte_size: i64| {
+            let mut stored = candidate.clone();
+            stored.revision = 2;
+            stored.lifecycle_state = "Stored".into();
+            stored
+                .fields
+                .insert("acknowledged_at".into(), json!("2026-09-17T00:00:02Z"));
+            stored.fields.insert("byte_size".into(), json!(byte_size));
+            stored
+        };
+        let oversized = stored(65_537);
+        assert!(
+            transition(&authority, &candidate, &oversized, acknowledge).is_err(),
+            "a byte size above 65536 was recorded"
+        );
+        transition(&authority, &candidate, &stored(65_536), acknowledge).unwrap();
     }
 }

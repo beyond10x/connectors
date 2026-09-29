@@ -2,13 +2,25 @@ domain: connectors.approval_issuers
 summary: Local issuer identities and immutable signing-key versions with guarded publication.
 # Normative owner: contracts/service/approval-issuers.md. These are trusted host
 # decisions, not caller authority, custody implementations or public wire codecs.
+# approval-issuers.md:12-13: public issuer and audience strings. The rule that
+# the suffix is the issuer UUID needs string composition; the host derives both
+# from issuer_id (er.rs local_approval_issuers).
+types:
+  - name: connectors.approval_issuers.IssuerName
+    kind: newtype
+    of: String
+    prefix: "connectors.local-issuer/"
+  - name: connectors.approval_issuers.AudienceName
+    kind: newtype
+    of: String
+    prefix: "connectors.approval/"
 entities:
   - name: connectors.approval_issuers.ApprovalIssuer
     identity: {name: issuer_id, type: Uuid}
     fields:
       - {name: instance_id, type: String}
-      - {name: issuer, type: String}
-      - {name: audience, type: String}
+      - {name: issuer, type: connectors.approval_issuers.IssuerName}
+      - {name: audience, type: connectors.approval_issuers.AudienceName}
       - {name: revision, type: Uuid}
       - {name: custody_scope_ref, type: Uuid}
     relations:
@@ -31,6 +43,11 @@ entities:
       - {name: material_version, type: Uuid}
     relations:
       - {name: issuer, kind: references, target: connectors.approval_issuers.ApprovalIssuer, cardinality: one, via: issuer_id}
+    # approval-issuers.md:22-23: validity bounds [0, 9007199254740991) Unix ms.
+    # The host records exactly 0 and 9007199254740991 (approval_keys.rs MAX_TIME).
+    invariants:
+      - not_before_unix_ms: {gte: 0, lte: 9007199254740991}
+      - not_after_unix_ms: {gte: 0, lte: 9007199254740991}
     lifecycle:
       initial: Candidate
       states: [Candidate, Active, Retired, Retiring, Deleted]
@@ -45,8 +62,8 @@ commands:
     input:
       - {name: issuer_id, type: Uuid}
       - {name: instance_id, type: String}
-      - {name: issuer, type: String}
-      - {name: audience, type: String}
+      - {name: issuer, type: connectors.approval_issuers.IssuerName}
+      - {name: audience, type: connectors.approval_issuers.AudienceName}
       - {name: revision, type: Uuid}
       - {name: custody_scope_ref, type: Uuid}
     outcomes:
@@ -66,8 +83,20 @@ commands:
   - name: connectors.approval_issuers.AdvanceIssuerRevision
     input:
       - {name: issuer_id, type: Uuid}
+      - {name: expected_revision, type: Uuid}
       - {name: revision, type: Uuid}
     outcomes:
+      # approval-issuers.md:18,76-77: management names the current revision
+      # (approval_keys.rs Record::expect) and each admitted decision writes a
+      # fresh random revision (approval_keys.rs bump; the column is UNIQUE).
+      - name: revision-conflict
+        when_subject:
+          predicate: revision != input.expected_revision
+        error: connectors.approval_issuers.IssuerRevisionConflict
+      - name: revision-reused
+        when_subject:
+          predicate: revision == input.revision
+        error: connectors.approval_issuers.IssuerRevisionReused
       - name: advanced
         moves: connectors.approval_issuers.ApprovalIssuer.advance_revision
         instance: issuer_id
@@ -137,13 +166,57 @@ events:
   - name: connectors.approval_issuers.KeyDeleted
     fields: [{name: key_id, type: Uuid}]
 errors:
+  - name: connectors.approval_issuers.IssuerRevisionConflict
+    fields: [{name: issuer_id, type: Uuid}]
+  - name: connectors.approval_issuers.IssuerRevisionReused
+    fields: [{name: issuer_id, type: Uuid}]
   - name: connectors.approval_issuers.KeyStateConflict
     fields:
       - {name: state, type: connectors.approval_issuers.ApprovalSigningKey.State}
 # ESS-LIMIT: durable custody acknowledgements, purpose-separated private locators,
-# revision CAS, at-most-one active/candidate, bounded retention, atomic publication
-# plus old-key retirement, trusted caller policy/time, and process lease exclusion
-# require the host binding. ESS 0.36 has no cross-record constraint (at most one
-# key per state per issuer), no multi-record transaction, no compare-and-set or
-# durable-acknowledgement construct and no trusted-time or process-lease construct.
+# at-most-one active/candidate, one issuer per instance, the 128-key bound, atomic
+# publication plus old-key retirement and revoke of the pending candidate, key
+# commands fenced by the issuer revision, trusted caller policy/time, and process
+# lease exclusion require the host binding. ESS 0.40 has no cross-record
+# constraint (at most one key per state per issuer, uniqueness of a non-identity
+# field, a count of sibling rows), no guard that reads another entity's field,
+# no transition inside `affects:` and no state read in its `where`, no
+# duplicate-identity refusal that lowers to Entity Runtime (`existing_instance:`
+# is refused there), and no durable-acknowledgement, trusted-time or
+# process-lease construct. The issuer's own revision CAS is declared above.
 # No entity here stores a seed or grants approval use.
+
+views:
+  - name: connectors.approval_issuers.ApprovalIssuers
+    source: connectors.approval_issuers.ApprovalIssuer
+    consistency: read_your_writes
+    fields:
+      - {name: issuer_id, type: Uuid}
+      - {name: instance_id, type: String}
+      - {name: issuer, type: connectors.approval_issuers.IssuerName}
+      - {name: audience, type: connectors.approval_issuers.AudienceName}
+      - {name: revision, type: Uuid}
+      - {name: custody_scope_ref, type: Uuid}
+      - {name: state, type: connectors.approval_issuers.ApprovalIssuer.State}
+  - name: connectors.approval_issuers.ApprovalSigningKeys
+    source: connectors.approval_issuers.ApprovalSigningKey
+    consistency: read_your_writes
+    fields:
+      - {name: key_id, type: Uuid}
+      - {name: issuer_id, type: Uuid}
+      - {name: public_key, type: String}
+      - {name: not_before_unix_ms, type: Integer}
+      - {name: not_after_unix_ms, type: Integer}
+      - {name: material_version, type: Uuid}
+      - {name: state, type: connectors.approval_issuers.ApprovalSigningKey.State}
+
+actors:
+  - name: connectors.approval_issuers.LocalHost
+    may:
+      - connectors.approval_issuers.AdvanceIssuerRevision
+      - connectors.approval_issuers.BindIssuer
+      - connectors.approval_issuers.ConfirmKeyDeletion
+      - connectors.approval_issuers.PublishKey
+      - connectors.approval_issuers.RetireKey
+      - connectors.approval_issuers.RevokeKey
+      - connectors.approval_issuers.StageKey

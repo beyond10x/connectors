@@ -22,3 +22,6 @@ ess-domain.workspace = true
 ess-entity-runtime.workspace = true
 ess-service-contract.workspace = true
 ess-synth.workspace = true
+ess-conformance.workspace = true
+ess-primitives.workspace = true
+entity-core.workspace = true
