@@ -37,21 +37,53 @@ struct ConfigInput {
     #[serde(default)]
     adapters: BTreeMap<String, Adapter>,
 }
-impl TryFrom<ConfigInput> for Config {
-    type Error = &'static str;
-    fn try_from(input: ConfigInput) -> std::result::Result<Self, Self::Error> {
-        let config = Self {
+impl Config {
+    fn assemble(input: ConfigInput) -> Self {
+        Self {
             format: input.format,
             owner_uid: input.owner_uid,
             approval_clock: input.approval_clock,
             secret_service_socket: input.secret_service_socket,
             default_adapter: input.default_adapter,
             adapters: input.adapters,
-        };
+        }
+    }
+}
+impl TryFrom<ConfigInput> for Config {
+    type Error = &'static str;
+    fn try_from(input: ConfigInput) -> std::result::Result<Self, Self::Error> {
+        let config = Self::assemble(input);
         config
             .validate()
             .map_err(|_| "invalid local configuration")?;
         Ok(config)
+    }
+}
+
+/// Why a configuration file was refused. Only operator-written, already
+/// admitted coordinates are carried; never parser, OS or database text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Refusal {
+    Failure(Failure),
+    /// An entry's `private_protocol` presence contradicts the file's format:
+    /// `connectors-local/1` forbids it, `connectors-local/2` requires it.
+    /// `format` is one of those two values and `instance_id` a valid selector.
+    PrivateProtocolMismatch {
+        format: String,
+        instance_id: String,
+    },
+}
+impl Refusal {
+    pub fn failure(&self) -> Failure {
+        match self {
+            Self::Failure(failure) => *failure,
+            Self::PrivateProtocolMismatch { .. } => Failure::InvalidConfiguration,
+        }
+    }
+}
+impl From<Failure> for Refusal {
+    fn from(failure: Failure) -> Self {
+        Self::Failure(failure)
     }
 }
 
@@ -172,14 +204,27 @@ fn selector(value: &str) -> bool {
 
 impl Config {
     pub fn load(path: &Path) -> Result<Self> {
+        Self::read(path).map_err(|refusal| refusal.failure())
+    }
+
+    /// Load like [`Config::load`], keeping which rule refused the file where
+    /// that can be named by operator-written coordinates alone.
+    pub fn read(path: &Path) -> std::result::Result<Self, Refusal> {
         let bytes = fs::read_bounded(fs::private_file(path)?, 1024 * 1024)?;
         let text = std::str::from_utf8(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
-        let config: Self = toml::from_str(text).map_err(|_| Failure::InvalidConfiguration)?;
-        config.validate()?;
+        // Decode the closed envelope without its embedded validation, so the
+        // refusal below can name its rule instead of collapsing into serde's.
+        let input: ConfigInput = toml::from_str(text).map_err(|_| Failure::InvalidConfiguration)?;
+        let config = Self::assemble(input);
+        config.check()?;
         Ok(config)
     }
 
     pub fn validate(&self) -> Result<()> {
+        self.check().map_err(|refusal| refusal.failure())
+    }
+
+    fn check(&self) -> std::result::Result<(), Refusal> {
         if let Some(clock) = &self.approval_clock {
             clock
                 .validate()
@@ -198,7 +243,7 @@ impl Config {
                 .as_ref()
                 .is_some_and(|alias| !self.adapters.contains_key(alias))
         {
-            return Err(Failure::InvalidConfiguration);
+            return Err(Failure::InvalidConfiguration.into());
         }
         let mut instances = BTreeSet::new();
         for (alias, entry) in &self.adapters {
@@ -221,7 +266,6 @@ impl Config {
                 || !selector(&entry.configuration_revision)
                 || !instances.insert(&entry.instance_id)
                 || entry.protocol != "v1alpha1"
-                || (self.format == "connectors-local/2") != entry.private_protocol.is_some()
                 || entry.permissions.profiles.len() > 64
                 || entry.permissions.operations.len() > 256
                 || entry
@@ -243,9 +287,24 @@ impl Config {
                     .iter()
                     .any(|arg| arg.len() > 4096 || arg.contains('\0'))
             {
-                return Err(Failure::InvalidConfiguration);
+                return Err(Failure::InvalidConfiguration.into());
             }
             fs::validate_path(&entry.executable.path)?;
+        }
+        // Named only once every entry passed every other check, so the refusal
+        // does not depend on alias order and both coordinates are already a
+        // supported format and a valid selector. The first mismatch in alias
+        // order is named.
+        let current = self.format == "connectors-local/2";
+        if let Some(entry) = self
+            .adapters
+            .values()
+            .find(|entry| current != entry.private_protocol.is_some())
+        {
+            return Err(Refusal::PrivateProtocolMismatch {
+                format: self.format.clone(),
+                instance_id: entry.instance_id.clone(),
+            });
         }
         Ok(())
     }
