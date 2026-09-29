@@ -23,6 +23,23 @@ use std::{
 pub struct Client {
     stream: UnixStream,
     pub host_incarnation: String,
+    /// The owner's executable digest; `None` for an owner that predates the
+    /// build handshake, which is by definition another build.
+    owner_build: Option<String>,
+}
+/// SHA-256 of this process's own executable image, measured once. Reading
+/// `/proc/self/exe` measures the image actually running, even after the file it
+/// was started from has been replaced on disk.
+fn own_build() -> Result<&'static str> {
+    static BUILD: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    BUILD
+        .get_or_init(|| {
+            std::fs::read("/proc/self/exe")
+                .ok()
+                .map(|image| hex::encode(Sha256::digest(image)))
+        })
+        .as_deref()
+        .ok_or_else(|| Code::Unavailable.into())
 }
 pub struct WriteClient(Client);
 const WRITE_VERSION: &str = "connectors-owner/2";
@@ -109,7 +126,11 @@ impl Client {
         loop {
             crate::local::protected::cancellation()?;
             match connect_socket(&socket) {
-                Ok(stream) => return Self::greet(stream, paths, &authority, version, deadline),
+                Ok(stream) => {
+                    return Self::greet_running(
+                        &socket, stream, paths, &authority, version, deadline,
+                    );
+                }
                 Err(error) if !start => return Err(error),
                 Err(error) if error.code != Code::Unavailable => return Err(error),
                 Err(_) => {}
@@ -121,10 +142,19 @@ impl Client {
             // SAFETY: the held owner-only file is the one admitted lifetime lock.
             if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
                 if let Ok(stream) = connect_socket(&socket) {
-                    return Self::greet(stream, paths, &authority, version, deadline);
+                    return Self::greet_running(
+                        &socket, stream, paths, &authority, version, deadline,
+                    );
                 }
                 let (stream, mut process) = spawn(paths, &lock, deadline)?;
-                let result = Self::greet(stream, paths, &authority, version, deadline);
+                let result = Self::greet(
+                    stream,
+                    paths,
+                    &authority,
+                    version,
+                    Some(own_build()?),
+                    deadline,
+                );
                 if result.is_err() {
                     let _ = process.kill();
                     let _ = process.wait();
@@ -141,47 +171,163 @@ impl Client {
             std::thread::sleep(Duration::from_millis(20));
         }
     }
+    /// Greets an owner that was already running. An owner built before the
+    /// build handshake closes the stream on the unknown `build` field without
+    /// any reply. A stream can also close without a reply for a reason that has
+    /// nothing to do with the build, so a silent close is never taken as proof:
+    /// the CLI greets without `build` and then asks for the build on that same
+    /// established stream. An owner that answers knows the handshake, and the
+    /// greeting with `build` is repeated; only an owner that accepts the
+    /// greeting and then closes on the unknown request is identified as one
+    /// from before the handshake. A reply of any kind, including a refusal,
+    /// keeps its own code. No work request is sent during identification.
+    fn greet_running(
+        socket: &std::path::Path,
+        mut stream: UnixStream,
+        paths: &Paths,
+        authority: &str,
+        version: &str,
+        deadline: Instant,
+    ) -> Result<Self> {
+        let build = own_build()?;
+        // Starts at the 20 ms startup-poll pause and doubles, so one transient
+        // close costs 20 ms and a persistently odd owner is not flooded.
+        let mut pause = Duration::from_millis(20);
+        loop {
+            let silent = match Self::hello(stream, paths, authority, version, Some(build), deadline)
+            {
+                Ok(answer) => return answer,
+                Err(silent) => silent,
+            };
+            let probe = Self::greet(
+                connect_socket(socket)?,
+                paths,
+                authority,
+                VERSION,
+                None,
+                deadline,
+            )?;
+            match probe.probe_build(deadline) {
+                Ok(()) => {}
+                Err(None) => {
+                    return Self::greet(
+                        connect_socket(socket)?,
+                        paths,
+                        authority,
+                        VERSION,
+                        None,
+                        deadline,
+                    );
+                }
+                Err(Some(error)) => return Err(error),
+            }
+            if Instant::now() >= deadline {
+                return Err(silent);
+            }
+            std::thread::sleep(pause.min(deadline.saturating_duration_since(Instant::now())));
+            pause = (pause * 2).min(Duration::from_secs(1));
+            stream = connect_socket(socket)?;
+        }
+    }
+    /// `Ok(())` when the owner answers with its build; `Err(None)` when it
+    /// closes the established stream without any reply.
+    fn probe_build(mut self, deadline: Instant) -> std::result::Result<(), Option<Error>> {
+        let silent = |error: Error| {
+            if error.code == Code::Unavailable {
+                None
+            } else {
+                Some(error)
+            }
+        };
+        channel::write(&mut self.stream, &Request::Build, None, &[], deadline)
+            .map_err(|error| silent(error.into()))?;
+        let frame =
+            read_reply(&mut self.stream, deadline, runtime::RESULT_LIMIT).map_err(silent)?;
+        match frame.control {
+            Reply::Success
+                if connectors_core::read_json::<Value>(&frame.document)
+                    .ok()
+                    .and_then(|value| value.get("build").and_then(Value::as_str).map(str::len))
+                    == Some(64) =>
+            {
+                Ok(())
+            }
+            Reply::Failed { error } => Err(Some(error)),
+            _ => Err(Some(Code::ReadinessMismatch.into())),
+        }
+    }
     fn greet(
+        stream: UnixStream,
+        paths: &Paths,
+        authority: &str,
+        selected_version: &str,
+        build: Option<&str>,
+        deadline: Instant,
+    ) -> Result<Self> {
+        Self::hello(stream, paths, authority, selected_version, build, deadline).unwrap_or_else(Err)
+    }
+    /// The outer `Err` means the stream closed before any reply arrived; the
+    /// inner result is the owner's answer.
+    fn hello(
         mut stream: UnixStream,
         paths: &Paths,
         authority: &str,
         selected_version: &str,
+        build: Option<&str>,
         deadline: Instant,
-    ) -> Result<Self> {
-        channel::peer(&stream)?;
+    ) -> std::result::Result<Result<Self>, Error> {
+        let closed = |error: Error| {
+            if error.code == Code::Unavailable {
+                Err(error)
+            } else {
+                Ok(Err(error))
+            }
+        };
+        if let Err(error) = channel::peer(&stream) {
+            return Ok(Err(error.into()));
+        }
         let challenge = uuid::Uuid::new_v4().to_string();
-        channel::write(
+        if let Err(error) = channel::write(
             &mut stream,
             &Request::Hello {
                 version: selected_version.into(),
                 challenge: challenge.clone(),
                 configuration: paths.config.clone(),
                 authority: authority.into(),
+                build: build.map(str::to_owned),
             },
             None,
             &[],
             deadline,
-        )?;
-        let reply = read_reply(&mut stream, deadline, 0)?;
-        match reply.control {
+        ) {
+            return closed(error.into());
+        }
+        let reply = match read_reply(&mut stream, deadline, 0) {
+            Ok(reply) => reply,
+            Err(error) => return closed(error),
+        };
+        Ok(match reply.control {
             Reply::Hello {
                 version,
                 challenge: returned,
                 host_incarnation,
                 authority: returned_authority,
+                build: owner_build,
             } if version == selected_version
                 && returned == challenge
                 && returned_authority == authority
+                && owner_build.is_some() == build.is_some()
                 && uuid::Uuid::parse_str(&host_incarnation).is_ok() =>
             {
                 Ok(Self {
                     stream,
                     host_incarnation,
+                    owner_build,
                 })
             }
             Reply::Failed { error } => Err(error),
             _ => Err(Code::ReadinessMismatch.into()),
-        }
+        })
     }
     pub fn begin(
         mut self,
@@ -190,6 +336,7 @@ impl Client {
         connection: Option<String>,
         expected_revision: Option<String>,
     ) -> Result<Capture> {
+        self.same_build()?;
         let deadline = Instant::now() + Duration::from_secs(40);
         channel::write(
             &mut self.stream,
@@ -231,6 +378,7 @@ impl Client {
         document: &[u8],
         deadline_ms: u64,
     ) -> Result<Value> {
+        self.same_build()?;
         crate::local::protected::cancellation()?;
         let request = Request::Invoke {
             adapter: adapter.into(),
@@ -256,6 +404,7 @@ impl Client {
         revision: &str,
         deadline_ms: u64,
     ) -> Result<Value> {
+        self.same_build()?;
         crate::local::protected::cancellation()?;
         channel::write(
             &mut self.stream,
@@ -277,6 +426,7 @@ impl Client {
         })
     }
     pub fn status(mut self, adapter: &str) -> Result<Value> {
+        self.same_build()?;
         self.simple(
             Request::Status {
                 adapter: adapter.into(),
@@ -291,6 +441,7 @@ impl Client {
         host: &str,
         child: &str,
     ) -> Result<Value> {
+        self.same_build()?;
         self.simple(
             Request::Stop {
                 adapter: adapter.into(),
@@ -311,6 +462,16 @@ impl Client {
             Duration::from_secs(5),
         )
         .map(|_| ())
+    }
+    /// Refuses work on an owner running a different executable than this CLI.
+    /// Stopping or replacing that owner is left to the user; `shutdown` stays
+    /// available across builds so the old owner can still be stopped.
+    fn same_build(&self) -> Result<()> {
+        if self.owner_build.as_deref() == Some(own_build()?) {
+            Ok(())
+        } else {
+            Err(Code::OwnerBuildMismatch.into())
+        }
     }
     fn simple(&mut self, request: Request, span: Duration) -> Result<Value> {
         let deadline = Instant::now() + span;
@@ -339,7 +500,10 @@ impl WriteClient {
                 .until()?
                 .min(Instant::now() + Duration::from_secs(10)),
         )
-        .map(Self)
+        .and_then(|client| {
+            client.same_build()?;
+            Ok(Self(client))
+        })
     }
     pub fn invoke(
         mut self,
@@ -490,6 +654,7 @@ struct Owner {
     paths: Arc<Paths>,
     authority: String,
     incarnation: String,
+    build: &'static str,
     pool: Arc<supervisor::Pool>,
     shutdown: AtomicBool,
     clients: AtomicUsize,
@@ -498,6 +663,7 @@ pub fn serve(paths: Paths) -> Result<()> {
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
     let (startup, lifetime) = inherited()?;
+    let build = own_build()?;
     let config = Config::load(&paths.config)?;
     let directory = fs::directory(&paths.state, false, true)?;
     let metadata = Metadata::update(&paths.state, true)?;
@@ -538,6 +704,7 @@ pub fn serve(paths: Paths) -> Result<()> {
         paths: paths.clone(),
         authority,
         incarnation: incarnation.clone(),
+        build,
         pool: Arc::new(supervisor::Pool::new(paths, incarnation)),
         shutdown: AtomicBool::new(false),
         clients: AtomicUsize::new(0),
@@ -605,6 +772,18 @@ fn handle(owner: Arc<Owner>, mut stream: UnixStream) -> Result<()> {
     channel::peer(&stream)?;
     if owner.clients.fetch_add(1, Ordering::SeqCst) >= 32 {
         owner.clients.fetch_sub(1, Ordering::SeqCst);
+        // Answer instead of closing silently: a stream closed without any reply
+        // sends the CLI into build identification. Every earlier build reads
+        // this reply as a greeting failure with its existing capacity code.
+        let _ = channel::write(
+            &mut stream,
+            &Reply::Failed {
+                error: Code::Capacity.into(),
+            },
+            None,
+            &[],
+            Instant::now() + Duration::from_millis(500),
+        );
         return Err(Code::Capacity.into());
     }
     let tracked = owner.clone();
@@ -629,6 +808,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
         challenge,
         configuration,
         authority,
+        build,
     } = hello.control
     else {
         return Err(Code::InvalidInput.into());
@@ -647,6 +827,9 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
             challenge,
             host_incarnation: owner.incarnation.clone(),
             authority: owner.authority.clone(),
+            // The caller compares and refuses; answering a caller that did not
+            // ask keeps the reply readable by builds before the handshake.
+            build: build.map(|_| owner.build.to_owned()),
         },
         None,
         &[],
@@ -813,6 +996,12 @@ fn action(
         }
         owner.pool.shutdown()?;
         return Ok(json!({}));
+    }
+    if let Request::Build = request {
+        if !document.is_empty() {
+            return Err(Code::InvalidInput.into());
+        }
+        return Ok(json!({ "build": owner.build }));
     }
     let alias = match &request {
         Request::Begin { adapter, .. }
@@ -1068,5 +1257,139 @@ fn action(
             )
         }
         _ => Err(Code::InvalidInput.into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    /// The greeting an owner built before the build handshake understands.
+    #[derive(Deserialize)]
+    #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+    enum LegacyRequest {
+        Hello {
+            version: String,
+            challenge: String,
+            #[allow(dead_code)]
+            configuration: PathBuf,
+            authority: String,
+        },
+        Status {
+            #[allow(dead_code)]
+            adapter: String,
+        },
+        Shutdown {
+            #[allow(dead_code)]
+            host_incarnation: String,
+        },
+    }
+    #[derive(Serialize)]
+    #[serde(tag = "kind", rename_all = "snake_case")]
+    enum LegacyReply {
+        Hello {
+            version: String,
+            challenge: String,
+            host_incarnation: String,
+            authority: String,
+        },
+        Success,
+    }
+
+    /// Serves `connections` exchanges the way an owner from an earlier build
+    /// does: a greeting it cannot parse closes the stream without a reply.
+    fn legacy_owner(
+        listener: UnixListener,
+        connections: usize,
+        seen: Arc<Mutex<Vec<&'static str>>>,
+    ) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            for _ in 0..connections {
+                let (mut stream, _) = listener.accept().unwrap();
+                let until = Instant::now() + Duration::from_secs(5);
+                let Ok(hello) = channel::read::<LegacyRequest>(&mut stream, until, false, 0) else {
+                    seen.lock().unwrap().push("refused_greeting");
+                    continue;
+                };
+                let LegacyRequest::Hello {
+                    version,
+                    challenge,
+                    authority,
+                    ..
+                } = hello.control
+                else {
+                    panic!("first frame must be a greeting");
+                };
+                seen.lock().unwrap().push("greeting");
+                channel::write(
+                    &mut stream,
+                    &LegacyReply::Hello {
+                        version,
+                        challenge,
+                        host_incarnation: uuid::Uuid::new_v4().to_string(),
+                        authority,
+                    },
+                    None,
+                    &[],
+                    until,
+                )
+                .unwrap();
+                let Ok(frame) =
+                    channel::read::<LegacyRequest>(&mut stream, until, false, runtime::INPUT_LIMIT)
+                else {
+                    continue;
+                };
+                seen.lock().unwrap().push(match frame.control {
+                    LegacyRequest::Status { .. } => "status",
+                    LegacyRequest::Shutdown { .. } => "shutdown",
+                    LegacyRequest::Hello { .. } => "hello",
+                });
+                channel::write(&mut stream, &LegacyReply::Success, None, b"{}", until).unwrap();
+            }
+        })
+    }
+
+    #[test]
+    fn an_owner_from_an_earlier_build_is_refused_by_name_and_left_running() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        let socket = paths.state.join("owner.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let owner = legacy_owner(listener, 6, seen.clone());
+
+        let refused = Client::connect(&paths, false)
+            .and_then(|client| client.status("forge"))
+            .map_err(|error| serde_json::to_value(error.code).unwrap());
+        assert_eq!(refused, Err(json!("owner_build_mismatch")));
+
+        // The remedy stays reachable: the earlier owner can still be asked to stop.
+        let client = Client::connect(&paths, false).unwrap();
+        let host = client.host_incarnation.clone();
+        client.shutdown(&host).unwrap();
+        owner.join().unwrap();
+        assert_eq!(
+            *seen.lock().unwrap(),
+            [
+                // status: silent close, greeting then the build probe it cannot
+                // parse (closed, unrecorded), greeting that is refused client-side
+                "refused_greeting",
+                "greeting",
+                "greeting",
+                // shutdown stays reachable across builds
+                "refused_greeting",
+                "greeting",
+                "greeting",
+                "shutdown"
+            ],
+            "no work request may reach an owner from another build"
+        );
     }
 }
