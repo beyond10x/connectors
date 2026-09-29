@@ -48,6 +48,16 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
+#[cfg(test)]
+pub(super) fn full_replays() -> u64 {
+    er::full_replays()
+}
+
+#[cfg(test)]
+pub(super) fn simulate_process(id: u64) {
+    er::simulate_process(id);
+}
+
 /// Runs on this thread each time an observation, having replayed ER outside
 /// the lifecycle lock, is about to take that lock back: the exact window in
 /// which another writer can advance what the observation read.
@@ -167,9 +177,12 @@ fn take_migration_fault(point: u8) -> bool {
 }
 
 pub struct Metadata {
-    // Field drop order matters: SQLite closes and retires sidecars while the
+    // Field drop order matters: this physical connection closes while the
     // lifecycle lock is still held. Releasing at open/validate left a race with
     // another process admitting a sidecar that the last connection was deleting.
+    // The recorded authority is not closed here: `Drop` returns it to the
+    // process pool, and its Eventlog SQLite handle outlives the lock (see
+    // `lifecycle_lock`).
     pub(super) connection: Connection,
     er: Option<er::ErAuthority>,
     durable_path: PathBuf,
@@ -178,7 +191,32 @@ pub struct Metadata {
     concurrent_observation: bool,
 }
 
+impl Drop for Metadata {
+    fn drop(&mut self) {
+        // The replayed authority outlives this handle: the next open of the
+        // same store in this process reads only what was appended since.
+        if let Some(er) = self.er.take() {
+            er::release(er);
+        }
+    }
+}
+
 impl Metadata {
+    /// The recorded state this handle's authority holds, for comparing a
+    /// reopened handle with a fresh replay.
+    #[cfg(test)]
+    pub(super) fn recorded_rows(&self) -> Vec<String> {
+        self.er
+            .as_ref()
+            .map(|er| {
+                er::baseline_rows(er)
+                    .iter()
+                    .map(|row| format!("{row:?}"))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     pub fn initialize(path: &Path) -> Result<Self> {
         let dir = fs::directory(path, false, true).map_err(|_| Failure::MetadataUnavailable)?;
         match fs::publish_new(&dir, OsStr::new(LOCK), &[]) {
@@ -879,9 +917,15 @@ fn admit_sidecars(dir: &std::fs::File) -> Result<()> {
 }
 
 // Protect physical SQLite admission, initial WAL installation, migration and
-// last-close sidecar retirement. Established ER observations close that physical
-// handle before releasing the OS lock; ordinary business writes retain it.
-// No handle may be retained across provider work.
+// the physical connection's close. Established ER observations close that
+// physical handle before releasing the OS lock; ordinary business writes retain
+// it. No physical handle or lock is retained across provider work. The recorded
+// authority's Eventlog SQLite handle is different: a released authority stays
+// open in the process pool, outside this lock, until the pool evicts it (more
+// than four idle authorities, or its file replaced at the path) or the process
+// exits. Its close, and so any sidecar retirement, can happen at any time, which
+// `admit_sidecars` tolerates; a process exit without a close leaves the WAL in
+// place, and WAL keeps every committed write for the next opener to recover.
 fn lifecycle_lock(directory: &std::fs::File) -> Result<std::fs::File> {
     let file = fs::private_file_at(directory, OsStr::new(LOCK))
         .map_err(|_| Failure::MetadataUnavailable)?;

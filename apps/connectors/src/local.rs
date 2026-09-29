@@ -3,7 +3,7 @@ use connectors_cli_contract::{
 };
 use connectors_host::local::{
     Failure,
-    config::{Config, Paths},
+    config::{Config, Paths, Refusal},
     keyring,
     metadata::Metadata,
     owner,
@@ -19,6 +19,9 @@ mod session;
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     let root_help = args.len() == 2 && matches!(args[1].to_str(), Some("--help" | "-h"));
     let session = session::Session::new(&args);
+    if let Some(output) = configuration_preflight(&session.borrow()) {
+        return output;
+    }
     let mut output = connectors_cli_contract::run(
         args,
         &mut session::AdmittedSources(session.clone()),
@@ -77,7 +80,15 @@ impl Handler for LocalHandler {
 
 fn owner_failure(error: owner::Error) -> HandlerReply {
     use owner::Code::*;
+    let provider = error.origin == owner::Origin::Provider;
     let (stage, action, usage) = match error.code {
+        // A provider's refusal of a dispatched call is not a host admission refusal.
+        Forbidden if provider => ("dispatch", "request_permission", false),
+        ServiceFailure
+            if provider && error.service_code == Some(connectors_core::ErrorCode::NotFound) =>
+        {
+            ("dispatch", "none", false)
+        }
         InvalidInput => ("arguments", "none", true),
         InvalidConfiguration => ("configuration", "check_configuration", true),
         ProtectedEntryUnavailable => ("protected_entry", "select_protected_source", true),
@@ -156,6 +167,68 @@ fn host_failure(error: Failure) -> HandlerReply {
     }
 }
 
+/// Every command but `setup init` loads the configuration somewhere in this
+/// process: in the handler, a protected source, the dynamic validator or an
+/// owner helper. Those later sites keep the owner's payload-free failure, so a
+/// file refused by a rule that can name its entry is refused here first, before
+/// any source is acquired or dispatch begins. Any other outcome, including every
+/// other invalid configuration, proceeds exactly as before.
+fn configuration_preflight(
+    session: &session::Session,
+) -> Option<connectors_cli_contract::ProcessOutput> {
+    use connectors_cli_contract::OutputMode;
+    let (callable, context) = session.selected()?;
+    if callable == "setup-init" {
+        return None;
+    }
+    let paths = Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()).ok()?;
+    let refusal = match Config::read(&paths.config) {
+        Err(refusal @ Refusal::PrivateProtocolMismatch { .. }) => refusal,
+        _ => return None,
+    };
+    let HandlerReply::UsageError { code, data } = configuration_refusal(refusal) else {
+        return None;
+    };
+    // Emit only what the generated contract admits for this callable.
+    if !connectors_cli_contract::plan()
+        .callables
+        .get(callable)
+        .and_then(|c| c.errors.get(&code))
+        .is_some_and(|c| c.shape.accepts(&data))
+    {
+        return None;
+    }
+    let stderr = if context.output == OutputMode::Json {
+        format!(
+            "{}\n",
+            json!({"ok":false,"error":{"code":code,"data":data}})
+        )
+    } else {
+        format!("{code}: {data}\n")
+    };
+    Some(connectors_cli_contract::ProcessOutput {
+        exit_code: 2,
+        stdout: String::new(),
+        stderr,
+    })
+}
+
+fn configuration_refusal(refusal: Refusal) -> HandlerReply {
+    let mut reply = host_failure(refusal.failure());
+    if let (
+        Refusal::PrivateProtocolMismatch {
+            format,
+            instance_id,
+        },
+        HandlerReply::UsageError { data, .. },
+    ) = (refusal, &mut reply)
+    {
+        data["configuration_format"] = json!(format);
+        data["instance_id"] = json!(instance_id);
+    }
+    reply
+}
+
 fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     let paths = Paths::resolve(
         call.context.config.as_deref(),
@@ -168,7 +241,7 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             json!({"disposition":"created", "config_path":paths.config, "state_path":paths.state, "os":"linux"}),
         );
     }
-    let config = Config::load(&paths.config).map_err(host_failure)?;
+    let config = Config::read(&paths.config).map_err(configuration_refusal)?;
     let summary = |alias: &str, adapter: &connectors_host::local::config::Adapter| json!({"adapter":alias,"instance_id":adapter.instance_id,"adapter_id":adapter.adapter_id,"startup":adapter.startup,"restart":adapter.restart});
     if call.callable == "setup-check" {
         let state = keyring::inspect_at(config.secret_service_socket.as_deref());

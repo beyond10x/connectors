@@ -86,6 +86,17 @@ pub struct Guard {
     pub postflight: Postflight,
 }
 
+/// A narrower range for one query parameter than the pinned source declares,
+/// such as a provider's page-size cap. The value is read as an integer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Bound {
+    /// Omitted when absent, so a maximum-only bound serialises unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<u64>,
+    pub maximum: u64,
+}
+
 /// One operation exposed from the bundle under a local id.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -99,6 +110,10 @@ pub struct Selection {
     pub guard: Option<Guard>,
     #[serde(default)]
     pub response: Option<ResponseKind>,
+    /// Bounds keyed by query parameter name; omitted when there are none, so an
+    /// unbounded selection serialises as it did before bounds existed.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub bounds: BTreeMap<String, Bound>,
 }
 
 /// An input reference: a top-level key, or `body.<key>` one level into the body.
@@ -122,6 +137,35 @@ fn scalar(value: &Value) -> Option<String> {
 
 fn refuse(message: impl Into<String>) -> Error {
     Error::invalid(message)
+}
+
+/// Every bounded value present must be a decimal integer within its bound.
+/// Checked on the bound value strings, before any request.
+fn check_bounds(selection: &Selection, values: &BTreeMap<String, String>) -> Result<()> {
+    for (name, bound) in &selection.bounds {
+        let Some(text) = values.get(name) else {
+            continue;
+        };
+        let digits = text.strip_prefix('-').unwrap_or(text);
+        let value = (!digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| text.parse::<i128>().ok())
+            .flatten()
+            .ok_or_else(|| refuse(format!("parameter `{name}` is not an integer")))?;
+        if value > i128::from(bound.maximum) {
+            return Err(refuse(format!(
+                "parameter `{name}` is above its maximum of {}",
+                bound.maximum
+            )));
+        }
+        if let Some(minimum) = bound.minimum
+            && value < i128::from(minimum)
+        {
+            return Err(refuse(format!(
+                "parameter `{name}` is below its minimum of {minimum}"
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Raw segments under the base path, and raw query pairs.
@@ -215,6 +259,27 @@ impl Engine {
             if !path_within(&operation.path, &base_segments) {
                 return Err(refuse(format!(
                     "selection `{}` is outside the configured base path",
+                    selection.id
+                )));
+            }
+            if let Some(name) = selection.bounds.keys().find(|name| {
+                !operation
+                    .parameters
+                    .iter()
+                    .any(|p| &p.name == *name && p.location == Location::Query)
+            }) {
+                return Err(refuse(format!(
+                    "selection `{}` bounds `{name}`, which is not a query parameter of its operation",
+                    selection.id
+                )));
+            }
+            if let Some((name, _)) = selection
+                .bounds
+                .iter()
+                .find(|(_, bound)| bound.minimum.is_some_and(|minimum| minimum > bound.maximum))
+            {
+                return Err(refuse(format!(
+                    "selection `{}` bounds `{name}` with a minimum above its maximum",
                     selection.id
                 )));
             }
@@ -340,6 +405,7 @@ impl Engine {
         }
         connectors_sdk::validate(&exposed.declaration.input_schema, &input)?;
         let values = Self::parameter_values(&exposed.operation, &input)?;
+        check_bounds(&exposed.selection, &values)?;
         let (segments, query) = self.resolve(&exposed.template, values)?;
         let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> =
@@ -372,6 +438,7 @@ impl Engine {
         };
         connectors_sdk::validate(&exposed.declaration.input_schema, &input)?;
         let values = Self::parameter_values(&exposed.operation, &input)?;
+        check_bounds(&exposed.selection, &values)?;
         let (segments, query) = self.resolve(&exposed.template, values)?;
         let body = if exposed.operation.request_media_types.is_empty() {
             Value::Null
@@ -562,7 +629,7 @@ fn read_body(response: &HttpResponse, text: bool) -> Result<Value> {
             500..=599 => ErrorCode::Unavailable,
             _ => ErrorCode::UpstreamProtocol,
         };
-        return Err(Error::new(code, "provider refused the request"));
+        return Err(Error::new(code, "provider refused the request").answered());
     }
     if response.body.is_empty() {
         return Ok(Value::Null);
@@ -600,10 +667,16 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
         if parameter.location == Location::Header || parameter.location == Location::Cookie {
             continue;
         }
-        properties.insert(
-            parameter.name.clone(),
-            json!({"type": ["string", "integer", "boolean"]}),
-        );
+        let mut schema = json!({"type": ["string", "integer", "boolean"]});
+        if let Some(bound) = selection.bounds.get(&parameter.name) {
+            // Advisory for callers: it constrains only numbers, so the engine
+            // checks the bound itself on every value.
+            schema["maximum"] = json!(bound.maximum);
+            if let Some(minimum) = bound.minimum {
+                schema["minimum"] = json!(minimum);
+            }
+        }
+        properties.insert(parameter.name.clone(), schema);
         if parameter.required {
             required.push(parameter.name.clone());
         }

@@ -1,0 +1,9 @@
+[
+  {
+    "file": "jira-platform-v3.json",
+    "url": "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.v3.json",
+    "sha256": "655b4790a5c8543c81755c8250c6a8b8f58ee62712168a39d628d6d927549709",
+    "bytes": 2478466,
+    "archive": "vendor/jira-platform-v3.json.gz"
+  }
+]

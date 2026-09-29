@@ -16,8 +16,8 @@ use entity_store::{
     LegacyStoreSnapshot, Recording,
     asynchronous::{
         AsyncStoreError, BatchKey, CompleteStoreSnapshot, HistoryOrigin, LegacyAnchor,
-        LegacyCompleteness, LegacyOrderDeclaration, RecordedEntry, Subject, SubjectHistory,
-        WriteFailure,
+        LegacyCompleteness, LegacyOrderDeclaration, RecordedEntry, StoredRecord, Subject,
+        SubjectHistory, WriteFailure,
     },
 };
 use eventlog_core::CaptureLimits;
@@ -447,6 +447,126 @@ pub(super) struct ErAuthority {
     projection_level: i64,
     durable_path: std::path::PathBuf,
     baseline: BTreeMap<(String, String), RowImage>,
+    /// Digest of the imported legacy anchors, as the last complete snapshot
+    /// read them. Anchors change only by an import event, which forces one.
+    source_digest: String,
+    /// The recorded tenant's head that `baseline` accounts for.
+    head: Head,
+    /// Subject event streams whose subject a verified read has named.
+    streams: BTreeMap<String, (String, String)>,
+    /// Only a handle whose baseline matches what it last verified is kept
+    /// for the next open in this process.
+    reusable: bool,
+    process: u64,
+    /// Device and inode of the file this authority's provider opened. A store
+    /// replaced at the same path is a different file and is opened afresh.
+    file: Option<(u64, u64)>,
+}
+
+/// Highest global position and number of the tenant's events. Eventlog
+/// appends only, and positions are never reused, so an equal head means no
+/// handle has appended since.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct Head {
+    last: i64,
+    count: i64,
+}
+
+/// One event after a known head, as the physical feed orders it.
+struct FeedEvent {
+    position: i64,
+    stream_type: String,
+    stream_id: String,
+    name: String,
+}
+
+/// Verified handles this process opened and is not using, at most one per
+/// store. Reopening one reads only what other handles appended since it last
+/// accounted for the store, instead of replaying every record again.
+static IDLE: std::sync::Mutex<Vec<ErAuthority>> = std::sync::Mutex::new(Vec::new());
+const IDLE_LIMIT: usize = 4;
+
+#[cfg(not(test))]
+fn process() -> u64 {
+    0
+}
+
+#[cfg(test)]
+fn process() -> u64 {
+    PROCESS.with(std::cell::Cell::get)
+}
+
+impl ErAuthority {
+    fn same_store(&self, path: &Path, authority: &Authority, source_level: i64) -> bool {
+        self.durable_path == path
+            && self.facade.authority() == authority
+            && self.source_level == source_level
+            && self.process == process()
+            && self.file.is_some()
+            && self.file == file_identity(path)
+    }
+}
+
+/// Keeps a handle for the next open of the same store in this process.
+pub(super) fn release(er: ErAuthority) {
+    if !er.reusable {
+        return;
+    }
+    let evicted = {
+        let Ok(mut idle) = IDLE.lock() else {
+            return;
+        };
+        let mut evicted = Vec::new();
+        let mut index = 0;
+        while index < idle.len() {
+            if idle[index].durable_path == er.durable_path
+                && idle[index].facade.authority() == er.facade.authority()
+                && idle[index].process == er.process
+            {
+                evicted.push(idle.remove(index));
+            } else {
+                index += 1;
+            }
+        }
+        idle.push(er);
+        while idle.len() > IDLE_LIMIT {
+            evicted.push(idle.remove(0));
+        }
+        evicted
+    };
+    // Stopping a provider worker waits for it; never while holding the pool.
+    drop(evicted);
+}
+
+fn file_identity(path: &Path) -> Option<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::symlink_metadata(path)
+        .ok()
+        .map(|metadata| (metadata.dev(), metadata.ino()))
+}
+
+fn take(path: &Path, authority: &Authority, source_level: i64) -> Option<ErAuthority> {
+    let file = file_identity(path);
+    let (taken, replaced) = {
+        let mut idle = IDLE.lock().ok()?;
+        // A held authority whose file is no longer the one at its path would
+        // read and write the file that was moved away: drop it.
+        let (replaced, kept) = std::mem::take(&mut *idle)
+            .into_iter()
+            .partition::<Vec<_>, _>(|held| {
+                held.durable_path == path
+                    && held.process == process()
+                    && (held.file.is_none() || held.file != file)
+            });
+        *idle = kept;
+        let taken = idle
+            .iter()
+            .position(|held| held.same_store(path, authority, source_level))
+            .map(|index| idle.remove(index));
+        (taken, replaced)
+    };
+    drop(replaced);
+    taken
 }
 
 #[cfg(test)]
@@ -464,6 +584,12 @@ pub(super) fn snapshot_facts(
             )
         })
         .collect()
+}
+
+/// Every subject's current state, revision included, as `er` accounts for it.
+#[cfg(test)]
+pub(super) fn baseline_rows(er: &ErAuthority) -> Vec<RowImage> {
+    er.baseline.values().cloned().collect()
 }
 
 impl std::fmt::Debug for ErAuthority {
@@ -1506,21 +1632,35 @@ pub(super) fn provision(
     facade
         .import_legacy(snapshot, context("legacy-import"), call_wait())
         .map_err(|_| Failure::MetadataUnavailable)?;
-    let baseline = snapshot_rows(&facade)?;
-    if visible_rows(&baseline) != expected {
+    let mut er = ErAuthority::new(facade, path, level, level);
+    resynchronize(&mut er)?;
+    if visible_rows(&er.baseline) != expected {
         return Err(Failure::MetadataUnavailable);
     }
-    Ok((
-        ErAuthority {
+    Ok((er, authority, source_digest))
+}
+
+impl ErAuthority {
+    fn new(
+        facade: RecordedProviderFacade,
+        path: &Path,
+        source_level: i64,
+        projection_level: i64,
+    ) -> Self {
+        Self {
             facade,
-            source_level: level,
-            projection_level: level,
+            source_level,
+            projection_level,
             durable_path: path.to_owned(),
-            baseline,
-        },
-        authority,
-        source_digest,
-    ))
+            baseline: BTreeMap::new(),
+            source_digest: String::new(),
+            head: Head::default(),
+            streams: BTreeMap::new(),
+            reusable: true,
+            process: process(),
+            file: file_identity(path),
+        }
+    }
 }
 
 pub(super) fn open(
@@ -1529,6 +1669,15 @@ pub(super) fn open(
     source_level: i64,
     projection_level: i64,
 ) -> Result<(ErAuthority, String)> {
+    if let Some(mut held) = take(path, &authority, source_level) {
+        held.projection_level = projection_level;
+        // A held handle whose read refuses is not evidence either way; the
+        // fresh open below verifies the whole store and reports the refusal.
+        if catch_up(&mut held, None).is_ok() {
+            let source_digest = held.source_digest.clone();
+            return Ok((held, source_digest));
+        }
+    }
     let definitions = registry()?;
     let facade = RecordedProviderFacade::start(
         definitions,
@@ -1541,19 +1690,334 @@ pub(super) fn open(
         bridge_config(),
     )
     .map_err(|_| Failure::MetadataUnavailable)?;
-    let snapshot = complete_snapshot(&facade)?;
+    let mut er = ErAuthority::new(facade, path, source_level, projection_level);
+    resynchronize(&mut er)?;
+    let source_digest = er.source_digest.clone();
+    Ok((er, source_digest))
+}
+
+/// Records appended since the head a handle last accounted for, per subject.
+type Observed = BTreeMap<(String, String), Vec<StoredRecord>>;
+
+/// More subjects than this written by other handles since the last catch-up
+/// are cheaper to read in one complete snapshot than one history at a time.
+const SUBJECT_READS: usize = 8;
+
+/// Replays the whole store into `er`, as every open used to. Returns every
+/// subject's verified records.
+fn resynchronize(er: &mut ErAuthority) -> Result<Observed> {
+    // The head is read before the snapshot: a record appended in between is
+    // then read again by the next catch-up, never skipped.
+    let head = feed_after(&er.durable_path, &er.facade.authority().tenant, i64::MAX)?.0;
+    let snapshot = complete_snapshot(&er.facade)?;
     let source_digest = imported_digest(&snapshot)?;
+    let observed = snapshot
+        .histories
+        .iter()
+        .map(|subject| {
+            (
+                (
+                    subject.history.subject.entity.clone(),
+                    subject.history.subject.id.clone(),
+                ),
+                subject.history.records.clone(),
+            )
+        })
+        .collect::<Observed>();
+    let positions = observed
+        .iter()
+        .flat_map(|(key, records)| {
+            records
+                .iter()
+                .map(move |record| (record.position.store, key.clone()))
+        })
+        .collect::<BTreeMap<_, _>>();
     let baseline = terminal_rows(snapshot)?;
-    Ok((
-        ErAuthority {
-            facade,
-            source_level,
-            projection_level,
-            durable_path: path.to_owned(),
-            baseline,
-        },
-        source_digest,
-    ))
+    let mut streams = BTreeMap::new();
+    for (position, stream) in subject_streams(&er.durable_path, &er.facade.authority().tenant)? {
+        if let Some(subject) = u64::try_from(position)
+            .ok()
+            .and_then(|position| positions.get(&position))
+        {
+            learn_stream(&mut streams, stream, subject.clone());
+        }
+    }
+    er.baseline = baseline;
+    er.source_digest = source_digest;
+    er.head = head;
+    er.streams = streams;
+    Ok(observed)
+}
+
+/// Records which subject a stream holds. A stream seen naming two subjects
+/// is forgotten, so any later record in it forces a complete replay.
+fn learn_stream(
+    streams: &mut BTreeMap<String, (String, String)>,
+    stream: String,
+    subject: (String, String),
+) {
+    match streams.get(&stream) {
+        Some(known) if *known != subject => {
+            streams.insert(stream, (String::new(), String::new()));
+        }
+        _ => {
+            streams.insert(stream, subject);
+        }
+    }
+}
+
+/// Brings `er` up to the store's current head and returns the records
+/// appended since the head it accounted for. `own` names a batch this handle
+/// just committed: its members are read back in one batch lookup. A subject
+/// another handle wrote in the meantime is read back by its own history. Falls
+/// back to a complete replay whenever a record since cannot be attributed to
+/// a subject this handle has verified.
+fn catch_up(er: &mut ErAuthority, own: Option<&BatchKey>) -> Result<Observed> {
+    match read_since(er, own)? {
+        Some(observed) => Ok(observed),
+        None => resynchronize(er),
+    }
+}
+
+fn read_since(er: &mut ErAuthority, own: Option<&BatchKey>) -> Result<Option<Observed>> {
+    let tenant = er.facade.authority().tenant.clone();
+    let (head, feed) = feed_after(&er.durable_path, &tenant, er.head.last)?;
+    let appended = i64::try_from(feed.len()).map_err(|_| Failure::MetadataUnavailable)?;
+    if head.count != er.head.count + appended || er.baseline.is_empty() {
+        return Ok(None);
+    }
+    let Some(key) = own else {
+        if feed.is_empty() {
+            // Nothing was appended, but the store is still read and verified,
+            // so a record altered in place is refused as a full replay would.
+            let (entity, id) = er
+                .baseline
+                .keys()
+                .next()
+                .ok_or(Failure::MetadataUnavailable)?;
+            read_history(&er.facade, entity, id)?;
+            return Ok(Some(Observed::new()));
+        }
+        return read_subjects(er, head, &feed, Vec::new());
+    };
+    let batch = er
+        .facade
+        .lookup_batch(key, call_wait())
+        .map_err(|_| Failure::MetadataUnavailable)?
+        .filter(|batch| batch.key == *key)
+        .ok_or(Failure::MetadataUnavailable)?;
+    read_subjects(er, head, &feed, batch.records)
+}
+
+/// Accounts for `feed`, the events after `er`'s head up to `head`: `own`
+/// are records this handle's batch appended; every other subject is read.
+fn read_subjects(
+    er: &mut ErAuthority,
+    head: Head,
+    feed: &[FeedEvent],
+    own: Vec<StoredRecord>,
+) -> Result<Option<Observed>> {
+    let mut streams = er.streams.clone();
+    for record in &own {
+        let Some(event) = i64::try_from(record.position.store)
+            .ok()
+            .and_then(|position| feed.iter().find(|event| event.position == position))
+        else {
+            return Ok(None);
+        };
+        let subject = record.entry.subject();
+        learn_stream(
+            &mut streams,
+            event.stream_id.clone(),
+            (subject.entity, subject.id),
+        );
+    }
+    let own_positions = own
+        .iter()
+        .map(|record| record.position.store)
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut others = std::collections::BTreeSet::new();
+    for event in feed {
+        if event.stream_type != "er.subject" || event.name != "er.recorded_entry" {
+            return Ok(None);
+        }
+        let Some(subject) = streams
+            .get(&event.stream_id)
+            .filter(|subject| !subject.0.is_empty())
+        else {
+            return Ok(None);
+        };
+        if !u64::try_from(event.position).is_ok_and(|position| own_positions.contains(&position)) {
+            others.insert(subject.clone());
+        }
+    }
+    if others.len() > SUBJECT_READS {
+        return Ok(None);
+    }
+    let mut observed = Observed::new();
+    let mut terminals = Vec::new();
+    for (entity, id) in &others {
+        let history = read_history(&er.facade, entity, id)?;
+        let Some(terminal) = terminal_instance(&history)
+            .filter(|terminal| terminal.entity == *entity && terminal.id == *id)
+        else {
+            return Ok(None);
+        };
+        terminals.push(row_image(terminal));
+        let since = history
+            .records
+            .into_iter()
+            .filter(|record| i64::try_from(record.position.store).is_ok_and(|p| p > er.head.last))
+            .collect();
+        observed.insert((entity.clone(), id.clone()), since);
+    }
+    for record in own {
+        let subject = record.entry.subject();
+        let key = (subject.entity, subject.id);
+        if others.contains(&key) {
+            continue;
+        }
+        if let RecordedEntry::Decision(commit) = &record.entry {
+            terminals.retain(|row: &RowImage| (&row.entity, &row.id) != (&key.0, &key.1));
+            terminals.push(row_image(&commit.instance));
+        }
+        observed.entry(key).or_default().push(record);
+    }
+    // Every appended event is exactly one of the records read back, and none
+    // was read back from beyond the head this catch-up accounts for.
+    let mut covered = std::collections::BTreeSet::new();
+    for records in observed.values() {
+        for record in records {
+            let position =
+                i64::try_from(record.position.store).map_err(|_| Failure::MetadataUnavailable)?;
+            if position > head.last || !covered.insert(position) {
+                return Ok(None);
+            }
+        }
+    }
+    if covered
+        != feed
+            .iter()
+            .map(|event| event.position)
+            .collect::<std::collections::BTreeSet<_>>()
+    {
+        return Ok(None);
+    }
+    for row in terminals {
+        er.baseline
+            .insert((row.entity.clone(), row.id.clone()), row);
+    }
+    er.streams = streams;
+    er.head = head;
+    Ok(Some(observed))
+}
+
+fn row_image(instance: &EntityInstance) -> RowImage {
+    RowImage {
+        entity: instance.entity.clone(),
+        id: instance.id.clone(),
+        revision: instance.revision,
+        lifecycle_state: instance.lifecycle_state.clone(),
+        fields: instance.fields.clone(),
+    }
+}
+
+fn read_history(facade: &RecordedProviderFacade, entity: &str, id: &str) -> Result<SubjectHistory> {
+    let subject = Subject::new(entity, id).map_err(|_| Failure::MetadataUnavailable)?;
+    let history = facade
+        .read_history(&subject, call_wait())
+        .map_err(|_| Failure::MetadataUnavailable)?;
+    if history.subject != subject {
+        return Err(Failure::MetadataUnavailable);
+    }
+    Ok(history)
+}
+
+/// A linear subject's current state: its last recorded decision, or its
+/// imported anchor when it has none.
+fn terminal_instance(history: &SubjectHistory) -> Option<&EntityInstance> {
+    history
+        .records
+        .iter()
+        .rev()
+        .find_map(|record| match &record.entry {
+            RecordedEntry::Decision(commit) => Some(&commit.instance),
+            RecordedEntry::Observation(_) => None,
+        })
+        .or(match &history.origin {
+            HistoryOrigin::Imported(anchor) => Some(&anchor.instance),
+            HistoryOrigin::Genesis => None,
+        })
+}
+
+fn feed_connection(path: &Path) -> Result<Connection> {
+    let connection = Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+            | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(unavailable)?;
+    connection.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
+    Ok(connection)
+}
+
+/// The tenant's head and every event after `after`, read in one transaction.
+fn feed_after(path: &Path, tenant: &str, after: i64) -> Result<(Head, Vec<FeedEvent>)> {
+    let mut connection = feed_connection(path)?;
+    let tx = connection.transaction().map_err(unavailable)?;
+    let head = tx
+        .query_row(
+            &format!(
+                "SELECT coalesce(max(global_seq),0),count(*) FROM {PREFIX}_events WHERE tenant_id=?1"
+            ),
+            [tenant],
+            |row| {
+                Ok(Head {
+                    last: row.get(0)?,
+                    count: row.get(1)?,
+                })
+            },
+        )
+        .map_err(unavailable)?;
+    let feed = {
+        let mut statement = tx
+            .prepare(&format!(
+                "SELECT global_seq,stream_type,stream_id,event_name FROM {PREFIX}_events \
+                 WHERE tenant_id=?1 AND global_seq>?2 ORDER BY global_seq"
+            ))
+            .map_err(unavailable)?;
+        statement
+            .query_map(rusqlite::params![tenant, after], |row| {
+                Ok(FeedEvent {
+                    position: row.get(0)?,
+                    stream_type: row.get(1)?,
+                    stream_id: row.get(2)?,
+                    name: row.get(3)?,
+                })
+            })
+            .map_err(unavailable)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(unavailable)?
+    };
+    tx.commit().map_err(unavailable)?;
+    Ok((head, feed))
+}
+
+/// Every recorded entry's position and subject stream.
+fn subject_streams(path: &Path, tenant: &str) -> Result<Vec<(i64, String)>> {
+    let connection = feed_connection(path)?;
+    let mut statement = connection
+        .prepare(&format!(
+            "SELECT global_seq,stream_id FROM {PREFIX}_events WHERE tenant_id=?1 \
+             AND stream_type='er.subject' AND event_name='er.recorded_entry'"
+        ))
+        .map_err(unavailable)?;
+    statement
+        .query_map([tenant], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(unavailable)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(unavailable)
 }
 
 pub(super) fn advance_projection_level(er: &mut ErAuthority, level: i64) -> Result<()> {
@@ -1661,11 +2125,28 @@ fn imported_digest(snapshot: &CompleteStoreSnapshot) -> Result<String> {
     rows_digest(&rows)
 }
 
-fn snapshot_rows(facade: &RecordedProviderFacade) -> Result<BTreeMap<(String, String), RowImage>> {
-    terminal_rows(complete_snapshot(facade)?)
+#[cfg(test)]
+thread_local! {
+    static FULL_REPLAYS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static PROCESS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Complete-store snapshots this thread has taken: each is a full replay.
+#[cfg(test)]
+pub(super) fn full_replays() -> u64 {
+    FULL_REPLAYS.with(std::cell::Cell::get)
+}
+
+/// Makes this thread act as process `id`: an authority one process opened is
+/// never reused by another, so a new `id` starts as a fresh process would.
+#[cfg(test)]
+pub(super) fn simulate_process(id: u64) {
+    PROCESS.with(|process| process.set(id));
 }
 
 fn complete_snapshot(facade: &RecordedProviderFacade) -> Result<CompleteStoreSnapshot> {
+    #[cfg(test)]
+    FULL_REPLAYS.with(|count| count.set(count.get() + 1));
     facade
         .complete_snapshot(call_wait())
         .map_err(|_| Failure::MetadataUnavailable)
@@ -2519,6 +3000,15 @@ pub(super) fn persist(
     connection: &Connection,
     mode: PersistMode,
 ) -> Result<()> {
+    // A refused or uncertain batch leaves the baseline unproven; such a
+    // handle is never reopened.
+    er.reusable = false;
+    persist_batch(er, connection, mode)?;
+    er.reusable = true;
+    Ok(())
+}
+
+fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMode) -> Result<()> {
     let (admitted_registry_use, concurrent_observation, runtime_state_only, prepared_observation) =
         match mode {
             PersistMode::Standard {
@@ -2677,26 +3167,38 @@ pub(super) fn persist(
             return Err(Failure::MetadataUnavailable);
         }
     }
-    let batch = format!("connectors-metadata-batch-{}", uuid::Uuid::new_v4());
+    let batch = BatchKey::Named(format!(
+        "connectors-metadata-batch-{}",
+        uuid::Uuid::new_v4()
+    ));
     let outcome = er
         .facade
         .execute_batch(
             context("metadata-mutation"),
-            BatchKey::Named(batch),
+            batch.clone(),
             actions,
             call_wait(),
         )
         .map_err(map_execution_failure)?;
     let receipt = outcome.receipt().ok_or(Failure::MetadataUnavailable)?;
-    let snapshot = complete_snapshot(&er.facade)?;
-    if !receipt.members().iter().all(|member| {
-        snapshot.histories.iter().any(|subject| {
-            subject
-                .history
-                .records
-                .iter()
-                .any(|record| record.receipt == *member)
+    let clocks_before = er
+        .baseline
+        .iter()
+        .filter(|(key, _)| key.0 == "connectors.clock.LocalClockFloor")
+        .map(|(key, row)| {
+            (
+                key.clone(),
+                (row.lifecycle_state.clone(), row.fields.clone()),
+            )
         })
+        .collect::<BTreeMap<_, _>>();
+    // Only this batch and the subjects other handles wrote since the
+    // baseline are read back, not the whole store.
+    let observed = catch_up(er, Some(&batch))?;
+    if !receipt.members().iter().all(|member| {
+        observed
+            .get(&(member.subject.entity.clone(), member.subject.id.clone()))
+            .is_some_and(|records| records.iter().any(|record| record.receipt == *member))
     }) {
         return Err(Failure::MetadataUnavailable);
     }
@@ -2709,60 +3211,47 @@ pub(super) fn persist(
     // A read-only observation can advance only the registry clock while a
     // serialized business transaction is finishing. Verify our exact clock
     // state at the acknowledged batch boundary before admitting its later
-    // clock state; a later record must not mask a bad own projection.
+    // clock state; a later record must not mask a bad own projection. A clock
+    // with no decision read back up to that boundary is as it was before.
     let clock_at_own = if concurrent_observation {
         None
     } else {
-        Some(
-            snapshot
-                .histories
+        let mut clocks = clocks_before;
+        for (key, records) in &observed {
+            if key.0 != "connectors.clock.LocalClockFloor" {
+                continue;
+            }
+            let decided = records
                 .iter()
-                .filter(|subject| {
-                    subject.history.subject.entity == "connectors.clock.LocalClockFloor"
+                .take_while(|record| record.position.store <= last_own_position)
+                .filter_map(|record| match &record.entry {
+                    RecordedEntry::Decision(commit) => Some(&commit.instance),
+                    RecordedEntry::Observation(_) => None,
                 })
-                .map(|subject| {
-                    let instance = subject
-                        .history
-                        .records
-                        .iter()
-                        .take_while(|record| record.position.store <= last_own_position)
-                        .filter_map(|record| match &record.entry {
-                            RecordedEntry::Decision(commit) => Some(&commit.instance),
-                            RecordedEntry::Observation(_) => None,
-                        })
-                        .last()
-                        .or(match &subject.history.origin {
-                            HistoryOrigin::Imported(anchor) => Some(&anchor.instance),
-                            HistoryOrigin::Genesis => None,
-                        })
-                        .ok_or(Failure::MetadataUnavailable)?;
-                    Ok((
-                        (
-                            subject.history.subject.entity.clone(),
-                            subject.history.subject.id.clone(),
-                        ),
+                .last();
+            match decided {
+                Some(instance) => {
+                    clocks.insert(
+                        key.clone(),
                         (instance.lifecycle_state.clone(), instance.fields.clone()),
-                    ))
-                })
-                .collect::<Result<BTreeMap<_, _>>>()?,
-        )
+                    );
+                }
+                None if clocks.contains_key(key) => {}
+                None => return Err(Failure::MetadataUnavailable),
+            }
+        }
+        Some(clocks)
     };
-    let latest_positions = snapshot
-        .histories
+    // A subject not read back has no record since the baseline, which is
+    // older than this batch, so it has no record after it either.
+    let latest_positions = observed
         .iter()
-        .filter_map(|subject| {
-            subject.history.records.last().map(|record| {
-                (
-                    (
-                        subject.history.subject.entity.clone(),
-                        subject.history.subject.id.clone(),
-                    ),
-                    record.position.store,
-                )
-            })
+        .filter_map(|(key, records)| {
+            records
+                .last()
+                .map(|record| (key.clone(), record.position.store))
         })
         .collect::<BTreeMap<_, _>>();
-    er.baseline = terminal_rows(snapshot)?;
     let rebuilt = projection_from_connection(connection)?;
     let current = visible_rows(&er.baseline);
     if !postcommit_projection_matches(
@@ -3875,7 +4364,7 @@ mod tests {
             .is_err()
         );
 
-        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        resynchronize(&mut authority).unwrap();
         let snapshot = authority.facade.complete_snapshot(call_wait()).unwrap();
         let history = snapshot
             .histories
@@ -3967,7 +4456,7 @@ mod tests {
             "connectors.cli.ExpireConnectionListCursor",
         )
         .unwrap();
-        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        resynchronize(&mut authority).unwrap();
         let terminal = authority
             .baseline
             .get(&(active.entity.clone(), active.id.clone()))
@@ -4012,7 +4501,7 @@ mod tests {
             "connectors.approval_issuers.PublishKey",
         )
         .unwrap();
-        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        resynchronize(&mut authority).unwrap();
         let terminal = authority
             .baseline
             .get(&(candidate.entity.clone(), candidate.id.clone()))
@@ -4550,7 +5039,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         decisions.sort_by_key(|(position, _)| *position);
-        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        resynchronize(&mut authority).unwrap();
         let mut out = verdicts;
         out.extend(decisions.into_iter().map(|(_, value)| value));
         out.extend(
@@ -5836,7 +6325,7 @@ mod tests {
             |_| {},
         )
         .unwrap();
-        authority.baseline = snapshot_rows(&authority.facade).unwrap();
+        resynchronize(&mut authority).unwrap();
         let recorded = authority
             .baseline
             .get(&(live.entity.clone(), live.id.clone()))

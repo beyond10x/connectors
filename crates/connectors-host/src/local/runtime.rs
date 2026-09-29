@@ -60,6 +60,10 @@ pub enum Failure {
     ProviderNotFound,
     ProviderRateLimited,
     ProviderInternal,
+    /// The upstream answered 403. Additive to the private protocol: a host
+    /// that predates it refuses the reply as unreadable, and a child that
+    /// predates it still sends `forbidden`, which reads as admission.
+    ProviderForbidden,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -74,10 +78,9 @@ mod failure_tests {
             ErrorCode::RateLimited,
             ErrorCode::Internal,
         ] {
-            let failure = Failure::from_provider(connectors_core::Error::new(
-                code.clone(),
-                "private-provider-message",
-            ));
+            let failure = Failure::from_provider(
+                connectors_core::Error::new(code.clone(), "private-provider-message").answered(),
+            );
             let bytes = serde_json::to_vec(&failure).unwrap();
             assert!(!String::from_utf8_lossy(&bytes).contains("private-provider-message"));
             let failure: Failure = serde_json::from_slice(&bytes).unwrap();
@@ -92,12 +95,64 @@ mod failure_tests {
         assert_eq!(local, Failure::NotFound);
         assert!(serde_json::from_str::<Failure>(r#"{"provider":"unreviewed_code"}"#).is_err());
     }
+
+    #[test]
+    fn a_provider_refusal_keeps_its_code_and_names_the_provider_as_origin() {
+        use crate::local::owner::{Code, Error, Origin};
+        let answered = |code| {
+            Failure::from_provider(
+                connectors_core::Error::new(code, "private-provider-message").answered(),
+            )
+        };
+        let raised =
+            |code| Failure::from_provider(connectors_core::Error::new(code, "configured scope"));
+        let refused: Error = answered(ErrorCode::Forbidden).into();
+        assert_eq!(refused.code, Code::Forbidden);
+        assert_eq!(refused.origin, Origin::Provider);
+        let missing: Error = answered(ErrorCode::NotFound).into();
+        assert_eq!(missing.code, Code::ServiceFailure);
+        assert_eq!(missing.service_code, Some(ErrorCode::NotFound));
+        assert_eq!(missing.origin, Origin::Provider);
+        // An adapter's own refusal before any request is not the provider's.
+        let scope: Error = raised(ErrorCode::Forbidden).into();
+        assert_eq!(scope.code, Code::Forbidden);
+        assert_eq!(scope.origin, Origin::Host);
+        let absent: Error = raised(ErrorCode::NotFound).into();
+        assert_eq!(absent.code, Code::NotFound);
+        assert_eq!(absent.origin, Origin::Host);
+        // Private protocol: a child that predates the variant sends
+        // `forbidden`, which still reads as the host's; the new variant is
+        // its own code.
+        let old: Failure = serde_json::from_str(r#""forbidden""#).unwrap();
+        assert_eq!(Error::from(old).origin, Origin::Host);
+        let new: Failure = serde_json::from_str(r#""provider_forbidden""#).unwrap();
+        assert_eq!(new, Failure::ProviderForbidden);
+        assert_eq!(
+            serde_json::to_string(&Failure::ProviderForbidden).unwrap(),
+            r#""provider_forbidden""#
+        );
+        let admission: Error = Code::Forbidden.into();
+        assert_eq!(admission.origin, Origin::Host);
+        // The host origin is the owner/1 default and is not written.
+        let bytes = serde_json::to_string(&admission).unwrap();
+        assert_eq!(bytes, r#"{"code":"forbidden"}"#);
+        let bytes = serde_json::to_string(&refused).unwrap();
+        assert_eq!(bytes, r#"{"code":"forbidden","origin":"provider"}"#);
+        let back: Error = serde_json::from_str(&bytes).unwrap();
+        assert_eq!(back.origin, Origin::Provider);
+        let host: Error = Failure::NotFound.into();
+        assert_eq!(host.origin, Origin::Host);
+    }
 }
 
 impl Failure {
     pub fn from_provider(error: connectors_core::Error) -> Self {
+        // Only the upstream's own answer is the provider refusing. A refusal the
+        // adapter raises from its configuration before any request keeps the
+        // host-side code and is reported at admission.
         match error.code {
-            ErrorCode::NotFound => Self::ProviderNotFound,
+            ErrorCode::Forbidden if error.upstream_answer => Self::ProviderForbidden,
+            ErrorCode::NotFound if error.upstream_answer => Self::ProviderNotFound,
             ErrorCode::RateLimited => Self::ProviderRateLimited,
             ErrorCode::Internal => Self::ProviderInternal,
             _ => Self::from_service(error),

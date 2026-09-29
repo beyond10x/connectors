@@ -194,7 +194,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -517,7 +533,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -798,7 +830,23 @@
                           "owner_build_mismatch"
                         ]
                       },
+                      "configuration_format": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "connectors-local/1",
+                            "connectors-local/2"
+                          ]
+                        }
+                      },
                       "connection": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "instance_id": {
                         "kind": "optional",
                         "of": {
                           "kind": "string"
@@ -1068,7 +1116,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -1358,7 +1422,23 @@
                           "owner_build_mismatch"
                         ]
                       },
+                      "configuration_format": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "connectors-local/1",
+                            "connectors-local/2"
+                          ]
+                        }
+                      },
                       "connection": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "instance_id": {
                         "kind": "optional",
                         "of": {
                           "kind": "string"
@@ -1628,7 +1708,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -1915,7 +2011,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -2221,7 +2333,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -2541,7 +2669,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -2861,7 +3005,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -3181,7 +3341,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -3501,7 +3677,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -3821,7 +4013,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -4135,7 +4343,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -4463,7 +4687,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -4782,7 +5022,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -5282,7 +5538,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -5632,7 +5904,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -5973,7 +6261,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -6316,7 +6620,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -6669,7 +6989,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -7013,7 +7349,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -7310,7 +7662,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -7724,7 +8092,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -8040,7 +8424,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -8464,7 +8864,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -8789,7 +9205,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -9104,7 +9536,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -9382,7 +9830,23 @@
                   "owner_build_mismatch"
                 ]
               },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2"
+                  ]
+                }
+              },
               "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"

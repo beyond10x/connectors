@@ -33,10 +33,11 @@ here reaches the network.
 ## The shipped selection set
 
 The repository reviews and ships one selection set per provider under
-`adapters/catalog/providers/<provider>/operations.json`. The GitLab set,
+`adapters/catalog/providers/<provider>/operations.json`; Jira Cloud is described
+in [the Jira guide](catalog-jira.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
-serves the provider from the pinned source alone:
+serves the provider from the pinned source alone, plus four repository reads:
 
 | id | source operation | effect |
 |---|---|---|
@@ -48,8 +49,32 @@ serves the provider from the pinned source alone:
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
 
+The repository reads list one page per call. Each takes `page` and `per_page`;
+a caller has walked the list when a page comes back shorter than `per_page`.
+GitLab serves at most 100 items per page, so with a larger value every page
+would be short and the walk would stop after page one. The pinned source
+declares no range, so the shipped selection bounds `per_page` to 1 through 100
+on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
+`pipeline.jobs` and these four): a value of zero or below never ends a walk on a
+short page. A value outside that range, or one that is not an integer, is
+refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
+`X-Next-Page` header. Every other query parameter the pinned source declares
+is accepted by name.
+
+| id | source operation | request | time filter | effect |
+|---|---|---|---|---|
+| `projects.list` | `getApiV4Projects` | `GET /projects`, e.g. `membership`, `simple=false`, `archived`, `order_by=last_activity_at` | `last_activity_after` | read |
+| `tags.list` | `getApiV4ProjectsIdRepositoryTags` | `GET /projects/{id}/repository/tags` | none; each tag carries its commit id | read |
+| `releases.list` | `getApiV4ProjectsIdReleases` | `GET /projects/{id}/releases` | none; each release carries `released_at` | read |
+| `project.events` | `getApiV4ProjectsIdEvents` | `GET /projects/{id}/events` | `after`, `before` (dates) | read |
+
+`projects.list` returns each project unchanged, including `archived`,
+`created_at`, `last_activity_at` and `path_with_namespace`. All four need only
+the `read_api` token scope.
+
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
-and checks that every id the native adapter carried is present. The native
+and pins the complete list of shipped ids, so a renamed, dropped or added id
+fails the gate. The native
 `merge_request.validate` has no entry: it was `merge_request.get` plus
 `pipeline.get` and a comparison, which the merge guard now makes itself.
 
@@ -121,6 +146,14 @@ The complete configuration used against the sandbox is
   the provider answers plain text, as GitLab does for a job trace. Without it the
   bundle decides: a 2xx declared only as `text/…` is read as text, anything else
   as JSON. A write never carries it.
+- `bounds` is optional: `{"<parameter>": {"minimum": <n>, "maximum": <n>}}`
+  narrows a query parameter the source declares, such as a provider's page-size
+  cap; `minimum` may be omitted. The value, whether sent as a number or a
+  string, must be a decimal integer no greater than `maximum` and no less than
+  `minimum` (`-0` is zero); anything else is refused as `invalid_input` before
+  any request. A bound on a parameter the operation does not declare as a query
+  parameter, or with a `minimum` above its `maximum`, is refused when the
+  selection loads. The declared input schema carries both limits as well.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
