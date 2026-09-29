@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: release-plan:connectors-0-14-0
 kind: release-plan
-status: active
+status: implemented
 title: 'Connectors 0.14.0: released ESS and AEP, newest dependencies, --version'
-revision: 2
+revision: 4
 transitions:
 - {from: "draft", to: "active", at: "2026-09-29T00:53:05Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-09-29T01:14:09Z", actor: "human:timo", revision: 4}
 ---
 ## Scope
 
@@ -40,3 +41,12 @@ Release 0.14.0 of `beyond10x/connectors`, cut from `main` after PR #42 and the r
 
 No MCP work, no sandbox acceptance, no binary or container publication. The three open
 decision blockers and the MCP stories are unchanged.
+
+## Publication
+
+- PR #43 merged as `0e950520b98c9796bc30999322e64e6e434d0b52`; its tree equals the gated commit
+  `8934bee8c` (CI: shared source gates, planning validate and docs check green).
+- Annotated tag `v0.14.0` (object `96193ae70b2c`), tagger `b10x-bot[bot]`, peels to the merge
+  commit, which is an ancestor of `origin/main`.
+- Release page https://github.com/beyond10x/connectors/releases/tag/v0.14.0, author
+  `b10x-bot[bot]`, not draft, not prerelease; `releases/latest` resolves to `v0.14.0`.
