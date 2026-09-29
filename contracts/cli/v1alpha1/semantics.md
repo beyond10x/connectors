@@ -469,6 +469,24 @@ Provider strings never bypass safe message projection. Failure has a safe stage
 and next-action enum, plus optional opaque correlation refs under current result
 access; it never contains raw provider evidence or custody references.
 
+The stage names who refused, because the same code can come from either side.
+A refusal made before any provider request — by the host's admission, or by an
+adapter from its own configured scope (a namespace, resource kind or operation
+the adapter entry does not allow) — reports `stage = admission` (`forbidden`
+with `next_action = request_permission`, `not_found` with
+`check_configuration`). Only the provider's own answer to a dispatched read
+reports `stage = dispatch`: an upstream forbidden answer (HTTP 403) keeps
+`code = forbidden` with `next_action = request_permission`, and an upstream
+not-found answer (HTTP 404; the catalog provider also 410) is
+`code = service_failure`, `service_code = not_found` with
+`next_action = none`. Neither sends the operator to connectors configuration.
+A connection probe's answer (the catalog provider's identity and scope probes,
+the Kubernetes token review) is classified separately and not by this rule: a
+403 reads as `forbidden` at `admission`, and a 404 is `service_failure` with
+`service_code = upstream_protocol` at `dispatch` and
+`next_action = retry_explicitly`. A refused write reports `stage = dispatch`
+with `next_action = retry_status` and its `mutation` record, whatever the code.
+
 ## 7. Verification and remaining obligations
 
 [Scenarios](scenarios.md) enumerate C01–C05, startup races and failure boundaries.

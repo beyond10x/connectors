@@ -34,6 +34,11 @@ pub struct Error {
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub retry_after_seconds: Option<u64>,
+    /// In-process only: the error carries the upstream's own answer (the
+    /// provider responded with a refusal), as opposed to one the adapter raised
+    /// from its configuration before any request. Never on the wire.
+    #[serde(skip)]
+    pub upstream_answer: bool,
 }
 
 impl Error {
@@ -42,7 +47,13 @@ impl Error {
             code,
             message: message.into(),
             retry_after_seconds: None,
+            upstream_answer: false,
         }
+    }
+    /// Mark this error as the upstream's own answer.
+    pub fn answered(mut self) -> Self {
+        self.upstream_answer = true;
+        self
     }
     pub fn invalid(message: impl Into<String>) -> Self {
         Self::new(ErrorCode::InvalidInput, message)

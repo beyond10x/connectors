@@ -629,7 +629,7 @@ fn read_body(response: &HttpResponse, text: bool) -> Result<Value> {
             500..=599 => ErrorCode::Unavailable,
             _ => ErrorCode::UpstreamProtocol,
         };
-        return Err(Error::new(code, "provider refused the request"));
+        return Err(Error::new(code, "provider refused the request").answered());
     }
     if response.body.is_empty() {
         return Ok(Value::Null);
