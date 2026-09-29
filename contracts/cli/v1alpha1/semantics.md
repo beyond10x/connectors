@@ -204,7 +204,10 @@ path in safe results identifies the selection; it is not a credential locator.
 `setup init` exclusively creates an owner-only file and directories with no
 symlink traversal, writes/fsyncs a temporary file, publishes without replacing an
 existing file, and fsyncs its directory before returning `created`. Existing
-configuration returns `configuration_exists`, never overwrites it. It records the
+configuration returns `configuration_exists`, never overwrites it. The file uses
+the current `connectors-local/2` format, whose adapter entries each select a
+`private_protocol` ([private mutation extension](private-mutations.md)); an
+existing `connectors-local/1` file keeps loading unchanged. It records the
 local owner policy and OS keyring requirement; it does not write credentials,
 authenticate, install artifacts or start processes. `setup check` checks syntax,
 permissions, configured artifacts and non-interactive keyring availability. A
@@ -444,11 +447,45 @@ never replay a possible write after interruption, timeout or lost response.
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
 | user interruption | `interrupted` | 130 |
 
+A configuration whose adapter entry contradicts its format — a
+`connectors-local/1` entry that carries `private_protocol`, or a
+`connectors-local/2` entry that lacks it — is `invalid_configuration` with
+`next_action = check_configuration`, and its `Failure` additionally carries
+`configuration_format` (the file's `format` value) and `instance_id` (the
+entry's `instance_id`). They are named only after every entry has passed every
+other check, so the refusal never depends on alias order: the first mismatched
+entry in alias order is named, and a file with any other defect names nothing.
+`configuration_format` is the closed enum `ConfigurationFormat`; `instance_id`
+is an admitted selector (at most 128 bytes of `[A-Za-z0-9._-]`). Every CLI
+command except `setup init` refuses such a file this way, before acquiring any
+protected source or dispatching. The selector shape and the rule that both
+fields appear only on `invalid_configuration` are host obligations: ESS 0.40
+declares no invariant on a CLI type. No parser, OS or database text is ever
+carried.
+
 Other admitted provider/service failures preserve their existing shared error code
 inside `Failure.service_code`; `code = service_failure` identifies that route.
 Provider strings never bypass safe message projection. Failure has a safe stage
 and next-action enum, plus optional opaque correlation refs under current result
 access; it never contains raw provider evidence or custody references.
+
+The stage names who refused, because the same code can come from either side.
+A refusal made before any provider request — by the host's admission, or by an
+adapter from its own configured scope (a namespace, resource kind or operation
+the adapter entry does not allow) — reports `stage = admission` (`forbidden`
+with `next_action = request_permission`, `not_found` with
+`check_configuration`). Only the provider's own answer to a dispatched read
+reports `stage = dispatch`: an upstream forbidden answer (HTTP 403) keeps
+`code = forbidden` with `next_action = request_permission`, and an upstream
+not-found answer (HTTP 404; the catalog provider also 410) is
+`code = service_failure`, `service_code = not_found` with
+`next_action = none`. Neither sends the operator to connectors configuration.
+A connection probe's answer (the catalog provider's identity and scope probes,
+the Kubernetes token review) is classified separately and not by this rule: a
+403 reads as `forbidden` at `admission`, and a 404 is `service_failure` with
+`service_code = upstream_protocol` at `dispatch` and
+`next_action = retry_explicitly`. A refused write reports `stage = dispatch`
+with `next_action = retry_status` and its `mutation` record, whatever the code.
 
 ## 7. Verification and remaining obligations
 

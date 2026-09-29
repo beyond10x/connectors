@@ -36,9 +36,12 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
     let paths = paths(&root);
     Config::initialize(&paths).unwrap();
     let setup = fs::read_to_string(&paths.config).unwrap();
-    assert!(setup.contains("connectors-local/1"));
+    // Setup writes the current format; an explicit selection needs no edit of it.
+    assert!(setup.contains("format = \"connectors-local/2\""));
+    assert!(Config::load(&paths.config).unwrap().adapters.is_empty());
+    let legacy_setup = setup.replace("connectors-local/2", "connectors-local/1");
     let text = format!(
-        "{setup}\n[adapters.fixture]\ninstance_id='fixture'\nadapter_id='fixture'\nconfiguration_revision='one'\nprotocol='v1alpha1'\n[adapters.fixture.executable]\npath='/fixture'\nsha256='{}'\n",
+        "{legacy_setup}\n[adapters.fixture]\ninstance_id='fixture'\nadapter_id='fixture'\nconfiguration_revision='one'\nprotocol='v1alpha1'\n[adapters.fixture.executable]\npath='/fixture'\nsha256='{}'\n",
         "a".repeat(64)
     );
     let legacy: Config = toml::from_str(&text).unwrap();
@@ -58,6 +61,12 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
     let mut null_selection = serde_json::to_value(&legacy).unwrap();
     null_selection["adapters"]["fixture"]["private_protocol"] = serde_json::Value::Null;
     assert!(serde_json::from_value::<Config>(null_selection).is_err());
+    // An existing connectors-local/1 file keeps loading, unrewritten.
+    fs::write(&paths.config, &text).unwrap();
+    let existing = Config::load(&paths.config).unwrap();
+    assert_eq!(existing.format, "connectors-local/1");
+    assert_eq!(existing.adapters["fixture"].selection(), old_digest);
+    assert_eq!(fs::read_to_string(&paths.config).unwrap(), text);
     let explicit = text.replace(
         "protocol='v1alpha1'",
         "protocol='v1alpha1'\nprivate_protocol='connectors-private/2'",
@@ -92,6 +101,52 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
     assert_eq!(fs::read_to_string(&paths.config).unwrap(), explicit);
     let roundtrip: Config = toml::from_str(&toml::to_string(&loaded).unwrap()).unwrap();
     assert_eq!(roundtrip.adapters["fixture"].selection(), digest);
+}
+
+#[test]
+fn a_format_and_private_protocol_mismatch_names_the_format_and_entry() {
+    use connectors_host::local::config::Refusal;
+    let root = root();
+    let paths = paths(&root);
+    Config::initialize(&paths).unwrap();
+    let setup = fs::read_to_string(&paths.config).unwrap();
+    let entry = |private: &str| {
+        format!(
+            "\n[adapters.fixture]\ninstance_id='fixture-one'\nadapter_id='fixture'\nconfiguration_revision='one'\nprotocol='v1alpha1'\n{private}[adapters.fixture.executable]\npath='/fixture'\nsha256='{}'\n",
+            "a".repeat(64)
+        )
+    };
+    for (format, private) in [
+        (
+            "connectors-local/1",
+            "private_protocol='connectors-private/2'\n",
+        ),
+        ("connectors-local/2", ""),
+    ] {
+        let text = setup.replace("connectors-local/2", format) + &entry(private);
+        fs::write(&paths.config, &text).unwrap();
+        assert_eq!(
+            Config::read(&paths.config).unwrap_err(),
+            Refusal::PrivateProtocolMismatch {
+                format: format.into(),
+                instance_id: "fixture-one".into(),
+            }
+        );
+        // The owner's own load keeps the payload-free failure.
+        assert_eq!(
+            Config::load(&paths.config).unwrap_err(),
+            Failure::InvalidConfiguration
+        );
+    }
+    // A mismatched entry whose instance id is itself invalid names nothing.
+    let text = setup.replace("connectors-local/2", "connectors-local/1")
+        + &entry("private_protocol='connectors-private/2'\n")
+            .replace("fixture-one", "not a selector");
+    fs::write(&paths.config, &text).unwrap();
+    assert_eq!(
+        Config::read(&paths.config).unwrap_err(),
+        Refusal::Failure(Failure::InvalidConfiguration)
+    );
 }
 
 #[test]

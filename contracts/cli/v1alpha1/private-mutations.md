@@ -11,9 +11,9 @@ transport port alone does not admit a provider write.
 
 The host configuration format `connectors-local/2` adds an adapter
 `private_protocol` selection, exactly `connectors-private/1` or
-`connectors-private/2`; it is required in this format. The existing
-`connectors-local/1` reader retains its fields and implicit private version one.
-It refuses the new field. Public service `protocol = "v1alpha1"` keeps its
+`connectors-private/2`; it is required in this format. `setup init` writes this
+format. The existing `connectors-local/1` reader retains its fields and implicit
+private version one. It refuses the new field. Public service `protocol = "v1alpha1"` keeps its
 existing meaning in both formats. No automatic configuration rewrite occurs.
 The private selection participates in the executable selection digest. Unsupported
 selection fails before startup; there is no negotiation fallback or silent

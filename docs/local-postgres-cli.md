@@ -67,6 +67,7 @@ instance_id = "postgres-local"
 adapter_id = "sql"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
 protocol = "v1alpha1"
+private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
