@@ -173,6 +173,10 @@ impl Provider {
                             200,
                             json!({"id":99,"user_id":user,"active":true,"revoked":false,"scopes":["api"],"expires_at":null}),
                         )
+                    } else if route.ends_with("fixture-refused") {
+                        (403, json!({"message":"403 Forbidden"}))
+                    } else if route.ends_with("fixture-missing") {
+                        (404, json!({"message":"404 Project Not Found"}))
                     } else if let Some(page) = repository_page(route, &path) {
                         (200, page)
                     } else if path.contains("/issues?") {
