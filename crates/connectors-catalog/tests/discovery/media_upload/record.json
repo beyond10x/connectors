@@ -18,5 +18,10 @@
       "path": "/upload/fixture/v1/things"
     }
   ],
-  "ignored_keys": []
+  "ignored_keys": [
+    "/resources/things/methods/create/mediaUpload/accept",
+    "/resources/things/methods/create/mediaUpload/maxSize",
+    "/resources/things/methods/create/mediaUpload/protocols/resumable/multipart",
+    "/resources/things/methods/create/mediaUpload/protocols/simple/multipart"
+  ]
 }
