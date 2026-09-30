@@ -17,6 +17,14 @@
       "unsupported": 67
     },
     {
+      "provider": "google-calendar",
+      "file_name": "google-calendar.bundle.json",
+      "bundle_sha256": "d397526c2c170cf4a1a925a1f50e5ef4dcebed342ff76b515d0bfd40674e0236",
+      "source_sha256": "da2ed3007e673653867fa77910886b9680053c378e420910b982aed98ff0f5ac",
+      "operations": 38,
+      "unsupported": 0
+    },
+    {
       "provider": "google-drive",
       "file_name": "google-drive.bundle.json",
       "bundle_sha256": "94544f04b1ccb0875d0aff39656c386f7dcc5b6abe4f4f75371f2330b7b49c43",

@@ -82,11 +82,9 @@ async fn an_empty_text_export_is_the_empty_string() {
 /// returned as a refusal". Drive's published usage-limit answer is a `403`
 /// whose reason is `userRateLimitExceeded` (or `rateLimitExceeded`), beside
 /// `429`. The caller has to be able to tell that apart from a permission
-/// denial to decide whether a walk can be resumed, so it should arrive as
-/// `rate_limited`, not `forbidden`. Today the engine maps every 403 to
-/// `forbidden`; that engine change is
-/// `story:catalog-engine-provider-refusal-shapes`. Until it lands this case
-/// pins today's `Forbidden`, so the change is seen when it arrives.
+/// denial to decide whether a walk can be resumed, so it arrives as
+/// `rate_limited`, not `forbidden`: the selection names both reasons in
+/// `rate_limit_reasons`.
 #[tokio::test]
 async fn a_drive_usage_limit_answer_is_rate_limited_not_forbidden() {
     let body = serde_json::to_vec(&json!({"error": {
@@ -104,12 +102,39 @@ async fn a_drive_usage_limit_answer_is_rate_limited_not_forbidden() {
         )
         .await
         .expect_err("a 403 is a refusal");
-    assert_eq!(
-        refusal.code,
-        ErrorCode::Forbidden,
-        "Drive's usage-limit 403 now reaches the caller as {:?}: if \
-         story:catalog-engine-provider-refusal-shapes has landed, flip this case to assert \
-         RateLimited",
-        refusal.code
-    );
+    assert_eq!(refusal.code, ErrorCode::RateLimited);
+}
+
+/// A `403` without a quota reason is still a permission denial.
+#[tokio::test]
+async fn a_drive_permission_answer_stays_forbidden() {
+    let body = serde_json::to_vec(&json!({"error": {
+        "code": 403, "message": "The user does not have sufficient permissions for this file.",
+        "errors": [{"domain": "global", "reason": "insufficientFilePermissions",
+                    "message": "The user does not have sufficient permissions for this file."}]}}))
+    .unwrap();
+    let http = scripted(403, "application/json", &body);
+    let refusal = drive()
+        .read(
+            &http,
+            "fixture-google-drive",
+            "files.get",
+            json!({"fileId": "fixture-doc-1"}),
+        )
+        .await
+        .expect_err("a 403 is a refusal");
+    assert_eq!(refusal.code, ErrorCode::Forbidden);
+}
+
+/// Drive refuses `about.get` without `fields`; the selection declares it
+/// required, so the input `{}` is refused before any request.
+#[tokio::test]
+async fn about_get_without_fields_is_refused_before_any_request() {
+    let http = scripted(200, "application/json", b"{}");
+    let refusal = drive()
+        .read(&http, "fixture-google-drive", "about.get", json!({}))
+        .await
+        .expect_err("refused");
+    assert_eq!(refusal.code, ErrorCode::InvalidInput);
+    assert!(http.calls.lock().unwrap().is_empty(), "a request was sent");
 }

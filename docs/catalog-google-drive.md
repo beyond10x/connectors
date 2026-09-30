@@ -68,8 +68,9 @@ end of a walk are in it.
 
 - **`about.get`.** Drive answers this method only when `fields` names what to
   return, for example `user,storageQuota`. The projection does not mark `fields`
-  required, so the engine does not enforce it; a read without it is sent and
-  Drive refuses it.
+  required, so the selection does (`"required": ["fields"]`): the declared input
+  schema requires it, and a read without it is refused as `invalid_input`
+  before any request.
 - **Following a page of `files.list`.** Send the first page without `pageToken`.
   For the next page, send the previous page's `nextPageToken` as `pageToken`,
   with the other parameters unchanged. A page without `nextPageToken` is the
@@ -89,8 +90,7 @@ end of a walk are in it.
   `text/plain`. The projection declares its answer `application/octet-stream`,
   so the selection declares `response: text` and the body is returned as a JSON
   string. An empty export (for example an empty spreadsheet as `text/csv`) is
-  returned as `null` today, not `""`; returning `""` is
-  `story:catalog-engine-provider-refusal-shapes`. Use a text `mimeType`: bytes that are not UTF-8 are refused as
+  returned as `""`. Use a text `mimeType`: bytes that are not UTF-8 are refused as
   `upstream_protocol`. The response limit applies: an answer over 4 MiB
   (`connectors_core::RESPONSE_LIMIT`) is refused as `capacity`.
 - **Deltas.** Read a baseline once with `changes.getStartPageToken` and keep its
@@ -160,7 +160,10 @@ for obtaining the entry by consent.
   rate-limited read is returned as a refusal.
 - Drive also signals an exceeded quota as a `403` whose `error.errors[].domain`
   is `usageLimits` and whose `reason` is `userRateLimitExceeded` or
-  `rateLimitExceeded`. Today every `403` reaches the caller as `forbidden`, so
-  a quota refusal cannot be told apart from a permission denial by its code.
-  Reporting it as `rate_limited` is
-  `story:catalog-engine-provider-refusal-shapes`.
+  `rateLimitExceeded`. Every selection names both in `rate_limit_reasons`, so
+  such a `403` reaches the caller as `rate_limited`, like a `429`; every other
+  `403` is `forbidden`.
+- Declaring `required` on `about.get` changed its declared input schema, and
+  so the descriptor revision; an approval policy bound to the earlier revision
+  must be issued again. Adding `rate_limit_reasons` changed the selection set,
+  and so the configuration revision of a Drive instance.

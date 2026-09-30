@@ -17,7 +17,7 @@ use std::path::Path;
 /// a caller gives, as before arrays were read; shipped reads are among them
 /// (`labels` and `iids` on issues and merge requests, `topic` on projects), and
 /// none of them changes what is sent.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 5] = [
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 6] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -31,6 +31,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 5] = [
         None,
         "gitlab.pat",
         67,
+    ),
+    (
+        "google-calendar",
+        "../google/generated/calendar.openapi.json",
+        Some("../google/upstream/calendar/calendar-api.json"),
+        "google.oauth",
+        0,
     ),
     (
         "google-drive",
