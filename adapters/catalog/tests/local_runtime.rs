@@ -42,6 +42,8 @@ mod cli_journey;
 mod oauth2_refresh;
 #[path = "local_runtime/oauth2_refresh_adversary.rs"]
 mod oauth2_refresh_adversary;
+#[path = "local_runtime/oauth2_refresh_adversary_pass2.rs"]
+mod oauth2_refresh_adversary_pass2;
 
 /// Fictional HTTP basic material the fixture accepts, and the exact header it
 /// expects: `Basic base64("fixture-account@example.test:fixture-api-token-one")`,

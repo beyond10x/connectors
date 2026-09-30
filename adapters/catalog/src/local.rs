@@ -495,6 +495,13 @@ fn valid_scopes(scopes: &BTreeSet<String>) -> bool {
             .iter()
             .all(|s| !s.is_empty() && s.len() <= 256 && s.bytes().all(|b| b.is_ascii_graphic()))
 }
+/// A granted scope set is split on whitespace, so an entry that is empty or
+/// holds whitespace could never be granted.
+fn grantable(scopes: &BTreeSet<String>) -> bool {
+    scopes
+        .iter()
+        .all(|s| !s.is_empty() && !s.chars().any(char::is_whitespace))
+}
 /// An https URL with no credentials, query or fragment, written as its own
 /// canonical form. Returns that form with a trailing `/`.
 fn https_url(value: &str) -> Result<String> {
@@ -550,6 +557,8 @@ impl Local {
             || config.auth.label.len() > 128
             || config.auth.evidence_lifetime_ms == 0
             || config.auth.evidence_lifetime_ms > 300_000
+            || !grantable(&config.auth.minimum_scopes)
+            || !grantable(&config.auth.requested_scopes)
             || match identity.source {
                 IdentitySource::Api => {
                     identity
@@ -698,6 +707,12 @@ impl Local {
         };
         let engine =
             Engine::new(&bundle, &base_path, &operations).map_err(Failure::from_service)?;
+        // Trust roots enter the revision by their bytes only, as `ca_file` does, so
+        // the same roots at another path keep it.
+        let mut auth = serde_json::to_value(&config.auth).map_err(|_| Failure::Protocol)?;
+        if let Some(auth) = auth.as_object_mut() {
+            auth.remove("token_ca_file");
+        }
         let mut effective = json!({
             "format": config.format,
             "instance": config.instance,
@@ -708,7 +723,7 @@ impl Local {
             "source_sha256": bundle.source.source_sha256,
             "api_base": base,
             "ca_digest": ca.as_ref().map(|b| connectors_core::digest(&json!(b))),
-            "auth": serde_json::to_value(&config.auth).map_err(|_| Failure::Protocol)?,
+            "auth": auth,
             "operations": serde_json::to_value(&operations).map_err(|_| Failure::Protocol)?,
         });
         // Only a profile with its own token trust roots has this key, so every

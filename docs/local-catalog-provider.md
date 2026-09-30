@@ -150,16 +150,21 @@ The complete configuration used against the sandbox is
   evicts it, and `validate` always exchanges afresh. A token answer carrying a
   different `refresh_token` is refused as an invalid credential and nothing is
   kept. `invalid_grant` and `invalid_client` are an invalid credential; on an
-  `operations invoke` of an existing connection the CLI reports it with
-  `next_action: repair_connection`, and while connecting with
-  `retry_explicitly`; a 429 is a provider
+  `operations invoke` of a read on an existing connection the CLI reports it
+  with `next_action: repair_connection`, and while connecting with
+  `retry_explicitly`. A guarded write refused for its credential reports
+  `retry_status` until `story:guarded-write-credential-refusal-says-repair`
+  lands; a 429 is a provider
   rate limit and a 5xx is `unavailable`. `token_url` and `authorize_url` must
   be `https` URLs without credentials, query or fragment, written in canonical
   form. `authorize_url` and `requested_scopes` are never called or checked by
   the provider: they reach the host as the profile's `acquisition`, next to
   `token_url`, for the CLI to obtain the entry by consent.
   `token_ca_file` names trust roots for the token host only; omit it to use
-  the platform roots. The profile is offered to the host as `http_bearer` with
+  the platform roots. Like `ca_file`, its bytes enter the configuration
+  revision and its path does not. Each `minimum_scopes` and `requested_scopes`
+  entry is one scope: an empty entry or one holding whitespace is refused at
+  load. The profile is offered to the host as `http_bearer` with
   the fields `client_id`, `client_secret` and `refresh_token`.
 - `identity.source` is `api` when omitted, the read shown above. `id_token`,
   for `oauth2_refresh` only, takes the subject from the `sub` of the token
