@@ -47,11 +47,15 @@ connectors connections connect --adapter drive --profile google.drive \
 The CLI starts the owner's capture, which gives it the profile's
 `authorize_url`, `token_url` and scopes, and then:
 
-1. listens on `127.0.0.1` on a free port for exactly one redirect;
-2. writes the consent address to your terminal (to standard error when there is
-   no terminal), which you open in a browser on the same machine;
+1. listens on `127.0.0.1` on a free port for the redirect;
+2. writes the consent address to your terminal, which you open in a browser on
+   the same machine. Without a terminal it writes one line to standard error,
+   `connectors: consent-url <address>`, so a program running the CLI can find
+   the address and hand it to a person;
 3. after you consent, reads the redirect, checks its `state`, and exchanges the
-   code together with its PKCE S256 verifier at `token_url`;
+   code together with its PKCE S256 verifier at `token_url`. This exchange uses
+   the platform trust roots only: the configuration's `token_ca_file` applies
+   to the provider's own refresh and validation requests, not to it;
 4. submits `{client_id, client_secret, refresh_token}` as the connection's
    entry. The owner validates it with a refresh of its own, checks the identity
    and `minimum_scopes`, and stores it in custody.
@@ -61,10 +65,14 @@ The scopes requested are `requested_scopes` plus `openid`, with
 every consent. The client file itself is read and not kept.
 
 Consent has 240 seconds. If it takes longer, the command ends with `timeout` and
-stores nothing; run it again. Ctrl-C ends the command, again storing nothing. A
-declined consent, a redirect with the wrong `state`, or a second request to the
-listener while the first one is being read also ends it without storing
-anything. The browser has to run on the machine the CLI runs on, because Google
+stores nothing; run it again. Ctrl-C ends the command, again storing nothing.
+Only a connection that completes a request counts: one that closes, or sends no
+complete request within 2 seconds, as a browser's speculative connections do,
+is dropped and changes nothing. The first request for the redirect path `/`
+decides. A declined consent or a redirect with the wrong `state` ends the
+command without storing anything. A request after the first is answered 400
+and does not change the outcome; a request for another path is answered 404.
+The browser has to run on the machine the CLI runs on, because Google
 redirects to that machine's loopback address; over SSH, forward the port the
 consent address names.
 
