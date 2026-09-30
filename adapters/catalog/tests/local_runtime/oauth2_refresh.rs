@@ -1218,3 +1218,34 @@ fn oauth_connect_refusal_does_not_say_repair() {
     assert_eq!(refused["next_action"], "retry_explicitly", "{refused}");
     journey.assert_no_material();
 }
+
+/// A `minimum_scopes` or `requested_scopes` entry that is empty or holds
+/// whitespace can never be granted, so it is refused at load for the API
+/// identity as for the `id_token` one.
+#[test]
+fn oauth_scope_entries_with_whitespace_refused_at_load() {
+    let token = Provider::new();
+    let base: Value = serde_json::from_slice(&fs::read(&token.config).unwrap()).unwrap();
+    for minimum in ["api read", "api ", "", "api\u{a0}"] {
+        let mut config = base.clone();
+        config["auth"]["minimum_scopes"] = json!([minimum]);
+        private(&token.config, &serde_json::to_vec(&config).unwrap());
+        assert!(print_bootstrap(&token.config).is_err(), "{minimum:?}");
+    }
+    private(&token.config, &serde_json::to_vec(&base).unwrap());
+    assert!(print_bootstrap(&token.config).is_ok());
+    let provider = OAuthProvider::new(Source::Api);
+    let port = provider.port;
+    for requested in ["openid email", " openid", ""] {
+        let mut config = oauth_config(
+            port,
+            &provider.ca,
+            Source::Api,
+            &format!("https://localhost:{port}/token"),
+            "https://localhost/authorize",
+        );
+        config["auth"]["requested_scopes"] = json!(["openid", requested]);
+        provider.write_config(&config);
+        assert!(print_bootstrap(&provider.config).is_err(), "{requested:?}");
+    }
+}
