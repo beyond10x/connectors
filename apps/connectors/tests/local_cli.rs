@@ -369,17 +369,45 @@ impl Drop for OwnerProcess {
 /// Starts `__connectors-owner` from `binary` the way the CLI does, with the
 /// startup channel on descriptor 3 and the lifetime lock on descriptor 4.
 fn start_owner(binary: &std::path::Path, root: &tempfile::TempDir) -> OwnerProcess {
-    use std::os::unix::{fs::OpenOptionsExt, net::UnixStream};
+    start_owner_with(binary, root, None)
+}
+
+/// As [`start_owner`], taking the lifetime lock the way the CLI does: the lock
+/// file may already exist, and the start refuses unless no owner holds it.
+/// `idle_ms` shortens the owner's idle exit bound (honoured by debug builds only).
+fn start_owner_with(
+    binary: &std::path::Path,
+    root: &tempfile::TempDir,
+    idle_ms: Option<u64>,
+) -> OwnerProcess {
+    use std::os::{
+        fd::AsRawFd,
+        unix::{fs::OpenOptionsExt, net::UnixStream},
+    };
     let state = root.path().join("state");
     let lock = fs::OpenOptions::new()
-        .create_new(true)
+        .create(true)
+        .truncate(false)
         .read(true)
         .write(true)
         .mode(0o600)
         .open(state.join("owner.lock"))
         .unwrap();
+    // flock(2); this test crate has no libc dependency.
+    unsafe extern "C" {
+        fn flock(fd: i32, operation: i32) -> i32;
+    }
+    const LOCK_EX: i32 = 2;
+    const LOCK_NB: i32 = 4;
+    // SAFETY: a live descriptor owned by `lock`.
+    let held = unsafe { flock(lock.as_raw_fd(), LOCK_EX | LOCK_NB) };
+    assert_eq!(held, 0, "another owner still holds the lifetime lock");
     let (startup, owner_end) = UnixStream::pair().unwrap();
-    let owner = Command::new("/bin/sh")
+    let mut owner = Command::new("/bin/sh");
+    if let Some(idle_ms) = idle_ms {
+        owner.env("CONNECTORS_TEST_OWNER_IDLE_MS", idle_ms.to_string());
+    }
+    let owner = owner
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
         .arg(binary)
@@ -918,4 +946,95 @@ fn an_owner_still_serves_a_caller_that_never_named_its_build() {
         served["kind"], "success",
         "owner serves build-less callers by design until story:owner-refuses-buildless-callers decides otherwise; flip this assertion when it does: {served}"
     );
+}
+
+/// Waits for `owner` to exit on its own within `limit`; `None` if it is still running.
+fn owner_exit(
+    owner: &mut OwnerProcess,
+    limit: std::time::Duration,
+) -> Option<std::process::ExitStatus> {
+    let until = std::time::Instant::now() + limit;
+    loop {
+        if let Some(status) = owner.0.try_wait().unwrap() {
+            return Some(status);
+        }
+        if std::time::Instant::now() >= until {
+            return None;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+fn shutdown_owner(root: &tempfile::TempDir) {
+    let paths = connectors_host::local::config::Paths::resolve(
+        Some(&root.path().join("config/config.toml")),
+        Some(&root.path().join("state")),
+    )
+    .unwrap();
+    let client = connectors_host::local::owner::Client::connect(&paths, false).unwrap();
+    let host = client.host_incarnation.clone();
+    client.shutdown(&host).unwrap();
+}
+
+/// story:owner-idle-exit: an owner with no client and no child work for its
+/// idle bound exits cleanly, and the next start gets a new owner.
+#[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the idle bound can be shortened only in a debug build"
+)]
+fn an_idle_owner_exits_and_the_next_start_gets_a_new_owner() {
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
+    let status = ["adapters", "status", "--adapter", "forge"];
+    let mut owner = start_owner_with(binary, &root, Some(1500));
+    let first = success(&command(&root, &status));
+    let first_host = first["observation"]["host_incarnation"].clone();
+    assert!(first_host.is_string(), "{first}");
+
+    let exit = owner_exit(&mut owner, std::time::Duration::from_secs(20))
+        .expect("an idle owner is still running 20 s after a 1.5 s idle bound");
+    assert!(exit.success(), "idle exit is clean: {exit}");
+    assert!(!state.join("owner.sock").exists(), "socket left behind");
+    let none = success(&command(&root, &status));
+    assert_eq!(none["observation"]["state"], "owner_unavailable", "{none}");
+
+    // The CLI's own start: the lifetime lock is free and a new owner serves.
+    let _next = start_owner_with(binary, &root, None);
+    let second = success(&command(&root, &status));
+    assert_ne!(second["observation"]["state"], "owner_unavailable");
+    assert!(second["observation"]["host_incarnation"].is_string());
+    assert_ne!(second["observation"]["host_incarnation"], first_host);
+    shutdown_owner(&root);
+}
+
+/// A connected client keeps an owner alive across its idle bound, and the idle
+/// interval restarts only once that client is gone.
+#[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the idle bound can be shortened only in a debug build"
+)]
+fn a_connected_client_keeps_an_owner_past_its_idle_bound() {
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
+    let mut owner = start_owner_with(binary, &root, Some(1500));
+    // Held without a greeting; the owner waits up to 10 s for one.
+    let held = std::os::unix::net::UnixStream::connect(state.join("owner.sock")).unwrap();
+    assert!(
+        owner_exit(&mut owner, std::time::Duration::from_secs(4)).is_none(),
+        "the owner exited with a client connected"
+    );
+    assert!(state.join("owner.sock").exists());
+    success(&command(
+        &root,
+        &["adapters", "status", "--adapter", "forge"],
+    ));
+    drop(held);
+    let exit = owner_exit(&mut owner, std::time::Duration::from_secs(20))
+        .expect("the owner never went idle after its client left");
+    assert!(exit.success(), "idle exit is clean: {exit}");
+    assert!(!state.join("owner.sock").exists());
 }

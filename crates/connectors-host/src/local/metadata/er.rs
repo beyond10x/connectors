@@ -4636,8 +4636,10 @@ mod tests {
     }
 
     // At 9007199254740991 a revise is refused (`ess/domains/local_approval_policy.yaml`,
-    // outcome `exhausted`, and the `revision` invariant behind it). Entity Runtime
-    // does not name the refusing outcome, so this cannot tell the two apart.
+    // outcome `exhausted`, and the `revision` invariant behind it). Through
+    // `transition` a refusal surfaces as `FulfillmentKeysMismatch`, so this cannot
+    // tell the two apart; `approval_policy_revise_at_the_maximum_answers_revision_exhausted`
+    // names the branch.
     #[test]
     fn approval_policy_exhausted_revision_is_refused() {
         let directory = tempfile::tempdir().unwrap();
@@ -4651,6 +4653,93 @@ mod tests {
         assert!(
             transition(&authority, &configured, &next, REVISE_POLICY).is_err(),
             "a revise past 9007199254740991 was accepted"
+        );
+    }
+
+    // Runs `command` from `current` towards `next` as `transition` does, but without the
+    // field fulfillments `command_action` prepares for the accepting branch. With them, a
+    // refusing branch surfaces as `FulfillmentKeysMismatch` naming no outcome; without them,
+    // the kernel answers the refusing branch and its declared error by name.
+    fn refused_by(
+        authority: &ErAuthority,
+        current: &RowImage,
+        next: &RowImage,
+        command: &str,
+    ) -> std::result::Result<(String, String), String> {
+        let commands = definition_bundle()
+            .unwrap()
+            .commands
+            .into_iter()
+            .map(|entry| (entry.name.clone(), entry))
+            .collect::<BTreeMap<_, _>>();
+        let desired = BTreeMap::from([((next.entity.clone(), next.id.clone()), next.clone())]);
+        let mut action = command_action(
+            &registry().unwrap(),
+            &commands,
+            &desired,
+            current,
+            next,
+            command,
+        )
+        .unwrap();
+        let BatchAction::Execute(request) = &mut action else {
+            return Err(format!("{command} is not an operation"));
+        };
+        request.fulfillments.clear();
+        match authority.facade.execute_batch(
+            context("refusal-test"),
+            BatchKey::Named(format!("refusal-{}", uuid::Uuid::new_v4())),
+            vec![action],
+            call_wait(),
+        ) {
+            Err(entity_eventlog::sync::SyncExecutionError::Execution(ExecutionError::Core(
+                entity_core::CoreError::Refused { outcome, error, .. },
+            ))) => Ok((outcome, error)),
+            other => Err(format!("{other:?}")),
+        }
+    }
+
+    // The ESS suite has no scenario for `exhausted` (ESS-SYNTH-003 since ESS 0.43,
+    // beyond10x/ess#251), so the host drives it: at the maximum stored revision a
+    // revise answers `exhausted` with RevisionExhausted, also for an input revision
+    // that `stale-revision` would claim, while a non-advancing revise below the
+    // maximum answers `stale-revision` with RevisionNotAdvanced
+    // (`ess/domains/local_approval_policy.yaml`, ReviseLocalApprovalPolicy).
+    #[test]
+    fn approval_policy_revise_at_the_maximum_answers_revision_exhausted() {
+        let exhausted = Ok((
+            "exhausted".to_owned(),
+            "connectors.local_approval_policy.RevisionExhausted".to_owned(),
+        ));
+        for input_revision in [MAX_SAFE + 1, MAX_SAFE, 5] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("metadata.sqlite3");
+            let configured = policy_row(POLICY_ID, MAX_SAFE, json!([]));
+            let (authority, _, _) =
+                provision(&path, uuid::Uuid::new_v4(), 8, vec![configured.clone()]).unwrap();
+            let mut next = configured.clone();
+            next.revision = 2;
+            next.fields.insert("revision".into(), json!(input_revision));
+            assert_eq!(
+                refused_by(&authority, &configured, &next, REVISE_POLICY),
+                exhausted,
+                "revise to {input_revision} at the maximum stored revision"
+            );
+        }
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let configured = policy_row(POLICY_ID, MAX_SAFE - 1, json!([]));
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![configured.clone()]).unwrap();
+        let mut next = configured.clone();
+        next.revision = 2;
+        next.fields.insert("revision".into(), json!(5));
+        assert_eq!(
+            refused_by(&authority, &configured, &next, REVISE_POLICY),
+            Ok((
+                "stale-revision".to_owned(),
+                "connectors.local_approval_policy.RevisionNotAdvanced".to_owned(),
+            )),
         );
     }
 

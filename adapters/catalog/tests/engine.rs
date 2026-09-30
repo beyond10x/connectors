@@ -537,6 +537,48 @@ async fn guarded_write_refuses_before_dispatch_and_classifies_after() {
     }
 }
 
+/// A refused write keeps what the provider answered, as a read does, and is
+/// marked as the provider's own answer so the host reports it at dispatch.
+#[tokio::test]
+async fn a_refused_write_keeps_the_providers_status_as_its_marked_code() {
+    let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();
+    for (status, code) in [
+        (400, ErrorCode::InvalidInput),
+        (409, ErrorCode::InvalidInput),
+        (412, ErrorCode::InvalidInput),
+        (422, ErrorCode::InvalidInput),
+        (401, ErrorCode::Unauthorized),
+        (403, ErrorCode::Forbidden),
+        (404, ErrorCode::NotFound),
+        (410, ErrorCode::NotFound),
+        (405, ErrorCode::Forbidden),
+        (415, ErrorCode::Forbidden),
+    ] {
+        let http = reads(vec![response(200, json!({"commit": {"id": SHA}}))]);
+        let prepared = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "merge_request.create",
+                create_input(),
+            )
+            .await
+            .unwrap();
+        let outcome = prepared
+            .execute(Box::new(Send {
+                sent: Arc::new(Mutex::new(Vec::new())),
+                response: Some(raw(status, b"private provider error")),
+            }))
+            .await;
+        let WriteOutcome::Refused(error) = outcome else {
+            panic!("{status} was not refused");
+        };
+        assert_eq!(error.code, code, "{status}");
+        assert!(error.upstream_answer, "{status} is the provider's answer");
+        assert!(!error.message.contains("private provider"));
+    }
+}
+
 #[tokio::test]
 async fn multi_check_guard_holds_every_check_before_and_after_dispatch() {
     let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();
