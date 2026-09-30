@@ -18,6 +18,25 @@ worker, or under the supervisor's worker-creation lock with no live worker for
 that instance. A busy/idle observation alone never owns the interval used for the
 [local mutation recovery binding](../../service/local-mutations.md).
 
+An owner exits after 10 minutes with no connected client and no work in flight:
+no queued or in-flight request (to an adapter child or otherwise) and no adapter
+child being started. A live adapter child with nothing in flight is not work,
+and neither is an `automatic` adapter by itself. Every accepted connection and
+every such piece of work restarts the interval. Recovery restarts it only when
+it settles an attempt: a pass that finds nothing pending, or that settles
+nothing (such as a Prepared attempt with no qualified clock), is not work, so
+such an attempt cannot keep an owner alive. It stays pending in the store and
+the next owner resumes it. A recovery pass still running when the interval ends
+delays the exit until it finishes. The owner first removes its socket, so no
+later connect reaches it, and then serves any connection that reached the socket before the removal; if
+one did, it listens on a new socket and stays. Otherwise it stops recovery and
+its supervisor, idle children included, as a shutdown request does, and the
+lifetime lock is released at process exit. A command arriving meanwhile finds no
+socket, or has its stream closed after the socket it reached was removed: one
+that may start an owner treats that as no owner, greets a newer owner already
+listening or waits for the lock and starts one, and a passive command reports
+no owner. Only a test build can shorten the 10 minutes.
+
 Private requests reuse the bounded three-section framing of the
 [adapter binding](private-adapter.md), with distinct `connectors-owner/1` greetings.
 

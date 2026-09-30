@@ -125,11 +125,20 @@ impl Client {
         let socket = socket_path(&directory);
         loop {
             crate::local::protected::cancellation()?;
-            match connect_socket(&socket) {
-                Ok(stream) => {
-                    return Self::greet_running(
-                        &socket, stream, paths, &authority, version, deadline,
-                    );
+            match connect_identified(&socket) {
+                Ok((stream, identity)) => {
+                    match Self::greet_running(&socket, stream, paths, &authority, version, deadline)
+                    {
+                        // The owner closed the stream and its socket is no longer
+                        // at the path: it retired (owner.md). Start over as if
+                        // none was running; a newer owner may already listen.
+                        Err(error)
+                            if start
+                                && error.code == Code::Unavailable
+                                && socket_identity(&socket) != Some(identity)
+                                && Instant::now() < deadline => {}
+                        result => return result,
+                    }
                 }
                 Err(error) if !start => return Err(error),
                 Err(error) if error.code != Code::Unavailable => return Err(error),
@@ -573,13 +582,23 @@ fn socket_path(directory: &File) -> PathBuf {
     ))
 }
 fn connect_socket(path: &std::path::Path) -> Result<UnixStream> {
+    connect_identified(path).map(|(stream, _)| stream)
+}
+/// Also returns the identity of the socket file connected to, so that a caller
+/// can tell whether the owner behind it has since removed it.
+fn connect_identified(path: &std::path::Path) -> Result<(UnixStream, (u64, u64))> {
     let info = std::fs::symlink_metadata(path).map_err(|_| Code::Unavailable)?;
     if !info.file_type().is_socket() || info.uid() != fs::uid() || info.mode() & 0o077 != 0 {
         return Err(Code::InvalidConfiguration.into());
     }
     let stream = UnixStream::connect(path).map_err(|_| Code::Unavailable)?;
     channel::peer(&stream)?;
-    Ok(stream)
+    Ok((stream, (info.dev(), info.ino())))
+}
+fn socket_identity(path: &std::path::Path) -> Option<(u64, u64)> {
+    std::fs::symlink_metadata(path)
+        .ok()
+        .map(|info| (info.dev(), info.ino()))
 }
 fn lock(directory: &File) -> Result<File> {
     match fs::publish_new(directory, std::ffi::OsStr::new("owner.lock"), &[]) {
@@ -692,12 +711,7 @@ pub fn serve(paths: Paths) -> Result<()> {
         }
         std::fs::remove_file(&socket).map_err(|_| Code::Unavailable)?;
     }
-    let listener = UnixListener::bind(&socket).map_err(|_| Code::Unavailable)?;
-    std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600))
-        .map_err(|_| Code::Unavailable)?;
-    listener
-        .set_nonblocking(true)
-        .map_err(|_| Code::Unavailable)?;
+    let mut listener = listen(&socket)?;
     let paths = Arc::new(paths);
     let incarnation = uuid::Uuid::new_v4().to_string();
     let owner = Arc::new(Owner {
@@ -716,13 +730,70 @@ pub fn serve(paths: Paths) -> Result<()> {
     let recovery = maintenance::Background::start(owner.paths.clone(), owner.pool.clone())?;
     handle(owner.clone(), startup)?;
     owner.pool.automatic(&config);
+    let (mut result, retired) = accept(&owner, &recovery, &mut listener, &socket, idle_bound());
+    drop(listener);
+    if let Err(error) = recovery.stop() {
+        result = Err(error);
+    }
+    if retired {
+        // A recovery pass that ended while retiring may have queued work on an
+        // instance worker. Let it run before the supervisor stops; it is bounded.
+        let until = Instant::now() + Duration::from_secs(5);
+        while !owner.pool.quiet().unwrap_or(true) && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    if let Err(error) = owner.pool.shutdown() {
+        result = Err(error);
+    }
+    if !retired && std::fs::remove_file(socket).is_err() {
+        result = Err(Code::Unavailable.into());
+    }
+    result
+}
+/// Serves connections until shutdown, a listener failure or idle retirement;
+/// the flag reports retirement, after which the socket is already gone.
+fn accept(
+    owner: &Arc<Owner>,
+    recovery: &maintenance::Background,
+    listener: &mut UnixListener,
+    socket: &std::path::Path,
+    bound: Duration,
+) -> (Result<()>, bool) {
     let mut result = Ok(());
+    let mut active_at = Instant::now();
+    let mut settled = owner.pool.settled();
+    let mut retired = false;
     while !owner.shutdown.load(Ordering::SeqCst) {
         match listener.accept() {
             Ok((stream, _)) => {
+                active_at = Instant::now();
                 let _ = handle(owner.clone(), stream);
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                let progress = owner.pool.settled();
+                if working(owner) || progress != settled {
+                    settled = progress;
+                    active_at = Instant::now();
+                } else if active_at.elapsed() >= bound && quiet(owner, recovery) {
+                    match retire(owner, recovery, listener, socket) {
+                        Retirement::Exit => {
+                            retired = true;
+                            break;
+                        }
+                        Retirement::Serve => {
+                            active_at = Instant::now();
+                            continue;
+                        }
+                        // Recovery began during the grace: exit once it ends.
+                        Retirement::Retry => continue,
+                        Retirement::Failed(error) => {
+                            result = Err(error);
+                            retired = true;
+                            break;
+                        }
+                    }
+                }
                 std::thread::sleep(Duration::from_millis(10))
             }
             Err(_) => {
@@ -731,17 +802,112 @@ pub fn serve(paths: Paths) -> Result<()> {
             }
         }
     }
-    drop(listener);
-    if let Err(error) = recovery.stop() {
-        result = Err(error);
-    }
-    if let Err(error) = owner.pool.shutdown() {
-        result = Err(error);
-    }
+    (result, retired)
+}
+/// contracts/cli/v1alpha1/owner.md: an owner with no client and no child work
+/// for this long exits.
+const IDLE_EXIT: Duration = Duration::from_secs(600);
+/// Test builds may shorten the bound through the environment; a release build
+/// has no override. The CLI starts owners with a cleared environment.
+#[cfg(debug_assertions)]
+fn idle_bound() -> Duration {
+    std::env::var("CONNECTORS_TEST_OWNER_IDLE_MS")
+        .ok()
+        .and_then(|value| value.parse().ok())
+        .map(Duration::from_millis)
+        .unwrap_or(IDLE_EXIT)
+}
+#[cfg(not(debug_assertions))]
+fn idle_bound() -> Duration {
+    IDLE_EXIT
+}
+fn listen(socket: &std::path::Path) -> Result<UnixListener> {
+    let listener = UnixListener::bind(socket).map_err(|_| Code::Unavailable)?;
+    std::fs::set_permissions(socket, std::fs::Permissions::from_mode(0o600))
+        .map_err(|_| Code::Unavailable)?;
+    listener
+        .set_nonblocking(true)
+        .map_err(|_| Code::Unavailable)?;
+    Ok(listener)
+}
+/// Work that restarts the idle clock: a connected client (including the startup
+/// channel) or a queued or running job. Recovery restarts it only by settling an
+/// attempt; one that settles nothing, such as a Prepared attempt without a
+/// qualified clock, would otherwise keep an owner alive for ever. The attempt
+/// stays pending in the store and the next owner resumes it.
+fn working(owner: &Owner) -> bool {
+    owner.clients.load(Ordering::SeqCst) > 0 || owner.pool.working().unwrap_or(true)
+}
+/// Nothing at all in flight, recovery included: the owner never exits while a
+/// recovery pass is running.
+fn quiet(owner: &Owner, recovery: &maintenance::Background) -> bool {
+    owner.clients.load(Ordering::SeqCst) == 0
+        && !recovery.busy()
+        && owner.pool.quiet().unwrap_or(false)
+}
+enum Retirement {
+    Exit,
+    Serve,
+    Retry,
+    Failed(Error),
+}
+/// Removes the socket so that no later connect reaches this owner, then serves
+/// any connection that reached it first. A later CLI finds no socket, waits on
+/// the lifetime lock this process holds until exit, and starts a new owner.
+/// If anything arrived meanwhile, the owner serves it and listens again.
+fn retire(
+    owner: &Arc<Owner>,
+    recovery: &maintenance::Background,
+    listener: &mut UnixListener,
+    socket: &std::path::Path,
+) -> Retirement {
     if std::fs::remove_file(socket).is_err() {
-        result = Err(Code::Unavailable.into());
+        return Retirement::Serve;
     }
-    result
+    // A connect that resolved the path just before removal is queued here.
+    let grace = Instant::now() + Duration::from_millis(100);
+    let mut arrived = false;
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                arrived = true;
+                let _ = handle(owner.clone(), stream);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if Instant::now() >= grace {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(_) => break,
+        }
+    }
+    if !arrived && quiet(owner, recovery) {
+        owner.shutdown.store(true, Ordering::SeqCst);
+        return Retirement::Exit;
+    }
+    match listen(socket) {
+        Ok(next) => {
+            // Anything still queued on the unlinked listener is served first.
+            while let Ok((stream, _)) = listener.accept() {
+                let _ = handle(owner.clone(), stream);
+            }
+            *listener = next;
+            if arrived {
+                Retirement::Serve
+            } else {
+                Retirement::Retry
+            }
+        }
+        Err(error) => {
+            // Unreachable now: finish what was admitted, then exit.
+            while owner.clients.load(Ordering::SeqCst) > 0 {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            owner.shutdown.store(true, Ordering::SeqCst);
+            Retirement::Failed(error)
+        }
+    }
 }
 fn inherited() -> Result<(UnixStream, File)> {
     let duplicate = |fd| -> Result<File> {
@@ -1390,6 +1556,279 @@ mod tests {
                 "shutdown"
             ],
             "no work request may reach an owner from another build"
+        );
+    }
+
+    /// story:owner-idle-exit: a CLI whose connection a retiring owner closes
+    /// after removing its socket treats that owner as gone. It waits on the
+    /// lifetime lock and greets the next owner instead of reporting a failure.
+    /// The test holds the lock throughout, so this CLI never spawns one itself.
+    #[test]
+    fn a_connection_closed_by_a_retiring_owner_reaches_the_next_owner() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        let directory = fs::directory(&paths.state, false, true).unwrap();
+        let held = lock(&directory).unwrap();
+        // SAFETY: a live descriptor owned by `held`.
+        assert_eq!(
+            unsafe { libc::flock(held.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+            0
+        );
+        let socket = paths.state.join("owner.sock");
+        let retiring = UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let cli = {
+            let paths = Paths {
+                config: paths.config.clone(),
+                state: paths.state.clone(),
+            };
+            std::thread::spawn(move || {
+                Client::connect_version(
+                    &paths,
+                    true,
+                    VERSION,
+                    Instant::now() + Duration::from_secs(10),
+                )
+                .map(|client| client.host_incarnation)
+                .map_err(|error| error.code)
+            })
+        };
+        // The retiring owner: the CLI's connection reached it before removal.
+        let (stream, _) = retiring.accept().unwrap();
+        std::fs::remove_file(&socket).unwrap();
+        drop(retiring);
+        drop(stream);
+        // The next owner starts only after the retiring one has exited.
+        std::thread::sleep(Duration::from_millis(300));
+
+        let next = UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
+        next.set_nonblocking(true).unwrap();
+        // A current-build owner: it answers a greeting with or without `build`
+        // and the build probe, until a CLI greets it with `build`.
+        let owner = std::thread::spawn(move || {
+            let until = Instant::now() + Duration::from_secs(10);
+            let host = uuid::Uuid::new_v4().to_string();
+            let build = own_build().unwrap().to_owned();
+            while Instant::now() < until {
+                let Ok((mut stream, _)) = next.accept() else {
+                    std::thread::sleep(Duration::from_millis(10));
+                    continue;
+                };
+                stream.set_nonblocking(false).unwrap();
+                let Ok(hello) = channel::read::<Request>(&mut stream, until, false, 0) else {
+                    continue;
+                };
+                let Request::Hello {
+                    version,
+                    challenge,
+                    authority,
+                    build: asked,
+                    ..
+                } = hello.control
+                else {
+                    continue;
+                };
+                let named = asked.is_some();
+                let reply = Reply::Hello {
+                    version,
+                    challenge,
+                    host_incarnation: host.clone(),
+                    authority,
+                    build: asked.map(|_| build.clone()),
+                };
+                if channel::write(&mut stream, &reply, None, &[], until).is_err() {
+                    continue;
+                }
+                if named {
+                    return Some(host);
+                }
+                if let Ok(frame) = channel::read::<Request>(&mut stream, until, false, 0)
+                    && matches!(frame.control, Request::Build)
+                {
+                    let document = serde_json::to_vec(&json!({ "build": build })).unwrap();
+                    let _ = channel::write(&mut stream, &Reply::Success, None, &document, until);
+                }
+            }
+            None
+        });
+        let greeted = cli
+            .join()
+            .unwrap()
+            .map_err(|code| serde_json::to_value(code).unwrap());
+        assert!(greeted.is_ok(), "the CLI reported {greeted:?}");
+        drop(held);
+        let host = owner.join().unwrap();
+        assert_eq!(greeted, Ok(host.expect("the next owner was never greeted")));
+    }
+}
+
+/// story:owner-idle-exit with the real accept loop, recovery thread and pool,
+/// and an idle bound spanning several 5 s recovery sweeps.
+#[cfg(test)]
+mod idle_sweep_tests {
+    use super::*;
+    use crate::local::{mutations as ledger, registry};
+
+    struct FixedClock;
+    impl ledger::Clock for FixedClock {
+        fn now(&self) -> ledger::Result<ledger::ClockInterval> {
+            let now = connectors_sdk::now_ms() as i64;
+            Ok(ledger::ClockInterval {
+                lower_unix_ms: now,
+                upper_unix_ms: now + 2000,
+            })
+        }
+    }
+
+    /// A Prepared attempt, as an owner that stopped before dispatch leaves one.
+    fn pending_attempt(state: &std::path::Path) -> ledger::AttemptRef {
+        let mut metadata = Metadata::update_mutations(state).unwrap();
+        metadata
+            .connection
+            .execute_batch(
+                "INSERT INTO registry_instances VALUES ('instance','adapter','config',0);",
+            )
+            .unwrap();
+        let binding = registry::fixture_binding("instance");
+        metadata
+            .connection
+            .execute(
+                "INSERT INTO registry_profiles VALUES ('profile','adapter','pat','1',?1)",
+                [serde_json::to_string(&binding.profile).unwrap()],
+            )
+            .unwrap();
+        metadata
+            .connection
+            .execute(
+                "INSERT INTO registry_connections(connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,public,created_at_ms)
+                 VALUES ('connection','instance','profile',?1,'scope','revision','fence','live',1,1)",
+                [serde_json::to_string(&binding).unwrap()],
+            )
+            .unwrap();
+        metadata.persist().unwrap();
+        drop(metadata);
+        let store = ledger::Store::new(state, FixedClock, ledger::Limits::default()).unwrap();
+        let candidate = ledger::Candidate {
+            namespace: ledger::Namespace {
+                receiver_instance: "instance".into(),
+                tenant: None,
+                realm: None,
+                caller: "caller".into(),
+                executor: None,
+                origin: ledger::Origin::Direct,
+            },
+            fingerprint: ledger::Fingerprint {
+                operation: ledger::OperationRef {
+                    instance: "instance".into(),
+                    adapter: "adapter".into(),
+                    operation: "operation".into(),
+                },
+                connection_ref: "connection".into(),
+                connection_revision: "revision".into(),
+                contract_ref: "operations/v1alpha1".into(),
+                profile: "mutation".into(),
+                descriptor_revision: "descriptor".into(),
+                configuration_revision: "config".into(),
+                canonicalization_version: "adapter-v1-canonical-json".into(),
+                input_digest: "a".repeat(64),
+                route: None,
+            },
+            caller_key: Some("key".into()),
+            request_id: "request".into(),
+            approval: ledger::Approval::NotRequired,
+        };
+        match store.prepare(&candidate).unwrap() {
+            ledger::Preparation::Prepared(prepared) => prepared.reference(),
+            ledger::Preparation::Existing(_) => panic!("unexpected existing attempt"),
+        }
+    }
+
+    /// Runs the owner's accept loop with no client and returns how long it took
+    /// to retire, or `None` if it was still serving `bound` + 10 s later.
+    fn idle_exit(state: &std::path::Path, bound: Duration) -> Option<Duration> {
+        let paths = Arc::new(Paths {
+            // No configuration: recovery has no qualified clock.
+            config: state.join("absent/config.toml"),
+            state: state.to_owned(),
+        });
+        let incarnation = uuid::Uuid::new_v4().to_string();
+        let owner = Arc::new(Owner {
+            paths: paths.clone(),
+            authority: Metadata::inspect(state)
+                .unwrap()
+                .authority()
+                .unwrap()
+                .to_string(),
+            incarnation: incarnation.clone(),
+            build: "test",
+            pool: Arc::new(supervisor::Pool::new(paths.clone(), incarnation)),
+            shutdown: AtomicBool::new(false),
+            clients: AtomicUsize::new(0),
+        });
+        let recovery = maintenance::Background::start(paths, owner.pool.clone()).unwrap();
+        let socket = state.join("owner.sock");
+        let mut listener = listen(&socket).unwrap();
+        let (done, finished) = std::sync::mpsc::channel();
+        let serving = owner.clone();
+        let started = Instant::now();
+        let loop_thread = std::thread::spawn(move || {
+            let (result, retired) = accept(&serving, &recovery, &mut listener, &socket, bound);
+            let _ = done.send(started.elapsed());
+            recovery.stop().unwrap();
+            (result, retired)
+        });
+        let exit = finished.recv_timeout(bound + Duration::from_secs(10)).ok();
+        owner.shutdown.store(true, Ordering::SeqCst);
+        let (result, retired) = loop_thread.join().unwrap();
+        owner.pool.shutdown().unwrap();
+        if exit.is_some() {
+            assert!(result.is_ok() && retired, "the owner retired cleanly");
+            assert!(!state.join("owner.sock").exists());
+        }
+        exit
+    }
+
+    fn state_dir() -> (tempfile::TempDir, PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        std::fs::create_dir(&state).unwrap();
+        std::fs::set_permissions(&state, std::fs::Permissions::from_mode(0o700)).unwrap();
+        drop(Metadata::initialize(&state).unwrap());
+        (root, state)
+    }
+
+    /// Nothing pending: the 5 s sweeps inside a 15 s bound are not work.
+    #[test]
+    fn an_idle_owner_exits_at_a_bound_spanning_several_empty_recovery_sweeps() {
+        let (_root, state) = state_dir();
+        let bound = Duration::from_secs(15);
+        let exit = idle_exit(&state, bound)
+            .expect("an owner with nothing pending outlived its 15 s bound by 10 s");
+        assert!(exit >= bound, "the owner exited before its bound: {exit:?}");
+    }
+
+    /// A Prepared attempt with no qualified clock cannot settle. Recovery that
+    /// settles nothing does not keep the owner alive, and the attempt stays
+    /// pending for the next owner.
+    #[test]
+    fn an_unsettleable_pending_attempt_does_not_keep_an_owner_alive() {
+        let (_root, state) = state_dir();
+        let reference = pending_attempt(&state);
+        let bound = Duration::from_secs(15);
+        let exit = idle_exit(&state, bound)
+            .expect("an owner whose recovery settles nothing outlived its 15 s bound by 10 s");
+        assert!(exit >= bound, "the owner exited before its bound: {exit:?}");
+        let store = ledger::Store::new(&state, FixedClock, ledger::Limits::default()).unwrap();
+        assert_eq!(
+            store.observe(reference).unwrap().state,
+            ledger::State::Prepared,
+            "the attempt is left for the next owner"
         );
     }
 }
