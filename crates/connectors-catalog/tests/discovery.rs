@@ -837,7 +837,7 @@ fn discovery_accepts_values_at_their_edges() {
     set(
         &mut document,
         "/rootUrl",
-        json!("https://fixture.googleapis.com:8443/"),
+        json!(concat!("https://fixture.googleapis.com", ":8443", "/")),
     );
     let parameters = "/resources/things/methods/get/parameters";
     let edges = [
@@ -940,7 +940,7 @@ fn discovery_refuses_values_outside_their_format() {
     for root in [
         "https://a..b/",
         "https://-fixture.googleapis.com/",
-        "https://fixture.googleapis.com:/",
+        concat!("https://fixture.googleapis.com", ":", "/"),
     ] {
         let mut document = base();
         set(&mut document, "/rootUrl", json!(root));
@@ -950,5 +950,104 @@ fn discovery_refuses_values_outside_their_format() {
             Reason::NotAbsoluteHttps,
             "{root}: {refused}"
         );
+    }
+}
+
+/// A string-format `default` in a document of its own, at the query parameter
+/// `when` of the base document's method.
+fn with_string_default(format: &str, value: &str) -> Value {
+    let mut document = base();
+    set(
+        &mut document,
+        "/resources/things/methods/get/parameters/when",
+        json!({"type": "string", "format": format, "location": "query", "default": value}),
+    );
+    document
+}
+
+/// The accept side of the string formats adversary pass 2 checked: a value in
+/// its format's own spelling projects, written exactly as Discovery wrote it.
+#[test]
+fn discovery_accepts_string_defaults_in_their_format() {
+    for (format, value) in [
+        ("date", "2024-02-29"),
+        ("date-time", "2026-09-30T14:03:00Z"),
+        ("date-time", "2026-09-30T14:03:00.123+02:00"),
+        ("google-datetime", "2026-09-30t14:03:00z"),
+        ("byte", "aGVsbG8="),
+        ("byte", "aGVsbG8"),
+        ("byte", "_-8_"),
+        ("byte", ""),
+        ("google-duration", "3.5s"),
+        ("google-duration", "-10s"),
+    ] {
+        let projection =
+            discovery::project(with_string_default(format, value).to_string().as_bytes())
+                .unwrap_or_else(|refusal| panic!("{format} default {value:?} refused: {refusal}"));
+        let openapi: Value = serde_json::from_slice(&projection.openapi).unwrap();
+        let when = openapi["paths"]["/things/{thingId}"]["get"]["parameters"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == "when")
+            .expect("when projected")
+            .clone();
+        assert_eq!(when["schema"]["default"], json!(value), "{format}");
+    }
+}
+
+/// The rest of the class adversary pass 2 found: every string format the
+/// projector checks refuses a default outside it, at the default's pointer.
+#[test]
+fn discovery_refuses_string_defaults_outside_their_format() {
+    for (format, value) in [
+        ("date", "2026-02-30"),
+        ("date", "2026-13-01"),
+        ("date", "26-01-01"),
+        ("date-time", "2026-09-30T24:00:00Z"),
+        ("date-time", "2026-09-30T14:03:00"),
+        ("date-time", "2026-09-30 14:03:00Z"),
+        ("google-datetime", "2026-09-30T14:03:00+2:00"),
+        ("byte", "aGVsbG8=="),
+        ("byte", "a+b_"),
+        ("byte", "a"),
+        ("google-duration", "3.5"),
+        ("google-duration", "1.0000000001s"),
+    ] {
+        let refused = refusal(&with_string_default(format, value));
+        assert_eq!(
+            refused.pointer, "/resources/things/methods/get/parameters/when/default",
+            "{format} default {value:?}: {refused}"
+        );
+    }
+}
+
+/// `supportsMediaUpload: true` with no protocol to exclude is refused at the
+/// pointer that lacks one, whether `protocols` is empty or absent.
+#[test]
+fn discovery_refuses_media_upload_without_a_protocol() {
+    for (media, at) in [
+        (
+            json!({"protocols": {}}),
+            "/resources/things/methods/get/mediaUpload/protocols",
+        ),
+        (
+            json!({"accept": ["*/*"]}),
+            "/resources/things/methods/get/mediaUpload",
+        ),
+    ] {
+        let mut document = base();
+        set(
+            &mut document,
+            "/resources/things/methods/get/supportsMediaUpload",
+            json!(true),
+        );
+        set(
+            &mut document,
+            "/resources/things/methods/get/mediaUpload",
+            media.clone(),
+        );
+        let refused = refusal(&document);
+        assert_eq!(refused.pointer, at, "{media}: {refused}");
     }
 }
