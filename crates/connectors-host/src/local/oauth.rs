@@ -21,7 +21,11 @@ use sha2::{Digest, Sha256};
 use std::{
     io::{ErrorKind, Read, Write},
     net::{Ipv4Addr, TcpListener, TcpStream},
-    time::Duration,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration, Instant},
 };
 use subtle::ConstantTimeEq;
 use zeroize::{Zeroize, Zeroizing};
@@ -35,7 +39,11 @@ const COMPLETION_RESERVE_MS: u64 = 45_000;
 const FIELDS: [&str; 3] = ["client_id", "client_secret", "refresh_token"];
 /// The largest request head the listener reads.
 const REQUEST_LIMIT: usize = 8192;
-const POLL: Duration = Duration::from_millis(50);
+const POLL: Duration = Duration::from_millis(20);
+/// How long an accepted connection may take to complete its request head.
+const IDLE: Duration = Duration::from_secs(2);
+/// The most connections read at once; more are closed on accept.
+const PENDING_LIMIT: usize = 64;
 
 /// The entry the CLI submits for `document` under `profile`: the acquired
 /// triple for Google's installed-client JSON under a profile with
@@ -172,7 +180,13 @@ fn acquire(
         &challenge(&verifier),
     )?;
     (environment.present)(&url);
-    let code = receive(listener, &state, deadline_ms, environment.cancelled)?;
+    // `_drain` answers every later request 400 until this flow returns.
+    let (code, _drain) = receive(
+        Loopback::new(listener),
+        &state,
+        deadline_ms,
+        environment.cancelled,
+    )?;
     (environment.cancelled)()?;
     let refresh_token = (environment.exchange)(&Exchange {
         token_url: &acquisition.token_url,
@@ -212,82 +226,170 @@ fn authorize_url(
     Ok(url.into())
 }
 
-/// The code of the one request the listener answers. The first request
-/// decides: a request that is not a redirect to `/` with the flow's `state`
-/// and a code, carries `error`, or has a second request queued behind it, is
-/// refused and the flow fails. The listener closes when this returns, so no
-/// later request is ever answered.
-fn receive(
+/// A connection that has not yet completed its request head.
+struct Pending {
+    stream: TcpStream,
+    head: Zeroizing<Vec<u8>>,
+    accepted: Instant,
+}
+
+/// The loopback listener and the connections it is reading, all nonblocking,
+/// so no connection can hold up another. Only a connection that completes a
+/// request head is a request: one that closes, fails, or sends no complete
+/// head within [`IDLE`] of being accepted, such as a browser's speculative
+/// preconnect, is dropped without an answer and without effect.
+struct Loopback {
     listener: TcpListener,
+    pending: Vec<Pending>,
+}
+impl Loopback {
+    fn new(listener: TcpListener) -> Self {
+        Self {
+            listener,
+            pending: Vec::new(),
+        }
+    }
+
+    /// Accepts what is queued, reads what has arrived, and returns every
+    /// connection whose head is complete (or has reached the limit), in the
+    /// order the connections were accepted.
+    fn poll(&mut self) -> Result<Vec<(TcpStream, Zeroizing<Vec<u8>>)>> {
+        loop {
+            match self.listener.accept() {
+                Ok((stream, _)) => {
+                    if self.pending.len() >= PENDING_LIMIT || stream.set_nonblocking(true).is_err()
+                    {
+                        continue;
+                    }
+                    self.pending.push(Pending {
+                        stream,
+                        head: Zeroizing::new(Vec::with_capacity(1024)),
+                        accepted: Instant::now(),
+                    });
+                }
+                Err(error) if error.kind() == ErrorKind::WouldBlock => break,
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        ErrorKind::Interrupted
+                            | ErrorKind::ConnectionAborted
+                            | ErrorKind::ConnectionReset
+                    ) => {}
+                Err(_) => return Err(Code::Unavailable.into()),
+            }
+        }
+        let mut complete = Vec::new();
+        let mut chunk = Zeroizing::new([0_u8; 1024]);
+        for mut pending in std::mem::take(&mut self.pending) {
+            let mut open = true;
+            while open && !head_complete(&pending.head) {
+                let room = (REQUEST_LIMIT - pending.head.len()).min(chunk.len());
+                match pending.stream.read(&mut chunk[..room]) {
+                    Ok(0) => open = false,
+                    Ok(read) => pending.head.extend_from_slice(&chunk[..read]),
+                    Err(error) if error.kind() == ErrorKind::Interrupted => {}
+                    Err(error) if error.kind() == ErrorKind::WouldBlock => break,
+                    Err(_) => open = false,
+                }
+            }
+            if head_complete(&pending.head) {
+                complete.push((pending.stream, pending.head));
+            } else if open && pending.accepted.elapsed() < IDLE {
+                self.pending.push(pending);
+            }
+        }
+        Ok(complete)
+    }
+}
+
+fn head_complete(head: &[u8]) -> bool {
+    head.len() >= REQUEST_LIMIT || head.windows(4).any(|window| window == b"\r\n\r\n")
+}
+
+/// The path of a head's request line, without its query.
+fn request_path(head: &[u8]) -> Option<&str> {
+    let line = head.split(|byte| *byte == b'\r').next()?;
+    let target = std::str::from_utf8(line).ok()?.split(' ').nth(1)?;
+    Some(target.split_once('?').map_or(target, |(path, _)| path))
+}
+
+/// The code of the redirect that decides the flow. The first connection to
+/// complete a request head for `/` decides: a redirect with the flow's
+/// `state` and a code is accepted, anything else, including one with `error`,
+/// is refused and the flow fails. A head for another path is answered 404 and
+/// decides nothing. Once decided, the returned [`Drain`] answers every later
+/// request 400 until the flow drops it, which closes the listener.
+fn receive(
+    mut loopback: Loopback,
     state: &str,
     deadline_ms: u64,
     cancelled: &dyn Fn() -> Result<()>,
-) -> Result<Zeroizing<String>> {
+) -> Result<(Zeroizing<String>, Drain)> {
     loop {
         cancelled()?;
         if connectors_sdk::now_ms() >= deadline_ms {
             return Err(Code::Timeout.into());
         }
-        let mut stream = match listener.accept() {
-            Ok((stream, _)) => stream,
-            Err(error)
-                if matches!(error.kind(), ErrorKind::WouldBlock | ErrorKind::Interrupted) =>
-            {
-                std::thread::sleep(POLL);
-                continue;
+        let mut decided = None;
+        for (stream, head) in loopback.poll()? {
+            if decided.is_some() {
+                answer(stream, Answer::Refused);
+            } else if request_path(&head) != Some("/") {
+                answer(stream, Answer::NotFound);
+            } else {
+                let outcome = redirect(&head, state);
+                answer(
+                    stream,
+                    if outcome.is_ok() {
+                        Answer::Completed
+                    } else {
+                        Answer::Refused
+                    },
+                );
+                decided = Some(outcome);
             }
-            Err(_) => return Err(Code::Unavailable.into()),
-        };
-        // A connection closed without a request, such as a browser's
-        // speculative one, is not a request.
-        let Some(head) = read_head(&mut stream, deadline_ms, cancelled)? else {
-            continue;
-        };
-        let queued = listener.accept().is_ok();
-        drop(listener);
-        let outcome = if queued {
-            Err(Code::ProtectedEntryUnavailable.into())
-        } else {
-            redirect(&head, state)
-        };
-        answer(stream, outcome.is_ok());
-        return outcome;
+        }
+        match decided {
+            Some(outcome) => return outcome.map(|code| (code, Drain::start(loopback))),
+            None => std::thread::sleep(POLL),
+        }
     }
 }
 
-/// The request head, bounded; `None` for a connection that ends before its
-/// first byte. A truncated or oversized head is returned as read, and refused.
-fn read_head(
-    stream: &mut TcpStream,
-    deadline_ms: u64,
-    cancelled: &dyn Fn() -> Result<()>,
-) -> Result<Option<Zeroizing<Vec<u8>>>> {
-    stream
-        .set_nonblocking(false)
-        .and_then(|_| stream.set_read_timeout(Some(POLL)))
-        .map_err(|_| Code::Unavailable)?;
-    let mut head = Zeroizing::new(Vec::with_capacity(REQUEST_LIMIT));
-    let mut chunk = Zeroizing::new([0_u8; 1024]);
-    while !head.windows(4).any(|window| window == b"\r\n\r\n") && head.len() < REQUEST_LIMIT {
-        cancelled()?;
-        if connectors_sdk::now_ms() >= deadline_ms {
-            return Err(Code::Timeout.into());
-        }
-        let room = (REQUEST_LIMIT - head.len()).min(chunk.len());
-        match stream.read(&mut chunk[..room]) {
-            Ok(0) if head.is_empty() => return Ok(None),
-            Ok(0) => break,
-            Ok(read) => head.extend_from_slice(&chunk[..read]),
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    ErrorKind::WouldBlock | ErrorKind::TimedOut | ErrorKind::Interrupted
-                ) => {}
-            Err(_) if head.is_empty() => return Ok(None),
-            Err(_) => break,
+/// Answers 400 to every request that completes after the decision, until
+/// dropped; dropping it closes the listener.
+struct Drain {
+    stop: Arc<AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+impl Drain {
+    fn start(mut loopback: Loopback) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let stopped = stop.clone();
+        let thread = std::thread::spawn(move || {
+            while !stopped.load(Ordering::SeqCst) {
+                let Ok(complete) = loopback.poll() else {
+                    return;
+                };
+                for (stream, _) in complete {
+                    answer(stream, Answer::Refused);
+                }
+                std::thread::sleep(POLL);
+            }
+        });
+        Self {
+            stop,
+            thread: Some(thread),
         }
     }
-    Ok(Some(head))
+}
+impl Drop for Drain {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
 }
 
 /// The code of a well-formed consent redirect for `state`.
@@ -329,19 +431,26 @@ fn redirect(head: &[u8], state: &str) -> Result<Zeroizing<String>> {
     }
 }
 
-/// Tells the browser how consent ended. Its answer is not the flow's result.
-fn answer(mut stream: TcpStream, completed: bool) {
-    let (status, body) = if completed {
-        (
+enum Answer {
+    Completed,
+    Refused,
+    NotFound,
+}
+
+/// Tells the browser how its request ended. The answer is not the flow's result.
+fn answer(mut stream: TcpStream, answer: Answer) {
+    let (status, body) = match answer {
+        Answer::Completed => (
             "200 OK",
             "Consent received. You can close this window and return to the terminal.",
-        )
-    } else {
-        (
+        ),
+        Answer::Refused => (
             "400 Bad Request",
             "Consent was not completed. Return to the terminal.",
-        )
+        ),
+        Answer::NotFound => ("404 Not Found", "Not found."),
     };
+    let _ = stream.set_nonblocking(false);
     let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
     let _ = stream.write_all(
         format!(
@@ -352,8 +461,10 @@ fn answer(mut stream: TcpStream, completed: bool) {
     );
 }
 
-/// Writes the consent address where the person running the CLI sees it now:
-/// the CLI's ordinary output is held until it exits.
+/// Writes the consent address where the person running the CLI sees it now,
+/// since the CLI's ordinary output is held until it exits: to the terminal,
+/// or, without one, as the single stderr line `connectors: consent-url <url>`
+/// that a caller can find ahead of the CLI's own output.
 fn present(url: &str) {
     let message = format!(
         "Open this address in a browser on this machine to grant access (waiting {} s):\n{url}\n",
@@ -364,8 +475,15 @@ fn present(url: &str) {
         .open("/dev/tty")
         .and_then(|mut tty| tty.write_all(message.as_bytes()));
     if shown.is_err() {
-        let _ = std::io::stderr().lock().write_all(message.as_bytes());
+        let _ = std::io::stderr()
+            .lock()
+            .write_all(consent_line(url).as_bytes());
     }
+}
+
+/// The stderr form of the consent address.
+fn consent_line(url: &str) -> String {
+    format!("connectors: consent-url {url}\n")
 }
 
 /// The code exchange: one form POST to `token_url`, under the platform trust
@@ -689,6 +807,16 @@ mod tests {
     const BUDGET: Duration = Duration::from_secs(20);
 
     #[test]
+    fn the_consent_address_without_a_terminal_is_one_marked_line() {
+        let line = consent_line("https://accounts.example.test/o/oauth2/auth?state=s");
+        assert_eq!(
+            line,
+            "connectors: consent-url https://accounts.example.test/o/oauth2/auth?state=s\n"
+        );
+        assert_eq!(line.matches('\n').count(), 1);
+    }
+
+    #[test]
     fn pkce_challenge_matches_rfc7636_appendix_b() {
         assert_eq!(
             challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
@@ -804,9 +932,66 @@ mod tests {
         }
     }
 
+    /// A browser's answer on `stream`, or what arrived within five seconds.
+    fn read_answer(stream: &mut TcpStream) -> String {
+        stream
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut bytes = Vec::new();
+        let _ = stream.read_to_end(&mut bytes);
+        String::from_utf8_lossy(&bytes).into_owned()
+    }
+
+    fn get(port: u16, target: &str) -> TcpStream {
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream
+            .write_all(
+                format!("GET {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n").as_bytes(),
+            )
+            .unwrap();
+        stream
+    }
+
     #[test]
     fn second_request_refused() {
-        // Two redirects queued together: neither is trusted, nothing is exchanged.
+        // The first redirect decides; a second one that sends its head after
+        // the decision, while the code is being exchanged, is answered 400 and
+        // changes nothing.
+        let mut first = None;
+        let port = std::cell::Cell::new(0_u16);
+        let mut exchanged = Vec::new();
+        let mut second = String::new();
+        let result = acquire(
+            &profile(&TRIPLE),
+            &client(AUTHORIZE, TOKEN),
+            connectors_sdk::now_ms() + BUDGET.as_millis() as u64,
+            Environment {
+                present: &mut |shown| {
+                    let url = Url::parse(shown).unwrap();
+                    let redirect = Url::parse(&param(&url, "redirect_uri").unwrap()).unwrap();
+                    port.set(redirect.port().unwrap());
+                    first = Some(get(port.get(), &consented(&url)));
+                },
+                cancelled: &|| Ok(()),
+                exchange: &mut |request| {
+                    exchanged.push(request.code.to_owned());
+                    second = read_answer(&mut get(port.get(), "/?state=forged&code=other"));
+                    Ok(Zeroizing::new(REFRESH.to_owned()))
+                },
+            },
+        );
+        let Ok(secret) = result else {
+            panic!("the first redirect did not decide: {:?}", code(&result));
+        };
+        let entry: serde_json::Value = serde_json::from_slice(&secret.0).unwrap();
+        assert!(entry["refresh_token"] == REFRESH);
+        assert_eq!(exchanged, ["fixture-code"]);
+        assert!(read_answer(first.as_mut().unwrap()).starts_with("HTTP/1.1 200 "));
+        assert!(second.starts_with("HTTP/1.1 400 "), "second: {second:?}");
+        // The listener closes when the flow returns (Drain joins on drop). A reconnect
+        // check is not asserted: parallel tests may bind the freed ephemeral port.
+
+        // Two redirects queued together: the first decides, the second is 400.
         let (result, mut record) = run(
             &profile(&TRIPLE),
             &client(AUTHORIZE, TOKEN),
@@ -818,23 +1003,27 @@ mod tests {
                 ]
             },
         );
-        assert_eq!(code(&result), Some(Code::ProtectedEntryUnavailable));
-        assert!(record.exchanged.is_empty());
+        assert!(result.is_ok());
+        assert_eq!(record.exchanged.len(), 1);
+        assert_eq!(record.exchanged[0].0, "fixture-code");
         let answers = record.answers();
-        assert!(answers[0].starts_with("HTTP/1.1 400 "));
-        assert!(answers[1].is_empty(), "the second request was answered");
+        assert!(answers[0].starts_with("HTTP/1.1 200 "), "{:?}", answers[0]);
+        assert!(answers[1].starts_with("HTTP/1.1 400 "), "{:?}", answers[1]);
+    }
 
-        // After the one request a flow answers, its listener is gone.
-        let (result, record) = run(
+    #[test]
+    fn a_request_off_the_redirect_path_does_not_decide() {
+        let (result, mut record) = run(
             &profile(&TRIPLE),
             &client(AUTHORIZE, TOKEN),
             BUDGET,
-            |url| vec![consented(url)],
+            |url| vec!["/favicon.ico".to_owned(), consented(url)],
         );
         assert!(result.is_ok());
-        let redirect = Url::parse(&param(&record.presented[0], "redirect_uri").unwrap()).unwrap();
-        assert!(TcpStream::connect(("127.0.0.1", redirect.port().unwrap())).is_err());
         assert_eq!(record.exchanged.len(), 1);
+        let answers = record.answers();
+        assert!(answers[0].starts_with("HTTP/1.1 404 "), "{:?}", answers[0]);
+        assert!(answers[1].starts_with("HTTP/1.1 200 "), "{:?}", answers[1]);
     }
 
     #[test]

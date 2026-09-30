@@ -155,10 +155,14 @@ The complete configuration used against the sandbox is
   be `https` URLs without credentials, query or fragment, written in canonical
   form. `authorize_url` and `requested_scopes` are never called or checked by
   the provider: they reach the host as the profile's `acquisition`, next to
-  `token_url`, for the CLI to obtain the entry by consent.
+  `token_url`, for the CLI to obtain the entry by consent
+  ([Google OAuth guide](catalog-google-oauth.md)).
   `token_ca_file` names trust roots for the token host only; omit it to use
-  the platform roots. The profile is offered to the host as `http_bearer` with
-  the fields `client_id`, `client_secret` and `refresh_token`.
+  the platform roots. It applies to the provider's refresh and validation
+  exchanges, not to the code exchange the CLI makes during consent, which uses
+  the platform roots only. The profile is offered to the host as
+  `http_bearer` with the fields `client_id`, `client_secret` and
+  `refresh_token`.
 - `identity.source` is `api` when omitted, the read shown above. `id_token`,
   for `oauth2_refresh` only, takes the subject from the `sub` of the token
   answer's `id_token`, after checking that its `iss` is
@@ -182,7 +186,7 @@ The complete configuration used against the sandbox is
   "identity": {"source": "id_token", "kind": "google.user"},
   "minimum_scopes": ["https://www.googleapis.com/auth/drive.readonly"],
   "token_url": "https://oauth2.googleapis.com/token",
-  "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+  "authorize_url": "https://accounts.google.com/o/oauth2/auth",
   "requested_scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly"]
 }
 ```
