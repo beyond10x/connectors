@@ -28,10 +28,13 @@ cargo run --locked -p connectors-build -- catalog \
   --source adapters/google/generated/drive.openapi.json \
   --derived-from adapters/google/upstream/drive/drive-api.json \
   --directory adapters/catalog/generated/bundles \
-  --auth-profile google.oauth
+  --auth-profile google.oauth \
+  --replace
 ```
 
-The first command writes `drive.openapi.json` and its projection record
+`--replace` is needed because the committed index already carries
+`google-drive`; without it the second command is refused with "provider is
+already indexed". The first command writes `drive.openapi.json` and its projection record
 `drive.openapi.projection.json`: all 64 methods of the document are projected
 and none is excluded. The projection's one server is
 `https://www.googleapis.com/drive/v3`, and the bundle records each path below it,
