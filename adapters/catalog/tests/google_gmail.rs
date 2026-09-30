@@ -67,7 +67,7 @@ const MAX_RESULTS: u64 = 500;
 
 /// The shipped ids, their Discovery method id and the path the bundle records.
 /// A renamed, dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 7] = [
+const SHIPPED: [(&str, &str, &str); 8] = [
     (
         "users.getProfile",
         "gmail.users.getProfile",
@@ -82,6 +82,11 @@ const SHIPPED: [(&str, &str, &str); 7] = [
         "users.labels.list",
         "gmail.users.labels.list",
         "/gmail/v1/users/{userId}/labels",
+    ),
+    (
+        "users.messages.attachments.get",
+        "gmail.users.messages.attachments.get",
+        "/gmail/v1/users/{userId}/messages/{messageId}/attachments/{id}",
     ),
     (
         "users.messages.get",
@@ -143,7 +148,7 @@ fn engine() -> Engine {
 }
 
 #[test]
-fn shipped_gmail_selections_are_exactly_the_seven_reads() {
+fn shipped_gmail_selections_are_exactly_the_eight_reads() {
     let selections = shipped();
     let bundle = committed_bundle();
     assert_eq!(bundle.auth_profile, PROFILE);
@@ -349,6 +354,12 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
             "`startHistoryId`",
         ),
         ("users.labels.list", "single item", "n/a", "none"),
+        (
+            "users.messages.attachments.get",
+            "single item",
+            "n/a",
+            "none",
+        ),
     ] {
         let (_, operation_id, path) = SHIPPED.iter().find(|(i, _, _)| *i == id).unwrap();
         let cited = rows.iter().any(|row| {
@@ -388,6 +399,9 @@ fn guide_documents_user_id_formats_and_history_deltas() {
         "`raw`",
         "`rate_limited`",
         "4 MiB",
+        "`raw` cannot be narrowed",
+        "`users.messages.attachments.get`",
+        "**`fields` and the end conditions.**",
     ] {
         assert!(guide.contains(term), "the guide does not state {term}");
     }
@@ -457,7 +471,9 @@ fn message(id: &str) -> Value {
            "sizeEstimate": 512,
            "payload": {"mimeType": "text/plain",
                        "headers": [{"name": "Subject", "value": "Fixture subject"}],
-                       "body": {"size": 14, "data": "Rml4dHVyZSBib2R5Cg"}}})
+                       "body": {"size": 14, "data": "Rml4dHVyZSBib2R5Cg"},
+                       "parts": [{"partId": "1", "filename": "notes.txt", "mimeType": "text/plain",
+                                  "body": {"attachmentId": "fixture-attachment-1", "size": 18}}]}})
 }
 fn thread(id: &str) -> Value {
     json!({"id": id, "historyId": "1001", "messages": [message("fixture-message-1")]})
@@ -492,6 +508,9 @@ fn answer(target: &str) -> Option<(u16, Value)> {
             "id": "fixture-message-1", "threadId": "fixture-thread-1",
             "raw": "U3ViamVjdDogRml4dHVyZSBzdWJqZWN0DQoNCkZpeHR1cmUgYm9keQ0K"})),
         "/gmail/v1/users/me/messages/fixture-message-1" => ok(message("fixture-message-1")),
+        "/gmail/v1/users/me/messages/fixture-message-1/attachments/fixture-attachment-1" => {
+            ok(json!({"size": 18, "data": "Rml4dHVyZSBhdHRhY2htZW50Cg"}))
+        }
         "/gmail/v1/users/me/threads" if has("pageToken=fixture-threads-page-2") => ok(json!({
             "threads": [{"id": "fixture-thread-3", "historyId": "1002"}],
             "resultSizeEstimate": 1})),
@@ -772,7 +791,7 @@ fn invoke(child: &mut Child, operation: &str, input: Value) -> Value {
 }
 
 /// Each read's input and the exact request the fixture must observe.
-fn first_requests() -> [(&'static str, Value, &'static str); 7] {
+fn first_requests() -> [(&'static str, Value, &'static str); 8] {
     [
         (
             "users.getProfile",
@@ -785,6 +804,12 @@ fn first_requests() -> [(&'static str, Value, &'static str); 7] {
             "users.labels.list",
             json!({"userId": "me"}),
             "/gmail/v1/users/me/labels?",
+        ),
+        (
+            "users.messages.attachments.get",
+            json!({"userId": "me", "messageId": "fixture-message-1",
+                   "id": "fixture-attachment-1"}),
+            "/gmail/v1/users/me/messages/fixture-message-1/attachments/fixture-attachment-1?",
         ),
         (
             "users.messages.list",
@@ -869,6 +894,38 @@ fn messages_list_repeats_label_ids() {
     assert_eq!(
         provider.api_targets(),
         ["/gmail/v1/users/me/messages?labelIds=INBOX&labelIds=UNREAD"]
+    );
+}
+
+/// The guide's route for a large message: read it with `format: full`, then
+/// each part whose body names an `attachmentId` with
+/// `users.messages.attachments.get`, which returns that part's `data`.
+#[test]
+fn messages_attachments_get_reads_a_part_named_by_a_full_message() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let message = invoke(
+        &mut child,
+        "users.messages.get",
+        json!({"userId": "me", "id": "fixture-message-1", "format": "full"}),
+    )["body"]
+        .clone();
+    let part = &message["payload"]["parts"][0]["body"];
+    let attachment = part["attachmentId"].as_str().expect("an attachment part");
+    let body = invoke(
+        &mut child,
+        "users.messages.attachments.get",
+        json!({"userId": "me", "messageId": "fixture-message-1", "id": attachment}),
+    )["body"]
+        .clone();
+    assert_eq!(body["size"], part["size"]);
+    assert_eq!(body["data"], "Rml4dHVyZSBhdHRhY2htZW50Cg");
+    assert_eq!(
+        provider.api_targets(),
+        [
+            "/gmail/v1/users/me/messages/fixture-message-1?format=full",
+            "/gmail/v1/users/me/messages/fixture-message-1/attachments/fixture-attachment-1?",
+        ]
     );
 }
 

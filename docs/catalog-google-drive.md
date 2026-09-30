@@ -159,8 +159,10 @@ for obtaining the entry by consent.
 - The provider does not walk pages itself and does not retry on `429`; a
   rate-limited read is returned as a refusal.
 - Drive also signals an exceeded quota as a `403` whose `error.errors[].domain`
-  is `usageLimits` and whose `reason` is `userRateLimitExceeded` or
-  `rateLimitExceeded`. Every selection names both in `rate_limit_reasons`, so
+  is `usageLimits` and whose `reason` is `userRateLimitExceeded`,
+  `rateLimitExceeded` or, for an exhausted daily project quota,
+  `dailyLimitExceeded`. Every selection names all three in
+  `rate_limit_reasons`, so
   such a `403` reaches the caller as `rate_limited`, like a `429`; every other
   `403` is `forbidden`.
 - Declaring `required` on `about.get` changed its declared input schema, and
