@@ -22,32 +22,33 @@ pub(super) fn describe(
     alias: &str,
     adapter: &Adapter,
 ) -> owner::Result<Value> {
+    let refused = |refusal| match refusal {
+        super::cursor::Refusal::InvalidInput => Code::InvalidInput,
+        super::cursor::Refusal::StaleCursor => Code::StaleCursor,
+    };
+    // `--limit` and the cursor's encoding are checked before the cached
+    // description is read.
+    let request = (call.callable == "operations-list")
+        .then(|| super::cursor::Request::parse(&call.input))
+        .transpose()
+        .map_err(refused)?;
     let bootstrap = owner::cached(paths, alias)?;
     let descriptor = bootstrap.descriptor()?;
-    if call.callable == "operations-list" {
-        if call.input.get("cursor").is_some_and(|v| !v.is_null()) {
-            return Err(Code::StaleCursor.into());
-        }
-        let limit = call
-            .input
-            .get("limit")
-            .and_then(Value::as_i64)
-            .unwrap_or(100);
-        if !(1..=500).contains(&limit) {
-            return Err(Code::InvalidInput.into());
-        }
+    if let Some(request) = request {
         let operations = descriptor
             .operations
             .iter()
             .filter(|o| owner::admit_operation(adapter, &bootstrap, &o.id).is_ok())
-            .map(summary)
             .collect::<Vec<_>>();
-        if operations.len() > limit as usize {
-            return Err(Code::Capacity.into());
+        // The selection a cursor is bound to: the adapter it lists, the
+        // descriptor revision and the operations this configuration permits.
+        let source = json!({"adapter":alias,"instance_id":adapter.instance_id,"revision":descriptor.revision,"operations":operations.iter().map(|o| &o.id).collect::<Vec<_>>()});
+        let (range, next) = request.page(&source, operations.len()).map_err(refused)?;
+        let mut result = json!({"adapter":alias,"revision":descriptor.revision,"operations":operations[range].iter().map(|o| summary(o)).collect::<Vec<_>>(),"source":"cached","stale":true});
+        if let Some(next) = next {
+            result["next_cursor"] = json!(next);
         }
-        Ok(
-            json!({"adapter":alias,"revision":descriptor.revision,"operations":operations,"source":"cached","stale":true}),
-        )
+        Ok(result)
     } else {
         let name = call.input["operation"]
             .as_str()
