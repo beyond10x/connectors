@@ -175,8 +175,61 @@ fn responses(raw: Option<&Value>) -> Vec<Response> {
     out
 }
 
+/// The path of one server URL, without a trailing slash. The authority —
+/// scheme, host, port, templated or not — is dropped; only the path decides
+/// where an operation's path sits below it.
+fn url_path(url: &str) -> Result<&str, &'static str> {
+    let url = url.split(['?', '#']).next().unwrap_or_default();
+    let path = if let Some(start) = url.find("://") {
+        let rest = &url[start + 3..];
+        rest.find('/').map_or("", |slash| &rest[slash..])
+    } else if let Some(rest) = url.strip_prefix("//") {
+        rest.find('/').map_or("", |slash| &rest[slash..])
+    } else if url.is_empty() || url.starts_with('/') {
+        url
+    } else {
+        return Err("a document server url is relative to the document");
+    };
+    if path.contains(['{', '}']) {
+        return Err("a document server path carries a template variable");
+    }
+    Ok(path.trim_end_matches('/'))
+}
+
+/// The base path the document's operation paths are appended to (OpenAPI 3.x:
+/// a path is relative to the server URL). Empty when the document declares no
+/// servers, or only servers at the authority's root — every document whose
+/// paths already carry their base. Every server must agree, because an
+/// inventory records one path per operation.
+fn server_path(document: &Value) -> Result<String, &'static str> {
+    let Some(servers) = document.get("servers") else {
+        return Ok(String::new());
+    };
+    let servers = servers
+        .as_array()
+        .ok_or("the document's `servers` is not a list")?;
+    let mut agreed: Option<&str> = None;
+    for server in servers {
+        let url = server
+            .get("url")
+            .and_then(Value::as_str)
+            .ok_or("a document server declares no url")?;
+        let path = url_path(url)?;
+        match agreed {
+            Some(previous) if previous != path => {
+                return Err("the document's servers declare different base paths");
+            }
+            _ => agreed = Some(path),
+        }
+    }
+    Ok(agreed.unwrap_or_default().to_owned())
+}
+
 /// Build the inventory from a parsed document. The document is the one the source
 /// ingest accepted; this function re-reads it rather than trusting a cached shape.
+/// Each recorded path is the document's path below its servers' base path, so it
+/// is the path a request sends below the provider's authority. Servers that give
+/// no single base are named unsupported, and paths are then recorded as written.
 pub fn extract(document: &Value) -> Inventory {
     let mut operations = Vec::new();
     let mut unsupported = Vec::new();
@@ -189,6 +242,13 @@ pub fn extract(document: &Value) -> Inventory {
             });
         }
     }
+    let base = server_path(document).unwrap_or_else(|reason| {
+        unsupported.push(Unsupported {
+            designation: "document.servers".into(),
+            reason: reason.into(),
+        });
+        String::new()
+    });
 
     let Some(paths) = document.get("paths").and_then(Value::as_object) else {
         return Inventory {
@@ -197,11 +257,25 @@ pub fn extract(document: &Value) -> Inventory {
         };
     };
 
-    for (path, item) in paths {
+    for (written, item) in paths {
+        let path = &format!("{base}{written}");
         if item.get("$ref").is_some() {
             unsupported.push(Unsupported {
                 designation: path.clone(),
                 reason: "path item is a $ref this pass does not resolve".into(),
+            });
+            continue;
+        }
+        // OpenAPI 3.x: servers on a path item or an operation override the
+        // document's for it. This pass records one base, so an override is
+        // named, and its operations are not recorded under the document's base,
+        // where they do not live.
+        if item.get("servers").is_some() {
+            unsupported.push(Unsupported {
+                designation: written.clone(),
+                reason: "path item declares its own `servers`, overriding the document's; \
+                         its operations are not recorded under the document's base"
+                    .into(),
             });
             continue;
         }
@@ -210,6 +284,21 @@ pub fn extract(document: &Value) -> Inventory {
             let Some(body) = item.get(method) else {
                 continue;
             };
+            if body.get("servers").is_some() {
+                let named = body
+                    .get("operationId")
+                    .and_then(Value::as_str)
+                    .map(|id| format!(" `{id}`"))
+                    .unwrap_or_default();
+                unsupported.push(Unsupported {
+                    designation: format!("{} {written}", method.to_uppercase()),
+                    reason: format!(
+                        "operation{named} declares its own `servers`, overriding the document's; \
+                         it is not recorded under the document's base"
+                    ),
+                });
+                continue;
+            }
             let operation_id = body
                 .get("operationId")
                 .and_then(Value::as_str)
