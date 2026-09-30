@@ -136,6 +136,64 @@ The complete configuration used against the sandbox is
   "identity": {"path": "myself", "kind": "tracker.user", "subject_pointer": "/accountId"}
 }
 ```
+- `oauth2_refresh` is for providers that issue expiring OAuth access tokens
+  from a refresh token that does not rotate, such as Google for installed apps
+  (`architecture-decision-record:oauth-material-as-static-entry`). The protected
+  entry is `{"client_id":"...","client_secret":"...","refresh_token":"..."}`,
+  each field under the token rules, and nothing else. The provider posts it
+  form-encoded (`grant_type=refresh_token`) to `token_url`, with no credential
+  header, and sends the access token it gets back as
+  `Authorization: Bearer <access token>`, so the profile must state
+  `"header": "Authorization"` and `"bearer": true`. The access token lives in
+  the provider process only, keyed by a digest of the entry, until 60 seconds
+  before its `expires_in`; a read or write the API refuses as an invalid credential
+  evicts it, and `validate` always exchanges afresh. A token answer carrying a
+  different `refresh_token` is refused as an invalid credential and nothing is
+  kept. `invalid_grant` and `invalid_client` are an invalid credential; on an
+  `operations invoke` of a read on an existing connection the CLI reports it
+  with `next_action: repair_connection`, and while connecting with
+  `retry_explicitly`. A guarded write refused for its credential reports
+  `retry_status` until `story:guarded-write-credential-refusal-says-repair`
+  lands; a 429 is a provider
+  rate limit and a 5xx is `unavailable`. `token_url` and `authorize_url` must
+  be `https` URLs without credentials, query or fragment, written in canonical
+  form. `authorize_url` and `requested_scopes` are never called or checked by
+  the provider: they reach the host as the profile's `acquisition`, next to
+  `token_url`, for the CLI to obtain the entry by consent.
+  `token_ca_file` names trust roots for the token host only; omit it to use
+  the platform roots. Like `ca_file`, its bytes enter the configuration
+  revision and its path does not. Each `minimum_scopes` and `requested_scopes`
+  entry is one scope: an empty entry or one holding whitespace is refused at
+  load. The profile is offered to the host as `http_bearer` with
+  the fields `client_id`, `client_secret` and `refresh_token`.
+- `identity.source` is `api` when omitted, the read shown above. `id_token`,
+  for `oauth2_refresh` only, takes the subject from the `sub` of the token
+  answer's `id_token`, after checking that its `iss` is
+  `https://accounts.google.com` or `accounts.google.com` and its `aud` is the
+  entry's `client_id`, that its `exp` is after now and that its `iat`, if
+  present, is at most five minutes ahead, and the granted scopes from the answer's
+  space-separated `scope`, which `minimum_scopes` is checked against. The
+  `id_token` came straight from the token endpoint over verified TLS, so its
+  signature is not checked. When the answer has no `id_token`, the provider
+  asks `tokeninfo` on the token host for the fresh access token and reads the
+  same `sub`, `aud` and `scope` there. A wrong issuer or audience, or an expired
+  `id_token`, is refused as a protocol failure. An `id_token` identity names no `path`,
+  `subject_pointer` or `scopes` read.
+
+```json
+"auth": {
+  "profile": "google.drive",
+  "scheme": "oauth2_refresh",
+  "header": "Authorization",
+  "bearer": true,
+  "label": "Google refresh token",
+  "identity": {"source": "id_token", "kind": "google.user"},
+  "minimum_scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+  "token_url": "https://oauth2.googleapis.com/token",
+  "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+  "requested_scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly"]
+}
+```
 - `operations_file` names a shipped selection set; its `provider` must match. An
   inline `operations` list is accepted as well and comes first. The selection
   ids, in either place, are what the host permits and the approval policy names.
@@ -281,10 +339,12 @@ appeared, which opened merge request 11 at the moved head and was classified
   supplies it and validated only by the provider.
 - Header and cookie parameters are not carried; a selection whose operation
   requires one is refused at load.
-- One authentication profile per configuration: a token in one header, or a
+- One authentication profile per configuration: a token in one header, a
   basic profile (`"scheme": "basic"`) sending an account and API token as HTTP
-  basic. OAuth and signing profiles are not offered by this provider yet. The
-  basic profile has run only against the local fixture, not a live provider.
+  basic, or an OAuth refresh profile (`"scheme": "oauth2_refresh"`). Signing
+  profiles and rotating refresh tokens are not offered by this provider. The
+  basic and OAuth refresh profiles have run only against the local fixture, not
+  a live provider, and the provider does not acquire the OAuth entry itself.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
 - A guard compares scalars for equality. It cannot express "any of", ordering or

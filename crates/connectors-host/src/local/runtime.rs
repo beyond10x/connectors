@@ -243,6 +243,37 @@ pub struct Profile {
     pub minimum_scopes: BTreeSet<String>,
     pub evidence_lifetime_ms: u64,
     pub fields: Vec<EntryField>,
+    /// Present only for a profile whose material is acquired by OAuth consent;
+    /// omitted otherwise, so every other profile keeps its bytes and revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acquisition: Option<Acquisition>,
+}
+/// Where a CLI obtains an OAuth profile's protected entry: the consent and
+/// token endpoints and the scopes it requests. Nonsecret metadata only.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Acquisition {
+    pub authorize_url: String,
+    pub token_url: String,
+    pub scopes: BTreeSet<String>,
+}
+impl Acquisition {
+    /// Both endpoints https with a host and at most 2048 bytes; 1 to 64 scopes,
+    /// each 1 to 256 printable ASCII bytes without whitespace.
+    fn bounded(&self) -> bool {
+        let endpoint = |value: &str| {
+            value.len() <= 2048
+                && url::Url::parse(value).is_ok_and(|url| {
+                    url.scheme() == "https" && url.host_str().is_some_and(|host| !host.is_empty())
+                })
+        };
+        endpoint(&self.authorize_url)
+            && endpoint(&self.token_url)
+            && (1..=64).contains(&self.scopes.len())
+            && self.scopes.iter().all(|scope| {
+                (1..=256).contains(&scope.len()) && scope.bytes().all(|b| b.is_ascii_graphic())
+            })
+    }
 }
 impl Profile {
     pub fn registry_profile(&self) -> registry::StaticProfile {
@@ -354,6 +385,10 @@ impl Bootstrap {
                 )
                 || profile.fields.is_empty()
                 || profile.fields.len() > 16
+                || profile
+                    .acquisition
+                    .as_ref()
+                    .is_some_and(|acquisition| !acquisition.bounded())
             {
                 return Err(Failure::Protocol);
             }
