@@ -1,0 +1,45 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Everything": {
+        "type": "object",
+        "description": "Every schema construct the table maps.",
+        "properties": {
+          "anyValue": {"description": "Anything."},
+          "count32": {"type": "integer", "format": "int32"},
+          "countU32": {"type": "integer", "format": "uint32"},
+          "size": {"type": "integer", "format": "int32", "default": 0},
+          "ratioD": {"type": "number", "format": "double"},
+          "ratioF": {"type": "number", "format": "float"},
+          "big": {"type": "string", "format": "int64"},
+          "ubig": {"type": "string", "format": "uint64"},
+          "when": {"type": "string", "format": "date-time"},
+          "day": {"type": "string", "format": "date"},
+          "stamp": {"type": "string", "format": "date-time"},
+          "blob": {"type": "string", "format": "byte"},
+          "mask": {"type": "string", "x-google-format": "google-fieldmask"},
+          "span": {"type": "string", "x-google-format": "google-duration"},
+          "tags": {"type": "array", "items": {"type": "string"}},
+          "labels": {"type": "object", "additionalProperties": {"type": "string"}},
+          "nested": {
+            "type": "object",
+            "properties": {"flag": {"type": "boolean", "default": true}}
+          },
+          "state": {
+            "type": "string",
+            "enum": ["A", "B"],
+            "x-google-enum-descriptions": ["First.", "Second."]
+          },
+          "id": {"type": "string", "readOnly": true},
+          "old": {"type": "string", "deprecated": true},
+          "kind": {"type": "string", "default": "fixture#everything"},
+          "name": {"type": "string", "x-google-required-for": ["fixture.things.insert"]}
+        }
+      }
+    }
+  }
+}
