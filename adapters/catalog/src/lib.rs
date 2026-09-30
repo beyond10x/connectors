@@ -802,13 +802,9 @@ fn provenance(instance: &str, resource: &str, source_revision: &str) -> Value {
     })
 }
 
-/// The input schema of one parameter, from the type its pinned document gives.
-/// An integer also takes its decimal string, a string also takes a JSON integer
-/// (sent as its decimal text), and a boolean the strings `true` and `false`:
-/// the forms callers already send and the engine sends on unchanged. A JSON
-/// number that is not an integer literal is refused by `parameter_values`. A
-/// parameter the bundle records no type for takes any scalar.
-/// `^-?[0-9]+$`, one integer element as its decimal text.
+/// Whether a text is one integer element as its decimal text: an optional
+/// leading `-` and at least one ASCII digit, the `^-?[0-9]+$` the integer
+/// schemas declare. One piece of a comma-joined integer list is read by it.
 fn integer_text(text: &str) -> bool {
     let digits = text.strip_prefix('-').unwrap_or(text);
     !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
@@ -863,6 +859,12 @@ fn repeated_schema(value_type: Option<ValueType>, required: bool) -> Value {
     schema
 }
 
+/// The input schema of one parameter, from the type its pinned document gives.
+/// An integer also takes its decimal string, a string also takes a JSON integer
+/// (sent as its decimal text), and a boolean the strings `true` and `false`:
+/// the forms callers already send and the engine sends on unchanged. A JSON
+/// number that is not an integer literal is refused by `parameter_values`. A
+/// parameter the bundle records no type for takes any scalar.
 fn declared_type(value_type: Option<ValueType>) -> Value {
     match value_type {
         Some(ValueType::String) => json!({"type": ["string", "integer"]}),
