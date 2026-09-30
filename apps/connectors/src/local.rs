@@ -269,7 +269,8 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         let state = keyring::inspect_at(config.secret_service_socket.as_deref());
         let mut checks =
             vec![json!({"name":"configuration", "state":"ready", "next_action":"none"})];
-        checks.push(json!({"name":"metadata", "state": if Metadata::inspect(&paths.state).is_ok() {"ready"} else {"failed"}, "next_action":"check_configuration"}));
+        let metadata = Metadata::inspect(&paths.state).is_ok();
+        checks.push(json!({"name":"metadata", "state": if metadata {"ready"} else {"failed"}, "next_action":if metadata {"none"} else {"check_configuration"}}));
         for (alias, adapter) in &config.adapters {
             let ready = adapter.executable.check().is_ok();
             checks.push(json!({"name":format!("artifact:{alias}"), "state":if ready {"ready"} else {"failed"}, "next_action":if ready {"none"} else {"check_configuration"}}));
@@ -318,7 +319,7 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     let adapter = config
         .adapters
         .get(alias)
-        .ok_or_else(|| failure("not_found", "configuration", "check_configuration", false))?;
+        .ok_or_else(|| failure("not_found", "admission", "check_configuration", false))?;
     if call.callable == "approval-clock-check" {
         let selected = config.approval_clock.as_ref().ok_or_else(|| {
             failure(
