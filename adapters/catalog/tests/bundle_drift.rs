@@ -10,7 +10,7 @@ use std::path::Path;
 /// literals, so a bundle rebuilt with another profile, or one that gains or
 /// loses a gap, fails here instead of being read back as correct. Confluence's
 /// 30 are writes whose request body is a `$ref`; no shipped read is among them.
-const SOURCES: [(&str, &str, &str, usize); 3] = [
+const SOURCES: [(&str, &str, &str, usize); 4] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -21,6 +21,12 @@ const SOURCES: [(&str, &str, &str, usize); 3] = [
         "gitlab",
         "../gitlab/upstream/openapi_v3.yaml",
         "gitlab.pat",
+        0,
+    ),
+    (
+        "hubspot",
+        "../hubspot/upstream/crm-objects-2026-09.json",
+        "hubspot.private-app",
         0,
     ),
     (
