@@ -423,7 +423,19 @@ fn guide_cites_each_write_its_guard_and_the_write_scope() {
         assert!(cited, "no row cites `{id}` as {request} with guard {guard}");
     }
     assert!(guide.contains(&format!("`{WRITE_SCOPE}`")));
-    assert!(guide.contains("`connections repair`"));
+    // The write scope comes from a separate instance, connected afresh: a
+    // repair cannot widen a connection, whose binding holds the configuration
+    // revision and the profile.
+    let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains("Writes use a separate instance"));
+    assert!(flat.contains("`google-drive-write`"));
+    assert!(flat.contains("then `connections connect` that instance with the Google client file"));
+    assert!(flat.contains("`connections repair` cannot add a scope"));
+    assert!(
+        !flat.contains("through `connections repair`")
+            && !flat.contains("with `connections repair`"),
+        "the guide still routes the write scope through `connections repair`"
+    );
 }
 
 /// The guide's configuration example for this provider: the read-only one, or
@@ -445,12 +457,15 @@ fn documented_config() -> Value {
     documented(false)
 }
 
-/// The write configuration is the read one with the write scope added to both
+/// The write configuration is a separate instance, `google-drive-write`: the
+/// read one with its own instance id and the write scope added to both
 /// `minimum_scopes` and `requested_scopes`, and nothing else changed.
 #[test]
 fn guide_documents_the_write_configuration_with_the_drive_file_scope() {
     let read = documented_config();
     let write = documented(true);
+    assert_eq!(read["instance"], "google-drive");
+    assert_eq!(write["instance"], "google-drive-write");
     assert_eq!(
         write["auth"]["minimum_scopes"],
         json!([DRIVE_SCOPE, WRITE_SCOPE])
@@ -460,6 +475,7 @@ fn guide_documents_the_write_configuration_with_the_drive_file_scope() {
         json!(["openid", DRIVE_SCOPE, WRITE_SCOPE])
     );
     let strip = |mut config: Value| {
+        config.as_object_mut().unwrap().remove("instance");
         config["auth"]
             .as_object_mut()
             .unwrap()
