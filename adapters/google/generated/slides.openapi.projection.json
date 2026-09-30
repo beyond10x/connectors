@@ -1,0 +1,58 @@
+{
+  "discovery_revision": "20260921",
+  "excluded_methods": [],
+  "excluded_parameters": [
+    "$.xgafv",
+    "access_token",
+    "alt",
+    "callback",
+    "key",
+    "oauth_token",
+    "prettyPrint",
+    "quotaUser",
+    "uploadType",
+    "upload_protocol"
+  ],
+  "excluded_upload_paths": [],
+  "ignored_keys": [
+    "/auth",
+    "/batchPath",
+    "/canonicalName",
+    "/fullyEncodeReservedExpansion",
+    "/icons",
+    "/id",
+    "/mtlsRootUrl",
+    "/name",
+    "/ownerDomain",
+    "/ownerName",
+    "/resources/presentations/methods/batchUpdate/flatPath",
+    "/resources/presentations/methods/batchUpdate/parameterOrder",
+    "/resources/presentations/methods/create/flatPath",
+    "/resources/presentations/methods/create/parameterOrder",
+    "/resources/presentations/methods/get/flatPath",
+    "/resources/presentations/methods/get/parameterOrder",
+    "/resources/presentations/resources/pages/methods/get/flatPath",
+    "/resources/presentations/resources/pages/methods/get/parameterOrder",
+    "/resources/presentations/resources/pages/methods/getThumbnail/flatPath",
+    "/resources/presentations/resources/pages/methods/getThumbnail/parameterOrder",
+    "/version_module"
+  ],
+  "method_count": 5,
+  "operations": [
+    "slides.presentations.batchUpdate",
+    "slides.presentations.create",
+    "slides.presentations.get",
+    "slides.presentations.pages.get",
+    "slides.presentations.pages.getThumbnail"
+  ],
+  "projector": "discovery-openapi/1",
+  "rewritten_paths": [
+    {
+      "discovery_path": "v1/presentations/{+presentationId}",
+      "operation_id": "slides.presentations.get",
+      "path": "/v1/presentations/{presentationId}"
+    }
+  ],
+  "source_bytes": 252866,
+  "source_sha256": "49fa379e29948696029ec8c4b334939f0bd6e74d9ef27650f523682283c1d3f1"
+}
