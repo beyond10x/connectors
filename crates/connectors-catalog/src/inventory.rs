@@ -47,12 +47,59 @@ impl Location {
     }
 }
 
+/// The scalar type a document declares for a parameter's value, recorded only
+/// when its schema names exactly one of these three. An array, an object, a
+/// number, a `oneOf` or a `$ref` records none, and a reader keeps its own
+/// default for that parameter rather than guessing one of these.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ValueType {
+    String,
+    Integer,
+    Boolean,
+}
+
+impl ValueType {
+    /// The type a parameter object's schema declares. OpenAPI 3.0 marks a
+    /// nullable scalar with `nullable`; 3.1 writes `["integer", "null"]`. Both
+    /// are the scalar: a parameter value is present or absent, never null.
+    fn declared(parameter: &Value) -> Option<Self> {
+        let parse = |name: &str| match name {
+            "string" => Some(Self::String),
+            "integer" => Some(Self::Integer),
+            "boolean" => Some(Self::Boolean),
+            _ => None,
+        };
+        match parameter.get("schema")?.get("type")? {
+            Value::String(name) => parse(name),
+            Value::Array(names) => {
+                let names: Vec<&str> = names.iter().map(Value::as_str).collect::<Option<_>>()?;
+                match names
+                    .into_iter()
+                    .filter(|name| *name != "null")
+                    .collect::<Vec<_>>()
+                    .as_slice()
+                {
+                    [name] => parse(name),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Parameter {
     pub name: String,
     pub location: Location,
     pub required: bool,
+    /// The declared scalar type, when the document gives one this model
+    /// carries. Omitted when absent, so a parameter without one serialises as
+    /// it did before types were recorded.
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub value_type: Option<ValueType>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -145,6 +192,7 @@ fn parameters(
                         .get("required")
                         .and_then(Value::as_bool)
                         .unwrap_or(false),
+                    value_type: ValueType::declared(parameter),
                 }),
                 None => gaps.push(Unsupported {
                     designation: designation.to_owned(),

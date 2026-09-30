@@ -352,6 +352,34 @@ async fn invalid_identifiers_cannot_inject_log_lines_or_terminal_controls() {
         .with_writer(move || writer.clone())
         .finish();
     let _subscriber = tracing::subscriber::set_default(subscriber);
+    // While one dispatcher is registered, tracing-core computes a newly
+    // registered callsite's interest from the registering thread's default
+    // alone, so a thread without this subscriber would cache the callsite as
+    // never enabled. A second live dispatcher makes every registration
+    // consult all of them, this thread-local one included.
+    let _consult_every_dispatcher =
+        tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+    // Another test's server, on a thread without this subscriber, may be the
+    // first to reach the completion log line; make that happen here.
+    std::thread::spawn(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(async {
+                let (url, task) = start(Arc::new(Echo(Arc::new(AtomicUsize::new(0))))).await;
+                let client =
+                    connectors_client::Client::new(&url, "service-token".into(), true).unwrap();
+                let description = client.describe().await.unwrap();
+                client
+                    .invoke(&description, "echo", json!({"value":1}))
+                    .await
+                    .unwrap();
+                task.abort();
+            });
+    })
+    .join()
+    .unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let calls = Arc::new(AtomicUsize::new(0));

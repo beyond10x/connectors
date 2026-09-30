@@ -263,9 +263,12 @@ impl Pool {
         Ok(receiver)
     }
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
+        // The worker may still commit a revalidation after this wait ends.
+        let committing = matches!(task, Task::Revalidate { .. });
         self.send(alias, adapter, task, deadline)?
             .recv_timeout(until(deadline)?.saturating_duration_since(Instant::now()))
             .map_err(|e| match e {
+                _ if committing => Code::OutcomeUnknown,
                 mpsc::RecvTimeoutError::Timeout => Code::Timeout,
                 _ => Code::Unavailable,
             })?
@@ -1120,6 +1123,93 @@ mod idle_tests {
         while !lifecycle::exited(&handle).unwrap() {
             assert!(Instant::now() < until, "the idle child outlived shutdown");
             std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+}
+
+/// story:failed-connect-reports-its-cause: a revalidation the pool stopped
+/// waiting for may still be committed by its worker, so its outcome is
+/// unknown; other tasks keep the definite wait failure.
+#[cfg(test)]
+mod revalidate_wait_tests {
+    use super::*;
+    use crate::local::config::{Executable, Startup};
+
+    fn adapter() -> Adapter {
+        Adapter {
+            instance_id: "instance".into(),
+            adapter_id: "adapter".into(),
+            configuration_revision: "config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: None,
+            startup: Startup::OnDemand,
+            restart: Default::default(),
+            permissions: Default::default(),
+            executable: Executable {
+                path: "/not-launched".into(),
+                sha256: "a".repeat(64),
+                args: Vec::new(),
+            },
+        }
+    }
+
+    /// A pool whose one worker takes every job and either keeps it unanswered
+    /// until shutdown or drops it at once.
+    fn pool(drop_jobs: bool) -> Pool {
+        let root = tempfile::tempdir().unwrap();
+        let pool = Pool::new(
+            Arc::new(Paths {
+                config: root.path().join("unread-config"),
+                state: root.path().join("unopened-state"),
+            }),
+            uuid::Uuid::new_v4().to_string(),
+        );
+        let (sender, receiver) = mpsc::sync_channel::<Work>(16);
+        let thread = std::thread::spawn(move || {
+            let mut held = Vec::new();
+            while let Ok(work) = receiver.recv() {
+                if !drop_jobs {
+                    held.push(work);
+                }
+            }
+        });
+        pool.workers.lock().unwrap().insert(
+            "instance".into(),
+            Worker {
+                sender,
+                thread,
+                control: Arc::new(Mutex::new(lifecycle::Control::default())),
+                busy: Arc::new(AtomicBool::new(false)),
+                recovering: Arc::new(AtomicBool::new(false)),
+                recovery_pending: Arc::new(AtomicBool::new(false)),
+                queued: Arc::new(AtomicUsize::new(0)),
+            },
+        );
+        pool
+    }
+
+    fn revalidate() -> Task {
+        Task::Revalidate {
+            connection: "connection".into(),
+            revision: "revision".into(),
+            profile: "profile".into(),
+        }
+    }
+
+    fn code(pool: &Pool, task: Task) -> Code {
+        match pool.run("alias", &adapter(), task, connectors_sdk::now_ms() + 300) {
+            Err(error) => error.code,
+            Ok(_) => panic!("the stand-in worker never answers"),
+        }
+    }
+
+    #[test]
+    fn a_revalidation_the_pool_stopped_waiting_for_is_outcome_unknown() {
+        for (drop_jobs, other) in [(false, Code::Timeout), (true, Code::Unavailable)] {
+            let pool = pool(drop_jobs);
+            assert_eq!(code(&pool, revalidate()), Code::OutcomeUnknown);
+            assert_eq!(code(&pool, Task::Ensure { resume: false }), other);
+            pool.shutdown().unwrap();
         }
     }
 }
