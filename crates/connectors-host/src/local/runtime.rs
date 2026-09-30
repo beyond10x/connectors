@@ -243,6 +243,19 @@ pub struct Profile {
     pub minimum_scopes: BTreeSet<String>,
     pub evidence_lifetime_ms: u64,
     pub fields: Vec<EntryField>,
+    /// Present only for a profile whose material is acquired by OAuth consent;
+    /// omitted otherwise, so every other profile keeps its bytes and revision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acquisition: Option<Acquisition>,
+}
+/// Where a CLI obtains an OAuth profile's protected entry: the consent and
+/// token endpoints and the scopes it requests. Nonsecret metadata only.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Acquisition {
+    pub authorize_url: String,
+    pub token_url: String,
+    pub scopes: BTreeSet<String>,
 }
 impl Profile {
     pub fn registry_profile(&self) -> registry::StaticProfile {
