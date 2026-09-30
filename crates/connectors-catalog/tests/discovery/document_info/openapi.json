@@ -1,0 +1,11 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Fixture API",
+    "description": "Reads fixtures.",
+    "version": "v2"
+  },
+  "externalDocs": {"url": "https://developers.google.com/fixture/"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v2"}],
+  "paths": {}
+}

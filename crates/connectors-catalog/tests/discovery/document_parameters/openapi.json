@@ -1,0 +1,36 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {
+    "/things": {
+      "get": {
+        "operationId": "fixture.things.list",
+        "parameters": [
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Selector specifying which fields to include in a partial response.",
+            "schema": {"type": "string"}
+          },
+          {"name": "q", "in": "query", "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    },
+    "/things:count": {
+      "get": {
+        "operationId": "fixture.things.count",
+        "parameters": [
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Selector specifying which fields to include in a partial response.",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}

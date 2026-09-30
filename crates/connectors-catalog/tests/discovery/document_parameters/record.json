@@ -1,0 +1,23 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 2,
+  "operations": ["fixture.things.count", "fixture.things.list"],
+  "excluded_methods": [],
+  "rewritten_paths": [],
+  "excluded_parameters": [
+    "$.xgafv",
+    "access_token",
+    "alt",
+    "callback",
+    "key",
+    "oauth_token",
+    "prettyPrint",
+    "quotaUser",
+    "uploadType",
+    "upload_protocol",
+    "userIp"
+  ],
+  "excluded_upload_paths": [],
+  "ignored_keys": []
+}

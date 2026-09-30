@@ -1,0 +1,14 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 3,
+  "operations": ["fixture.things.delete", "fixture.things.download", "fixture.things.get"],
+  "excluded_methods": [],
+  "rewritten_paths": [],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [],
+  "ignored_keys": [
+    "/resources/things/methods/download/useMediaDownloadService",
+    "/resources/things/methods/get/supportsMediaDownload"
+  ]
+}

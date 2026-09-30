@@ -1,0 +1,22 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 1,
+  "operations": ["fixture.things.create"],
+  "excluded_methods": [],
+  "rewritten_paths": [],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [
+    {
+      "operation_id": "fixture.things.create",
+      "protocol": "resumable",
+      "path": "/resumable/upload/fixture/v1/things"
+    },
+    {
+      "operation_id": "fixture.things.create",
+      "protocol": "simple",
+      "path": "/upload/fixture/v1/things"
+    }
+  ],
+  "ignored_keys": []
+}

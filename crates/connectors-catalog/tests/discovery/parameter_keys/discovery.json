@@ -1,0 +1,60 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "list": {
+          "id": "fixture.things.list",
+          "path": "things",
+          "httpMethod": "GET",
+          "parameters": {
+            "pageSize": {
+              "type": "integer",
+              "format": "int32",
+              "location": "query",
+              "minimum": "1",
+              "maximum": "100",
+              "default": "20",
+              "description": "Page size."
+            },
+            "includeDeleted": {
+              "type": "boolean",
+              "location": "query",
+              "default": "false",
+              "deprecated": true
+            },
+            "orderBy": {
+              "type": "string",
+              "location": "query",
+              "enum": ["NAME", "TIME"],
+              "enumDescriptions": ["By name.", "By time."]
+            },
+            "after": {"type": "string", "format": "date-time", "location": "query"},
+            "startId": {"type": "string", "format": "uint64", "location": "query"},
+            "cursor": {
+              "type": "string",
+              "location": "query",
+              "pattern": "^[a-z]+$",
+              "required": true
+            },
+            "ratio": {
+              "type": "number",
+              "format": "double",
+              "location": "query",
+              "minimum": "0.5",
+              "maximum": "1.5"
+            },
+            "limit": {"type": "integer", "format": "uint32", "location": "query", "default": "10"}
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {
+    "/things": {
+      "get": {
+        "operationId": "fixture.things.list",
+        "responses": {"200": {"description": "Successful response"}}
+      },
+      "post": {
+        "operationId": "fixture.things.insert",
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    },
+    "/things/{thingId}": {
+      "put": {
+        "operationId": "fixture.things.update",
+        "parameters": [
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      },
+      "patch": {
+        "operationId": "fixture.things.patch",
+        "parameters": [
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      },
+      "delete": {
+        "operationId": "fixture.things.delete",
+        "parameters": [
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}

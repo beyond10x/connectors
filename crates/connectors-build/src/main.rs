@@ -87,6 +87,21 @@ enum Action {
         /// Replace a bundle the index already carries for this provider.
         #[arg(long)]
         replace: bool,
+        /// The pinned Google Discovery document `--source` was projected from.
+        /// The projection is recomputed and must equal `--source` byte for byte;
+        /// the bundle then records the derivation.
+        #[arg(long)]
+        derived_from: Option<PathBuf>,
+    },
+    /// Project a pinned Google Discovery document into OpenAPI 3.0.3, and write
+    /// its projection record beside it as `<name>.projection.json`.
+    /// Deterministic; never touches the network.
+    Discovery {
+        #[arg(long)]
+        source: PathBuf,
+        /// The OpenAPI document to write; its name ends in `.json`.
+        #[arg(long)]
+        out: PathBuf,
     },
     /// Run the local repository acceptance gates, without live provider credentials.
     Gate {
@@ -142,7 +157,9 @@ fn save_json(path: &Path, value: &Value) -> Result<()> {
     Ok(write(path, &json_bytes(value)?)?)
 }
 fn main() -> Result<()> {
-    let args = Args::parse();
+    execute(Args::parse())
+}
+fn execute(args: Args) -> Result<()> {
     let root = args.root.canonicalize()?;
     if let Action::DocsAudit { directory } = args.command {
         return docs::audit(&directory.unwrap_or_else(|| root.join("website/build")));
@@ -171,18 +188,28 @@ fn main() -> Result<()> {
         directory,
         auth_profile,
         replace,
+        derived_from,
     } = &args.command
     {
-        let run = connectors_catalog::pipeline::run(&connectors_catalog::pipeline::Request {
+        let request = connectors_catalog::pipeline::Request {
             provider,
             source: &inside(&root, source)?,
             directory: &inside(&root, directory)?,
             auth_profile,
             replace: *replace,
-        })
+        };
+        let run = match derived_from {
+            Some(discovery) => {
+                connectors_catalog::pipeline::run_derived(&request, &inside(&root, discovery)?)
+            }
+            None => connectors_catalog::pipeline::run(&request),
+        }
         .map_err(|failure| failure.to_string())?;
         println!("{}", serde_json::to_string_pretty(&run.coverage)?);
         return Ok(());
+    }
+    if let Action::Discovery { source, out } = &args.command {
+        return discovery(&root, source, out);
     }
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
     if let Action::Cli { check } = args.command {
@@ -396,6 +423,38 @@ fn main() -> Result<()> {
     }
     Ok(())
 }
+/// Project the Discovery document at `source` and write the OpenAPI document to
+/// `out` and its record beside it as `<name>.projection.json`. Nothing is
+/// written unless the projection succeeds.
+fn discovery(root: &Path, source: &Path, out: &Path) -> Result<()> {
+    let bytes = std::fs::read(inside(root, source)?)?;
+    let projection = connectors_catalog::discovery::project(&bytes)?;
+    let name = out
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_suffix(".json"))
+        .filter(|stem| !stem.is_empty())
+        .ok_or("the projected document's name ends in `.json`")?;
+    let parent = out
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let directory = inside(root, parent)?;
+    let document = directory.join(format!("{name}.json"));
+    let record = directory.join(format!("{name}.projection.json"));
+    write(&document, &projection.openapi)?;
+    write(&record, &projection.record_bytes())?;
+    let record_value = &projection.record;
+    println!(
+        "discovery: {} methods, {} projected, {} excluded; wrote {} and {}",
+        record_value.method_count,
+        record_value.operations.len(),
+        record_value.excluded_methods.len(),
+        document.display(),
+        record.display()
+    );
+    Ok(())
+}
 fn copy_file(source: &Path, destination: &Path) -> Result<()> {
     std::fs::create_dir_all(destination.parent().ok_or("missing destination parent")?)?;
     std::fs::copy(source, destination)?;
@@ -472,4 +531,166 @@ fn inside(root: &Path, path: &Path) -> Result<PathBuf> {
         return Err("declaration path escapes the repository".into());
     }
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use connectors_catalog::{bundle, discovery};
+
+    /// The pinned Drive Discovery document, read in place.
+    fn pinned_drive() -> Vec<u8> {
+        std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../adapters/google/upstream/drive/drive-api.json"),
+        )
+        .expect("the pinned Drive document")
+    }
+
+    /// A throwaway repository root holding a copy of the pinned document at
+    /// `upstream/drive-api.json` and an empty `bundles/` directory.
+    fn workspace() -> tempfile::TempDir {
+        let temp = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(temp.path().join("upstream")).unwrap();
+        std::fs::create_dir_all(temp.path().join("bundles")).unwrap();
+        std::fs::create_dir_all(temp.path().join("projected")).unwrap();
+        std::fs::write(temp.path().join("upstream/drive-api.json"), pinned_drive()).unwrap();
+        temp
+    }
+
+    fn cli(root: &Path, arguments: &[&str]) -> Result<()> {
+        let root = root.to_str().unwrap();
+        let argv = ["connectors-build", "--root", root]
+            .into_iter()
+            .chain(arguments.iter().copied());
+        execute(Args::try_parse_from(argv)?)
+    }
+
+    fn catalog(root: &Path, source: &str) -> Result<()> {
+        cli(
+            root,
+            &[
+                "catalog",
+                "--provider",
+                "google-drive",
+                "--source",
+                source,
+                "--directory",
+                "bundles",
+                "--auth-profile",
+                "google.oauth",
+                "--derived-from",
+                "upstream/drive-api.json",
+            ],
+        )
+    }
+
+    fn project_into(root: &Path) {
+        cli(
+            root,
+            &[
+                "discovery",
+                "--source",
+                "upstream/drive-api.json",
+                "--out",
+                "projected/drive-openapi.json",
+            ],
+        )
+        .expect("discovery subcommand");
+    }
+
+    #[test]
+    fn discovery_writes_the_projection_and_its_record() {
+        let temp = workspace();
+        project_into(temp.path());
+        let expected = discovery::project(&pinned_drive()).expect("projection");
+        let written = std::fs::read(temp.path().join("projected/drive-openapi.json")).unwrap();
+        assert!(
+            written == expected.openapi,
+            "the written document is the projection"
+        );
+        let record =
+            std::fs::read(temp.path().join("projected/drive-openapi.projection.json")).unwrap();
+        assert!(
+            record == expected.record_bytes(),
+            "the written record is the projection's"
+        );
+        let entries = std::fs::read_dir(temp.path().join("projected"))
+            .unwrap()
+            .count();
+        assert_eq!(
+            entries, 2,
+            "the subcommand writes the document and its record only"
+        );
+    }
+
+    #[test]
+    fn catalog_records_derivation() {
+        let temp = workspace();
+        project_into(temp.path());
+        catalog(temp.path(), "projected/drive-openapi.json").expect("catalog run");
+        let bundle = bundle::load(&temp.path().join("bundles"), "google-drive").unwrap();
+        let pinned = pinned_drive();
+        let derivation = bundle
+            .source
+            .derivation
+            .expect("the bundle records its derivation");
+        assert_eq!(derivation.from_sha256, connectors_spec::v2::hash(&pinned));
+        assert_eq!(derivation.from_bytes, pinned.len());
+        assert_eq!(derivation.from_file, "drive-api.json");
+        assert_eq!(derivation.format, "google-discovery/v1");
+        assert_eq!(derivation.projector, "discovery-openapi/1");
+        let revision = serde_json::from_slice::<Value>(&pinned).unwrap()["revision"].clone();
+        assert_eq!(json!(derivation.discovery_revision), revision);
+        assert_eq!(bundle.source.file_name, "drive-openapi.json");
+    }
+
+    #[test]
+    fn catalog_derived_from_mismatch_refused() {
+        let temp = workspace();
+        project_into(temp.path());
+        let path = temp.path().join("projected/drive-openapi.json");
+        let mut bytes = std::fs::read(&path).unwrap();
+        // One byte: the final newline becomes a space, which is still JSON the
+        // ingest would accept, so only the derivation check can refuse it.
+        let last = bytes.len() - 1;
+        assert_eq!(bytes[last], b'\n');
+        bytes[last] = b' ';
+        std::fs::write(&path, &bytes).unwrap();
+        let refused = catalog(temp.path(), "projected/drive-openapi.json")
+            .expect_err("a source that is not the projection is refused");
+        assert!(
+            refused.to_string().contains("projection"),
+            "the refusal names the mismatch: {refused}"
+        );
+        let written: Vec<_> = std::fs::read_dir(temp.path().join("bundles"))
+            .unwrap()
+            .collect();
+        assert!(written.is_empty(), "no bundle and no index is written");
+    }
+
+    #[test]
+    fn catalog_without_derived_from_records_none() {
+        let temp = workspace();
+        project_into(temp.path());
+        cli(
+            temp.path(),
+            &[
+                "catalog",
+                "--provider",
+                "google-drive",
+                "--source",
+                "projected/drive-openapi.json",
+                "--directory",
+                "bundles",
+                "--auth-profile",
+                "google.oauth",
+            ],
+        )
+        .expect("catalog run");
+        let bundle = bundle::load(&temp.path().join("bundles"), "google-drive").unwrap();
+        assert_eq!(bundle.source.derivation, None);
+        let bytes = std::fs::read(temp.path().join("bundles/google-drive.bundle.json")).unwrap();
+        assert!(!String::from_utf8(bytes).unwrap().contains("derivation"));
+    }
 }
