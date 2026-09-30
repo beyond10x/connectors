@@ -500,7 +500,7 @@ fn guide_documents_the_oauth_refresh_configuration() {
     assert_eq!(auth["token_url"], "https://oauth2.googleapis.com/token");
     assert_eq!(
         auth["authorize_url"],
-        "https://accounts.google.com/o/oauth2/v2/auth"
+        "https://accounts.google.com/o/oauth2/auth"
     );
     assert_eq!(auth["identity"]["source"], "id_token");
     assert_eq!(auth["minimum_scopes"], json!([DRIVE_SCOPE]));
