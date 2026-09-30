@@ -1,0 +1,9 @@
+[
+  {
+    "file": "crm-objects-2026-09.json",
+    "url": "https://raw.githubusercontent.com/HubSpot/HubSpot-public-api-spec-collection/55d9bcaaf1c208516f11a33aa43fb6bba7aac823/PublicApiSpecs/CRM/Objects/Rollouts/424/2026-09/objects.json",
+    "sha256": "1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9",
+    "bytes": 203904,
+    "archive": "vendor/crm-objects-2026-09.json.gz"
+  }
+]

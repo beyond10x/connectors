@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.19.0 — 2026-09-30
+
+### Added
+
+- The catalog provider reads HubSpot CRM records: `objects.list` (one object type, paged by
+  `after`) and `object.get`, from the pinned CRM Objects `2026-09` document, with a
+  private-app access token as a bearer header (profile `hubspot.private-app`, identity
+  `hubspot.portal` from the account details). No time filter: search is a POST, which the
+  engine does not admit as a read. See `docs/catalog-hubspot.md`.
+
 ## 0.18.0 — 2026-09-30
 
 ### Added
