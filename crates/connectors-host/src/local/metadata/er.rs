@@ -528,9 +528,14 @@ pub(super) fn release(er: ErAuthority) {
                 index += 1;
             }
         }
+        // The bound is per process: a process has at most `IDLE_LIMIT` idle
+        // handles, and only its own releases evict them.
+        let process = er.process;
         idle.push(er);
-        while idle.len() > IDLE_LIMIT {
-            evicted.push(idle.remove(0));
+        while idle.iter().filter(|held| held.process == process).count() > IDLE_LIMIT {
+            if let Some(oldest) = idle.iter().position(|held| held.process == process) {
+                evicted.push(idle.remove(oldest));
+            }
         }
         evicted
     };
@@ -5631,6 +5636,46 @@ mod tests {
                 call_wait(),
             )
             .map(|_| ())
+    }
+
+    /// Each process keeps its own idle handles, so handles that other
+    /// processes release never evict one this process holds. Tests simulate
+    /// processes in one pool; a simulated process is bounded as a real one is.
+    #[test]
+    fn handles_another_process_releases_never_evict_this_process_held_handle() {
+        let owner = 0x9001_0001_u64;
+        let other = 0x9001_0002_u64;
+        simulate_process(owner);
+        let held_directory = tempfile::tempdir().unwrap();
+        let held = empty_authority(&held_directory);
+        let held_path = held.durable_path.clone();
+        let held_authority = held.facade.authority().clone();
+        release(held);
+
+        simulate_process(other);
+        let directories = (0..=IDLE_LIMIT)
+            .map(|_| tempfile::tempdir().unwrap())
+            .collect::<Vec<_>>();
+        for directory in &directories {
+            release(empty_authority(directory));
+        }
+        // The other process's own handles stay bounded: its oldest is gone.
+        let others = IDLE
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|idle| idle.process == other)
+            .map(|idle| idle.durable_path.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(others.len(), IDLE_LIMIT);
+        assert!(!others.contains(&directories[0].path().join("metadata.sqlite3")));
+
+        simulate_process(owner);
+        assert!(
+            take(&held_path, &held_authority, 8).is_some(),
+            "another process's releases evicted the owner's held handle"
+        );
+        simulate_process(0);
     }
 
     fn empty_authority(directory: &tempfile::TempDir) -> ErAuthority {
