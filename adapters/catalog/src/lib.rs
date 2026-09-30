@@ -9,7 +9,7 @@
 //! request and turns the response into an observation.
 use connectors_catalog::{
     bundle::Bundle,
-    inventory::{Location, Operation},
+    inventory::{Location, Operation, ValueType},
     template::Template,
 };
 use connectors_core::{Error, ErrorCode, Result};
@@ -382,6 +382,18 @@ impl Engine {
         let mut values = BTreeMap::new();
         for parameter in &operation.parameters {
             if let Some(value) = input.get(&parameter.name) {
+                // JSON Schema counts `2.0` as an integer; a typed parameter never
+                // sends a fraction or an exponent.
+                if parameter.value_type.is_some()
+                    && value
+                        .as_number()
+                        .is_some_and(|n| !n.is_i64() && !n.is_u64())
+                {
+                    return Err(refuse(format!(
+                        "parameter `{}` is not an integer literal",
+                        parameter.name
+                    )));
+                }
                 let text = scalar(value).ok_or_else(|| {
                     refuse(format!("parameter `{}` is not a scalar", parameter.name))
                 })?;
@@ -664,6 +676,27 @@ fn provenance(instance: &str, resource: &str, source_revision: &str) -> Value {
     })
 }
 
+/// The input schema of one parameter, from the type its pinned document gives.
+/// An integer also takes its decimal string, a string also takes a JSON integer
+/// (sent as its decimal text), and a boolean the strings `true` and `false`:
+/// the forms callers already send and the engine sends on unchanged. A JSON
+/// number that is not an integer literal is refused by `parameter_values`. A
+/// parameter the bundle records no type for takes any scalar.
+fn declared_type(value_type: Option<ValueType>) -> Value {
+    match value_type {
+        Some(ValueType::String) => json!({"type": ["string", "integer"]}),
+        Some(ValueType::Integer) => json!({"anyOf": [
+            {"type": "integer"},
+            {"type": "string", "pattern": "^-?[0-9]+$"}
+        ]}),
+        Some(ValueType::Boolean) => json!({"anyOf": [
+            {"type": "boolean"},
+            {"type": "string", "enum": ["true", "false"]}
+        ]}),
+        None => json!({"type": ["string", "integer", "boolean"]}),
+    }
+}
+
 /// The descriptor operation for a selection: one property per declared path or
 /// query parameter, a `body` object when the operation takes one, and one string
 /// property per input reference a guard reads that no parameter covers.
@@ -674,7 +707,7 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
         if parameter.location == Location::Header || parameter.location == Location::Cookie {
             continue;
         }
-        let mut schema = json!({"type": ["string", "integer", "boolean"]});
+        let mut schema = declared_type(parameter.value_type);
         if let Some(bound) = selection.bounds.get(&parameter.name) {
             // Advisory for callers: it constrains only numbers, so the engine
             // checks the bound itself on every value.
@@ -713,10 +746,9 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
                 continue;
             }
             if !properties.contains_key(reference.as_str()) {
-                properties.insert(
-                    reference.clone(),
-                    json!({"type": ["string", "integer", "boolean"]}),
-                );
+                // A comparison reference names no pinned parameter, so it has
+                // no declared type; it keeps the any-scalar schema.
+                properties.insert(reference.clone(), declared_type(None));
                 required.push(reference.clone());
             }
         }
