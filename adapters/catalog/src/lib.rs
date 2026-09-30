@@ -126,6 +126,50 @@ pub struct Selection {
     /// `403` stays `forbidden`. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rate_limit_reasons: Vec<String>,
+    /// The only top-level keys a write's JSON body may carry. When set, the
+    /// declaration types `body` as an object with exactly these properties,
+    /// and a body carrying any key outside the set is refused before any
+    /// request. Keys a guard reads are also compared by that guard, and are
+    /// declared required, as scalars when the guard reads them directly; a
+    /// key no guard reads is admitted with any value and compared by nothing.
+    /// Omitted when empty, which leaves the body an open object.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub body_keys: Vec<String>,
+}
+
+/// The body paths a guard reads, each the part after `body.` of a reference.
+fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
+    guard
+        .preflight
+        .values
+        .values()
+        .chain(
+            guard
+                .preflight
+                .checks
+                .iter()
+                .chain(&guard.postflight.checks)
+                .filter_map(|check| match &check.expect {
+                    Expectation::Input(path) => Some(path),
+                    Expectation::Literal(_) => None,
+                }),
+        )
+        .filter_map(|path| path.strip_prefix("body."))
+}
+
+/// The top-level body keys a guard reads through `body.<key>` references.
+fn guarded_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
+    guarded_body_paths(guard)
+        .map(|rest| rest.split('.').next().unwrap_or(rest))
+        .collect()
+}
+
+/// The top-level body keys a guard reads as scalars: referenced as
+/// `body.<key>` itself, not only through a path nested under it.
+fn scalar_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
+    guarded_body_paths(guard)
+        .filter(|rest| !rest.contains('.'))
+        .collect()
 }
 
 /// An input reference: a top-level key, or `body.<key>` one level into the body.
@@ -367,6 +411,33 @@ impl Engine {
                     Template::from_operation(&probe).map_err(|refusal| refuse(refusal.reason()))?;
                 probes.insert(guard.preflight.operation_id.clone(), Probe { template });
             }
+            if !selection.body_keys.is_empty() {
+                let mut names = std::collections::BTreeSet::new();
+                if selection.effect != Effect::Write
+                    || operation.request_media_types.is_empty()
+                    || selection
+                        .body_keys
+                        .iter()
+                        .any(|key| key.is_empty() || key.contains('.') || !names.insert(key))
+                {
+                    return Err(refuse(format!(
+                        "selection `{}` declares body_keys that do not close a write's body with distinct plain names",
+                        selection.id
+                    )));
+                }
+                // A guard reading a key the closed body cannot carry could
+                // never be satisfied: refused here, not at every write.
+                if let Some(key) = selection.guard.as_ref().and_then(|guard| {
+                    guarded_body_keys(guard)
+                        .into_iter()
+                        .find(|key| !selection.body_keys.iter().any(|k| k == key))
+                }) {
+                    return Err(refuse(format!(
+                        "guard of `{}` reads `body.{key}`, which its body_keys do not admit",
+                        selection.id
+                    )));
+                }
+            }
             if selection.response == Some(ResponseKind::Text) && selection.effect != Effect::Read {
                 return Err(refuse(format!(
                     "selection `{}` declares a text response for a write",
@@ -530,6 +601,17 @@ impl Engine {
             _ => return Err(Error::new(ErrorCode::Forbidden, "operation is a read")),
         };
         connectors_sdk::validate(&exposed.declaration.input_schema, &input)?;
+        // The closed body is held here as well as in the declaration, so it
+        // does not rest on the schema validator alone.
+        let body_keys = &exposed.selection.body_keys;
+        if !body_keys.is_empty()
+            && !input
+                .get("body")
+                .and_then(Value::as_object)
+                .is_some_and(|body| body.keys().all(|key| body_keys.contains(key)))
+        {
+            return Err(refuse("body carries a key its selection does not admit"));
+        }
         let values = Self::parameter_values(&exposed.operation, &input)?;
         check_bounds(&exposed.selection, &values)?;
         let (segments, query) = self.resolve(&exposed.template, values)?;
@@ -857,7 +939,45 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
         }
     }
     if !operation.request_media_types.is_empty() {
-        properties.insert("body".into(), json!({"type": "object"}));
+        let body = if selection.body_keys.is_empty() {
+            json!({"type": "object"})
+        } else {
+            // A closed body: exactly these keys. A key a guard reads directly
+            // is declared as the scalar the guard compares; any other key takes
+            // any JSON value. Every key a guard reads is required.
+            let scalars = selection
+                .guard
+                .as_ref()
+                .map(scalar_body_keys)
+                .unwrap_or_default();
+            let keys: serde_json::Map<String, Value> = selection
+                .body_keys
+                .iter()
+                .map(|key| {
+                    let schema = if scalars.contains(key.as_str()) {
+                        declared_type(None)
+                    } else {
+                        json!({})
+                    };
+                    (key.clone(), schema)
+                })
+                .collect();
+            let mut body = json!({
+                "type": "object",
+                "properties": keys,
+                "additionalProperties": false,
+            });
+            let guarded: Vec<&str> = selection
+                .guard
+                .as_ref()
+                .map(|guard| guarded_body_keys(guard).into_iter().collect())
+                .unwrap_or_default();
+            if !guarded.is_empty() {
+                body["required"] = json!(guarded);
+            }
+            body
+        };
+        properties.insert("body".into(), body);
         required.push("body".into());
     }
     if let Some(guard) = &selection.guard {
