@@ -217,12 +217,39 @@ impl ScopedHttp {
             .map_err(provider_error)
     }
 
-    async fn request(
+    /// Trusted composition only. One `application/x-www-form-urlencoded` POST
+    /// to fixed segments under the captured target and TLS configuration, for
+    /// a request whose form is itself the credential, such as an OAuth token
+    /// exchange. It never carries this capability's credential header. The
+    /// encoded form is sized once and zeroized when the transport releases it;
+    /// the response is bounded like a write's.
+    pub async fn post_form(
         &self,
-        method: reqwest::Method,
         segments: &[&str],
-        query: &[(&str, String)],
-    ) -> Result<reqwest::RequestBuilder> {
+        form: &[(&str, &[u8])],
+    ) -> Result<HttpResponse> {
+        let body = form_body(form)?;
+        if segments.is_empty() {
+            return Err(Error::invalid("a form endpoint is one fixed path"));
+        }
+        let url = self.url(segments)?;
+        let response = self
+            .client
+            .post(url)
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                "application/x-www-form-urlencoded",
+            )
+            .header(reqwest::header::ACCEPT, "application/json")
+            // The transport holds the owner, and drops it when the body is sent.
+            .body(reqwest::Body::from(axum::body::Bytes::from_owner(body)))
+            .send()
+            .await
+            .map_err(provider_error)?;
+        bounded_response(response).await
+    }
+
+    fn url(&self, segments: &[&str]) -> Result<Url> {
         let mut url = self.base.clone();
         {
             let mut path = url
@@ -236,6 +263,16 @@ impl ScopedHttp {
                 path.push(segment);
             }
         }
+        Ok(url)
+    }
+
+    async fn request(
+        &self,
+        method: reqwest::Method,
+        segments: &[&str],
+        query: &[(&str, String)],
+    ) -> Result<reqwest::RequestBuilder> {
+        let mut url = self.url(segments)?;
         url.query_pairs_mut()
             .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
         let mut request = self.client.request(method, url);
@@ -365,6 +402,85 @@ impl AuthProbe for ScopedProbe {
             body,
         })
     }
+}
+
+/// The largest encoded form `post_form` sends.
+pub const FORM_BODY_LIMIT: usize = 64 * 1024;
+
+/// `application/x-www-form-urlencoded`: `*-._` and ASCII alphanumerics as they
+/// are, a space as `+`, every other byte `%XX`. The buffer is allocated once at
+/// its final size, so no reallocation leaves an unzeroized copy behind.
+fn form_body(form: &[(&str, &[u8])]) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    fn plain(byte: u8) -> bool {
+        byte.is_ascii_alphanumeric() || matches!(byte, b'*' | b'-' | b'.' | b'_' | b' ')
+    }
+    fn encoded(bytes: &[u8]) -> usize {
+        bytes.iter().map(|b| if plain(*b) { 1 } else { 3 }).sum()
+    }
+    fn encode(body: &mut Vec<u8>, bytes: &[u8]) {
+        const HEX: &[u8; 16] = b"0123456789ABCDEF";
+        for &byte in bytes {
+            match byte {
+                b' ' => body.push(b'+'),
+                byte if plain(byte) => body.push(byte),
+                byte => body.extend_from_slice(&[
+                    b'%',
+                    HEX[usize::from(byte >> 4)],
+                    HEX[usize::from(byte & 15)],
+                ]),
+            }
+        }
+    }
+    let length = form
+        .iter()
+        .map(|(name, value)| encoded(name.as_bytes()) + 1 + encoded(value))
+        .sum::<usize>()
+        + form.len().saturating_sub(1);
+    if length > FORM_BODY_LIMIT {
+        return Err(Error::new(
+            ErrorCode::Capacity,
+            "form exceeds the permitted size",
+        ));
+    }
+    let mut body = zeroize::Zeroizing::new(Vec::with_capacity(length));
+    for (index, (name, value)) in form.iter().enumerate() {
+        if index > 0 {
+            body.push(b'&');
+        }
+        encode(&mut body, name.as_bytes());
+        body.push(b'=');
+        encode(&mut body, value);
+    }
+    Ok(body)
+}
+
+/// Status, bounded headers and a bounded body, as a write reads them.
+async fn bounded_response(response: reqwest::Response) -> Result<HttpResponse> {
+    let status = response.status().as_u16();
+    let mut headers = std::collections::BTreeMap::new();
+    let mut bytes = 0_usize;
+    for (index, (name, value)) in response.headers().iter().enumerate() {
+        bytes = bytes
+            .saturating_add(name.as_str().len())
+            .saturating_add(value.as_bytes().len());
+        if index >= 128 || bytes > 32_768 {
+            return Err(Error::new(
+                ErrorCode::Capacity,
+                "provider response headers exceed limit",
+            ));
+        }
+        if let Ok(value) = value.to_str() {
+            headers.insert(name.to_string(), value.to_owned());
+        }
+    }
+    let body = connectors_client::bounded(response)
+        .await
+        .map_err(body_error)?;
+    Ok(HttpResponse {
+        status,
+        headers,
+        body,
+    })
 }
 
 /// The response's status and headers have arrived, so a deadline that passes
@@ -538,6 +654,110 @@ mod tests {
         let error = provider_error(error);
         assert_eq!(error.code, ErrorCode::Unavailable);
         assert!(!error.upstream_answer);
+    }
+
+    struct FixtureCredential;
+    #[async_trait]
+    impl Credential for FixtureCredential {
+        async fn resolve(&self) -> Result<connectors_sdk::Secret> {
+            Ok(connectors_sdk::Secret(b"fixture-credential".to_vec()))
+        }
+    }
+
+    #[tokio::test]
+    async fn a_form_post_sends_the_encoded_form_and_never_the_credential_header() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                head.push(socket.read_u8().await.unwrap());
+            }
+            let head = String::from_utf8(head).unwrap();
+            let length: usize = head
+                .lines()
+                .find_map(|line| {
+                    line.split_once(':')
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                        .map(|(_, value)| value.trim().parse().unwrap())
+                })
+                .unwrap();
+            let mut body = vec![0; length];
+            socket.read_exact(&mut body).await.unwrap();
+            let answer = br#"{"answered":true}"#;
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        answer.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+            socket.write_all(answer).await.unwrap();
+            (head, body)
+        });
+        let http = ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: format!("http://{address}/"),
+                credential: None,
+                credential_header: "authorization".into(),
+                bearer: true,
+                allow_plaintext: true,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap()
+        .with_credential(Arc::new(FixtureCredential));
+        let response = http
+            .post_form(
+                &["oauth", "token"],
+                &[
+                    ("grant_type", b"refresh_token".as_slice()),
+                    ("value", b"a b&c=d/\xff~*-._Z9".as_slice()),
+                ],
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, br#"{"answered":true}"#);
+        let (head, body) = server.await.unwrap();
+        assert!(head.starts_with("POST /oauth/token HTTP/1.1\r\n"), "{head}");
+        let lower = head.to_ascii_lowercase();
+        assert!(!lower.contains("authorization:"), "credential header sent");
+        assert!(!head.contains("fixture-credential"));
+        assert!(lower.contains("content-type: application/x-www-form-urlencoded\r\n"));
+        assert_eq!(
+            body,
+            b"grant_type=refresh_token&value=a+b%26c%3Dd%2F%FF%7E*-._Z9".as_slice()
+        );
+    }
+
+    #[tokio::test]
+    async fn an_oversized_or_unaddressed_form_is_refused_without_any_request() {
+        let http = scoped();
+        let large = vec![b'x'; FORM_BODY_LIMIT];
+        let Err(error) = http.post_form(&["token"], &[("v", large.as_slice())]).await else {
+            panic!("an oversized form was sent");
+        };
+        assert_eq!(error.code, ErrorCode::Capacity);
+        for segments in [&[][..], &[""][..], &[".."][..]] {
+            let Err(error) = http.post_form(segments, &[("v", b"x".as_slice())]).await else {
+                panic!("an unaddressed form was sent");
+            };
+            assert_eq!(error.code, ErrorCode::InvalidInput);
+        }
+        // Within the limit the form is sent, and this base resolves nowhere.
+        let fits = vec![b'x'; FORM_BODY_LIMIT - 2];
+        let Err(error) = http.post_form(&["token"], &[("v", fits.as_slice())]).await else {
+            panic!("an unresolvable base produced a response");
+        };
+        assert_eq!(error.code, ErrorCode::Unavailable);
     }
 
     #[tokio::test]
