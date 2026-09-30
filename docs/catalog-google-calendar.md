@@ -92,9 +92,14 @@ the end of a walk are in it.
 - **`fields` and the end conditions.** `fields` selects the parts of the answer
   Google returns, and a token it leaves out is not returned. The end conditions
   above hold only when `fields`, if given, includes both `nextPageToken` and
-  `nextSyncToken` (for example `nextPageToken,nextSyncToken,items(id,summary)`).
-  Without them the first page looks like the last, and a walk ends with no sync
-  token.
+  `nextSyncToken`. Without them the first page looks like the last, and a walk
+  ends with no sync token. A walk meant for sync tokens also keeps the fields
+  that mark a removal in a delta: `status` for events (a deleted event is
+  `cancelled` and may carry only its `id`), and `deleted` and `hidden` for
+  calendar list entries. For example
+  `nextPageToken,nextSyncToken,items(id,status,summary,start,end)` for
+  `events.list`, and `nextPageToken,nextSyncToken,items(id,summary,deleted,hidden)`
+  for `calendarList.list`.
 - **`maxAttendees`** on `events.list` and `events.get` has a minimum of 1 in the
   pinned document and no maximum. A selection bound needs a maximum, so none is
   declared: `maxAttendees` 0 is sent as given, and Google answers `400`
@@ -130,10 +135,12 @@ decides.
 that does not exist or is no longer shared is answered `404`, which reaches the
 caller as the same `not_found` with the same message. So a `not_found` on an
 `events.list` sync-token request means either the sync token expired or the calendar is gone.
-On that refusal, first re-check the calendar with `calendarList.list`: if it is
-gone, drop its mirror. Otherwise discard the stored token and everything
-derived from it, walk the list again from the first page without `syncToken`,
-and keep the new `nextSyncToken`.
+On that refusal, walk the list again from the first page without `syncToken`.
+If that walk also answers `not_found`, the calendar is gone: drop its mirror.
+Otherwise discard the stored token and everything derived from it, rebuild the
+mirror from that walk, and keep its new `nextSyncToken`. `calendarList.list` is
+no test of a gone calendar: it never lists `primary` by that id, and it leaves
+hidden calendars out unless `showHidden` is `true`.
 
 ## Authentication
 

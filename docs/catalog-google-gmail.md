@@ -100,7 +100,11 @@ end of a walk are in it.
   separately names an `attachmentId` in its `body`, and
   `users.messages.attachments.get` with `messageId` and that id (sent as `id`)
   returns the part's `size` and its `data` as one base64url string. Each of
-  those reads is subject to the same 4 MiB limit.
+  those reads is subject to the same 4 MiB limit, and `data` is base64url, a
+  third larger than the part's `size` (which counts the bytes before encoding).
+  So the ceiling on a part's `size` is about 3 MiB: a part over it is refused
+  as `capacity` and cannot be read through this provider, and neither can a
+  message over about 3 MiB read with `raw`.
 - **`maxResults`.** The pinned document declares no bound for the three lists;
   each description says the maximum allowed value is 500. The selections bound
   `maxResults` to 1–500, so 0, 501 or a value that is not an integer is refused
@@ -119,14 +123,16 @@ refused before any request.
 
 ## Deltas by `historyId`
 
-Take a baseline once: `users.getProfile` returns the mailbox's current
-`historyId` (a message or thread's own `historyId` works as well). To read what
-changed since, send it as `startHistoryId` to `users.history.list` and walk the
-pages; each record names the messages added, deleted or relabelled. The page
-without `nextPageToken` is the last; keep its `historyId` as the baseline for
-the next walk. `historyTypes` (repeated) narrows the records to
-`messageAdded`, `messageDeleted`, `labelAdded` or `labelRemoved`, and `labelId`
-to one label.
+Take a baseline once, before the first full walk: `users.getProfile` returns
+the mailbox's current `historyId` (a message or thread's own `historyId` works
+as well). Read it before walking `users.messages.list` or `users.threads.list`
+for the first time, so a change made while that walk runs is replayed by the
+first delta instead of being lost. To read what changed since, send it as
+`startHistoryId` to `users.history.list` and walk the pages; each record names
+the messages added, deleted or relabelled. The page without `nextPageToken` is
+the last; keep its `historyId` as the baseline for the next walk.
+`historyTypes` (repeated) narrows the records to `messageAdded`,
+`messageDeleted`, `labelAdded` or `labelRemoved`, and `labelId` to one label.
 
 The pinned document says `startHistoryId` is required although it does not mark
 it so; the selection declares it required, so a `users.history.list` without it
