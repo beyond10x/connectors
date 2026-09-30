@@ -232,12 +232,23 @@ not read as arrays.
 A selection's `required` list adds the provider's requirement where the source
 omits it; see the selection fields above.
 
-The bundles were rebuilt to record repeated parameters, and that moves the
-descriptor revision of every GitLab, Jira and Confluence instance. The revision
-belongs to the instance, not to an operation: it digests the configuration
-revision, which digests the bundle's SHA-256, so it changes even for an
-instance whose selections have no repeated parameter. Every write approval
-policy bound to such an instance's earlier revision must be issued again.
+The bundles were rebuilt to record repeated parameters. The configuration
+revision digests the bundle's SHA-256, so the rebuild moves the configuration
+revision, and with it the descriptor revision, of every GitLab, Jira and
+Confluence instance, including one whose selections have no repeated
+parameter. After upgrading:
+
+1. Print the bootstrap again and copy its `configuration_revision` into the
+   adapter entry (see [Bind the provider to the local
+   CLI](#bind-the-provider-to-the-local-cli)). Until then the adapter does not
+   start: the host refuses a bootstrap whose revision differs from the entry's.
+2. An instance that was already connected cannot reconnect or be repaired under
+   the new binding: the connection registry keeps an instance id bound to the
+   configuration revision it first connected under, and refuses the new one
+   (`Conflict` on connect, `IdentityMismatch` on repair). Connect it again under
+   a new `instance` id, or with fresh local state. Configuration upgrades are
+   not implemented (see [the connection registry](local-connection-registry.md)).
+3. Issue every write approval policy bound to the instance again.
 
 Separately, the declared input of these shipped reads changed, because each
 has a repeated parameter: Jira `issues.search`; Confluence `pages.changed`,
