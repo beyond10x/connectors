@@ -429,8 +429,8 @@ impl Engine {
 
     /// The value each supplied parameter carries. A JSON array is read only
     /// for a repeated query parameter, and each of its elements must be a
-    /// scalar; one scalar for a repeated parameter is one value, as before
-    /// arrays were read.
+    /// scalar; one scalar for a repeated parameter is one value, typed as
+    /// [`joined_fits`] reads it.
     fn parameter_values(
         operation: &Operation,
         input: &Value,
@@ -448,9 +448,19 @@ impl Engine {
                         .map(|element| Self::element(parameter, element, true))
                         .collect::<Result<_>>()?,
                 ),
-                // One value for a repeated parameter keeps the any-scalar
-                // reading it had before its elements were typed.
-                _ => Supplied::One(Self::element(parameter, value, !repeated)?),
+                // One value for a repeated parameter is typed like its
+                // elements, or is a comma-joined list of such elements, the
+                // form callers sent before arrays were read.
+                _ if repeated => {
+                    if !joined_fits(parameter.value_type, value) {
+                        return Err(refuse(format!(
+                            "parameter `{}` is neither one of its elements nor a comma-joined list of them",
+                            parameter.name
+                        )));
+                    }
+                    Supplied::One(Self::element(parameter, value, true)?)
+                }
+                _ => Supplied::One(Self::element(parameter, value, true)?),
             };
             values.insert(parameter.name.clone(), supplied);
         }
@@ -798,6 +808,61 @@ fn provenance(instance: &str, resource: &str, source_revision: &str) -> Value {
 /// the forms callers already send and the engine sends on unchanged. A JSON
 /// number that is not an integer literal is refused by `parameter_values`. A
 /// parameter the bundle records no type for takes any scalar.
+/// `^-?[0-9]+$`, one integer element as its decimal text.
+fn integer_text(text: &str) -> bool {
+    let digits = text.strip_prefix('-').unwrap_or(text);
+    !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit())
+}
+
+/// Whether one scalar may stand for a repeated parameter: an element of its
+/// type, or a string listing such elements separated by commas. Integer
+/// elements take a JSON integer or `1,2,-3`; boolean elements `true`/`false`
+/// or a comma list of them; string elements any string or a JSON integer, as
+/// a string parameter does; untyped elements any scalar. The same rule is the
+/// scalar half of [`repeated_schema`].
+fn joined_fits(value_type: Option<ValueType>, value: &Value) -> bool {
+    let joined =
+        |each: fn(&str) -> bool| value.as_str().is_some_and(|text| text.split(',').all(each));
+    match value_type {
+        Some(ValueType::Integer) => {
+            value.as_number().is_some_and(|n| n.is_i64() || n.is_u64()) || joined(integer_text)
+        }
+        Some(ValueType::Boolean) => {
+            value.is_boolean() || joined(|piece| piece == "true" || piece == "false")
+        }
+        Some(ValueType::String) => value.is_string() || value.is_i64() || value.is_u64(),
+        None => scalar(value).is_some(),
+    }
+}
+
+/// The declared schema of a repeated query parameter: an array of its element
+/// type, or one scalar read as [`joined_fits`] reads it. The type stays a union
+/// with the scalar types because callers already send a comma-joined string
+/// (Jira's `fields`, Confluence's `space-id`; `docs/catalog-jira.md`,
+/// `docs/catalog-confluence.md`). `pattern` applies only to a string, and
+/// `minItems` only to an array.
+fn repeated_schema(value_type: Option<ValueType>, required: bool) -> Value {
+    let mut schema = match value_type {
+        Some(ValueType::Integer) => json!({
+            "type": ["array", "integer", "string"],
+            "pattern": "^-?[0-9]+(,-?[0-9]+)*$",
+        }),
+        Some(ValueType::Boolean) => json!({
+            "type": ["array", "boolean", "string"],
+            "pattern": "^(true|false)(,(true|false))*$",
+        }),
+        Some(ValueType::String) => json!({"type": ["array", "string", "integer"]}),
+        None => json!({"type": ["array", "string", "integer", "boolean"]}),
+    };
+    schema["items"] = declared_type(value_type);
+    if required {
+        // The engine refuses an empty list for a required parameter as absent;
+        // the declaration says the same.
+        schema["minItems"] = json!(1);
+    }
+    schema
+}
+
 fn declared_type(value_type: Option<ValueType>) -> Value {
     match value_type {
         Some(ValueType::String) => json!({"type": ["string", "integer"]}),
@@ -835,15 +900,10 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
         };
         let schema = if parameter.repeated && parameter.location == Location::Query {
             // An array of the declared element type, sent one pair per
-            // element; or one value, which keeps the any-scalar reading it had
-            // before arrays were read, so a caller's comma-joined string is
-            // still sent as it was given.
-            let mut items = declared_type(parameter.value_type);
-            bounded(&mut items);
-            let mut schema = json!({
-                "type": ["array", "string", "integer", "boolean"],
-                "items": items,
-            });
+            // element; or one value typed like its elements, a comma-joined
+            // list of them included, sent as it was given.
+            let mut schema = repeated_schema(parameter.value_type, parameter.required);
+            bounded(&mut schema["items"]);
             bounded(&mut schema);
             schema
         } else {

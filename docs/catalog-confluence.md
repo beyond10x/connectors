@@ -219,7 +219,10 @@ document, expiry and scopes as in the Jira guide. **Not verified live.**
   `space-id` (both of integers) and `status` on `pages.changed`, and `status` on
   `space.pages`, `page.get` and `page.comments`. Each takes a JSON array, sent
   as one `name=value` pair per element in the order given, or one value (a
-  comma-separated string included), sent as one pair as before. See
+  comma-separated string included), sent as one pair as before. For `id` and
+  `space-id` that value must be an integer or a string of comma-separated
+  integers, such as `"65538,98305"`; anything else is refused as
+  `invalid_input` before any request. See
   [array and required query parameters](local-catalog-provider.md#array-and-required-query-parameters).
 - The provider does not walk pages itself and does not retry on `429`; a
   rate-limited read is returned as a refusal.
