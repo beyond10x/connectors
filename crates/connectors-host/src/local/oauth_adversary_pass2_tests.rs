@@ -341,10 +341,18 @@ fn sixty_four_idle_connections_delay_the_redirect_until_a_slot_frees() {
          {answered:?}; the behaviour changed, so update {GUIDE}"
     );
     drop(idle);
-    // A slot frees as soon as the held connections close.
-    let mut retry = flow.connect();
-    retry.write_all(flow.redirect_head().as_bytes()).unwrap();
-    let retried = answer(&mut retry, Duration::from_secs(5));
+    // A slot frees once the listener sees the held connections close; a browser
+    // retries, so the redirect is retried until it is answered or 5 s pass.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let retried = loop {
+        let mut retry = flow.connect();
+        let _ = retry.write_all(flow.redirect_head().as_bytes());
+        let got = answer(&mut retry, Duration::from_millis(500));
+        if got.starts_with("HTTP/1.1 ") || Instant::now() >= deadline {
+            break got;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    };
     assert!(
         retried.starts_with("HTTP/1.1 200 "),
         "the redirect was not accepted once the held connections closed: {:?}; \
