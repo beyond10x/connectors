@@ -6,7 +6,7 @@ status: draft
 title: Per-invoke metadata cost does not grow with the store
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Source
 
@@ -36,3 +36,11 @@ So the consumer's ~700-invoke workload will still reach the admission bound, lat
 A fingerprint over event rows in place of the verifying read on an unchanged store would drop about 5 captures
 per invoke, but corruption inside blob bytes would no longer be caught on a read-only reopen. Declined by the
 coordinator on 2026-09-29: integrity checks stay as they are.
+
+## Observed on an operator store (2026-09-30)
+
+The default local store (`~/.local/state/connectors`, 837 events, 29.5 MB, 24 MB of it in
+`connectors_er_blobs`) with 0.20.0: `connections describe` took 6.9 s and `connections revalidate` 30.09 s,
+answering `outcome_unknown` at `publication`; new connections stayed `pending`. The same adapter
+configuration revalidated in a 3.7 MB store. The store was moved to `connectors.grown-20260930` and
+re-initialised to restore use.
