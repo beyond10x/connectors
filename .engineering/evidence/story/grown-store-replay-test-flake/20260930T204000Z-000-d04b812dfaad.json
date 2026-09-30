@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-30T20:40:00Z",
+  "actor": "human:timo",
+  "artifact": "story:grown-store-replay-test-flake",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "flake unit: grown-store replay test 10/10 full --lib runs (was 8/10), service log-injection test 20/20 isolated (deterministic red before), cargo test -p connectors-host exit 0"
+  }
+}

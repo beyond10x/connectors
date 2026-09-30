@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:list-commands-page-with-a-cursor
 kind: story
-status: draft
+status: active
 title: adapters list and operations list page with a cursor instead of refusing with capacity
 relations:
 - serves: vision:independent-contract-adapters
@@ -13,7 +13,10 @@ scope:
   path: apps/connectors/src/local/operations.rs
 - confidence: cited
   path: apps/connectors/tests/list_paging.rs
-revision: 7
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-30T14:19:49Z", actor: "human:timo", revision: 8}
+- {from: "proposed", to: "active", at: "2026-09-30T14:19:50Z", actor: "human:timo", revision: 9}
 ---
 ## Observed
 Found by the black-box CLI surface test of release 0.18.0 on 2026-09-30 (raw output under the tester's sandbox, outside the repository).
