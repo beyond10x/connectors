@@ -13,12 +13,21 @@
 //! token's `410` reaches the caller as `not_found`. The profile is the guide's
 //! own, pointed at the fixture token route. The fixture secrets are fictional
 //! and only ever compared, never printed. No live credential and no network.
+//!
+//! The three event writes run through the same child over private protocol
+//! two, under the guide's write instance: the host's prepare and commit, the
+//! declared `events.get` preflight that compares the pinned `etag`, and the
+//! exact request and body. The approval binding is exercised with the host's
+//! own approval signer and verifier against a subject built from the child's
+//! descriptor; the signing key is the public RFC 8032 section 7.1 test vector,
+//! never a deployment key.
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
+    approvals,
     config::{Adapter, Executable, Restart, Startup},
-    filesystem,
-    runtime::{Bootstrap, Child, Failure},
+    filesystem, mutations,
+    runtime::{Bootstrap, Child, Failure, PrivateProtocol, WriteEffect, WriteResult},
 };
 use connectors_sdk::Secret;
 use serde_json::{Value, json};
@@ -47,6 +56,8 @@ const PROVIDER: &str = "google-calendar";
 /// The bundle's auth profile, and the profile of the guide's configuration.
 const PROFILE: &str = "google.oauth";
 const CALENDAR_SCOPE: &str = "https://www.googleapis.com/auth/calendar.readonly";
+/// The scope the three event writes need, per the pinned document.
+const WRITE_SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";
 /// Fictional OAuth material. The access token is what the fixture token route
 /// issues and the only bearer the fixture Calendar routes accept.
 const CLIENT_ID: &str = "fixture-client-id.apps.example.test";
@@ -81,6 +92,28 @@ const SHIPPED: [(&str, &str, &str); 3] = [
         "/calendar/v3/calendars/{calendarId}/events",
     ),
 ];
+/// The shipped writes: id, Discovery method id, method and the path the bundle
+/// records.
+const WRITES: [(&str, &str, &str, &str); 3] = [
+    (
+        "events.delete",
+        "calendar.events.delete",
+        "delete",
+        "/calendar/v3/calendars/{calendarId}/events/{eventId}",
+    ),
+    (
+        "events.insert",
+        "calendar.events.insert",
+        "post",
+        "/calendar/v3/calendars/{calendarId}/events",
+    ),
+    (
+        "events.patch",
+        "calendar.events.patch",
+        "patch",
+        "/calendar/v3/calendars/{calendarId}/events/{eventId}",
+    ),
+];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -105,20 +138,72 @@ fn engine() -> Engine {
 }
 
 #[test]
-fn shipped_calendar_selections_are_exactly_the_three_reads() {
+fn shipped_calendar_selections_are_the_three_reads_and_three_writes() {
     let selections = shipped();
     let bundle = committed_bundle();
     assert_eq!(bundle.auth_profile, PROFILE);
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
-    let mut declared: Vec<String> = engine
-        .declarations(&[Effect::Read, Effect::Write])
-        .into_iter()
-        .map(|o| o.id)
-        .collect();
-    declared.sort();
-    let expected: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
-    assert_eq!(declared, expected);
-    assert!(engine.declarations(&[Effect::Write]).is_empty());
+    let ids = |effects: &[Effect]| {
+        let mut declared: Vec<String> = engine
+            .declarations(effects)
+            .into_iter()
+            .map(|o| o.id)
+            .collect();
+        declared.sort();
+        declared
+    };
+    let reads: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
+    let writes: Vec<&str> = WRITES.iter().map(|(id, _, _, _)| *id).collect();
+    assert_eq!(ids(&[Effect::Read]), reads);
+    assert_eq!(ids(&[Effect::Write]), writes);
+    assert_eq!(selections.len(), reads.len() + writes.len());
+    for (id, operation_id, method, path) in WRITES {
+        let selection = selections.iter().find(|s| s.id == id).unwrap();
+        assert_eq!(selection.operation_id, operation_id, "`{id}`");
+        assert_eq!(Some(id), operation_id.strip_prefix("calendar."), "`{id}`");
+        assert_eq!(selection.effect, Effect::Write, "`{id}`");
+        assert_eq!(engine.effect(id), Some(Effect::Write), "`{id}`");
+        assert_eq!(selection.response, None, "`{id}`");
+        assert!(selection.bounds.is_empty(), "`{id}` bounds");
+        let operation = bundle
+            .inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == Some(operation_id))
+            .unwrap_or_else(|| panic!("the projection lacks `{operation_id}`"));
+        assert_eq!(operation.method, method, "`{id}`");
+        assert_eq!(operation.path, path, "`{id}`");
+        // A create has nothing to compare before it exists; patch and delete
+        // read the event first and require its `etag` to be the pinned one.
+        let guard = serde_json::to_value(&selection.guard).unwrap();
+        let expected = if id == "events.insert" {
+            Value::Null
+        } else {
+            json!({
+                "preflight": {"operation_id": "calendar.events.get",
+                              "values": {"calendarId": "calendarId", "eventId": "eventId"},
+                              "checks": [{"pointer": "/etag", "expect": {"input": "etag"}}]},
+                "postflight": {"checks": []}})
+        };
+        assert_eq!(guard, expected, "`{id}` guard");
+        // The pin is a declared, required input; Google is never sent it.
+        let declaration = engine
+            .declarations(&[Effect::Write])
+            .into_iter()
+            .find(|o| o.id == id)
+            .unwrap();
+        assert_eq!(declaration.profile, "mutation", "`{id}`");
+        let required = &declaration.input_schema["required"];
+        assert_eq!(
+            required.as_array().unwrap().contains(&json!("etag")),
+            id != "events.insert",
+            "`{id}` requires {required}"
+        );
+        assert!(
+            operation.parameters.iter().all(|p| p.name != "etag"),
+            "`{operation_id}` declares an `etag` parameter"
+        );
+    }
     for (id, operation_id, path) in SHIPPED {
         let selection = selections.iter().find(|s| s.id == id).unwrap();
         assert_eq!(selection.operation_id, operation_id, "`{id}`");
@@ -341,16 +426,165 @@ fn guide_documents_time_windows_sync_tokens_and_the_full_sync_reset() {
     }
 }
 
-/// The guide's configuration example for this provider.
-fn documented_config() -> Value {
+/// The guide's configuration example for this provider: the read-only one, or
+/// the write instance's, which also asks for the write scope.
+fn documented(write: bool) -> Value {
     let guide = guide();
     let example = guide
         .split("```json\n")
         .skip(1)
         .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(&format!("\"provider\": \"{PROVIDER}\"")))
+        .find(|body| {
+            body.contains(&format!("\"provider\": \"{PROVIDER}\""))
+                && body.contains(WRITE_SCOPE) == write
+        })
         .expect("the documented google-calendar configuration");
     serde_json::from_str::<Value>(example).unwrap()
+}
+fn documented_config() -> Value {
+    documented(false)
+}
+
+/// Each write is cited with its request and its guard; the write scope, the
+/// pinned `etag` and the route to a write-capable connection are stated: a
+/// separate instance, connected afresh. Repair cannot add a scope, and the
+/// guide must not say it does.
+#[test]
+fn guide_cites_each_write_its_guard_and_the_write_scope() {
+    let guide = guide();
+    let rows: Vec<&str> = guide.lines().filter(|l| l.starts_with('|')).collect();
+    for (id, operation_id, method, path) in WRITES {
+        let request = format!("`{} {path}`", method.to_uppercase());
+        let guard = if id == "events.insert" {
+            "none"
+        } else {
+            "`/etag` equals the input `etag`"
+        };
+        let cited = rows.iter().any(|row| {
+            row.starts_with(&format!("| `{id}` "))
+                && row.contains(&format!("`{operation_id}`"))
+                && row.contains(&request)
+                && row.contains(guard)
+        });
+        assert!(cited, "no row cites `{id}` as {request} with guard {guard}");
+    }
+    assert!(guide.contains(&format!("`{WRITE_SCOPE}`")));
+    let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
+    for phrase in [
+        "Writes use a separate instance",
+        "`google-calendar-write`",
+        "`connections connect` that instance with the Google client file",
+        "`connections repair` cannot add a scope",
+        "approval binds the whole input by its digest",
+        "`sendUpdates`",
+    ] {
+        assert!(flat.contains(phrase), "the guide does not say {phrase}");
+    }
+    assert!(
+        !flat.contains("through `connections repair`")
+            && !flat.contains("with `connections repair`"),
+        "the guide routes the write scope through `connections repair`"
+    );
+}
+
+/// The write configuration is a separate instance, `google-calendar-write`:
+/// the read one with its own instance id and the write scope added to both
+/// `minimum_scopes` and `requested_scopes`, and nothing else changed.
+#[test]
+fn guide_documents_the_write_configuration_with_the_calendar_events_scope() {
+    let read = documented_config();
+    let write = documented(true);
+    assert_eq!(read["instance"], "google-calendar");
+    assert_eq!(write["instance"], "google-calendar-write");
+    assert_eq!(
+        write["auth"]["minimum_scopes"],
+        json!([CALENDAR_SCOPE, WRITE_SCOPE])
+    );
+    assert_eq!(
+        write["auth"]["requested_scopes"],
+        json!(["openid", CALENDAR_SCOPE, WRITE_SCOPE])
+    );
+    let strip = |mut config: Value| {
+        config.as_object_mut().unwrap().remove("instance");
+        config["auth"]
+            .as_object_mut()
+            .unwrap()
+            .retain(|key, _| key != "minimum_scopes" && key != "requested_scopes");
+        config
+    };
+    assert_eq!(strip(write), strip(read));
+    // Every write, and the reads its preflight makes, accept the write scope,
+    // per the pinned document; the read-only scope accepts no write.
+    let events = &pinned()["resources"]["events"]["methods"];
+    for method in ["insert", "patch", "delete", "get"] {
+        let scopes = events[method]["scopes"].as_array().unwrap();
+        assert!(scopes.contains(&json!(WRITE_SCOPE)), "`{method}`");
+        assert_eq!(
+            scopes.contains(&json!(CALENDAR_SCOPE)),
+            method == "get",
+            "`{method}`"
+        );
+    }
+}
+
+/// Each write's description names the effects that reach people other than
+/// the caller, and says the approval binds the whole input by digest.
+#[test]
+fn write_descriptions_name_their_effects_and_the_digest_binding() {
+    let selections = shipped();
+    let description = |id: &str| {
+        selections
+            .iter()
+            .find(|s| s.id == id)
+            .and_then(|s| s.description.clone())
+            .unwrap_or_default()
+    };
+    let mut missing = Vec::new();
+    for (id, terms) in [
+        (
+            "events.insert",
+            &[
+                "sendUpdates",
+                "attendees",
+                "conferenceDataVersion",
+                "conferenceData.createRequest",
+                "guestsCanModify",
+                "guestsCanInviteOthers",
+                "guestsCanSeeOtherGuests",
+                "visibility",
+                "autoDeclineMode",
+                "recurrence",
+                "a second event",
+                "by digest",
+            ][..],
+        ),
+        (
+            "events.patch",
+            &[
+                "etag",
+                "sendUpdates",
+                "attendees",
+                "replaces",
+                "conferenceDataVersion",
+                "guestsCanModify",
+                "visibility",
+                "every instance",
+                "by digest",
+            ][..],
+        ),
+        (
+            "events.delete",
+            &["etag", "sendUpdates", "every instance", "by digest"][..],
+        ),
+    ] {
+        let text = description(id);
+        for term in terms {
+            if !text.contains(term) {
+                missing.push(format!("{id}: {term}"));
+            }
+        }
+    }
+    assert!(missing.is_empty(), "descriptions omit {missing:#?}");
 }
 
 /// The guide configures the bundle's profile as an `oauth2_refresh` profile
@@ -366,9 +600,10 @@ fn guide_documents_the_oauth_refresh_configuration() {
     assert_eq!(auth["header"], "Authorization");
     assert_eq!(auth["bearer"], true);
     assert_eq!(auth["token_url"], "https://oauth2.googleapis.com/token");
+    // The `auth_uri` of the installed-app client file Google issues.
     assert_eq!(
         auth["authorize_url"],
-        "https://accounts.google.com/o/oauth2/v2/auth"
+        "https://accounts.google.com/o/oauth2/auth"
     );
     assert_eq!(auth["identity"]["source"], "id_token");
     assert_eq!(auth["minimum_scopes"], json!([CALENDAR_SCOPE]));
@@ -405,9 +640,16 @@ fn calendar_entry(id: &str, summary: &str) -> Value {
     json!({"kind": "calendar#calendarListEntry", "id": id, "summary": summary,
            "accessRole": "reader", "timeZone": "Europe/Berlin"})
 }
+/// The fixture events' current `etag`, which every event read answers. Google's
+/// event ETags are quoted strings, and the quotes are part of the value.
+const ETAG: &str = "\"fixture-etag-2\"";
+/// An earlier `etag` of the same event: a pin taken before a change.
+const STALE_ETAG: &str = "\"fixture-etag-1\"";
+/// The `etag` Google gives an event a write created or changed.
+const WRITTEN_ETAG: &str = "\"fixture-etag-3\"";
 fn event(id: &str, summary: &str) -> Value {
-    json!({"kind": "calendar#event", "id": id, "status": "confirmed", "summary": summary,
-           "eventType": "default",
+    json!({"kind": "calendar#event", "etag": ETAG, "id": id, "status": "confirmed",
+           "summary": summary, "eventType": "default",
            "start": {"dateTime": "2026-09-21T10:00:00+02:00"},
            "end": {"dateTime": "2026-09-21T11:00:00+02:00"},
            "updated": "2026-09-20T08:00:00.000Z"})
@@ -476,6 +718,43 @@ fn answer(target: &str) -> Option<(u16, Value)> {
         "/calendar/v3/calendars/primary/events/fixture-event-1" => {
             ok(event("fixture-event-1", "first"))
         }
+        // An event Google no longer has: `410 Gone`, reason `deleted`.
+        "/calendar/v3/calendars/primary/events/fixture-event-gone" => Some((
+            410,
+            json!({"error": {"code": 410, "message": "Resource has been deleted",
+                             "errors": [{"domain": "global", "reason": "deleted",
+                                         "message": "Resource has been deleted"}]}}),
+        )),
+        _ => None,
+    }
+}
+
+/// The recorded answer to a write: a status and, except for a delete's
+/// `204 No Content`, the event Google returns. An insert answers the event it
+/// created from the body, a patch the stored event with the body applied, each
+/// with a new `etag`. `None` for anything else, which the fixture answers 404.
+fn written(method: &str, target: &str, body: &[u8]) -> Option<(u16, Option<Value>)> {
+    let (route, _) = target.split_once('?').unwrap_or((target, ""));
+    let apply = |mut event: Value| {
+        let supplied: Value = serde_json::from_slice(body).unwrap();
+        for (key, value) in supplied.as_object().unwrap() {
+            event[key] = value.clone();
+        }
+        event["etag"] = json!(WRITTEN_ETAG);
+        event
+    };
+    match (method, route) {
+        ("POST", "/calendar/v3/calendars/primary/events") => Some((
+            200,
+            Some(apply(
+                json!({"kind": "calendar#event", "id": "fixture-event-new",
+                              "status": "confirmed", "eventType": "default"}),
+            )),
+        )),
+        ("PATCH", "/calendar/v3/calendars/primary/events/fixture-event-1") => {
+            Some((200, Some(apply(event("fixture-event-1", "first")))))
+        }
+        ("DELETE", "/calendar/v3/calendars/primary/events/fixture-event-1") => Some((204, None)),
         _ => None,
     }
 }
@@ -499,15 +778,44 @@ fn id_token() -> String {
     )
 }
 
+/// Method, route with query, and body of each Calendar request that was not a
+/// GET.
+type Bodies = Arc<Mutex<Vec<(String, String, Vec<u8>)>>>;
+
 struct Provider {
     stop: Option<oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
     _root: tempfile::TempDir,
     config: PathBuf,
     requests: Requests,
+    bodies: Bodies,
+    protocol: Option<PrivateProtocol>,
+}
+/// The grant of the guide's read-only consent.
+fn read_grant() -> String {
+    format!("openid {CALENDAR_SCOPE}")
+}
+/// The grant of the write instance's consent: the read scope and the write
+/// scope.
+fn write_grant() -> String {
+    format!("openid {CALENDAR_SCOPE} {WRITE_SCOPE}")
 }
 impl Provider {
+    /// The guide's read-only configuration, over private protocol one.
     fn new() -> Self {
+        Self::with(documented_config(), read_grant(), None)
+    }
+    /// The guide's write instance, over private protocol two, whose token
+    /// route grants `grant`.
+    fn writes(grant: &str) -> Self {
+        Self::with(
+            documented(true),
+            grant.to_owned(),
+            Some(PrivateProtocol::V2),
+        )
+    }
+    /// `config` pointed at the fixture, whose token route grants `grant`.
+    fn with(mut config: Value, grant: String, protocol: Option<PrivateProtocol>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -529,6 +837,8 @@ impl Provider {
         let (stop, mut stopped) = oneshot::channel();
         let requests: Requests = Arc::new(Mutex::new(Vec::new()));
         let observed = requests.clone();
+        let bodies: Bodies = Arc::new(Mutex::new(Vec::new()));
+        let carried = bodies.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -571,7 +881,9 @@ impl Provider {
                         continue;
                     }
                     let authorization = header("authorization");
-                    let (status, answer) = if method == "POST" && target == "/token" {
+                    let (status, answer): (u16, Option<Value>) = if method == "POST"
+                        && target == "/token"
+                    {
                         // Only the fixture entry is exchanged; the form is
                         // compared, never printed.
                         let form = String::from_utf8(body).unwrap();
@@ -587,29 +899,42 @@ impl Provider {
                         if fields == expected {
                             (
                                 200,
-                                json!({
+                                Some(json!({
                                     "access_token": ACCESS_TOKEN, "token_type": "Bearer",
                                     "expires_in": 3600,
-                                    "scope": format!("openid {CALENDAR_SCOPE}"),
-                                    "id_token": id_token()}),
+                                    "scope": grant.clone(),
+                                    "id_token": id_token()})),
                             )
                         } else {
-                            (400, json!({"error": "invalid_grant"}))
+                            (400, Some(json!({"error": "invalid_grant"})))
                         }
                     } else if authorization.as_deref() != Some(&*format!("Bearer {ACCESS_TOKEN}"))
                     {
-                        (401, json!({"error": {"code": 401, "message": "fixture refusal"}}))
+                        let refusal = json!({"error": {"code": 401, "message": "fixture refusal"}});
+                        (401, Some(refusal))
                     } else {
-                        match (method.as_str(), answer(&target)) {
-                            ("GET", Some(answer)) => answer,
-                            _ => (404, json!({"error": {"code": 404, "message": "no fixture"}})),
-                        }
+                        let found = if method == "GET" {
+                            answer(&target).map(|(status, value)| (status, Some(value)))
+                        } else {
+                            let found = written(&method, &target, &body);
+                            carried
+                                .lock()
+                                .unwrap()
+                                .push((method.clone(), target.clone(), body));
+                            found
+                        };
+                        found.unwrap_or_else(|| {
+                            let missing = json!({"error": {"code": 404, "message": "no fixture"}});
+                            (404, Some(missing))
+                        })
                     };
                     observed
                         .lock()
                         .unwrap()
                         .push((method, target, authorization));
-                    let answer = serde_json::to_vec(&answer).unwrap();
+                    let answer = answer
+                        .map(|value| serde_json::to_vec(&value).unwrap())
+                        .unwrap_or_default();
                     let head = format!(
                         "HTTP/1.1 {status} fixture\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                         answer.len()
@@ -622,7 +947,6 @@ impl Provider {
         let address = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         // The guide's configuration, with the fixture as API host and token
         // host, trusted through its own CA.
-        let mut config = documented_config();
         config["instance"] = json!("fixture-google-calendar");
         config["bundle_directory"] = json!(root_path("generated/bundles"));
         config["operations_file"] = json!(root_path("providers/google-calendar/operations.json"));
@@ -638,7 +962,34 @@ impl Provider {
             _root: root,
             config: path,
             requests,
+            bodies,
+            protocol,
         }
+    }
+    /// Method, route with query and JSON body (`null` for none) of each
+    /// Calendar request that was not a GET.
+    fn bodies(&self) -> Vec<(String, String, Value)> {
+        self.bodies
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(method, target, body)| {
+                let body = if body.is_empty() {
+                    Value::Null
+                } else {
+                    serde_json::from_slice(body).unwrap()
+                };
+                (method.clone(), target.clone(), body)
+            })
+            .collect()
+    }
+    /// Method and route with query of each Calendar request.
+    fn api_calls(&self) -> Vec<(String, String)> {
+        self.requests()
+            .into_iter()
+            .filter(|(_, target, _)| target != "/token")
+            .map(|(method, target, _)| (method, target))
+            .collect()
     }
     fn selection(&self) -> Adapter {
         let output = Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
@@ -658,7 +1009,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
-            private_protocol: None,
+            private_protocol: self.protocol,
             permissions: Default::default(),
             instance_id: "fixture-google-calendar".into(),
             adapter_id: "catalog".into(),
@@ -962,4 +1313,543 @@ fn events_list_max_results_bounds() {
             format!("/calendar/v3/calendars/primary/events?maxResults={size}"),
         );
     }
+}
+
+/// A new event with one guest, and the input that creates it on `primary`
+/// without notifying anyone.
+fn review() -> Value {
+    json!({"summary": "Fixture review",
+           "start": {"dateTime": "2026-10-05T10:00:00+02:00"},
+           "end": {"dateTime": "2026-10-05T11:00:00+02:00"},
+           "attendees": [{"email": "guest@example.test"}]})
+}
+fn moved() -> Value {
+    json!({"summary": "first, moved", "start": {"dateTime": "2026-09-22T10:00:00+02:00"},
+           "end": {"dateTime": "2026-09-22T11:00:00+02:00"}})
+}
+fn insert_input() -> Value {
+    json!({"calendarId": "primary", "sendUpdates": "none", "body": review()})
+}
+fn patch_input(etag: &str) -> Value {
+    json!({"calendarId": "primary", "eventId": "fixture-event-1", "etag": etag,
+           "sendUpdates": "none", "body": moved()})
+}
+fn delete_input(etag: &str) -> Value {
+    json!({"calendarId": "primary", "eventId": "fixture-event-1", "etag": etag,
+           "sendUpdates": "none"})
+}
+/// Each write's input at the current `etag`.
+fn write_inputs() -> [(&'static str, Value); 3] {
+    [
+        ("events.insert", insert_input()),
+        ("events.patch", patch_input(ETAG)),
+        ("events.delete", delete_input(ETAG)),
+    ]
+}
+
+/// Prepare (the declared preflight included) and commit one write on this
+/// child: the transport the host's approval coordinator drives once it holds a
+/// verified, spent approval. A refusal in prepare is the `Err`.
+fn write(child: &mut Child, operation: &str, input: &Value) -> Result<WriteResult, Failure> {
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let prepared = child.prepare_write(
+        operation,
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(input).unwrap(),
+        connectors_sdk::now_ms() + 30_000,
+    )?;
+    Ok(prepared.commit())
+}
+#[track_caller]
+fn applied(result: Result<WriteResult, Failure>, operation: &str) -> Value {
+    let result =
+        result.unwrap_or_else(|failure| panic!("`{operation}` refused in prepare: {failure:?}"));
+    assert_eq!(result.effect, WriteEffect::Applied, "`{operation}`");
+    result
+        .result
+        .unwrap_or_else(|failure| panic!("`{operation}` result: {failure:?}"))
+}
+fn calls(expected: &[(&str, &str)]) -> Vec<(String, String)> {
+    expected
+        .iter()
+        .map(|(method, target)| ((*method).to_owned(), (*target).to_owned()))
+        .collect()
+}
+const EVENT_1: &str = "/calendar/v3/calendars/primary/events/fixture-event-1";
+
+/// Each write sends exactly its request — patch and delete after their one
+/// preflight read — with the body as supplied, `sendUpdates` in the query, the
+/// pinned `etag` nowhere, and the exchanged bearer; Google's answer is returned
+/// as applied, a delete's empty `204` as a `null` body.
+#[test]
+fn each_write_sends_exactly_its_request_and_body_and_returns_the_answer() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let preflight = (
+        "GET",
+        "/calendar/v3/calendars/primary/events/fixture-event-1?",
+    );
+    for (operation, input, expected, body) in [
+        (
+            "events.insert",
+            insert_input(),
+            calls(&[(
+                "POST",
+                "/calendar/v3/calendars/primary/events?sendUpdates=none",
+            )]),
+            review(),
+        ),
+        (
+            "events.patch",
+            patch_input(ETAG),
+            calls(&[
+                preflight,
+                (
+                    "PATCH",
+                    "/calendar/v3/calendars/primary/events/fixture-event-1?sendUpdates=none",
+                ),
+            ]),
+            moved(),
+        ),
+        (
+            "events.delete",
+            delete_input(ETAG),
+            calls(&[
+                preflight,
+                (
+                    "DELETE",
+                    "/calendar/v3/calendars/primary/events/fixture-event-1?sendUpdates=none",
+                ),
+            ]),
+            Value::Null,
+        ),
+    ] {
+        let before = provider.api_calls().len();
+        let carried = provider.bodies().len();
+        let result = applied(write(&mut child, operation, &input), operation);
+        assert_eq!(
+            provider.api_calls()[before..],
+            expected[..],
+            "`{operation}` requests"
+        );
+        let (method, target) = expected.last().unwrap().clone();
+        assert_eq!(
+            provider.bodies()[carried..],
+            [(method.clone(), target.clone(), body.clone())],
+            "`{operation}` body"
+        );
+        let sent = if body.is_null() {
+            Vec::new()
+        } else {
+            serde_json::to_vec(&body).unwrap()
+        };
+        let (status, answer) = written(&method, &target, &sent).unwrap();
+        assert_eq!(result["status"], status, "`{operation}` status");
+        assert_eq!(
+            result["body"],
+            answer.unwrap_or(Value::Null),
+            "`{operation}` answer"
+        );
+        assert_eq!(result["provenance"]["instance"], "fixture-google-calendar");
+    }
+    let bearer = format!("Bearer {ACCESS_TOKEN}");
+    let requests = provider.requests();
+    assert!(
+        requests
+            .iter()
+            .filter(|(_, target, _)| target != "/token")
+            .all(
+                |(_, target, authorization)| authorization.as_deref() == Some(bearer.as_str())
+                    && !target.contains("etag")
+            ),
+        "a Calendar request without the exchanged bearer, or carrying the pin"
+    );
+}
+
+/// A pinned `etag` other than the event's current one fails the preflight for
+/// patch and delete: the one `events.get` is sent and no write follows. The
+/// same inputs at the current `etag` then write, so the refusal was the pin.
+#[test]
+fn a_stale_etag_fails_the_preflight_and_sends_no_write() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, stale) in [
+        ("events.patch", patch_input(STALE_ETAG)),
+        ("events.delete", delete_input(STALE_ETAG)),
+        // The same value without Google's quotes is another value.
+        ("events.patch", patch_input(ETAG.trim_matches('"'))),
+    ] {
+        let before = provider.api_calls().len();
+        let outcome = write(&mut child, operation, &stale);
+        assert!(
+            matches!(outcome, Err(Failure::Forbidden)),
+            "`{operation}` at {}: {:?}",
+            stale["etag"],
+            outcome.map(|result| result.effect)
+        );
+        assert_eq!(
+            provider.api_calls()[before..],
+            calls(&[("GET", &format!("{EVENT_1}?"))])[..],
+            "`{operation}`"
+        );
+    }
+    assert!(provider.bodies().is_empty(), "a write was sent");
+    applied(
+        write(&mut child, "events.patch", &patch_input(ETAG)),
+        "events.patch",
+    );
+    applied(
+        write(&mut child, "events.delete", &delete_input(ETAG)),
+        "events.delete",
+    );
+    assert_eq!(provider.bodies().len(), 2);
+}
+
+/// Patch and delete without a pin, or with a pin that is not a scalar, are
+/// refused as invalid input before any Calendar request.
+#[test]
+fn patch_and_delete_without_an_etag_are_refused_before_any_request() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, input) in [
+        ("events.patch", patch_input(ETAG)),
+        ("events.delete", delete_input(ETAG)),
+    ] {
+        let mut unpinned = input.clone();
+        unpinned.as_object_mut().unwrap().remove("etag");
+        let mut object = input.clone();
+        object["etag"] = json!({"value": ETAG});
+        let mut null = input.clone();
+        null["etag"] = Value::Null;
+        for (what, input) in [("no etag", unpinned), ("an object", object), ("null", null)] {
+            let outcome = write(&mut child, operation, &input);
+            assert!(
+                matches!(outcome, Err(Failure::InvalidInput)),
+                "`{operation}` with {what}: {:?}",
+                outcome.map(|result| result.effect)
+            );
+        }
+    }
+    assert!(
+        provider.api_calls().is_empty(),
+        "a Calendar request was sent"
+    );
+}
+
+/// An event the preflight cannot find — Google's `404`, or `410` for one it
+/// deleted — is a refusal before any write: the one `events.get` and nothing
+/// after it.
+#[test]
+fn a_write_to_an_event_google_does_not_have_sends_no_write() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for event_id in ["fixture-event-unknown", "fixture-event-gone"] {
+        for (operation, mut input) in [
+            ("events.patch", patch_input(ETAG)),
+            ("events.delete", delete_input(ETAG)),
+        ] {
+            input["eventId"] = json!(event_id);
+            let before = provider.api_calls().len();
+            let outcome = write(&mut child, operation, &input);
+            assert!(
+                outcome.is_err(),
+                "`{operation}` of {event_id}: {:?}",
+                outcome.map(|result| result.effect)
+            );
+            let route = format!("/calendar/v3/calendars/primary/events/{event_id}?");
+            assert_eq!(
+                provider.api_calls()[before..],
+                calls(&[("GET", &route)])[..],
+                "`{operation}` of {event_id}"
+            );
+        }
+    }
+    assert!(provider.bodies().is_empty(), "a write was sent");
+}
+
+/// A write offered on the dispatch path, which carries no approval, is refused
+/// by the host before the child is asked for anything: no token exchange and
+/// no Calendar request. Over private protocol one a write is not even
+/// described and cannot be prepared; over private protocol two it is a
+/// `mutation`, which only the host's prepare/commit exchange runs, and the
+/// owner enters that exchange only with a verified proof. An absent or empty
+/// proof document is refused where the owner decodes it.
+#[test]
+fn each_write_without_an_approval_is_refused_before_any_request() {
+    let two = Provider::writes(&write_grant());
+    let mut v2 = Child::spawn(&two.selection()).unwrap();
+    let described = v2.bootstrap().descriptor().unwrap();
+    let one = Provider::with(documented(true), write_grant(), None);
+    let mut v1 = Child::spawn(&one.selection()).unwrap();
+    for (operation, input) in write_inputs() {
+        assert_eq!(
+            described.operation(operation).unwrap().profile,
+            "mutation",
+            "`{operation}`"
+        );
+        assert!(
+            matches!(
+                attempt(&mut v2, operation, &input),
+                Err(Failure::Unsupported)
+            ),
+            "`{operation}` dispatched without an approval"
+        );
+        assert!(
+            v1.bootstrap()
+                .descriptor()
+                .unwrap()
+                .operation(operation)
+                .is_err(),
+            "`{operation}` described over private protocol one"
+        );
+        assert!(
+            matches!(attempt(&mut v1, operation, &input), Err(Failure::NotFound)),
+            "`{operation}` over private protocol one"
+        );
+        let outcome = write(&mut v1, operation, &input);
+        assert!(
+            matches!(outcome, Err(Failure::Unsupported)),
+            "`{operation}` prepared over private protocol one: {:?}",
+            outcome.map(|result| result.effect)
+        );
+    }
+    for document in [b"".as_slice(), b"{}"] {
+        assert!(matches!(
+            approvals::Evidence::from_document(Secret(document.to_vec())),
+            Err(approvals::Failure::Refused)
+        ));
+    }
+    assert!(two.requests().is_empty(), "protocol two sent a request");
+    assert!(one.requests().is_empty(), "protocol one sent a request");
+}
+
+/// The public RFC 8032 section 7.1 test 1 key pair: test material only.
+const APPROVAL_SEED: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+const APPROVAL_PUBLIC: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+struct Now;
+impl mutations::Clock for Now {
+    fn now(&self) -> mutations::Result<mutations::ClockInterval> {
+        let now = connectors_sdk::now_ms() as i64;
+        Ok(mutations::ClockInterval {
+            lower_unix_ms: now,
+            upper_unix_ms: now + 1000,
+        })
+    }
+}
+struct ApprovalKey(approvals::ConfiguredApprovalKey);
+impl approvals::CurrentAdmission for &ApprovalKey {
+    fn key(&self) -> &approvals::ConfiguredApprovalKey {
+        &self.0
+    }
+}
+/// Admits by key id only, so any refusal is the proof's own subject binding.
+impl approvals::ReceiverPolicy for ApprovalKey {
+    type Guard<'a> = &'a ApprovalKey;
+    fn admit<'a>(&'a self, _: &approvals::Subject, kid: &str) -> approvals::Result<&'a Self> {
+        if kid == self.0.kid {
+            Ok(self)
+        } else {
+            Err(approvals::Failure::Refused)
+        }
+    }
+}
+impl approvals::IssuancePolicy for ApprovalKey {
+    type Guard<'a> = &'a ApprovalKey;
+    fn authorize<'a>(
+        &'a self,
+        subject: &approvals::Subject,
+        kid: &str,
+    ) -> approvals::Result<&'a Self> {
+        approvals::ReceiverPolicy::admit(self, subject, kid)
+    }
+}
+fn approval_key() -> ApprovalKey {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    ApprovalKey(approvals::ConfiguredApprovalKey {
+        issuer: "fixture-issuer".into(),
+        audience: "approval:fixture-google-calendar".into(),
+        kid: "fixture-key".into(),
+        public_key: URL_SAFE_NO_PAD.encode(hex::decode(APPROVAL_PUBLIC).unwrap()),
+        not_before_unix_ms: 0,
+        not_after_unix_ms: 4_000_000_000_000,
+        revoked: false,
+    })
+}
+fn signer() -> approvals::Signer {
+    approvals::Signer::from_seed(
+        Secret(hex::decode(APPROVAL_SEED).unwrap()),
+        "fixture-key".into(),
+    )
+    .unwrap()
+}
+/// The approval subject for `input` to `operation` on this child, with the
+/// input digest the owner's issuance computes (`connectors_core::digest`).
+fn subject(child: &Child, operation: &str, input: &Value) -> approvals::Subject {
+    let bootstrap = child.bootstrap();
+    let descriptor = bootstrap.descriptor().unwrap();
+    let declared = descriptor.operation(operation).unwrap();
+    approvals::Subject {
+        format: "connectors.approval-subject/v1".into(),
+        target: approvals::Target {
+            instance: bootstrap.instance.clone(),
+            operation: operation.into(),
+            connection: "fixture-connection".into(),
+            connection_revision: "fixture-connection-revision".into(),
+            contract: declared.contract.clone(),
+            profile: declared.profile.clone(),
+            descriptor_revision: descriptor.revision.clone(),
+            configuration_revision: bootstrap.configuration_revision.clone(),
+        },
+        authority: approvals::Authority {
+            scope: approvals::Scope {
+                tenant: None,
+                realm: None,
+                caller: "fixture-caller".into(),
+                executor: None,
+            },
+            current_authority: None,
+            executor: None,
+        },
+        origin: approvals::Origin {
+            kind: approvals::OriginKind::Direct,
+            authority_ref: bootstrap.instance.clone(),
+        },
+        route: None,
+        canonicalization: "adapter-v1-canonical-json".into(),
+        input_sha256: connectors_core::digest(input),
+        approval_mode: "required".into(),
+    }
+}
+/// Issue a proof for `approved`, and require that it does not verify for
+/// `changed` — so that write is refused before the child prepares it and
+/// nothing is sent — and that it verifies for `approved`, whose write then
+/// sends exactly the approved request.
+fn approved_only(
+    provider: &Provider,
+    child: &mut Child,
+    operation: &str,
+    approved: &Value,
+    changed: &Value,
+) -> Value {
+    let key = approval_key();
+    assert_ne!(approved, changed);
+    let proof = signer()
+        .issue(&subject(child, operation, approved), &key, &Now)
+        .unwrap();
+    let before = provider.requests().len();
+    assert!(
+        matches!(
+            approvals::verify(&proof, &subject(child, operation, changed), &key, &Now),
+            Err(approvals::Failure::Refused)
+        ),
+        "`{operation}` approval verified for {changed}"
+    );
+    assert_eq!(provider.requests().len(), before, "`{operation}` sent");
+    approvals::verify(&proof, &subject(child, operation, approved), &key, &Now)
+        .unwrap_or_else(|failure| panic!("`{operation}` approval refused: {failure:?}"));
+    applied(write(child, operation, approved), operation)
+}
+
+/// An approval binds the whole input: a proof issued for one body, one target
+/// event or one pin does not verify for another.
+#[test]
+fn a_write_approved_for_a_different_input_is_refused() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let mut other_body = insert_input();
+    other_body["body"]["attendees"] = json!([{"email": "someone-else@example.test"}]);
+    approved_only(
+        &provider,
+        &mut child,
+        "events.insert",
+        &insert_input(),
+        &other_body,
+    );
+    let mut other_event = patch_input(ETAG);
+    other_event["eventId"] = json!("fixture-event-2");
+    approved_only(
+        &provider,
+        &mut child,
+        "events.patch",
+        &patch_input(ETAG),
+        &other_event,
+    );
+    approved_only(
+        &provider,
+        &mut child,
+        "events.delete",
+        &delete_input(ETAG),
+        &delete_input(STALE_ETAG),
+    );
+    // One write per approved input, and none for an input that was not.
+    assert_eq!(provider.bodies().len(), 3);
+}
+
+/// The approval binds `sendUpdates`: a proof issued for an input with
+/// `sendUpdates: none` does not verify for the same event with
+/// `sendUpdates: all`, and no request is sent for it. The approved input's
+/// write carries `sendUpdates=none`.
+#[test]
+fn approval_binds_send_updates() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, quiet) in write_inputs() {
+        assert_eq!(quiet["sendUpdates"], "none");
+        let mut loud = quiet.clone();
+        loud["sendUpdates"] = json!("all");
+        let before = provider.bodies().len();
+        approved_only(&provider, &mut child, operation, &quiet, &loud);
+        let sent = provider.bodies();
+        assert_eq!(sent.len(), before + 1, "`{operation}` writes");
+        assert!(
+            sent[before].1.ends_with("?sendUpdates=none"),
+            "`{operation}` sent {}",
+            sent[before].1
+        );
+    }
+    assert!(
+        provider
+            .api_calls()
+            .iter()
+            .all(|(_, target)| !target.contains("sendUpdates=all")),
+        "a request carried sendUpdates=all"
+    );
+}
+
+/// The write configuration asks for `calendar.events`, so a consent that
+/// granted only the read-only scope fails validation; one that granted both
+/// validates.
+#[test]
+fn calendar_write_config_requires_calendar_events_scope() {
+    let deadline = || connectors_sdk::now_ms() + 30_000;
+    let provider = Provider::writes(&read_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    assert!(
+        matches!(
+            child.validate(PROFILE, &secret(), deadline()),
+            Err(Failure::InsufficientScope)
+        ),
+        "a read-only grant validated the write configuration"
+    );
+    assert_eq!(
+        provider.requests().len(),
+        1,
+        "one token exchange and nothing else"
+    );
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let validated = child
+        .validate(PROFILE, &secret(), deadline())
+        .unwrap_or_else(|failure| panic!("validation {failure:?}"));
+    assert_eq!(
+        validated.granted_scopes.unwrap(),
+        [
+            "openid".to_owned(),
+            CALENDAR_SCOPE.to_owned(),
+            WRITE_SCOPE.to_owned()
+        ]
+        .into()
+    );
 }
