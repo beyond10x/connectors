@@ -362,14 +362,24 @@ fn guide_cites_each_operation_the_write_scope_the_response_cap_and_fields() {
             "no row cites `{id}` as `{operation_id}` `POST {path}`"
         );
     }
-    // The write scope, the pinned revision the guard compares, and the command
-    // that adds the scope to an existing connection.
+    // The write scope, the pinned revision the guard compares, and the route to
+    // a write-capable connection: a separate instance, connected afresh. Repair
+    // cannot add a scope, and the guide must not say it does.
     assert!(guide.contains(&format!("`{WRITE_SCOPE}`")));
     assert!(guide.contains("`writeControl.requiredRevisionId`"));
+    let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains("Writes use a separate instance"));
+    assert!(guide.contains("`google-slides-write`"));
+    assert!(flat.contains("`connections connect` that instance"));
+    assert!(flat.contains("`connections repair` cannot add a scope"));
     assert!(
-        guide.contains("`connections repair`"),
-        "the guide does not name `connections repair` for adding a write scope"
+        !flat.contains("with `connections repair`"),
+        "the guide still routes the write scope through `connections repair`"
     );
+    // `fields` on `batchUpdate` must keep what the postflight compares, and a
+    // view-only preflight's code is explained.
+    assert!(flat.contains("must therefore keep `presentationId`"));
+    assert!(flat.contains("fails its preflight as `upstream_protocol`"));
     // The response cap, and `fields` as the way to stay under it.
     assert!(guide.contains("4 MiB"), "the guide does not state the cap");
     assert!(guide.contains("`connectors_core::RESPONSE_LIMIT`"));
