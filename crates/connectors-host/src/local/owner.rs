@@ -128,9 +128,9 @@ impl From<runtime::Failure> for Error {
             F::Forbidden | F::ProviderForbidden => Code::Forbidden,
             F::NotFound => Code::NotFound,
             F::Unavailable => Code::Unavailable,
-            F::Timeout => Code::Timeout,
+            F::Timeout | F::ProviderTimeout => Code::Timeout,
             F::Interrupted => Code::Interrupted,
-            F::Capacity => Code::Capacity,
+            F::Capacity | F::ProviderCapacity => Code::Capacity,
             F::Unsupported => Code::Unsupported,
             F::ReadinessMismatch => Code::ReadinessMismatch,
             F::IncarnationMismatch => Code::IncarnationMismatch,
@@ -158,9 +158,13 @@ impl From<runtime::Failure> for Error {
         // `Forbidden` is a refusal it raised from its own configuration before
         // any request, or a connection probe's 403, and keeps reading as
         // admission; the host's own admission refusals are owner codes that
-        // never pass through here.
+        // never pass through here. Likewise a plain `Timeout` / `Capacity` is
+        // the host's or the adapter's own deadline or limit.
         let origin = match e {
-            F::ProviderForbidden | F::ProviderNotFound => Origin::Provider,
+            F::ProviderForbidden
+            | F::ProviderNotFound
+            | F::ProviderTimeout
+            | F::ProviderCapacity => Origin::Provider,
             _ => Origin::Host,
         };
         Self {
