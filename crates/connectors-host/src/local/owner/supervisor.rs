@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     sync::{
         Arc, Condvar, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
         mpsc,
     },
 };
@@ -76,13 +76,33 @@ struct Job {
     deadline: u64,
     reply: mpsc::Sender<Result<Output>>,
     epoch: u64,
+    queued: Option<JobQueued>,
+}
+/// Counts a sent job until the worker takes it up, after which the worker's
+/// `busy` covers it, or until it is dropped unsent, so an owner never reads a
+/// queued job as idle.
+struct JobQueued(Arc<AtomicUsize>);
+impl JobQueued {
+    fn new(count: &Arc<AtomicUsize>) -> Self {
+        count.fetch_add(1, Ordering::SeqCst);
+        Self(count.clone())
+    }
+}
+impl Drop for JobQueued {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::SeqCst);
+    }
 }
 struct Worker {
     sender: mpsc::SyncSender<Work>,
     control: Arc<Mutex<lifecycle::Control>>,
     thread: std::thread::JoinHandle<()>,
     busy: Arc<AtomicBool>,
+    /// Set with `busy` while the worker applies recovery rather than a job.
+    recovering: Arc<AtomicBool>,
     recovery_pending: Arc<AtomicBool>,
+    /// Jobs sent and not yet taken up; `busy` covers a job once it is.
+    queued: Arc<AtomicUsize>,
 }
 enum Work {
     Invoke(Box<Job>),
@@ -145,6 +165,8 @@ pub(super) struct Pool {
     incarnation: String,
     stopped: Arc<AtomicBool>,
     shutdown_lock: Mutex<()>,
+    /// Attempts recovery has settled; the owner's idle clock counts only these.
+    settled: Arc<AtomicU64>,
 }
 impl Pool {
     pub fn new(paths: Arc<Paths>, incarnation: String) -> Self {
@@ -155,6 +177,7 @@ impl Pool {
             incarnation,
             stopped: Arc::new(AtomicBool::new(false)),
             shutdown_lock: Mutex::new(()),
+            settled: Arc::new(AtomicU64::new(0)),
         }
     }
     fn send(
@@ -179,12 +202,21 @@ impl Pool {
             let shared = control.clone();
             let stopped = self.stopped.clone();
             let busy = Arc::new(AtomicBool::new(false));
-            let active = busy.clone();
+            let recovering = Arc::new(AtomicBool::new(false));
+            let activity = Activity {
+                busy: busy.clone(),
+                recovering: recovering.clone(),
+                settled: self.settled.clone(),
+            };
             let recovery_pending = Arc::new(AtomicBool::new(false));
             let instance = adapter.instance_id.clone();
             let thread = std::thread::Builder::new()
                 .name("connectors-adapter-owner".into())
-                .spawn(move || worker(paths, launches, shared, stopped, active, instance, receiver))
+                .spawn(move || {
+                    worker(
+                        paths, launches, shared, stopped, activity, instance, receiver,
+                    )
+                })
                 .map_err(|_| Code::Unavailable)?;
             workers.insert(
                 adapter.instance_id.clone(),
@@ -193,7 +225,9 @@ impl Pool {
                     control,
                     thread,
                     busy,
+                    recovering,
                     recovery_pending,
+                    queued: Arc::new(AtomicUsize::new(0)),
                 },
             );
         }
@@ -220,6 +254,7 @@ impl Pool {
                 deadline,
                 reply,
                 epoch: control.epoch,
+                queued: Some(JobQueued::new(&worker.queued)),
             })))
             .map_err(|e| match e {
                 mpsc::TrySendError::Full(_) => Code::Capacity,
@@ -263,7 +298,7 @@ impl Pool {
             // A retained finished thread cannot dispatch or be replaced here.
             let instance = batch.instance.clone();
             let mut absent = None;
-            maintenance::apply(
+            let settled = maintenance::apply(
                 &self.paths,
                 batch,
                 Quiescent {
@@ -272,6 +307,7 @@ impl Pool {
                 },
                 &self.stopped,
             )?;
+            self.settled.fetch_add(settled as u64, Ordering::SeqCst);
         }
         Ok(())
     }
@@ -284,6 +320,49 @@ impl Pool {
             .map_err(|_| Code::Unavailable)?
             .get(&adapter.instance_id)
             .is_none_or(|worker| !worker.busy.load(Ordering::SeqCst)))
+    }
+    /// A job is queued or running, or a child is being started: work that
+    /// restarts the owner's idle clock. Recovery is not included; see `settled`.
+    pub fn working(&self) -> Result<bool> {
+        let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
+        for worker in workers.values() {
+            if (worker.busy.load(Ordering::SeqCst) && !worker.recovering.load(Ordering::SeqCst))
+                || worker.queued.load(Ordering::SeqCst) > 0
+                || worker
+                    .control
+                    .lock()
+                    .map_err(|_| Code::Unavailable)?
+                    .starting
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+    /// How many attempts recovery has settled so far in this owner.
+    pub fn settled(&self) -> u64 {
+        self.settled.load(Ordering::SeqCst)
+    }
+    /// No instance has work in flight: a queued or running job (a child's
+    /// request in flight included), a child being started, or queued recovery.
+    /// A live adapter child with nothing in flight is not work. The owner's
+    /// idle exit reads this; it grants no recovery or lifecycle authority.
+    pub fn quiet(&self) -> Result<bool> {
+        let workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
+        for worker in workers.values() {
+            if worker.busy.load(Ordering::SeqCst)
+                || worker.recovery_pending.load(Ordering::SeqCst)
+                || worker.queued.load(Ordering::SeqCst) > 0
+                || worker
+                    .control
+                    .lock()
+                    .map_err(|_| Code::Unavailable)?
+                    .starting
+            {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
     pub fn automatic(&self, config: &Config) {
         for (alias, adapter) in &config.adapters {
@@ -383,20 +462,27 @@ fn worker(
     launches: Arc<Launches>,
     control: Arc<Mutex<lifecycle::Control>>,
     stopped: Arc<AtomicBool>,
-    busy: Arc<AtomicBool>,
+    activity: Activity,
     instance: String,
     receiver: mpsc::Receiver<Work>,
 ) {
+    let Activity {
+        busy,
+        recovering,
+        settled,
+    } = activity;
     let state = runtime::state::State::new(&paths.state);
     let mut child: Option<runtime::Child> = None;
     let mut selection = String::new();
     for work in receiver {
+        // Marked before `busy`, so that recovery never reads as a job.
+        recovering.store(matches!(work, Work::Recover(..)), Ordering::SeqCst);
         busy.store(true, Ordering::SeqCst);
-        let job = match work {
+        let mut job = match work {
             Work::Invoke(job) => *job,
             Work::Recover(batch, _queued) => {
                 if !stopped.load(Ordering::SeqCst) {
-                    let _ = maintenance::apply(
+                    let applied = maintenance::apply(
                         &paths,
                         batch,
                         Quiescent {
@@ -405,11 +491,15 @@ fn worker(
                         },
                         &stopped,
                     );
+                    settled.fetch_add(applied.unwrap_or(0) as u64, Ordering::SeqCst);
                 }
                 busy.store(false, Ordering::SeqCst);
+                recovering.store(false, Ordering::SeqCst);
                 continue;
             }
         };
+        // `busy` now covers this job; it is no longer queued.
+        drop(job.queued.take());
         let result = (|| {
             until(job.deadline)?;
             if stopped.load(Ordering::SeqCst) {
@@ -819,6 +909,13 @@ fn worker(
     }
 }
 
+/// A worker's markers, shared with the pool.
+struct Activity {
+    busy: Arc<AtomicBool>,
+    recovering: Arc<AtomicBool>,
+    settled: Arc<AtomicU64>,
+}
+
 #[cfg(test)]
 mod maintenance_tests {
     use super::*;
@@ -846,7 +943,9 @@ mod maintenance_tests {
                 thread,
                 control: Arc::new(Mutex::new(lifecycle::Control::default())),
                 busy: Arc::new(AtomicBool::new(false)),
+                recovering: Arc::new(AtomicBool::new(false)),
                 recovery_pending: queued.clone(),
+                queued: Arc::new(AtomicUsize::new(0)),
             },
         );
         let reference = crate::local::mutations::AttemptRef {
@@ -865,8 +964,10 @@ mod maintenance_tests {
             Err(mpsc::TryRecvError::Empty)
         ));
         assert!(queued.load(Ordering::SeqCst));
+        assert!(!pool.quiet().unwrap(), "queued recovery is work");
         drop(token);
         assert!(!queued.load(Ordering::SeqCst));
+        assert!(pool.quiet().unwrap());
         pool.recover(batch()).unwrap();
         assert!(matches!(receiver.try_recv(), Ok(Work::Recover(_, _))));
         assert!(!root.path().join("unopened-state").exists());
@@ -933,6 +1034,92 @@ mod suppression_tests {
         ];
         for task in &passive {
             assert!(!resumes_suppression(task));
+        }
+    }
+}
+
+#[cfg(test)]
+mod idle_tests {
+    use super::*;
+    use crate::local::config::{Executable, Startup};
+    use sha2::{Digest, Sha256};
+
+    /// story:owner-idle-exit: a live adapter child with nothing in flight is
+    /// not work, so an `Automatic` adapter cannot keep an owner alive; a job in
+    /// flight is. The owner's retirement stops the idle child through the same
+    /// `shutdown` a shutdown request uses.
+    #[test]
+    fn a_live_idle_child_leaves_the_pool_quiet_and_a_request_in_flight_does_not() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        Config::initialize(&paths).unwrap();
+        let mut config = Config::load(&paths.config).unwrap();
+        let path = std::env::current_exe().unwrap();
+        let sha256 = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
+        let adapter = Adapter {
+            instance_id: "fixture".into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "fixture-config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(runtime::PrivateProtocol::V2),
+            startup: Startup::Automatic,
+            restart: Default::default(),
+            permissions: Default::default(),
+            executable: Executable {
+                path,
+                sha256,
+                args: vec![
+                    "--exact".into(),
+                    "local::runtime::process::write_tests::fixture".into(),
+                    "--".into(),
+                    "write-mode=idle".into(),
+                    format!("write-root={}", root.path().display()),
+                ],
+            },
+        };
+        config.adapters.insert("fixture".into(), adapter);
+        std::fs::write(&paths.config, toml::to_string(&config).unwrap()).unwrap();
+        let pool = Pool::new(Arc::new(paths), uuid::Uuid::new_v4().to_string());
+        pool.automatic(&config);
+
+        // The automatic start is work until its child is ready and the job ends.
+        let until = Instant::now() + Duration::from_secs(20);
+        let (handle, busy) = loop {
+            let ready = {
+                let workers = pool.workers.lock().unwrap();
+                workers.get("fixture").and_then(|worker| {
+                    let control = worker.control.lock().unwrap();
+                    let child = control.child.as_ref()?;
+                    (!worker.busy.load(Ordering::SeqCst) && !control.starting)
+                        .then(|| (child.handle.try_clone().unwrap(), worker.busy.clone()))
+                })
+            };
+            if let Some(ready) = ready {
+                break ready;
+            }
+            assert!(
+                Instant::now() < until,
+                "the automatic child never became ready"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert!(!lifecycle::exited(&handle).unwrap(), "the child is live");
+        assert!(pool.quiet().unwrap(), "a live idle child is not work");
+
+        // `busy` is the worker's in-flight marker for a job's whole duration.
+        busy.store(true, Ordering::SeqCst);
+        assert!(!pool.quiet().unwrap(), "a request in flight is work");
+        busy.store(false, Ordering::SeqCst);
+        assert!(pool.quiet().unwrap());
+
+        pool.shutdown().unwrap();
+        let until = Instant::now() + Duration::from_secs(5);
+        while !lifecycle::exited(&handle).unwrap() {
+            assert!(Instant::now() < until, "the idle child outlived shutdown");
+            std::thread::sleep(Duration::from_millis(20));
         }
     }
 }

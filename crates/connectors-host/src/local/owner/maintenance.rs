@@ -33,10 +33,13 @@ impl ledger::Clock for RecoveryClock {
 pub(super) struct Background {
     stop: Option<mpsc::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
+    sweeping: Arc<AtomicBool>,
 }
 impl Background {
     pub fn start(paths: Arc<Paths>, pool: Arc<supervisor::Pool>) -> Result<Self> {
         let (stop, receiver) = mpsc::channel();
+        let sweeping = Arc::new(AtomicBool::new(false));
+        let active = sweeping.clone();
         let thread = std::thread::Builder::new()
             .name("connectors-mutation-recovery".into())
             .spawn(move || {
@@ -47,14 +50,22 @@ impl Background {
                 ) {
                     // A failed pass supplies no retry authority. The next pass
                     // must obtain fresh positive pending references from SQLite.
-                    let _ = sweep(&paths, &pool, &mut scan);
+                    let _ = sweep(&paths, &pool, &mut scan, &active);
+                    active.store(false, Ordering::SeqCst);
                 }
             })
             .map_err(|_| Code::Unavailable)?;
         Ok(Self {
             stop: Some(stop),
             thread: Some(thread),
+            sweeping,
         })
+    }
+    /// Whether a pass is recovering pending attempts now; a pass that found
+    /// nothing pending never sets this. Work a pass hands to an instance worker
+    /// is reported by the supervisor, not here.
+    pub fn busy(&self) -> bool {
+        self.sweeping.load(Ordering::SeqCst)
     }
     pub fn stop(mut self) -> Result<()> {
         self.finish()
@@ -73,7 +84,12 @@ impl Drop for Background {
     }
 }
 
-fn sweep(paths: &Paths, pool: &supervisor::Pool, scan: &mut ledger::PendingScan) -> Result<()> {
+fn sweep(
+    paths: &Paths,
+    pool: &supervisor::Pool,
+    scan: &mut ledger::PendingScan,
+    recovering: &AtomicBool,
+) -> Result<()> {
     let store = ledger::Store::new(&paths.state, RecoveryClock(None), ledger::Limits::default())
         .map_err(|_| Code::MetadataUnavailable)?;
     let pending = store
@@ -82,6 +98,7 @@ fn sweep(paths: &Paths, pool: &supervisor::Pool, scan: &mut ledger::PendingScan)
     let Some(first) = pending.first() else {
         return Ok(());
     };
+    recovering.store(true, Ordering::SeqCst);
     // The scan has closed every metadata handle before this network exchange.
     let clock = if pending
         .iter()
@@ -106,12 +123,14 @@ fn sweep(paths: &Paths, pool: &supervisor::Pool, scan: &mut ledger::PendingScan)
     })
 }
 
+/// Returns how many attempts this batch settled, i.e. moved out of a pending
+/// state. The owner's idle clock counts only those as work.
 pub(super) fn apply(
     paths: &Paths,
     batch: Batch,
     quiescent: supervisor::Quiescent<'_>,
     stopped: &AtomicBool,
-) -> Result<()> {
+) -> Result<usize> {
     if batch.instance != quiescent.instance() || batch.references.len() > 64 {
         return Err(Code::LifecycleConflict.into());
     }
@@ -132,18 +151,26 @@ pub(super) fn apply(
         ledger::Limits::default(),
     )
     .map_err(|_| Code::MetadataUnavailable)?;
+    let mut settled = 0;
     for reference in batch.references {
         if stopped.load(Ordering::SeqCst) || Instant::now() >= until {
             break;
         }
-        if store
-            .recover_for_instance(reference, &batch.instance)
-            .is_err()
-        {
+        let observed = match store.recover_for_instance(reference, &batch.instance) {
+            Ok(observed) => Some(observed),
             // One authoritative observation after an uncertain acknowledgement,
             // never a retry inside this batch or a provider send receipt.
-            let _ = store.observe(reference);
+            Err(_) => store.observe(reference).ok(),
+        };
+        // The scan returned it pending; a settled observation is a change.
+        if observed.is_some_and(|observed| {
+            !matches!(
+                observed.state,
+                ledger::State::Prepared | ledger::State::Dispatching
+            )
+        }) {
+            settled += 1;
         }
     }
-    Ok(())
+    Ok(settled)
 }
