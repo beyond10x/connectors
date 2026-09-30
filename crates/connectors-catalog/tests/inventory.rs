@@ -275,3 +275,133 @@ fn a_servers_override_is_named_and_not_recorded_under_the_document_base() {
         );
     }
 }
+
+/// One operation whose query parameters cover every array shape this pass
+/// reads, beside a scalar and a header array that must stay as they were.
+fn array_document() -> serde_json::Value {
+    let query = |name: &str, schema: serde_json::Value| json!({"name": name, "in": "query", "schema": schema});
+    json!({
+        "openapi": "3.1.0",
+        "paths": {"/messages": {"get": {
+            "operationId": "listMessages",
+            "parameters": [
+                query("labelIds", json!({"type": "array", "items": {"type": "string"}})),
+                {"name": "eventTypes", "in": "query", "style": "form", "explode": true,
+                 "schema": {"type": "array", "items": {"type": "integer"}}},
+                query("nullable", json!({"type": ["array", "null"], "items": {"type": "boolean"}})),
+                query("untyped", json!({"type": "array", "items": {"$ref": "#/components/schemas/Id"}})),
+                query("q", json!({"type": "string"})),
+                {"name": "joined", "in": "query", "style": "form", "explode": false,
+                 "schema": {"type": "array", "items": {"type": "string"}}},
+                {"name": "spaced", "in": "query", "style": "spaceDelimited",
+                 "schema": {"type": "array", "items": {"type": "string"}}},
+                {"name": "piped", "in": "query", "style": "pipeDelimited", "explode": true,
+                 "schema": {"type": "array", "items": {"type": "string"}}},
+                {"name": "trace", "in": "header", "schema": {"type": "array", "items": {"type": "string"}}}
+            ],
+            "responses": {}
+        }}}
+    })
+}
+
+#[test]
+fn inventory_marks_form_explode_array_repeated() {
+    use connectors_catalog::inventory::ValueType;
+    let inventory = extract(&array_document());
+    let parameters = &inventory.operations[0].parameters;
+    let shape = |name: &str| {
+        let parameter = parameters
+            .iter()
+            .find(|p| p.name == name)
+            .unwrap_or_else(|| panic!("`{name}` is inventoried"));
+        (parameter.repeated, parameter.value_type)
+    };
+    // `style` and `explode` absent are OpenAPI's query defaults: form, exploded.
+    assert_eq!(shape("labelIds"), (true, Some(ValueType::String)));
+    assert_eq!(shape("eventTypes"), (true, Some(ValueType::Integer)));
+    assert_eq!(shape("nullable"), (true, Some(ValueType::Boolean)));
+    // Repeated, with elements of no type this model carries.
+    assert_eq!(shape("untyped"), (true, None));
+    assert_eq!(shape("q"), (false, Some(ValueType::String)));
+    // Arrays outside the query are out of this pass: recorded as they were.
+    assert_eq!(shape("trace"), (false, None));
+    // A parameter that is not repeated serialises without the field, so a
+    // bundle with no repeated parameter keeps its bytes; one that is says so.
+    let serialised = serde_json::to_value(parameters).unwrap();
+    let by_name = |name: &str| {
+        serialised
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == name)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(
+        by_name("q"),
+        json!({"name": "q", "location": "query", "required": false, "type": "string"})
+    );
+    assert_eq!(by_name("labelIds")["repeated"], json!(true));
+    assert_eq!(by_name("labelIds")["type"], json!("string"));
+    let back: Vec<connectors_catalog::inventory::Parameter> =
+        serde_json::from_value(serialised).unwrap();
+    assert_eq!(&back, parameters);
+}
+
+#[test]
+fn inventory_records_unsupported_array_style() {
+    let inventory = extract(&array_document());
+    let parameters = &inventory.operations[0].parameters;
+    for name in ["joined", "spaced", "piped"] {
+        let parameter = parameters
+            .iter()
+            .find(|p| p.name == name)
+            .unwrap_or_else(|| panic!("`{name}` stays inventoried"));
+        // Kept as the scalar it was read as before: a caller that sends the
+        // joined string itself is not refused by this pass.
+        assert!(!parameter.repeated, "{name}");
+        assert_eq!(parameter.value_type, None, "{name}");
+    }
+    let reasons: Vec<(&str, &str)> = inventory
+        .unsupported
+        .iter()
+        .map(|u| (u.designation.as_str(), u.reason.as_str()))
+        .collect();
+    assert_eq!(reasons.len(), 3, "{reasons:?}");
+    for (name, shape) in [
+        ("joined", "style `form`, explode false"),
+        ("spaced", "style `spaceDelimited`, explode false"),
+        ("piped", "style `pipeDelimited`, explode true"),
+    ] {
+        assert!(
+            reasons.iter().any(|(d, r)| *d == "listMessages"
+                && r.contains(&format!("`{name}`"))
+                && r.contains(shape)),
+            "{name}: {reasons:?}"
+        );
+    }
+}
+
+#[test]
+fn an_overridden_array_parameter_records_no_gap_for_the_declaration_it_replaced() {
+    let document = json!({
+        "openapi": "3.1.0",
+        "paths": {"/messages": {
+            "parameters": [{"name": "labelIds", "in": "query", "explode": false,
+                            "schema": {"type": "array", "items": {"type": "string"}}}],
+            "get": {
+                "operationId": "listMessages",
+                "parameters": [{"name": "labelIds", "in": "query",
+                                "schema": {"type": "array", "items": {"type": "string"}}}],
+                "responses": {}
+            }
+        }}
+    });
+    let inventory = extract(&document);
+    assert!(
+        inventory.unsupported.is_empty(),
+        "{:?}",
+        inventory.unsupported
+    );
+    assert!(inventory.operations[0].parameters[0].repeated);
+}
