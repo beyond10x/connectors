@@ -192,13 +192,13 @@ impl Fixture {
                 "api_base": format!("https://localhost:{}/rest/api/3", address.port()),
                 "ca_file": ca,
                 "auth": {
-                    "profile": "jira.basic",
+                    "profile": "atlassian.basic",
                     "scheme": "basic",
                     "header": "Authorization",
                     "bearer": false,
                     "account_label": "Account email",
                     "label": "API token",
-                    "identity": {"path": "myself", "kind": "jira.user", "subject_pointer": "/accountId"}
+                    "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
                 },
                 "operations_file": root().join("providers/jira/operations.json").canonicalize().unwrap(),
             }))
