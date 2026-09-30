@@ -1,0 +1,51 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {
+    "/things/{thingId}": {
+      "delete": {
+        "operationId": "fixture.things.delete",
+        "parameters": [
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      },
+      "get": {
+        "operationId": "fixture.things.get",
+        "parameters": [
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/Thing"}}
+            }
+          }
+        }
+      }
+    },
+    "/things/{thingId}/download": {
+      "get": {
+        "operationId": "fixture.things.download",
+        "parameters": [
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Thing": {"type": "object", "properties": {"name": {"type": "string"}}}
+    }
+  }
+}

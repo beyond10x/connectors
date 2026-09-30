@@ -1,0 +1,20 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 5,
+  "operations": ["fixture.others.get", "fixture.things.delete", "fixture.things.get"],
+  "excluded_methods": [
+    {
+      "id": "fixture.others.delete",
+      "reason": "path `/others/{b}` differs from the projected `/others/{a}` only in parameter names, which OpenAPI 3.0.3 does not admit"
+    },
+    {
+      "id": "fixture.things.patch",
+      "reason": "path `/things/{name}` differs from the projected `/things/{thingId}` only in parameter names, which OpenAPI 3.0.3 does not admit"
+    }
+  ],
+  "rewritten_paths": [],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [],
+  "ignored_keys": []
+}

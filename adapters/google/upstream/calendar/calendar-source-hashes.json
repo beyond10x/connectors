@@ -1,0 +1,9 @@
+[
+  {
+    "file": "calendar-api.json",
+    "url": "https://raw.githubusercontent.com/googleapis/google-api-go-client/ec13a0cd76ecc7fede8932d040a3156804515da9/calendar/v3/calendar-api.json",
+    "sha256": "ae11869097c421ddd12e16b6cd4710ed7500379bbf669957b7014efb5b3a2698",
+    "bytes": 169809,
+    "archive": "vendor/calendar-api.json.gz"
+  }
+]

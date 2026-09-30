@@ -1,0 +1,35 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "create": {
+          "id": "fixture.things.create",
+          "path": "things",
+          "httpMethod": "POST",
+          "request": {"$ref": "Thing"},
+          "response": {"$ref": "Thing"},
+          "supportsMediaUpload": true,
+          "mediaUpload": {
+            "accept": ["*/*"],
+            "maxSize": "10GB",
+            "protocols": {
+              "simple": {"multipart": true, "path": "/upload/fixture/v1/things"},
+              "resumable": {"multipart": true, "path": "/resumable/upload/fixture/v1/things"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Thing": {"id": "Thing", "type": "object", "properties": {"name": {"type": "string"}}}
+  }
+}

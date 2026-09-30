@@ -1,0 +1,41 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "",
+  "methods": {
+    "batchGet": {"id": "fixture.batchGet", "path": "fixture/v1:batchGet", "httpMethod": "GET"}
+  },
+  "resources": {
+    "users": {
+      "methods": {
+        "getProfile": {
+          "id": "fixture.users.getProfile",
+          "path": "fixture/v1/users/{userId}/profile",
+          "httpMethod": "GET",
+          "parameters": {"userId": {"type": "string", "location": "path", "required": true, "default": "me"}}
+        }
+      },
+      "resources": {
+        "settings": {
+          "resources": {
+            "filters": {
+              "methods": {
+                "list": {
+                  "id": "fixture.users.settings.filters.list",
+                  "path": "fixture/v1/users/{userId}/settings/filters",
+                  "httpMethod": "GET",
+                  "parameters": {"userId": {"type": "string", "location": "path", "required": true}}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
