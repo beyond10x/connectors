@@ -145,17 +145,21 @@ below. Writes run on a separate write instance with the write scope; see
 | id | Discovery id | request | guard | beyond the event's own fields |
 |---|---|---|---|---|
 | `events.insert` | `calendar.events.insert` | `POST /calendar/v3/calendars/{calendarId}/events` with an Event `body` | none; the approval binds the whole body | every guest in `body.attendees` is invited; `body.guestsCanModify` lets guests change the event; `body.guestsCanInviteOthers` and `body.guestsCanSeeOtherGuests` default to true; `body.visibility` `public` shows its details to every reader of the calendar; with `conferenceDataVersion` 1, `body.conferenceData.createRequest` creates a new conference; `body.recurrence` makes a series; an `autoDeclineMode` other than `declineNone` in `body.outOfOfficeProperties` or `body.focusTimeProperties` declines conflicting invitations |
-| `events.patch` | `calendar.events.patch` | `PATCH /calendar/v3/calendars/{calendarId}/events/{eventId}` with a partial Event `body` | preflight `events.get`: `/etag` equals the input `etag` | a given field replaces the stored one, so `body.attendees` replaces the whole guest list, removing a guest left out and inviting one added; the guest rights, `body.visibility`, `body.conferenceData` and `body.recurrence` as for insert; the id of a recurring event changes the whole series |
-| `events.delete` | `calendar.events.delete` | `DELETE /calendar/v3/calendars/{calendarId}/events/{eventId}` | preflight `events.get`: `/etag` equals the input `etag` | the id of a recurring event deletes the whole series; guests may be sent a cancellation |
+| `events.patch` | `calendar.events.patch` | `PATCH /calendar/v3/calendars/{calendarId}/events/{eventId}` with a partial Event `body` | preflight `events.get`: `/status` is `confirmed` and `/etag` equals the input `etag` | a given field replaces the stored one, so `body.attendees` replaces the whole guest list, removing a guest left out and inviting one added; the guest rights, `body.visibility`, `body.conferenceData` and `body.recurrence` as for insert; the id of a recurring event changes the whole series |
+| `events.delete` | `calendar.events.delete` | `DELETE /calendar/v3/calendars/{calendarId}/events/{eventId}` | preflight `events.get`: `/status` is `confirmed` and `/etag` equals the input `etag` | the id of a recurring event deletes the whole series; guests may be sent a cancellation |
 
 - **`sendUpdates`** decides whom Google emails about the write: `all`,
   `externalOnly` (guests not on Google Calendar) or `none`. Name it in every
-  write input. The pinned document gives no default for patch and delete; for
-  insert it says the default is false and that some emails might still be sent,
-  and it warns that `none` "can have significant adverse effects, including
-  events not syncing to external calendars or events being lost altogether for
-  some users". The deprecated `sendNotifications` is accepted too; do not send
-  both.
+  write input. Each write's selection requires it, so an input without it is
+  refused as `invalid_input` before any request, and an approved input always
+  says whom Google emails. The pinned document gives no default for patch and
+  delete; for insert it says the default is false and that some emails might
+  still be sent, and it warns that `none` "can have significant adverse
+  effects, including events not syncing to external calendars or events being
+  lost altogether for some users". The deprecated `sendNotifications` is
+  accepted too, and nothing refuses an input that names both: both are sent,
+  and the pinned document does not say which one Google obeys when they
+  disagree. Do not send both.
 - **`events.insert` carries no guard.** Nothing exists to compare before a
   create, and a guard compares a value read before the write for equality only.
   The approval, bound to the whole body, is its only check. The same input
@@ -176,17 +180,33 @@ below. Writes run on a separate write instance with the write scope; see
   Google's event ETags are quoted strings, and the quotes are part of the
   value: pin it exactly as read. The `etag` is compared, never sent to Google.
   Before the write the provider sends one `events.get` for `calendarId` and
-  `eventId`, and refuses before any write unless the answer's `etag` equals
-  the input's; the attempt is then `not_attempted`. An input without `etag`, or
-  with an object, an array or `null` as its `etag`, is refused as
-  `invalid_input` before any request. An event the preflight cannot find — a `404`, or a `410`
-  for an event Google has deleted — is refused with no write sent.
+  `eventId`, and refuses before any write unless the answer's `status` is
+  `confirmed` and its `etag` equals the input's; the attempt is then
+  `not_attempted`. An input without `etag`, or with an object, an array or
+  `null` as its `etag`, is refused as `invalid_input` before any request.
+- **Only confirmed events are written.** The pinned document says a deleted
+  event keeps being answered with `status` `cancelled` ("The get method always
+  returns them"), and `events.list` returns such events on an incremental sync
+  or with `showDeleted`, each with an `etag` a caller could pin. The `status`
+  check refuses a patch or delete of a cancelled event with no write sent. It
+  refuses a `tentative` event too: an event whose `status` is `tentative`
+  cannot be changed or deleted through these selections, and a cancelled one
+  cannot be restored by a patch. A preflight Google answers `404` or `410` is
+  refused with no write sent as well.
 - **Patch semantics.** The pinned document says `events.patch` "supports patch
   semantics": the fields given in `body` change and the others stay. Google's
   [performance guide](https://developers.google.com/workspace/calendar/api/guides/performance)
   documents that an array given in a patch replaces the stored array, so
   `body.attendees` must list every guest who should remain. That is Google's
   stated behaviour, not verified here against a live calendar.
+- **A truncated guest list.** `events.get` and `events.list` take
+  `maxAttendees`; the pinned document says that when an event has more
+  attendees than that, "only the participant is returned", and the answer sets
+  `attendeesOmitted`. A `body.attendees` built from such a read lists only the
+  caller, and the patch then removes every other guest. The guard does not
+  catch it: the preflight reads the event in full and compares only `status`
+  and `etag`. Before patching `attendees`, read the event without
+  `maxAttendees` and check that `attendeesOmitted` is not `true`.
 - **Recurring events.** The id of a recurring event names the series: a patch
   or delete of it changes or deletes every instance. An instance returned by
   `events.list` with `singleEvents` has its own id, and a write to that id
@@ -308,11 +328,13 @@ same instance is refused while the old one exists.
   configuration, through the host's prepare/commit exchange: the exact request
   and body of each write with `sendUpdates` in the query, the `events.get`
   preflight, a stale, missing or unquoted `etag` refused with no write sent, a
-  `404` or `410` preflight refused with no write sent, a delete's empty answer
-  returned as `null`, and a read-only grant refused by the write
-  configuration's validation. The approval binding, `sendUpdates` included, is
-  verified with the host's approval signer and verifier against a subject
-  built from the provider's descriptor, not through the CLI and owner. No live
+  `404` or `410` preflight, or a cancelled or tentative event, refused with no
+  write sent, a write without `sendUpdates` refused before any request, a
+  delete's empty answer returned as `null`, and a read-only grant refused by
+  the write configuration's validation. The approval binding, `sendUpdates`
+  included, is verified with the host's approval signer and verifier against a
+  subject built from the provider's descriptor, not through the CLI and owner.
+  No live
   event has been created, changed or deleted, and no email to a guest has been
   observed.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
