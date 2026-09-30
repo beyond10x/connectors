@@ -7,6 +7,15 @@
     {"id": "presentations.pages.get", "operation_id": "slides.presentations.pages.get", "effect": "read",
      "description": "Read one page of a presentation by presentationId and pageObjectId, with its page elements"},
     {"id": "presentations.pages.getThumbnail", "operation_id": "slides.presentations.pages.getThumbnail", "effect": "read",
-     "description": "Read a page thumbnail's contentUrl, width and height; the image behind contentUrl is not fetched. contentUrl gives anyone holding it the requester's access to the image for about 30 minutes: treat it as a credential and do not log or share it"}
+     "description": "Read a page thumbnail's contentUrl, width and height; the image behind contentUrl is not fetched. contentUrl gives anyone holding it the requester's access to the image for about 30 minutes: treat it as a credential and do not log or share it"},
+    {"id": "presentations.create", "operation_id": "slides.presentations.create", "effect": "write",
+     "description": "Create a blank presentation from the body's title, and presentationId if one is given; Google ignores every other body field. Unguarded: nothing exists to compare before a create"},
+    {"id": "presentations.batchUpdate", "operation_id": "slides.presentations.batchUpdate", "effect": "write",
+     "description": "Apply body.requests atomically to a presentation whose current revisionId equals the pinned body.writeControl.requiredRevisionId, which is required; Google checks that revision again when it applies them",
+     "guard": {
+       "preflight": {"operation_id": "slides.presentations.get",
+                     "values": {"presentationId": "presentationId"},
+                     "checks": [{"pointer": "/revisionId", "expect": {"input": "body.writeControl.requiredRevisionId"}}]},
+       "postflight": {"checks": [{"pointer": "/presentationId", "expect": {"input": "presentationId"}}]}}}
   ]
 }

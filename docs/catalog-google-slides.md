@@ -1,11 +1,13 @@
 # Google Slides through the catalog provider
 
 The catalog provider reads the structure of Google Slides presentations — the
-presentation, one page, and a page's thumbnail URL — from the pinned Google
-Slides API v1 Discovery document. Nothing here is Slides-specific code: the
-Discovery document is projected into OpenAPI, the projection is compiled into a
-bundle, a reviewed selection set exposes three reads, and the engine described
-in [the catalog provider guide](local-catalog-provider.md) binds and sends them.
+presentation, one page, and a page's thumbnail URL — and creates and updates
+presentations under approval, from the pinned Google Slides API v1 Discovery
+document. Nothing here is Slides-specific code: the Discovery document is
+projected into OpenAPI, the projection is compiled into a bundle, a reviewed
+selection set exposes three reads and two guarded writes, and the engine
+described in [the catalog provider guide](local-catalog-provider.md) binds and
+sends them.
 Configuration, connection, approval and invocation work as described there; this
 page covers what differs for Slides. Authentication is the `oauth2_refresh`
 profile `google.oauth`, as for [Google Drive](catalog-google-drive.md); see
@@ -50,12 +52,13 @@ reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/google-slides/operations.json`](../adapters/catalog/providers/google-slides/operations.json)
-exposes three reads and nothing else. Each is `effect: read`; the document's two
-writes (`presentations.create`, `presentations.batchUpdate`) are not selected. A
-selection id is the Discovery method id without its `slides.` prefix.
-`adapters/catalog/tests/google_slides.rs` pins this exact id list and each id's
-Discovery id and path, so a renamed or dropped id, or a method that moved, fails
-the gate. The bundle refuses at load any `operation_id` the projection lacks.
+exposes three reads and the document's two writes, and nothing else. The reads
+are `effect: read`; `presentations.create` and `presentations.batchUpdate` are
+`effect: write` (see [Writes](#writes)). A selection id is the Discovery method
+id without its `slides.` prefix. `adapters/catalog/tests/google_slides.rs` pins
+this exact id list and each id's Discovery id, path and effect, so a renamed or
+dropped id, or a method that moved, fails the gate. The bundle refuses at load
+any `operation_id` the projection lacks.
 
 The provider returns `status`, `body` and `provenance`; `body` is the Slides
 answer unchanged. None of the three reads is paged.
@@ -94,6 +97,49 @@ selector: for example
 lists the slide ids only, and each slide can then be read with
 `presentations.pages.get`.
 
+## Writes
+
+| id | Discovery id | request | guard |
+|---|---|---|---|
+| `presentations.create` | `slides.presentations.create` | `POST /v1/presentations` | none |
+| `presentations.batchUpdate` | `slides.presentations.batchUpdate` | `POST /v1/presentations/{presentationId}:batchUpdate` | preflight `presentations.get`: `revisionId` must equal the body's `writeControl.requiredRevisionId` |
+
+Both are required-approval mutations, like every catalog write: select
+`private_protocol = "connectors-private/2"`, permit them in the adapter's
+operation permissions, name them in the approval policy, and invoke each with a
+proof issued for its exact input, as the
+[guarded merge guide](local-gitlab-merge.md) walks through for GitLab. The
+approval subject carries the digest of the whole input, `body` included, so a
+proof issued for one body is refused for any other. A write offered without an
+approval is refused before the provider sends anything.
+
+- **`presentations.create`** takes a `body` and nothing else. The pinned
+  document says Google uses only its `title` and, if given, its
+  `presentationId`, and ignores every other field. It carries no guard: there is
+  nothing to compare before a presentation exists. Media upload is not
+  projected; the body is JSON metadata only.
+- **`presentations.batchUpdate`** takes `presentationId` and a `body` with
+  `requests` and `writeControl.requiredRevisionId`. Read the current
+  `revisionId` with `presentations.get` (narrowed with
+  `{"fields": "revisionId"}`) and pin it there:
+
+  ```json
+  {"presentationId": "<id>", "body": {"requests": [{"createSlide": {}}], "writeControl": {"requiredRevisionId": "<revisionId>"}}}
+  ```
+
+  An input that pins no revision is refused before any Slides request.
+  Otherwise the provider reads the presentation once and, when its
+  `revisionId` differs from the pinned one, refuses with no POST sent. Google checks `requiredRevisionId` again when it applies the
+  requests, and applies them all or none. After the POST the acknowledgement's
+  `presentationId` must equal the input's; otherwise the outcome is reported as
+  unknown, never as refused.
+- The preflight reads the whole presentation, with no `fields`, so it is subject
+  to the 4 MiB response limit: a presentation whose full answer exceeds it
+  cannot be updated through this selection, and the write is refused before
+  dispatch. The pinned document says `revisionId` is populated only for a user
+  with edit access; without it the preflight answer carries no revision and the
+  write is refused before dispatch.
+
 ## Authentication
 
 Slides uses Google OAuth: the `oauth2_refresh` scheme under the profile
@@ -107,6 +153,17 @@ identity comes from the token answer's `id_token` (`identity.source: id_token`).
 accepts for all three reads. `authorize_url` and `requested_scopes` are never
 called by the provider; they are handed to the host for obtaining the entry by
 consent.
+
+The read-only scope does not cover the writes. The pinned document accepts
+`https://www.googleapis.com/auth/presentations` for both, and
+not `presentations.readonly`. An instance that writes names
+`https://www.googleapis.com/auth/presentations` in both `minimum_scopes` and
+`requested_scopes`; it grants the reads too. With that configuration, a stored
+refresh token that was granted only the read-only scope fails validation as
+insufficient scope, and the CLI reports `next_action: repair_connection`. Add the
+write scope to an existing connection with `connections repair`, supplying an
+entry whose refresh token was granted the write scope; the Google identity must
+stay the same.
 
 ```json
 {
@@ -139,6 +196,12 @@ consent.
   read with the exchanged bearer, the returned body as JSON, and a `/` in every
   path parameter sent as one escaped segment. No live presentation has been
   read; live evidence belongs to `story:catalog-google-live-deck-read`.
+- The writes are verified against the same fixture through the host's
+  prepare/commit exchange: the preflight read, a stale or missing pinned
+  revision refused with no POST, and the exact POST body. The approval binding
+  is verified with the host's approval signer and verifier against a subject
+  built from the provider's descriptor, not through the CLI and owner. No live
+  presentation has been created or changed.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Google's exact bytes.
 - The provider does not retry on `429`; a rate-limited read is returned as a
