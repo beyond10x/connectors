@@ -111,6 +111,11 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         ReadinessMismatch => ("readiness", "check_configuration", false),
         IncarnationMismatch => ("stop", "retry_status", false),
         StaleDescription | DescriptionUnavailable => ("observation", "refresh_description", false),
+        // The provider refused the stored credential itself, such as an OAuth
+        // refresh token that was revoked: a retry cannot succeed, a repair can.
+        ServiceFailure if error.service_code == Some(connectors_core::ErrorCode::Unauthorized) => {
+            ("dispatch", "repair_connection", false)
+        }
         ServiceFailure => ("dispatch", "retry_explicitly", false),
         OwnerBuildMismatch => ("readiness", "stop_owner", false),
     };
