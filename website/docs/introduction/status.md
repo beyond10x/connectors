@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.19.0
+# Source release v0.20.0
 
-Version **0.19.0** specifies at ESS source format `ess/15` with the released
+Version **0.20.0** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -30,7 +30,8 @@ document. [Confluence Cloud](https://github.com/beyond10x/connectors/blob/main/d
 runs the same way from its pinned REST v2 document: pages changed since a cutoff,
 a space's pages, one page with its body and a page's comments. Both share one
 Atlassian auth profile, `atlassian.basic`, so one account and API token serve both.
-Both have been exercised against local fixtures only, not a live site.
+Jira has answered live through the Atlassian API gateway (`request_prefix`, since 0.20.0) with a
+service-account token; Confluence has been exercised against local fixtures only.
 [HubSpot CRM](https://github.com/beyond10x/connectors/blob/main/docs/catalog-hubspot.md)
 runs from its pinned CRM Objects `2026-09` document with a private-app access token:
 one object type's records, paged, and one record by id, for contacts, companies,
