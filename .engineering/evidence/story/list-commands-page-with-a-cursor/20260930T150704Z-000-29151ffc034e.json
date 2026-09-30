@@ -1,0 +1,14 @@
+{
+  "at": "2026-09-30T15:07:04Z",
+  "actor": "human:timo",
+  "artifact": "story:list-commands-page-with-a-cursor",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-list-paging-pass-1",
+    "review": "review-result:adversary-list-paging-pass-1",
+    "outcome": "fixed"
+  }
+}

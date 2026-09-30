@@ -3,7 +3,7 @@
     {
       "provider": "confluence",
       "file_name": "confluence.bundle.json",
-      "bundle_sha256": "ca11d2e5c755faf7815dbfa3e27ee7cb2bd0abfc99cef568fdb759cf06362281",
+      "bundle_sha256": "9ecf9453b051988f4e09016807406813b7392f4301abb6d346cbff4bae7877de",
       "source_sha256": "edb639bbc700ee451a996acd2568e51db4ceab954449427537df30f0ce20ca08",
       "operations": 218,
       "unsupported": 30
@@ -11,7 +11,7 @@
     {
       "provider": "gitlab",
       "file_name": "gitlab.bundle.json",
-      "bundle_sha256": "20c8d99532de7dc287dba318ce42c97adbc8b612451ff1e2c3063935d8e15773",
+      "bundle_sha256": "da458f3b69bf4634579d61482fa020733ef888c5d7de63cbb0e097b3685bd127",
       "source_sha256": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530",
       "operations": 1847,
       "unsupported": 0
@@ -19,7 +19,7 @@
     {
       "provider": "google-drive",
       "file_name": "google-drive.bundle.json",
-      "bundle_sha256": "3d6fe6964b33d07d588749a014c1c7446ffe5809d684e457814957d36320f679",
+      "bundle_sha256": "94544f04b1ccb0875d0aff39656c386f7dcc5b6abe4f4f75371f2330b7b49c43",
       "source_sha256": "571c8d820490b340459d29fa532b1d814406ba00c7d5d97f83d9b4e362cbea8b",
       "operations": 64,
       "unsupported": 0
@@ -27,7 +27,7 @@
     {
       "provider": "google-slides",
       "file_name": "google-slides.bundle.json",
-      "bundle_sha256": "5a360c3094af8533e1906c9b5ed73cedb8cbbbc25680f24241172093b0409211",
+      "bundle_sha256": "b85ad83010b6a95a44fe0baf11406dbc5193d91126f0dfb6f201f2a08774d1ba",
       "source_sha256": "0ff83829831cbba4aaa7f364cf25697c75e7eb33df48ceec1492f19b1882c46e",
       "operations": 5,
       "unsupported": 0
@@ -35,7 +35,7 @@
     {
       "provider": "hubspot",
       "file_name": "hubspot.bundle.json",
-      "bundle_sha256": "23aafb8c8d1c70908076b513aec0394fb528a464974b5f16e7c58d254e67d2cb",
+      "bundle_sha256": "4e1645bb9569e95f296538fdbc6d6651f68ac247abb2858cb607122a25db80e7",
       "source_sha256": "1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9",
       "operations": 11,
       "unsupported": 0
@@ -43,7 +43,7 @@
     {
       "provider": "jira",
       "file_name": "jira.bundle.json",
-      "bundle_sha256": "56c1ad99046e00132bbdfaefec86cc702e1096ce7571ccb6b13454493dbc7dd4",
+      "bundle_sha256": "d3f12cb8d0bd91c42c6bd804457b66078bbdbc033015aa4af777f8e7f1eba0fd",
       "source_sha256": "655b4790a5c8543c81755c8250c6a8b8f58ee62712168a39d628d6d927549709",
       "operations": 620,
       "unsupported": 0

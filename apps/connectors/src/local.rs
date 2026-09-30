@@ -13,11 +13,12 @@ use std::ffi::OsString;
 mod approval_keys;
 mod approvals;
 mod connections;
+mod cursor;
 mod operations;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
-    let root_help = args.len() == 2 && matches!(args[1].to_str(), Some("--help" | "-h"));
+    let root_help = is_root_help(&args);
     let session = session::Session::new(&args);
     if let Some(output) = configuration_preflight(&session.borrow()) {
         return output;
@@ -33,6 +34,24 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         output.stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n  describe  Read a complete service descriptor\n  invoke    Invoke an explicit service operation\n  serve     Run the configured federation service\n");
     }
     output
+}
+
+/// Whether the argument list, after any leading process globals, is exactly
+/// root `--help` or `-h`.
+fn is_root_help(args: &[OsString]) -> bool {
+    let mut rest = args.iter().skip(1);
+    while let Some(arg) = rest.next() {
+        match arg.to_str() {
+            Some("--output" | "--config" | "--state-dir") if rest.next().is_some() => {}
+            Some(arg)
+                if ["--output=", "--config=", "--state-dir="]
+                    .iter()
+                    .any(|prefix| arg.starts_with(prefix)) => {}
+            Some("--help" | "-h") => return rest.next().is_none(),
+            _ => return false,
+        }
+    }
+    false
 }
 
 struct LocalHandler(session::Shared);
@@ -110,6 +129,12 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         // A sent request's deadline that passed, or a marked upstream capacity
         // answer; the host's and the adapter's own limits stay admission.
         Timeout | Capacity if provider => ("dispatch", "retry_explicitly", false),
+        // A connect's acquisition that failed before publication: the owner
+        // recorded it as failed, as `connections status` then reports. A lost
+        // reply never gets here; the client reports it as `outcome_unknown`.
+        Unavailable | Timeout if error.acquisition.is_some() => {
+            ("dispatch", "retry_explicitly", false)
+        }
         InvalidInput => ("arguments", "none", true),
         InvalidConfiguration => ("configuration", "check_configuration", true),
         ProtectedEntryUnavailable => ("protected_entry", "select_protected_source", true),
@@ -268,7 +293,8 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         let state = keyring::inspect_at(config.secret_service_socket.as_deref());
         let mut checks =
             vec![json!({"name":"configuration", "state":"ready", "next_action":"none"})];
-        checks.push(json!({"name":"metadata", "state": if Metadata::inspect(&paths.state).is_ok() {"ready"} else {"failed"}, "next_action":"check_configuration"}));
+        let metadata = Metadata::inspect(&paths.state).is_ok();
+        checks.push(json!({"name":"metadata", "state": if metadata {"ready"} else {"failed"}, "next_action":if metadata {"none"} else {"check_configuration"}}));
         for (alias, adapter) in &config.adapters {
             let ready = adapter.executable.check().is_ok();
             checks.push(json!({"name":format!("artifact:{alias}"), "state":if ready {"ready"} else {"failed"}, "next_action":if ready {"none"} else {"check_configuration"}}));
@@ -284,39 +310,32 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         );
     }
     if call.callable == "adapters-list" {
-        if call
-            .input
-            .get("cursor")
-            .is_some_and(|value| !value.is_null())
-        {
-            return Err(failure(
-                "stale_cursor",
-                "observation",
-                "retry_explicitly",
-                false,
-            ));
+        let refused = |refusal| match refusal {
+            cursor::Refusal::InvalidInput => failure("invalid_input", "arguments", "none", true),
+            cursor::Refusal::StaleCursor => {
+                failure("stale_cursor", "observation", "retry_explicitly", false)
+            }
+        };
+        let request = cursor::Request::parse(&call.input).map_err(refused)?;
+        let adapters = config
+            .adapters
+            .iter()
+            .map(|(alias, entry)| summary(alias, entry))
+            .collect::<Vec<_>>();
+        // The selection a cursor is bound to: every listed entry and the
+        // configuration revision it was listed under.
+        let source = config
+            .adapters
+            .iter()
+            .zip(&adapters)
+            .map(|((_, entry), listed)| json!([entry.configuration_revision, listed]))
+            .collect::<Value>();
+        let (range, next) = request.page(&source, adapters.len()).map_err(refused)?;
+        let mut result = json!({"adapters":adapters[range],"source":"configuration"});
+        if let Some(next) = next {
+            result["next_cursor"] = json!(next);
         }
-        let limit = call
-            .input
-            .get("limit")
-            .and_then(Value::as_i64)
-            .unwrap_or(100);
-        if !(1..=500).contains(&limit) {
-            return Err(failure("invalid_input", "arguments", "none", true));
-        }
-        if config.adapters.len() > limit as usize {
-            // No cursor owner yet. Refuse an incomplete page rather than claim
-            // exhaustion or issue a forgeable/unrecoverable continuation.
-            return Err(failure(
-                "capacity",
-                "observation",
-                "retry_explicitly",
-                false,
-            ));
-        }
-        return Ok(
-            json!({"adapters":config.adapters.iter().map(|(alias, entry)| summary(alias,entry)).collect::<Vec<_>>(),"source":"configuration"}),
-        );
+        return Ok(result);
     }
     let alias = call.input["adapter"]
         .as_str()
@@ -324,7 +343,7 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     let adapter = config
         .adapters
         .get(alias)
-        .ok_or_else(|| failure("not_found", "configuration", "check_configuration", false))?;
+        .ok_or_else(|| failure("not_found", "admission", "check_configuration", false))?;
     if call.callable == "approval-clock-check" {
         let selected = config.approval_clock.as_ref().ok_or_else(|| {
             failure(

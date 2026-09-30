@@ -61,7 +61,11 @@ on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares
-is accepted by name.
+is accepted by name, with the type the pinned source gives it: an integer as a
+JSON integer or its decimal string (`100` or `"100"`), a boolean as `true` or
+`false` (or those two strings), a string as any string or a JSON integer (sent as
+its decimal text); any other value, such as `per_page=true` or `page=2.0`, is
+refused as `invalid_input` before any request.
 
 | id | source operation | request | time filter | effect |
 |---|---|---|---|---|
@@ -199,6 +203,17 @@ The complete configuration used against the sandbox is
   "requested_scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly"]
 }
 ```
+- `request_prefix` is optional, for a provider reached through an API gateway
+  that adds path segments in front of the document's paths, such as
+  `/ex/jira/<cloud id>`. It names the leading part of the `api_base` path that
+  belongs to the gateway; the rest of that path is the document base every
+  selected operation must lie under. Requests, the identity and scope reads
+  included, still go to the full `api_base`, which is also the provider
+  authority. The prefix is plain path text: a leading `/`, no trailing `/`, and
+  segments of letters, digits, `-`, `.`, `_` and `~` only, none of them `.` or
+  `..` (so no query, fragment or percent-encoding); it must be the leading part
+  of the `api_base` path, or the configuration is refused. Without it the
+  configuration revision is what it was before the field existed.
 - `operations_file` names a shipped selection set; its `provider` must match. An
   inline `operations` list is accepted as well and comes first. The selection
   ids, in either place, are what the host permits and the approval policy names.
