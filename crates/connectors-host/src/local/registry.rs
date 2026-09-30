@@ -58,7 +58,9 @@ pub enum Subject {
 }
 
 /// Selected subset of an immutable reviewed AuthProfile declaration. This module
-/// admits only credential-bearing static_entry flows, never OAuth or refresh.
+/// admits only credential-bearing static_entry flows, including the
+/// OAuth-acquired non-rotating variant whose entry a CLI obtained by consent
+/// before submitting it; never a coordinator OAuth flow or host-owned refresh.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StaticProfile {
