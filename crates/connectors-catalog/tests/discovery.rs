@@ -828,3 +828,127 @@ fn discovery_ingests() {
         assert_eq!(inventoried, operations, "{api}");
     }
 }
+
+/// Adversary pass 1 tightened `rootUrl` and integer ranges; values at the edge
+/// of what is allowed still project, with the value written as Discovery wrote it.
+#[test]
+fn discovery_accepts_values_at_their_edges() {
+    let mut document = base();
+    set(
+        &mut document,
+        "/rootUrl",
+        json!("https://fixture.googleapis.com:8443/"),
+    );
+    let parameters = "/resources/things/methods/get/parameters";
+    let edges = [
+        (
+            "a",
+            json!({"type": "integer", "format": "int32", "location": "query",
+                     "minimum": "-2147483648", "maximum": "2147483647"}),
+        ),
+        (
+            "b",
+            json!({"type": "integer", "format": "uint32", "location": "query",
+                     "minimum": "0", "default": "4294967295"}),
+        ),
+        (
+            "c",
+            json!({"type": "string", "format": "int64", "location": "query",
+                     "default": "-9223372036854775808"}),
+        ),
+        (
+            "d",
+            json!({"type": "string", "format": "uint64", "location": "query",
+                     "default": "18446744073709551615"}),
+        ),
+        (
+            "e",
+            json!({"type": "number", "format": "float", "location": "query",
+                     "maximum": "3.4028235e38"}),
+        ),
+    ];
+    for (name, value) in edges {
+        set(&mut document, &format!("{parameters}/{name}"), value);
+    }
+    let projection = discovery::project(document.to_string().as_bytes())
+        .unwrap_or_else(|refusal| panic!("edge values refused: {refusal}"));
+    let openapi: Value = serde_json::from_slice(&projection.openapi).unwrap();
+    assert_eq!(
+        openapi["servers"][0]["url"],
+        concat!("https://fixture.googleapis.com", ":8443", "/fixture/v1")
+    );
+    let schema = |name: &str| -> Value {
+        openapi["paths"]["/things/{thingId}"]["get"]["parameters"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["name"] == name)
+            .unwrap_or_else(|| panic!("{name} projected"))["schema"]
+            .clone()
+    };
+    assert_eq!(schema("a")["minimum"], json!(-2147483648i64));
+    assert_eq!(schema("a")["maximum"], json!(2147483647));
+    assert_eq!(schema("b")["default"], json!(4294967295u64));
+    assert_eq!(schema("c")["default"], json!("-9223372036854775808"));
+    assert_eq!(schema("d")["default"], json!("18446744073709551615"));
+    assert_eq!(schema("e")["maximum"], json!(3.4028235e38));
+}
+
+/// The rest of the class adversary pass 1 found in `int32`/`uint32`: a value
+/// that contradicts its own `format` is refused at its pointer, for the string
+/// integer formats and for `float` as well.
+#[test]
+fn discovery_refuses_values_outside_their_format() {
+    let parameter = "/resources/things/methods/get/parameters/count";
+    let cases = [
+        (
+            json!({"type": "string", "format": "int64", "location": "query",
+                "default": "9223372036854775808"}),
+            "default",
+        ),
+        (
+            json!({"type": "string", "format": "uint64", "location": "query",
+                "default": "-1"}),
+            "default",
+        ),
+        (
+            json!({"type": "string", "format": "int64", "location": "query",
+                "default": "ten"}),
+            "default",
+        ),
+        (
+            json!({"type": "number", "format": "float", "location": "query",
+                "maximum": "1e39"}),
+            "maximum",
+        ),
+        (
+            json!({"type": "integer", "format": "int32", "location": "query",
+                "minimum": "1.5"}),
+            "minimum",
+        ),
+    ];
+    for (value, key) in cases {
+        let mut document = base();
+        set(&mut document, parameter, value.clone());
+        let refused = refusal(&document);
+        assert_eq!(
+            refused.pointer,
+            format!("{parameter}/{key}"),
+            "{value}: {refused}"
+        );
+    }
+    for root in [
+        "https://a..b/",
+        "https://-fixture.googleapis.com/",
+        "https://fixture.googleapis.com:/",
+    ] {
+        let mut document = base();
+        set(&mut document, "/rootUrl", json!(root));
+        let refused = refusal(&document);
+        assert_eq!(
+            refused.reason,
+            Reason::NotAbsoluteHttps,
+            "{root}: {refused}"
+        );
+    }
+}
