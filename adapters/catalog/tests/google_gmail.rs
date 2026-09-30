@@ -367,6 +367,19 @@ fn drafts_send_is_guarded_on_the_drafts_message_id() {
             "`{id}`"
         );
     }
+    // The guide's other scope sentences: the preflight read accepts the
+    // read-only scope as well, and at Google the compose scope also permits
+    // the unselected `users.messages.send`.
+    for (id, scope) in [
+        ("users.drafts.get", GMAIL_SCOPE),
+        ("users.messages.send", COMPOSE_SCOPE),
+    ] {
+        let scopes = pinned_method(&document, id)["scopes"].clone();
+        assert!(
+            scopes.as_array().unwrap().contains(&json!(scope)),
+            "`{id}` {scope}"
+        );
+    }
     let composing: Vec<&str> = SHIPPED
         .iter()
         .map(|(id, _, _)| *id)
@@ -1822,6 +1835,56 @@ fn users_drafts_send_of_a_changed_draft_fails_the_preflight_and_sends_nothing() 
     let (method, _, authorization) = provider.requests().pop().unwrap();
     assert_eq!(method, "POST");
     assert!(authorization.as_deref() == Some(&*format!("Bearer {ACCESS_TOKEN}")));
+}
+
+/// The send's body is closed to `id`: a `body.message`, which Google would
+/// send in place of the draft the issuer read, or any other key, is refused as
+/// `invalid_input` with no Gmail request, even when `messageId` pins the
+/// draft's current message. The declaration says so to every caller.
+#[test]
+fn users_drafts_send_refuses_a_body_beyond_the_draft_id() {
+    let selection = shipped()
+        .into_iter()
+        .find(|s| s.id == "users.drafts.send")
+        .unwrap();
+    assert_eq!(selection.body_keys, ["id"]);
+    let create = shipped()
+        .into_iter()
+        .find(|s| s.id == "users.drafts.create")
+        .unwrap();
+    assert!(create.body_keys.is_empty(), "a create's body stays open");
+    let send = engine()
+        .declarations(&[Effect::Write])
+        .into_iter()
+        .find(|o| o.id == "users.drafts.send")
+        .unwrap();
+    assert_eq!(
+        send.input_schema["properties"]["body"],
+        json!({"type": "object", "properties": {"id": {}}, "required": ["id"],
+               "additionalProperties": false})
+    );
+    let provider = Provider::writer();
+    let mut child = Child::spawn(&provider.write_selection()).unwrap();
+    let [_, (operation, current)] = write_inputs();
+    for extra in [
+        json!({"message": {"raw": RAW}}),
+        json!({"message": {"id": DRAFT_MESSAGE}}),
+        json!({"threadId": "fixture-thread-1"}),
+    ] {
+        let mut input = current.clone();
+        for (key, value) in extra.as_object().unwrap() {
+            input["body"][key] = value.clone();
+        }
+        assert!(
+            matches!(
+                write(&mut child, operation, &input),
+                Err(Failure::InvalidInput)
+            ),
+            "{input} was not refused"
+        );
+    }
+    assert!(provider.requests().is_empty(), "a request was sent");
+    assert!(provider.bodies().is_empty(), "a write was sent");
 }
 
 /// `users.drafts.create` has no preflight: one POST to `/drafts` with the
