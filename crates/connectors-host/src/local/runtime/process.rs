@@ -596,6 +596,7 @@ mod tests {
                 subject:registry::Subject::User,scheme:"http_bearer".into(),capability:"http-bearer".into(),
                 minimum_scopes:BTreeSet::new(),evidence_lifetime_ms:60_000,
                 fields:vec![EntryField{name:"token".into(),label:"Fictional credential".into(),max_bytes:100}],
+                acquisition:None,
             }],
             requirements:vec![Requirement{operation:"read".into(),profile:"fixture".into(),scopes:BTreeSet::new(),effect:Effect::Read}],
         }
