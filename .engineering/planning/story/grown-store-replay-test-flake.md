@@ -6,6 +6,7 @@ status: implemented
 title: The grown-store replay count holds under parallel test load
 relations:
 - serves: vision:independent-contract-adapters
+- supersedes: story:registry-replay-test-flaky-under-load
 scope:
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
