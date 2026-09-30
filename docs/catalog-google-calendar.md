@@ -151,9 +151,12 @@ below. Writes run on a separate write instance with the write scope; see
 - **`sendUpdates`** decides whom Google emails about the write: `all`,
   `externalOnly` (guests not on Google Calendar) or `none`. Name it in every
   write input. Each write's selection requires it, so an input without it is
-  refused as `invalid_input` before any request, and an approved input always
-  says whom Google emails. The pinned document gives no default for patch and
-  delete; for insert it says the default is false and that some emails might
+  refused as `invalid_input` before any request. The engine checks only that it
+  is present: the bundle records no list of allowed values, so any string or
+  integer, such as `""`, `NONE` or `0`, is sent to Google as given, and what
+  Google does with it is not documented. The issuer checks that it is one of
+  `all`, `externalOnly` or `none` before approving. The pinned document gives
+  no default for patch and delete; for insert it says the default is false and that some emails might
   still be sent, and it warns that `none` "can have significant adverse
   effects, including events not syncing to external calendars or events being
   lost altogether for some users". The deprecated `sendNotifications` is
@@ -199,14 +202,21 @@ below. Writes run on a separate write instance with the write scope; see
   documents that an array given in a patch replaces the stored array, so
   `body.attendees` must list every guest who should remain. That is Google's
   stated behaviour, not verified here against a live calendar.
-- **A truncated guest list.** `events.get` and `events.list` take
-  `maxAttendees`; the pinned document says that when an event has more
-  attendees than that, "only the participant is returned", and the answer sets
-  `attendeesOmitted`. A `body.attendees` built from such a read lists only the
-  caller, and the patch then removes every other guest. The guard does not
-  catch it: the preflight reads the event in full and compares only `status`
-  and `etag`. Before patching `attendees`, read the event without
-  `maxAttendees` and check that `attendeesOmitted` is not `true`.
+- **A truncated guest list.** `events.get`, `events.list`, `events.insert` and
+  `events.patch` take `maxAttendees`; the pinned document says that when an
+  event has more attendees than that, "only the participant is returned", and
+  the answer sets `attendeesOmitted`. So an insert or patch sent with
+  `maxAttendees` answers a truncated guest list as well: pin the next `etag`
+  from that answer if you like, but do not build the next patch's
+  `body.attendees` from it. A `body` copied from a truncated read lists only
+  the caller and carries `attendeesOmitted: true`, which the pinned document
+  says, for an update, "can be used to only update the participant's
+  response". What Google does with such a patch — with that flag, or with a
+  truncated list and without it — has not been verified here, and the guard
+  does not look at it: the preflight reads the event in full and compares only
+  `status` and `etag`. Before patching `attendees`, read the event without
+  `maxAttendees`, check that `attendeesOmitted` is not `true`, and send every
+  guest who should remain.
 - **Recurring events.** The id of a recurring event names the series: a patch
   or delete of it changes or deletes every instance. An instance returned by
   `events.list` with `singleEvents` has its own id, and a write to that id
@@ -220,7 +230,8 @@ below. Writes run on a separate write instance with the write scope; see
   `supportsAttachments` set to `true`.
 - **The answers.** Insert and patch return the event Google stored, with its
   new `etag` to pin next; a `fields` value narrows that answer and nothing
-  else, because no postflight check reads it. A delete's answer has no body and
+  else, because no postflight check reads it, and `maxAttendees` truncates its
+  guest list as described above. A delete's answer has no body and
   is returned as `null`.
 - **Race boundary.** The `etag` is checked in preflight only: the provider
   does not ask Google to check it again with the write, so a change between the
@@ -339,7 +350,11 @@ same instance is refused while the old one exists.
   observed.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Google's exact bytes.
-- The provider does not walk pages itself and does not retry. A `429`, or a
-  `403` whose reason is `rateLimitExceeded` or `userRateLimitExceeded`
-  (each selection names both in `rate_limit_reasons`), is returned as
-  `rate_limited`; every other `403` is `forbidden`.
+- The provider does not walk pages itself and does not retry. On a read, and
+  on the preflight read of a patch or delete, a `429`, or a `403` whose reason
+  is `rateLimitExceeded` or `userRateLimitExceeded` (each selection names both
+  in `rate_limit_reasons`), is returned as `rate_limited`, and no write is
+  sent; every other `403` is `forbidden`. A write that Google answers `429` is
+  reported `unknown`, as [the catalog provider guide](local-catalog-provider.md)
+  says: only its documented definite refusals are refused, and among them a
+  `403` naming one of those reasons is a `rate_limited` refusal.
