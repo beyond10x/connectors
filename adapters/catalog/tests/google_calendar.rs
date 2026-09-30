@@ -597,13 +597,61 @@ fn write_descriptions_name_their_effects_and_the_digest_binding() {
         ),
     ] {
         let text = description(id);
-        for term in terms {
+        // Every write names the three `sendUpdates` values and says the
+        // provider does not check them, so the approver must.
+        let checked = [
+            "must be all, externalOnly or none",
+            "the provider does not check the value",
+        ];
+        for term in terms.iter().chain(&checked) {
             if !text.contains(term) {
                 missing.push(format!("{id}: {term}"));
             }
         }
     }
+    // Insert and patch answer a truncated guest list when sent with
+    // `maxAttendees`, and a patch body copied from a truncated read is
+    // described as the pinned document describes it, not as a certainty.
+    for (id, term) in [
+        ("events.insert", "maxAttendees"),
+        (
+            "events.patch",
+            "limits an update to the participant's response",
+        ),
+        ("events.patch", "not verified"),
+    ] {
+        if !description(id).contains(term) {
+            missing.push(format!("{id}: {term}"));
+        }
+    }
     assert!(missing.is_empty(), "descriptions omit {missing:#?}");
+}
+
+/// The guide says what the engine does not check about `sendUpdates`, how a
+/// rate-limited write is classified, and which operations truncate a guest
+/// list.
+#[test]
+fn guide_states_what_the_engine_leaves_to_the_approver_and_the_caller() {
+    let guide = guide();
+    let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
+    for phrase in [
+        // `sendUpdates` is required, but its value is not checked.
+        "The issuer checks that it is one of `all`, `externalOnly` or `none` before approving.",
+        // A write answered `429` is `unknown`, as the provider guide says.
+        "A write that Google answers `429` is reported `unknown`",
+        // Insert and patch take `maxAttendees` like the reads.
+        "`events.get`, `events.list`, `events.insert` and `events.patch` take `maxAttendees`",
+        // The pinned document's words, not an unverified certainty.
+        "\"can be used to only update the participant's response\"",
+    ] {
+        assert!(flat.contains(phrase), "the guide does not say: {phrase}");
+    }
+    for stale in [
+        "an approved input always says whom Google emails",
+        "and the patch then removes every other guest",
+    ] {
+        assert!(!flat.contains(stale), "the guide still says: {stale}");
+    }
 }
 
 /// The guide configures the bundle's profile as an `oauth2_refresh` profile
