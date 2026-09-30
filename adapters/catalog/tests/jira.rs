@@ -42,7 +42,7 @@ const BASE: &str = "/rest/api/3";
 const ACCOUNT: &str = "reader@example.test";
 const TOKEN: &str = "fixture-jira-token";
 const HEADER: &str = "Basic cmVhZGVyQGV4YW1wbGUudGVzdDpmaXh0dXJlLWppcmEtdG9rZW4=";
-const PROFILE: &str = "jira.basic";
+const PROFILE: &str = "atlassian.basic";
 
 /// The shipped ids, their pinned `operationId` and their pinned path. A renamed,
 /// dropped or added id fails here.
@@ -413,6 +413,7 @@ fn documented_auth() -> Value {
     let auth = serde_json::from_str::<Value>(example).unwrap()["auth"].clone();
     assert_eq!(auth["profile"], PROFILE);
     assert_eq!(auth["scheme"], "basic");
+    assert_eq!(auth["identity"]["kind"], "atlassian.account");
     auth
 }
 fn root_path(relative: &str) -> PathBuf {

@@ -22,7 +22,7 @@ cargo run --locked -p connectors-build -- catalog \
   --provider jira \
   --source adapters/atlassian/upstream/jira-platform-v3.json \
   --directory adapters/catalog/generated/bundles \
-  --auth-profile jira.basic
+  --auth-profile atlassian.basic
 ```
 
 It carries all 620 operations of the pinned document, none unsupported, and
@@ -76,10 +76,15 @@ accepted by name; one it does not declare is refused before any request.
 
 ## Authentication
 
-Jira Cloud API tokens use HTTP basic with the account email. Declare a basic
-profile; the identity read is `GET /rest/api/3/myself`, whose `accountId`
-names the credential's subject. Jira API tokens expose no scope list, so the
-profile declares no `scopes` read and no `minimum_scopes`.
+Jira Cloud API tokens use HTTP basic with the account email. Declare the basic
+profile `atlassian.basic`, which Confluence uses too: one Atlassian credential
+connects both, as one `atlassian.account` identity (see
+[the Confluence guide](catalog-confluence.md#authentication)). The identity read
+is `GET /rest/api/3/myself`, whose `accountId` names the credential's subject.
+Atlassian API tokens expose no scope list, so the profile declares no `scopes`
+read and no `minimum_scopes`. The profile was `jira.basic` with identity kind
+`jira.user` in 0.16 and 0.17; a configuration naming it must be changed and its
+connection made again.
 
 ```json
 {
@@ -89,13 +94,13 @@ profile declares no `scopes` read and no `minimum_scopes`.
   "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
   "api_base": "https://your-domain.atlassian.net/rest/api/3",
   "auth": {
-    "profile": "jira.basic",
+    "profile": "atlassian.basic",
     "scheme": "basic",
     "header": "Authorization",
     "bearer": false,
     "account_label": "Account email",
     "label": "API token",
-    "identity": {"path": "myself", "kind": "jira.user", "subject_pointer": "/accountId"}
+    "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
   },
   "operations_file": "/absolute/path/adapters/catalog/providers/jira/operations.json"
 }
