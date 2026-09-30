@@ -68,7 +68,7 @@ fn db(_: rusqlite::Error) -> Failure {
     Failure::MetadataUnavailable
 }
 fn identifier(value: &str) -> bool {
-    !value.is_empty() && value.len() <= 256 && connectors_core::valid_id(value)
+    connectors_core::valid_id(value)
 }
 fn digest(value: &str) -> bool {
     value.len() == 64
