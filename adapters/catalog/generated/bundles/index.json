@@ -17,6 +17,14 @@
       "unsupported": 0
     },
     {
+      "provider": "google-drive",
+      "file_name": "google-drive.bundle.json",
+      "bundle_sha256": "3d6fe6964b33d07d588749a014c1c7446ffe5809d684e457814957d36320f679",
+      "source_sha256": "571c8d820490b340459d29fa532b1d814406ba00c7d5d97f83d9b4e362cbea8b",
+      "operations": 64,
+      "unsupported": 0
+    },
+    {
       "provider": "jira",
       "file_name": "jira.bundle.json",
       "bundle_sha256": "56c1ad99046e00132bbdfaefec86cc702e1096ce7571ccb6b13454493dbc7dd4",

@@ -1,35 +1,68 @@
 //! Every committed bundle is exactly what the pipeline produces from its pinned
 //! source. One fresh run over every indexed provider reproduces each bundle and
 //! the whole index byte for byte, and an indexed provider with no pinned source
-//! named here fails rather than going unchecked.
-use connectors_catalog::{bundle, pipeline};
+//! named here fails rather than going unchecked. A source projected from a
+//! pinned Google Discovery document is itself regenerated from that document
+//! first, with its projection record, and must match byte for byte too.
+use connectors_catalog::{bundle, discovery, pipeline};
 use std::path::Path;
 
-/// The pinned source, auth profile and unsupported-operation count of each
-/// indexed provider, relative to this crate. The profile and the count are
-/// literals, so a bundle rebuilt with another profile, or one that gains or
-/// loses a gap, fails here instead of being read back as correct. Confluence's
-/// 30 are writes whose request body is a `$ref`; no shipped read is among them.
-const SOURCES: [(&str, &str, &str, usize); 3] = [
+/// The pinned source, the Discovery document it is projected from (if any),
+/// auth profile and unsupported-operation count of each indexed provider,
+/// relative to this crate. The profile and the count are literals, so a bundle
+/// rebuilt with another profile, or one that gains or loses a gap, fails here
+/// instead of being read back as correct. Confluence's 30 are writes whose
+/// request body is a `$ref`; no shipped read is among them.
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 4] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
+        None,
         "atlassian.basic",
         30,
     ),
     (
         "gitlab",
         "../gitlab/upstream/openapi_v3.yaml",
+        None,
         "gitlab.pat",
+        0,
+    ),
+    (
+        "google-drive",
+        "../google/generated/drive.openapi.json",
+        Some("../google/upstream/drive/drive-api.json"),
+        "google.oauth",
         0,
     ),
     (
         "jira",
         "../atlassian/upstream/jira-platform-v3.json",
+        None,
         "atlassian.basic",
         0,
     ),
 ];
+
+/// The committed projection at `source` and its record beside it are exactly
+/// what projecting the pinned Discovery document at `from` produces now.
+fn assert_projection_is_fresh(provider: &str, source: &Path, from: &Path) {
+    let projection = discovery::project(&std::fs::read(from).unwrap()).unwrap();
+    assert!(
+        std::fs::read(source).unwrap() == projection.openapi,
+        "committed `{provider}` projection drifted from its pinned Discovery document"
+    );
+    let stem = source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .and_then(|name| name.strip_suffix(".json"))
+        .unwrap();
+    let record = source.with_file_name(format!("{stem}.projection.json"));
+    assert!(
+        std::fs::read(&record).unwrap() == projection.record_bytes(),
+        "committed `{provider}` projection record drifted"
+    );
+}
 
 #[test]
 fn every_committed_bundle_matches_a_fresh_pipeline_run() {
@@ -44,7 +77,7 @@ fn every_committed_bundle_matches_a_fresh_pipeline_run() {
     providers.sort();
     let mut named: Vec<&str> = SOURCES
         .iter()
-        .map(|(provider, _, _, _)| *provider)
+        .map(|(provider, _, _, _, _)| *provider)
         .collect();
     named.sort();
     assert_eq!(
@@ -52,14 +85,23 @@ fn every_committed_bundle_matches_a_fresh_pipeline_run() {
         "every indexed provider needs its pinned source here"
     );
     let temp = tempfile::tempdir().unwrap();
-    for (provider, source, auth_profile, unsupported) in SOURCES {
-        let run = pipeline::run(&pipeline::Request {
+    for (provider, source, derived_from, auth_profile, unsupported) in SOURCES {
+        let source = root.join(source);
+        let request = pipeline::Request {
             provider,
-            source: &root.join(source),
+            source: &source,
             directory: temp.path(),
             auth_profile,
             replace: false,
-        })
+        };
+        let run = match derived_from {
+            Some(from) => {
+                let from = root.join(from);
+                assert_projection_is_fresh(provider, &source, &from);
+                pipeline::run_derived(&request, &from)
+            }
+            None => pipeline::run(&request),
+        }
         .unwrap();
         assert_eq!(run.coverage.unsupported, unsupported, "`{provider}`");
         let file_name = format!("{provider}.bundle.json");
