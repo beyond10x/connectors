@@ -13,6 +13,7 @@ use std::ffi::OsString;
 mod approval_keys;
 mod approvals;
 mod connections;
+mod cursor;
 mod operations;
 mod session;
 
@@ -284,39 +285,32 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         );
     }
     if call.callable == "adapters-list" {
-        if call
-            .input
-            .get("cursor")
-            .is_some_and(|value| !value.is_null())
-        {
-            return Err(failure(
-                "stale_cursor",
-                "observation",
-                "retry_explicitly",
-                false,
-            ));
+        let refused = |refusal| match refusal {
+            cursor::Refusal::InvalidInput => failure("invalid_input", "arguments", "none", true),
+            cursor::Refusal::StaleCursor => {
+                failure("stale_cursor", "observation", "retry_explicitly", false)
+            }
+        };
+        let request = cursor::Request::parse(&call.input).map_err(refused)?;
+        let adapters = config
+            .adapters
+            .iter()
+            .map(|(alias, entry)| summary(alias, entry))
+            .collect::<Vec<_>>();
+        // The selection a cursor is bound to: every listed entry and the
+        // configuration revision it was listed under.
+        let source = config
+            .adapters
+            .iter()
+            .zip(&adapters)
+            .map(|((_, entry), listed)| json!([entry.configuration_revision, listed]))
+            .collect::<Value>();
+        let (range, next) = request.page(&source, adapters.len()).map_err(refused)?;
+        let mut result = json!({"adapters":adapters[range],"source":"configuration"});
+        if let Some(next) = next {
+            result["next_cursor"] = json!(next);
         }
-        let limit = call
-            .input
-            .get("limit")
-            .and_then(Value::as_i64)
-            .unwrap_or(100);
-        if !(1..=500).contains(&limit) {
-            return Err(failure("invalid_input", "arguments", "none", true));
-        }
-        if config.adapters.len() > limit as usize {
-            // No cursor owner yet. Refuse an incomplete page rather than claim
-            // exhaustion or issue a forgeable/unrecoverable continuation.
-            return Err(failure(
-                "capacity",
-                "observation",
-                "retry_explicitly",
-                false,
-            ));
-        }
-        return Ok(
-            json!({"adapters":config.adapters.iter().map(|(alias, entry)| summary(alias,entry)).collect::<Vec<_>>(),"source":"configuration"}),
-        );
+        return Ok(result);
     }
     let alias = call.input["adapter"]
         .as_str()
