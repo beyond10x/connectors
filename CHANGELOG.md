@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The local owner exits after 10 minutes with no connected client and no work in flight.
+  An idle adapter child, an empty recovery sweep or recovery that settles nothing do not
+  keep it alive; an attempt that cannot settle stays pending for the next owner. The next
+  command starts a new owner, and a command whose connection the exiting owner closes
+  starts over instead of failing.
+- A provider's refusal of a guarded write reports stage `dispatch` with
+  `request_permission` (403) or `none` (404/410); the catalog provider keeps the refused
+  status (400/409/412/422 `invalid_input`, 401 `unauthorized`). A host refusal before
+  anything was sent reports `admission`. A write whose effect may have happened is never
+  offered `retry_explicitly`.
+- A provider timeout after the request was sent (including while its answer was being
+  read, and on a connection probe), a database statement timeout and the database
+  connection limit report `dispatch` / `retry_explicitly`; the host's own deadlines and
+  limits stay `admission`.
+- The ESS pin moves to 0.45.0 with the `ess-*` libraries. The local metadata conformance
+  suite runs 289 scenarios (285 on 0.40.0): it gains 5 wrong-state scenarios and loses
+  `ReviseLocalApprovalPolicy/outcome/exhausted` to an ESS-SYNTH-003 refusal present since
+  ESS 0.43.0 (beyond10x/ess#251); a host test now checks that outcome.
+
+### Compatibility
+
+- A binary older than this release cannot read a write-attempt record that stores a
+  provider refusal, nor an adapter child's `provider_timeout` / `provider_capacity`
+  reply. Records it wrote itself still replay.
+
 ## 0.16.0 — 2026-09-29
 
 ### Added

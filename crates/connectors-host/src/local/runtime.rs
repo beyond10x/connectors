@@ -64,6 +64,12 @@ pub enum Failure {
     /// that predates it refuses the reply as unreadable, and a child that
     /// predates it still sends `forbidden`, which reads as admission.
     ProviderForbidden,
+    /// The upstream's own timeout or capacity answer to a sent request (a
+    /// transport deadline that passed after sending, a database statement
+    /// timeout, a marked capacity refusal). Additive like `provider_forbidden`:
+    /// a host that predates them refuses the reply as unreadable.
+    ProviderTimeout,
+    ProviderCapacity,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -143,6 +149,44 @@ mod failure_tests {
         let host: Error = Failure::NotFound.into();
         assert_eq!(host.origin, Origin::Host);
     }
+
+    #[test]
+    fn a_provider_timeout_or_capacity_answer_is_the_providers_and_the_hosts_own_is_not() {
+        use crate::local::owner::{Code, Error, Origin};
+        for (code, wire, owner) in [
+            (ErrorCode::Timeout, r#""provider_timeout""#, Code::Timeout),
+            (
+                ErrorCode::Capacity,
+                r#""provider_capacity""#,
+                Code::Capacity,
+            ),
+        ] {
+            let answered = Failure::from_provider(
+                connectors_core::Error::new(code.clone(), "private-provider-message").answered(),
+            );
+            let bytes = serde_json::to_string(&answered).unwrap();
+            assert_eq!(bytes, wire);
+            let back: Failure = serde_json::from_str(&bytes).unwrap();
+            let error: Error = back.into();
+            assert_eq!(error.code, owner);
+            assert_eq!(error.origin, Origin::Provider);
+            assert_eq!(error.service_code, None);
+            // Raised by the adapter or the host before or without an answer.
+            let raised: Error =
+                Failure::from_provider(connectors_core::Error::new(code, "own limit")).into();
+            assert_eq!(raised.code, owner);
+            assert_eq!(raised.origin, Origin::Host);
+        }
+        for host in [Failure::Timeout, Failure::Capacity] {
+            assert_eq!(Error::from(host).origin, Origin::Host);
+        }
+        // Unsupported is raised before dispatch whatever its source.
+        let unsupported: Error = Failure::from_provider(
+            connectors_core::Error::new(ErrorCode::Unsupported, "x").answered(),
+        )
+        .into();
+        assert_eq!(unsupported.origin, Origin::Host);
+    }
 }
 
 impl Failure {
@@ -153,6 +197,8 @@ impl Failure {
         match error.code {
             ErrorCode::Forbidden if error.upstream_answer => Self::ProviderForbidden,
             ErrorCode::NotFound if error.upstream_answer => Self::ProviderNotFound,
+            ErrorCode::Timeout if error.upstream_answer => Self::ProviderTimeout,
+            ErrorCode::Capacity if error.upstream_answer => Self::ProviderCapacity,
             ErrorCode::RateLimited => Self::ProviderRateLimited,
             ErrorCode::Internal => Self::ProviderInternal,
             _ => Self::from_service(error),

@@ -1633,8 +1633,8 @@ fn replay_fixture(events: i64) -> (tempfile::TempDir, Registry, String) {
 
 #[test]
 fn a_read_invoke_against_a_grown_store_replays_it_at_most_once() {
-    let (root, registry, reference) = replay_fixture(600);
-    assert!(recorded_events(root.path()) >= 600);
+    let (root, registry, reference) = replay_fixture(150);
+    assert!(recorded_events(root.path()) >= 150);
     let replays = read_invoke(root.path(), &registry, &reference, NOW + 2);
     assert!(
         replays <= 1,

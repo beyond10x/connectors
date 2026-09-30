@@ -347,8 +347,12 @@ views:
 # Atomic uniqueness of (issuer, receiver, nonce) and (issuer, reference), one
 # redemption per Prepared attempt, and redemption only against a Prepared attempt
 # need compound and cross-record uniqueness and a guard on another record's
-# state; ESS 0.40 has neither (`affects:` sets fields on other rows but does not
-# select or refuse by them). Trusted clocks, revocation of live keys, durability
+# state. ESS 0.45 has no uniqueness constraint (`affects:` sets fields on other
+# rows but does not select or refuse by them). `when_related:` (ESS 0.41, source
+# format ess/18) reads another row's stored fields but not its lifecycle state
+# (ESS 0.45 refuses `state` there as unobservable_fact); this specification is
+# ess/15, which refuses the construct (unsupported_format_version), and the ESS
+# 0.45 Entity Runtime lowering refuses it at any format (RelatedGuardUnsupported). Trusted clocks, revocation of live keys, durability
 # or replicas and anti-rollback remain host obligations.
 # Retiring a nonce INDEX after safe expiry does not erase this historical receipt;
 # physical retention/compaction and all receipt creation are persistence bindings.

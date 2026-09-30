@@ -543,10 +543,17 @@ impl Prepared {
             response.status,
             400 | 401 | 403 | 404 | 405 | 409 | 410 | 412 | 415 | 422
         ) {
-            return WriteOutcome::Refused(Error::new(
-                ErrorCode::Forbidden,
-                "provider refused the write",
-            ));
+            // The same split a read's refusal gets; each is the provider's answer.
+            let code = match response.status {
+                400 | 409 | 412 | 422 => ErrorCode::InvalidInput,
+                401 => ErrorCode::Unauthorized,
+                403 => ErrorCode::Forbidden,
+                404 | 410 => ErrorCode::NotFound,
+                _ => ErrorCode::Forbidden,
+            };
+            return WriteOutcome::Refused(
+                Error::new(code, "provider refused the write").answered(),
+            );
         }
         if !(200..300).contains(&response.status) {
             return WriteOutcome::Unknown(Error::new(

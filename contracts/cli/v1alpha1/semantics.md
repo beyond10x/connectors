@@ -474,7 +474,7 @@ A refusal made before any provider request — by the host's admission, or by an
 adapter from its own configured scope (a namespace, resource kind or operation
 the adapter entry does not allow) — reports `stage = admission` (`forbidden`
 with `next_action = request_permission`, `not_found` with
-`check_configuration`). Only the provider's own answer to a dispatched read
+`check_configuration`). Only the provider's own answer to a dispatched call
 reports `stage = dispatch`: an upstream forbidden answer (HTTP 403) keeps
 `code = forbidden` with `next_action = request_permission`, and an upstream
 not-found answer (HTTP 404; the catalog provider also 410) is
@@ -484,8 +484,40 @@ A connection probe's answer (the catalog provider's identity and scope probes,
 the Kubernetes token review) is classified separately and not by this rule: a
 403 reads as `forbidden` at `admission`, and a 404 is `service_failure` with
 `service_code = upstream_protocol` at `dispatch` and
-`next_action = retry_explicitly`. A refused write reports `stage = dispatch`
-with `next_action = retry_status` and its `mutation` record, whatever the code.
+`next_action = retry_explicitly`.
+
+A provider's timeout or capacity answer is the provider's too: a request the
+provider transport sent whose deadline then passed (a connection probe's
+included, and one that passes while the provider's answer is still being
+read after its status and headers arrived), a database statement timeout, and a capacity refusal the adapter
+marks as the upstream's answer (the SQL adapter's database connection limit)
+report `timeout` / `capacity` at `stage = dispatch` with
+`next_action = retry_explicitly`. A connection that never opened sent nothing
+and is not one of them. The host's own deadline and limits, and an adapter's
+own connect or work deadline and result bounds, keep `stage = admission`
+(`retry_explicitly`). An HTTP 429 stays `service_failure` with
+`service_code = rate_limited`. `unsupported` is always `admission`: every
+source of it is raised before dispatch.
+
+A guarded write's failure carries its `mutation` record, and its stage follows
+who refused and whether the write was attempted. A refusal the host made
+before anything was sent (`mutation.classification = not_attempted` — the
+host's approval refusals and its own deadline included) reports
+`stage = admission`. The provider's answer, and a host failure once the write
+was sent or may have been (`refused`, `applied`, `unknown`), report
+`stage = dispatch`. The provider's own refusal of the write names its next
+action as a read's does: an upstream 403 (the catalog provider also 405 and
+415) is `forbidden` with `next_action = request_permission`, an upstream 404 or
+410 is `service_failure`, `service_code = not_found` with
+`next_action = none`, and a provider timeout or capacity answer to the
+write's preflight is `retry_explicitly`. A write classified `applied` or
+`unknown` is never offered `retry_explicitly`: it may have taken effect.
+Every other write failure — the host's approval refusals included — reports
+`next_action = retry_status`. A write whose effect is unknown after its
+request was sent, including by a timeout, stays `outcome_unknown`. The settled attempt stores which side refused, so a replay
+of the same idempotency key reports the same stage and next action as the
+original reply; an attempt stored before the origin was recorded replays as
+the host's (`retry_status`).
 
 ## 7. Verification and remaining obligations
 
