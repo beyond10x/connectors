@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:grown-store-replay-test-flake
 kind: story
-status: active
+status: implemented
 title: The grown-store replay count holds under parallel test load
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,11 +10,12 @@ scope:
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
 - confidence: cited
-  path: crates/connectors-host/src/local/registry/tests.rs
-revision: 5
+  path: crates/connectors-host/tests/service.rs
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T15:07:27Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-09-30T15:07:28Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-09-30T16:53:27Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":2}}}
 ---
 ## Observed
 

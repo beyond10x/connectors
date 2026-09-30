@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-30T16:53:25Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-parameters-declare-their-type",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run -p connectors-build -- gate --msrv at ae2651244: 113 suites, 812 passed, 0 failed, 35 ignored"
+  }
+}

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:cli-surface-minor-findings-0-18-0
 kind: story
-status: active
+status: implemented
 title: Minor CLI surface findings from the 0.18.0 test
 relations:
 - serves: vision:independent-contract-adapters
@@ -12,11 +12,20 @@ scope:
 - confidence: cited
   path: apps/connectors/tests/cli_surface_minor.rs
 - confidence: cited
+  path: apps/connectors/tests/cli_surface_minor_adversary.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/scenarios.md
+- confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
-revision: 9
+- confidence: cited
+  path: crates/connectors-host/src/local/approval_policy.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/config.rs
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T14:19:50Z", actor: "human:timo", revision: 8}
 - {from: "proposed", to: "active", at: "2026-09-30T14:19:51Z", actor: "human:timo", revision: 9}
+- {from: "active", to: "implemented", at: "2026-09-30T16:53:26Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Observed
 Found by the black-box CLI surface test of release 0.18.0 on 2026-09-30 (raw output under the tester's sandbox, outside the repository).

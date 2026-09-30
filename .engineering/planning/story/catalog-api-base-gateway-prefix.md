@@ -2,23 +2,28 @@
 format: aep.planning-md/3
 id: story:catalog-api-base-gateway-prefix
 kind: story
-status: active
+status: implemented
 title: A catalog api_base may carry a gateway prefix in front of the document's paths
 relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
-  path: adapters/catalog/src/lib.rs
-- confidence: cited
   path: adapters/catalog/src/local.rs
+- confidence: cited
+  path: adapters/catalog/tests/gateway_prefix.rs
+- confidence: cited
+  path: adapters/catalog/tests/gateway_prefix_adversary.rs
 - confidence: cited
   path: docs/catalog-confluence.md
 - confidence: cited
   path: docs/catalog-jira.md
-revision: 4
+- confidence: cited
+  path: docs/local-catalog-provider.md
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T14:11:04Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-09-30T14:11:05Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-09-30T16:53:26Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Source
 
