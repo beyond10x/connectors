@@ -1451,10 +1451,13 @@ fn body_keys_are_refused_at_load_unless_they_close_a_write_body() {
         .err()
         .expect("a guard reading a body key the set refuses loaded");
     assert!(error.message.contains("body_keys"), "{}", error.message);
-    let engine = Engine::new(&bundle(), "/api/v4", &[guarded(&["sha"])]).unwrap();
+    // The key the guard compares is declared as the scalar it compares; a key
+    // no guard reads takes any value and is not required.
+    let engine = Engine::new(&bundle(), "/api/v4", &[guarded(&["sha", "note"])]).unwrap();
     assert_eq!(
         engine.declarations(&[Effect::Write])[0].input_schema["properties"]["body"],
-        json!({"type": "object", "properties": {"sha": {}}, "required": ["sha"],
-               "additionalProperties": false})
+        json!({"type": "object",
+               "properties": {"sha": {"type": ["string", "integer", "boolean"]}, "note": {}},
+               "required": ["sha"], "additionalProperties": false})
     );
 }

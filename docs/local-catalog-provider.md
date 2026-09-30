@@ -237,11 +237,14 @@ The complete configuration used against the sandbox is
   when the selection loads.
 - `body_keys` is optional, for a write: `["<key>", …]` closes its JSON body to
   exactly those top-level keys. The declared input schema types `body` as an
-  object with those properties and no others (each key a guard reads through
-  `body.<key>` is required there), and a body carrying any other key is refused
-  as `invalid_input` before any request, the preflight read included. It is for
-  a write whose provider would act on a body field the guard does not compare,
-  such as a Gmail draft send given a replacement message. A read, an operation
+  object with those properties and no others, and a body carrying any other key
+  is refused as `invalid_input` before any request, the preflight read
+  included. Each key a guard reads is required and compared by that guard; one
+  it reads as `body.<key>` itself is declared as the scalar it compares. A key
+  no guard reads takes any JSON value and is compared by nothing: closing the
+  body only keeps out keys outside the set. It is for a write whose provider
+  would act on a body field the guard does not compare, such as a Gmail draft
+  send given a replacement message. A read, an operation
   without a request body, an empty, dotted or repeated name, or a guard reading
   a `body.<key>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the

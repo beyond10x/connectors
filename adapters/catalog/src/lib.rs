@@ -128,15 +128,17 @@ pub struct Selection {
     pub rate_limit_reasons: Vec<String>,
     /// The only top-level keys a write's JSON body may carry. When set, the
     /// declaration types `body` as an object with exactly these properties,
-    /// and a body with any other key is refused before any request: what the
-    /// provider receives is what a guard compared and nothing more. Omitted
-    /// when empty, which leaves the body an open object.
+    /// and a body carrying any key outside the set is refused before any
+    /// request. Keys a guard reads are also compared by that guard, and are
+    /// declared required, as scalars when the guard reads them directly; a
+    /// key no guard reads is admitted with any value and compared by nothing.
+    /// Omitted when empty, which leaves the body an open object.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_keys: Vec<String>,
 }
 
-/// The top-level body keys a guard reads through `body.<key>` references.
-fn guarded_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
+/// The body paths a guard reads, each the part after `body.` of a reference.
+fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
     guard
         .preflight
         .values
@@ -153,7 +155,20 @@ fn guarded_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
                 }),
         )
         .filter_map(|path| path.strip_prefix("body."))
+}
+
+/// The top-level body keys a guard reads through `body.<key>` references.
+fn guarded_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
+    guarded_body_paths(guard)
         .map(|rest| rest.split('.').next().unwrap_or(rest))
+        .collect()
+}
+
+/// The top-level body keys a guard reads as scalars: referenced as
+/// `body.<key>` itself, not only through a path nested under it.
+fn scalar_body_keys(guard: &Guard) -> std::collections::BTreeSet<&str> {
+    guarded_body_paths(guard)
+        .filter(|rest| !rest.contains('.'))
         .collect()
 }
 
@@ -927,12 +942,25 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
         let body = if selection.body_keys.is_empty() {
             json!({"type": "object"})
         } else {
-            // A closed body: exactly these keys, each of any JSON value, and
-            // those a guard reads are required.
+            // A closed body: exactly these keys. A key a guard reads directly
+            // is declared as the scalar the guard compares; any other key takes
+            // any JSON value. Every key a guard reads is required.
+            let scalars = selection
+                .guard
+                .as_ref()
+                .map(scalar_body_keys)
+                .unwrap_or_default();
             let keys: serde_json::Map<String, Value> = selection
                 .body_keys
                 .iter()
-                .map(|key| (key.clone(), json!({})))
+                .map(|key| {
+                    let schema = if scalars.contains(key.as_str()) {
+                        declared_type(None)
+                    } else {
+                        json!({})
+                    };
+                    (key.clone(), schema)
+                })
                 .collect();
             let mut body = json!({
                 "type": "object",
