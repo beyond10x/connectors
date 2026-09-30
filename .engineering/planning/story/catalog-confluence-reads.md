@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-confluence-reads
 kind: story
-status: active
+status: implemented
 title: Confluence Cloud pages by space, updated since, with body
 relations:
 - decomposes: epic:catalog-knowledge-sources
@@ -11,9 +11,17 @@ relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
+  path: CHANGELOG.md
+- confidence: cited
   path: adapters/atlassian/upstream/README.md
 - confidence: cited
-  path: adapters/atlassian/upstream/confluence-v1-search.json
+  path: adapters/atlassian/upstream/confluence/README.md
+- confidence: cited
+  path: adapters/atlassian/upstream/confluence/confluence-source-hashes.json
+- confidence: cited
+  path: adapters/atlassian/upstream/confluence/confluence-v2.json
+- confidence: cited
+  path: adapters/atlassian/upstream/confluence/vendor/confluence-v2.json.gz
 - confidence: cited
   path: adapters/catalog/generated/bundles/confluence.bundle.json
 - confidence: cited
@@ -27,15 +35,28 @@ scope:
 - confidence: cited
   path: adapters/catalog/tests/confluence.rs
 - confidence: cited
+  path: adapters/catalog/tests/confluence_reads_adversary.rs
+- confidence: cited
   path: adapters/catalog/tests/jira.rs
+- confidence: cited
+  path: adapters/catalog/tests/jira_cloud_reads_adversary.rs
+- confidence: cited
+  path: crates/connectors-catalog/src/inventory.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/inventory.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/server_path_adversary.rs
 - confidence: cited
   path: docs/catalog-confluence.md
 - confidence: cited
   path: docs/catalog-jira.md
-revision: 11
+- confidence: cited
+  path: docs/local-catalog-provider.md
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-29T16:39:50Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":5}}}
 - {from: "proposed", to: "active", at: "2026-09-29T16:39:51Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":5}}}
+- {from: "active", to: "implemented", at: "2026-09-30T09:07:38Z", actor: "human:timo", revision: 16, decided_on: {"recorded":{"test_result":1,"review_outcome":6}}}
 ---
 ## Source
 
@@ -79,3 +100,12 @@ also ask for `view`). Page comments were added on 2026-09-29 at the knowledge-in
   Jira bundle moves from `jira.basic` to it. That breaks a 0.16/0.17 configuration that names `jira.basic`;
   the CHANGELOG says so.
 - Fixture bodies compare as equal JSON; end conditions read from the body; a null link counts as absent.
+
+## Document decision (coordinator, 2026-09-30, after the implementor's check)
+
+The v1 REST document carries only `pages.changed` (CQL search); it has no dedicated space-pages, page or
+comment reads. The v2 document (https://developer.atlassian.com/cloud/confluence/openapi-v2.v3.json,
+sha256 edb639bb…0ca08) carries all four once `pages.changed` becomes `GET /pages` (`getPages`) with
+`space-id` and `sort=-modified-date` (the sort enum includes `-modified-date`): the caller walks newest first
+and stops at the first page last modified before its cutoff. The provider uses v2 alone; this replaces the
+v1 choice above and the CQL row in the Operations table.
