@@ -104,7 +104,9 @@ lists the slide ids only, and each slide can then be read with
 | `presentations.create` | `slides.presentations.create` | `POST /v1/presentations` | none |
 | `presentations.batchUpdate` | `slides.presentations.batchUpdate` | `POST /v1/presentations/{presentationId}:batchUpdate` | preflight `presentations.get`: `revisionId` must equal the body's `writeControl.requiredRevisionId` |
 
-Both are required-approval mutations, like every catalog write: select
+They run on a separate write instance with the write scope; see
+[Authentication](#authentication). Both are required-approval mutations, like
+every catalog write: select
 `private_protocol = "connectors-private/2"`, permit them in the adapter's
 operation permissions, name them in the approval policy, and invoke each with a
 proof issued for its exact input, as the
@@ -132,13 +134,18 @@ approval is refused before the provider sends anything.
   `revisionId` differs from the pinned one, refuses with no POST sent. Google checks `requiredRevisionId` again when it applies the
   requests, and applies them all or none. After the POST the acknowledgement's
   `presentationId` must equal the input's; otherwise the outcome is reported as
-  unknown, never as refused.
+  unknown, never as refused. A `fields` value on `batchUpdate` must therefore
+  keep `presentationId` (for example `presentationId,replies`): an answer
+  narrowed without it carries no `presentationId`, and a write Google applied is
+  then reported as unknown.
 - The preflight reads the whole presentation, with no `fields`, so it is subject
   to the 4 MiB response limit: a presentation whose full answer exceeds it
   cannot be updated through this selection, and the write is refused before
   dispatch. The pinned document says `revisionId` is populated only for a user
-  with edit access; without it the preflight answer carries no revision and the
-  write is refused before dispatch.
+  with edit access. A view-only connection's `batchUpdate` therefore fails its
+  preflight as `upstream_protocol`, because the answer carries no `revisionId`,
+  and nothing is written; that code here means missing edit access, not a
+  provider fault.
 
 ## Authentication
 
@@ -160,10 +167,30 @@ not `presentations.readonly`. An instance that writes names
 `https://www.googleapis.com/auth/presentations` in both `minimum_scopes` and
 `requested_scopes`; it grants the reads too. With that configuration, a stored
 refresh token that was granted only the read-only scope fails validation as
-insufficient scope, and the CLI reports `next_action: repair_connection`. Add the
-write scope to an existing connection with `connections repair`, supplying an
-entry whose refresh token was granted the write scope; the Google identity must
-stay the same.
+insufficient scope.
+
+Writes use a separate instance. Configure a second instance id, such as
+`google-slides-write`: a copy of the configuration below with these values
+changed, as its own adapter entry in the host configuration with the writes in
+its operation permissions and `private_protocol = "connectors-private/2"`:
+
+```json
+{
+  "instance": "google-slides-write",
+  "auth": {
+    "minimum_scopes": ["https://www.googleapis.com/auth/presentations"],
+    "requested_scopes": ["openid", "https://www.googleapis.com/auth/presentations"]
+  }
+}
+```
+
+Then `connections connect` that instance with the Google client file. An
+existing read-only connection cannot be widened in place:
+`connections repair` cannot add a scope, because the configuration revision and
+the profile, whose `minimum_scopes` the scope changes, are part of the
+connection binding. Changing the scopes of the read instance itself leaves its
+connection bound to the old configuration, and a new connection on that same
+instance is refused while the old one exists.
 
 ```json
 {
