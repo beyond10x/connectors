@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:ess-pin-newest-release
 kind: story
-status: active
+status: implemented
 title: Move the ESS pin to the newest release
 relations:
 - serves: vision:independent-contract-adapters
@@ -12,29 +12,36 @@ scope:
 - confidence: cited
   path: Cargo.toml
 - confidence: cited
-  path: apps/connectors-cli-contract
-- confidence: inferred
   path: crates/connectors-build/src/metadata_conformance.rs
-- confidence: inferred
-  path: crates/connectors-build/src/metadata_entities.rs
 - confidence: cited
-  path: crates/connectors-host/src/local/metadata/entity-runtime-definitions.json
+  path: crates/connectors-host/src/local/metadata/er.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/tests.rs
 - confidence: cited
   path: crates/connectors-spec/src/toolchain.rs
+- confidence: cited
+  path: crates/connectors-spec/tests/adversary_ess_limit_notes.rs
 - confidence: cited
   path: crates/connectors-spec/toolchain.json
 - confidence: cited
   path: docs/development.md
-- confidence: inferred
-  path: ess/domains/artifact_provenance.yaml
-- confidence: inferred
-  path: ess/domains/auth_bindings.yaml
 - confidence: cited
-  path: website/docs/introduction/status.md
-revision: 6
+  path: ess/domains/approval_issuers.yaml
+- confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: cited
+  path: ess/domains/delegation.yaml
+- confidence: cited
+  path: ess/domains/execution_audit.yaml
+- confidence: cited
+  path: ess/domains/local_approval_policy.yaml
+- confidence: cited
+  path: ess/domains/mutations.yaml
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-29T21:31:58Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-09-29T21:31:58Z", actor: "human:timo", revision: 6}
+- {from: "active", to: "implemented", at: "2026-09-30T00:49:52Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Problem
 

@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-30T00:49:40Z",
+  "actor": "human:timo",
+  "artifact": "story:ess-pin-newest-release",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv on wave/20260929c-idle-writes-ess b8c0fea84, ESS 0.45.0: all checks passed, 95 suites, 699 passed, 0 failed, 33 ignored, metadata conformance 289 scenarios"
+  }
+}

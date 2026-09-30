@@ -2,43 +2,44 @@
 format: aep.planning-md/3
 id: story:provider-refusal-stage-for-writes-and-timeouts
 kind: story
-status: active
+status: implemented
 title: Provider refusals on writes, and provider timeouts, report dispatch with a fitting next action
 relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/catalog/src/lib.rs
-- confidence: inferred
+- confidence: cited
   path: adapters/catalog/tests/engine.rs
+- confidence: cited
+  path: adapters/sql/src/lib.rs
 - confidence: cited
   path: apps/connectors/src/local.rs
 - confidence: cited
   path: apps/connectors/src/local/operations.rs
 - confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
-- confidence: inferred
-  path: crates/connectors-core/src/lib.rs
 - confidence: cited
   path: crates/connectors-host/src/http.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/mutation.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-host/src/local/owner/mutation/execution.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-host/src/local/owner/mutation/tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/runtime.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-host/src/local/runtime/process/write_tests.rs
-- confidence: inferred
-  path: crates/connectors-host/src/local/runtime/writes.rs
-revision: 6
+- confidence: cited
+  path: crates/connectors-host/tests/provider_timeout_adversary.rs
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-29T21:31:57Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-09-29T21:31:57Z", actor: "human:timo", revision: 6}
+- {from: "active", to: "implemented", at: "2026-09-30T00:49:52Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Source
 
