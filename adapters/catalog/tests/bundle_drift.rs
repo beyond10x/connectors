@@ -12,8 +12,12 @@ use std::path::Path;
 /// relative to this crate. The profile and the count are literals, so a bundle
 /// rebuilt with another profile, or one that gains or loses a gap, fails here
 /// instead of being read back as correct. Confluence's 30 are writes whose
-/// request body is a `$ref`; no shipped read is among them.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 6] = [
+/// request body is a `$ref`; no shipped read is among them. GitLab's 67 are
+/// array query parameters declared `explode: false`, each sent as the one value
+/// a caller gives, as before arrays were read; shipped reads are among them
+/// (`labels` and `iids` on issues and merge requests, `topic` on projects), and
+/// none of them changes what is sent.
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 8] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -26,12 +30,26 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 6] = [
         "../gitlab/upstream/openapi_v3.yaml",
         None,
         "gitlab.pat",
+        67,
+    ),
+    (
+        "google-calendar",
+        "../google/generated/calendar.openapi.json",
+        Some("../google/upstream/calendar/calendar-api.json"),
+        "google.oauth",
         0,
     ),
     (
         "google-drive",
         "../google/generated/drive.openapi.json",
         Some("../google/upstream/drive/drive-api.json"),
+        "google.oauth",
+        0,
+    ),
+    (
+        "google-gmail",
+        "../google/generated/gmail.openapi.json",
+        Some("../google/upstream/gmail/gmail-api.json"),
         "google.oauth",
         0,
     ),
