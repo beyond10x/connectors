@@ -11,6 +11,25 @@
      "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
     {"id": "events.get", "operation_id": "calendar.events.get", "effect": "read",
      "description": "Read one event by calendarId and eventId",
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "events.insert", "operation_id": "calendar.events.insert", "effect": "write",
+     "description": "Create one event on calendarId (primary for the signed-in user's own) from body, a Calendar Event resource. Unguarded: nothing exists to compare before a create, so the same input approved and sent again makes a second event; a body.id must be unique per calendar, but the pinned document says Google cannot guarantee to detect a collision at creation, so an id does not make a repeated create safe. Every guest in body.attendees is invited, and sendUpdates (all, externalOnly or none) decides whom Google emails; the pinned document says some emails might still be sent and that none can leave external calendars out of sync, so name it explicitly. Among other effects: with conferenceDataVersion 1, body.conferenceData.createRequest creates a new conference, such as a Google Meet link, on the event; body.guestsCanModify lets guests change the event, and body.guestsCanInviteOthers and body.guestsCanSeeOtherGuests default to true, so guests may invite others and see each other unless the body says otherwise; body.visibility public shows its details to every reader of the calendar; body.recurrence makes it a recurring series; an outOfOffice or focusTime event whose body.outOfOfficeProperties or body.focusTimeProperties sets an autoDeclineMode other than declineNone declines conflicting meeting invitations; body.attachments needs supportsAttachments. This list is not exhaustive: the approval binds the whole input by digest, so read the whole input before approving",
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "events.patch", "operation_id": "calendar.events.patch", "effect": "write",
+     "description": "Change one event by calendarId and eventId while its etag is the pinned etag, read from events.get or events.list; the provider reads the event first and refuses before any write when its etag differs, and a change between that read and the patch is not detected. Each field given in body replaces the stored one: body.attendees replaces the whole guest list, so a guest left out is removed and a guest added is invited, and sendUpdates (all, externalOnly or none) decides whom Google emails about the change; name it explicitly. The id of a recurring event changes the series and so every instance of it. Among other effects: with conferenceDataVersion 1, body.conferenceData.createRequest creates a new conference on the event; body.guestsCanModify, body.guestsCanInviteOthers and body.guestsCanSeeOtherGuests change what guests may do and see; body.visibility changes who sees its details; body.recurrence changes the series. This list is not exhaustive: the approval binds the whole input by digest, so read the whole input before approving",
+     "guard": {
+       "preflight": {"operation_id": "calendar.events.get",
+                     "values": {"calendarId": "calendarId", "eventId": "eventId"},
+                     "checks": [{"pointer": "/etag", "expect": {"input": "etag"}}]},
+       "postflight": {"checks": []}},
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "events.delete", "operation_id": "calendar.events.delete", "effect": "write",
+     "description": "Delete one event by calendarId and eventId while its etag is the pinned etag, read from events.get or events.list; the provider reads the event first and refuses before any write when its etag differs, and a change between that read and the delete is not detected. The id of a recurring event deletes the series and so every instance of it; an instance's own id deletes that instance. sendUpdates (all, externalOnly or none) decides whom Google emails a cancellation; name it explicitly. Google answers with an empty body, returned as a null body. The approval binds the whole input by digest, so read the whole input before approving",
+     "guard": {
+       "preflight": {"operation_id": "calendar.events.get",
+                     "values": {"calendarId": "calendarId", "eventId": "eventId"},
+                     "checks": [{"pointer": "/etag", "expect": {"input": "etag"}}]},
+       "postflight": {"checks": []}},
      "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]}
   ]
 }
