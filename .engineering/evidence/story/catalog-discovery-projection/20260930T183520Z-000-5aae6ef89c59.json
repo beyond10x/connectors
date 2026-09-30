@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T18:35:20Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-discovery-projection",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv at b3fdab0a0 (wave/20260930c-final) from a short clone under ~/.cache, CONNECTORS_ESS=0.45.0, CONNECTORS_AEP=0.65.0",
+    "reference": "gate: all checks passed, exit 0; 134 test suites, 1089 passed, 0 failed, 43 ignored"
+  }
+}

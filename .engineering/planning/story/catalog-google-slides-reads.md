@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-google-slides-reads
 kind: story
-status: draft
+status: implemented
 title: Google Slides presentation and page reads
 relations:
 - decomposes: epic:google-workspace-reads
@@ -21,11 +21,15 @@ scope:
   path: adapters/catalog/tests/google_slides.rs
 - confidence: inferred
   path: adapters/google/generated/slides.openapi.json
-- confidence: inferred
-  path: adapters/google/generated/slides.projection.json
+- confidence: cited
+  path: adapters/google/generated/slides.openapi.projection.json
 - confidence: inferred
   path: docs/catalog-google-slides.md
-revision: 5
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-30T18:33:41Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
+- {from: "proposed", to: "active", at: "2026-09-30T18:33:41Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:42Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
 ---
 ## Outcome
 

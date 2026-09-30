@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-repeated-query-parameters
 kind: story
-status: draft
+status: implemented
 title: A form-exploded array query parameter is sent as one pair per element
 relations:
 - decomposes: epic:google-workspace-reads
@@ -16,7 +16,11 @@ scope:
   path: crates/connectors-catalog/src/template.rs
 - confidence: inferred
   path: crates/connectors-catalog/tests/inventory.rs
-revision: 3
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-30T17:43:06Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"review_outcome":5,"verification":1}}}
+- {from: "proposed", to: "active", at: "2026-09-30T17:43:06Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":5,"verification":1}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:43Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":5,"verification":1}}}
 ---
 ## Outcome
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-google-calendar-writes
 kind: story
-status: draft
+status: implemented
 title: 'Guarded Google Calendar event writes: insert, patch, delete'
 relations:
 - decomposes: epic:google-workspace-reads
@@ -16,7 +16,11 @@ scope:
   path: adapters/catalog/tests/google_calendar.rs
 - confidence: inferred
   path: docs/catalog-google-calendar.md
-revision: 5
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-30T16:44:52Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "proposed", to: "active", at: "2026-09-30T16:44:52Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:47Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":5,"verification":1}}}
 ---
 ## Outcome
 
