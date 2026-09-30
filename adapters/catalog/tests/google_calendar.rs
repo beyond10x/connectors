@@ -174,7 +174,8 @@ fn shipped_calendar_selections_are_the_three_reads_and_three_writes() {
         assert_eq!(operation.method, method, "`{id}`");
         assert_eq!(operation.path, path, "`{id}`");
         // A create has nothing to compare before it exists; patch and delete
-        // read the event first and require its `etag` to be the pinned one.
+        // read the event first and require it to be confirmed and its `etag`
+        // to be the pinned one.
         let guard = serde_json::to_value(&selection.guard).unwrap();
         let expected = if id == "events.insert" {
             Value::Null
@@ -182,7 +183,8 @@ fn shipped_calendar_selections_are_the_three_reads_and_three_writes() {
             json!({
                 "preflight": {"operation_id": "calendar.events.get",
                               "values": {"calendarId": "calendarId", "eventId": "eventId"},
-                              "checks": [{"pointer": "/etag", "expect": {"input": "etag"}}]},
+                              "checks": [{"pointer": "/status", "expect": {"literal": "confirmed"}},
+                                         {"pointer": "/etag", "expect": {"input": "etag"}}]},
                 "postflight": {"checks": []}})
         };
         assert_eq!(guard, expected, "`{id}` guard");
@@ -197,6 +199,12 @@ fn shipped_calendar_selections_are_the_three_reads_and_three_writes() {
         assert_eq!(
             required.as_array().unwrap().contains(&json!("etag")),
             id != "events.insert",
+            "`{id}` requires {required}"
+        );
+        // Every write names whom Google emails: `sendUpdates` is required.
+        assert_eq!(selection.required, ["sendUpdates"], "`{id}` required");
+        assert!(
+            required.as_array().unwrap().contains(&json!("sendUpdates")),
             "`{id}` requires {required}"
         );
         assert!(
@@ -458,7 +466,7 @@ fn guide_cites_each_write_its_guard_and_the_write_scope() {
         let guard = if id == "events.insert" {
             "none"
         } else {
-            "`/etag` equals the input `etag`"
+            "`/status` is `confirmed` and `/etag` equals the input `etag`"
         };
         let cited = rows.iter().any(|row| {
             row.starts_with(&format!("| `{id}` "))
@@ -569,12 +577,23 @@ fn write_descriptions_name_their_effects_and_the_digest_binding() {
                 "guestsCanModify",
                 "visibility",
                 "every instance",
+                "maxAttendees",
+                "attendeesOmitted",
+                "confirmed",
+                "tentative",
                 "by digest",
             ][..],
         ),
         (
             "events.delete",
-            &["etag", "sendUpdates", "every instance", "by digest"][..],
+            &[
+                "etag",
+                "sendUpdates",
+                "every instance",
+                "confirmed",
+                "tentative",
+                "by digest",
+            ][..],
         ),
     ] {
         let text = description(id);
@@ -717,6 +736,18 @@ fn answer(target: &str) -> Option<(u16, Value)> {
         )),
         "/calendar/v3/calendars/primary/events/fixture-event-1" => {
             ok(event("fixture-event-1", "first"))
+        }
+        // A deleted event, which the pinned document says `events.get` always
+        // returns, and a tentative one; each still carries the current `etag`.
+        "/calendar/v3/calendars/primary/events/fixture-event-cancelled" => {
+            let mut deleted = event("fixture-event-cancelled", "deleted");
+            deleted["status"] = json!("cancelled");
+            ok(deleted)
+        }
+        "/calendar/v3/calendars/primary/events/fixture-event-tentative" => {
+            let mut tentative = event("fixture-event-tentative", "tentative");
+            tentative["status"] = json!("tentative");
+            ok(tentative)
         }
         // An event Google no longer has: `410 Gone`, reason `deleted`.
         "/calendar/v3/calendars/primary/events/fixture-event-gone" => Some((
@@ -1555,6 +1586,37 @@ fn a_write_to_an_event_google_does_not_have_sends_no_write() {
             let outcome = write(&mut child, operation, &input);
             assert!(
                 outcome.is_err(),
+                "`{operation}` of {event_id}: {:?}",
+                outcome.map(|result| result.effect)
+            );
+            let route = format!("/calendar/v3/calendars/primary/events/{event_id}?");
+            assert_eq!(
+                provider.api_calls()[before..],
+                calls(&[("GET", &route)])[..],
+                "`{operation}` of {event_id}"
+            );
+        }
+    }
+    assert!(provider.bodies().is_empty(), "a write was sent");
+}
+
+/// An event whose `status` is not `confirmed` — a deleted event, answered as
+/// `cancelled` with an `etag` that equals the pin, or a `tentative` one — fails
+/// the preflight's literal check: the one `events.get` and no write.
+#[test]
+fn a_write_to_an_event_that_is_not_confirmed_sends_no_write() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for event_id in ["fixture-event-cancelled", "fixture-event-tentative"] {
+        for (operation, mut input) in [
+            ("events.patch", patch_input(ETAG)),
+            ("events.delete", delete_input(ETAG)),
+        ] {
+            input["eventId"] = json!(event_id);
+            let before = provider.api_calls().len();
+            let outcome = write(&mut child, operation, &input);
+            assert!(
+                matches!(outcome, Err(Failure::Forbidden)),
                 "`{operation}` of {event_id}: {:?}",
                 outcome.map(|result| result.effect)
             );
