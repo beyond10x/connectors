@@ -190,6 +190,25 @@ network routes are outside the no-launch/no-auth guarantee for local inspection.
 The current `serve --config` runtime stays a separate federation command; this
 contract does not claim its configuration starts the new local supervisor.
 
+These three compatibility commands accept the process global `--output` before
+or after the command word; it selects only the parse-refusal presentation, and
+successful results stay raw JSON. `--config` and `--state-dir` are not accepted
+before them (`serve --config` is that command's own argument). Their parse
+errors, including unknown, missing or malformed arguments, follow the output
+contract above: exit 2, empty stdout, and the fixed `cli_parse` code with empty
+data on stderr, never an argv echo. `COMMAND --help` prints that command's usage.
+Root `--help` or `-h`, alone or after leading process globals, prints the
+generated grouped help (the short form of the long help
+in `apps/connectors-cli-contract/help.txt`), one blank line and then this block,
+which the generated help does not carry:
+
+```text
+Explicit service commands (use COMMAND --help for options):
+  describe  Read a complete service descriptor
+  invoke    Invoke an explicit service operation
+  serve     Run the configured federation service
+```
+
 ## 3. Explicit local TOML configuration
 
 Selection order is explicit Context `--config`, then
