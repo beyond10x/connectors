@@ -18,6 +18,8 @@ pub mod metadata;
 pub mod mutations;
 pub mod oauth;
 #[cfg(test)]
+mod oauth_adversary_pass2_tests;
+#[cfg(test)]
 mod oauth_adversary_tests;
 pub mod owner;
 pub mod protected;

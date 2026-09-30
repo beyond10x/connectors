@@ -71,7 +71,21 @@ complete request within 2 seconds, as a browser's speculative connections do,
 is dropped and changes nothing. The first request for the redirect path `/`
 decides. A declined consent or a redirect with the wrong `state` ends the
 command without storing anything. A request after the first is answered 400
-and does not change the outcome; a request for another path is answered 404.
+and does not change the outcome; a request for another path is answered 404. A
+request whose head, cookies included, exceeds 64 KiB is dropped as not a
+request.
+
+The listener reads at most 64 connections at once. More than 64 pending local
+connections delay the redirect: while a local process holds every slot, the
+browser's redirect is closed unanswered until a slot frees, which happens at
+most 2 seconds after a connection opened without completing a request; a
+process that keeps re-opening them can hold the redirect off until consent
+times out. Any local process can also race the consent: the first request for
+`/` decides, so a process that sends one first ends the command without
+storing anything, and consent must be run again. This is as designed: the
+loopback address offers no stronger boundary, and `state` and PKCE keep such a
+process from substituting its own grant.
+
 The browser has to run on the machine the CLI runs on, because Google
 redirects to that machine's loopback address; over SSH, forward the port the
 consent address names.
