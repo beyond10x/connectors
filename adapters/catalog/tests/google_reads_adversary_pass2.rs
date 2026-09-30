@@ -60,11 +60,8 @@ fn drive() -> Engine {
 /// The Drive guide: "the selection declares `response: text` and the body is
 /// returned as a JSON string"; the selection: "returned as text". An export
 /// with no bytes — an empty spreadsheet exported as `text/csv`, a text
-/// `mimeType` the guide invites — is still text, so its body should be `""`.
-/// Today the engine returns `null` for any empty 2xx body before it looks at
-/// the text mode; that engine change is
-/// `story:catalog-engine-provider-refusal-shapes`. Until it lands this case
-/// pins today's `null`, so the change is seen when it arrives.
+/// `mimeType` the guide invites — is still text, so its body is `""`, not
+/// `null` (`story:catalog-engine-provider-refusal-shapes`).
 #[tokio::test]
 async fn an_empty_text_export_is_the_empty_string() {
     let http = scripted(200, "text/csv", b"");
@@ -78,13 +75,7 @@ async fn an_empty_text_export_is_the_empty_string() {
         .await
         .unwrap();
     assert_eq!(http.calls.lock().unwrap().len(), 1);
-    assert_eq!(
-        read["body"],
-        Value::Null,
-        "an empty export is now returned as {}: if story:catalog-engine-provider-refusal-shapes \
-         has landed, flip this case to assert the empty string `\"\"`",
-        read["body"]
-    );
+    assert_eq!(read["body"], json!(""));
 }
 
 /// The Drive guide's Limits: "does not retry on `429`; a rate-limited read is
