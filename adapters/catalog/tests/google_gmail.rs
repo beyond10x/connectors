@@ -1860,8 +1860,9 @@ fn users_drafts_send_refuses_a_body_beyond_the_draft_id() {
         .unwrap();
     assert_eq!(
         send.input_schema["properties"]["body"],
-        json!({"type": "object", "properties": {"id": {}}, "required": ["id"],
-               "additionalProperties": false})
+        json!({"type": "object",
+               "properties": {"id": {"type": ["string", "integer", "boolean"]}},
+               "required": ["id"], "additionalProperties": false})
     );
     let provider = Provider::writer();
     let mut child = Child::spawn(&provider.write_selection()).unwrap();
