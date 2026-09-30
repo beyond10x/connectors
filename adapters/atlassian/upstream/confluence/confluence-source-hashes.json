@@ -1,0 +1,9 @@
+[
+  {
+    "file": "confluence-v2.json",
+    "url": "https://developer.atlassian.com/cloud/confluence/openapi-v2.v3.json",
+    "sha256": "edb639bbc700ee451a996acd2568e51db4ceab954449427537df30f0ce20ca08",
+    "bytes": 614311,
+    "archive": "vendor/confluence-v2.json.gz"
+  }
+]

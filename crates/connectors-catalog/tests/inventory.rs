@@ -189,3 +189,89 @@ fn a_parameter_in_another_location_is_not_an_override() {
         vec![("id", Location::Path), ("id", Location::Query)]
     );
 }
+
+fn served(servers: serde_json::Value) -> serde_json::Value {
+    json!({
+        "openapi": "3.0.3",
+        "info": {"title": "Fixture", "version": "1"},
+        "servers": servers,
+        "paths": {"/pages/{id}": {"get": {"operationId": "readPage", "responses": {}}}}
+    })
+}
+
+#[test]
+fn a_path_is_recorded_below_its_servers_base_path() {
+    // OpenAPI 3.x: an operation path is appended to the server URL, so a
+    // document served under `/wiki/api/v2` sends `/wiki/api/v2/pages/{id}`.
+    for url in [
+        "https://{your-domain}/wiki/api/v2",
+        "https://site.example/wiki/api/v2/",
+        "//site.example/wiki/api/v2",
+        "/wiki/api/v2",
+    ] {
+        let inventory = extract(&served(json!([{"url": url}])));
+        assert_eq!(
+            inventory.operations[0].path, "/wiki/api/v2/pages/{id}",
+            "{url}"
+        );
+        assert!(inventory.unsupported.is_empty(), "{url}");
+    }
+}
+
+#[test]
+fn servers_at_the_root_leave_the_paths_as_written() {
+    for servers in [
+        json!([{"url": "https://{hostname}"}]),
+        json!([{"url": "https://your-domain.example"}, {"url": "https://other.example/"}]),
+        json!([]),
+    ] {
+        let inventory = extract(&served(servers.clone()));
+        assert_eq!(inventory.operations[0].path, "/pages/{id}", "{servers}");
+        assert!(inventory.unsupported.is_empty(), "{servers}");
+    }
+    let inventory = extract(&document());
+    assert_eq!(inventory.operations[0].path, "/projects");
+}
+
+#[test]
+fn servers_without_one_base_path_are_named_and_the_paths_kept() {
+    for servers in [
+        json!([{"url": "https://a.example/v1"}, {"url": "https://a.example/v2"}]),
+        json!([{"url": "https://a.example/{version}"}]),
+        json!([{"url": "v2"}]),
+        json!([{"description": "no url"}]),
+        json!({"url": "/v2"}),
+    ] {
+        let inventory = extract(&served(servers.clone()));
+        assert_eq!(inventory.operations[0].path, "/pages/{id}", "{servers}");
+        assert_eq!(inventory.unsupported.len(), 1, "{servers}");
+        assert_eq!(inventory.unsupported[0].designation, "document.servers");
+    }
+}
+
+#[test]
+fn a_servers_override_is_named_and_not_recorded_under_the_document_base() {
+    let own = json!([{"url": "https://site.example/wiki/rest/api"}]);
+    for paths in [
+        json!({"/user/current": {"servers": own, "get": {"operationId": "getCurrentUser"}}}),
+        json!({"/user/current": {"get": {"operationId": "getCurrentUser", "servers": own}}}),
+    ] {
+        let mut document = served(json!([{"url": "https://site.example/wiki/api/v2"}]));
+        document["paths"] = paths.clone();
+        let inventory = extract(&document);
+        assert!(inventory.operations.is_empty(), "{paths}");
+        assert_eq!(inventory.unsupported.len(), 1, "{paths}");
+        assert!(
+            inventory.unsupported[0]
+                .designation
+                .contains("/user/current"),
+            "{paths}"
+        );
+        assert!(
+            inventory.unsupported[0]
+                .reason
+                .contains("declares its own `servers`"),
+            "{paths}"
+        );
+    }
+}

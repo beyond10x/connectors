@@ -20,6 +20,8 @@ record, this README and the committed bundle index name one digest.
 The catalog provider compiles this document into
 `../../catalog/generated/bundles/jira.bundle.json`; the reviewed read-only
 selection set is `../../catalog/providers/jira/operations.json`, described in
-[the Jira guide](../../../docs/catalog-jira.md). Atlassian does not endorse this
+[the Jira guide](../../../docs/catalog-jira.md). Jira and Confluence
+([`confluence/`](confluence/README.md)) share the `atlassian.basic`
+authentication profile. Atlassian does not endorse this
 adapter. Refreshing the source means replacing this file, its archive, both
 records and the bundle together.

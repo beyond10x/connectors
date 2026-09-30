@@ -1,0 +1,17 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "confluence",
+  "operations": [
+    {"id": "pages.changed", "operation_id": "getPages", "effect": "read",
+     "description": "List pages newest-modified first (space-id, sort -modified-date), one page per call; the walk ends on a page without _links.next or at the first page whose version.createdAt is older than the caller's cutoff",
+     "bounds": {"limit": {"minimum": 1, "maximum": 250}}},
+    {"id": "space.pages", "operation_id": "getPagesInSpace", "effect": "read",
+     "description": "List one space's pages, one page per call; the walk follows the cursor in _links.next and ends on a page without it",
+     "bounds": {"limit": {"minimum": 1, "maximum": 250}}},
+    {"id": "page.get", "operation_id": "getPageById", "effect": "read",
+     "description": "Read one page; ask for body-format storage to receive its body"},
+    {"id": "page.comments", "operation_id": "getPageFooterComments", "effect": "read",
+     "description": "List one page's footer comments, one page per call; the walk follows the cursor in _links.next and ends on a page without it",
+     "bounds": {"limit": {"minimum": 1, "maximum": 250}}}
+  ]
+}
