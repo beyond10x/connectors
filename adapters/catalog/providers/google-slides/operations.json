@@ -4,12 +4,12 @@
   "operations": [
     {"id": "presentations.get", "operation_id": "slides.presentations.get", "effect": "read",
      "description": "Read one presentation by presentationId: its slides, layouts, masters and their elements; narrow it with fields to stay under the engine's 4 MiB response limit",
-     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded", "dailyLimitExceeded"]},
     {"id": "presentations.pages.get", "operation_id": "slides.presentations.pages.get", "effect": "read",
      "description": "Read one page of a presentation by presentationId and pageObjectId, with its page elements",
-     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded", "dailyLimitExceeded"]},
     {"id": "presentations.pages.getThumbnail", "operation_id": "slides.presentations.pages.getThumbnail", "effect": "read",
      "description": "Read a page thumbnail's contentUrl, width and height; the image behind contentUrl is not fetched. contentUrl gives anyone holding it the requester's access to the image for about 30 minutes: treat it as a credential and do not log or share it",
-     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]}
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded", "dailyLimitExceeded"]}
   ]
 }

@@ -306,6 +306,36 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
     }
 }
 
+/// The pinned document: beside `syncToken`, "All other query parameters should
+/// be the same as for the initial synchronization to avoid undefined
+/// behavior". The `events.list` description an agent reads says a delta
+/// repeats the full walk's other parameters, and does not offer a windowed
+/// full walk followed by an unwindowed delta.
+#[test]
+fn events_list_description_keeps_the_full_walk_parameters_for_the_delta() {
+    let file: Value = serde_json::from_slice(
+        &fs::read(root().join("providers/google-calendar/operations.json")).unwrap(),
+    )
+    .unwrap();
+    let description = file["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|o| o["id"] == "events.list")
+        .unwrap()["description"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        description.contains("repeats every other parameter of the full walk"),
+        "{description}"
+    );
+    assert!(
+        description.contains("a walk meant for sync tokens sends none of"),
+        "{description}"
+    );
+}
+
 /// The guide states the time window, the sync-token cycle and the reset rule:
 /// the parameters that cannot accompany a `syncToken`, and that a `410`
 /// (`fullSyncRequired`) means discarding the token for a full walk without it.
@@ -325,6 +355,7 @@ fn guide_documents_time_windows_sync_tokens_and_the_full_sync_reset() {
         "`not_found`",
         "`rate_limited`",
         "2500",
+        "**`fields` and the end conditions.**",
     ] {
         assert!(guide.contains(term), "the guide does not state {term}");
     }

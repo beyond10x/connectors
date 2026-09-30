@@ -142,8 +142,9 @@ consent.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Google's exact bytes.
 - The provider does not retry on `429`; a rate-limited read is returned as a
-  refusal. A `403` whose reason is `rateLimitExceeded` or
-  `userRateLimitExceeded` is Google's quota answer: every selection names both
-  in `rate_limit_reasons`, so it reaches the caller as `rate_limited`, not
+  refusal. A `403` whose reason is `rateLimitExceeded`,
+  `userRateLimitExceeded` or `dailyLimitExceeded` is Google's quota answer:
+  every selection names all three in `rate_limit_reasons`, so it reaches the
+  caller as `rate_limited`, not
   `forbidden`. Adding them changed the selection set, and so the
   configuration revision of a Slides instance.
