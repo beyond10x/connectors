@@ -112,21 +112,31 @@ refused before any request.
 
 ## Writes
 
-Three writes change Drive metadata. Each is a required-approval mutation: it
-runs only through the host's approval, audit and mutation coordinator, needs
-`private_protocol = "connectors-private/2"` and an approval policy naming it,
-and is prepared, approved and invoked as
-[the guarded merge guide](local-gitlab-merge.md) describes. The approval binds
-the whole input — every `body` member, the target `fileId`, the pinned `version`
-and every query parameter — so a proof issued for one body is refused for any
-other. Without a proof the write is refused before the provider is asked
-anything. Writes need the write scope; see [Authentication](#authentication).
+Three writes create, change and copy Drive files through their metadata. None
+uploads content, but a metadata write is not harmless: one `files.update` can
+also move a file, trash it or remove the access it inherits, and a create or
+copy can set who may share or copy the result (see the table). Each is a
+required-approval mutation: it runs only through the host's approval, audit and
+mutation coordinator, needs `private_protocol = "connectors-private/2"` and an
+approval policy naming it, and is prepared, approved and invoked as
+[the guarded merge guide](local-gitlab-merge.md) describes. Without a proof the
+write is refused before the provider is asked anything.
 
-| id | Discovery id | request | guard |
-|---|---|---|---|
-| `files.create` | `drive.files.create` | `POST /drive/v3/files` with a metadata `body` | none; the approval binds the whole body |
-| `files.update` | `drive.files.update` | `PATCH /drive/v3/files/{fileId}` with a metadata `body` | preflight `files.get`: `/version` equals the input `version` |
-| `files.copy` | `drive.files.copy` | `POST /drive/v3/files/{fileId}/copy` with a metadata `body` | none; the approval binds the whole body |
+The approval binds the whole input by its digest: the subject's `input_sha256`
+is the SHA-256 of the canonical input — every `body` member, the target
+`fileId`, the pinned `version` and every query parameter — so a proof issued for
+one input is refused for any other. The subject shows only that digest; the
+presentation `approvals prepare` returns names the instance, operation,
+connection and descriptor revision, not the input
+(`crates/connectors-host/src/local/owner/approval_issuance.rs`). Read the input
+file itself before approving: its query parameters and `body` decide what the
+write does. Writes need the write scope; see [Authentication](#authentication).
+
+| id | Discovery id | request | guard | beyond naming and describing a file |
+|---|---|---|---|---|
+| `files.create` | `drive.files.create` | `POST /drive/v3/files` with a metadata `body` | none; the approval binds the whole body | `body.parents` places it; `body.writersCanShare` (whether writers may change its permissions) and `body.copyRequiresWriterPermission` (whether readers and commenters may copy, print or download it) set who may share or copy it; `ignoreDefaultVisibility` skips the domain's default visibility |
+| `files.update` | `drive.files.update` | `PATCH /drive/v3/files/{fileId}` with a metadata `body` | preflight `files.get`: `/version` equals the input `version` | `addParents` and `removeParents` move it; `body.trashed` trashes it; `body.inheritedPermissionsDisabled` removes the access it inherits from its folders; `body.writersCanShare` and `body.copyRequiresWriterPermission` change who may share or copy it |
+| `files.copy` | `drive.files.copy` | `POST /drive/v3/files/{fileId}/copy` with a metadata `body` | none; the approval binds the whole body | `body.parents` places the copy; `body.writersCanShare` (whether writers may change its permissions) and `body.copyRequiresWriterPermission` (whether readers and commenters may copy, print or download it) set who may share or copy it; `ignoreDefaultVisibility` skips the domain's default visibility |
 
 - **Metadata only.** The projection excludes every media upload path and the
   `uploadType` parameter (`crates/connectors-catalog/src/discovery.rs`), so no
@@ -150,7 +160,19 @@ anything. Writes need the write scope; see [Authentication](#authentication).
   `invalid_input` before any request, and one whose `fields` leaves out
   `version` sends the preflight, gets no `version` back and writes nothing. Use
   `fields` such as `id,name,version`: the same `fields` selects the PATCH's
-  answer, which then carries the new version to pin next.
+  answer, which then carries the new version to pin next. The declared input
+  schema does not yet mark `fields` required, although the update refuses
+  without it; declaring it is `story:catalog-selection-required-parameters`.
+- **Shared-drive files are not supported by `files.update` yet.** A caller
+  updating a shared-drive file sends `supportsAllDrives`, and the PATCH carries
+  it, but the preflight `files.get` is sent with `fileId` and `fields` only: a
+  guard value is required, so an optional `supportsAllDrives` cannot be passed
+  to the preflight. Google documents that a request for a shared-drive item
+  needs `supportsAllDrives=true`, so the preflight cannot read such a file and
+  the update is refused before any write (inferred from the documentation, not
+  run against live Drive). Optional preflight values are
+  `story:catalog-guard-optional-preflight-values`. `files.create` and
+  `files.copy` have no preflight and pass `supportsAllDrives` through.
 - **Race boundary.** Drive offers no precondition on `files.update`, so the pin
   is checked in preflight only: a change between the preflight and the PATCH is
   not detected, and the guard compares nothing afterwards. This is the accepted
@@ -196,12 +218,17 @@ for obtaining the entry by consent.
 
 ### The write scope
 
-The writes need `https://www.googleapis.com/auth/drive.file`: access to the
-files this OAuth client created or that the user opened with it, and to no
-other file. The read scope stays, so the reads and each update's preflight still
-see every file; Drive refuses a write to a file outside `drive.file`. The write
-configuration is the one above with `drive.file` added to both
-`minimum_scopes` and `requested_scopes`:
+The writes need `https://www.googleapis.com/auth/drive.file`. Google documents
+it as "See, edit, create, and delete only the specific Google Drive files you
+use with this app" (the pinned Discovery document; see also
+[Choose Google Drive API scopes](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)).
+That is Google's stated scope semantics, not a behaviour this repository has
+verified: no live Drive file has been written, and whether a token holding both
+scopes may, for example, copy any readable file or create a file in a folder the
+app did not create is not known here. The read scope stays, so the reads and
+each update's preflight still see every file. The write configuration is the
+one above with `drive.file` added to both `minimum_scopes` and
+`requested_scopes`:
 
 ```json
 {
