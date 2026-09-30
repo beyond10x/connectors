@@ -74,13 +74,23 @@ end of a walk are in it.
   For the next page, send the previous page's `nextPageToken` as `pageToken`,
   with the other parameters unchanged. A page without `nextPageToken` is the
   last. `q` is Drive's search query (for example `trashed = false`).
+- **`fields` and the end conditions.** `fields` selects the parts of the answer
+  Drive returns, and a token it leaves out is not returned. The end conditions
+  above and below hold only when `fields`, if given, includes the tokens: include
+  `nextPageToken` for `files.list` (for example
+  `nextPageToken,files(id,name)`), and both `nextPageToken` and
+  `newStartPageToken` for `changes.list` (for example
+  `nextPageToken,newStartPageToken,changes`). Without them the first page looks
+  like the last, and a delta walk ends with no new baseline.
 - **`files.get`** reads metadata only. The media download (`alt=media`) is not
   projected, so `alt` is refused before any request; use `files.export` for the
   text of a Google Workspace document.
 - **`files.export`** takes the file's `fileId` and the target `mimeType`, such as
   `text/plain`. The projection declares its answer `application/octet-stream`,
   so the selection declares `response: text` and the body is returned as a JSON
-  string. Use a text `mimeType`: bytes that are not UTF-8 are refused as
+  string. An empty export (for example an empty spreadsheet as `text/csv`) is
+  returned as `null` today, not `""`; returning `""` is
+  `story:catalog-engine-provider-refusal-shapes`. Use a text `mimeType`: bytes that are not UTF-8 are refused as
   `upstream_protocol`. The response limit applies: an answer over 4 MiB
   (`connectors_core::RESPONSE_LIMIT`) is refused as `capacity`.
 - **Deltas.** Read a baseline once with `changes.getStartPageToken` and keep its
@@ -148,3 +158,9 @@ for obtaining the entry by consent.
   JSON, not as Drive's exact bytes.
 - The provider does not walk pages itself and does not retry on `429`; a
   rate-limited read is returned as a refusal.
+- Drive also signals an exceeded quota as a `403` whose `error.errors[].domain`
+  is `usageLimits` and whose `reason` is `userRateLimitExceeded` or
+  `rateLimitExceeded`. Today every `403` reaches the caller as `forbidden`, so
+  a quota refusal cannot be told apart from a permission denial by its code.
+  Reporting it as `rate_limited` is
+  `story:catalog-engine-provider-refusal-shapes`.
