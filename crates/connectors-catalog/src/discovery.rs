@@ -24,7 +24,7 @@
 //! | `httpMethod` | GET, POST, PUT, PATCH, DELETE; anything else refused |
 //! | `parameters` with `location` `path` / `query` | `in: path` / `in: query`; path parameters `required: true`, in template order, then query parameters by name |
 //! | parameter `required`, `description`, `deprecated` | on the parameter, as written |
-//! | parameter `type`, `format`, `enum`, `default`, `pattern`, `minimum`, `maximum` | on its `schema` (`default`, `minimum`, `maximum` are strings in Discovery and become the schema type's own values; a value that does not parse, or does not fit its `format` — `int32`, `uint32`, `float`, and the digits of a string `int64`/`uint64` — is refused) |
+//! | parameter `type`, `format`, `enum`, `default`, `pattern`, `minimum`, `maximum` | on its `schema` (`default`, `minimum`, `maximum` are strings in Discovery and become the schema type's own values; a value that does not parse, or does not fit its `format` — `int32`, `uint32`, `float`, the digits of a string `int64`/`uint64`, and the spelling of a string `date`, `date-time`, `google-datetime` (RFC 3339), `byte` (base64, standard or URL-safe) or `google-duration` — is refused; a `google-fieldmask` value is kept as written) |
 //! | `enumDescriptions` | `x-google-enum-descriptions` beside the `enum` |
 //! | `repeated: true` (query only) | `schema: {type: array, items: …}`, `style: form`, `explode: true` |
 //! | `request.$ref` | `requestBody` `application/json` → `#/components/schemas/<name>`, `required: true` |
@@ -32,7 +32,7 @@
 //! | `response.$ref` | `200` `application/json` → `#/components/schemas/<name>` |
 //! | no `response` | `200` with no content, or `application/octet-stream` when `supportsMediaDownload` |
 //! | `supportsMediaDownload` beside a `response` | ignored, listed: the media form needs `alt=media`, which is excluded |
-//! | `supportsMediaUpload` / `mediaUpload` | the metadata path is projected as above; each upload protocol path is excluded and listed; `mediaUpload.accept`, `maxSize` and `protocols.*.multipart` are ignored, listed |
+//! | `supportsMediaUpload` / `mediaUpload` | the metadata path is projected as above; each upload protocol path is excluded and listed; `mediaUpload.accept`, `maxSize` and `protocols.*.multipart` are ignored, listed; upload paths are recorded only for a projected method; media upload with no protocol is refused |
 //! | `useMediaDownloadService`, `supportsSubscription`, `parameterOrder`, `flatPath` | ignored, listed |
 //! | `scopes` | `x-google-scopes` on the operation; each must be declared in `auth`; no `securitySchemes` |
 //! | document `parameters` | `fields` projected on every operation; `$.xgafv`, `access_token`, `alt`, `callback`, `key`, `oauth_token`, `prettyPrint`, `quotaUser`, `uploadType`, `upload_protocol`, `userIp` excluded and listed; a method parameter of any of those twelve names is refused |
@@ -47,7 +47,7 @@
 //! | `$ref` inside schemas | `#/components/schemas/<name>`, beside the node's `description`, `readOnly`, `deprecated`, `annotations`; an unresolved name is refused |
 //! | nested `resources` and top-level `methods` | walked recursively; method ids are already fully qualified |
 //! | paths that differ only in template names, with different HTTP methods | the spelling most methods use (the first in order on a tie) is projected; each method on another spelling is excluded, named with its reason in the record (pinned: `gmail.users.settings.cse.identities.patch`) |
-//! | paths that differ only in template names, with the same HTTP method | refused: one OpenAPI path and one HTTP method |
+//! | paths that differ only in template names, with the same HTTP method (on the kept spelling or not) | refused: one OpenAPI path and one HTTP method |
 //! | two methods on one path and one HTTP method, or with one `id` | refused |
 //! | any key or value not in this table | refused, naming the JSON pointer |
 //!
@@ -462,16 +462,135 @@ fn scalar(kind: &str, format: Option<&str>, pointer: &str) -> Result<Map<String,
     Ok(out)
 }
 
+/// `n` ASCII digits, as a number.
+fn digits(text: &str) -> Option<u32> {
+    (!text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()))
+        .then(|| text.parse().ok())
+        .flatten()
+}
+
+/// `YYYY-MM-DD`, a day that exists (RFC 3339 `full-date`).
+fn is_date(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return false;
+    }
+    let (Some(year), Some(month), Some(day)) = (
+        digits(&text[0..4]),
+        digits(&text[5..7]),
+        digits(&text[8..10]),
+    ) else {
+        return false;
+    };
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let last = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return false,
+    };
+    (1..=last).contains(&day)
+}
+
+/// RFC 3339 `date-time`: `full-date "T" HH:MM:SS [.fraction] ("Z" / ±HH:MM)`,
+/// `T` and `Z` in either case, seconds up to 60 for a leap second.
+fn is_date_time(text: &str) -> bool {
+    let Some((date, time)) = text.split_once(['T', 't']) else {
+        return false;
+    };
+    let clock = |text: &str, seconds: bool| -> bool {
+        let parts: Vec<&str> = text.split(':').collect();
+        let expected = if seconds { 3 } else { 2 };
+        parts.len() == expected
+            && parts.iter().all(|part| part.len() == 2)
+            && digits(parts[0]).is_some_and(|hour| hour <= 23)
+            && digits(parts[1]).is_some_and(|minute| minute <= 59)
+            && (!seconds || digits(parts[2]).is_some_and(|second| second <= 60))
+    };
+    let (local, offset) = if let Some(local) = time.strip_suffix(['Z', 'z']) {
+        (local, None)
+    } else {
+        match time.rfind(['+', '-']) {
+            Some(at) => (&time[..at], Some(&time[at + 1..])),
+            None => return false,
+        }
+    };
+    let (whole, fraction) = match local.split_once('.') {
+        Some((whole, fraction)) => (whole, Some(fraction)),
+        None => (local, None),
+    };
+    is_date(date)
+        && clock(whole, true)
+        && fraction.is_none_or(|fraction| {
+            !fraction.is_empty() && fraction.bytes().all(|b| b.is_ascii_digit())
+        })
+        && offset.is_none_or(|offset| clock(offset, false))
+}
+
+/// Base64 in one alphabet, standard (`+`, `/`) or URL-safe (`-`, `_`): padded
+/// to a multiple of four with at most two `=`, or unpadded with a length that
+/// is not one more than a multiple of four. Google writes both alphabets.
+fn is_base64(text: &str) -> bool {
+    let body = text.trim_end_matches('=');
+    let padding = text.len() - body.len();
+    let standard = body
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/');
+    let url_safe = body
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    let length = if padding == 0 {
+        body.len() % 4 != 1
+    } else {
+        padding <= 2 && text.len().is_multiple_of(4)
+    };
+    (standard || url_safe) && length
+}
+
+/// A protobuf `Duration` in JSON: optional `-`, seconds, up to nine fraction
+/// digits, then `s`.
+fn is_duration(text: &str) -> bool {
+    let Some(number) = text.strip_suffix('s') else {
+        return false;
+    };
+    let number = number.strip_prefix('-').unwrap_or(number);
+    let (seconds, fraction) = match number.split_once('.') {
+        Some((seconds, fraction)) => (seconds, Some(fraction)),
+        None => (number, None),
+    };
+    let all_digits = |part: &str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
+    all_digits(seconds)
+        && fraction.is_none_or(|fraction| all_digits(fraction) && fraction.len() <= 9)
+}
+
+/// Whether a string default is spelled as its Discovery `format` is. A format
+/// with no checked spelling (`google-fieldmask`) accepts any string; `scalar`
+/// has already refused every format outside the table.
+fn spelled(format: &str, text: &str) -> bool {
+    match format {
+        "date" => is_date(text),
+        "date-time" | "google-datetime" => is_date_time(text),
+        "byte" => is_base64(text),
+        "google-duration" => is_duration(text),
+        _ => true,
+    }
+}
+
 /// A Discovery string holding a value of `kind` and `format`, as that kind's own
 /// JSON value. The value must fit its format: `int32` and `uint32` bound an
-/// integer, `float` bounds a number, and the string formats `int64` and `uint64`
-/// bound the digits a string carries. A value outside its format is refused, so
-/// no schema contradicts its own `format` (adversary pass 1, F6).
+/// integer, `float` bounds a number, the string formats `int64` and `uint64`
+/// bound the digits a string carries, and the string formats `date`,
+/// `date-time`, `google-datetime`, `byte` and `google-duration` must be spelled
+/// as that format is (see [`spelled`]). A value outside its format is refused.
+/// `google-fieldmask` has no spelling this projector checks, so its value is
+/// kept as written (adversary pass 1, F6; pass 2, G2).
 fn typed(kind: &str, format: Option<&str>, text: &str, pointer: &str) -> Result<Value> {
     let parsed = match (kind, format) {
         ("string", Some("int64")) => text.parse::<i64>().ok().map(|_| json!(text)),
         ("string", Some("uint64")) => text.parse::<u64>().ok().map(|_| json!(text)),
-        ("string", _) => Some(json!(text)),
+        ("string", Some(format)) => spelled(format, text).then(|| json!(text)),
+        ("string", None) => Some(json!(text)),
         ("boolean", _) => match text {
             "true" => Some(json!(true)),
             "false" => Some(json!(false)),
@@ -952,6 +1071,9 @@ struct Candidate {
     at: String,
     operation: Value,
     rewritten: Option<RewrittenPath>,
+    /// Its upload protocol paths, recorded only if the method is projected
+    /// (adversary pass 2, G3).
+    uploads: Vec<UploadPath>,
 }
 
 /// Everything collected while walking the methods.
@@ -963,7 +1085,6 @@ struct Walk<'a> {
     /// Operation id → the pointer of its method.
     ids: BTreeMap<String, String>,
     method_count: usize,
-    uploads: Vec<UploadPath>,
     ignored: BTreeSet<String>,
 }
 
@@ -973,6 +1094,7 @@ type Selected = (
     Vec<String>,
     Vec<ExcludedMethod>,
     Vec<RewrittenPath>,
+    Vec<UploadPath>,
 );
 
 /// OpenAPI 3.0.3 admits one spelling of templated paths that differ only in
@@ -1005,6 +1127,7 @@ fn select(mut candidates: Vec<Candidate>) -> Result<Selected> {
     let mut operations = Vec::new();
     let mut excluded = Vec::new();
     let mut rewritten = Vec::new();
+    let mut uploads = Vec::new();
     candidates.sort_by(|a, b| a.at.cmp(&b.at));
     // Every method on a kept spelling is placed first, so that a method on
     // another spelling can be judged against all of them.
@@ -1026,14 +1149,21 @@ fn select(mut candidates: Vec<Candidate>) -> Result<Selected> {
         item.insert(candidate.verb.to_owned(), candidate.operation);
         operations.push(candidate.id);
         rewritten.extend(candidate.rewritten);
+        uploads.extend(candidate.uploads);
     }
+    // Every (OpenAPI path, HTTP method) pair a method off the kept spelling
+    // claims, so two such methods meet each other too (adversary pass 2, G1).
+    let mut claimed: BTreeSet<(String, &'static str)> = BTreeSet::new();
     for candidate in elsewhere {
         let chosen = &kept[&candidate.shape];
         // One OpenAPI path and one HTTP method, whatever the names are spelled:
         // the same collision as two methods on one spelling, and refused alike
-        // (adversary pass 1, F3). Only a method whose HTTP method the kept
-        // spelling does not carry is excluded instead.
-        if paths[chosen].contains_key(candidate.verb) {
+        // (adversary pass 1, F3), including against another method off the kept
+        // spelling (pass 2, G1). Only a method whose HTTP method nothing else on
+        // that OpenAPI path carries is excluded instead.
+        if paths[chosen].contains_key(candidate.verb)
+            || !claimed.insert((chosen.clone(), candidate.verb))
+        {
             return invalid(
                 &candidate.at,
                 format!(
@@ -1055,7 +1185,10 @@ fn select(mut candidates: Vec<Candidate>) -> Result<Selected> {
     operations.sort();
     excluded.sort_by(|a, b| a.id.cmp(&b.id));
     rewritten.sort_by(|a, b| a.operation_id.cmp(&b.operation_id));
-    Ok((paths, operations, excluded, rewritten))
+    uploads.sort_by(|a: &UploadPath, b: &UploadPath| {
+        (&a.operation_id, &a.protocol, &a.path).cmp(&(&b.operation_id, &b.protocol, &b.path))
+    });
+    Ok((paths, operations, excluded, rewritten, uploads))
 }
 
 fn resource(node: &Map<String, Value>, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
@@ -1228,6 +1361,7 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
     }
 
     let upload = boolean(map, "supportsMediaUpload", pointer)?;
+    let mut uploads = Vec::new();
     match (upload, map.get("mediaUpload")) {
         (Some(true), Some(media)) => {
             let at = child(pointer, "mediaUpload");
@@ -1248,6 +1382,11 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
             };
             let protocols = object(protocols, &protocols_at)?;
             only(protocols, &protocols_at, &["simple", "resumable"])?;
+            // Media upload with no protocol has nothing to exclude and nothing to
+            // project: it is refused rather than dropped (adversary pass 2, G4).
+            if protocols.is_empty() {
+                return invalid(&protocols_at, "media upload with no protocol");
+            }
             for (protocol, value) in protocols {
                 let here = child(&protocols_at, protocol);
                 let entry = object(value, &here)?;
@@ -1259,7 +1398,7 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
                 if !path.starts_with('/') {
                     return invalid(&child(&here, "path"), "an upload path is absolute");
                 }
-                walk.uploads.push(UploadPath {
+                uploads.push(UploadPath {
                     operation_id: id.to_owned(),
                     protocol: protocol.clone(),
                     path: path.to_owned(),
@@ -1312,6 +1451,7 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
             path: shape.path.clone(),
         }),
         path: shape.path,
+        uploads,
     });
     Ok(())
 }
@@ -1441,11 +1581,11 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
         candidates: Vec::new(),
         ids: BTreeMap::new(),
         method_count: 0,
-        uploads: Vec::new(),
         ignored,
     };
     resource(document, "", &mut walk)?;
-    let (paths, operations, excluded_methods, rewritten_paths) = select(walk.candidates)?;
+    let (paths, operations, excluded_methods, rewritten_paths, excluded_upload_paths) =
+        select(walk.candidates)?;
 
     let mut openapi = Map::new();
     openapi.insert("openapi".into(), json!(OPENAPI));
@@ -1467,9 +1607,6 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
         openapi.insert("components".into(), json!({"schemas": components}));
     }
 
-    walk.uploads.sort_by(|a, b| {
-        (&a.operation_id, &a.protocol, &a.path).cmp(&(&b.operation_id, &b.protocol, &b.path))
-    });
     let record = ProjectionRecord {
         projector: PROJECTOR.to_owned(),
         source_sha256: hex::encode(Sha256::digest(bytes)),
@@ -1480,7 +1617,7 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
         excluded_methods,
         rewritten_paths,
         excluded_parameters,
-        excluded_upload_paths: walk.uploads,
+        excluded_upload_paths,
         ignored_keys: walk.ignored.into_iter().collect(),
     };
     Ok(Projection {
