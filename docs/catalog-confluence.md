@@ -67,7 +67,8 @@ the end of a walk are in it.
   before any request.
 - **`pages.changed`** is the delta read. The pinned document gives `getPages`
   no updated-since parameter, so the time window is a stop rule the caller
-  applies. Send `space-id` (one id, or several as one comma-separated string),
+  applies. Send `space-id` (one id, several as a JSON array of ids, or several
+  as one comma-separated string),
   `sort=-modified-date` and `body-format` (`storage` for the body in storage
   format). `sort=-modified-date` is required: the stop rule only holds when the
   newest-modified pages come first, and without it the deltas are wrong. A
@@ -214,7 +215,11 @@ document, expiry and scopes as in the Jira guide. **Not verified live.**
   not as Confluence's exact bytes.
 - The cursor is sent as given. Take it from `_links.next` percent-decoded, or the
   engine encodes it a second time.
-- `space-id` is declared as an array by the pinned document; the engine sends
-  one value per parameter, so pass one id or a comma-separated string.
+- The pinned document declares some query parameters as arrays: `id`,
+  `space-id` (both of integers) and `status` on `pages.changed`, and `status` on
+  `space.pages`, `page.get` and `page.comments`. Each takes a JSON array, sent
+  as one `name=value` pair per element in the order given, or one value (a
+  comma-separated string included), sent as one pair as before. See
+  [array and required query parameters](local-catalog-provider.md#array-and-required-query-parameters).
 - The provider does not walk pages itself and does not retry on `429`; a
   rate-limited read is returned as a refusal.

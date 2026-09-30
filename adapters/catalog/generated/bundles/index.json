@@ -3,7 +3,7 @@
     {
       "provider": "confluence",
       "file_name": "confluence.bundle.json",
-      "bundle_sha256": "9ecf9453b051988f4e09016807406813b7392f4301abb6d346cbff4bae7877de",
+      "bundle_sha256": "1bffcc5c89c4c16ef63064bb70b4335cf34937d5841c81860d30cc561d572752",
       "source_sha256": "edb639bbc700ee451a996acd2568e51db4ceab954449427537df30f0ce20ca08",
       "operations": 218,
       "unsupported": 30
@@ -11,15 +11,15 @@
     {
       "provider": "gitlab",
       "file_name": "gitlab.bundle.json",
-      "bundle_sha256": "da458f3b69bf4634579d61482fa020733ef888c5d7de63cbb0e097b3685bd127",
+      "bundle_sha256": "89090cc0a41c921afe9fc2d93480a493a33731e8017a1232fac32aa5478a3788",
       "source_sha256": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530",
       "operations": 1847,
-      "unsupported": 0
+      "unsupported": 67
     },
     {
       "provider": "jira",
       "file_name": "jira.bundle.json",
-      "bundle_sha256": "d3f12cb8d0bd91c42c6bd804457b66078bbdbc033015aa4af777f8e7f1eba0fd",
+      "bundle_sha256": "96a7508cb558252ec1f1e38c8be2241100326f2265e229436f1cf11853257eee",
       "source_sha256": "655b4790a5c8543c81755c8250c6a8b8f58ee62712168a39d628d6d927549709",
       "operations": 620,
       "unsupported": 0
