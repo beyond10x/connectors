@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:confluence-openapi-redistribution
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided whether the Confluence OpenAPI documents may be committed to a public repository
 relations:
 - blocks: story:catalog-confluence-reads
 withholds: test_result
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-09-30T07:53:27Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -36,3 +38,9 @@ passed, source-hashes 103 across 9 manifests). It includes the multi-source bund
 ## Cleared by
 
 An operator decision: vendor as is; vendor digests only and fetch at build time; or drop Confluence.
+
+## Answer (operator, 2026-09-30)
+
+"2 documents: jira + confluence - but they can share the auth profile." The Confluence document may be
+vendored like the Jira one: one pinned document per provider, and both providers use one shared Atlassian
+basic-auth profile.
