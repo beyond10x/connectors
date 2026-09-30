@@ -111,6 +111,12 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         // A sent request's deadline that passed, or a marked upstream capacity
         // answer; the host's and the adapter's own limits stay admission.
         Timeout | Capacity if provider => ("dispatch", "retry_explicitly", false),
+        // A connect's acquisition that failed before publication: the owner
+        // recorded it as failed, as `connections status` then reports. A lost
+        // reply never gets here; the client reports it as `outcome_unknown`.
+        Unavailable | Timeout if error.acquisition.is_some() => {
+            ("dispatch", "retry_explicitly", false)
+        }
         InvalidInput => ("arguments", "none", true),
         InvalidConfiguration => ("configuration", "check_configuration", true),
         ProtectedEntryUnavailable => ("protected_entry", "select_protected_source", true),
