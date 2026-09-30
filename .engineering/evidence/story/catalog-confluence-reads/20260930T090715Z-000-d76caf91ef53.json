@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-30T09:07:15Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-confluence-reads",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv on wave/20260930-atlassian 0025717d8, ESS 0.45.0: all checks passed, 98 suites, 721 passed, 0 failed, 33 ignored"
+  }
+}

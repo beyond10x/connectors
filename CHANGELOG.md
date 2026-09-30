@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The catalog provider reads Confluence Cloud: `pages.changed` (pages newest first by
+  modification date, walked to a cutoff), `space.pages`, `page.get` (body in storage
+  format) and `page.comments`, from the pinned REST v2 document; `limit` is bounded to
+  1–250. See `docs/catalog-confluence.md`.
+- Catalog bundles record each operation path below its document's server path; a path or
+  operation that declares its own `servers` is named unsupported.
+
+### Changed
+
+- **Breaking:** Jira and Confluence share one auth profile. The Jira profile `jira.basic`
+  (identity kind `jira.user`) is now `atlassian.basic` (identity kind `atlassian.account`).
+  A configuration that names `jira.basic` must name `atlassian.basic` and connect again.
+
 ## 0.17.0 — 2026-09-30
 
 ### Changed
