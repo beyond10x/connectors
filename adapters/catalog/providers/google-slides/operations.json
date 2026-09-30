@@ -11,7 +11,7 @@
     {"id": "presentations.create", "operation_id": "slides.presentations.create", "effect": "write",
      "description": "Create a blank presentation from the body's title, and presentationId if one is given; Google ignores every other body field. Unguarded: nothing exists to compare before a create"},
     {"id": "presentations.batchUpdate", "operation_id": "slides.presentations.batchUpdate", "effect": "write",
-     "description": "Apply body.requests atomically to a presentation whose current revisionId equals the pinned body.writeControl.requiredRevisionId, which is required; Google checks that revision again when it applies them. A fields value must keep presentationId, otherwise an applied write is reported unknown",
+     "description": "Apply body.requests atomically to a presentation whose current revisionId equals the pinned body.writeControl.requiredRevisionId, which is required; Google checks that revision again when it applies them. A fields value must keep presentationId, otherwise an applied write is reported unknown. createImage, replaceImage and replaceAllShapesWithImage store their URL in the deck as Image.sourceUrl, readable by every viewer: never pass a getThumbnail contentUrl as an image URL. Comment requests (Developer Preview) can fail on a 200 that is reported applied: read commentUpdateState in the answer",
      "guard": {
        "preflight": {"operation_id": "slides.presentations.get",
                      "values": {"presentationId": "presentationId"},

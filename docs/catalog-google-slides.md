@@ -138,6 +138,19 @@ approval is refused before the provider sends anything.
   keep `presentationId` (for example `presentationId,replies`): an answer
   narrowed without it carries no `presentationId`, and a write Google applied is
   then reported as unknown.
+- **Image URLs are published.** `createImage`, `replaceImage` and
+  `replaceAllShapesWithImage` take an image URL, which the pinned document says
+  is saved with the image and exposed as `Image.sourceUrl`: every viewer of the
+  deck can read it. Never use a `presentations.pages.getThumbnail`
+  `contentUrl` as an image URL; that URL grants the requester's access to
+  whoever holds it, and the provider forwards the request unchanged.
+- **Comment requests.** `insertComment`, `deleteComment`, `addCommentReply`,
+  `deleteCommentReply` and `updateCommentPost` are Developer Preview in the
+  pinned document. Their updates can fail on a 200: the answer's
+  `commentUpdateState` is then `ALL_FAILED_UNKNOWN_REASON`, and the engine
+  reports the write applied, because it compares only `presentationId`. A
+  caller that sends comment requests must read `commentUpdateState` in the
+  answer; "all or none" above does not cover them.
 - The preflight reads the whole presentation, with no `fields`, so it is subject
   to the 4 MiB response limit: a presentation whose full answer exceeds it
   cannot be updated through this selection, and the write is refused before
@@ -208,7 +221,7 @@ instance is refused while the old one exists.
     "identity": {"source": "id_token", "kind": "google.user"},
     "minimum_scopes": ["https://www.googleapis.com/auth/presentations.readonly"],
     "token_url": "https://oauth2.googleapis.com/token",
-    "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
     "requested_scopes": ["openid", "https://www.googleapis.com/auth/presentations.readonly"]
   },
   "operations_file": "/absolute/path/adapters/catalog/providers/google-slides/operations.json"
