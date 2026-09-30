@@ -4,11 +4,14 @@ use connectors_host::{
     federation::{Federation, FederationConfig},
 };
 use connectors_sdk::Credential;
-use std::{path::PathBuf, sync::Arc};
+use std::{ffi::OsString, path::PathBuf, sync::Arc};
 
 #[derive(Parser)]
 #[command(about = "Discover and invoke independently hosted connector contracts")]
 struct Args {
+    /// Output for parse refusals; successful results stay raw JSON.
+    #[arg(long, global = true, value_parser = ["human", "json"], default_value = "human")]
+    output: String,
     #[command(subcommand)]
     command: Command,
 }
@@ -40,15 +43,44 @@ enum Command {
     },
 }
 
-pub async fn main() {
+pub async fn main(argv: Vec<OsString>) {
+    let args = match Args::try_parse_from(&argv) {
+        Ok(args) => args,
+        Err(error) if error.kind() == clap::error::ErrorKind::DisplayHelp => error.exit(),
+        Err(_) => parse_refusal(&argv),
+    };
     connectors_host::logging();
-    if let Err(error) = run(Args::parse()).await {
+    if let Err(error) = run(args).await {
         eprintln!(
             "{}",
             serde_json::to_string(&error).unwrap_or_else(|_| "{\"code\":\"internal\"}".into())
         );
         std::process::exit(1);
     }
+}
+/// The contract's fixed parser refusal: exit 2, empty stdout, no argv echo.
+fn parse_refusal(argv: &[OsString]) -> ! {
+    let mut json = false;
+    let mut previous = false;
+    for arg in argv.iter().skip(1) {
+        if arg == "--" {
+            break;
+        }
+        if arg == "--output=json" || (previous && arg == "json") {
+            json = true;
+            break;
+        }
+        previous = arg == "--output";
+    }
+    if json {
+        eprintln!(
+            "{}",
+            serde_json::json!({"ok": false, "error": {"code": "cli_parse", "data": {}}})
+        );
+    } else {
+        eprintln!("cli_parse");
+    }
+    std::process::exit(2);
 }
 async fn client(
     endpoint: String,

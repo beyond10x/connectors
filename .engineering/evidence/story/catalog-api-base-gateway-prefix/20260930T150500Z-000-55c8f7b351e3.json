@@ -1,0 +1,12 @@
+{
+  "at": "2026-09-30T15:05:00Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-api-base-gateway-prefix",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "coordinator live check 2026-09-30: service-account token connected Jira through https://api.atlassian.com/ex/jira/<cloud id>/rest/api/3 with request_prefix and atlassian.basic; issues.search returned 10 issues and a nextPageToken"
+  }
+}

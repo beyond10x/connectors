@@ -13,6 +13,7 @@ fn parameter(name: &str, location: Location, required: bool) -> Parameter {
         name: name.to_owned(),
         location,
         required,
+        value_type: None,
     }
 }
 
