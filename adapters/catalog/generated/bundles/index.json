@@ -17,6 +17,14 @@
       "unsupported": 0
     },
     {
+      "provider": "hubspot",
+      "file_name": "hubspot.bundle.json",
+      "bundle_sha256": "23aafb8c8d1c70908076b513aec0394fb528a464974b5f16e7c58d254e67d2cb",
+      "source_sha256": "1cb7ca32e7a9ff224838f8c1f02a99104e509d651fc2524dfd16f77fdc9be9f9",
+      "operations": 11,
+      "unsupported": 0
+    },
+    {
       "provider": "jira",
       "file_name": "jira.bundle.json",
       "bundle_sha256": "56c1ad99046e00132bbdfaefec86cc702e1096ce7571ccb6b13454493dbc7dd4",
