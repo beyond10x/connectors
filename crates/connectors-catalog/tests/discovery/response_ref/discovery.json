@@ -1,0 +1,37 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "list": {
+          "id": "fixture.things.list",
+          "path": "things",
+          "httpMethod": "GET",
+          "response": {"$ref": "ThingList"}
+        }
+      }
+    }
+  },
+  "schemas": {
+    "ThingList": {
+      "id": "ThingList",
+      "type": "object",
+      "properties": {
+        "things": {"type": "array", "items": {"$ref": "Thing"}},
+        "nextPageToken": {"type": "string"}
+      }
+    },
+    "Thing": {
+      "id": "Thing",
+      "type": "object",
+      "properties": {"name": {"type": "string"}}
+    }
+  }
+}

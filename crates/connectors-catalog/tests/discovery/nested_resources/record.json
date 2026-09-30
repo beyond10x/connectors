@@ -1,0 +1,15 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 3,
+  "operations": [
+    "fixture.batchGet",
+    "fixture.users.getProfile",
+    "fixture.users.settings.filters.list"
+  ],
+  "excluded_methods": [],
+  "rewritten_paths": [],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [],
+  "ignored_keys": []
+}
