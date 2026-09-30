@@ -1,10 +1,11 @@
 # Gmail through the catalog provider
 
 The catalog provider reads Gmail — the mailbox profile, messages, threads, the
-change history and labels — from the pinned Gmail API v1 Discovery document.
-Nothing here is Gmail-specific code: the Discovery document is projected into
-OpenAPI, the projection is compiled into a bundle, a reviewed selection set
-exposes seven reads, and the engine described in
+change history and labels — and writes mail through drafts under approval,
+from the pinned Gmail API v1 Discovery document. Nothing here is Gmail-specific
+code: the Discovery document is projected into OpenAPI, the projection is
+compiled into a bundle, a reviewed selection set exposes seven reads and two
+draft writes, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there; this
 page covers what differs for Gmail. Authentication is the `oauth2_refresh`
@@ -40,8 +41,9 @@ projection record `gmail.openapi.projection.json`. Of the document's 79 methods,
 78 are projected. One is excluded and listed in the record with its reason:
 `gmail.users.settings.cse.identities.patch`, whose path differs from another
 method's only in a parameter name, which OpenAPI 3.0.3 does not admit. The
-media-upload paths of six methods are listed there as excluded too; none of
-them is a read. The document's service path is empty, so the projection's one
+media-upload paths of six methods are listed there as excluded too, among them
+those of `gmail.users.drafts.create` and `gmail.users.drafts.send`; the two
+draft writes take a JSON body only. The document's service path is empty, so the projection's one
 server is `https://gmail.googleapis.com` and every path carries its own
 `/gmail/v1`. The bundle carries all 78 projected operations and names none
 unsupported. `adapters/catalog/tests/bundle_drift.rs` regenerates the
@@ -52,12 +54,17 @@ reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/google-gmail/operations.json`](../adapters/catalog/providers/google-gmail/operations.json)
-exposes seven reads and nothing else. Each is `effect: read`; none of the
-document's writes (sending, drafts, labels, settings, trash) is selected. A
-selection id is the Discovery method id without its `gmail.` prefix.
-`adapters/catalog/tests/google_gmail.rs` pins this exact id list and each id's
-Discovery id and path, so a renamed or dropped id, or a method that moved, fails
-the gate. The bundle refuses at load any `operation_id` the projection lacks.
+exposes seven reads and two draft writes, and nothing else. The reads are
+`effect: read`; `users.drafts.create` and `users.drafts.send` are
+`effect: write` (see [Writes](#writes)). No other write of the document —
+labels, settings, trash, message import — is selected, and
+`users.messages.send` is not selected: mail leaves only as a draft that exists,
+can be read, and is sent by id. A selection id is the Discovery method id
+without its `gmail.` prefix. `adapters/catalog/tests/google_gmail.rs` pins this
+exact id list and each id's Discovery id, path and effect, and that no selection
+exposes `gmail.users.messages.send`, so a renamed, dropped or added id, or a
+method that moved, fails the gate. The bundle refuses at load any
+`operation_id` the projection lacks.
 
 Every list returns one page per call. The provider returns `status`, `body` and
 `provenance`; `body` is Gmail's answer unchanged, and the fields that decide the
@@ -122,6 +129,82 @@ answered `404`, which reaches the caller as `not_found`. On that refusal, do a
 full sync: walk `users.messages.list` (or `users.threads.list`) from the first
 page, read what is needed, and take a new baseline from `users.getProfile`.
 
+## Writes
+
+| id | Discovery id | request | guard |
+|---|---|---|---|
+| `users.drafts.create` | `gmail.users.drafts.create` | `POST /gmail/v1/users/{userId}/drafts` | none |
+| `users.drafts.send` | `gmail.users.drafts.send` | `POST /gmail/v1/users/{userId}/drafts/send` | preflight `users.drafts.get`: the draft's `message.id` must equal the input's `messageId` |
+
+Gmail is written through drafts only: a draft is created, can be read, and is
+then sent by id, so the approval to send binds a message the issuer has read.
+`users.messages.send` is not selected; it would send a message that never
+existed as a draft, bound only by the digest of its own input.
+
+They run on a separate write instance with the compose scope; see
+[Authentication](#authentication). Both are required-approval mutations, like
+every catalog write: select `private_protocol = "connectors-private/2"`, permit
+them in the adapter's operation permissions, name them in the approval policy,
+and invoke each with a proof issued for its exact input, as the
+[guarded merge guide](local-gitlab-merge.md) walks through for GitLab. The
+approval subject carries the digest of the whole input, `body` included, so a
+proof issued for one input is refused for any other. What the issuer is shown
+is the instance, operation, connection and descriptor revision, not the input
+(`crates/connectors-host/src/local/owner/approval_issuance.rs`): read the input
+file, and the message it names, before approving. A write offered without an
+approval is refused before the provider sends anything.
+
+- **`users.drafts.create`** takes `userId` (`me`) and a `body` whose
+  `message.raw` is the whole message: RFC 5322 text (the pinned document says
+  RFC 2822), encoded base64url. It sends nothing. The headers inside that
+  message are what a later send uses: `To`, `Cc` and `Bcc` are its recipients,
+  `Subject` and `From` what they see. `body.message.threadId` files the draft
+  in an existing thread, which the pinned document says also needs matching
+  `References` and `In-Reply-To` headers and the same `Subject`. A create is not
+  idempotent: the same input twice makes a second draft. It carries no guard:
+  there is nothing to compare before a draft exists. The answer is the draft:
+  its `id` and its `message.id`, the two values a send pins.
+
+  ```json
+  {"userId": "me", "body": {"message": {"raw": "<base64url RFC 5322 message>"}}}
+  ```
+
+  To approve it, decode `body.message.raw` from the input file and read the
+  headers and body: the approval binds exactly those bytes.
+- **`users.drafts.send`** sends an existing draft to every recipient in its
+  `To`, `Cc` and `Bcc` headers. A sent message cannot be recalled. It takes
+  `userId`, the draft id as `body.id`, and `messageId`, the draft's
+  `message.id` the issuer read:
+
+  ```json
+  {"userId": "me", "messageId": "<the draft's message.id>", "body": {"id": "<draft id>"}}
+  ```
+
+  `messageId` is compared, never sent: the POST body is `body` as given. Read
+  the message before approving: `users.messages.get` with that `messageId` and
+  `{"format": "raw"}` on the read instance returns it as one base64url string
+  in `raw`. The pinned document calls a message id immutable, so a draft whose
+  content changed carries a different `message.id` under the same draft id.
+  **A changed draft sends nothing.** The provider reads the draft once with
+  `users.drafts.get`; when its `message.id` differs from `messageId`, the send
+  is refused with no POST. An input without `messageId` or without `body.id` is
+  refused before any Gmail request, and a draft that no longer exists is refused
+  after its read (`guard target was not found before dispatch`).
+- **Send `body` as `{"id": "<draft id>"}` and nothing else.** Google's drafts
+  guide says a `body.message` given to a send replaces the draft's content
+  before it is sent. The provider forwards it, and the preflight compares only
+  the stored draft, so such a send is bound by the approval's digest of the
+  input alone. Refuse to approve a send whose `body` carries anything but `id`.
+- The preflight and the POST are two requests, and Gmail's send takes no
+  precondition: a draft edited between them is sent as edited. Nothing is
+  compared after dispatch, because the send answers with the sent message,
+  and whether that keeps the draft's `message.id` is neither documented nor
+  observed. A `2xx` is reported applied.
+- The approval input is capped at 256 KiB (`TARGET_LIMIT` in
+  `approval_issuance.rs`), so a draft whose encoded message makes the input
+  larger cannot be created under approval. The preflight reads the whole draft,
+  so it is also subject to the 4 MiB response limit.
+
 ## Authentication
 
 Gmail uses Google OAuth: the `oauth2_refresh` scheme under the profile
@@ -134,7 +217,42 @@ identity comes from the token answer's `id_token` (`identity.source: id_token`).
 `minimum_scopes` asks for the Gmail read-only scope, which the pinned document
 accepts for all seven reads. `authorize_url` and `requested_scopes` are never
 called by the provider; they are handed to the host for obtaining the entry by
-consent.
+consent. `authorize_url` is `https://accounts.google.com/o/oauth2/auth`, the
+`auth_uri` Google writes into a downloaded client file, which the client-file
+connect compares byte for byte.
+
+The read-only scope does not cover the writes. The pinned document accepts
+`https://www.googleapis.com/auth/gmail.compose` for both writes and for
+`users.drafts.get`, which the send's preflight reads, and not
+`gmail.readonly`. Of the seven reads the compose scope covers only
+`users.getProfile`, so the write instance does not read messages, threads,
+history or labels; read with the read instance. At
+Google the compose scope also permits `users.messages.send`; this provider
+does not expose it. With the write configuration, a stored refresh token that
+was granted only the read-only scope fails validation as insufficient scope.
+
+Writes use a separate instance. Configure a second instance id,
+`google-gmail-write`: a copy of the configuration below with these values
+changed, as its own adapter entry in the host configuration with the writes in
+its operation permissions and `private_protocol = "connectors-private/2"`:
+
+```json
+{
+  "instance": "google-gmail-write",
+  "auth": {
+    "minimum_scopes": ["https://www.googleapis.com/auth/gmail.compose"],
+    "requested_scopes": ["openid", "https://www.googleapis.com/auth/gmail.compose"]
+  }
+}
+```
+
+Then `connections connect` that instance with the Google client file. An
+existing read-only connection cannot be widened in place:
+`connections repair` cannot add a scope, because the configuration revision and
+the profile, whose `minimum_scopes` the scope changes, are part of the
+connection binding. Changing the scopes of the read instance itself leaves its
+connection bound to the old configuration, and a new connection on that same
+instance is refused while the old one exists.
 
 ```json
 {
@@ -152,7 +270,7 @@ consent.
     "identity": {"source": "id_token", "kind": "google.user"},
     "minimum_scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
     "token_url": "https://oauth2.googleapis.com/token",
-    "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
     "requested_scopes": ["openid", "https://www.googleapis.com/auth/gmail.readonly"]
   },
   "operations_file": "/absolute/path/adapters/catalog/providers/google-gmail/operations.json"
@@ -170,6 +288,18 @@ consent.
   an out-of-date `startHistoryId`'s `404` as `not_found`, `labelIds` and
   `metadataHeaders` sent as repeated pairs, each message `format`, and the
   `maxResults` bounds of the three lists. No live mailbox has been read.
+- The writes are verified against the same fixture on the guide's write
+  instance through the host's prepare/commit exchange: the send's preflight
+  read, a changed draft, a missing `messageId` or `body.id` and a missing draft
+  refused with no POST, and the exact POST body of each write. The approval
+  binding is verified with the host's approval signer and verifier against a
+  subject built from the provider's descriptor, not through the CLI and owner.
+  The write instance's scope check and its separate acquisition are verified
+  through the provider's bootstrap and the host's connection registry. No live
+  draft has been created or sent. That a changed draft carries a new
+  `message.id` is inferred from the pinned document calling message ids
+  immutable, and that `users.messages.get` reads a draft's message from Gmail
+  keeping drafts as messages labelled `DRAFT`; neither has been observed live.
 - The response limit applies to every read: an answer over 4 MiB
   (`connectors_core::RESPONSE_LIMIT`) is refused as `capacity`, not truncated.
   A large message read with `raw` or `full`, or a long thread, can exceed it;
