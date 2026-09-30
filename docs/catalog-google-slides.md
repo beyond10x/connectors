@@ -29,10 +29,13 @@ cargo run --locked -p connectors-build -- catalog \
   --source adapters/google/generated/slides.openapi.json \
   --derived-from adapters/google/upstream/slides/slides-api.json \
   --directory adapters/catalog/generated/bundles \
-  --auth-profile google.oauth
+  --auth-profile google.oauth \
+  --replace
 ```
 
-The first command writes `slides.openapi.json` and its projection record
+`--replace` is needed because the committed index already carries
+`google-slides`; without it the second command is refused with "provider is
+already indexed". The first command writes `slides.openapi.json` and its projection record
 `slides.openapi.projection.json`: all 5 methods of the document are projected
 and none is excluded. The document's service path is empty, so the projection's
 one server is `https://slides.googleapis.com` and every path carries its own

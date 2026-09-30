@@ -143,10 +143,26 @@ fn shipped_drive_selections_are_exactly_the_six_reads() {
 fn a_selection_the_projection_lacks_is_refused_at_load() {
     let bundle = committed_bundle();
     let mut selections = shipped();
-    // `alt=media` downloads are excluded from the projection, and no method
-    // named for them exists.
-    selections[0].operation_id = "drive.files.download".into();
-    assert!(Engine::new(&bundle, BASE, &selections).is_err());
+    // Drive has no `files.search` method: search is `files.list` with `q`.
+    // The id is absent from the bundle, so the load is refused for its absence
+    // and for nothing else.
+    let absent = "drive.files.search";
+    assert!(
+        bundle
+            .inventory
+            .operations
+            .iter()
+            .all(|o| o.operation_id.as_deref() != Some(absent)),
+        "the bundle carries `{absent}`"
+    );
+    selections[0].operation_id = absent.into();
+    let refusal = Engine::new(&bundle, BASE, &selections)
+        .err()
+        .expect("refused at load");
+    assert_eq!(
+        refusal.message,
+        format!("bundle carries no operation `{absent}`")
+    );
 }
 
 /// The bundle is the projection of the pinned document, and records it.
