@@ -13,7 +13,7 @@ scope:
   path: apps/connectors/src/main.rs
 - confidence: cited
   path: apps/connectors/tests/compatibility.rs
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T13:03:57Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-09-30T13:03:57Z", actor: "human:timo", revision: 7}
@@ -36,6 +36,6 @@ Top-level `--help` adds an "Explicit service commands" block advertising the leg
 ## Decided (coordinator, 2026-09-30)
 
 Route, do not remove: `serve --config` is the only entry to the federation host (semantics.md:180-191,
-docs/running-services.md:18). `apps/connectors/src/main.rs:34-41` accepts `--output`/`-o` before the legacy command
+docs/running-services.md:18). `apps/connectors/src/main.rs:34-41` accepts `--output` (the contract has no `-o`) before the legacy command
 word, and `apps/connectors/src/legacy.rs:58-101` turns clap errors into the fixed `cli_parse` envelope with no argv
 echo. The extra help block (D9) stays, and `help.txt` or the contract text says so.
