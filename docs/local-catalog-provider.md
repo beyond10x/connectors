@@ -208,13 +208,21 @@ A query parameter the pinned source declares as an array with `style: form` and
 `explode: true` (OpenAPI's default for a query parameter) is repeated: its input
 takes a JSON array of scalars, sent as one `name=value` pair per element in the
 order given, each encoded as a single value is; an empty array sends nothing.
-The declared input schema gives it `"type": ["array", "string", "integer",
-"boolean"]` with `items` of the element type the source declares. One scalar is
-still accepted and sent as one pair, so a caller that already sends a
-comma-joined string, such as Jira's `fields` or Confluence's `space-id`, sends
-the same request as before. A `bounds` entry holds for each element. An array
-for a parameter that is not repeated, or an element that is itself an array, an
-object or `null`, is refused as `invalid_input` before any request.
+One scalar is still accepted and sent as one pair, so a caller that already
+sends a comma-joined string, such as Jira's `fields` or Confluence's
+`space-id`, sends the same request as before. That scalar is typed like the
+elements: for integer elements, an integer or a string of comma-separated
+integers (`"65538,98305"`); for boolean elements, `true`, `false` or a string
+of them separated by commas; for string elements, any string (or a JSON
+integer, as for any string parameter); for elements of no declared type, any
+scalar. The declared input schema says the same: its `type` is `array` together
+with those scalar types, `items` is the element type, a `pattern` constrains
+the joined string, and a required repeated parameter declares `minItems: 1`
+because an empty array is refused as absent. A `bounds` entry holds for each
+element, and a comma-joined string for a bounded parameter is refused. An
+array for a parameter that is not repeated, an element that is itself an
+array, an object or `null`, or a scalar that fits none of the forms above, is
+refused as `invalid_input` before any request.
 
 An array query parameter with any other `style`, or `explode: false`, is
 recorded as a gap in the bundle and keeps the one-value reading it had before:
@@ -224,13 +232,19 @@ not read as arrays.
 A selection's `required` list adds the provider's requirement where the source
 omits it; see the selection fields above.
 
-Reading arrays changed the declared input schema, and so the descriptor
-revision, of every shipped read with a repeated parameter: Jira `issues.search`;
-Confluence `pages.changed`, `space.pages`, `page.get` and `page.comments`; and
-GitLab `issues.list` (`assignee_username`, `not[labels]`, `not[iids]`,
-`not[assignee_username]`) and `merge_requests.list` (`assignee_username`,
-`not[assignee_username]`, `not[labels]`). An approval policy bound to the
-earlier revision must be issued again.
+The bundles were rebuilt to record repeated parameters, and that moves the
+descriptor revision of every GitLab, Jira and Confluence instance. The revision
+belongs to the instance, not to an operation: it digests the configuration
+revision, which digests the bundle's SHA-256, so it changes even for an
+instance whose selections have no repeated parameter. Every write approval
+policy bound to such an instance's earlier revision must be issued again.
+
+Separately, the declared input of these shipped reads changed, because each
+has a repeated parameter: Jira `issues.search`; Confluence `pages.changed`,
+`space.pages`, `page.get` and `page.comments`; and GitLab `issues.list`
+(`assignee_username`, `not[labels]`, `not[iids]`, `not[assignee_username]`)
+and `merge_requests.list` (`assignee_username`, `not[assignee_username]`,
+`not[labels]`).
 
 ## Bind the provider to the local CLI
 
