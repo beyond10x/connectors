@@ -157,6 +157,16 @@ impl Cli {
         self.command(args).output().unwrap()
     }
 
+    /// `run`, with the consent hook of a debug-build CLI following the
+    /// authorize URL itself, trusting the fixture root `ca`, where a person
+    /// would open it in a browser. A release build has no such hook.
+    fn run_following(&self, args: &[&str], ca: &Path) -> Output {
+        self.command(args)
+            .env("CONNECTORS_TEST_OAUTH_FOLLOW", ca)
+            .output()
+            .unwrap()
+    }
+
     fn run_with_stdin(&self, args: &[&str], input: &[u8]) -> Output {
         let mut process = self.command(args).stdin(Stdio::piped()).spawn().unwrap();
         process.stdin.take().unwrap().write_all(input).unwrap();
@@ -636,4 +646,283 @@ fn a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission() {
         admission["next_action"], "request_permission",
         "{admission}"
     );
+}
+
+/// A Google-shaped OAuth connection through the production CLI. One fixture
+/// host serves consent, token and API; `connections connect` and `repair`
+/// receive Google's installed-client download instead of an entry, and the
+/// debug-build consent hook follows the authorize URL in place of a browser.
+struct OAuthJourney {
+    // Dropped in this order: the owner stops before custody and the fixture.
+    cli: Cli,
+    client_file: PathBuf,
+    _custody: Custody,
+    provider: super::oauth2_refresh::OAuthProvider,
+}
+
+impl OAuthJourney {
+    fn new() -> Self {
+        use super::oauth2_refresh::*;
+        let provider = OAuthProvider::new(Source::Api);
+        let authorize_url = format!("https://localhost:{}/authorize", provider.port);
+        let token_url = format!("https://localhost:{}/token", provider.port);
+        provider.write_config(&oauth_config(
+            provider.port,
+            &provider.ca,
+            Source::Api,
+            &token_url,
+            &authorize_url,
+        ));
+        let custody = Custody::new(provider.root.path());
+        let cli = Cli::new(provider.root.path());
+        success(cli.run(&["setup", "init"]));
+        success(cli.run(&["setup", "check"]));
+        let adapter = provider.selection();
+        let q = |value: &str| serde_json::to_string(value).unwrap();
+        let configuration = format!(
+            "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.drive]\ninstance_id={}\nadapter_id='catalog'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.drive.permissions]\nprofiles=[{}]\noperations=['project.get']\n[adapters.drive.executable]\npath={}\nsha256={}\nargs={}\n",
+            filesystem::uid(),
+            q(custody.socket.to_str().unwrap()),
+            q(&adapter.instance_id),
+            q(&adapter.configuration_revision),
+            q(OAUTH_PROFILE),
+            q(adapter.executable.path.to_str().unwrap()),
+            q(&adapter.executable.sha256),
+            serde_json::to_string(&adapter.executable.args).unwrap()
+        );
+        private(&cli.paths.config, configuration.as_bytes());
+        // The shape Google's console downloads for a Desktop app client.
+        let client_file = provider.root.path().join("private/client_secret.json");
+        private(
+            &client_file,
+            &serde_json::to_vec(&json!({"installed": {
+                "client_id": CLIENT_ID,
+                "project_id": "fixture-project",
+                "auth_uri": authorize_url,
+                "token_uri": token_url,
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_secret": CLIENT_SECRET,
+                "redirect_uris": ["http://localhost"],
+            }}))
+            .unwrap(),
+        );
+        Self {
+            cli,
+            client_file,
+            _custody: custody,
+            provider,
+        }
+    }
+
+    /// Runs `args` with the consent hook, and checks that no OAuth material
+    /// reaches either output stream.
+    fn follow(&self, args: &[&str]) -> Output {
+        let output = self.cli.run_following(args, &self.provider.ca);
+        self.clean(&output);
+        output
+    }
+
+    fn clean(&self, output: &Output) {
+        use super::oauth2_refresh::carries_oauth_material;
+        assert!(
+            !carries_oauth_material(&output.stdout),
+            "material on stdout"
+        );
+        assert!(
+            !carries_oauth_material(&output.stderr),
+            "material on stderr"
+        );
+    }
+
+    fn connect(&self) -> Value {
+        success(self.follow(&[
+            "connections",
+            "connect",
+            "--adapter",
+            "drive",
+            "--profile",
+            super::oauth2_refresh::OAUTH_PROFILE,
+            "--credential-file",
+            self.client_file.to_str().unwrap(),
+        ]))["connection"]
+            .clone()
+    }
+
+    fn invoke(&self, reference: &str) -> Output {
+        let description = success(self.cli.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "drive",
+            "--operation",
+            "project.get",
+        ]));
+        let output = self.cli.run(&[
+            "operations",
+            "invoke",
+            "--adapter",
+            "drive",
+            "--connection",
+            reference,
+            "--operation",
+            "project.get",
+            "--schema",
+            description["schema"].as_str().unwrap(),
+            "--revision",
+            description["revision"].as_str().unwrap(),
+            "--input-json",
+            r#"{"id":"org/project"}"#,
+        ]);
+        self.clean(&output);
+        output
+    }
+
+    /// The form of every token request, in order.
+    fn token_forms(&self) -> Vec<Vec<(String, String)>> {
+        self.provider
+            .requests()
+            .iter()
+            .filter(|request| request.route == "/token")
+            .map(|request| super::oauth2_refresh::decode_form(&request.body))
+            .collect()
+    }
+
+    /// Whether a refresh-token exchange presented the `n`th acquired token.
+    fn refreshed_with(&self, n: u32) -> bool {
+        use super::oauth2_refresh::{ACQUIRED_REFRESH_TOKEN, field};
+        let acquired = format!("{ACQUIRED_REFRESH_TOKEN}{n}");
+        self.token_forms().iter().any(|form| {
+            field(form, "grant_type") == Some("refresh_token")
+                && field(form, "refresh_token") == Some(acquired.as_str())
+        })
+    }
+
+    /// The configuration, the owner's state and the provider children carry
+    /// no OAuth material.
+    fn assert_no_material_at_rest(&self) {
+        use super::oauth2_refresh::carries_oauth_material;
+        let mut written = vec![self.cli.paths.config.clone(), self.provider.config.clone()];
+        files_under(&self.cli.paths.state, &mut written);
+        for path in &written {
+            let bytes = fs::read(path).unwrap_or_default();
+            assert!(!carries_oauth_material(&bytes), "{}", path.display());
+        }
+    }
+}
+
+#[track_caller]
+fn read_project(output: Output) {
+    let result = success(output);
+    assert_eq!(
+        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        7
+    );
+}
+
+/// `connections connect` with Google's client file runs consent against the
+/// fixture authorize/token host and stores the acquired triple; the connection
+/// is ready and an invoke reads with a fixture access token.
+#[test]
+#[ignore = "requires built debug production CLI and qualified disposable Secret Service"]
+fn oauth_connect_journey() {
+    use super::oauth2_refresh::{ACCESS_TOKEN, DRIVE_SCOPE, decode_form, field};
+    let journey = OAuthJourney::new();
+    let connected = journey.connect();
+    assert_eq!(connected["summary"]["state"], "ready");
+    let reference = connected["summary"]["connection"].as_str().unwrap();
+    assert_eq!(journey.provider.acquired(), 1, "one code was exchanged");
+
+    let requests = journey.provider.requests();
+    let consent: Vec<_> = requests
+        .iter()
+        .filter(|request| request.route == "/authorize")
+        .collect();
+    assert_eq!(consent.len(), 1, "consent was requested once");
+    let query = decode_form(consent[0].query.as_bytes());
+    assert_eq!(field(&query, "code_challenge_method"), Some("S256"));
+    assert_eq!(field(&query, "access_type"), Some("offline"));
+    assert_eq!(field(&query, "prompt"), Some("consent"));
+    let scopes: std::collections::BTreeSet<&str> =
+        field(&query, "scope").unwrap().split(' ').collect();
+    assert_eq!(scopes, ["openid", DRIVE_SCOPE].into());
+    let codes = journey
+        .token_forms()
+        .iter()
+        .filter(|form| field(form, "grant_type") == Some("authorization_code"))
+        .count();
+    assert_eq!(codes, 1);
+    // The owner validated the stored triple by a refresh of its own.
+    assert!(journey.refreshed_with(1));
+
+    read_project(journey.invoke(reference));
+    let used = journey.provider.api_authorizations();
+    let bearer = used.last().unwrap().as_deref().unwrap();
+    assert!(bearer.starts_with(&format!("Bearer {ACCESS_TOKEN}")));
+    journey.assert_no_material_at_rest();
+}
+
+/// A revoked grant is reported as `repair_connection`; `connections repair`
+/// with the same client file runs consent again, and the next invoke reads
+/// with an access token from the new refresh token.
+#[test]
+#[ignore = "requires built debug production CLI and qualified disposable Secret Service"]
+fn oauth_repair_journey() {
+    use super::oauth2_refresh::ACQUIRED_REFRESH_TOKEN;
+    let journey = OAuthJourney::new();
+    let connected = journey.connect();
+    let reference = connected["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    read_project(journey.invoke(&reference));
+    let before = journey.provider.api_authorizations();
+
+    journey
+        .provider
+        .revoke(&format!("{ACQUIRED_REFRESH_TOKEN}1"));
+    // A new owner and child hold no cached access token.
+    journey.cli.shutdown();
+    let refused = refused_data(journey.invoke(&reference));
+    assert_eq!(refused["code"], "service_failure", "{refused}");
+    assert_eq!(refused["service_code"], "unauthorized", "{refused}");
+    assert_eq!(refused["next_action"], "repair_connection", "{refused}");
+
+    let status = success(journey.cli.run(&[
+        "connections",
+        "status",
+        "--adapter",
+        "drive",
+        "--connection",
+        &reference,
+    ]));
+    let revision = status["connection"]["summary"]["revision"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let repaired = success(journey.follow(&[
+        "connections",
+        "repair",
+        "--adapter",
+        "drive",
+        "--connection",
+        &reference,
+        "--expected-revision",
+        &revision,
+        "--credential-file",
+        journey.client_file.to_str().unwrap(),
+    ]))["connection"]
+        .clone();
+    assert_eq!(repaired["summary"]["state"], "ready");
+    assert_eq!(repaired["summary"]["connection"], reference.as_str());
+    assert_eq!(journey.provider.acquired(), 2, "consent ran again");
+
+    read_project(journey.invoke(&reference));
+    assert!(journey.refreshed_with(2));
+    let after = journey.provider.api_authorizations();
+    let bearer = after.last().unwrap();
+    assert!(
+        !before.contains(bearer),
+        "the read used an access token issued before the repair"
+    );
+    journey.assert_no_material_at_rest();
 }
