@@ -3,6 +3,7 @@ use connectors_cli_contract::{
     Context, DynamicError, DynamicPhase, DynamicValidator, OutputMode, ProcessOutput,
 };
 use connectors_host::local::{
+    oauth,
     owner::{self, Code},
     protected, runtime,
 };
@@ -187,7 +188,13 @@ impl Session {
             text("expected_revision").map(str::to_owned),
         )?;
         let result = match source {
-            ProtectedSource::File(path) => protected::file(&path, capture.expires_at_ms),
+            // Google's client file under an OAuth-acquired profile becomes the
+            // entry by consent; every other file is submitted as it is.
+            ProtectedSource::File(path) => {
+                protected::file(&path, capture.expires_at_ms).and_then(|document| {
+                    oauth::entry(&capture.profile, document, capture.expires_at_ms)
+                })
+            }
             ProtectedSource::Stdin => protected::stdin(capture.expires_at_ms),
             ProtectedSource::HiddenTty => {
                 protected::terminal(&capture.profile.fields, capture.expires_at_ms)
