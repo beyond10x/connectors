@@ -1,0 +1,20 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {
+    "/owners/{ownerId}/things/{thingId}": {
+      "get": {
+        "operationId": "fixture.things.get",
+        "parameters": [
+          {"name": "ownerId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "thingId", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "filter", "in": "query", "required": true, "schema": {"type": "string"}},
+          {"name": "q", "in": "query", "schema": {"type": "string"}},
+          {"name": "view", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}

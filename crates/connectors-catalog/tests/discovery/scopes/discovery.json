@@ -1,0 +1,33 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "auth": {
+    "oauth2": {
+      "scopes": {
+        "https://www.googleapis.com/auth/fixture": {"description": "See, edit and delete fixtures"},
+        "https://www.googleapis.com/auth/fixture.readonly": {"description": "See fixtures"}
+      }
+    }
+  },
+  "resources": {
+    "things": {
+      "methods": {
+        "list": {
+          "id": "fixture.things.list",
+          "path": "things",
+          "httpMethod": "GET",
+          "scopes": [
+            "https://www.googleapis.com/auth/fixture.readonly",
+            "https://www.googleapis.com/auth/fixture"
+          ]
+        }
+      }
+    }
+  }
+}
