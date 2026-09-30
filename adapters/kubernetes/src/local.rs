@@ -136,6 +136,7 @@ impl Local {
                 label: "Kubernetes bearer token".into(),
                 max_bytes: 8192,
             }],
+            acquisition: None,
         };
         profile.revision = connectors_core::digest(
             &serde_json::to_value(&profile).map_err(|_| Failure::Protocol)?,
