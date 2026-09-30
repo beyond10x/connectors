@@ -1,5 +1,5 @@
-//! Google Drive reads — about, files, export and changes — through the catalog
-//! provider.
+//! Google Drive reads — about, files, export and changes — and guarded metadata
+//! writes — create, update, copy — through the catalog provider.
 //!
 //! The shipped selection set is pinned by id and Discovery method id, resolves
 //! against the committed bundle compiled from the projection of the pinned
@@ -12,12 +12,21 @@
 //! conditions. The profile is the guide's own, pointed at the fixture token
 //! route. The fixture secrets are fictional and only ever compared, never
 //! printed. No live credential and no network.
+//!
+//! The writes run through a private-protocol-two child from the guide's write
+//! configuration: prepare (with the declared preflight) and commit, the
+//! transport the host's approval coordinator drives. The fixture records each
+//! write's method, route and body, so "no write was sent" is a count of what
+//! the fixture saw.
 use connectors_catalog::{bundle, discovery};
-use connectors_catalog_provider::{Effect, Engine, ResponseKind, Selection};
+use connectors_catalog_provider::{
+    Check, Effect, Engine, Expectation, Guard, Postflight, Preflight, ResponseKind, Selection,
+};
 use connectors_host::local::{
+    approvals,
     config::{Adapter, Executable, Restart, Startup},
-    filesystem,
-    runtime::{Bootstrap, Child, Failure},
+    filesystem, mutations,
+    runtime::{Bootstrap, Child, Failure, PrivateProtocol, WriteEffect, WriteResult},
 };
 use connectors_sdk::Secret;
 use serde_json::{Value, json};
@@ -46,6 +55,10 @@ const PROVIDER: &str = "google-drive";
 /// The bundle's auth profile, and the profile of the guide's configuration.
 const PROFILE: &str = "google.oauth";
 const DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive.readonly";
+/// The write scope: files the app created or opened, and nothing else.
+const WRITE_SCOPE: &str = "https://www.googleapis.com/auth/drive.file";
+/// The fixture file's current `version`; a stale pin is any other value.
+const VERSION: &str = "7";
 /// Fictional OAuth material. The access token is what the fixture token route
 /// issues and the only bearer the fixture Drive routes accept.
 const CLIENT_ID: &str = "fixture-client-id.apps.example.test";
@@ -76,6 +89,27 @@ const SHIPPED: [(&str, &str, &str); 6] = [
     ("files.get", "drive.files.get", "/drive/v3/files/{fileId}"),
     ("files.list", "drive.files.list", "/drive/v3/files"),
 ];
+/// The shipped writes: id, Discovery method id, method and recorded path.
+const WRITES: [(&str, &str, &str, &str); 3] = [
+    (
+        "files.copy",
+        "drive.files.copy",
+        "post",
+        "/drive/v3/files/{fileId}/copy",
+    ),
+    (
+        "files.create",
+        "drive.files.create",
+        "post",
+        "/drive/v3/files",
+    ),
+    (
+        "files.update",
+        "drive.files.update",
+        "patch",
+        "/drive/v3/files/{fileId}",
+    ),
+];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -97,20 +131,82 @@ fn committed_bundle() -> bundle::Bundle {
 }
 
 #[test]
-fn shipped_drive_selections_are_exactly_the_six_reads() {
+fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
     let selections = shipped();
     let bundle = committed_bundle();
     assert_eq!(bundle.auth_profile, PROFILE);
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
-    let mut declared: Vec<String> = engine
-        .declarations(&[Effect::Read, Effect::Write])
-        .into_iter()
-        .map(|o| o.id)
-        .collect();
-    declared.sort();
-    let expected: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
-    assert_eq!(declared, expected);
-    assert!(engine.declarations(&[Effect::Write]).is_empty());
+    let ids = |effects: &[Effect]| {
+        let mut ids: Vec<String> = engine
+            .declarations(effects)
+            .into_iter()
+            .map(|o| o.id)
+            .collect();
+        ids.sort();
+        ids
+    };
+    let reads: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
+    let writes: Vec<&str> = WRITES.iter().map(|(id, _, _, _)| *id).collect();
+    assert_eq!(ids(&[Effect::Read]), reads);
+    assert_eq!(ids(&[Effect::Write]), writes);
+    assert_eq!(selections.len(), SHIPPED.len() + WRITES.len());
+    for (id, operation_id, method, path) in WRITES {
+        let selection = selections.iter().find(|s| s.id == id).unwrap();
+        assert_eq!(selection.operation_id, operation_id, "`{id}`");
+        assert_eq!(Some(id), operation_id.strip_prefix("drive."), "`{id}`");
+        assert_eq!(selection.effect, Effect::Write, "`{id}`");
+        assert_eq!(engine.effect(id), Some(Effect::Write), "`{id}`");
+        assert!(selection.bounds.is_empty(), "`{id}`");
+        let operation = bundle
+            .inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == Some(operation_id))
+            .unwrap_or_else(|| panic!("the projection lacks `{operation_id}`"));
+        assert_eq!(operation.method, method, "`{id}`");
+        assert_eq!(operation.path, path, "`{id}`");
+        // Metadata only: the JSON body, never an upload media type.
+        assert_eq!(
+            operation.request_media_types,
+            ["application/json"],
+            "`{id}`"
+        );
+    }
+    // A create and a copy have nothing to compare before they run; the update
+    // pins the file's `version`, read by `files.get` with the caller's `fields`.
+    for id in ["files.create", "files.copy"] {
+        let selection = selections.iter().find(|s| s.id == id).unwrap();
+        assert_eq!(selection.guard, None, "`{id}`");
+    }
+    let update = selections.iter().find(|s| s.id == "files.update").unwrap();
+    assert_eq!(
+        update.guard,
+        Some(Guard {
+            preflight: Preflight {
+                operation_id: "drive.files.get".into(),
+                values: [("fileId", "fileId"), ("fields", "fields")]
+                    .into_iter()
+                    .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                    .collect(),
+                checks: vec![Check {
+                    pointer: "/version".into(),
+                    expect: Expectation::Input("version".into()),
+                }],
+            },
+            postflight: Postflight { checks: vec![] },
+        })
+    );
+    // The declared inputs: every write takes a `body`; the update also takes
+    // the pinned `version`, which no Drive parameter carries.
+    let declared = engine.declarations(&[Effect::Write]);
+    let required = |id: &str| -> Vec<String> {
+        let declaration = declared.iter().find(|o| o.id == id).unwrap();
+        assert_eq!(declaration.profile, "mutation", "`{id}`");
+        serde_json::from_value(declaration.input_schema["required"].clone()).unwrap()
+    };
+    assert_eq!(required("files.create"), ["body"]);
+    assert_eq!(required("files.copy"), ["body", "fileId"]);
+    assert_eq!(required("files.update"), ["body", "fileId", "version"]);
     for (id, operation_id, path) in SHIPPED {
         let selection = selections.iter().find(|s| s.id == id).unwrap();
         assert_eq!(selection.operation_id, operation_id, "`{id}`");
@@ -292,16 +388,101 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
     }
 }
 
-/// The guide's configuration example for this provider.
-fn documented_config() -> Value {
+/// The guide cites each write with its request and guard, names the write
+/// scope, and names how an existing connection gains it.
+#[test]
+fn guide_cites_each_write_its_guard_and_the_write_scope() {
+    let guide = fs::read_to_string(root().join("../../docs/catalog-google-drive.md")).unwrap();
+    let rows: Vec<&str> = guide.lines().filter(|l| l.starts_with('|')).collect();
+    for (id, operation_id, request, guard) in [
+        (
+            "files.create",
+            "drive.files.create",
+            "`POST /drive/v3/files`",
+            "none",
+        ),
+        (
+            "files.update",
+            "drive.files.update",
+            "`PATCH /drive/v3/files/{fileId}`",
+            "`/version` equals the input `version`",
+        ),
+        (
+            "files.copy",
+            "drive.files.copy",
+            "`POST /drive/v3/files/{fileId}/copy`",
+            "none",
+        ),
+    ] {
+        let cited = rows.iter().any(|row| {
+            row.starts_with(&format!("| `{id}` "))
+                && row.contains(&format!("`{operation_id}`"))
+                && row.contains(request)
+                && row.contains(guard)
+        });
+        assert!(cited, "no row cites `{id}` as {request} with guard {guard}");
+    }
+    assert!(guide.contains(&format!("`{WRITE_SCOPE}`")));
+    // The write scope comes from a separate instance, connected afresh: a
+    // repair cannot widen a connection, whose binding holds the configuration
+    // revision and the profile.
+    let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(flat.contains("Writes use a separate instance"));
+    assert!(flat.contains("`google-drive-write`"));
+    assert!(flat.contains("then `connections connect` that instance with the Google client file"));
+    assert!(flat.contains("`connections repair` cannot add a scope"));
+    assert!(
+        !flat.contains("through `connections repair`")
+            && !flat.contains("with `connections repair`"),
+        "the guide still routes the write scope through `connections repair`"
+    );
+}
+
+/// The guide's configuration example for this provider: the read-only one, or
+/// the one that also asks for the write scope.
+fn documented(write: bool) -> Value {
     let guide = fs::read_to_string(root().join("../../docs/catalog-google-drive.md")).unwrap();
     let example = guide
         .split("```json\n")
         .skip(1)
         .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(&format!("\"provider\": \"{PROVIDER}\"")))
+        .find(|body| {
+            body.contains(&format!("\"provider\": \"{PROVIDER}\""))
+                && body.contains(WRITE_SCOPE) == write
+        })
         .expect("the documented google-drive configuration");
     serde_json::from_str::<Value>(example).unwrap()
+}
+fn documented_config() -> Value {
+    documented(false)
+}
+
+/// The write configuration is a separate instance, `google-drive-write`: the
+/// read one with its own instance id and the write scope added to both
+/// `minimum_scopes` and `requested_scopes`, and nothing else changed.
+#[test]
+fn guide_documents_the_write_configuration_with_the_drive_file_scope() {
+    let read = documented_config();
+    let write = documented(true);
+    assert_eq!(read["instance"], "google-drive");
+    assert_eq!(write["instance"], "google-drive-write");
+    assert_eq!(
+        write["auth"]["minimum_scopes"],
+        json!([DRIVE_SCOPE, WRITE_SCOPE])
+    );
+    assert_eq!(
+        write["auth"]["requested_scopes"],
+        json!(["openid", DRIVE_SCOPE, WRITE_SCOPE])
+    );
+    let strip = |mut config: Value| {
+        config.as_object_mut().unwrap().remove("instance");
+        config["auth"]
+            .as_object_mut()
+            .unwrap()
+            .retain(|key, _| key != "minimum_scopes" && key != "requested_scopes");
+        config
+    };
+    assert_eq!(strip(write), strip(read));
 }
 
 /// The guide configures the bundle's profile as an `oauth2_refresh` profile
@@ -334,11 +515,32 @@ fn guide_documents_the_oauth_refresh_configuration() {
 
 /// Method, route with query, and `Authorization` header of each fixture request.
 type Requests = Arc<Mutex<Vec<(String, String, Option<String>)>>>;
+/// Method, route with query, and body of each Drive request that carried one.
+type Bodies = Arc<Mutex<Vec<(String, String, Vec<u8>)>>>;
 
 fn file(id: &str, name: &str) -> Value {
     json!({"kind": "drive#file", "id": id, "name": name,
            "mimeType": "application/vnd.google-apps.document",
-           "modifiedTime": "2026-09-20T10:00:00.000Z"})
+           "modifiedTime": "2026-09-20T10:00:00.000Z", "version": VERSION})
+}
+
+/// The recorded Drive answers to the three writes, built from the request
+/// body as Drive would: the new or changed file's metadata. `None` for any
+/// other write, which the fixture answers 404.
+fn write_answer(method: &str, target: &str, body: &[u8]) -> Option<Value> {
+    let route = target.split_once('?').map_or(target, |(route, _)| route);
+    let body: Value = serde_json::from_slice(body).ok()?;
+    match (method, route) {
+        ("POST", "/drive/v3/files") => Some(json!({"kind": "drive#file",
+            "id": "fixture-created-1", "name": body["name"], "mimeType": body["mimeType"],
+            "version": "1"})),
+        ("POST", "/drive/v3/files/fixture-doc-1/copy") => Some(json!({"kind": "drive#file",
+            "id": "fixture-copy-1", "name": body["name"],
+            "mimeType": "application/vnd.google-apps.document", "version": "1"})),
+        ("PATCH", "/drive/v3/files/fixture-doc-1") => Some(json!({"kind": "drive#file",
+            "id": "fixture-doc-1", "name": body["name"], "version": "8"})),
+        _ => None,
+    }
 }
 fn change(file_id: &str, time: &str) -> Value {
     json!({"kind": "drive#change", "changeType": "file", "fileId": file_id, "removed": false,
@@ -424,9 +626,25 @@ struct Provider {
     _root: tempfile::TempDir,
     config: PathBuf,
     requests: Requests,
+    bodies: Bodies,
+    protocol: Option<PrivateProtocol>,
 }
 impl Provider {
+    /// The guide's read configuration on private protocol one; the token route
+    /// grants the read scope.
     fn new() -> Self {
+        Self::with(documented_config(), format!("openid {DRIVE_SCOPE}"), None)
+    }
+    /// The guide's write configuration on private protocol two; the token
+    /// route grants `grant`.
+    fn writes(grant: &str) -> Self {
+        Self::with(
+            documented(true),
+            grant.to_owned(),
+            Some(PrivateProtocol::V2),
+        )
+    }
+    fn with(mut config: Value, grant: String, protocol: Option<PrivateProtocol>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -448,6 +666,8 @@ impl Provider {
         let (stop, mut stopped) = oneshot::channel();
         let requests: Requests = Arc::new(Mutex::new(Vec::new()));
         let observed = requests.clone();
+        let bodies: Bodies = Arc::new(Mutex::new(Vec::new()));
+        let carried = bodies.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -508,7 +728,7 @@ impl Provider {
                             let grant = json!({
                                 "access_token": ACCESS_TOKEN, "token_type": "Bearer",
                                 "expires_in": 3600,
-                                "scope": format!("openid {DRIVE_SCOPE}"),
+                                "scope": grant.as_str(),
                                 "id_token": id_token()});
                             (200, "application/json", serde_json::to_vec(&grant).unwrap())
                         } else {
@@ -520,8 +740,19 @@ impl Provider {
                         let refusal = json!({"error": {"code": 401, "message": "fixture refusal"}});
                         (401, "application/json", serde_json::to_vec(&refusal).unwrap())
                     } else {
-                        match (method.as_str(), answer(&target)) {
-                            ("GET", Some((content_type, body))) => (200, content_type, body),
+                        if !body.is_empty() {
+                            carried
+                                .lock()
+                                .unwrap()
+                                .push((method.clone(), target.clone(), body.clone()));
+                        }
+                        let written = write_answer(&method, &target, &body)
+                            .map(|value| ("application/json", serde_json::to_vec(&value).unwrap()));
+                        match (method.as_str(), answer(&target), written) {
+                            ("GET", Some((content_type, body)), _) => (200, content_type, body),
+                            ("POST" | "PATCH", _, Some((content_type, body))) => {
+                                (200, content_type, body)
+                            }
                             _ => {
                                 let missing = json!({"error": {"code": 404, "message": "no fixture"}});
                                 (404, "application/json", serde_json::to_vec(&missing).unwrap())
@@ -544,7 +775,6 @@ impl Provider {
         let address = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         // The guide's configuration, with the fixture as API host and token
         // host, trusted through its own CA.
-        let mut config = documented_config();
         config["instance"] = json!("fixture-google-drive");
         config["bundle_directory"] = json!(root_path("generated/bundles"));
         config["operations_file"] = json!(root_path("providers/google-drive/operations.json"));
@@ -560,6 +790,8 @@ impl Provider {
             _root: root,
             config: path,
             requests,
+            bodies,
+            protocol,
         }
     }
     fn selection(&self) -> Adapter {
@@ -580,7 +812,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
-            private_protocol: None,
+            private_protocol: self.protocol,
             permissions: Default::default(),
             instance_id: "fixture-google-drive".into(),
             adapter_id: "catalog".into(),
@@ -600,6 +832,29 @@ impl Provider {
     }
     fn requests(&self) -> Vec<(String, String, Option<String>)> {
         self.requests.lock().unwrap().clone()
+    }
+    /// The Drive requests as method and route with query.
+    fn api_calls(&self) -> Vec<(String, String)> {
+        self.requests()
+            .into_iter()
+            .filter(|(_, target, _)| target != "/token")
+            .map(|(method, target, _)| (method, target))
+            .collect()
+    }
+    /// The Drive requests that carried a body, the body parsed as JSON.
+    fn bodies(&self) -> Vec<(String, String, Value)> {
+        self.bodies
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(method, target, body)| {
+                (
+                    method.clone(),
+                    target.clone(),
+                    serde_json::from_slice(body).unwrap(),
+                )
+            })
+            .collect()
     }
     /// The Drive requests (everything but the token route), as route with query.
     fn api_targets(&self) -> Vec<String> {
@@ -877,4 +1132,424 @@ fn changes_list_page_size_bounds() {
         "changes.list",
         json!({"pageToken": "fixture-start-100", "pageSize": 2}),
     );
+}
+
+/// The grant of a write-enabled consent: the read scope and the write scope.
+fn write_grant() -> String {
+    format!("openid {DRIVE_SCOPE} {WRITE_SCOPE}")
+}
+
+/// Prepare (the declared preflight included) and commit one write on this
+/// child: the transport the host's approval coordinator drives once it holds a
+/// verified, spent approval. A refusal in prepare is the `Err`.
+fn write(child: &mut Child, operation: &str, input: &Value) -> Result<WriteResult, Failure> {
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let prepared = child.prepare_write(
+        operation,
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(input).unwrap(),
+        connectors_sdk::now_ms() + 30_000,
+    )?;
+    Ok(prepared.commit())
+}
+#[track_caller]
+fn applied(result: Result<WriteResult, Failure>, operation: &str) -> Value {
+    let result =
+        result.unwrap_or_else(|failure| panic!("`{operation}` refused in prepare: {failure:?}"));
+    assert_eq!(result.effect, WriteEffect::Applied, "`{operation}`");
+    result
+        .result
+        .unwrap_or_else(|failure| panic!("`{operation}` result: {failure:?}"))
+}
+fn calls(expected: &[(&str, &str)]) -> Vec<(String, String)> {
+    expected
+        .iter()
+        .map(|(method, target)| ((*method).to_owned(), (*target).to_owned()))
+        .collect()
+}
+
+/// A metadata-only body for each write, and the input that carries it.
+fn folder() -> Value {
+    json!({"name": "Fixture folder", "mimeType": "application/vnd.google-apps.folder",
+           "parents": ["root"]})
+}
+fn renamed() -> Value {
+    json!({"name": "first, renamed", "description": "fixture description"})
+}
+fn copied() -> Value {
+    json!({"name": "Copy of first", "parents": ["fixture-created-1"]})
+}
+fn create_input() -> Value {
+    json!({"fields": "id,name,mimeType,version", "body": folder()})
+}
+fn update_input(version: Value) -> Value {
+    json!({"fileId": "fixture-doc-1", "version": version, "fields": "id,name,version",
+           "body": renamed()})
+}
+fn copy_input() -> Value {
+    json!({"fileId": "fixture-doc-1", "body": copied()})
+}
+
+/// Each write sends exactly its request — the update after its one preflight
+/// read — with the body as supplied and the exchanged bearer, and returns
+/// Drive's answer as applied.
+#[test]
+fn each_write_sends_exactly_its_request_and_body_and_returns_the_answer() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, input, expected, body) in [
+        (
+            "files.create",
+            create_input(),
+            calls(&[(
+                "POST",
+                "/drive/v3/files?fields=id%2Cname%2CmimeType%2Cversion",
+            )]),
+            folder(),
+        ),
+        (
+            "files.update",
+            update_input(json!(VERSION)),
+            calls(&[
+                (
+                    "GET",
+                    "/drive/v3/files/fixture-doc-1?fields=id%2Cname%2Cversion",
+                ),
+                (
+                    "PATCH",
+                    "/drive/v3/files/fixture-doc-1?fields=id%2Cname%2Cversion",
+                ),
+            ]),
+            renamed(),
+        ),
+        (
+            "files.copy",
+            copy_input(),
+            calls(&[("POST", "/drive/v3/files/fixture-doc-1/copy?")]),
+            copied(),
+        ),
+    ] {
+        let before = provider.api_calls().len();
+        let carried = provider.bodies().len();
+        let result = applied(write(&mut child, operation, &input), operation);
+        assert_eq!(
+            provider.api_calls()[before..],
+            expected[..],
+            "`{operation}` requests"
+        );
+        let (method, target) = expected.last().unwrap().clone();
+        assert_eq!(
+            provider.bodies()[carried..],
+            [(method.clone(), target.clone(), body.clone())],
+            "`{operation}` body"
+        );
+        assert_eq!(result["status"], 200, "`{operation}` status");
+        let answer = write_answer(&method, &target, &serde_json::to_vec(&body).unwrap()).unwrap();
+        assert_eq!(result["body"], answer, "`{operation}` answer");
+        assert_eq!(result["provenance"]["instance"], "fixture-google-drive");
+    }
+    let bearer = format!("Bearer {ACCESS_TOKEN}");
+    assert!(
+        provider
+            .requests()
+            .iter()
+            .filter(|(_, target, _)| target != "/token")
+            .all(|(_, _, authorization)| authorization.as_deref() == Some(bearer.as_str())),
+        "a Drive request without the exchanged bearer"
+    );
+}
+
+/// A pinned `version` other than the file's current one fails the preflight:
+/// the one `files.get` is sent and no PATCH follows. The same input at the
+/// current version then writes, so the refusal was the pin.
+#[test]
+fn files_update_with_a_stale_version_fails_the_preflight_and_sends_no_write() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let preflight = (
+        "GET",
+        "/drive/v3/files/fixture-doc-1?fields=id%2Cname%2Cversion",
+    );
+    for stale in [json!("6"), json!("8"), json!(6)] {
+        let before = provider.api_calls().len();
+        let outcome = write(&mut child, "files.update", &update_input(stale.clone()));
+        assert!(
+            matches!(outcome, Err(Failure::Forbidden)),
+            "version {stale}: {:?}",
+            outcome.map(|result| result.effect)
+        );
+        assert_eq!(
+            provider.api_calls()[before..],
+            calls(&[preflight])[..],
+            "version {stale}"
+        );
+    }
+    assert!(provider.bodies().is_empty(), "a write body was sent");
+    applied(
+        write(&mut child, "files.update", &update_input(json!(VERSION))),
+        "files.update",
+    );
+    assert_eq!(provider.bodies().len(), 1);
+}
+
+/// An update without its pin, with a pin that is not a scalar, or without the
+/// `fields` its preflight reads `version` through, is refused as invalid input
+/// before any Drive request.
+#[test]
+fn files_update_without_its_pin_or_fields_is_refused_before_any_request() {
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let mut unpinned = update_input(json!(VERSION));
+    unpinned.as_object_mut().unwrap().remove("version");
+    let mut unselected = update_input(json!(VERSION));
+    unselected.as_object_mut().unwrap().remove("fields");
+    for (what, input) in [
+        ("no version", unpinned),
+        ("an object version", update_input(json!({"value": VERSION}))),
+        ("no fields", unselected),
+    ] {
+        let outcome = write(&mut child, "files.update", &input);
+        assert!(
+            matches!(outcome, Err(Failure::InvalidInput)),
+            "{what}: {:?}",
+            outcome.map(|result| result.effect)
+        );
+    }
+    assert!(provider.api_calls().is_empty(), "a Drive request was sent");
+}
+
+/// The read transport never carries a write. On private protocol two each
+/// write id is unsupported there; on protocol one its bootstrap lists no write
+/// at all and prepare is unsupported. Nothing reaches the fixture, not even a
+/// token exchange.
+#[test]
+fn drive_writes_are_refused_on_the_read_transport_before_any_request() {
+    let inputs = [
+        ("files.create", create_input()),
+        ("files.update", update_input(json!(VERSION))),
+        ("files.copy", copy_input()),
+    ];
+    let two = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&two.selection()).unwrap();
+    for (operation, input) in &inputs {
+        let outcome = attempt(&mut child, operation, input);
+        assert!(
+            matches!(outcome, Err(Failure::Unsupported)),
+            "`{operation}` on protocol two: {outcome:?}"
+        );
+    }
+    let one = Provider::with(documented(true), write_grant(), None);
+    let mut child = Child::spawn(&one.selection()).unwrap();
+    for (operation, input) in &inputs {
+        let outcome = attempt(&mut child, operation, input);
+        assert!(
+            matches!(outcome, Err(Failure::NotFound)),
+            "`{operation}` on protocol one: {outcome:?}"
+        );
+        let outcome = write(&mut child, operation, input);
+        assert!(
+            matches!(outcome, Err(Failure::Unsupported)),
+            "`{operation}` prepared on protocol one: {:?}",
+            outcome.map(|result| result.effect)
+        );
+    }
+    assert!(two.requests().is_empty(), "protocol two sent a request");
+    assert!(one.requests().is_empty(), "protocol one sent a request");
+}
+
+/// The write configuration asks for `drive.file`, so a consent that granted
+/// only the read scope fails validation; one that granted both validates.
+#[test]
+fn drive_write_config_requires_the_drive_file_scope() {
+    let deadline = || connectors_sdk::now_ms() + 30_000;
+    let provider = Provider::writes(&format!("openid {DRIVE_SCOPE}"));
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    assert!(matches!(
+        child.validate(PROFILE, &secret(), deadline()),
+        Err(Failure::InsufficientScope)
+    ));
+    let provider = Provider::writes(&write_grant());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let baseline = child
+        .validate(PROFILE, &secret(), deadline())
+        .unwrap_or_else(|failure| panic!("validation {failure:?}"));
+    assert_eq!(
+        baseline.granted_scopes.unwrap(),
+        [
+            "openid".to_owned(),
+            DRIVE_SCOPE.to_owned(),
+            WRITE_SCOPE.to_owned()
+        ]
+        .into()
+    );
+}
+
+/// Public RFC 8032 §7.1 test material, never a deployment signing key.
+const APPROVAL_SEED: &str = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+const APPROVAL_PUBLIC: &str = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+const APPROVAL_NOW: i64 = 1_789_056_000_000;
+
+struct FixedClock;
+impl mutations::Clock for FixedClock {
+    fn now(&self) -> mutations::Result<mutations::ClockInterval> {
+        Ok(mutations::ClockInterval {
+            lower_unix_ms: APPROVAL_NOW,
+            upper_unix_ms: APPROVAL_NOW + 2000,
+        })
+    }
+}
+/// A key admission that accepts every subject under its key id, so a refusal
+/// can only come from the proof itself.
+struct Key(approvals::ConfiguredApprovalKey);
+impl approvals::CurrentAdmission for &Key {
+    fn key(&self) -> &approvals::ConfiguredApprovalKey {
+        &self.0
+    }
+}
+impl approvals::ReceiverPolicy for Key {
+    type Guard<'a>
+        = &'a Key
+    where
+        Self: 'a;
+    fn admit<'a>(&'a self, _: &approvals::Subject, kid: &str) -> approvals::Result<&'a Key> {
+        if kid == self.0.kid {
+            Ok(self)
+        } else {
+            Err(approvals::Failure::Refused)
+        }
+    }
+}
+impl approvals::IssuancePolicy for Key {
+    type Guard<'a>
+        = &'a Key
+    where
+        Self: 'a;
+    fn authorize<'a>(
+        &'a self,
+        subject: &approvals::Subject,
+        kid: &str,
+    ) -> approvals::Result<&'a Key> {
+        approvals::ReceiverPolicy::admit(self, subject, kid)
+    }
+}
+
+/// The approval subject of a Drive write, as the owner resolves it: the
+/// operation's declared contract and profile, and the digest of the whole
+/// input (`crates/connectors-host/src/local/owner/approval_issuance.rs`).
+fn drive_subject(operation: &str, input: &Value) -> approvals::Subject {
+    let engine = Engine::new(&committed_bundle(), BASE, &shipped()).unwrap();
+    let declaration = engine
+        .declarations(&[Effect::Write])
+        .into_iter()
+        .find(|o| o.id == operation)
+        .unwrap();
+    approvals::Subject {
+        format: "connectors.approval-subject/v1".into(),
+        target: approvals::Target {
+            instance: "fixture-google-drive".into(),
+            operation: operation.into(),
+            connection: "fixture-connection".into(),
+            connection_revision: "fixture-connection-revision".into(),
+            contract: declaration.contract,
+            profile: declaration.profile,
+            descriptor_revision: "fixture-descriptor-revision".into(),
+            configuration_revision: "fixture-configuration-revision".into(),
+        },
+        authority: approvals::Authority {
+            scope: approvals::Scope {
+                tenant: None,
+                realm: None,
+                caller: "fixture-caller".into(),
+                executor: None,
+            },
+            current_authority: None,
+            executor: None,
+        },
+        origin: approvals::Origin {
+            kind: approvals::OriginKind::Direct,
+            authority_ref: "fixture-google-drive".into(),
+        },
+        route: None,
+        canonicalization: "adapter-v1-canonical-json".into(),
+        input_sha256: connectors_core::digest(input),
+        approval_mode: "required".into(),
+    }
+}
+
+/// An approval issued for one Drive write verifies for exactly that input and
+/// is refused for any other: a changed body member, an added body member, a
+/// changed pin, target file or query parameter.
+#[test]
+fn a_drive_write_approval_for_a_different_body_is_refused() {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let key = Key(approvals::ConfiguredApprovalKey {
+        issuer: "fixture-issuer".into(),
+        audience: "fixture-audience".into(),
+        kid: "fixture-key".into(),
+        public_key: URL_SAFE_NO_PAD.encode(hex::decode(APPROVAL_PUBLIC).unwrap()),
+        not_before_unix_ms: 0,
+        not_after_unix_ms: APPROVAL_NOW + 1_000_000,
+        revoked: false,
+    });
+    let signer = approvals::Signer::from_seed(
+        Secret(hex::decode(APPROVAL_SEED).unwrap()),
+        "fixture-key".into(),
+    )
+    .unwrap();
+    let change = |input: &Value, pointer: &str, value: Value| {
+        let mut changed = input.clone();
+        let (parent, key) = pointer.rsplit_once('/').unwrap();
+        changed.pointer_mut(parent).unwrap()[key] = value;
+        changed
+    };
+    let update = update_input(json!(VERSION));
+    for (operation, approved, others) in [
+        (
+            "files.create",
+            create_input(),
+            vec![
+                change(&create_input(), "/body/name", json!("Another folder")),
+                change(&create_input(), "/body/parents", json!(["fixture-other"])),
+                change(&create_input(), "/body/description", json!("added")),
+                change(&create_input(), "/fields", json!("id")),
+            ],
+        ),
+        (
+            "files.update",
+            update.clone(),
+            vec![
+                change(&update, "/body/name", json!("renamed otherwise")),
+                change(&update, "/body/trashed", json!(true)),
+                change(&update, "/version", json!("8")),
+                change(&update, "/fileId", json!("fixture-doc-2")),
+            ],
+        ),
+        (
+            "files.copy",
+            copy_input(),
+            vec![
+                change(&copy_input(), "/body/name", json!("Another copy")),
+                change(&copy_input(), "/body/parents", json!(["fixture-other"])),
+                change(&copy_input(), "/fileId", json!("fixture-doc-2")),
+            ],
+        ),
+    ] {
+        let subject = drive_subject(operation, &approved);
+        let proof = signer.issue(&subject, &key, &FixedClock).unwrap();
+        assert!(
+            approvals::verify(&proof, &subject, &key, &FixedClock).is_ok(),
+            "`{operation}` refused its own approval"
+        );
+        for other in others {
+            assert_ne!(other, approved);
+            let outcome =
+                approvals::verify(&proof, &drive_subject(operation, &other), &key, &FixedClock);
+            assert!(
+                matches!(outcome, Err(approvals::Failure::Refused)),
+                "`{operation}` accepted its approval for {other}"
+            );
+        }
+    }
 }
