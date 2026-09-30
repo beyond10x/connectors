@@ -67,7 +67,8 @@ the end of a walk are in it.
   before any request.
 - **`pages.changed`** is the delta read. The pinned document gives `getPages`
   no updated-since parameter, so the time window is a stop rule the caller
-  applies. Send `space-id` (one id, or several as one comma-separated string),
+  applies. Send `space-id` (one id, several as a JSON array of ids, or several
+  as one comma-separated string),
   `sort=-modified-date` and `body-format` (`storage` for the body in storage
   format). `sort=-modified-date` is required: the stop rule only holds when the
   newest-modified pages come first, and without it the deltas are wrong. A
@@ -140,6 +141,67 @@ target/release/connectors --output json connections connect --adapter jira --pro
 target/release/connectors --output json connections connect --adapter confluence --profile atlassian.basic --credential-file /owner-only/atlassian.json
 ```
 
+### Through the API gateway
+
+Service-account API tokens and OAuth 2.0 (3LO) access tokens work only through
+the Atlassian API gateway, `https://api.atlassian.com/ex/confluence/<cloud id>/…`.
+The `/wiki` root follows the gateway part, so write
+`https://api.atlassian.com/ex/confluence/<cloud id>/wiki` as `api_base` and name
+the gateway part in `request_prefix`. The cloud id is the same one Jira uses on
+that site (see [the Jira guide](catalog-jira.md#through-the-api-gateway)). The
+pinned paths (`/wiki/api/v2/…`) are checked against what follows the prefix, and
+every request goes to the full `api_base`, the identity read included:
+`GET /ex/confluence/<cloud id>/wiki/rest/api/user/current`.
+
+A service-account API token uses the same `atlassian.basic` profile as on the
+site, with the service account's email as the account and the credential
+document `{"account": "<service account email>", "token": "<API token>"}`. The
+same credential then connects Jira and Confluence as one identity. This form was
+checked live for Jira on 2026-09-30, not yet for Confluence.
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "confluence-cloud",
+  "provider": "confluence",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/confluence/your-cloud-id/wiki",
+  "request_prefix": "/ex/confluence/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.basic",
+    "scheme": "basic",
+    "header": "Authorization",
+    "bearer": false,
+    "account_label": "Account email",
+    "label": "API token",
+    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
+}
+```
+
+An OAuth 2.0 (3LO) access token is sent as a bearer token, with the credential
+document, expiry and scopes as in the Jira guide. **Not verified live.**
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "confluence-cloud",
+  "provider": "confluence",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/confluence/your-cloud-id/wiki",
+  "request_prefix": "/ex/confluence/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.bearer",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Atlassian access token",
+    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
+}
+```
+
 ## Limits
 
 - Verified against a local HTTPS fixture only
@@ -153,7 +215,11 @@ target/release/connectors --output json connections connect --adapter confluence
   not as Confluence's exact bytes.
 - The cursor is sent as given. Take it from `_links.next` percent-decoded, or the
   engine encodes it a second time.
-- `space-id` is declared as an array by the pinned document; the engine sends
-  one value per parameter, so pass one id or a comma-separated string.
+- The pinned document declares some query parameters as arrays: `id`,
+  `space-id` (both of integers) and `status` on `pages.changed`, and `status` on
+  `space.pages`, `page.get` and `page.comments`. Each takes a JSON array, sent
+  as one `name=value` pair per element in the order given, or one value (a
+  comma-separated string included), sent as one pair as before. See
+  [array and required query parameters](local-catalog-provider.md#array-and-required-query-parameters).
 - The provider does not walk pages itself and does not retry on `429`; a
   rate-limited read is returned as a refusal.

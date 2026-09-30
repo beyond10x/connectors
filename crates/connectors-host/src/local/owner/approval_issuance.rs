@@ -216,6 +216,7 @@ pub(super) fn resolve(
     let (config, adapter) = selected(paths, alias)?;
     let bootstrap = snapshot(paths, &adapter)?;
     let descriptor = bootstrap.descriptor()?;
+    super::admit_operation(&adapter, &bootstrap, request.operation)?;
     if descriptor.revision != request.revision
         || super::schema(&bootstrap, request.operation)? != request.schema
     {

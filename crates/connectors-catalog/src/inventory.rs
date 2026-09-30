@@ -47,12 +47,110 @@ impl Location {
     }
 }
 
+/// The scalar type a document declares for a parameter's value, recorded only
+/// when its schema names exactly one of these three. An array, an object, a
+/// number, a `oneOf` or a `$ref` records none, and a reader keeps its own
+/// default for that parameter rather than guessing one of these.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ValueType {
+    String,
+    Integer,
+    Boolean,
+}
+
+impl ValueType {
+    /// The type a parameter object's schema declares. OpenAPI 3.0 marks a
+    /// nullable scalar with `nullable`; 3.1 writes `["integer", "null"]`. Both
+    /// are the scalar: a parameter value is present or absent, never null.
+    fn declared(parameter: &Value) -> Option<Self> {
+        Self::of_schema(parameter.get("schema")?)
+    }
+
+    fn of_schema(schema: &Value) -> Option<Self> {
+        match single_type(schema)? {
+            "string" => Some(Self::String),
+            "integer" => Some(Self::Integer),
+            "boolean" => Some(Self::Boolean),
+            _ => None,
+        }
+    }
+}
+
+/// The one type a schema names, with a 3.1 `"null"` member set aside as 3.0's
+/// `nullable` is. A schema naming none, or several, names no single type.
+fn single_type(schema: &Value) -> Option<&str> {
+    match schema.get("type")? {
+        Value::String(name) => Some(name),
+        Value::Array(names) => {
+            let names: Vec<&str> = names.iter().map(Value::as_str).collect::<Option<_>>()?;
+            match names
+                .into_iter()
+                .filter(|name| *name != "null")
+                .collect::<Vec<_>>()
+                .as_slice()
+            {
+                [name] => Some(name),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+/// How a query parameter whose schema is an array is sent. OpenAPI 3.x: a
+/// query parameter's `style` defaults to `form`, and `explode` defaults to true
+/// for `form` and to false for every other style. Only `form` exploded — one
+/// `name=value` pair per element — is sent as an array; any other shape is
+/// named, with the parameter kept as the one value it was read as before.
+fn array_shape(parameter: &Value, name: &str) -> Result<(), String> {
+    let style = match parameter.get("style") {
+        None => "form",
+        Some(Value::String(style)) => style,
+        Some(_) => {
+            return Err(format!(
+                "array query parameter `{name}` declares a `style` that is not a string; \
+                 it is sent as one value as given"
+            ));
+        }
+    };
+    let explode = match parameter.get("explode") {
+        None => style == "form",
+        Some(Value::Bool(explode)) => *explode,
+        Some(_) => {
+            return Err(format!(
+                "array query parameter `{name}` declares an `explode` that is not a boolean; \
+                 it is sent as one value as given"
+            ));
+        }
+    };
+    if style == "form" && explode {
+        Ok(())
+    } else {
+        Err(format!(
+            "array query parameter `{name}` is serialised with style `{style}`, explode {explode}, \
+             which this pass does not send as an array; it is sent as one value as given"
+        ))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Parameter {
     pub name: String,
     pub location: Location,
     pub required: bool,
+    /// The declared scalar type, when the document gives one this model
+    /// carries. Omitted when absent, so a parameter without one serialises as
+    /// it did before types were recorded.
+    /// For a repeated parameter, the type of each element.
+    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
+    pub value_type: Option<ValueType>,
+    /// A query parameter declared as an array sent `style: form, explode:
+    /// true`: one `name=value` pair per element. Omitted when false, so a
+    /// parameter that is not repeated serialises as it did before.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub repeated: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -117,11 +215,17 @@ fn media_types(container: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// One declared parameter, with the gap its shape leaves when it has one. The
+/// gap is held beside the parameter rather than recorded at once, because an
+/// operation's own declaration may replace the path item's, and a replaced
+/// declaration leaves no gap in the operation.
+type Declared = (Parameter, Option<String>);
+
 fn parameters(
     raw: Option<&Value>,
     designation: &str,
     gaps: &mut Vec<Unsupported>,
-) -> Vec<Parameter> {
+) -> Vec<Declared> {
     let mut out = Vec::new();
     let Some(list) = raw.and_then(Value::as_array) else {
         return out;
@@ -138,14 +242,33 @@ fn parameters(
         let location = parameter.get("in").and_then(Value::as_str);
         match (name, location) {
             (Some(name), Some(location)) => match Location::parse(location) {
-                Some(location) => out.push(Parameter {
-                    name: name.to_owned(),
-                    location,
-                    required: parameter
-                        .get("required")
-                        .and_then(Value::as_bool)
-                        .unwrap_or(false),
-                }),
+                Some(location) => {
+                    let schema = parameter.get("schema");
+                    let array = location == Location::Query
+                        && schema.and_then(single_type) == Some("array");
+                    let shape = array.then(|| array_shape(parameter, name));
+                    let repeated = matches!(shape, Some(Ok(())));
+                    let value_type = if repeated {
+                        schema
+                            .and_then(|s| s.get("items"))
+                            .and_then(ValueType::of_schema)
+                    } else {
+                        ValueType::declared(parameter)
+                    };
+                    out.push((
+                        Parameter {
+                            name: name.to_owned(),
+                            location,
+                            required: parameter
+                                .get("required")
+                                .and_then(Value::as_bool)
+                                .unwrap_or(false),
+                            value_type,
+                            repeated,
+                        },
+                        shape.and_then(Result::err),
+                    ))
+                }
                 None => gaps.push(Unsupported {
                     designation: designation.to_owned(),
                     reason: format!("parameter `{name}` declares location `{location}`"),
@@ -315,12 +438,24 @@ pub fn extract(document: &Value) -> Inventory {
                 // one parameter twice and lose the override's `required`.
                 match declared
                     .iter_mut()
-                    .find(|d| d.name == parameter.name && d.location == parameter.location)
+                    .find(|(d, _)| d.name == parameter.0.name && d.location == parameter.0.location)
                 {
                     Some(overridden) => *overridden = parameter,
                     None => declared.push(parameter),
                 }
             }
+            let declared: Vec<Parameter> = declared
+                .into_iter()
+                .map(|(parameter, gap)| {
+                    if let Some(reason) = gap {
+                        unsupported.push(Unsupported {
+                            designation: designation.clone(),
+                            reason,
+                        });
+                    }
+                    parameter
+                })
+                .collect();
             let request = body.get("requestBody");
             if request.map(|r| r.get("$ref").is_some()).unwrap_or(false) {
                 unsupported.push(Unsupported {

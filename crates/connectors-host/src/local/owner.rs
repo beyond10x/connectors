@@ -254,9 +254,36 @@ pub fn admit_capture(
     }
     Ok(profile)
 }
+/// Admission of a named operation, in the contract's order: an operation the
+/// selected description does not expose is `not_found`, one it exposes but the
+/// configuration does not grant is `forbidden`. Callers compare the selected
+/// revision and schema only after this.
+pub fn admit_operation<'a>(
+    adapter: &Adapter,
+    bootstrap: &'a runtime::Bootstrap,
+    operation: &str,
+) -> Result<&'a runtime::Requirement> {
+    bootstrap
+        .descriptor()?
+        .operation(operation)
+        .map_err(|_| Code::NotFound)?;
+    let requirement = bootstrap
+        .requirements
+        .iter()
+        .find(|r| r.operation == operation)
+        .ok_or(Code::NotFound)?;
+    if !adapter.permissions.operations.contains(operation)
+        || !adapter.permissions.profiles.contains(&requirement.profile)
+    {
+        return Err(Code::Forbidden.into());
+    }
+    Ok(requirement)
+}
 pub fn operation_snapshot(paths: &Paths, alias: &str, call: &Value) -> Result<runtime::Bootstrap> {
+    let (_, adapter) = selected(paths, alias)?;
     let bootstrap = cached(paths, alias)?;
     let operation = input(call, "operation")?;
+    admit_operation(&adapter, &bootstrap, &operation)?;
     if bootstrap.descriptor()?.revision != input(call, "revision")?
         || schema(&bootstrap, &operation)? != input(call, "schema")?
     {
@@ -308,16 +335,7 @@ pub fn admit_invoke(paths: &Paths, alias: &str, call: &Value, document: &[u8]) -
     let bootstrap = operation_snapshot(paths, alias, call)?;
     let operation = input(call, "operation")?;
     let descriptor = bootstrap.descriptor()?;
-    let requirement = bootstrap
-        .requirements
-        .iter()
-        .find(|r| r.operation == operation)
-        .ok_or(Code::NotFound)?;
-    if !adapter.permissions.operations.contains(&operation)
-        || !adapter.permissions.profiles.contains(&requirement.profile)
-    {
-        return Err(Code::Forbidden.into());
-    }
+    let requirement = admit_operation(&adapter, &bootstrap, &operation)?;
     if requirement.effect != runtime::Effect::Read {
         return Err(Code::Unsupported.into());
     }

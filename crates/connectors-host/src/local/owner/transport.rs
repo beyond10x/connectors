@@ -1380,9 +1380,7 @@ fn action(
             if !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
                 return Err(Code::Timeout.into());
             }
-            if !adapter.permissions.operations.contains(&operation) {
-                return Err(Code::Forbidden.into());
-            }
+            // Admission decides existence, then grant, then revision.
             admit_invoke(
                 &owner.paths,
                 &alias,
