@@ -15,4 +15,5 @@ hex.workspace = true
 toml = "1.1"
 
 [dev-dependencies]
+openapiv3 = "2.2"
 tempfile.workspace = true

@@ -1,0 +1,35 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://slides.fixture.googleapis.com"}],
+  "paths": {
+    "/v1/presentations/{presentationId}": {
+      "get": {
+        "operationId": "fixture.presentations.get",
+        "parameters": [
+          {
+            "name": "presentationId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "pattern": "^[^/]+$"}
+          }
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    },
+    "/v1/presentations/{presentationId}:batchUpdate": {
+      "post": {
+        "operationId": "fixture.presentations.batchUpdate",
+        "parameters": [
+          {
+            "name": "presentationId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}
