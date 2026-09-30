@@ -16,6 +16,7 @@ pub mod filesystem;
 pub mod keyring;
 pub mod metadata;
 pub mod mutations;
+pub mod oauth;
 pub mod owner;
 pub mod protected;
 pub mod registry;

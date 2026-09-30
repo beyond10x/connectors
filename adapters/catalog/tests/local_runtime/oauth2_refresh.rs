@@ -4,25 +4,36 @@
 //! for an access token, sends it as `Authorization: Bearer`, caches it until
 //! 60 s before it expires, and refuses by code. The fixture's secrets are
 //! fictional and only ever compared, never printed.
+//!
+//! The same host also answers the consent a CLI acquisition follows: `/authorize`
+//! redirects to the loopback `redirect_uri` with a code bound to the PKCE
+//! challenge, and `/token` exchanges that code for a new refresh token.
 use super::*;
 
-const CLIENT_ID: &str = "fixture-client-id.apps.example.test";
-const CLIENT_SECRET: &str = "fixture-client-secret-one";
+pub(super) const CLIENT_ID: &str = "fixture-client-id.apps.example.test";
+pub(super) const CLIENT_SECRET: &str = "fixture-client-secret-one";
 const REFRESH_TOKEN: &str = "fixture-refresh-token-one";
 const ROTATED_REFRESH_TOKEN: &str = "fixture-refresh-token-rotated";
-const ACCESS_TOKEN: &str = "fixture-access-token-";
-const OAUTH_PROFILE: &str = "fixture.oauth";
-const DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive.readonly";
+pub(super) const ACCESS_TOKEN: &str = "fixture-access-token-";
+/// Prefix of every refresh token the fixture issues for an authorization code.
+pub(super) const ACQUIRED_REFRESH_TOKEN: &str = "fixture-refresh-token-acquired-";
+/// Prefix of every authorization code the fixture issues.
+const AUTHORIZATION_CODE: &str = "fixture-authorization-code-";
+pub(super) const OAUTH_PROFILE: &str = "fixture.oauth";
+pub(super) const DRIVE_SCOPE: &str = "https://www.googleapis.com/auth/drive.readonly";
 const SUBJECT: &str = "110000000000000000001";
 const TOKENINFO_SUBJECT: &str = "110000000000000000002";
 
-/// Every fixture secret, and the access-token prefix, which no output may carry.
-fn carries_oauth_material(haystack: &[u8]) -> bool {
+/// Every fixture secret, and the access-token, acquired refresh-token and
+/// authorization-code prefixes, which no output may carry.
+pub(super) fn carries_oauth_material(haystack: &[u8]) -> bool {
     [
         CLIENT_SECRET,
         REFRESH_TOKEN,
         ROTATED_REFRESH_TOKEN,
         ACCESS_TOKEN,
+        ACQUIRED_REFRESH_TOKEN,
+        AUTHORIZATION_CODE,
     ]
     .iter()
     .any(|needle| {
@@ -80,15 +91,134 @@ fn grant(expires_in: u64) -> TokenAnswer {
     }
 }
 
+/// `application/x-www-form-urlencoded` pairs, decoded: a query or a form body.
+pub(super) fn decode_form(bytes: &[u8]) -> Vec<(String, String)> {
+    fn decode(part: &[u8]) -> String {
+        let mut out = Vec::with_capacity(part.len());
+        let mut index = 0;
+        while index < part.len() {
+            match part[index] {
+                b'+' => out.push(b' '),
+                b'%' if index + 2 < part.len() => {
+                    match std::str::from_utf8(&part[index + 1..index + 3])
+                        .ok()
+                        .and_then(|hex| u8::from_str_radix(hex, 16).ok())
+                    {
+                        Some(byte) => {
+                            out.push(byte);
+                            index += 2;
+                        }
+                        None => out.push(b'%'),
+                    }
+                }
+                byte => out.push(byte),
+            }
+            index += 1;
+        }
+        String::from_utf8_lossy(&out).into_owned()
+    }
+    bytes
+        .split(|byte| *byte == b'&')
+        .filter(|pair| !pair.is_empty())
+        .map(|pair| match pair.iter().position(|byte| *byte == b'=') {
+            Some(at) => (decode(&pair[..at]), decode(&pair[at + 1..])),
+            None => (decode(pair), String::new()),
+        })
+        .collect()
+}
+pub(super) fn field<'a>(form: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    form.iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| value.as_str())
+}
+
+/// Consent to a well-formed authorization request, as a user who approved it:
+/// a code bound to its PKCE challenge and redirect, and the redirect target
+/// that carries it back with the request's `state`. `None` refuses it.
+fn consent(state: &mut FixtureState, query: &[(String, String)]) -> Option<String> {
+    let scopes: Vec<&str> = field(query, "scope")?.split(' ').collect();
+    let redirect_uri = field(query, "redirect_uri")?;
+    let challenge = field(query, "code_challenge")?;
+    let request_state = field(query, "state")?;
+    let well_formed = field(query, "response_type") == Some("code")
+        && field(query, "client_id") == Some(CLIENT_ID)
+        && field(query, "code_challenge_method") == Some("S256")
+        && field(query, "access_type") == Some("offline")
+        && field(query, "prompt") == Some("consent")
+        && scopes.contains(&"openid")
+        && scopes.contains(&DRIVE_SCOPE)
+        && redirect_uri
+            .strip_prefix("http://127.0.0.1:")
+            .is_some_and(|port| port.parse::<u16>().is_ok())
+        && challenge.len() == 43
+        && !request_state.is_empty()
+        && request_state
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    if !well_formed {
+        return None;
+    }
+    let code = format!("{AUTHORIZATION_CODE}{}", state.consents.len() + 1);
+    state.consents.push(Consent {
+        code: code.clone(),
+        challenge: challenge.to_owned(),
+        redirect_uri: redirect_uri.to_owned(),
+        exchanged: false,
+    });
+    Some(format!("{redirect_uri}?code={code}&state={request_state}"))
+}
+
+/// Exchanges an unused code whose verifier matches its challenge, for the same
+/// redirect and client, for a new refresh token; anything else is `invalid_grant`.
+fn exchange_code(state: &mut FixtureState, form: &[(String, String)]) -> (u16, Value) {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    let verifier = field(form, "code_verifier").unwrap_or_default();
+    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
+    let client = field(form, "client_id") == Some(CLIENT_ID)
+        && field(form, "client_secret") == Some(CLIENT_SECRET)
+        && (43..=128).contains(&verifier.len());
+    let Some(consent) = state.consents.iter_mut().find(|consent| {
+        client
+            && !consent.exchanged
+            && Some(consent.code.as_str()) == field(form, "code")
+            && consent.challenge == challenge
+            && Some(consent.redirect_uri.as_str()) == field(form, "redirect_uri")
+    }) else {
+        return (400, json!({"error": "invalid_grant"}));
+    };
+    consent.exchanged = true;
+    state.acquired += 1;
+    state.issued += 1;
+    (
+        200,
+        json!({
+            "access_token": format!("{ACCESS_TOKEN}{}", state.issued),
+            "token_type": "Bearer",
+            "expires_in": 3600,
+            "scope": format!("openid {DRIVE_SCOPE}"),
+            "refresh_token": format!("{ACQUIRED_REFRESH_TOKEN}{}", state.acquired),
+        }),
+    )
+}
+
 /// One observed request. Compared by the tests, never printed.
 #[derive(Clone)]
-struct Observed {
-    method: String,
-    route: String,
-    query: String,
+pub(super) struct Observed {
+    pub(super) method: String,
+    pub(super) route: String,
+    pub(super) query: String,
     content_type: Option<String>,
     authorization: Option<String>,
-    body: Vec<u8>,
+    pub(super) body: Vec<u8>,
+}
+
+/// One consent the fixture granted: its code, the PKCE challenge and the
+/// redirect it was issued for, and whether the code was exchanged.
+struct Consent {
+    code: String,
+    challenge: String,
+    redirect_uri: String,
+    exchanged: bool,
 }
 
 struct FixtureState {
@@ -97,26 +227,31 @@ struct FixtureState {
     tokeninfo: (u16, Value),
     issued: u32,
     api_refuses: bool,
+    consents: Vec<Consent>,
+    /// Refresh tokens issued for an authorization code.
+    acquired: u32,
+    /// Refresh tokens the token route answers `invalid_grant` for.
+    revoked: Vec<String>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum Source {
+pub(super) enum Source {
     Api,
     IdToken,
 }
 
-struct OAuthProvider {
+pub(super) struct OAuthProvider {
     stop: Option<oneshot::Sender<()>>,
     thread: Option<std::thread::JoinHandle<()>>,
-    root: tempfile::TempDir,
-    ca: PathBuf,
-    config: PathBuf,
-    port: u16,
+    pub(super) root: tempfile::TempDir,
+    pub(super) ca: PathBuf,
+    pub(super) config: PathBuf,
+    pub(super) port: u16,
     state: Arc<Mutex<FixtureState>>,
 }
 
 impl OAuthProvider {
-    fn new(source: Source) -> Self {
+    pub(super) fn new(source: Source) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -144,6 +279,9 @@ impl OAuthProvider {
             ),
             issued: 0,
             api_refuses: false,
+            consents: Vec::new(),
+            acquired: 0,
+            revoked: Vec::new(),
         }));
         let served = state.clone();
         let (address_tx, address_rx) = std::sync::mpsc::channel();
@@ -194,6 +332,8 @@ impl OAuthProvider {
                         continue;
                     }
                     let authorization = header("authorization");
+                    let form = decode_form(&body);
+                    let mut location = None;
                     let (status, answer) = {
                         let mut state = served.lock().unwrap();
                         state.requests.push(Observed {
@@ -204,7 +344,27 @@ impl OAuthProvider {
                             authorization: authorization.clone(),
                             body,
                         });
-                        if route == "/token" && method == "POST" {
+                        let token = route == "/token" && method == "POST";
+                        if route == "/authorize" && method == "GET" {
+                            match consent(&mut state, &decode_form(query.as_bytes())) {
+                                Some(redirect) => {
+                                    location = Some(redirect);
+                                    (302, json!({}))
+                                }
+                                None => (400, json!({"error": "invalid_request"})),
+                            }
+                        } else if token && field(&form, "grant_type") == Some("authorization_code")
+                        {
+                            exchange_code(&mut state, &form)
+                        } else if token
+                            && field(&form, "refresh_token")
+                                .is_some_and(|value| state.revoked.iter().any(|r| r == value))
+                        {
+                            (
+                                400,
+                                json!({"error": "invalid_grant", "error_description": "Token has been expired or revoked."}),
+                            )
+                        } else if token {
                             match state.token.clone() {
                                 TokenAnswer::Refuse(status, body) => (status, body),
                                 TokenAnswer::Grant {
@@ -246,8 +406,11 @@ impl OAuthProvider {
                         }
                     };
                     let answer = serde_json::to_vec(&answer).unwrap();
+                    let location = location
+                        .map(|target| format!("Location: {target}\r\n"))
+                        .unwrap_or_default();
                     let head = format!(
-                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        "HTTP/1.1 {status} fixture\r\n{location}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                         answer.len()
                     );
                     let _ = stream.write_all(head.as_bytes()).await;
@@ -278,10 +441,10 @@ impl OAuthProvider {
         ));
         provider
     }
-    fn write_config(&self, config: &Value) {
+    pub(super) fn write_config(&self, config: &Value) {
         private(&self.config, &serde_json::to_vec(config).unwrap());
     }
-    fn selection(&self) -> Adapter {
+    pub(super) fn selection(&self) -> Adapter {
         let bootstrap = print_bootstrap(&self.config).expect("bootstrap inspection failed");
         let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
             .canonicalize()
@@ -308,10 +471,23 @@ impl OAuthProvider {
             },
         }
     }
+    /// Answer `invalid_grant` for this refresh token from now on, as a provider
+    /// does once the grant is revoked or has expired.
+    pub(super) fn revoke(&self, refresh_token: &str) {
+        self.state
+            .lock()
+            .unwrap()
+            .revoked
+            .push(refresh_token.to_owned());
+    }
+    /// How many refresh tokens the fixture issued for an authorization code.
+    pub(super) fn acquired(&self) -> u32 {
+        self.state.lock().unwrap().acquired
+    }
     fn set_token(&self, answer: TokenAnswer) {
         self.state.lock().unwrap().token = answer;
     }
-    fn requests(&self) -> Vec<Observed> {
+    pub(super) fn requests(&self) -> Vec<Observed> {
         self.state.lock().unwrap().requests.clone()
     }
     fn token_requests(&self) -> usize {
@@ -321,7 +497,7 @@ impl OAuthProvider {
             .count()
     }
     /// The `Authorization` header of every API request, in order.
-    fn api_authorizations(&self) -> Vec<Option<String>> {
+    pub(super) fn api_authorizations(&self) -> Vec<Option<String>> {
         self.requests()
             .into_iter()
             .filter(|request| request.route.starts_with("/api/v4/"))
@@ -336,7 +512,7 @@ impl Drop for OAuthProvider {
     }
 }
 
-fn oauth_config(
+pub(super) fn oauth_config(
     port: u16,
     ca: &Path,
     source: Source,
