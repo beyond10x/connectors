@@ -74,13 +74,9 @@ fn the_drive_absent_selection_case_is_refused_for_its_absence() {
 
 /// Drive refuses `about.get` unless `fields` is set (the story's own note, the
 /// selection's description and the projected operation description). An agent
-/// reading `connectors operations describe` sees the input schema, and that
-/// schema does not require `fields`, so the documented input `{}` passes the
-/// schema and a request is spent on a certain refusal. A selection cannot
-/// declare a parameter required today; that engine change is
-/// `story:catalog-selection-required-parameters`. Until it lands this case pins
-/// today's state — `required` is empty — so the change is seen when it arrives;
-/// the selection's description carries the warning meanwhile.
+/// reading `connectors operations describe` sees the input schema, so the
+/// selection declares `fields` required and the schema says so; the input `{}`
+/// is refused before a request is spent on a certain refusal.
 #[test]
 fn about_get_declares_fields_required() {
     let bundle = committed_bundle(PROVIDER);
@@ -90,13 +86,7 @@ fn about_get_declares_fields_required() {
         .into_iter()
         .find(|o| o.id == "about.get")
         .unwrap();
-    let required = about.input_schema["required"].as_array().unwrap();
-    assert!(
-        required.is_empty(),
-        "`about.get` input schema now requires {required:?}: if \
-         story:catalog-selection-required-parameters has landed, flip this case to assert \
-         `fields` is required"
-    );
+    assert_eq!(about.input_schema["required"], json!(["fields"]));
     let description = &about.description;
     assert!(
         description.contains("Drive requires fields"),
