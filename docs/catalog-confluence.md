@@ -140,6 +140,67 @@ target/release/connectors --output json connections connect --adapter jira --pro
 target/release/connectors --output json connections connect --adapter confluence --profile atlassian.basic --credential-file /owner-only/atlassian.json
 ```
 
+### Through the API gateway
+
+Service-account API tokens and OAuth 2.0 (3LO) access tokens work only through
+the Atlassian API gateway, `https://api.atlassian.com/ex/confluence/<cloud id>/…`.
+The `/wiki` root follows the gateway part, so write
+`https://api.atlassian.com/ex/confluence/<cloud id>/wiki` as `api_base` and name
+the gateway part in `request_prefix`. The cloud id is the same one Jira uses on
+that site (see [the Jira guide](catalog-jira.md#through-the-api-gateway)). The
+pinned paths (`/wiki/api/v2/…`) are checked against what follows the prefix, and
+every request goes to the full `api_base`, the identity read included:
+`GET /ex/confluence/<cloud id>/wiki/rest/api/user/current`.
+
+A service-account API token uses the same `atlassian.basic` profile as on the
+site, with the service account's email as the account and the credential
+document `{"account": "<service account email>", "token": "<API token>"}`. The
+same credential then connects Jira and Confluence as one identity. This form was
+checked live for Jira on 2026-09-30, not yet for Confluence.
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "confluence-cloud",
+  "provider": "confluence",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/confluence/your-cloud-id/wiki",
+  "request_prefix": "/ex/confluence/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.basic",
+    "scheme": "basic",
+    "header": "Authorization",
+    "bearer": false,
+    "account_label": "Account email",
+    "label": "API token",
+    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
+}
+```
+
+An OAuth 2.0 (3LO) access token is sent as a bearer token, with the credential
+document, expiry and scopes as in the Jira guide. **Not verified live.**
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "confluence-cloud",
+  "provider": "confluence",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/confluence/your-cloud-id/wiki",
+  "request_prefix": "/ex/confluence/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.bearer",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Atlassian access token",
+    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
+}
+```
+
 ## Limits
 
 - Verified against a local HTTPS fixture only

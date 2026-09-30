@@ -140,6 +140,17 @@ The complete configuration used against the sandbox is
   "identity": {"path": "myself", "kind": "tracker.user", "subject_pointer": "/accountId"}
 }
 ```
+- `request_prefix` is optional, for a provider reached through an API gateway
+  that adds path segments in front of the document's paths, such as
+  `/ex/jira/<cloud id>`. It names the leading part of the `api_base` path that
+  belongs to the gateway; the rest of that path is the document base every
+  selected operation must lie under. Requests, the identity and scope reads
+  included, still go to the full `api_base`, which is also the provider
+  authority. The prefix is plain path text: a leading `/`, no trailing `/`, and
+  segments of letters, digits, `-`, `.`, `_` and `~` only, none of them `.` or
+  `..` (so no query, fragment or percent-encoding); it must be the leading part
+  of the `api_base` path, or the configuration is refused. Without it the
+  configuration revision is what it was before the field existed.
 - `operations_file` names a shipped selection set; its `provider` must match. An
   inline `operations` list is accepted as well and comes first. The selection
   ids, in either place, are what the host permits and the approval policy names.
