@@ -18,15 +18,15 @@
      "description": "List changes since pageToken, one page per call; the walk follows nextPageToken and ends on the page carrying newStartPageToken, the next baseline; that end condition holds only if fields, when given, includes nextPageToken and newStartPageToken, so include both (for example nextPageToken,newStartPageToken,changes)",
      "bounds": {"pageSize": {"minimum": 1, "maximum": 1000}}},
     {"id": "files.create", "operation_id": "drive.files.create", "effect": "write",
-     "description": "Create a file from metadata only, such as a Google Workspace document, a folder (mimeType application/vnd.google-apps.folder) or a shortcut; no content is uploaded"},
+     "description": "Create a file from metadata only, such as a Google Workspace document, a folder (mimeType application/vnd.google-apps.folder) or a shortcut; no content is uploaded; body.writersCanShare and body.copyRequiresWriterPermission set who may share or copy it and ignoreDefaultVisibility skips the domain default visibility; the approval binds the whole input by digest, so read the input before approving"},
     {"id": "files.update", "operation_id": "drive.files.update", "effect": "write",
-     "description": "Change one file's metadata while its version is the pinned version; fields selects both the preflight read and the answer and must include version",
+     "description": "Change one file's metadata while its version is the pinned version; one update can also move the file (addParents, removeParents), trash it (body.trashed), remove the access it inherits (body.inheritedPermissionsDisabled) and change who may share or copy it (body.writersCanShare, body.copyRequiresWriterPermission); fields is required, selects both the preflight read and the answer and must include version; shared-drive files are not supported yet; the approval binds the whole input by digest, so read the input before approving",
      "guard": {
        "preflight": {"operation_id": "drive.files.get",
                      "values": {"fileId": "fileId", "fields": "fields"},
                      "checks": [{"pointer": "/version", "expect": {"input": "version"}}]},
        "postflight": {"checks": []}}},
     {"id": "files.copy", "operation_id": "drive.files.copy", "effect": "write",
-     "description": "Copy one file; the body names the copy and its parents"}
+     "description": "Copy one file; the body names the copy and its parents; body.writersCanShare and body.copyRequiresWriterPermission set who may share or copy it and ignoreDefaultVisibility skips the domain default visibility; the approval binds the whole input by digest, so read the input before approving"}
   ]
 }
