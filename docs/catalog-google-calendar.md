@@ -62,7 +62,7 @@ the end of a walk are in it.
 
 | id | Discovery id | request | paging parameters | end condition | time filter or deltas |
 |---|---|---|---|---|---|
-| `calendarList.list` | `calendar.calendarList.list` | `GET /calendar/v3/users/me/calendarList` | `pageToken`, `maxResults` | `nextPageToken` absent; the last page carries `nextSyncToken` | `syncToken` from the last walk's `nextSyncToken` |
+| `calendarList.list` | `calendar.calendarList.list` | `GET /calendar/v3/users/me/calendarList` | `pageToken`, `maxResults` (1–250) | `nextPageToken` absent; the last page carries `nextSyncToken` | `syncToken` from the last walk's `nextSyncToken` |
 | `events.list` | `calendar.events.list` | `GET /calendar/v3/calendars/{calendarId}/events` | `pageToken`, `maxResults` (1–2500) | `nextPageToken` absent; the last page carries `nextSyncToken` | `timeMin`, `timeMax`, `updatedMin`; deltas with `syncToken` |
 | `events.get` | `calendar.events.get` | `GET /calendar/v3/calendars/{calendarId}/events/{eventId}` | single item | n/a | none; deltas come from `events.list` |
 
@@ -83,13 +83,12 @@ the end of a walk are in it.
   `default`, `focusTime`, `fromGmail`, `outOfOffice` and `workingLocation`. The
   engine does not check a value against that list: another value is sent, and
   Google answers it.
-- **`maxResults`.** The pinned document states a minimum of 1 for `events.list`
-  and, in its description only, that a page is never larger than 2500 events.
-  The selection bounds `maxResults` to 1–2500, so 0, 2501 or a value that is not
-  an integer is refused as `invalid_input` before any request.
-  `calendarList.list` carries no bound: its description says a page is never
-  larger than 250 entries, but the story did not select that bound, so a
-  larger value is sent as given.
+- **`maxResults`.** The pinned document states a minimum of 1 for both lists
+  and, in each description only, a ceiling: a page is never larger than 2500
+  events for `events.list` and never larger than 250 entries for
+  `calendarList.list`. The selections bound `maxResults` to 1–2500 and 1–250,
+  so 0, a value over the ceiling (2501, 251) or a value that is not an integer
+  is refused as `invalid_input` before any request.
 
 Every other query parameter the projection declares for an operation is accepted
 by name, including the document-wide `fields`; one it does not declare is
@@ -161,7 +160,8 @@ entry by consent.
   each read with the exchanged bearer, the returned body as JSON, a two-page
   walk of each list to the page carrying `nextSyncToken`, a delta read with
   `syncToken`, an expired token's `410` as `not_found`, `eventTypes` sent as two
-  pairs, and the `maxResults` bounds. No live calendar has been read.
+  pairs, and the `maxResults` bounds of both lists. No live calendar has been
+  read.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Google's exact bytes.
 - The provider does not walk pages itself and does not retry. A `429`, or a

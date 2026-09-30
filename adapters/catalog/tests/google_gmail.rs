@@ -1,18 +1,20 @@
-//! Google Calendar reads — the calendar list and events — through the catalog
-//! provider.
+//! Gmail reads — the profile, messages, threads, history and labels — through
+//! the catalog provider.
 //!
 //! The shipped selection set is pinned by id and Discovery method id, resolves
 //! against the committed bundle compiled from the projection of the pinned
-//! Calendar v3 Discovery document, and is cited row by row in
-//! `docs/catalog-google-calendar.md`. Each read runs through the provider child
-//! against a disposable HTTPS fixture that serves the Calendar routes and an
-//! OAuth token route on one host: the child exchanges the fixture refresh entry
-//! for an access token, and the exact request (path, query,
-//! `Authorization: Bearer …`) and the returned body are asserted. Both lists
-//! walk two pages to the page carrying `nextSyncToken`, and an expired sync
-//! token's `410` reaches the caller as `not_found`. The profile is the guide's
-//! own, pointed at the fixture token route. The fixture secrets are fictional
-//! and only ever compared, never printed. No live credential and no network.
+//! Gmail v1 Discovery document, and is cited row by row in
+//! `docs/catalog-google-gmail.md`. Each read runs through the provider child
+//! against a disposable HTTPS fixture that serves the Gmail routes and an OAuth
+//! token route on one host: the child exchanges the fixture refresh entry for an
+//! access token, and the exact request (path, query, `Authorization: Bearer …`)
+//! and the returned body are asserted. The message and thread lists walk two
+//! pages until `nextPageToken` is absent; the history walk starts from the
+//! profile's `historyId` and ends on the page without `nextPageToken`, whose
+//! `historyId` is the next baseline; an out-of-date `startHistoryId`'s `404`
+//! reaches the caller as `not_found`. The profile is the guide's own, pointed at
+//! the fixture token route. The fixture secrets are fictional and only ever
+//! compared, never printed. No live credential and no network.
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
@@ -40,49 +42,73 @@ use tokio_rustls::{
     rustls::{self, pki_types::PrivatePkcs8KeyDer},
 };
 
-/// The path the configured `api_base` carries: the projection's one server,
-/// `https://www.googleapis.com/calendar/v3`, below its host.
-const BASE: &str = "/calendar/v3";
-const PROVIDER: &str = "google-calendar";
+/// The path the configured `api_base` carries: none. The projection's one
+/// server is `https://gmail.googleapis.com`, and each operation path carries
+/// its own `/gmail/v1`.
+const BASE: &str = "";
+const PROVIDER: &str = "google-gmail";
 /// The bundle's auth profile, and the profile of the guide's configuration.
 const PROFILE: &str = "google.oauth";
-const CALENDAR_SCOPE: &str = "https://www.googleapis.com/auth/calendar.readonly";
+const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.readonly";
 /// Fictional OAuth material. The access token is what the fixture token route
-/// issues and the only bearer the fixture Calendar routes accept.
+/// issues and the only bearer the fixture Gmail routes accept.
 const CLIENT_ID: &str = "fixture-client-id.apps.example.test";
-const CLIENT_SECRET: &str = "fixture-client-secret-calendar";
-const REFRESH_TOKEN: &str = "fixture-refresh-token-calendar";
-const ACCESS_TOKEN: &str = "fixture-access-token-calendar";
+const CLIENT_SECRET: &str = "fixture-client-secret-gmail";
+const REFRESH_TOKEN: &str = "fixture-refresh-token-gmail";
+const ACCESS_TOKEN: &str = "fixture-access-token-gmail";
 /// The pinned Discovery document, relative to this crate.
-const UPSTREAM: &str = "../google/upstream/calendar/calendar-api.json";
+const UPSTREAM: &str = "../google/upstream/gmail/gmail-api.json";
 /// The committed projection, relative to this crate.
-const PROJECTED: &str = "../google/generated/calendar.openapi.json";
-/// The page-size ceiling the pinned `events.list` states only in the text of
-/// its `maxResults` description ("can never be larger than 2500 events").
-const EVENTS_MAX_RESULTS: u64 = 2500;
-/// The ceiling the pinned `calendarList.list` states the same way ("can never be
-/// larger than 250 entries").
-const CALENDARS_MAX_RESULTS: u64 = 250;
+const PROJECTED: &str = "../google/generated/gmail.openapi.json";
+/// The page-size ceiling the three pinned lists state only in the text of
+/// their `maxResults` description ("The maximum allowed value for this field
+/// is 500.").
+const MAX_RESULTS: u64 = 500;
 
-/// The shipped ids, their Discovery method id and the path the bundle records
-/// (the Discovery path below the server path `/calendar/v3`). A renamed,
-/// dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 3] = [
+/// The shipped ids, their Discovery method id and the path the bundle records.
+/// A renamed, dropped or added id fails here.
+const SHIPPED: [(&str, &str, &str); 7] = [
     (
-        "calendarList.list",
-        "calendar.calendarList.list",
-        "/calendar/v3/users/me/calendarList",
+        "users.getProfile",
+        "gmail.users.getProfile",
+        "/gmail/v1/users/{userId}/profile",
     ),
     (
-        "events.get",
-        "calendar.events.get",
-        "/calendar/v3/calendars/{calendarId}/events/{eventId}",
+        "users.history.list",
+        "gmail.users.history.list",
+        "/gmail/v1/users/{userId}/history",
     ),
     (
-        "events.list",
-        "calendar.events.list",
-        "/calendar/v3/calendars/{calendarId}/events",
+        "users.labels.list",
+        "gmail.users.labels.list",
+        "/gmail/v1/users/{userId}/labels",
     ),
+    (
+        "users.messages.get",
+        "gmail.users.messages.get",
+        "/gmail/v1/users/{userId}/messages/{id}",
+    ),
+    (
+        "users.messages.list",
+        "gmail.users.messages.list",
+        "/gmail/v1/users/{userId}/messages",
+    ),
+    (
+        "users.threads.get",
+        "gmail.users.threads.get",
+        "/gmail/v1/users/{userId}/threads/{id}",
+    ),
+    (
+        "users.threads.list",
+        "gmail.users.threads.list",
+        "/gmail/v1/users/{userId}/threads",
+    ),
+];
+/// The three lists, by selection id and Discovery resource.
+const LISTS: [(&str, &str); 3] = [
+    ("users.messages.list", "messages"),
+    ("users.threads.list", "threads"),
+    ("users.history.list", "history"),
 ];
 
 fn root() -> &'static Path {
@@ -90,7 +116,7 @@ fn root() -> &'static Path {
 }
 fn shipped() -> Vec<Selection> {
     let file: Value = serde_json::from_slice(
-        &fs::read(root().join("providers/google-calendar/operations.json")).unwrap(),
+        &fs::read(root().join("providers/google-gmail/operations.json")).unwrap(),
     )
     .unwrap();
     assert_eq!(file["format"], "connectors-catalog-operations/1");
@@ -100,6 +126,15 @@ fn shipped() -> Vec<Selection> {
 fn pinned() -> Value {
     serde_json::from_slice(&fs::read(root().join(UPSTREAM)).unwrap()).unwrap()
 }
+/// The pinned Discovery method of a selection id such as `users.messages.list`.
+fn pinned_method(document: &Value, id: &str) -> Value {
+    let parts: Vec<&str> = id.split('.').collect();
+    let mut node = &document["resources"][parts[0]];
+    for resource in &parts[1..parts.len() - 1] {
+        node = &node["resources"][*resource];
+    }
+    node["methods"][parts[parts.len() - 1]].clone()
+}
 fn committed_bundle() -> bundle::Bundle {
     bundle::load(&root().join("generated/bundles"), PROVIDER).unwrap()
 }
@@ -108,7 +143,7 @@ fn engine() -> Engine {
 }
 
 #[test]
-fn shipped_calendar_selections_are_exactly_the_three_reads() {
+fn shipped_gmail_selections_are_exactly_the_seven_reads() {
     let selections = shipped();
     let bundle = committed_bundle();
     assert_eq!(bundle.auth_profile, PROFILE);
@@ -128,8 +163,8 @@ fn shipped_calendar_selections_are_exactly_the_three_reads() {
         // The selection id is the Discovery id without its API-name prefix.
         assert_eq!(
             Some(id),
-            operation_id.strip_prefix("calendar."),
-            "`{id}` is not `{operation_id}` without `calendar.`"
+            operation_id.strip_prefix("gmail."),
+            "`{id}` is not `{operation_id}` without `gmail.`"
         );
         assert_eq!(selection.effect, Effect::Read, "`{id}`");
         assert_eq!(selection.response, None, "`{id}` reads JSON");
@@ -149,8 +184,8 @@ fn shipped_calendar_selections_are_exactly_the_three_reads() {
 fn a_selection_the_projection_lacks_is_refused_at_load() {
     let bundle = committed_bundle();
     let mut selections = shipped();
-    // Calendar has no `events.search` method: search is `events.list` with `q`.
-    let absent = "calendar.events.search";
+    // Gmail has no `messages.search` method: search is `messages.list` with `q`.
+    let absent = "gmail.users.messages.search";
     assert!(
         bundle
             .inventory
@@ -181,13 +216,13 @@ fn the_bundle_is_derived_from_the_pinned_discovery_document() {
         "committed projection drifted from the pinned Discovery document"
     );
     let bundle = committed_bundle();
-    assert_eq!(bundle.source.file_name, "calendar.openapi.json");
+    assert_eq!(bundle.source.file_name, "gmail.openapi.json");
     assert_eq!(
         bundle.source.source_sha256,
         hex::encode(Sha256::digest(&committed))
     );
     let derivation = bundle.source.derivation.expect("the bundle's derivation");
-    assert_eq!(derivation.from_file, "calendar-api.json");
+    assert_eq!(derivation.from_file, "gmail-api.json");
     assert_eq!(derivation.from_sha256, digest);
     assert_eq!(derivation.from_bytes, bytes.len());
     assert_eq!(derivation.format, discovery::FORMAT);
@@ -197,99 +232,125 @@ fn the_bundle_is_derived_from_the_pinned_discovery_document() {
     assert!(index.find(PROVIDER).is_some());
 }
 
-/// Both lists bound `maxResults`: the pinned document's own `minimum` and the
-/// ceiling its description states, 2500 for `events.list` and 250 for
-/// `calendarList.list`. `events.get` carries no bound.
+/// The three lists bound `maxResults` at 1–500: the ceiling each pinned
+/// description states, the document declaring neither bound. No other
+/// selection carries a bound.
 #[test]
-fn both_lists_bound_max_results_at_the_documented_range() {
+fn the_three_lists_bound_max_results_at_the_documented_range() {
     let document = pinned();
-    for (resource, noun, maximum) in [
-        ("events", "events", EVENTS_MAX_RESULTS),
-        ("calendarList", "entries", CALENDARS_MAX_RESULTS),
-    ] {
-        let max_results =
-            &document["resources"][resource]["methods"]["list"]["parameters"]["maxResults"];
-        assert_eq!(max_results["minimum"], "1", "{resource}");
-        assert!(max_results.get("maximum").is_none(), "{resource}");
+    for (id, _) in LISTS {
+        let max_results = &pinned_method(&document, id)["parameters"]["maxResults"];
+        assert!(max_results.get("minimum").is_none(), "`{id}`");
+        assert!(max_results.get("maximum").is_none(), "`{id}`");
         assert!(
             max_results["description"]
                 .as_str()
                 .unwrap()
-                .contains(&format!("never be larger than {maximum} {noun}")),
-            "{resource}"
+                .contains(&format!(
+                    "The maximum allowed value for this field is {MAX_RESULTS}."
+                )),
+            "`{id}`"
         );
     }
     for selection in shipped() {
         let written = serde_json::to_value(&selection).unwrap();
-        let expected = match selection.id.as_str() {
-            "events.list" => json!({"maxResults": {"minimum": 1, "maximum": EVENTS_MAX_RESULTS}}),
-            "calendarList.list" => {
-                json!({"maxResults": {"minimum": 1, "maximum": CALENDARS_MAX_RESULTS}})
-            }
-            _ => Value::Null,
+        let expected = if LISTS.iter().any(|(id, _)| *id == selection.id) {
+            json!({"maxResults": {"minimum": 1, "maximum": MAX_RESULTS}})
+        } else {
+            Value::Null
         };
         assert_eq!(written["bounds"], expected, "`{}`", selection.id);
     }
 }
 
-/// `eventTypes` is repeated in the pinned document, so the declared input
-/// schema takes an array of string elements.
+/// The pinned document calls `startHistoryId` "Required." in its description
+/// but does not mark it required; the selection does, so the declared input
+/// schema requires it. No other selection declares `required`.
 #[test]
-fn events_list_declares_event_types_repeated() {
-    let declaration = engine()
+fn history_list_declares_start_history_id_required() {
+    let document = pinned();
+    let start = &pinned_method(&document, "users.history.list")["parameters"]["startHistoryId"];
+    assert!(start.get("required").is_none());
+    assert!(
+        start["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("Required.")
+    );
+    for selection in shipped() {
+        let expected: &[&str] = if selection.id == "users.history.list" {
+            &["startHistoryId"]
+        } else {
+            &[]
+        };
+        assert_eq!(selection.required, expected, "`{}`", selection.id);
+    }
+    let history = engine()
         .declarations(&[Effect::Read])
         .into_iter()
-        .find(|o| o.id == "events.list")
+        .find(|o| o.id == "users.history.list")
         .unwrap();
-    let event_types = &declaration.input_schema["properties"]["eventTypes"];
-    assert!(
-        event_types["type"]
-            .as_array()
-            .is_some_and(|types| types.contains(&json!("array"))),
-        "{event_types}"
-    );
-    assert!(
-        event_types["items"]["type"]
-            .as_array()
-            .is_some_and(|types| types.contains(&json!("string"))),
-        "{event_types}"
-    );
+    let required = history.input_schema["required"].as_array().unwrap();
+    assert!(required.contains(&json!("startHistoryId")), "{required:?}");
+    assert!(required.contains(&json!("userId")), "{required:?}");
+}
+
+/// `labelIds` on both lists and `metadataHeaders` on both gets are repeated in
+/// the pinned document, so their declared input schema takes an array.
+#[test]
+fn repeated_parameters_are_declared_as_arrays() {
+    let declarations = engine().declarations(&[Effect::Read]);
+    for (id, parameter) in [
+        ("users.messages.list", "labelIds"),
+        ("users.threads.list", "labelIds"),
+        ("users.messages.get", "metadataHeaders"),
+        ("users.threads.get", "metadataHeaders"),
+    ] {
+        let declaration = declarations.iter().find(|o| o.id == id).unwrap();
+        let schema = &declaration.input_schema["properties"][parameter];
+        assert!(
+            schema["type"]
+                .as_array()
+                .is_some_and(|types| types.contains(&json!("array"))),
+            "`{id}` `{parameter}`: {schema}"
+        );
+    }
 }
 
 fn guide() -> String {
-    fs::read_to_string(root().join("../../docs/catalog-google-calendar.md")).unwrap()
+    fs::read_to_string(root().join("../../docs/catalog-google-gmail.md")).unwrap()
 }
 
 #[test]
 fn guide_cites_each_operation_its_paging_and_its_deltas() {
     let guide = guide();
     let rows: Vec<&str> = guide.lines().filter(|l| l.starts_with('|')).collect();
-    for (id, operation_id, path, paging, end, deltas) in [
+    let list = "`pageToken`, `maxResults` (1–500)";
+    for (id, paging, end, deltas) in [
+        ("users.getProfile", "single item", "n/a", "`historyId`"),
+        ("users.messages.list", list, "`nextPageToken` absent", "`q`"),
         (
-            "calendarList.list",
-            "calendar.calendarList.list",
-            "/calendar/v3/users/me/calendarList",
-            "`pageToken`, `maxResults` (1–250)",
-            "`nextPageToken` absent",
-            "`syncToken`",
-        ),
-        (
-            "events.list",
-            "calendar.events.list",
-            "/calendar/v3/calendars/{calendarId}/events",
-            "`pageToken`, `maxResults` (1–2500)",
-            "`nextPageToken` absent",
-            "`syncToken`",
-        ),
-        (
-            "events.get",
-            "calendar.events.get",
-            "/calendar/v3/calendars/{calendarId}/events/{eventId}",
+            "users.messages.get",
             "single item",
             "n/a",
-            "`events.list`",
+            "`users.history.list`",
         ),
+        ("users.threads.list", list, "`nextPageToken` absent", "`q`"),
+        (
+            "users.threads.get",
+            "single item",
+            "n/a",
+            "`users.history.list`",
+        ),
+        (
+            "users.history.list",
+            list,
+            "`nextPageToken` absent",
+            "`startHistoryId`",
+        ),
+        ("users.labels.list", "single item", "n/a", "none"),
     ] {
+        let (_, operation_id, path) = SHIPPED.iter().find(|(i, _, _)| *i == id).unwrap();
         let cited = rows.iter().any(|row| {
             row.starts_with(&format!("| `{id}` "))
                 && row.contains(&format!("`{operation_id}`"))
@@ -306,49 +367,29 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
     }
 }
 
-/// The guide states the time window, the sync-token cycle and the reset rule:
-/// the parameters that cannot accompany a `syncToken`, and that a `410`
-/// (`fullSyncRequired`) means discarding the token for a full walk without it.
+/// The guide states that `userId` is `me`, the message formats, and the delta
+/// cycle by `historyId` with its reset rule: a `404` means a full sync.
 #[test]
-fn guide_documents_time_windows_sync_tokens_and_the_full_sync_reset() {
+fn guide_documents_user_id_formats_and_history_deltas() {
     let guide = guide();
     for term in [
-        "`timeMin`",
-        "`timeMax`",
-        "`updatedMin`",
-        "`singleEvents`",
-        "`eventTypes`",
-        "`syncToken`",
-        "`nextSyncToken`",
-        "`410`",
-        "`fullSyncRequired`",
+        "`userId`",
+        "`me`",
+        "`historyId`",
+        "`startHistoryId`",
+        "`404`",
         "`not_found`",
+        "full sync",
+        "`labelIds`",
+        "`format`",
+        "`full`",
+        "`metadata`",
+        "`minimal`",
+        "`raw`",
         "`rate_limited`",
-        "2500",
+        "4 MiB",
     ] {
         assert!(guide.contains(term), "the guide does not state {term}");
-    }
-    // Discovery names the parameters that cannot accompany `syncToken`.
-    let sync = pinned()["resources"]["events"]["methods"]["list"]["parameters"]["syncToken"]
-        ["description"]
-        .as_str()
-        .unwrap()
-        .to_owned();
-    for excluded in [
-        "iCalUID",
-        "orderBy",
-        "privateExtendedProperty",
-        "q",
-        "sharedExtendedProperty",
-        "timeMin",
-        "timeMax",
-        "updatedMin",
-    ] {
-        assert!(sync.contains(&format!("- {excluded}")), "{excluded}");
-        assert!(
-            guide.contains(&format!("`{excluded}`")),
-            "the guide does not name `{excluded}` as excluded beside `syncToken`"
-        );
     }
 }
 
@@ -360,17 +401,17 @@ fn documented_config() -> Value {
         .skip(1)
         .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
         .find(|body| body.contains(&format!("\"provider\": \"{PROVIDER}\"")))
-        .expect("the documented google-calendar configuration");
+        .expect("the documented google-gmail configuration");
     serde_json::from_str::<Value>(example).unwrap()
 }
 
 /// The guide configures the bundle's profile as an `oauth2_refresh` profile
-/// against Google's token endpoint, with the Calendar read-only scope, and the
+/// against Google's token endpoint, with the Gmail read-only scope, and the
 /// projection's server as the API base.
 #[test]
 fn guide_documents_the_oauth_refresh_configuration() {
     let config = documented_config();
-    assert_eq!(config["api_base"], "https://www.googleapis.com/calendar/v3");
+    assert_eq!(config["api_base"], "https://gmail.googleapis.com");
     let auth = &config["auth"];
     assert_eq!(auth["profile"], PROFILE);
     assert_eq!(auth["scheme"], "oauth2_refresh");
@@ -382,29 +423,24 @@ fn guide_documents_the_oauth_refresh_configuration() {
         "https://accounts.google.com/o/oauth2/v2/auth"
     );
     assert_eq!(auth["identity"]["source"], "id_token");
-    assert_eq!(auth["minimum_scopes"], json!([CALENDAR_SCOPE]));
+    assert_eq!(auth["minimum_scopes"], json!([GMAIL_SCOPE]));
     assert!(
         auth["requested_scopes"]
             .as_array()
             .unwrap()
-            .contains(&json!(CALENDAR_SCOPE))
+            .contains(&json!(GMAIL_SCOPE))
     );
     assert!(auth.get("token_ca_file").is_none());
     // Every shipped read accepts that scope, per the pinned document.
     let document = pinned();
-    for (resource, method) in [
-        ("calendarList", "list"),
-        ("events", "list"),
-        ("events", "get"),
-    ] {
-        let method = &document["resources"][resource]["methods"][method];
+    for (id, _, _) in SHIPPED {
+        let method = pinned_method(&document, id);
         assert!(
             method["scopes"]
                 .as_array()
                 .unwrap()
-                .contains(&json!(CALENDAR_SCOPE)),
-            "`{}`",
-            method["id"]
+                .contains(&json!(GMAIL_SCOPE)),
+            "`{id}`"
         );
     }
 }
@@ -412,32 +448,26 @@ fn guide_documents_the_oauth_refresh_configuration() {
 /// Method, route with query, and `Authorization` header of each fixture request.
 type Requests = Arc<Mutex<Vec<(String, String, Option<String>)>>>;
 
-fn calendar_entry(id: &str, summary: &str) -> Value {
-    json!({"kind": "calendar#calendarListEntry", "id": id, "summary": summary,
-           "accessRole": "reader", "timeZone": "Europe/Berlin"})
+fn message_ref(id: &str) -> Value {
+    json!({"id": id, "threadId": format!("thread-of-{id}")})
 }
-fn event(id: &str, summary: &str) -> Value {
-    json!({"kind": "calendar#event", "id": id, "status": "confirmed", "summary": summary,
-           "eventType": "default",
-           "start": {"dateTime": "2026-09-21T10:00:00+02:00"},
-           "end": {"dateTime": "2026-09-21T11:00:00+02:00"},
-           "updated": "2026-09-20T08:00:00.000Z"})
+fn message(id: &str) -> Value {
+    json!({"id": id, "threadId": "fixture-thread-1", "labelIds": ["INBOX", "UNREAD"],
+           "snippet": "Fixture message", "historyId": "1001", "internalDate": "1790000000000",
+           "sizeEstimate": 512,
+           "payload": {"mimeType": "text/plain",
+                       "headers": [{"name": "Subject", "value": "Fixture subject"}],
+                       "body": {"size": 14, "data": "Rml4dHVyZSBib2R5Cg"}}})
 }
-fn events_page(items: Vec<Value>, token: (&str, &str)) -> Value {
-    let mut page = json!({"kind": "calendar#events", "summary": "Fixture calendar",
-                          "timeZone": "Europe/Berlin", "items": items});
-    page[token.0] = json!(token.1);
-    page
+fn thread(id: &str) -> Value {
+    json!({"id": id, "historyId": "1001", "messages": [message("fixture-message-1")]})
 }
-
-/// The body of Google's answer to an expired sync token.
-fn full_sync_required() -> Value {
-    json!({"error": {"code": 410, "message": "Sync token is no longer valid, a full sync is required.",
-                     "errors": [{"domain": "calendar", "reason": "fullSyncRequired",
-                                 "message": "Sync token is no longer valid, a full sync is required."}]}})
+fn history(id: &str, message_id: &str) -> Value {
+    json!({"id": id, "messages": [message_ref(message_id)],
+           "messagesAdded": [{"message": message_ref(message_id)}]})
 }
 
-/// The recorded Calendar answers the fixture serves, keyed by route and paging
+/// The recorded Gmail answers the fixture serves, keyed by route and paging
 /// position: a status and a JSON body. `None` for anything else, which the
 /// fixture answers 404.
 fn answer(target: &str) -> Option<(u16, Value)> {
@@ -445,48 +475,49 @@ fn answer(target: &str) -> Option<(u16, Value)> {
     let has = |pair: &str| query.split('&').any(|p| p == pair);
     let ok = |value: Value| Some((200, value));
     match route {
-        "/calendar/v3/users/me/calendarList" if has("pageToken=fixture-calendars-page-2") => {
-            ok(json!({"kind": "calendar#calendarList",
-                      "nextSyncToken": "fixture-calendars-sync-1",
-                      "items": [calendar_entry("team@group.example.test", "Team")]}))
-        }
-        "/calendar/v3/users/me/calendarList" if has("maxResults=1") => {
-            ok(json!({"kind": "calendar#calendarList",
-                      "nextPageToken": "fixture-calendars-page-2",
-                      "items": [calendar_entry("reader@example.test", "Reader")]}))
-        }
-        "/calendar/v3/users/me/calendarList" => ok(json!({"kind": "calendar#calendarList",
-            "nextSyncToken": "fixture-calendars-sync-1", "items": []})),
-        "/calendar/v3/calendars/primary/events" if has("syncToken=fixture-expired-sync") => {
-            Some((410, full_sync_required()))
-        }
-        "/calendar/v3/calendars/primary/events" if has("syncToken=fixture-events-sync-1") => {
-            ok(events_page(
-                vec![event("fixture-event-4", "moved")],
-                ("nextSyncToken", "fixture-events-sync-2"),
-            ))
-        }
-        "/calendar/v3/calendars/primary/events" if has("pageToken=fixture-events-page-2") => {
-            ok(events_page(
-                vec![event("fixture-event-3", "third")],
-                ("nextSyncToken", "fixture-events-sync-1"),
-            ))
-        }
-        "/calendar/v3/calendars/primary/events" if has("maxResults=2") => ok(events_page(
-            vec![
-                event("fixture-event-1", "first"),
-                event("fixture-event-2", "second"),
-            ],
-            ("nextPageToken", "fixture-events-page-2"),
+        "/gmail/v1/users/me/profile" => ok(json!({
+            "emailAddress": "reader@example.test", "messagesTotal": 3, "threadsTotal": 2,
+            "historyId": "1000"})),
+        "/gmail/v1/users/me/labels" => ok(json!({"labels": [
+            {"id": "INBOX", "name": "INBOX", "type": "system"},
+            {"id": "Label_1", "name": "Fixture label", "type": "user"}]})),
+        "/gmail/v1/users/me/messages" if has("pageToken=fixture-messages-page-2") => ok(json!({
+            "messages": [message_ref("fixture-message-3")], "resultSizeEstimate": 1})),
+        "/gmail/v1/users/me/messages" if has("maxResults=2") => ok(json!({
+            "messages": [message_ref("fixture-message-1"), message_ref("fixture-message-2")],
+            "nextPageToken": "fixture-messages-page-2", "resultSizeEstimate": 3})),
+        // Any other page size: one last page; Gmail omits an empty `messages`.
+        "/gmail/v1/users/me/messages" => ok(json!({"resultSizeEstimate": 0})),
+        "/gmail/v1/users/me/messages/fixture-message-1" if has("format=raw") => ok(json!({
+            "id": "fixture-message-1", "threadId": "fixture-thread-1",
+            "raw": "U3ViamVjdDogRml4dHVyZSBzdWJqZWN0DQoNCkZpeHR1cmUgYm9keQ0K"})),
+        "/gmail/v1/users/me/messages/fixture-message-1" => ok(message("fixture-message-1")),
+        "/gmail/v1/users/me/threads" if has("pageToken=fixture-threads-page-2") => ok(json!({
+            "threads": [{"id": "fixture-thread-3", "historyId": "1002"}],
+            "resultSizeEstimate": 1})),
+        "/gmail/v1/users/me/threads" if has("maxResults=2") => ok(json!({
+            "threads": [{"id": "fixture-thread-1", "historyId": "1001"},
+                        {"id": "fixture-thread-2", "historyId": "1001"}],
+            "nextPageToken": "fixture-threads-page-2", "resultSizeEstimate": 3})),
+        "/gmail/v1/users/me/threads" => ok(json!({"resultSizeEstimate": 0})),
+        "/gmail/v1/users/me/threads/fixture-thread-1" => ok(thread("fixture-thread-1")),
+        "/gmail/v1/users/me/history" if has("startHistoryId=fixture-stale") => Some((
+            404,
+            json!({"error": {"code": 404, "message": "Requested entity was not found.",
+                             "errors": [{"domain": "global", "reason": "notFound",
+                                         "message": "Requested entity was not found."}],
+                             "status": "NOT_FOUND"}}),
         )),
-        // Any other page size: one last page.
-        "/calendar/v3/calendars/primary/events" => ok(events_page(
-            vec![],
-            ("nextSyncToken", "fixture-events-sync-1"),
-        )),
-        "/calendar/v3/calendars/primary/events/fixture-event-1" => {
-            ok(event("fixture-event-1", "first"))
+        "/gmail/v1/users/me/history" if has("pageToken=fixture-history-page-2") => ok(json!({
+            "history": [history("1003", "fixture-message-6")], "historyId": "1003"})),
+        "/gmail/v1/users/me/history" if has("startHistoryId=1000") && has("maxResults=2") => {
+            ok(json!({
+                "history": [history("1001", "fixture-message-4"),
+                            history("1002", "fixture-message-5")],
+                "nextPageToken": "fixture-history-page-2", "historyId": "1003"}))
         }
+        // Any other page size from a baseline: no change since it.
+        "/gmail/v1/users/me/history" => ok(json!({"historyId": "1003"})),
         _ => None,
     }
 }
@@ -504,7 +535,7 @@ fn id_token() -> String {
         part(&json!({"alg": "RS256", "typ": "JWT", "kid": "fixture"})),
         part(
             &json!({"iss": "https://accounts.google.com", "aud": CLIENT_ID, "azp": CLIENT_ID,
-                     "sub": "110000000000000000003", "iat": 1, "exp": 4_000_000_000_u64})
+                     "sub": "110000000000000000004", "iat": 1, "exp": 4_000_000_000_u64})
         ),
         URL_SAFE_NO_PAD.encode(b"fixture-signature")
     )
@@ -601,7 +632,7 @@ impl Provider {
                                 json!({
                                     "access_token": ACCESS_TOKEN, "token_type": "Bearer",
                                     "expires_in": 3600,
-                                    "scope": format!("openid {CALENDAR_SCOPE}"),
+                                    "scope": format!("openid {GMAIL_SCOPE}"),
                                     "id_token": id_token()}),
                             )
                         } else {
@@ -634,10 +665,10 @@ impl Provider {
         // The guide's configuration, with the fixture as API host and token
         // host, trusted through its own CA.
         let mut config = documented_config();
-        config["instance"] = json!("fixture-google-calendar");
+        config["instance"] = json!("fixture-google-gmail");
         config["bundle_directory"] = json!(root_path("generated/bundles"));
-        config["operations_file"] = json!(root_path("providers/google-calendar/operations.json"));
-        config["api_base"] = json!(format!("https://localhost:{}/calendar/v3", address.port()));
+        config["operations_file"] = json!(root_path("providers/google-gmail/operations.json"));
+        config["api_base"] = json!(format!("https://localhost:{}", address.port()));
         config["ca_file"] = json!(ca);
         config["auth"]["token_url"] = json!(format!("https://localhost:{}/token", address.port()));
         config["auth"]["token_ca_file"] = json!(ca);
@@ -671,7 +702,7 @@ impl Provider {
         Adapter {
             private_protocol: None,
             permissions: Default::default(),
-            instance_id: "fixture-google-calendar".into(),
+            instance_id: "fixture-google-gmail".into(),
             adapter_id: "catalog".into(),
             configuration_revision: bootstrap.configuration_revision,
             protocol: "v1alpha1".into(),
@@ -690,7 +721,7 @@ impl Provider {
     fn requests(&self) -> Vec<(String, String, Option<String>)> {
         self.requests.lock().unwrap().clone()
     }
-    /// The Calendar requests (everything but the token route), as route with
+    /// The Gmail requests (everything but the token route), as route with
     /// query.
     fn api_targets(&self) -> Vec<String> {
         self.requests()
@@ -741,24 +772,46 @@ fn invoke(child: &mut Child, operation: &str, input: Value) -> Value {
 }
 
 /// Each read's input and the exact request the fixture must observe.
-fn first_requests() -> [(&'static str, Value, &'static str); 3] {
+fn first_requests() -> [(&'static str, Value, &'static str); 7] {
     [
         (
-            "calendarList.list",
-            json!({"maxResults": 1}),
-            "/calendar/v3/users/me/calendarList?maxResults=1",
+            "users.getProfile",
+            json!({"userId": "me"}),
+            // The transport writes an empty query when no query parameter is
+            // bound, so the wire request ends in `?`.
+            "/gmail/v1/users/me/profile?",
         ),
         (
-            "events.list",
-            json!({"calendarId": "primary", "maxResults": 2, "singleEvents": true,
-                   "timeMin": "2026-09-21T00:00:00Z", "timeMax": "2026-09-28T00:00:00Z"}),
-            "/calendar/v3/calendars/primary/events?maxResults=2&singleEvents=true\
-             &timeMax=2026-09-28T00%3A00%3A00Z&timeMin=2026-09-21T00%3A00%3A00Z",
+            "users.labels.list",
+            json!({"userId": "me"}),
+            "/gmail/v1/users/me/labels?",
         ),
         (
-            "events.get",
-            json!({"calendarId": "primary", "eventId": "fixture-event-1"}),
-            "/calendar/v3/calendars/primary/events/fixture-event-1?",
+            "users.messages.list",
+            json!({"userId": "me", "q": "newer_than:7d", "maxResults": 2}),
+            "/gmail/v1/users/me/messages?maxResults=2&q=newer_than%3A7d",
+        ),
+        (
+            "users.messages.get",
+            json!({"userId": "me", "id": "fixture-message-1", "format": "full"}),
+            "/gmail/v1/users/me/messages/fixture-message-1?format=full",
+        ),
+        (
+            "users.threads.list",
+            json!({"userId": "me", "maxResults": 2}),
+            "/gmail/v1/users/me/threads?maxResults=2",
+        ),
+        (
+            "users.threads.get",
+            json!({"userId": "me", "id": "fixture-thread-1", "format": "metadata",
+                   "metadataHeaders": ["Subject", "From"]}),
+            "/gmail/v1/users/me/threads/fixture-thread-1?format=metadata\
+             &metadataHeaders=Subject&metadataHeaders=From",
+        ),
+        (
+            "users.history.list",
+            json!({"userId": "me", "startHistoryId": "1000", "maxResults": 2}),
+            "/gmail/v1/users/me/history?maxResults=2&startHistoryId=1000",
         ),
     ]
 }
@@ -784,12 +837,12 @@ fn each_read_sends_the_declared_request_with_the_exchanged_bearer_and_returns_th
             "`{operation}` does not carry the exchanged bearer"
         );
         assert_eq!(result["status"], 200, "`{operation}` status");
-        assert_eq!(result["provenance"]["instance"], "fixture-google-calendar");
+        assert_eq!(result["provenance"]["instance"], "fixture-google-gmail");
         // The engine re-serialises the body, so the recorded answer is
         // compared as JSON, not as bytes.
         assert_eq!(result["body"], recorded(expected), "`{operation}` body");
     }
-    // The bearer came from the token route: one exchange, before any Calendar
+    // The bearer came from the token route: one exchange, before any Gmail
     // request; the cached token served every read after it.
     let requests = provider.requests();
     let token: Vec<_> = requests.iter().filter(|(_, t, _)| t == "/token").collect();
@@ -802,130 +855,185 @@ fn each_read_sends_the_declared_request_with_the_exchanged_bearer_and_returns_th
     assert_eq!(requests[0].1, "/token", "the exchange comes first");
 }
 
-/// `eventTypes` is repeated: two types are two `eventTypes` pairs, in the
-/// order given.
+/// `labelIds` is repeated: two labels are two `labelIds` pairs, in the order
+/// given.
 #[test]
-fn events_list_repeats_event_types() {
+fn messages_list_repeats_label_ids() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
     invoke(
         &mut child,
-        "events.list",
-        json!({"calendarId": "primary", "eventTypes": ["default", "focusTime"]}),
+        "users.messages.list",
+        json!({"userId": "me", "labelIds": ["INBOX", "UNREAD"]}),
     );
     assert_eq!(
         provider.api_targets(),
-        ["/calendar/v3/calendars/primary/events?eventTypes=default&eventTypes=focusTime"]
+        ["/gmail/v1/users/me/messages?labelIds=INBOX&labelIds=UNREAD"]
     );
 }
 
-/// The guide: the engine does not check an `eventTypes` value against the
-/// pinned document's enumeration (`connectors_catalog::inventory::Parameter`
-/// records no `enum`); an unknown type is sent, and Google answers it.
+/// Each `format` the pinned document enumerates is sent as given; `raw`
+/// returns the message as one base64url string in `raw`.
 #[test]
-fn events_list_sends_an_event_type_outside_the_enumeration() {
+fn messages_get_sends_each_format() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    invoke(
-        &mut child,
-        "events.list",
-        json!({"calendarId": "primary", "eventTypes": ["default", "fixture-unknown"]}),
-    );
+    let enumerated =
+        pinned_method(&pinned(), "users.messages.get")["parameters"]["format"]["enum"].clone();
+    assert_eq!(enumerated, json!(["minimal", "full", "raw", "metadata"]));
+    for format in ["full", "metadata", "minimal", "raw"] {
+        let body = invoke(
+            &mut child,
+            "users.messages.get",
+            json!({"userId": "me", "id": "fixture-message-1", "format": format}),
+        )["body"]
+            .clone();
+        if format == "raw" {
+            assert!(body["raw"].is_string(), "{body}");
+        } else {
+            assert_eq!(body["id"], "fixture-message-1");
+        }
+    }
     assert_eq!(
         provider.api_targets(),
-        ["/calendar/v3/calendars/primary/events?eventTypes=default&eventTypes=fixture-unknown"]
+        [
+            "/gmail/v1/users/me/messages/fixture-message-1?format=full",
+            "/gmail/v1/users/me/messages/fixture-message-1?format=metadata",
+            "/gmail/v1/users/me/messages/fixture-message-1?format=minimal",
+            "/gmail/v1/users/me/messages/fixture-message-1?format=raw",
+        ]
     );
 }
 
 /// Walk one list from `input` following `nextPageToken`, and return the ids
-/// seen, the page count and the `nextSyncToken` of the last page.
-fn walk(child: &mut Child, operation: &str, mut input: Value) -> (Vec<String>, usize, String) {
+/// under `items` (an absent array is an empty page), the page count and the
+/// last page.
+fn walk(
+    child: &mut Child,
+    operation: &str,
+    items: &str,
+    mut input: Value,
+) -> (Vec<String>, usize, Value) {
     let mut ids = Vec::new();
     let mut pages = 0;
     loop {
         let body = invoke(child, operation, input.clone())["body"].clone();
         pages += 1;
-        for item in body["items"].as_array().unwrap() {
+        for item in body[items].as_array().into_iter().flatten() {
             ids.push(item["id"].as_str().unwrap().to_owned());
         }
         match body.get("nextPageToken").and_then(Value::as_str) {
-            Some(token) => {
-                assert!(body.get("nextSyncToken").is_none());
-                input["pageToken"] = json!(token);
-            }
-            None => {
-                let sync = body["nextSyncToken"]
-                    .as_str()
-                    .expect("the last page carries nextSyncToken");
-                return (ids, pages, sync.to_owned());
-            }
+            Some(token) => input["pageToken"] = json!(token),
+            None => return (ids, pages, body),
         }
         assert!(pages < 3, "`{operation}` did not stop");
     }
 }
 
 #[test]
-fn calendar_list_walks_two_pages_to_next_sync_token() {
+fn messages_list_walks_two_pages_until_next_page_token_is_absent() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    let (ids, pages, sync) = walk(&mut child, "calendarList.list", json!({"maxResults": 1}));
-    assert_eq!(pages, 2);
-    assert_eq!(sync, "fixture-calendars-sync-1");
-    assert_eq!(ids, ["reader@example.test", "team@group.example.test"]);
-    assert_eq!(
-        provider.api_targets(),
-        [
-            "/calendar/v3/users/me/calendarList?maxResults=1",
-            "/calendar/v3/users/me/calendarList?maxResults=1&pageToken=fixture-calendars-page-2",
-        ]
-    );
-}
-
-/// The full walk ends on the page carrying `nextSyncToken`; sending it as
-/// `syncToken` reads only what changed since, with the next token.
-#[test]
-fn events_list_walks_two_pages_to_next_sync_token_and_reads_the_delta() {
-    let provider = Provider::new();
-    let mut child = Child::spawn(&provider.selection()).unwrap();
-    let (ids, pages, sync) = walk(
+    let (ids, pages, _) = walk(
         &mut child,
-        "events.list",
-        json!({"calendarId": "primary", "maxResults": 2, "singleEvents": true}),
+        "users.messages.list",
+        "messages",
+        json!({"userId": "me", "q": "newer_than:7d", "maxResults": 2}),
     );
     assert_eq!(pages, 2);
-    assert_eq!(sync, "fixture-events-sync-1");
     assert_eq!(
         ids,
-        ["fixture-event-1", "fixture-event-2", "fixture-event-3"]
+        [
+            "fixture-message-1",
+            "fixture-message-2",
+            "fixture-message-3"
+        ]
     );
-    let (delta, pages, next) = walk(
-        &mut child,
-        "events.list",
-        json!({"calendarId": "primary", "singleEvents": true, "syncToken": sync}),
-    );
-    assert_eq!((delta, pages), (vec!["fixture-event-4".to_owned()], 1));
-    assert_eq!(next, "fixture-events-sync-2");
     assert_eq!(
         provider.api_targets(),
         [
-            "/calendar/v3/calendars/primary/events?maxResults=2&singleEvents=true",
-            "/calendar/v3/calendars/primary/events?maxResults=2&pageToken=fixture-events-page-2\
-             &singleEvents=true",
-            "/calendar/v3/calendars/primary/events?singleEvents=true&syncToken=fixture-events-sync-1",
+            "/gmail/v1/users/me/messages?maxResults=2&q=newer_than%3A7d",
+            "/gmail/v1/users/me/messages?maxResults=2&pageToken=fixture-messages-page-2\
+             &q=newer_than%3A7d",
         ]
     );
 }
 
-/// An expired sync token is Google's `410` `fullSyncRequired`; it reaches the
-/// caller as `not_found`, the refusal the guide's reset rule starts from.
 #[test]
-fn an_expired_sync_token_is_refused_as_not_found() {
+fn threads_list_walks_two_pages_until_next_page_token_is_absent() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let (ids, pages, _) = walk(
+        &mut child,
+        "users.threads.list",
+        "threads",
+        json!({"userId": "me", "maxResults": 2}),
+    );
+    assert_eq!(pages, 2);
+    assert_eq!(
+        ids,
+        ["fixture-thread-1", "fixture-thread-2", "fixture-thread-3"]
+    );
+    assert_eq!(
+        provider.api_targets(),
+        [
+            "/gmail/v1/users/me/threads?maxResults=2",
+            "/gmail/v1/users/me/threads?maxResults=2&pageToken=fixture-threads-page-2",
+        ]
+    );
+}
+
+/// The delta walk: a baseline `historyId` from `users.getProfile`, then
+/// `users.history.list` from it, following `nextPageToken`, until a page has
+/// none; that page's `historyId` is the baseline for the next walk.
+#[test]
+fn history_list_walks_two_pages_from_the_profile_baseline() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let baseline =
+        invoke(&mut child, "users.getProfile", json!({"userId": "me"}))["body"]["historyId"]
+            .clone();
+    assert_eq!(baseline, "1000");
+    let (records, pages, last) = walk(
+        &mut child,
+        "users.history.list",
+        "history",
+        json!({"userId": "me", "startHistoryId": baseline, "maxResults": 2}),
+    );
+    assert_eq!(pages, 2);
+    assert_eq!(records, ["1001", "1002", "1003"]);
+    assert_eq!(last["historyId"], "1003");
+    assert_eq!(
+        provider.api_targets(),
+        [
+            "/gmail/v1/users/me/profile?",
+            "/gmail/v1/users/me/history?maxResults=2&startHistoryId=1000",
+            "/gmail/v1/users/me/history?maxResults=2&pageToken=fixture-history-page-2\
+             &startHistoryId=1000",
+        ]
+    );
+}
+
+/// `users.history.list` needs a `startHistoryId`; without one nothing is sent.
+#[test]
+fn history_list_requires_a_start_history_id() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let outcome = attempt(&mut child, "users.history.list", &json!({"userId": "me"}));
+    assert!(matches!(outcome, Err(Failure::InvalidInput)), "{outcome:?}");
+    assert!(provider.api_targets().is_empty(), "a request was sent");
+}
+
+/// An out-of-date `startHistoryId` is Gmail's `404`; it reaches the caller as
+/// `not_found`, the refusal the guide's full-sync rule starts from.
+#[test]
+fn an_out_of_date_start_history_id_is_refused_as_not_found() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
     let outcome = attempt(
         &mut child,
-        "events.list",
-        &json!({"calendarId": "primary", "syncToken": "fixture-expired-sync"}),
+        "users.history.list",
+        &json!({"userId": "me", "startHistoryId": "fixture-stale"}),
     );
     assert!(
         matches!(outcome, Err(Failure::ProviderNotFound)),
@@ -933,18 +1041,18 @@ fn an_expired_sync_token_is_refused_as_not_found() {
     );
     assert_eq!(
         provider.api_targets(),
-        ["/calendar/v3/calendars/primary/events?syncToken=fixture-expired-sync"]
+        ["/gmail/v1/users/me/history?startHistoryId=fixture-stale"]
     );
 }
 
-/// `maxResults` 0 and one over `maximum` are refused as `invalid_input` with
-/// nothing sent, as numbers and as strings; 1 and `maximum` are sent.
-fn max_results_bounds(operation: &str, first: Value, route: &str, maximum: u64) {
+/// `maxResults` 0 and 501 are refused as `invalid_input` with nothing sent, as
+/// numbers and as strings; 1 and 500 are sent.
+fn max_results_bounds(operation: &str, first: Value, route: &str) {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
     // Exchange the token first, so "nothing sent" counts every request.
     invoke(&mut child, operation, first.clone());
-    let over = maximum + 1;
+    let over = MAX_RESULTS + 1;
     let mut escaped = Vec::new();
     for size in [json!(0), json!(over), json!("0"), json!(over.to_string())] {
         let mut input = first.clone();
@@ -962,33 +1070,40 @@ fn max_results_bounds(operation: &str, first: Value, route: &str, maximum: u64) 
         escaped.is_empty(),
         "not refused before any request: {escaped:#?}"
     );
-    for size in [1, maximum] {
+    for size in [1, MAX_RESULTS] {
         let mut input = first.clone();
         input["maxResults"] = json!(size);
         let before = provider.api_targets().len();
         invoke(&mut child, operation, input);
         let targets = provider.api_targets();
         assert_eq!(targets.len(), before + 1, "`{operation}` {size}");
-        assert_eq!(targets[before], format!("{route}?maxResults={size}"));
+        assert_eq!(targets[before], route.replace("{size}", &size.to_string()));
     }
 }
 
 #[test]
-fn events_list_max_results_bounds() {
+fn messages_list_max_results_bounds() {
     max_results_bounds(
-        "events.list",
-        json!({"calendarId": "primary", "maxResults": 2}),
-        "/calendar/v3/calendars/primary/events",
-        EVENTS_MAX_RESULTS,
+        "users.messages.list",
+        json!({"userId": "me", "maxResults": 2}),
+        "/gmail/v1/users/me/messages?maxResults={size}",
     );
 }
 
 #[test]
-fn calendar_list_max_results_bounds() {
+fn threads_list_max_results_bounds() {
     max_results_bounds(
-        "calendarList.list",
-        json!({"maxResults": 1}),
-        "/calendar/v3/users/me/calendarList",
-        CALENDARS_MAX_RESULTS,
+        "users.threads.list",
+        json!({"userId": "me", "maxResults": 2}),
+        "/gmail/v1/users/me/threads?maxResults={size}",
+    );
+}
+
+#[test]
+fn history_list_max_results_bounds() {
+    max_results_bounds(
+        "users.history.list",
+        json!({"userId": "me", "startHistoryId": "1000", "maxResults": 2}),
+        "/gmail/v1/users/me/history?maxResults={size}&startHistoryId=1000",
     );
 }
