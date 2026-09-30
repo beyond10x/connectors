@@ -9,7 +9,7 @@ relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - informed_by: specification:catalog-http-runtime-handoff
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 6
 ---
 ## Outcome
 
@@ -38,7 +38,7 @@ refresh tokens expire after 7 days (developers.google.com/identity/protocols/oau
 | No OAuth code on `main`; the registry admits `static_entry` only | `crates/connectors-host/src/local/registry.rs:60-61` |
 | The adapter child lives across invokes and receives the secret per request; it cannot write material back | `crates/connectors-host/src/local/owner/supervisor.rs:617-640`; `crates/connectors-host/src/local/runtime/server.rs:12-36` |
 | Google Discovery method counts: Slides 5, Drive 64, Calendar 38, Gmail 79; constructs in use: one `{+presentationId}`, 11 media methods, 11 `repeated` parameters, `any`, `int64`, `uint64`, `byte`, `google-datetime`, `google-fieldmask` | live Discovery documents fetched 2026-09-30 |
-| Endpoints: authorize `https://accounts.google.com/o/oauth2/v2/auth`, token `https://oauth2.googleapis.com/token`; loopback `http://127.0.0.1:port`; PKCE S256; installed apps "cannot keep secrets" | developers.google.com/identity/protocols/oauth2/native-app |
+| Endpoints: authorize `https://accounts.google.com/o/oauth2/v2/auth` in Google's guide, but a downloaded Desktop client file carries `auth_uri` `https://accounts.google.com/o/oauth2/auth`, and the connectors configuration uses the latter because the consent flow compares them byte for byte (review-result:adversary-google-slides-writes-pass-2, F1); token `https://oauth2.googleapis.com/token`; loopback `http://127.0.0.1:port`; PKCE S256; installed apps "cannot keep secrets" | developers.google.com/identity/protocols/oauth2/native-app |
 | BSD-3-Clause copies of the Discovery documents: `googleapis/google-api-go-client` at `ec13a0cd76ecc7fede8932d040a3156804515da9` | `git ls-remote`, HTTP 200 on each file, 2026-09-30 |
 
 ## Design
