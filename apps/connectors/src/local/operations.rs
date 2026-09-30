@@ -39,7 +39,7 @@ pub(super) fn describe(
         let operations = descriptor
             .operations
             .iter()
-            .filter(|o| adapter.permissions.operations.contains(&o.id))
+            .filter(|o| owner::admit_operation(adapter, &bootstrap, &o.id).is_ok())
             .map(summary)
             .collect::<Vec<_>>();
         if operations.len() > limit as usize {
@@ -49,10 +49,11 @@ pub(super) fn describe(
             json!({"adapter":alias,"revision":descriptor.revision,"operations":operations,"source":"cached","stale":true}),
         )
     } else {
-        let name = call.input["operation"].as_str().ok_or(Code::InvalidInput)?;
-        if !adapter.permissions.operations.contains(name) {
-            return Err(Code::Forbidden.into());
-        }
+        let name = call.input["operation"]
+            .as_str()
+            .filter(|name| connectors_core::valid_id(name))
+            .ok_or(Code::InvalidInput)?;
+        owner::admit_operation(adapter, &bootstrap, name)?;
         let selected = descriptor.operation(name).map_err(|_| Code::NotFound)?;
         Ok(
             json!({"adapter":alias,"revision":descriptor.revision,"schema":owner::schema(&bootstrap,name)?,"operation":operation(selected),"source":"cached","stale":true}),
