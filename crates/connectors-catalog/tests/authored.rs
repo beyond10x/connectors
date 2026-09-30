@@ -64,12 +64,14 @@ fn equivalent() -> Operation {
                 location: Location::Path,
                 required: true,
                 value_type: None,
+                repeated: false,
             },
             Parameter {
                 name: "page".into(),
                 location: Location::Query,
                 required: false,
                 value_type: None,
+                repeated: false,
             },
         ],
         request_media_types: vec!["application/json".into()],
@@ -697,18 +699,21 @@ location = "header"
                 location: Location::Path,
                 required: true,
                 value_type: None,
+                repeated: false,
             },
             Parameter {
                 name: "page".into(),
                 location: Location::Query,
                 required: false,
                 value_type: None,
+                repeated: false,
             },
             Parameter {
                 name: "tenant".into(),
                 location: Location::Header,
                 required: false,
                 value_type: None,
+                repeated: false,
             },
         ]
     );
