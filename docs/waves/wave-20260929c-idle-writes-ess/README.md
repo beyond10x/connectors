@@ -6,9 +6,9 @@ Skill version: aep implementing 0.18.0. Approved by the operator ("approved next
 
 | story | serves | agents | branch | worktree | build dir | scratch | stage |
 |---|---|---|---|---|---|---|---|
-| story:owner-idle-exit | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/owner-idle-exit | `<managed-trees>`/wave0929c-idle | `<tree>`/target | `<wave-scratch>`/idle | dispatched |
-| story:provider-refusal-stage-for-writes-and-timeouts | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/provider-refusal-stage-for-writes-and-timeouts | `<managed-trees>`/wave0929c-writes | `<tree>`/target | `<wave-scratch>`/writes | dispatched |
-| story:ess-pin-newest-release | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/ess-pin-newest-release | `<managed-trees>`/wave0929c-ess | `<tree>`/target | `<wave-scratch>`/ess | dispatched |
+| story:owner-idle-exit | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/owner-idle-exit | `<managed-trees>`/wave0929c-idle | `<tree>`/target | `<wave-scratch>`/idle | merged (b8c0fea84), target deleted |
+| story:provider-refusal-stage-for-writes-and-timeouts | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/provider-refusal-stage-for-writes-and-timeouts | `<managed-trees>`/wave0929c-writes | `<tree>`/target | `<wave-scratch>`/writes | merged (509e98f9f), target deleted |
+| story:ess-pin-newest-release | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/ess-pin-newest-release | `<managed-trees>`/wave0929c-ess | `<tree>`/target | `<wave-scratch>`/ess | merged (6fe1bb813), target deleted |
 
 Integration branch: `wave/20260929c-idle-writes-ess` off `main` 8b04b0b20 (release v0.16.0).
 
@@ -29,3 +29,12 @@ Integration branch: `wave/20260929c-idle-writes-ess` off `main` 8b04b0b20 (relea
 
 One commit per unit (3), the merges into the integration branch, the closing planning-store commit,
 the merge into `main` through a pull request once the single wave gate is green, then the next release.
+
+## Close
+
+- Gate: `cargo run -p connectors-build -- gate --msrv` at `b8c0fea84`, `CONNECTORS_ESS` = ESS 0.45.0:
+  `gate: all checks passed`, exit 0; 95 suites, 699 passed, 0 failed, 33 ignored; local metadata
+  authority conformance 289 scenarios, 20 synthesis refusals.
+- Implemented: owner-idle-exit, provider-refusal-stage-for-writes-and-timeouts, ess-pin-newest-release.
+  Scopes rewritten from each unit commit (all cited).
+- Filed during the wave: beyond10x/ess#251 (ESS-SYNTH-003 since 0.43.0).
