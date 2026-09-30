@@ -18,6 +18,8 @@ const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
 
 fn document() -> Vec<u8> {
     let path = |name: &str| json!({"name": name, "in": "path", "required": true, "schema": {"type": "string"}});
+    // As the pinned GitLab document types them: an iid or a job id is an integer.
+    let number = |name: &str| json!({"name": name, "in": "path", "required": true, "schema": {"type": "integer"}});
     serde_json::to_vec(&json!({
         "openapi": "3.0.0",
         "info": {"title": "fixture", "version": "1"},
@@ -42,14 +44,14 @@ fn document() -> Vec<u8> {
             "/api/v4/projects/{id}/merge_requests/{merge_request_iid}": {
                 "get": {
                     "operationId": "getMergeRequest",
-                    "parameters": [path("id"), path("merge_request_iid")],
+                    "parameters": [path("id"), number("merge_request_iid")],
                     "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
                 }
             },
             "/api/v4/projects/{id}/merge_requests/{merge_request_iid}/merge": {
                 "put": {
                     "operationId": "mergeMergeRequest",
-                    "parameters": [path("id"), path("merge_request_iid")],
+                    "parameters": [path("id"), number("merge_request_iid")],
                     "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
                     "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
                 }
@@ -64,7 +66,7 @@ fn document() -> Vec<u8> {
             "/api/v4/projects/{id}/jobs/{job_id}/trace": {
                 "get": {
                     "operationId": "getJobTrace",
-                    "parameters": [path("id"), path("job_id")],
+                    "parameters": [path("id"), number("job_id")],
                     "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
                 }
             },
