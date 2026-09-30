@@ -1,0 +1,31 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "google-gmail",
+  "operations": [
+    {"id": "users.getProfile", "operation_id": "gmail.users.getProfile", "effect": "read",
+     "description": "Read the mailbox profile of userId (me for the signed-in user): its address, message and thread totals, and historyId, the baseline from which users.history.list reports later changes",
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "users.messages.list", "operation_id": "gmail.users.messages.list", "effect": "read",
+     "description": "List message ids and thread ids of userId (me) matching the Gmail search query q and every label in labelIds (an array), one page per call; the walk follows nextPageToken as pageToken and ends on a page without it; read each message with users.messages.get",
+     "bounds": {"maxResults": {"minimum": 1, "maximum": 500}},
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "users.messages.get", "operation_id": "gmail.users.messages.get", "effect": "read",
+     "description": "Read one message of userId (me) by id; format is full (the default), metadata (ids, labels and headers, narrowed by metadataHeaders), minimal (ids and labels) or raw (the full message as one base64url string in raw); at most the engine's 4 MiB response limit",
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "users.threads.list", "operation_id": "gmail.users.threads.list", "effect": "read",
+     "description": "List thread ids of userId (me) matching the Gmail search query q and every label in labelIds (an array), one page per call; the walk follows nextPageToken as pageToken and ends on a page without it; read each thread with users.threads.get",
+     "bounds": {"maxResults": {"minimum": 1, "maximum": 500}},
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "users.threads.get", "operation_id": "gmail.users.threads.get", "effect": "read",
+     "description": "Read one thread of userId (me) by id with its messages; format is full (the default), metadata (ids, labels and headers, narrowed by metadataHeaders) or minimal; at most the engine's 4 MiB response limit",
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "users.history.list", "operation_id": "gmail.users.history.list", "effect": "read",
+     "description": "List the mailbox changes of userId (me) after startHistoryId (required), one page per call; the walk follows nextPageToken as pageToken and ends on a page without it, whose historyId is the next baseline; a 404 (not_found) means startHistoryId is out of date: do a full sync and take a new baseline from users.getProfile",
+     "bounds": {"maxResults": {"minimum": 1, "maximum": 500}},
+     "required": ["startHistoryId"],
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
+    {"id": "users.labels.list", "operation_id": "gmail.users.labels.list", "effect": "read",
+     "description": "List every label of userId (me), system and user labels, in one answer; the label ids are what labelIds takes",
+     "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]}
+  ]
+}
