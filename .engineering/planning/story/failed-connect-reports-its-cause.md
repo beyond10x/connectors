@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:failed-connect-reports-its-cause
 kind: story
-status: active
+status: implemented
 title: A connect that fails with a known cause does not report outcome_unknown
 relations:
 - serves: vision:independent-contract-adapters
@@ -14,18 +14,19 @@ scope:
   path: apps/connectors/src/local/connections.rs
 - confidence: cited
   path: apps/connectors/tests/failed_connect.rs
-- confidence: inferred
+- confidence: cited
+  path: apps/connectors/tests/failed_connect_adversary.rs
+- confidence: cited
   path: contracts/cli/v1alpha1/scenarios.md
-- confidence: inferred
-  path: contracts/cli/v1alpha1/semantics.md
 - confidence: cited
   path: crates/connectors-host/src/local/owner/supervisor.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/transport.rs
-revision: 10
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T14:19:49Z", actor: "human:timo", revision: 7}
 - {from: "proposed", to: "active", at: "2026-09-30T14:19:49Z", actor: "human:timo", revision: 8}
+- {from: "active", to: "implemented", at: "2026-09-30T16:53:27Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Observed
 Found by the black-box CLI surface test of release 0.18.0 on 2026-09-30 (raw output under the tester's sandbox, outside the repository).

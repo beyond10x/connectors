@@ -2,19 +2,44 @@
 format: aep.planning-md/3
 id: story:catalog-parameters-declare-their-type
 kind: story
-status: active
+status: implemented
 title: Catalog parameters declare the provider's type instead of string|integer|boolean
 relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
+  path: adapters/catalog/generated/bundles/confluence.bundle.json
+- confidence: cited
+  path: adapters/catalog/generated/bundles/gitlab.bundle.json
+- confidence: cited
+  path: adapters/catalog/generated/bundles/index.json
+- confidence: cited
+  path: adapters/catalog/generated/bundles/jira.bundle.json
+- confidence: cited
   path: adapters/catalog/src/lib.rs
-- confidence: inferred
+- confidence: cited
   path: adapters/catalog/tests/engine.rs
-revision: 5
+- confidence: cited
+  path: adapters/catalog/tests/parameter_types.rs
+- confidence: cited
+  path: adapters/catalog/tests/parameter_types_adversary.rs
+- confidence: cited
+  path: crates/connectors-catalog/src/authored.rs
+- confidence: cited
+  path: crates/connectors-catalog/src/inventory.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/authored.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/template.rs
+- confidence: cited
+  path: crates/connectors-catalog/tests/template_adversarial.rs
+- confidence: cited
+  path: docs/local-catalog-provider.md
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T13:03:57Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-09-30T13:03:57Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-09-30T16:53:25Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Source
 

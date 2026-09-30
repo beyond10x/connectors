@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:legacy-commands-parse-like-the-contract
 kind: story
-status: active
+status: implemented
 title: Legacy describe, invoke and serve parse errors follow the CLI error envelope
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,13 +10,20 @@ scope:
 - confidence: cited
   path: apps/connectors/src/legacy.rs
 - confidence: cited
+  path: apps/connectors/src/local.rs
+- confidence: cited
   path: apps/connectors/src/main.rs
 - confidence: cited
-  path: apps/connectors/tests/compatibility.rs
-revision: 8
+  path: apps/connectors/tests/adversary_legacy_edges.rs
+- confidence: cited
+  path: apps/connectors/tests/legacy_commands.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T13:03:57Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-09-30T13:03:57Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-09-30T16:53:26Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Observed
 Found by the black-box CLI surface test of release 0.18.0 on 2026-09-30 (raw output under the tester's sandbox, outside the repository).
