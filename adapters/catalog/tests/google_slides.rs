@@ -141,8 +141,26 @@ fn shipped_slides_selections_are_exactly_the_three_reads() {
 fn a_selection_the_projection_lacks_is_refused_at_load() {
     let bundle = committed_bundle();
     let mut selections = shipped();
-    selections[0].operation_id = "slides.presentations.list".into();
-    assert!(Engine::new(&bundle, BASE, &selections).is_err());
+    // Slides has no list method; presentations are listed through Drive. The
+    // id is absent from the bundle, so the load is refused for its absence and
+    // for nothing else.
+    let absent = "slides.presentations.list";
+    assert!(
+        bundle
+            .inventory
+            .operations
+            .iter()
+            .all(|o| o.operation_id.as_deref() != Some(absent)),
+        "the bundle carries `{absent}`"
+    );
+    selections[0].operation_id = absent.into();
+    let refusal = Engine::new(&bundle, BASE, &selections)
+        .err()
+        .expect("refused at load");
+    assert_eq!(
+        refusal.message,
+        format!("bundle carries no operation `{absent}`")
+    );
 }
 
 /// The bundle is the projection of the pinned document, and records it; the
