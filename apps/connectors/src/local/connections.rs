@@ -27,8 +27,18 @@ pub(super) fn execute(
             let revision = text("expected_revision")?;
             owner::admit_revalidation(paths, alias, reference, revision).map_err(owner_failure)?;
             owner::Client::connect(paths, true)
-                .and_then(|client| client.revalidate(alias, reference, revision, deadline))
-                .map_err(owner_failure)
+                .map_err(owner_failure)?
+                .revalidate(alias, reference, revision, deadline)
+                .map_err(|error| match error.code {
+                    // The owner's own definite answer to a dispatched
+                    // revalidation; a lost reply is already `outcome_unknown`.
+                    owner::Code::Unavailable | owner::Code::Timeout => {
+                        let code = serde_json::to_value(error.code).unwrap_or_default();
+                        let code = code.as_str().unwrap_or("unavailable").to_owned();
+                        failure(&code, "dispatch", "retry_explicitly", false)
+                    }
+                    _ => owner_failure(error),
+                })
         }
         "connections-list" => {
             let limit = call
