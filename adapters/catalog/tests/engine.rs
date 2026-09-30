@@ -120,6 +120,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         bounds: BTreeMap::new(),
         required: Vec::new(),
         rate_limit_reasons: Vec::new(),
+        body_keys: Vec::new(),
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {
@@ -1305,4 +1306,155 @@ fn a_rate_limit_reason_must_be_a_nonempty_string() {
     }
     let plain = serde_json::to_value(select("file.export", "exportFile", Effect::Read)).unwrap();
     assert!(plain.get("rate_limit_reasons").is_none(), "{plain}");
+}
+
+/// A write whose body is closed to `id`, as a draft send is.
+fn closed_thing() -> Engine {
+    let selection = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["id"]
+    }));
+    Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap()
+}
+
+/// `body_keys` closes the body: the declaration types it as an object with
+/// exactly those properties and no others. The field round-trips, and a
+/// selection without it serialises and declares its body as before.
+#[test]
+fn body_keys_close_the_declared_body() {
+    let engine = closed_thing();
+    let declared = &engine.declarations(&[Effect::Write])[0].input_schema;
+    assert_eq!(
+        declared["properties"]["body"],
+        json!({"type": "object", "properties": {"id": {}}, "additionalProperties": false})
+    );
+    assert!(
+        declared["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("body"))
+    );
+    let closed = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["id"]
+    }));
+    assert_eq!(
+        serde_json::to_value(&closed).unwrap()["body_keys"],
+        json!(["id"])
+    );
+    let plain = select("thing.create", "createThing", Effect::Write);
+    assert!(
+        serde_json::to_value(&plain)
+            .unwrap()
+            .get("body_keys")
+            .is_none()
+    );
+    let open = Engine::new(&shapes_bundle(), "/v1", &[plain]).unwrap();
+    assert_eq!(
+        open.declarations(&[Effect::Write])[0].input_schema["properties"]["body"],
+        json!({"type": "object"})
+    );
+}
+
+/// A body key outside the closed set is `invalid_input` before any request:
+/// no read and no write is sent. A body inside the set is sent unchanged.
+#[tokio::test]
+async fn a_body_key_outside_the_closed_set_is_refused_before_any_request() {
+    let engine = closed_thing();
+    for body in [
+        json!({"id": "t-1", "message": {"raw": "x"}}),
+        json!({"message": {"raw": "x"}}),
+        json!({"id": "t-1", "": 1}),
+        json!(["id"]),
+    ] {
+        let http = reads(vec![]);
+        let error = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "thing.create",
+                json!({"body": body}),
+            )
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{body} was prepared"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{body}");
+        assert!(http.calls.lock().unwrap().is_empty(), "{body}");
+    }
+    let http = reads(vec![]);
+    let prepared = engine
+        .prepare(
+            http.as_ref(),
+            "fixture",
+            "thing.create",
+            json!({"body": {"id": "t-1"}}),
+        )
+        .await
+        .unwrap();
+    let sent: Sent = Arc::default();
+    let outcome = prepared
+        .execute(Box::new(Send {
+            sent: sent.clone(),
+            response: Some(response(200, json!({"id": "t-1"}))),
+        }))
+        .await;
+    assert!(matches!(outcome, WriteOutcome::Applied(Ok(_))));
+    assert_eq!(sent.lock().unwrap()[0].2, json!({"id": "t-1"}));
+}
+
+/// `body_keys` is refused when the selection loads unless it closes a
+/// write's JSON body with distinct plain names, and a guard that reads a
+/// `body.<key>` must read a key the set admits. A guarded key is required in
+/// the declared body.
+#[test]
+fn body_keys_are_refused_at_load_unless_they_close_a_write_body() {
+    for (label, selection) in [
+        (
+            "a read",
+            json!({"id": "about.get", "operation_id": "getAbout", "effect": "read",
+                   "body_keys": ["id"]}),
+        ),
+        (
+            "an empty name",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": [""]}),
+        ),
+        (
+            "a repeated name",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id", "id"]}),
+        ),
+        (
+            "a dotted name",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["message.raw"]}),
+        ),
+    ] {
+        let error = Engine::new(&shapes_bundle(), "/v1", &[written(selection)])
+            .err()
+            .unwrap_or_else(|| panic!("{label} loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{label}");
+        assert!(error.message.contains("body_keys"), "{}", error.message);
+    }
+    let guarded = |keys: &[&str]| {
+        written(json!({
+            "id": "merge_request.merge", "operation_id": "mergeMergeRequest", "effect": "write",
+            "body_keys": keys,
+            "guard": {
+                "preflight": {"operation_id": "getMergeRequest",
+                              "values": {"id": "id", "merge_request_iid": "merge_request_iid"},
+                              "checks": [{"pointer": "/sha", "expect": {"input": "body.sha"}}]},
+                "postflight": {"checks": []}}
+        }))
+    };
+    let error = Engine::new(&bundle(), "/api/v4", &[guarded(&["other"])])
+        .err()
+        .expect("a guard reading a body key the set refuses loaded");
+    assert!(error.message.contains("body_keys"), "{}", error.message);
+    let engine = Engine::new(&bundle(), "/api/v4", &[guarded(&["sha"])]).unwrap();
+    assert_eq!(
+        engine.declarations(&[Effect::Write])[0].input_schema["properties"]["body"],
+        json!({"type": "object", "properties": {"sha": {}}, "required": ["sha"],
+               "additionalProperties": false})
+    );
 }
