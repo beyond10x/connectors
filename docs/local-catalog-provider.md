@@ -190,7 +190,7 @@ The complete configuration used against the sandbox is
   "identity": {"source": "id_token", "kind": "google.user"},
   "minimum_scopes": ["https://www.googleapis.com/auth/drive.readonly"],
   "token_url": "https://oauth2.googleapis.com/token",
-  "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+  "authorize_url": "https://accounts.google.com/o/oauth2/auth",
   "requested_scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly"]
 }
 ```
