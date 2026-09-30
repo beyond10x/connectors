@@ -190,11 +190,13 @@ approval is refused before the provider sends anything.
   is refused with no POST. An input without `messageId` or without `body.id` is
   refused before any Gmail request, and a draft that no longer exists is refused
   after its read (`guard target was not found before dispatch`).
-- **Send `body` as `{"id": "<draft id>"}` and nothing else.** Google's drafts
-  guide says a `body.message` given to a send replaces the draft's content
-  before it is sent. The provider forwards it, and the preflight compares only
-  the stored draft, so such a send is bound by the approval's digest of the
-  input alone. Refuse to approve a send whose `body` carries anything but `id`.
+- **The send accepts only `{"id": "<draft id>"}` as its `body`.** Google's
+  drafts guide says a `body.message` given to a send replaces the draft's
+  content before it is sent, which the preflight, comparing the stored draft,
+  would not see. The selection closes the body with `body_keys: ["id"]` (see
+  [the catalog provider guide](local-catalog-provider.md)): its declared input
+  schema admits `id` and nothing else, and a `body.message`, or any other body
+  key, is refused as `invalid_input` before any request.
 - The preflight and the POST are two requests, and Gmail's send takes no
   precondition: a draft edited between them is sent as edited. Nothing is
   compared after dispatch, because the send answers with the sent message,
@@ -222,9 +224,10 @@ consent. `authorize_url` is `https://accounts.google.com/o/oauth2/auth`, the
 connect compares byte for byte.
 
 The read-only scope does not cover the writes. The pinned document accepts
-`https://www.googleapis.com/auth/gmail.compose` for both writes and for
-`users.drafts.get`, which the send's preflight reads, and not
-`gmail.readonly`. Of the seven reads the compose scope covers only
+`https://www.googleapis.com/auth/gmail.compose` for both writes, and not
+`gmail.readonly`. It accepts both scopes for `users.drafts.get`, which the
+send's preflight reads, so the compose scope alone covers the whole send.
+Of the seven reads the compose scope covers only
 `users.getProfile`, so the write instance does not read messages, threads,
 history or labels; read with the read instance. At
 Google the compose scope also permits `users.messages.send`; this provider
@@ -290,8 +293,9 @@ instance is refused while the old one exists.
   `maxResults` bounds of the three lists. No live mailbox has been read.
 - The writes are verified against the same fixture on the guide's write
   instance through the host's prepare/commit exchange: the send's preflight
-  read, a changed draft, a missing `messageId` or `body.id` and a missing draft
-  refused with no POST, and the exact POST body of each write. The approval
+  read, a changed draft, a missing `messageId` or `body.id`, a send body with
+  any key but `id` and a missing draft refused with no POST, and the exact POST
+  body of each write. The approval
   binding is verified with the host's approval signer and verifier against a
   subject built from the provider's descriptor, not through the CLI and owner.
   The write instance's scope check and its separate acquisition are verified

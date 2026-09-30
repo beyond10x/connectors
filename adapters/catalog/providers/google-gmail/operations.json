@@ -31,12 +31,13 @@
      "description": "Create a draft of userId (me) from body.message.raw, the whole message as RFC 5322 text (RFC 2822 in the pinned document) encoded base64url; it sends nothing, but its To, Cc and Bcc headers are who a later users.drafts.send reaches and its Subject and From what they see; body.message.threadId files it in that thread only with matching References, In-Reply-To and Subject headers; the same input twice makes a second draft; the answer's id and message.id are what users.drafts.send pins. Unguarded: nothing exists to compare before a create; the approval binds the whole input by digest, so the issuer reads the decoded message before approving",
      "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
     {"id": "users.drafts.send", "operation_id": "gmail.users.drafts.send", "effect": "write",
-     "description": "Send the existing draft body.id of userId (me) to every recipient in its To, Cc and Bcc headers; a sent message cannot be recalled. messageId pins the draft's message.id the issuer read and is not sent: the preflight reads the draft with users.drafts.get and refuses with nothing sent unless its message.id still equals messageId, so a changed draft sends nothing. Send body as {\"id\": draft id} only: a body.message would replace the draft's content before sending, unseen by the preflight; the approval binds the whole input by digest, so the issuer reads the message first (users.messages.get of messageId with format raw, decoded) before approving",
+     "description": "Send the existing draft body.id of userId (me) to every recipient in its To, Cc and Bcc headers; a sent message cannot be recalled. messageId pins the draft's message.id the issuer read and is not sent: the preflight reads the draft with users.drafts.get and refuses with nothing sent unless its message.id still equals messageId, so a changed draft sends nothing. The body carries id and nothing else: a body.message, which Google would send in place of the stored draft, or any other body key is refused as invalid_input before any request; the approval binds the whole input by digest, so the issuer reads the message first (users.messages.get of messageId with format raw, decoded) before approving",
      "guard": {
        "preflight": {"operation_id": "gmail.users.drafts.get",
                      "values": {"userId": "userId", "id": "body.id"},
                      "checks": [{"pointer": "/message/id", "expect": {"input": "messageId"}}]},
        "postflight": {"checks": []}},
+     "body_keys": ["id"],
      "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]}
   ]
 }

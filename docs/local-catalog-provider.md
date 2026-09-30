@@ -235,6 +235,17 @@ The complete configuration used against the sandbox is
   `error.status` is `rate_limited`, for a read and for a write's definite
   refusal; every other `403` stays `forbidden`. An empty reason is refused
   when the selection loads.
+- `body_keys` is optional, for a write: `["<key>", …]` closes its JSON body to
+  exactly those top-level keys. The declared input schema types `body` as an
+  object with those properties and no others (each key a guard reads through
+  `body.<key>` is required there), and a body carrying any other key is refused
+  as `invalid_input` before any request, the preflight read included. It is for
+  a write whose provider would act on a body field the guard does not compare,
+  such as a Gmail draft send given a replacement message. A read, an operation
+  without a request body, an empty, dotted or repeated name, or a guard reading
+  a `body.<key>` the set does not admit is refused when the selection loads.
+  The bundle records no body schema, so the names are not checked against the
+  provider's.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
