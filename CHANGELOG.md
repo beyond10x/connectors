@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A catalog native configuration accepts an optional `request_prefix` naming the API-gateway
+  part of `api_base` (for example `/ex/jira/<cloud id>`), so service-account API tokens connect
+  Jira and Confluence through `https://api.atlassian.com/ex/<product>/<cloud id>/…` with the
+  `atlassian.basic` profile (verified live for Jira). Configurations without it keep their
+  revision.
+- `adapters list` and `operations list` page with `--limit`/`--cursor` and answer `next_cursor`.
+  A cursor is bound to the list's source, the adapter and the page limit, expires after 300 s,
+  and answers `stale_cursor` once the list changes.
+
+### Changed
+
+- Catalog parameters are declared with their pinned document's type: integers take a number or
+  its decimal string, booleans `true`/`false`, strings any string or an integer; other values,
+  and non-integer numbers for typed parameters, are refused as `invalid_input` before any
+  request. Bundle digests and every catalog provider's descriptor revision change; approval
+  policies bound to an earlier revision must be set again.
+- A connect, repair or revalidation the owner definitely failed answers the owner's code
+  (`unavailable`/`timeout`) at `dispatch` with `retry_explicitly` instead of `outcome_unknown`;
+  `outcome_unknown` remains for any reply that is missing, cut short or malformed, and for a
+  revalidation the owner stopped waiting for.
+- An operation id the adapter does not expose answers `not_found` on describe, invoke and
+  approvals prepare; refusals are decided in the order existence, grant, revision. `operations
+  describe` checks the profile grant and the id format like invoke, and `operations list` hides
+  operations whose profile is not granted.
+- The legacy `describe`, `invoke` and `serve` commands accept `--output` before the command word;
+  their parse errors are the fixed `cli_parse` refusal (exit 2) and never echo arguments.
+- `setup check` reports `next_action: none` for ready metadata; an unknown adapter alias answers
+  stage `admission` on every adapter command.
+- The CLI contract states the `ess-cli/1` parser and input codes, where the JSON decoder's
+  recursion limit takes over from the owner's depth bound, which commands read the business
+  document before the alias, `stale_cursor` and pre-publication connect rows, and a 128-byte
+  selector bound.
+
+### Compatibility
+
+- Every catalog provider's descriptor revision changes with the typed parameters: cached
+  operation descriptions go stale and are refreshed by `operations describe`, and approval
+  policies bound to the previous revision must be set again.
+
 ## 0.18.0 — 2026-09-30
 
 ### Added

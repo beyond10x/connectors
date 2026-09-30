@@ -28,3 +28,16 @@ Integration branch: `wave/20260930b-cli-contract-1` off `main` b50ffba79 (releas
 
 Per wave: one commit per unit, the merges, the closing store commit, the merge into `main` through a pull request
 once that wave's gate is green; a release after the last wave.
+
+## Wave 2 units (same integration branch, base e9af199d8; one gate for waves 1 and 2)
+
+`apps/connectors/src/local.rs` is split by function: failed-connect owns `owner_failure`; list paging owns
+`adapters-list`; minor owns the setup-check prerequisite line and the unknown-alias stage. `git merge-tree` dry run
+before the first wave 2 merge.
+
+| story | agents | branch | worktree | stage |
+|---|---|---|---|---|
+| story:failed-connect-reports-its-cause | aep:implementor, aep:adversary | impl/failed-connect-reports-its-cause | `<managed-trees>`/wave0930b-connect | dispatched |
+| story:list-commands-page-with-a-cursor | aep:implementor, aep:adversary | impl/list-commands-page-with-a-cursor | `<managed-trees>`/wave0930b-paging | dispatched |
+| story:cli-surface-minor-findings-0-18-0 | aep:implementor, aep:adversary | impl/cli-surface-minor-findings-0-18-0 | `<managed-trees>`/wave0930b-minor | dispatched |
+| story:catalog-api-base-gateway-prefix (joined wave 1) | aep:implementor, aep:adversary | impl/catalog-api-base-gateway-prefix | `<managed-trees>`/wave0930b-gateway | dispatched |
