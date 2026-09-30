@@ -91,6 +91,12 @@ struct Configuration {
     provider: String,
     bundle_directory: PathBuf,
     api_base: String,
+    /// The leading part of the `api_base` path that an API gateway adds in
+    /// front of the document's paths, such as `/ex/jira/<cloud id>`. Requests
+    /// still go to the full `api_base`; only the document's base-path check
+    /// starts after it.
+    #[serde(default)]
+    request_prefix: Option<String>,
     ca_file: Option<PathBuf>,
     auth: AuthConfig,
     /// Selections written into this file.
@@ -266,6 +272,12 @@ impl Local {
             return Err(Failure::InvalidConfiguration);
         }
         let base_path = url_path(&base).ok_or(Failure::InvalidConfiguration)?;
+        let document_base = match &config.request_prefix {
+            None => base_path,
+            Some(prefix) => {
+                document_base(&base_path, prefix).ok_or(Failure::InvalidConfiguration)?
+            }
+        };
         let ca = config
             .ca_file
             .as_ref()
@@ -273,8 +285,8 @@ impl Local {
             .transpose()
             .map_err(|_| Failure::InvalidConfiguration)?;
         let engine =
-            Engine::new(&bundle, &base_path, &operations).map_err(Failure::from_service)?;
-        let effective = json!({
+            Engine::new(&bundle, &document_base, &operations).map_err(Failure::from_service)?;
+        let mut effective = json!({
             "format": config.format,
             "instance": config.instance,
             "provider": config.provider,
@@ -287,6 +299,10 @@ impl Local {
             "auth": serde_json::to_value(&config.auth).map_err(|_| Failure::Protocol)?,
             "operations": serde_json::to_value(&operations).map_err(|_| Failure::Protocol)?,
         });
+        // Present only when stated, so a configuration without it keeps its revision.
+        if let Some(prefix) = &config.request_prefix {
+            effective["request_prefix"] = json!(prefix);
+        }
         let configuration_revision = connectors_core::digest(&effective);
         let http = Arc::new(
             ScopedHttp::new_with_ca_bytes(
@@ -418,6 +434,35 @@ fn url_path(base: &str) -> Option<String> {
         Some(index) => rest[index..].to_owned(),
         None => "/".into(),
     })
+}
+
+/// The document base left once a gateway `prefix` is removed from the front of
+/// a canonical base path. The prefix is plain path text — a leading `/`, no
+/// trailing `/`, segments of unreserved characters that are not `.` or `..` —
+/// and must be whole leading segments of `base_path`; anything else is `None`.
+fn document_base(base_path: &str, prefix: &str) -> Option<String> {
+    let segments = prefix.strip_prefix('/')?.split('/').collect::<Vec<_>>();
+    let plain = |segment: &&str| {
+        !segment.is_empty()
+            && *segment != "."
+            && *segment != ".."
+            && segment
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-._~".contains(&b))
+    };
+    if prefix.len() > 1024 || !segments.iter().all(plain) {
+        return None;
+    }
+    let mut rest = base_path.strip_prefix('/')?;
+    for segment in segments {
+        rest = rest.strip_prefix(segment)?;
+        rest = match rest.strip_prefix('/') {
+            Some(rest) => rest,
+            None if rest.is_empty() => rest,
+            None => return None,
+        };
+    }
+    Some(format!("/{rest}"))
 }
 
 fn probe_failure(status: u16) -> Failure {
