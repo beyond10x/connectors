@@ -197,7 +197,8 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
         })
     );
     // The declared inputs: every write takes a `body`; the update also takes
-    // the pinned `version`, which no Drive parameter carries.
+    // the pinned `version`, which no Drive parameter carries, and `fields`,
+    // which its selection declares required.
     let declared = engine.declarations(&[Effect::Write]);
     let required = |id: &str| -> Vec<String> {
         let declaration = declared.iter().find(|o| o.id == id).unwrap();
@@ -206,7 +207,10 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
     };
     assert_eq!(required("files.create"), ["body"]);
     assert_eq!(required("files.copy"), ["body", "fileId"]);
-    assert_eq!(required("files.update"), ["body", "fileId", "version"]);
+    assert_eq!(
+        required("files.update"),
+        ["body", "fields", "fileId", "version"]
+    );
     for (id, operation_id, path) in SHIPPED {
         let selection = selections.iter().find(|s| s.id == id).unwrap();
         assert_eq!(selection.operation_id, operation_id, "`{id}`");
