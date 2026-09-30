@@ -37,8 +37,9 @@ pub const FLOW_TIMEOUT: Duration = Duration::from_secs(240);
 const COMPLETION_RESERVE_MS: u64 = 45_000;
 /// The profile fields this flow fills, in sorted order.
 const FIELDS: [&str; 3] = ["client_id", "client_secret", "refresh_token"];
-/// The largest request head the listener reads.
-const REQUEST_LIMIT: usize = 8192;
+/// The largest request head a connection may send, headers included: a
+/// browser sends every cookie it holds for 127.0.0.1 with the redirect.
+const HEAD_LIMIT: usize = 64 * 1024;
 const POLL: Duration = Duration::from_millis(20);
 /// How long an accepted connection may take to complete its request head.
 const IDLE: Duration = Duration::from_secs(2);
@@ -226,18 +227,79 @@ fn authorize_url(
     Ok(url.into())
 }
 
-/// A connection that has not yet completed its request head.
+/// A connection that has not yet completed its request head. Only the request
+/// line is kept; the headers after it are counted and scanned for the end of
+/// the head, never stored.
 struct Pending {
     stream: TcpStream,
-    head: Zeroizing<Vec<u8>>,
+    line: Zeroizing<Vec<u8>>,
+    /// Bytes of the head read so far, request line included.
+    seen: usize,
+    /// Whether the request line's CRLF has been read.
+    line_done: bool,
+    /// How much of `\r\n\r\n` the head currently ends with.
+    matched: usize,
     accepted: Instant,
+}
+impl Pending {
+    fn new(stream: TcpStream) -> Self {
+        Self {
+            stream,
+            line: Zeroizing::new(Vec::with_capacity(1024)),
+            seen: 0,
+            line_done: false,
+            matched: 0,
+            accepted: Instant::now(),
+        }
+    }
+
+    /// Takes `bytes` of the head; answers whether the head is now complete.
+    fn take(&mut self, bytes: &[u8]) -> bool {
+        const END: &[u8; 4] = b"\r\n\r\n";
+        for &byte in bytes {
+            self.seen += 1;
+            self.matched = if byte == END[self.matched] {
+                self.matched + 1
+            } else if byte == b'\r' {
+                1
+            } else {
+                0
+            };
+            if !self.line_done {
+                if self.matched == 2 {
+                    // The CR before this LF was pushed; it is not the line's.
+                    self.line.pop();
+                    self.line_done = true;
+                } else {
+                    push(&mut self.line, byte);
+                }
+            }
+            if self.matched == END.len() {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+/// Appends without leaving an unzeroized copy: a full buffer moves to a
+/// larger one and the old one is zeroized as it drops.
+fn push(buffer: &mut Zeroizing<Vec<u8>>, byte: u8) {
+    if buffer.len() == buffer.capacity() {
+        let mut larger = Zeroizing::new(Vec::with_capacity(buffer.capacity().max(512) * 2));
+        larger.extend_from_slice(buffer);
+        *buffer = larger;
+    }
+    buffer.push(byte);
 }
 
 /// The loopback listener and the connections it is reading, all nonblocking,
 /// so no connection can hold up another. Only a connection that completes a
-/// request head is a request: one that closes, fails, or sends no complete
-/// head within [`IDLE`] of being accepted, such as a browser's speculative
-/// preconnect, is dropped without an answer and without effect.
+/// request head within [`HEAD_LIMIT`] bytes is a request: one that closes,
+/// fails, sends a longer head, or sends no complete head within [`IDLE`] of
+/// being accepted, such as a browser's speculative preconnect, is dropped
+/// without an answer and without effect. At most [`PENDING_LIMIT`]
+/// connections are read at once; one accepted beyond that is closed unread.
 struct Loopback {
     listener: TcpListener,
     pending: Vec<Pending>,
@@ -250,22 +312,22 @@ impl Loopback {
         }
     }
 
-    /// Accepts what is queued, reads what has arrived, and returns every
-    /// connection whose head is complete (or has reached the limit), in the
-    /// order the connections were accepted.
+    /// Reads what has arrived, which frees the slots of connections that
+    /// ended, then accepts what is queued, closing what finds no free slot,
+    /// and reads the new connections.
+    /// Returns the request line of every connection whose head is complete,
+    /// in the order the connections were accepted.
     fn poll(&mut self) -> Result<Vec<(TcpStream, Zeroizing<Vec<u8>>)>> {
+        let mut complete = self.read();
         loop {
             match self.listener.accept() {
                 Ok((stream, _)) => {
-                    if self.pending.len() >= PENDING_LIMIT || stream.set_nonblocking(true).is_err()
-                    {
-                        continue;
+                    // Past the limit a connection is closed unread: a local
+                    // process holding every slot delays the redirect, as the
+                    // guide says, and cannot stall the listener.
+                    if self.pending.len() < PENDING_LIMIT && stream.set_nonblocking(true).is_ok() {
+                        self.pending.push(Pending::new(stream));
                     }
-                    self.pending.push(Pending {
-                        stream,
-                        head: Zeroizing::new(Vec::with_capacity(1024)),
-                        accepted: Instant::now(),
-                    });
                 }
                 Err(error) if error.kind() == ErrorKind::WouldBlock => break,
                 Err(error)
@@ -278,37 +340,37 @@ impl Loopback {
                 Err(_) => return Err(Code::Unavailable.into()),
             }
         }
+        complete.extend(self.read());
+        Ok(complete)
+    }
+
+    fn read(&mut self) -> Vec<(TcpStream, Zeroizing<Vec<u8>>)> {
         let mut complete = Vec::new();
-        let mut chunk = Zeroizing::new([0_u8; 1024]);
+        let mut chunk = Zeroizing::new([0_u8; 4096]);
         for mut pending in std::mem::take(&mut self.pending) {
-            let mut open = true;
-            while open && !head_complete(&pending.head) {
-                let room = (REQUEST_LIMIT - pending.head.len()).min(chunk.len());
+            let (mut open, mut done) = (true, false);
+            while open && !done && pending.seen < HEAD_LIMIT {
+                let room = (HEAD_LIMIT - pending.seen).min(chunk.len());
                 match pending.stream.read(&mut chunk[..room]) {
                     Ok(0) => open = false,
-                    Ok(read) => pending.head.extend_from_slice(&chunk[..read]),
+                    Ok(read) => done = pending.take(&chunk[..read]),
                     Err(error) if error.kind() == ErrorKind::Interrupted => {}
                     Err(error) if error.kind() == ErrorKind::WouldBlock => break,
                     Err(_) => open = false,
                 }
             }
-            if head_complete(&pending.head) {
-                complete.push((pending.stream, pending.head));
-            } else if open && pending.accepted.elapsed() < IDLE {
+            if done {
+                complete.push((pending.stream, pending.line));
+            } else if open && pending.seen < HEAD_LIMIT && pending.accepted.elapsed() < IDLE {
                 self.pending.push(pending);
             }
         }
-        Ok(complete)
+        complete
     }
 }
 
-fn head_complete(head: &[u8]) -> bool {
-    head.len() >= REQUEST_LIMIT || head.windows(4).any(|window| window == b"\r\n\r\n")
-}
-
-/// The path of a head's request line, without its query.
-fn request_path(head: &[u8]) -> Option<&str> {
-    let line = head.split(|byte| *byte == b'\r').next()?;
+/// The path of a request line, without its query.
+fn request_path(line: &[u8]) -> Option<&str> {
     let target = std::str::from_utf8(line).ok()?.split(' ').nth(1)?;
     Some(target.split_once('?').map_or(target, |(path, _)| path))
 }
@@ -331,13 +393,13 @@ fn receive(
             return Err(Code::Timeout.into());
         }
         let mut decided = None;
-        for (stream, head) in loopback.poll()? {
+        for (stream, line) in loopback.poll()? {
             if decided.is_some() {
                 answer(stream, Answer::Refused);
-            } else if request_path(&head) != Some("/") {
+            } else if request_path(&line) != Some("/") {
                 answer(stream, Answer::NotFound);
             } else {
-                let outcome = redirect(&head, state);
+                let outcome = redirect(&line, state);
                 answer(
                     stream,
                     if outcome.is_ok() {
@@ -392,11 +454,10 @@ impl Drop for Drain {
     }
 }
 
-/// The code of a well-formed consent redirect for `state`.
-fn redirect(head: &[u8], state: &str) -> Result<Zeroizing<String>> {
+/// The code of a well-formed consent redirect for `state`, from its request line.
+fn redirect(line: &[u8], state: &str) -> Result<Zeroizing<String>> {
     let refused = || -> Error { Code::ProtectedEntryUnavailable.into() };
-    let text = std::str::from_utf8(head).map_err(|_| refused())?;
-    let line = text.split("\r\n").next().unwrap_or_default();
+    let line = std::str::from_utf8(line).map_err(|_| refused())?;
     let mut words = line.split(' ');
     let (Some("GET"), Some(target), Some(version), None) =
         (words.next(), words.next(), words.next(), words.next())
@@ -404,7 +465,7 @@ fn redirect(head: &[u8], state: &str) -> Result<Zeroizing<String>> {
         return Err(refused());
     };
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
-    if path != "/" || !version.starts_with("HTTP/1.") || !text.ends_with("\r\n\r\n") {
+    if path != "/" || !version.starts_with("HTTP/1.") {
         return Err(refused());
     }
     let (mut code, mut received, mut error) = (None, None, false);
@@ -1023,6 +1084,22 @@ mod tests {
         assert_eq!(record.exchanged.len(), 1);
         let answers = record.answers();
         assert!(answers[0].starts_with("HTTP/1.1 404 "), "{:?}", answers[0]);
+        assert!(answers[1].starts_with("HTTP/1.1 200 "), "{:?}", answers[1]);
+    }
+
+    #[test]
+    fn a_head_over_the_limit_is_not_a_request() {
+        // No end of head within the limit: dropped unanswered, deciding nothing.
+        let (result, mut record) = run(
+            &profile(&TRIPLE),
+            &client(AUTHORIZE, TOKEN),
+            BUDGET,
+            |url| vec![format!("/?pad={}", "p".repeat(HEAD_LIMIT)), consented(url)],
+        );
+        assert!(result.is_ok(), "{:?}", code(&result));
+        assert_eq!(record.exchanged.len(), 1);
+        let answers = record.answers();
+        assert!(answers[0].is_empty(), "{:?}", answers[0].lines().next());
         assert!(answers[1].starts_with("HTTP/1.1 200 "), "{:?}", answers[1]);
     }
 
