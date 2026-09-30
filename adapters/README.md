@@ -57,6 +57,7 @@ result envelope does not make native query/continuation semantics shared.
 | [Loki](loki/design.md) | [LogQL profile](loki/contracts/logs/v1alpha1/semantics.md), tenant binding and [ESS](loki/spec/ess/system.yaml) |
 | [Prometheus](prometheus/design.md) | [PromQL series profile](prometheus/contracts/series/v1alpha1/semantics.md), native configuration and future model obligations |
 | [Alertmanager](alertmanager/design.md) | Native alert records, configuration and future model obligations |
+| HubSpot | Served by the catalog provider: pinned CRM Objects `2026-09` document in hubspot/upstream/, bundle and shipped read-only selection set under catalog/; see [the HubSpot guide](../docs/catalog-hubspot.md) |
 | GitLab | Served by the catalog provider: pinned upstream in gitlab/upstream/, bundle and shipped selection set under catalog/; the native adapter was retired in 0.11.0 |
 | SQL | Existing declaration, native runtime and tests live in sql/ |
 | [Catalog](catalog/design.md) | Optional catalog adapter design |
