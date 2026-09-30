@@ -89,6 +89,16 @@ the end of a walk are in it.
   `calendarList.list`. The selections bound `maxResults` to 1–2500 and 1–250,
   so 0, a value over the ceiling (2501, 251) or a value that is not an integer
   is refused as `invalid_input` before any request.
+- **`fields` and the end conditions.** `fields` selects the parts of the answer
+  Google returns, and a token it leaves out is not returned. The end conditions
+  above hold only when `fields`, if given, includes both `nextPageToken` and
+  `nextSyncToken` (for example `nextPageToken,nextSyncToken,items(id,summary)`).
+  Without them the first page looks like the last, and a walk ends with no sync
+  token.
+- **`maxAttendees`** on `events.list` and `events.get` has a minimum of 1 in the
+  pinned document and no maximum. A selection bound needs a maximum, so none is
+  declared: `maxAttendees` 0 is sent as given, and Google answers `400`
+  (`invalid_input`).
 
 Every other query parameter the projection declares for an operation is accepted
 by name, including the document-wide `fields`; one it does not declare is
@@ -106,14 +116,24 @@ The pinned document names parameters that cannot be sent beside `syncToken`.
 For `events.list` these are `iCalUID`, `orderBy`, `privateExtendedProperty`,
 `q`, `sharedExtendedProperty`, `timeMin`, `timeMax` and `updatedMin`; for
 `calendarList.list` they are `minAccessRole` and `showOwnOrganizationOnly`. So
-a walk meant to be continued with sync tokens is a full walk without them. The
+a walk meant to be continued with sync tokens is a full walk without them: a
+walk windowed by `timeMin`, `timeMax` or `updatedMin` cannot be continued by a
+delta, and a delta repeats every other parameter of the full walk. The pinned
+document also does not allow `showDeleted` set to `false` beside `syncToken`,
+nor, for `calendarList.list`, `showHidden` set to `false`; leave both unset (or
+`true`) on a walk meant for sync tokens, since its delta repeats them. The
 provider does not check these combinations: it sends them, and Google's answer
 decides.
 
 **Reset rule.** A sync token expires. Google then answers `410` with the reason
-`fullSyncRequired`, which reaches the caller as `not_found`. On that refusal,
-discard the stored token and everything derived from it, walk the list again
-from the first page without `syncToken`, and keep the new `nextSyncToken`.
+`fullSyncRequired`, which reaches the caller as `not_found`. A `calendarId`
+that does not exist or is no longer shared is answered `404`, which reaches the
+caller as the same `not_found` with the same message. So a `not_found` on an
+`events.list` sync-token request means either the sync token expired or the calendar is gone.
+On that refusal, first re-check the calendar with `calendarList.list`: if it is
+gone, drop its mirror. Otherwise discard the stored token and everything
+derived from it, walk the list again from the first page without `syncToken`,
+and keep the new `nextSyncToken`.
 
 ## Authentication
 
@@ -165,6 +185,7 @@ entry by consent.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Google's exact bytes.
 - The provider does not walk pages itself and does not retry. A `429`, or a
-  `403` whose reason is `rateLimitExceeded` or `userRateLimitExceeded`
-  (each selection names both in `rate_limit_reasons`), is returned as
-  `rate_limited`; every other `403` is `forbidden`.
+  `403` whose reason is `rateLimitExceeded`, `userRateLimitExceeded` or
+  `dailyLimitExceeded` (each selection names all three in
+  `rate_limit_reasons`), is returned as `rate_limited`; every other `403` is
+  `forbidden`.

@@ -4,7 +4,7 @@ The catalog provider reads Gmail — the mailbox profile, messages, threads, the
 change history and labels — from the pinned Gmail API v1 Discovery document.
 Nothing here is Gmail-specific code: the Discovery document is projected into
 OpenAPI, the projection is compiled into a bundle, a reviewed selection set
-exposes seven reads, and the engine described in
+exposes eight reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there; this
 page covers what differs for Gmail. Authentication is the `oauth2_refresh`
@@ -52,7 +52,7 @@ reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/google-gmail/operations.json`](../adapters/catalog/providers/google-gmail/operations.json)
-exposes seven reads and nothing else. Each is `effect: read`; none of the
+exposes eight reads and nothing else. Each is `effect: read`; none of the
 document's writes (sending, drafts, labels, settings, trash) is selected. A
 selection id is the Discovery method id without its `gmail.` prefix.
 `adapters/catalog/tests/google_gmail.rs` pins this exact id list and each id's
@@ -68,6 +68,7 @@ end of a walk are in it.
 | `users.getProfile` | `gmail.users.getProfile` | `GET /gmail/v1/users/{userId}/profile` | single item | n/a | returns `historyId`, the first baseline |
 | `users.messages.list` | `gmail.users.messages.list` | `GET /gmail/v1/users/{userId}/messages` | `pageToken`, `maxResults` (1–500) | `nextPageToken` absent | a `q` term such as `newer_than:7d`; deltas come from `users.history.list` |
 | `users.messages.get` | `gmail.users.messages.get` | `GET /gmail/v1/users/{userId}/messages/{id}` | single item | n/a | none; deltas come from `users.history.list` |
+| `users.messages.attachments.get` | `gmail.users.messages.attachments.get` | `GET /gmail/v1/users/{userId}/messages/{messageId}/attachments/{id}` | single item | n/a | none; the `attachmentId` comes from a `full` message |
 | `users.threads.list` | `gmail.users.threads.list` | `GET /gmail/v1/users/{userId}/threads` | `pageToken`, `maxResults` (1–500) | `nextPageToken` absent | a `q` term such as `newer_than:7d`; deltas come from `users.history.list` |
 | `users.threads.get` | `gmail.users.threads.get` | `GET /gmail/v1/users/{userId}/threads/{id}` | single item | n/a | none; deltas come from `users.history.list` |
 | `users.history.list` | `gmail.users.history.list` | `GET /gmail/v1/users/{userId}/history` with `startHistoryId` (required) | `pageToken`, `maxResults` (1–500) | `nextPageToken` absent; that page's `historyId` is the next baseline | from `startHistoryId` to the last page's `historyId` |
@@ -88,14 +89,29 @@ end of a walk are in it.
   the document declares it.
 - **`format`.** `users.messages.get` takes `full` (the default), `metadata`,
   `minimal` or `raw`; `users.threads.get` takes `full`, `metadata` or
-  `minimal`. `metadata` returns ids, labels and headers, narrowed by `metadataHeaders`,
-  which is repeated like `labelIds`. `raw` returns the whole message as one
-  base64url string in `raw`. The engine does not check a value against these
-  lists: another value is sent, and Gmail answers it.
+  `minimal`. `metadata` returns ids, labels and headers, narrowed by
+  `metadataHeaders`, which is repeated like `labelIds`. `raw` returns the whole
+  message as one base64url string in `raw`. The engine does not check a value
+  against these lists: another value is sent, and Gmail answers it.
+- **Large messages and attachments.** `raw` cannot be narrowed: neither
+  `metadataHeaders` nor `fields` shortens the one string, so a message whose
+  encoded form is over the 4 MiB response limit cannot be read with `raw`. Read
+  a large message with `format` `full` instead: a part whose body is held
+  separately names an `attachmentId` in its `body`, and
+  `users.messages.attachments.get` with `messageId` and that id (sent as `id`)
+  returns the part's `size` and its `data` as one base64url string. Each of
+  those reads is subject to the same 4 MiB limit.
 - **`maxResults`.** The pinned document declares no bound for the three lists;
   each description says the maximum allowed value is 500. The selections bound
   `maxResults` to 1–500, so 0, 501 or a value that is not an integer is refused
   as `invalid_input` before any request.
+- **`fields` and the end conditions.** `fields` selects the parts of the answer
+  Gmail returns, and a token it leaves out is not returned. The end conditions
+  above hold only when `fields`, if given, includes `nextPageToken`, and for
+  `users.history.list` also `historyId` (for example
+  `nextPageToken,messages(id,threadId)` or `nextPageToken,historyId,history`).
+  Without them the first page looks like the last, and a history walk ends with
+  no new baseline.
 
 Every other query parameter the projection declares for an operation is accepted
 by name, including the document-wide `fields`; one it does not declare is
@@ -118,9 +134,12 @@ is refused as `invalid_input` before any request.
 
 **Reset rule.** A `historyId` is typically valid for at least a week, and in
 rare cases for only a few hours. An out-of-date or invalid `startHistoryId` is
-answered `404`, which reaches the caller as `not_found`. On that refusal, do a
-full sync: walk `users.messages.list` (or `users.threads.list`) from the first
-page, read what is needed, and take a new baseline from `users.getProfile`.
+answered `404`, which reaches the caller as `not_found`. On that refusal, first
+read a new baseline `historyId` from `users.getProfile`, then do a full sync:
+walk `users.messages.list` (or `users.threads.list`) from the first page and
+read what is needed. Continue with `users.history.list` from that baseline, not
+from anything the walk returned: a change made while the walk runs is then
+replayed by the next delta instead of being lost.
 
 ## Authentication
 
@@ -132,7 +151,7 @@ installed-app OAuth client. The provider exchanges it at `token_url` for an
 access token and sends that as `Authorization: Bearer <access token>`. The
 identity comes from the token answer's `id_token` (`identity.source: id_token`).
 `minimum_scopes` asks for the Gmail read-only scope, which the pinned document
-accepts for all seven reads. `authorize_url` and `requested_scopes` are never
+accepts for all eight reads. `authorize_url` and `requested_scopes` are never
 called by the provider; they are handed to the host for obtaining the entry by
 consent.
 
@@ -168,15 +187,18 @@ consent.
   `users.messages.list` and `users.threads.list` to a page without
   `nextPageToken` and of `users.history.list` from the profile's `historyId`,
   an out-of-date `startHistoryId`'s `404` as `not_found`, `labelIds` and
-  `metadataHeaders` sent as repeated pairs, each message `format`, and the
+  `metadataHeaders` sent as repeated pairs, each message `format`, an
+  attachment read by the `attachmentId` a `full` message names, and the
   `maxResults` bounds of the three lists. No live mailbox has been read.
 - The response limit applies to every read: an answer over 4 MiB
   (`connectors_core::RESPONSE_LIMIT`) is refused as `capacity`, not truncated.
-  A large message read with `raw` or `full`, or a long thread, can exceed it;
-  `metadata` or `fields` narrows the answer.
+  A large message read with `raw` or `full`, or a long thread, can exceed it.
+  `metadata` or `fields` narrows a `full` or `metadata` answer; nothing narrows
+  `raw`. See [Large messages and attachments](#the-shipped-selection-set).
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Gmail's exact bytes.
 - The provider does not walk pages itself and does not retry. A `429`, or a
-  `403` whose reason is `rateLimitExceeded` or `userRateLimitExceeded` (each
-  selection names both in `rate_limit_reasons`), is returned as `rate_limited`;
-  every other `403` is `forbidden`.
+  `403` whose reason is `rateLimitExceeded`, `userRateLimitExceeded` or
+  `dailyLimitExceeded` (each selection names all three in
+  `rate_limit_reasons`), is returned as `rate_limited`; every other `403` is
+  `forbidden`.
