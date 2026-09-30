@@ -13,7 +13,7 @@ use std::path::Path;
 /// rebuilt with another profile, or one that gains or loses a gap, fails here
 /// instead of being read back as correct. Confluence's 30 are writes whose
 /// request body is a `$ref`; no shipped read is among them.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 5] = [
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 6] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -40,6 +40,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 5] = [
         "../google/generated/slides.openapi.json",
         Some("../google/upstream/slides/slides-api.json"),
         "google.oauth",
+        0,
+    ),
+    (
+        "hubspot",
+        "../hubspot/upstream/crm-objects-2026-09.json",
+        None,
+        "hubspot.private-app",
         0,
     ),
     (
