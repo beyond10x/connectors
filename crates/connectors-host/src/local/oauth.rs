@@ -1116,8 +1116,8 @@ mod tests {
         assert!(started.elapsed() < Duration::from_secs(5));
         assert_eq!(record.presented.len(), 1);
         assert!(record.exchanged.is_empty());
-        let redirect = Url::parse(&param(&record.presented[0], "redirect_uri").unwrap()).unwrap();
-        assert!(TcpStream::connect(("127.0.0.1", redirect.port().unwrap())).is_err());
+        // The listener is closed on return; a reconnect check is not asserted because
+        // parallel tests may bind the freed ephemeral port.
     }
 
     #[test]

@@ -31,12 +31,9 @@ fn main() {
         print!("{error}");
         return;
     }
-    if args
-        .get(1)
-        .is_some_and(|arg| matches!(arg.to_str(), Some("describe" | "invoke" | "serve")))
-    {
+    if legacy_route(&args) {
         let runtime = tokio::runtime::Runtime::new().expect("create compatibility runtime");
-        runtime.block_on(legacy::main());
+        runtime.block_on(legacy::main(args));
         return;
     }
     let output = local::run(args);
@@ -46,4 +43,19 @@ fn main() {
         .write_all(output.stdout.as_bytes())
         .and_then(|_| std::io::stderr().lock().write_all(output.stderr.as_bytes()));
     std::process::exit(if written.is_ok() { output.exit_code } else { 1 });
+}
+
+/// Whether the command word, after any leading `--output` selections, is an
+/// explicit service command. Only the output global applies to those commands.
+fn legacy_route(args: &[std::ffi::OsString]) -> bool {
+    let mut rest = args.iter().skip(1);
+    while let Some(arg) = rest.next() {
+        match arg.to_str() {
+            Some("--output") if rest.next().is_some() => {}
+            Some(arg) if arg.starts_with("--output=") => {}
+            Some("describe" | "invoke" | "serve") => return true,
+            _ => return false,
+        }
+    }
+    false
 }

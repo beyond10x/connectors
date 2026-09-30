@@ -240,20 +240,17 @@ fn files_update_declares_fields_required() {
         .unwrap();
     let required: Vec<String> =
         serde_json::from_value(update.input_schema["required"].clone()).unwrap();
-    // Today's state, pinned: `declare()` does not mark a guard reference that a
-    // parameter already covers as required, and selection `required` is
-    // story:catalog-selection-required-parameters. At integration the
-    // selection gains `required: ["fields"]`; flip this assertion then.
+    // The selection declares `required: ["fields"]`
+    // (story:catalog-selection-required-parameters), so the schema an agent
+    // reads requires what the runtime refuses without.
     assert_eq!(
         required,
-        ["body", "fileId", "version"],
-        "the declared input schema changed: if it now requires `fields`, \
-         story:catalog-selection-required-parameters has landed; flip this case to \
-         require `fields`"
+        ["body", "fields", "fileId", "version"],
+        "files.update's declared input schema must require `fields` \
+         (story:catalog-selection-required-parameters)"
     );
     assert!(
-        guide().contains("story:catalog-selection-required-parameters"),
-        "the guide must say `fields` is not yet declared required and name \
-         story:catalog-selection-required-parameters"
+        !guide().contains("does not yet mark `fields` required"),
+        "the guide still says files.update's schema does not require `fields`"
     );
 }

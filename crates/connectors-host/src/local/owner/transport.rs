@@ -83,9 +83,20 @@ fn read_reply(
     )
     .map_err(Error::from)
 }
+/// A request without a well-formed reply may have been carried out: its
+/// outcome is unknown, whatever failed while sending or while reading and
+/// decoding the reply. An interruption stays one (C03 "or interruption as
+/// appropriate"). An owner's own `Failed` reply is definite and never passes here.
+fn lost(error: Error) -> Error {
+    if error.code == Code::Interrupted {
+        error
+    } else {
+        Code::OutcomeUnknown.into()
+    }
+}
 impl Capture {
     pub fn complete(mut self, secret: &Secret) -> Result<Value> {
-        let result = (|| {
+        let answer = (|| {
             crate::local::protected::cancellation()?;
             channel::write(
                 &mut self.client.stream,
@@ -94,15 +105,14 @@ impl Capture {
                 &[],
                 until(self.expires_at_ms)?,
             )?;
-            self.client.value(until(self.expires_at_ms)?)
+            self.client.answer(until(self.expires_at_ms)?)
         })();
-        result.map_err(|mut error: Error| {
-            if matches!(error.code, Code::Unavailable | Code::Timeout) {
-                error.code = Code::OutcomeUnknown;
-            }
-            error.acquisition = Some(self.acquisition.clone());
-            error
-        })
+        answer
+            .unwrap_or_else(|error| Err(lost(error)))
+            .map_err(|mut error: Error| {
+                error.acquisition = Some(self.acquisition.clone());
+                error
+            })
     }
 }
 impl Client {
@@ -415,24 +425,23 @@ impl Client {
     ) -> Result<Value> {
         self.same_build()?;
         crate::local::protected::cancellation()?;
-        channel::write(
-            &mut self.stream,
-            &Request::Revalidate {
-                adapter: adapter.into(),
-                connection: connection.into(),
-                expected_revision: revision.into(),
-                deadline_ms,
-            },
-            None,
-            &[],
-            until(deadline_ms)?,
-        )?;
-        self.value(until(deadline_ms)?).map_err(|mut error| {
-            if matches!(error.code, Code::Unavailable | Code::Timeout) {
-                error.code = Code::OutcomeUnknown;
-            }
-            error
-        })
+        let deadline = until(deadline_ms)?;
+        let answer = (|| {
+            channel::write(
+                &mut self.stream,
+                &Request::Revalidate {
+                    adapter: adapter.into(),
+                    connection: connection.into(),
+                    expected_revision: revision.into(),
+                    deadline_ms,
+                },
+                None,
+                &[],
+                deadline,
+            )?;
+            self.answer(deadline)
+        })();
+        answer.unwrap_or_else(|error| Err(lost(error)))
     }
     pub fn status(mut self, adapter: &str) -> Result<Value> {
         self.same_build()?;
@@ -488,13 +497,21 @@ impl Client {
         self.value(deadline)
     }
     fn value(&mut self, deadline: Instant) -> Result<Value> {
+        self.answer(deadline).unwrap_or_else(Err)
+    }
+    /// The outer `Err` means no usable reply arrived: the stream failed or
+    /// closed, or the frame was not a well-formed answer. The inner result is
+    /// the owner's own answer, a success or its definite `Failed` reply.
+    fn answer(&mut self, deadline: Instant) -> std::result::Result<Result<Value>, Error> {
         let frame = read_reply(&mut self.stream, deadline, runtime::RESULT_LIMIT)?;
         match frame.control {
             Reply::Success => {
                 channel::depth(&frame.document)?;
-                connectors_core::read_json(&frame.document).map_err(|_| Code::Unavailable.into())
+                connectors_core::read_json(&frame.document)
+                    .map(Ok)
+                    .map_err(|_| Code::Unavailable.into())
             }
-            Reply::Failed { error } if frame.document.is_empty() => Err(error),
+            Reply::Failed { error } if frame.document.is_empty() => Ok(Err(error)),
             _ => Err(Code::Unavailable.into()),
         }
     }
@@ -1380,9 +1397,7 @@ fn action(
             if !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
                 return Err(Code::Timeout.into());
             }
-            if !adapter.permissions.operations.contains(&operation) {
-                return Err(Code::Forbidden.into());
-            }
+            // Admission decides existence, then grant, then revision.
             admit_invoke(
                 &owner.paths,
                 &alias,
