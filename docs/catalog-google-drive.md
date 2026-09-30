@@ -114,8 +114,11 @@ refused before any request.
 
 Three writes create, change and copy Drive files through their metadata. None
 uploads content, but a metadata write is not harmless: one `files.update` can
-also move a file, trash it or remove the access it inherits, and a create or
-copy can set who may share or copy the result (see the table). Each is a
+also move a file, trash it, lock it or remove the access it inherits, and a
+create or copy can set who may share, copy or download the result (see the
+table). The table's last column names the effects most likely to matter; it is
+not exhaustive, because the `body` is Drive's File resource and every writable
+member of it reaches Drive. Each is a
 required-approval mutation: it runs only through the host's approval, audit and
 mutation coordinator, needs `private_protocol = "connectors-private/2"` and an
 approval policy naming it, and is prepared, approved and invoked as
@@ -129,14 +132,16 @@ one input is refused for any other. The subject shows only that digest; the
 presentation `approvals prepare` returns names the instance, operation,
 connection and descriptor revision, not the input
 (`crates/connectors-host/src/local/owner/approval_issuance.rs`). Read the input
-file itself before approving: its query parameters and `body` decide what the
-write does. Writes need the write scope; see [Authentication](#authentication).
+file itself before approving — the whole input, not only the members the table
+names: its query parameters and `body` decide what the write does. Writes run on
+a separate write instance with the write scope; see
+[The write scope](#the-write-scope).
 
 | id | Discovery id | request | guard | beyond naming and describing a file |
 |---|---|---|---|---|
-| `files.create` | `drive.files.create` | `POST /drive/v3/files` with a metadata `body` | none; the approval binds the whole body | `body.parents` places it; `body.writersCanShare` (whether writers may change its permissions) and `body.copyRequiresWriterPermission` (whether readers and commenters may copy, print or download it) set who may share or copy it; `ignoreDefaultVisibility` skips the domain's default visibility |
-| `files.update` | `drive.files.update` | `PATCH /drive/v3/files/{fileId}` with a metadata `body` | preflight `files.get`: `/version` equals the input `version` | `addParents` and `removeParents` move it; `body.trashed` trashes it; `body.inheritedPermissionsDisabled` removes the access it inherits from its folders; `body.writersCanShare` and `body.copyRequiresWriterPermission` change who may share or copy it |
-| `files.copy` | `drive.files.copy` | `POST /drive/v3/files/{fileId}/copy` with a metadata `body` | none; the approval binds the whole body | `body.parents` places the copy; `body.writersCanShare` (whether writers may change its permissions) and `body.copyRequiresWriterPermission` (whether readers and commenters may copy, print or download it) set who may share or copy it; `ignoreDefaultVisibility` skips the domain's default visibility |
+| `files.create` | `drive.files.create` | `POST /drive/v3/files` with a metadata `body` | none; the approval binds the whole body | `body.parents` places it, and without it the file goes directly into the user's My Drive; `body.writersCanShare` (whether writers may change its permissions) and `body.copyRequiresWriterPermission` (whether readers and commenters may copy, print or download it) set who may share or copy it; `body.contentRestrictions` locks it (`readOnly`: no new revision, no comments, no title change; `ownerRestricted`: only its owner may lift the lock); `body.downloadRestrictions` restricts downloading it; `ignoreDefaultVisibility` skips the domain's default visibility |
+| `files.update` | `drive.files.update` | `PATCH /drive/v3/files/{fileId}` with a metadata `body` | preflight `files.get`: `/version` equals the input `version` | `addParents` and `removeParents` move it; `body.trashed` trashes it; `body.inheritedPermissionsDisabled` removes the access it inherits from its folders; `body.writersCanShare` and `body.copyRequiresWriterPermission` change who may share or copy it; `body.contentRestrictions` locks or unlocks it (`readOnly`, `ownerRestricted`); `body.downloadRestrictions` restricts downloading it |
+| `files.copy` | `drive.files.copy` | `POST /drive/v3/files/{fileId}/copy` with a metadata `body` | none; the approval binds the whole body | `body.parents` places the copy, and without it the copy inherits any discoverable parent of the source file — the source's folder and the access it gives, not My Drive as a create would; `copyComments` copies the source's open comments, other people's words included; `body.writersCanShare` (whether writers may change its permissions) and `body.copyRequiresWriterPermission` (whether readers and commenters may copy, print or download it) set who may share or copy it; `body.contentRestrictions` locks it (`readOnly`, `ownerRestricted`); `body.downloadRestrictions` restricts downloading it; `ignoreDefaultVisibility` skips the domain's default visibility |
 
 - **Metadata only.** The projection excludes every media upload path and the
   `uploadType` parameter (`crates/connectors-catalog/src/discovery.rs`), so no
@@ -150,6 +155,13 @@ write does. Writes need the write scope; see [Authentication](#authentication).
   and a guard compares a value read before the write for equality only. The
   approval, bound to the whole body, is their only check; a create or copy made
   again under a new approval makes another file.
+- **A name is not unique within a folder.** Drive keeps any number of files of
+  the same name in one folder (the pinned Discovery document, `File.name`:
+  "This isn't necessarily unique within a folder"). A create or copy under a
+  name that already exists there is not refused and replaces nothing: it makes
+  a second file of that name, and a later `files.list` by `name` finds both.
+  Identify a file by its `id`, which a write's answer carries unless `fields`
+  leaves it out.
 - **`files.update` is pinned to `version`.** Its input is `fileId`, `version`
   (the file's current version, from `files.get` with `fields` including
   `version`), `fields` and `body`. Before the PATCH the provider sends one
@@ -225,15 +237,19 @@ use with this app" (the pinned Discovery document; see also
 That is Google's stated scope semantics, not a behaviour this repository has
 verified: no live Drive file has been written, and whether a token holding both
 scopes may, for example, copy any readable file or create a file in a folder the
-app did not create is not known here. The read scope stays, so the reads and
-each update's preflight still see every file. The write configuration is the
-one above with `drive.file` added to both `minimum_scopes` and
-`requested_scopes`:
+app did not create is not known here.
+
+Writes use a separate instance. Configure a second instance id, such as
+`google-drive-write`: the read configuration above with that instance id and
+`drive.file` added to both `minimum_scopes` and `requested_scopes`, as its own
+adapter entry in the host configuration, with the writes in its operation
+permissions and `private_protocol = "connectors-private/2"`. The read scope
+stays in it, so its reads and each update's preflight still see every file:
 
 ```json
 {
   "format": "connectors-catalog-local/2",
-  "instance": "google-drive",
+  "instance": "google-drive-write",
   "provider": "google-drive",
   "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
   "api_base": "https://www.googleapis.com/drive/v3",
@@ -253,15 +269,16 @@ one above with `drive.file` added to both `minimum_scopes` and
 }
 ```
 
-Validation checks the granted scopes against `minimum_scopes`, so an entry
-consented for the read scope alone is refused as insufficient scope under this
-configuration. The configuration change also changes the bootstrap's
-`configuration_revision`; take the new one from `--print-local-bootstrap` for
-the adapter entry. To add the write scope to an existing connection, replace
-its entry with one consented for both scopes through `connections repair`: the
-same Google account keeps the connection's identity, and a repair whose entry
-still lacks `drive.file` fails and leaves the prior credential selected
-([the connection registry](local-connection-registry.md)).
+Take its `configuration_revision` from `--print-local-bootstrap` for its
+adapter entry, then `connections connect` that instance with the Google client
+file. Validation checks the granted scopes against `minimum_scopes`, so an
+entry consented for the read scope alone is refused as insufficient scope on
+this instance. An existing read-only connection cannot be widened in place:
+`connections repair` cannot add a scope, because the configuration revision and
+the profile, whose `minimum_scopes` the scope changes, are part of the
+connection binding. Changing the scopes of the read instance itself leaves its
+connection bound to the old configuration, and a new connection on that same
+instance is refused while the old one exists.
 
 ## Limits
 
