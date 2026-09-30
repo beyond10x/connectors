@@ -55,7 +55,7 @@ impl Handler for LocalHandler {
         } else if call.callable == "operations-invoke" {
             let session = self.0.borrow();
             return operations::dispatch(call, session.deadline, session.mutation_deadline)
-                .unwrap_or_else(owner_failure);
+                .unwrap_or_else(invoke_failure);
         } else if call.callable == "connections-revalidate" {
             self.0
                 .borrow_mut()
@@ -76,6 +76,24 @@ impl Handler for LocalHandler {
             }
         }
     }
+}
+
+/// An operation invoke runs on an existing connection, so a credential the
+/// provider refuses there is the stored one, such as an OAuth refresh token that
+/// was revoked: a retry cannot succeed, a repair can. Everywhere else, and a
+/// credential refused while a connection is made in particular, keeps
+/// `owner_failure`'s next action.
+fn invoke_failure(error: owner::Error) -> HandlerReply {
+    let stored = error.code == owner::Code::ServiceFailure
+        && error.service_code == Some(connectors_core::ErrorCode::Unauthorized);
+    let mut reply = owner_failure(error);
+    if stored
+        && let HandlerReply::Error { data, .. } = &mut reply
+        && data["stage"] == "dispatch"
+    {
+        data["next_action"] = json!("repair_connection");
+    }
+    reply
 }
 
 fn owner_failure(error: owner::Error) -> HandlerReply {
@@ -111,11 +129,6 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         ReadinessMismatch => ("readiness", "check_configuration", false),
         IncarnationMismatch => ("stop", "retry_status", false),
         StaleDescription | DescriptionUnavailable => ("observation", "refresh_description", false),
-        // The provider refused the stored credential itself, such as an OAuth
-        // refresh token that was revoked: a retry cannot succeed, a repair can.
-        ServiceFailure if error.service_code == Some(connectors_core::ErrorCode::Unauthorized) => {
-            ("dispatch", "repair_connection", false)
-        }
         ServiceFailure => ("dispatch", "retry_explicitly", false),
         OwnerBuildMismatch => ("readiness", "stop_owner", false),
     };

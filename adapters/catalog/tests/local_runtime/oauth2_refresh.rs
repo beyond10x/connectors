@@ -1028,136 +1028,193 @@ fn oauth_existing_configuration_revisions_unchanged() {
     }
 }
 
-/// The CLI names `repair_connection` for a token endpoint's `invalid_grant`,
-/// both when a connection is made and when a cached token has gone bad.
-#[test]
-#[ignore = "requires built production CLI and qualified disposable Secret Service"]
-fn oauth_invalid_grant_reports_repair() {
-    use super::cli_journey::{Cli, Custody, refused_data, success};
-    use std::process::Output;
-    let provider = OAuthProvider::new(Source::Api);
-    let custody = Custody::new(provider.root.path());
-    let cli = Cli::new(provider.root.path());
-    success(cli.run(&["setup", "init"]));
-    success(cli.run(&["setup", "check"]));
-    let adapter = provider.selection();
-    let q = |value: &str| serde_json::to_string(value).unwrap();
-    let configuration = format!(
-        "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.drive]\ninstance_id={}\nadapter_id='catalog'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.drive.permissions]\nprofiles=[{}]\noperations=['project.get']\n[adapters.drive.executable]\npath={}\nsha256={}\nargs={}\n",
-        filesystem::uid(),
-        q(custody.socket.to_str().unwrap()),
-        q(&adapter.instance_id),
-        q(&adapter.configuration_revision),
-        q(OAUTH_PROFILE),
-        q(adapter.executable.path.to_str().unwrap()),
-        q(&adapter.executable.sha256),
-        serde_json::to_string(&adapter.executable.args).unwrap()
-    );
-    private(&cli.paths.config, configuration.as_bytes());
-    let credential = provider.root.path().join("private/credential.json");
-    private(&credential, &entry().0);
-    let connect = [
-        "connections",
-        "connect",
-        "--adapter",
-        "drive",
-        "--profile",
-        OAUTH_PROFILE,
-        "--credential-file",
-        credential.to_str().unwrap(),
-    ];
-    let invalid_grant = || {
-        TokenAnswer::Refuse(
-            400,
-            json!({"error": "invalid_grant", "error_description": "Token has been expired or revoked."}),
-        )
-    };
-    let assert_repair = |output: Output, what: &str| {
+/// The production CLI bound to an `oauth2_refresh` provider, with disposable
+/// custody. The adapter alias is `drive` and it grants `project.get`.
+struct OAuthCli {
+    provider: OAuthProvider,
+    _custody: super::cli_journey::Custody,
+    cli: super::cli_journey::Cli,
+    credential: PathBuf,
+}
+impl OAuthCli {
+    fn new() -> Self {
+        use super::cli_journey::{Cli, Custody, success};
+        let provider = OAuthProvider::new(Source::Api);
+        let custody = Custody::new(provider.root.path());
+        let cli = Cli::new(provider.root.path());
+        success(cli.run(&["setup", "init"]));
+        success(cli.run(&["setup", "check"]));
+        let adapter = provider.selection();
+        let q = |value: &str| serde_json::to_string(value).unwrap();
+        let configuration = format!(
+            "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.drive]\ninstance_id={}\nadapter_id='catalog'\nconfiguration_revision={}\nprotocol='v1alpha1'\nstartup='on-demand'\nrestart='never'\n[adapters.drive.permissions]\nprofiles=[{}]\noperations=['project.get']\n[adapters.drive.executable]\npath={}\nsha256={}\nargs={}\n",
+            filesystem::uid(),
+            q(custody.socket.to_str().unwrap()),
+            q(&adapter.instance_id),
+            q(&adapter.configuration_revision),
+            q(OAUTH_PROFILE),
+            q(adapter.executable.path.to_str().unwrap()),
+            q(&adapter.executable.sha256),
+            serde_json::to_string(&adapter.executable.args).unwrap()
+        );
+        private(&cli.paths.config, configuration.as_bytes());
+        let credential = provider.root.path().join("private/credential.json");
+        private(&credential, &entry().0);
+        Self {
+            provider,
+            _custody: custody,
+            cli,
+            credential,
+        }
+    }
+    fn connect(&self) -> std::process::Output {
+        self.cli.run(&[
+            "connections",
+            "connect",
+            "--adapter",
+            "drive",
+            "--profile",
+            OAUTH_PROFILE,
+            "--credential-file",
+            self.credential.to_str().unwrap(),
+        ])
+    }
+    /// Connects, and returns the `project.get` invoke arguments for it.
+    fn connected(&self) -> Vec<String> {
+        use super::cli_journey::success;
+        let connected = success(self.connect())["connection"].clone();
+        assert_eq!(connected["summary"]["state"], "ready");
+        let reference = connected["summary"]["connection"].as_str().unwrap();
+        let description = success(self.cli.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "drive",
+            "--operation",
+            "project.get",
+        ]));
+        [
+            "operations",
+            "invoke",
+            "--adapter",
+            "drive",
+            "--connection",
+            reference,
+            "--operation",
+            "project.get",
+            "--schema",
+            description["schema"].as_str().unwrap(),
+            "--revision",
+            description["revision"].as_str().unwrap(),
+            "--input-json",
+            r#"{"id":"org/project"}"#,
+        ]
+        .map(str::to_owned)
+        .to_vec()
+    }
+    fn run(&self, args: &[String]) -> std::process::Output {
+        self.cli
+            .run(&args.iter().map(String::as_str).collect::<Vec<_>>())
+    }
+    /// The refusal's data, after checking no OAuth material reached either stream.
+    fn refused(output: std::process::Output, what: &str) -> Value {
         assert!(!carries_oauth_material(&output.stdout), "{what}");
         assert!(!carries_oauth_material(&output.stderr), "{what}");
-        let refused = refused_data(output);
+        let refused = super::cli_journey::refused_data(output);
         assert_eq!(refused["code"], "service_failure", "{what}: {refused}");
         assert_eq!(refused["service_code"], "unauthorized", "{what}: {refused}");
         assert_eq!(refused["stage"], "dispatch", "{what}: {refused}");
-        assert_eq!(
-            refused["next_action"], "repair_connection",
-            "{what}: {refused}"
-        );
-    };
+        refused
+    }
+    /// Written configuration, owner state and every provider child carry no
+    /// OAuth material.
+    fn assert_no_material(&self) {
+        fn files_under(directory: &Path, found: &mut Vec<PathBuf>) {
+            for entry in fs::read_dir(directory).unwrap() {
+                let entry = entry.unwrap();
+                if entry.file_type().unwrap().is_dir() {
+                    files_under(&entry.path(), found);
+                } else {
+                    found.push(entry.path());
+                }
+            }
+        }
+        let mut written = vec![self.cli.paths.config.clone(), self.provider.config.clone()];
+        files_under(&self.cli.paths.state, &mut written);
+        for path in &written {
+            assert!(
+                !carries_oauth_material(&fs::read(path).unwrap_or_default()),
+                "{}",
+                path.display()
+            );
+        }
+        assert_no_material_at_rest(&self.provider);
+    }
+}
+fn invalid_grant() -> TokenAnswer {
+    TokenAnswer::Refuse(
+        400,
+        json!({"error": "invalid_grant", "error_description": "Token has been expired or revoked."}),
+    )
+}
 
-    provider.set_token(invalid_grant());
-    assert_repair(cli.run(&connect), "connect");
-    assert_eq!(provider.token_requests(), 1);
-
-    provider.set_token(grant(3600));
-    let connected = success(cli.run(&connect))["connection"].clone();
-    assert_eq!(connected["summary"]["state"], "ready");
-    let reference = connected["summary"]["connection"]
-        .as_str()
-        .unwrap()
-        .to_owned();
-    let description = success(cli.run(&[
-        "operations",
-        "describe",
-        "--adapter",
-        "drive",
-        "--operation",
-        "project.get",
-    ]));
-    let schema = description["schema"].as_str().unwrap().to_owned();
-    let descriptor = description["revision"].as_str().unwrap().to_owned();
-    let invoke = [
-        "operations",
-        "invoke",
-        "--adapter",
-        "drive",
-        "--connection",
-        &reference,
-        "--operation",
-        "project.get",
-        "--schema",
-        &schema,
-        "--revision",
-        &descriptor,
-        "--input-json",
-        r#"{"id":"org/project"}"#,
-    ];
-    let output = cli.run(&invoke);
-    assert!(!carries_oauth_material(&output.stdout));
-    let result = success(output);
+/// A stored connection whose refresh token the token host now refuses as
+/// `invalid_grant` is reported with `next_action = repair_connection` on the
+/// next invoke; so is a cached access token the API refuses.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn oauth_invalid_grant_reports_repair() {
+    use super::cli_journey::success;
+    let journey = OAuthCli::new();
+    let provider = &journey.provider;
+    // Tokens expire within the skew, so every invoke exchanges again.
+    provider.set_token(grant(60));
+    let invoke = journey.connected();
+    let result = success(journey.run(&invoke));
     assert_eq!(
         serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
         7
     );
-    let exchanged = provider.token_requests();
 
-    // The grant is revoked: the API refuses the cached token, which is evicted,
-    // and the next exchange is refused as `invalid_grant`.
+    // The grant is revoked at the token host.
     provider.set_token(invalid_grant());
-    provider.state.lock().unwrap().api_refuses = true;
-    assert_repair(cli.run(&invoke), "invoke with the cached token");
-    assert_eq!(provider.token_requests(), exchanged);
-    assert_repair(cli.run(&invoke), "invoke after eviction");
+    let exchanged = provider.token_requests();
+    let refused = OAuthCli::refused(journey.run(&invoke), "invoke after revocation");
+    assert_eq!(refused["next_action"], "repair_connection", "{refused}");
     assert_eq!(provider.token_requests(), exchanged + 1);
+    assert!(
+        provider.api_authorizations().len() == 2,
+        "the refused exchange reached the API"
+    );
 
-    let mut written = vec![cli.paths.config.clone(), provider.config.clone()];
-    fn files_under(directory: &Path, found: &mut Vec<PathBuf>) {
-        for entry in fs::read_dir(directory).unwrap() {
-            let entry = entry.unwrap();
-            if entry.file_type().unwrap().is_dir() {
-                files_under(&entry.path(), found);
-            } else {
-                found.push(entry.path());
-            }
-        }
-    }
-    files_under(&cli.paths.state, &mut written);
-    for path in &written {
-        assert!(
-            !carries_oauth_material(&fs::read(path).unwrap_or_default()),
-            "{}",
-            path.display()
-        );
-    }
-    assert_no_material_at_rest(&provider);
+    // A cached access token the API refuses is the stored credential's too.
+    provider.set_token(grant(3600));
+    success(journey.run(&invoke));
+    provider.state.lock().unwrap().api_refuses = true;
+    let exchanged = provider.token_requests();
+    let refused = OAuthCli::refused(journey.run(&invoke), "invoke with the cached token");
+    assert_eq!(refused["next_action"], "repair_connection", "{refused}");
+    assert_eq!(provider.token_requests(), exchanged);
+    journey.assert_no_material();
+}
+
+/// A credential refused while the connection is being made is not a stored
+/// credential: there is nothing to repair, and the refusal keeps the next
+/// action every other `service_failure` has.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn oauth_connect_refusal_does_not_say_repair() {
+    let journey = OAuthCli::new();
+    let provider = &journey.provider;
+    provider.set_token(invalid_grant());
+    let refused = OAuthCli::refused(journey.connect(), "connect");
+    assert_eq!(refused["next_action"], "retry_explicitly", "{refused}");
+    assert_eq!(provider.token_requests(), 1);
+    assert!(provider.api_authorizations().is_empty());
+    // The API refusing the fresh token at connect reads the same.
+    provider.set_token(grant(3600));
+    provider.state.lock().unwrap().api_refuses = true;
+    let refused = OAuthCli::refused(journey.connect(), "connect, API refusal");
+    assert_eq!(refused["next_action"], "retry_explicitly", "{refused}");
+    journey.assert_no_material();
 }

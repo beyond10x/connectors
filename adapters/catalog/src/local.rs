@@ -263,7 +263,14 @@ struct IdClaims {
     iss: String,
     aud: String,
     sub: String,
+    /// Seconds since the epoch; the token is refused unless this is after now.
+    exp: u64,
+    /// Seconds since the epoch; refused when further ahead than the skew.
+    #[serde(default)]
+    iat: Option<u64>,
 }
+/// How far an `id_token` may claim to be issued ahead of this clock.
+const ISSUED_AT_SKEW_S: u64 = 5 * 60;
 /// The token host's `tokeninfo` answer for an access token.
 #[derive(Deserialize)]
 struct TokenInfo {
@@ -411,8 +418,17 @@ impl OAuth {
             // which OpenID Connect Core 3.1.3.7 accepts in place of checking its
             // signature; issuer and audience are still checked.
             let claims = id_claims(id_token)?;
+            // 3.1.3.7 also requires the current time before `exp`.
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|_| Failure::Protocol)?
+                .as_secs();
             if !ISSUERS.contains(&claims.iss.as_str())
                 || claims.aud.as_bytes() != entry.client_id.as_bytes()
+                || claims.exp <= now
+                || claims
+                    .iat
+                    .is_some_and(|iat| iat > now.saturating_add(ISSUED_AT_SKEW_S))
             {
                 return Err(Failure::Protocol);
             }
@@ -507,7 +523,7 @@ pub struct Local {
     engine: Engine,
     instance: String,
     auth: AuthConfig,
-    oauth: Option<OAuth>,
+    oauth: Option<Arc<OAuth>>,
 }
 
 fn segments(path: &str) -> Vec<&str> {
@@ -672,11 +688,11 @@ impl Local {
                     token_ca.as_deref(),
                 )
                 .map_err(Failure::from_service)?;
-                Some(OAuth {
+                Some(Arc::new(OAuth {
                     http,
                     path,
                     cache: Mutex::new(BTreeMap::new()),
-                })
+                }))
             }
             None => None,
         };
@@ -828,7 +844,7 @@ impl Local {
     }
     /// An `oauth2_refresh` entry and its cache key, the digest of its bytes.
     fn oauth_entry(&self, document: Secret) -> Result<(&OAuth, OAuthEntry, [u8; 32])> {
-        let oauth = self.oauth.as_ref().ok_or(Failure::InvalidConfiguration)?;
+        let oauth = self.oauth.as_deref().ok_or(Failure::InvalidConfiguration)?;
         let document = Self::document(document)?;
         let entry: OAuthEntry =
             serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
@@ -1009,6 +1025,7 @@ impl runtime::Adapter for Local {
         Ok(Box::new(Write {
             prepared: prepared?,
             http: http.into_write(),
+            token: key.and_then(|key| Some((self.oauth.clone()?, key))),
         }))
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline> {
@@ -1069,10 +1086,25 @@ impl runtime::Adapter for Local {
 struct Write {
     prepared: connectors_catalog_provider::Prepared,
     http: Box<dyn connectors_sdk::AuthenticatedWrite>,
+    /// The cache and key of the OAuth access token the write carries.
+    token: Option<(Arc<OAuth>, [u8; 32])>,
 }
 #[async_trait::async_trait]
 impl runtime::PreparedWrite for Write {
     async fn execute(self: Box<Self>) -> connectors_sdk::WriteOutcome<Value> {
-        self.prepared.execute(self.http).await
+        let Write {
+            prepared,
+            http,
+            token,
+        } = *self;
+        let outcome = prepared.execute(http).await;
+        // A write the provider refused as unauthorized refused the token too.
+        if let (Some((oauth, key)), connectors_sdk::WriteOutcome::Refused(error)) =
+            (&token, &outcome)
+            && error.code == connectors_core::ErrorCode::Unauthorized
+        {
+            oauth.evict(key);
+        }
+        outcome
     }
 }

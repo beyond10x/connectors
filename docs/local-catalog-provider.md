@@ -146,11 +146,13 @@ The complete configuration used against the sandbox is
   `Authorization: Bearer <access token>`, so the profile must state
   `"header": "Authorization"` and `"bearer": true`. The access token lives in
   the provider process only, keyed by a digest of the entry, until 60 seconds
-  before its `expires_in`; a request the API refuses as an invalid credential
+  before its `expires_in`; a read or write the API refuses as an invalid credential
   evicts it, and `validate` always exchanges afresh. A token answer carrying a
   different `refresh_token` is refused as an invalid credential and nothing is
-  kept. `invalid_grant` and `invalid_client` are an invalid credential, which
-  the CLI reports with `next_action: repair_connection`; a 429 is a provider
+  kept. `invalid_grant` and `invalid_client` are an invalid credential; on an
+  `operations invoke` of an existing connection the CLI reports it with
+  `next_action: repair_connection`, and while connecting with
+  `retry_explicitly`; a 429 is a provider
   rate limit and a 5xx is `unavailable`. `token_url` and `authorize_url` must
   be `https` URLs without credentials, query or fragment, written in canonical
   form. `authorize_url` and `requested_scopes` are never called or checked by
@@ -163,13 +165,14 @@ The complete configuration used against the sandbox is
   for `oauth2_refresh` only, takes the subject from the `sub` of the token
   answer's `id_token`, after checking that its `iss` is
   `https://accounts.google.com` or `accounts.google.com` and its `aud` is the
-  entry's `client_id`, and the granted scopes from the answer's
+  entry's `client_id`, that its `exp` is after now and that its `iat`, if
+  present, is at most five minutes ahead, and the granted scopes from the answer's
   space-separated `scope`, which `minimum_scopes` is checked against. The
   `id_token` came straight from the token endpoint over verified TLS, so its
   signature is not checked. When the answer has no `id_token`, the provider
   asks `tokeninfo` on the token host for the fresh access token and reads the
-  same `sub`, `aud` and `scope` there. A wrong issuer or audience is refused as
-  a protocol failure. An `id_token` identity names no `path`,
+  same `sub`, `aud` and `scope` there. A wrong issuer or audience, or an expired
+  `id_token`, is refused as a protocol failure. An `id_token` identity names no `path`,
   `subject_pointer` or `scopes` read.
 
 ```json
