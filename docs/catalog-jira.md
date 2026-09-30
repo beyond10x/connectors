@@ -55,7 +55,8 @@ the end of a walk are in it.
   token will be null"), and says `isLast: true`. Never send a null token back.
   The pinned document requires a bounded query: a JQL with a search
   restriction, not only an `ORDER BY`. Jira returns only issue ids unless
-  `fields` is given; send it as one comma-separated string, such as
+  `fields` is given; send it as a JSON array, such as
+  `["summary", "updated", "status"]`, or as one comma-separated string, such as
   `"summary,updated,status"` or `"*all"`. The pinned document states at most
   5,000 issues per page and a default `maxResults` of 50, and that Jira may
   return fewer items than asked, so a short page is not an end condition.
@@ -110,16 +111,90 @@ connection made again.
 `{"account": "<email>", "token": "<API token>"}`; every request then carries
 `Authorization: Basic base64(<email>:<API token>)`.
 
+### Through the API gateway
+
+Service-account API tokens and OAuth 2.0 (3LO) access tokens are not accepted on
+the site URL; they work only through the Atlassian API gateway,
+`https://api.atlassian.com/ex/jira/<cloud id>/…`. Write the gateway URL as
+`api_base` and name its gateway part in `request_prefix`. The cloud id is the
+`cloudId` of `https://your-domain.atlassian.net/_edge/tenant_info`, or the `id`
+of the site in `GET https://api.atlassian.com/oauth/token/accessible-resources`
+for an OAuth token. The pinned paths (`/rest/api/3/…`) are checked against what
+follows the prefix, and every request, the identity read `myself` included, goes
+to the full `api_base`: `GET /ex/jira/<cloud id>/rest/api/3/myself`.
+
+A service-account API token uses the same `atlassian.basic` profile as on the
+site, with the service account's email as the account. Only `api_base` and
+`request_prefix` change:
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "jira-cloud",
+  "provider": "jira",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/jira/your-cloud-id/rest/api/3",
+  "request_prefix": "/ex/jira/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.basic",
+    "scheme": "basic",
+    "header": "Authorization",
+    "bearer": false,
+    "account_label": "Account email",
+    "label": "API token",
+    "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/jira/operations.json"
+}
+```
+
+The credential document is `{"account": "<service account email>", "token": "<API token>"}`,
+sent as `Authorization: Basic base64(<email>:<API token>)`. This form was checked
+live on 2026-09-30: a service-account API token connected through the gateway
+and `issues.search` returned issues. A user's scoped API token takes the same
+form with the user's email.
+
+An OAuth 2.0 (3LO) access token is sent as a bearer token. **Not verified live.**
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "jira-cloud",
+  "provider": "jira",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/jira/your-cloud-id/rest/api/3",
+  "request_prefix": "/ex/jira/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.bearer",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Atlassian access token",
+    "identity": {"path": "myself", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/jira/operations.json"
+}
+```
+
+The credential document is `{"token": "<access token>"}`, sent as
+`Authorization: Bearer <access token>`. The provider does not refresh an OAuth
+token; connect again when it expires. The token must carry the read scopes the
+three reads and `myself` need; Atlassian names them per operation.
+
 ## Limits
 
-- Verified against a local HTTPS fixture only (`adapters/catalog/tests/jira.rs`):
+- Verified against a local HTTPS fixture (`adapters/catalog/tests/jira.rs`):
   the exact request of each read, including the JQL time filter and the basic
   header, the returned body as JSON, and a two-page walk of each list to the
-  end condition above. No live Jira Cloud site has been read.
+  end condition above. Live, only the basic gateway form has been run: a
+  service-account API token connected and `issues.search` returned issues
+  (2026-09-30). The site form, the other reads and the OAuth form have not been
+  run against a live site.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Jira's exact bytes.
-- `fields`, `properties` and `reconcileIssues` are declared as arrays by the
-  pinned document; the engine sends one value per parameter, so pass a
-  comma-separated string.
+- `fields`, `properties` and `reconcileIssues` on `issues.search` are declared
+  as arrays by the pinned document. Each takes a JSON array, sent as one
+  `name=value` pair per element in the order given (`reconcileIssues` elements
+  are integers), or one comma-separated string, sent as one pair as before. See
+  [array and required query parameters](local-catalog-provider.md#array-and-required-query-parameters).
 - The provider does not walk pages itself, does not bound `maxResults`, and does
   not retry on `429`; a rate-limited read is returned as a refusal.

@@ -18,6 +18,8 @@ const SHA: &str = "0123456789abcdef0123456789abcdef01234567";
 
 fn document() -> Vec<u8> {
     let path = |name: &str| json!({"name": name, "in": "path", "required": true, "schema": {"type": "string"}});
+    // As the pinned GitLab document types them: an iid or a job id is an integer.
+    let number = |name: &str| json!({"name": name, "in": "path", "required": true, "schema": {"type": "integer"}});
     serde_json::to_vec(&json!({
         "openapi": "3.0.0",
         "info": {"title": "fixture", "version": "1"},
@@ -42,14 +44,14 @@ fn document() -> Vec<u8> {
             "/api/v4/projects/{id}/merge_requests/{merge_request_iid}": {
                 "get": {
                     "operationId": "getMergeRequest",
-                    "parameters": [path("id"), path("merge_request_iid")],
+                    "parameters": [path("id"), number("merge_request_iid")],
                     "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
                 }
             },
             "/api/v4/projects/{id}/merge_requests/{merge_request_iid}/merge": {
                 "put": {
                     "operationId": "mergeMergeRequest",
-                    "parameters": [path("id"), path("merge_request_iid")],
+                    "parameters": [path("id"), number("merge_request_iid")],
                     "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
                     "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
                 }
@@ -64,7 +66,7 @@ fn document() -> Vec<u8> {
             "/api/v4/projects/{id}/jobs/{job_id}/trace": {
                 "get": {
                     "operationId": "getJobTrace",
-                    "parameters": [path("id"), path("job_id")],
+                    "parameters": [path("id"), number("job_id")],
                     "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
                 }
             },
@@ -116,6 +118,8 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         guard: None,
         response: None,
         bounds: BTreeMap::new(),
+        required: Vec::new(),
+        rate_limit_reasons: Vec::new(),
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {
@@ -838,4 +842,467 @@ async fn a_bounded_parameter_is_checked_as_an_integer_before_any_request() {
             "per_page={per_page}"
         );
     }
+}
+
+/// A second fixture for the parameter and answer shapes: a repeated string, a
+/// repeated integer, a scalar, a query parameter the document does not require,
+/// a text read and a plain write.
+fn shapes_bundle() -> Bundle {
+    let bytes = serde_json::to_vec(&json!({
+        "openapi": "3.0.0",
+        "info": {"title": "shapes", "version": "1"},
+        "paths": {
+            "/v1/users/{userId}/messages": {"get": {
+                "operationId": "listMessages",
+                "parameters": [
+                    {"name": "userId", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "labelIds", "in": "query", "schema": {"type": "array", "items": {"type": "string"}}},
+                    {"name": "ids", "in": "query", "style": "form", "explode": true,
+                     "schema": {"type": "array", "items": {"type": "integer"}}},
+                    {"name": "q", "in": "query", "schema": {"type": "string"}}
+                ],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
+            }},
+            "/v1/about": {"get": {
+                "operationId": "getAbout",
+                "parameters": [
+                    {"name": "fields", "in": "query", "schema": {"type": "string"}},
+                    {"name": "trace", "in": "header", "schema": {"type": "string"}}
+                ],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
+            }},
+            "/v1/files/{fileId}/export": {"get": {
+                "operationId": "exportFile",
+                "parameters": [{"name": "fileId", "in": "path", "required": true, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK", "content": {"text/csv": {}}}}
+            }},
+            "/v1/things": {"post": {
+                "operationId": "createThing",
+                "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
+                "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
+            }}
+        }
+    }))
+    .unwrap();
+    let source = ingest("shapes.json", &bytes).unwrap();
+    let document: Value = serde_json::from_slice(&bytes).unwrap();
+    Bundle {
+        provider: "shapes".into(),
+        source,
+        inventory: inventory::extract(&document),
+        auth_profile: "fixture.token".into(),
+    }
+}
+
+fn messages() -> Engine {
+    let selection = written(json!({
+        "id": "messages.list", "operation_id": "listMessages", "effect": "read",
+        "bounds": {"ids": {"minimum": 1, "maximum": 10}}
+    }));
+    Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap()
+}
+
+async fn refused_with_nothing_sent(engine: &Engine, id: &str, input: Value) -> ErrorCode {
+    let http = reads(vec![]);
+    let error = engine
+        .read(http.as_ref(), "fixture", id, input.clone())
+        .await
+        .err()
+        .unwrap_or_else(|| panic!("{input} was sent"));
+    assert!(http.calls.lock().unwrap().is_empty(), "{input}");
+    error.code
+}
+
+#[tokio::test]
+async fn engine_sends_repeated_pairs() {
+    let engine = messages();
+    for (input, expected) in [
+        (
+            json!({"userId": "me", "labelIds": ["INBOX", "UNREAD"]}),
+            vec![("labelIds", "INBOX"), ("labelIds", "UNREAD")],
+        ),
+        // Integers are sent as their decimal text, one pair each, in input order.
+        (
+            json!({"userId": "me", "ids": [3, "1", 2], "q": "is:unread"}),
+            vec![("ids", "3"), ("ids", "1"), ("ids", "2"), ("q", "is:unread")],
+        ),
+        // One value is still one pair, as it was before arrays were read.
+        (
+            json!({"userId": "me", "labelIds": "INBOX,UNREAD"}),
+            vec![("labelIds", "INBOX,UNREAD")],
+        ),
+        // An empty array sends nothing.
+        (json!({"userId": "me", "labelIds": []}), vec![]),
+    ] {
+        let http = reads(vec![response(200, json!({"messages": []}))]);
+        engine
+            .read(http.as_ref(), "fixture", "messages.list", input.clone())
+            .await
+            .unwrap_or_else(|error| panic!("{input}: {error}"));
+        let calls = http.calls.lock().unwrap();
+        assert_eq!(calls.len(), 1, "{input}");
+        assert_eq!(calls[0].0, ["users", "me", "messages"]);
+        let expected: Vec<(String, String)> = expected
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        assert_eq!(calls[0].1, expected, "{input}");
+    }
+}
+
+#[test]
+fn engine_declares_array_schema() {
+    let engine = messages();
+    let declared = &engine.declarations(&[Effect::Read])[0].input_schema["properties"];
+    for (name, items) in [
+        ("labelIds", json!({"type": ["string", "integer"]})),
+        (
+            "ids",
+            json!({"anyOf": [{"type": "integer"}, {"type": "string", "pattern": "^-?[0-9]+$"}],
+                   "minimum": 1, "maximum": 10}),
+        ),
+    ] {
+        let schema = &declared[name];
+        let types = schema["type"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{schema}"));
+        assert!(types.contains(&json!("array")), "{name}: {schema}");
+        // The scalar one value was accepted as before this pass stays accepted.
+        for scalar in ["string", "integer", "boolean"] {
+            assert!(types.contains(&json!(scalar)), "{name}: {schema}");
+        }
+        assert_eq!(schema["items"], items, "{name}");
+    }
+    // A parameter that is not repeated declares no array.
+    assert_eq!(declared["q"], json!({"type": ["string", "integer"]}));
+}
+
+#[tokio::test]
+async fn engine_refuses_array_on_scalar_parameter() {
+    let engine = messages();
+    for input in [
+        json!({"userId": "me", "q": ["a", "b"]}),
+        json!({"userId": "me", "q": []}),
+        json!({"userId": ["me", "you"]}),
+    ] {
+        assert_eq!(
+            refused_with_nothing_sent(&engine, "messages.list", input).await,
+            ErrorCode::InvalidInput
+        );
+    }
+}
+
+#[tokio::test]
+async fn engine_refuses_nested_array_element() {
+    let engine = messages();
+    for input in [
+        json!({"userId": "me", "labelIds": [["INBOX"]]}),
+        json!({"userId": "me", "labelIds": ["INBOX", {"id": "UNREAD"}]}),
+        json!({"userId": "me", "labelIds": [null]}),
+        json!({"userId": "me", "ids": [1, 2.5]}),
+        json!({"userId": "me", "ids": [1, "two"]}),
+    ] {
+        assert_eq!(
+            refused_with_nothing_sent(&engine, "messages.list", input).await,
+            ErrorCode::InvalidInput
+        );
+    }
+}
+
+#[tokio::test]
+async fn engine_bounds_apply_per_element() {
+    let engine = messages();
+    for ids in [
+        json!([1, 11]),
+        json!([0]),
+        json!(["10", "11"]),
+        json!([5, "-1"]),
+    ] {
+        assert_eq!(
+            refused_with_nothing_sent(
+                &engine,
+                "messages.list",
+                json!({"userId": "me", "ids": ids})
+            )
+            .await,
+            ErrorCode::InvalidInput,
+            "{ids}"
+        );
+    }
+    let http = reads(vec![response(200, json!({}))]);
+    engine
+        .read(
+            http.as_ref(),
+            "fixture",
+            "messages.list",
+            json!({"userId": "me", "ids": [1, "10"]}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        http.calls.lock().unwrap()[0].1,
+        [
+            ("ids".to_string(), "1".to_string()),
+            ("ids".to_string(), "10".to_string())
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_selection_required_parameter_is_declared_and_refused_before_any_request() {
+    let selection = written(json!({
+        "id": "about.get", "operation_id": "getAbout", "effect": "read", "required": ["fields"]
+    }));
+    let engine = Engine::new(&shapes_bundle(), "/v1", std::slice::from_ref(&selection)).unwrap();
+    let declared = &engine.declarations(&[Effect::Read])[0].input_schema;
+    assert_eq!(declared["required"], json!(["fields"]));
+    assert_eq!(
+        refused_with_nothing_sent(&engine, "about.get", json!({})).await,
+        ErrorCode::InvalidInput
+    );
+    let http = reads(vec![response(200, json!({"user": {}}))]);
+    engine
+        .read(
+            http.as_ref(),
+            "fixture",
+            "about.get",
+            json!({"fields": "user"}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        http.calls.lock().unwrap()[0].1,
+        [("fields".to_string(), "user".to_string())]
+    );
+    // The field round-trips, and a selection without it serialises as before.
+    assert_eq!(
+        serde_json::to_value(&selection).unwrap()["required"],
+        json!(["fields"])
+    );
+    let plain = serde_json::to_value(select("about.get", "getAbout", Effect::Read)).unwrap();
+    assert!(plain.get("required").is_none(), "{plain}");
+    // Without the selection's requirement the document's own applies: none.
+    let open = Engine::new(
+        &shapes_bundle(),
+        "/v1",
+        &[select("about.get", "getAbout", Effect::Read)],
+    )
+    .unwrap();
+    assert_eq!(
+        open.declarations(&[Effect::Read])[0].input_schema["required"],
+        json!([])
+    );
+}
+
+#[test]
+fn a_selection_can_require_only_a_query_parameter_of_its_operation() {
+    for (operation_id, name) in [
+        ("getAbout", "nope"),
+        ("getAbout", "trace"),
+        ("listMessages", "userId"),
+        ("getAbout", ""),
+    ] {
+        let selection = written(json!({
+            "id": "one", "operation_id": operation_id, "effect": "read", "required": [name]
+        }));
+        let error = Engine::new(&shapes_bundle(), "/v1", &[selection])
+            .err()
+            .unwrap_or_else(|| panic!("`{name}` on `{operation_id}` loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "`{name}`");
+        assert!(error.message.contains("required"), "{}", error.message);
+    }
+}
+
+fn text_export() -> Engine {
+    let selection = written(json!({
+        "id": "file.export", "operation_id": "exportFile", "effect": "read",
+        "response": "text",
+        "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]
+    }));
+    Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap()
+}
+
+#[tokio::test]
+async fn an_empty_text_body_is_the_empty_string() {
+    let http = reads(vec![raw(200, b"")]);
+    let value = text_export()
+        .read(
+            http.as_ref(),
+            "fixture",
+            "file.export",
+            json!({"fileId": "f"}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(value["body"], json!(""));
+    // An empty JSON body is still null: there is no JSON value to read.
+    let engine = Engine::new(
+        &shapes_bundle(),
+        "/v1",
+        &[select("about.get", "getAbout", Effect::Read)],
+    )
+    .unwrap();
+    let http = reads(vec![raw(200, b"")]);
+    let value = engine
+        .read(http.as_ref(), "fixture", "about.get", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(value["body"], Value::Null);
+}
+
+fn quota(reason: &str) -> Value {
+    json!({"error": {"code": 403, "message": "private provider detail",
+        "errors": [{"domain": "usageLimits", "reason": reason, "message": "private provider detail"}]}})
+}
+
+#[tokio::test]
+async fn a_declared_rate_limit_reason_on_a_403_is_rate_limited() {
+    let engine = text_export();
+    for body in [
+        quota("userRateLimitExceeded"),
+        quota("rateLimitExceeded"),
+        json!({"error": {"errors": [{"reason": "other"}, {"reason": "rateLimitExceeded"}]}}),
+        json!({"error": {"code": 403, "status": "rateLimitExceeded"}}),
+    ] {
+        let http = reads(vec![response(403, body.clone())]);
+        let error = engine
+            .read(
+                http.as_ref(),
+                "fixture",
+                "file.export",
+                json!({"fileId": "f"}),
+            )
+            .await
+            .err()
+            .unwrap();
+        assert_eq!(error.code, ErrorCode::RateLimited, "{body}");
+        assert!(!error.message.contains("private"), "{}", error.message);
+    }
+}
+
+#[tokio::test]
+async fn every_other_403_stays_forbidden() {
+    let undeclared = Engine::new(
+        &shapes_bundle(),
+        "/v1",
+        &[Selection {
+            response: Some(ResponseKind::Text),
+            ..select("file.export", "exportFile", Effect::Read)
+        }],
+    )
+    .unwrap();
+    for (engine, body) in [
+        // A reason the selection does not declare.
+        (
+            text_export(),
+            serde_json::to_vec(&quota("insufficientPermissions")).unwrap(),
+        ),
+        (
+            text_export(),
+            serde_json::to_vec(&json!({"error": {"status": "PERMISSION_DENIED"}})).unwrap(),
+        ),
+        // The reason, somewhere other than the two places it is read from.
+        (
+            text_export(),
+            serde_json::to_vec(&json!({"reason": "rateLimitExceeded"})).unwrap(),
+        ),
+        (
+            text_export(),
+            serde_json::to_vec(&json!({"error": {"message": "rateLimitExceeded"}})).unwrap(),
+        ),
+        (
+            text_export(),
+            serde_json::to_vec(&json!({"error": {"errors": "rateLimitExceeded"}})).unwrap(),
+        ),
+        // A body that is not JSON, or no body.
+        (text_export(), b"rateLimitExceeded".to_vec()),
+        (text_export(), Vec::new()),
+        // A selection that declares no reasons.
+        (
+            undeclared,
+            serde_json::to_vec(&quota("rateLimitExceeded")).unwrap(),
+        ),
+    ] {
+        let http = reads(vec![raw(403, &body)]);
+        let error = engine
+            .read(
+                http.as_ref(),
+                "fixture",
+                "file.export",
+                json!({"fileId": "f"}),
+            )
+            .await
+            .err()
+            .unwrap();
+        assert_eq!(
+            error.code,
+            ErrorCode::Forbidden,
+            "{}",
+            String::from_utf8_lossy(&body)
+        );
+    }
+    // A declared reason on another status is that status's answer.
+    let http = reads(vec![response(400, quota("rateLimitExceeded"))]);
+    let error = text_export()
+        .read(
+            http.as_ref(),
+            "fixture",
+            "file.export",
+            json!({"fileId": "f"}),
+        )
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+}
+
+#[tokio::test]
+async fn a_write_refused_for_a_declared_rate_limit_reason_is_refused_as_rate_limited() {
+    let selection = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "rate_limit_reasons": ["userRateLimitExceeded"]
+    }));
+    let engine = Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap();
+    for (reason, expected) in [
+        ("userRateLimitExceeded", ErrorCode::RateLimited),
+        ("insufficientPermissions", ErrorCode::Forbidden),
+    ] {
+        let http = reads(vec![]);
+        let prepared = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "thing.create",
+                json!({"body": {}}),
+            )
+            .await
+            .unwrap();
+        let sent: Sent = Arc::default();
+        let outcome = prepared
+            .execute(Box::new(Send {
+                sent: sent.clone(),
+                response: Some(response(403, quota(reason))),
+            }))
+            .await;
+        match outcome {
+            WriteOutcome::Refused(error) => assert_eq!(error.code, expected, "{reason}"),
+            _ => panic!("{reason}: not refused"),
+        }
+    }
+}
+
+#[test]
+fn a_rate_limit_reason_must_be_a_nonempty_string() {
+    for reasons in [json!([""]), json!(["rateLimitExceeded", ""])] {
+        let selection = written(json!({
+            "id": "file.export", "operation_id": "exportFile", "effect": "read",
+            "rate_limit_reasons": reasons
+        }));
+        let error = Engine::new(&shapes_bundle(), "/v1", &[selection])
+            .err()
+            .unwrap_or_else(|| panic!("{reasons} loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput);
+    }
+    let plain = serde_json::to_value(select("file.export", "exportFile", Effect::Read)).unwrap();
+    assert!(plain.get("rate_limit_reasons").is_none(), "{plain}");
 }
