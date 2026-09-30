@@ -17,6 +17,22 @@
       "unsupported": 0
     },
     {
+      "provider": "google-drive",
+      "file_name": "google-drive.bundle.json",
+      "bundle_sha256": "3d6fe6964b33d07d588749a014c1c7446ffe5809d684e457814957d36320f679",
+      "source_sha256": "571c8d820490b340459d29fa532b1d814406ba00c7d5d97f83d9b4e362cbea8b",
+      "operations": 64,
+      "unsupported": 0
+    },
+    {
+      "provider": "google-slides",
+      "file_name": "google-slides.bundle.json",
+      "bundle_sha256": "5a360c3094af8533e1906c9b5ed73cedb8cbbbc25680f24241172093b0409211",
+      "source_sha256": "0ff83829831cbba4aaa7f364cf25697c75e7eb33df48ceec1492f19b1882c46e",
+      "operations": 5,
+      "unsupported": 0
+    },
+    {
       "provider": "jira",
       "file_name": "jira.bundle.json",
       "bundle_sha256": "56c1ad99046e00132bbdfaefec86cc702e1096ce7571ccb6b13454493dbc7dd4",
