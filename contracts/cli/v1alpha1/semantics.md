@@ -480,6 +480,11 @@ reports `stage = dispatch`: an upstream forbidden answer (HTTP 403) keeps
 not-found answer (HTTP 404; the catalog provider also 410) is
 `code = service_failure`, `service_code = not_found` with
 `next_action = none`. Neither sends the operator to connectors configuration.
+A stored credential the provider refuses — an HTTP 401, or an OAuth token
+endpoint's `invalid_grant` or `invalid_client` for a refresh profile — is
+`code = service_failure`, `service_code = unauthorized` at `stage = dispatch`
+with `next_action = repair_connection`: a retry with the same protected entry
+cannot succeed, and a repair replaces it.
 A connection probe's answer (the catalog provider's identity and scope probes,
 the Kubernetes token review) is classified separately and not by this rule: a
 403 reads as `forbidden` at `admission`, and a 404 is `service_failure` with
