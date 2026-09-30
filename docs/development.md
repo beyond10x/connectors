@@ -16,7 +16,11 @@ and the Eventlog-backed runtime roots on installed Rust 1.91.0. The Rust gate ru
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
 independent adapter-model compilation and AEP validation. It uses a task-owned temporary directory under
-`.local/tmp`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
+`.local/tmp`, and the CLI owner tests bind Unix sockets inside it, so the repository root must
+be short: from a managed worktree under `~/.local/state/worktree/trees/…` the socket paths
+exceed `SUN_LEN` and eight `apps/connectors/tests/local_cli.rs` tests fail with "path must be
+shorter than SUN_LEN" (measured 2026-09-30). Run the gate from a short checkout, such as a
+`git clone --shared` of the exact commit under `~/.cache`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`). This local repository has no
 configured CI or publication target.
 

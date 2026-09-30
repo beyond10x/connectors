@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-oauth2-refresh-profile
 kind: story
-status: active
+status: implemented
 title: The catalog provider refreshes an OAuth access token from a stored refresh token
 relations:
 - decomposes: epic:google-workspace-reads
@@ -15,18 +15,31 @@ scope:
   path: adapters/catalog/src/local.rs
 - confidence: inferred
   path: adapters/catalog/tests/local_runtime.rs
+- confidence: cited
+  path: adapters/kubernetes/src/local.rs
+- confidence: cited
+  path: adapters/sql/src/local.rs
 - confidence: inferred
   path: apps/connectors/src/local.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
 - confidence: inferred
   path: crates/connectors-host/src/http.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/metadata/entity-runtime-definitions.json
 - confidence: inferred
   path: crates/connectors-host/src/local/runtime.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/runtime/process.rs
 - confidence: inferred
   path: docs/local-catalog-provider.md
-revision: 6
+- confidence: cited
+  path: ess/domains/cli.yaml
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T13:14:00Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-09-30T13:14:01Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:32Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":5,"verification":1}}}
 ---
 ## Outcome
 

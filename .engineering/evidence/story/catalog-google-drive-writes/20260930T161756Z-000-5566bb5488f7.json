@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T16:17:56Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-google-drive-writes",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test google_drive at 05236d8e8 vs 2c9101e03",
+    "reference": "baseline: files.create/update/copy absent from the google-drive selection (6 reads); treatment: google_drive 21 passed incl. stale-version refusal with only the preflight sent, adversary files 3+3 passed (c2/test.log in ~/.cache/w0930wd)"
+  }
+}

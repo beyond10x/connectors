@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:cli-oauth-loopback-acquisition
 kind: story
-status: draft
+status: implemented
 title: connections connect acquires a Google refresh token by browser consent
 relations:
 - decomposes: epic:google-workspace-reads
@@ -12,8 +12,6 @@ relations:
 scope:
 - confidence: inferred
   path: adapters/catalog/tests/local_runtime/cli_journey.rs
-- confidence: inferred
-  path: apps/connectors/src/local/owner.rs
 - confidence: inferred
   path: apps/connectors/src/local/session.rs
 - confidence: inferred
@@ -28,7 +26,11 @@ scope:
   path: docs/catalog-google-oauth.md
 - confidence: inferred
   path: docs/local-connection-registry.md
-revision: 5
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-30T14:43:10Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":5}}}
+- {from: "proposed", to: "active", at: "2026-09-30T14:43:11Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":5}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:32Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":7,"verification":1}}}
 ---
 ## Outcome
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-google-drive-reads
 kind: story
-status: draft
+status: implemented
 title: 'Google Drive reads: about, files, export and changes'
 relations:
 - decomposes: epic:google-workspace-reads
@@ -22,11 +22,15 @@ scope:
   path: adapters/catalog/tests/google_drive.rs
 - confidence: inferred
   path: adapters/google/generated/drive.openapi.json
-- confidence: inferred
-  path: adapters/google/generated/drive.projection.json
+- confidence: cited
+  path: adapters/google/generated/drive.openapi.projection.json
 - confidence: inferred
   path: docs/catalog-google-drive.md
-revision: 6
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-30T14:43:08Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":6}}}
+- {from: "proposed", to: "active", at: "2026-09-30T14:43:09Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":6}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:33Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":12,"verification":1}}}
 ---
 ## Outcome
 

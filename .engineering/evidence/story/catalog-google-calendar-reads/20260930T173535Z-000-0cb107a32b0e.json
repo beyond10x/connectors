@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T17:35:35Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-google-calendar-reads",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test google_calendar at 985466d8d vs 8e455e2bf",
+    "reference": "baseline: no google-calendar provider or bundle at 985466d8d; treatment: google_calendar 17 / google_gmail 21 passed, adversary pass 1 and 2 files 6+5 passed, bundle_drift reproduces google-calendar"
+  }
+}

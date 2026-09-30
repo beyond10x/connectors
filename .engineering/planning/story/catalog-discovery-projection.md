@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-discovery-projection
 kind: story
-status: active
+status: implemented
 title: Project a Google Discovery document into OpenAPI exactly, and record the derivation
 relations:
 - decomposes: epic:google-workspace-reads
@@ -26,10 +26,11 @@ scope:
   path: crates/connectors-catalog/tests/discovery
 - confidence: inferred
   path: crates/connectors-catalog/tests/discovery.rs
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-30T13:14:01Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-09-30T13:14:02Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:31Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":10,"verification":1}}}
 ---
 ## Outcome
 

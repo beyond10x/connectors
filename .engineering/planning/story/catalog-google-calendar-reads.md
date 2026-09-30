@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-google-calendar-reads
 kind: story
-status: draft
+status: implemented
 title: Google Calendar list and event reads
 relations:
 - decomposes: epic:google-workspace-reads
@@ -22,11 +22,15 @@ scope:
   path: adapters/catalog/tests/google_calendar.rs
 - confidence: inferred
   path: adapters/google/generated/calendar.openapi.json
-- confidence: inferred
-  path: adapters/google/generated/calendar.projection.json
+- confidence: cited
+  path: adapters/google/generated/calendar.openapi.projection.json
 - confidence: inferred
   path: docs/catalog-google-calendar.md
-revision: 5
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-09-30T15:56:53Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-09-30T15:56:54Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-09-30T18:33:46Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":4,"verification":1}}}
 ---
 ## Outcome
 
