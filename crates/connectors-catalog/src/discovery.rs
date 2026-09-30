@@ -15,8 +15,8 @@
 //! | `title`, `version`, `description` | `info.title`, `info.version`, `info.description` |
 //! | `documentationLink` | `externalDocs.url` |
 //! | `revision` | the record's `discovery_revision` |
-//! | `rootUrl` + `servicePath` | one `servers[].url`, without its final `/` (`rootUrl` an absolute `https://<host>/`; anything else refused) |
-//! | `baseUrl`, `basePath` | must equal `rootUrl` + `servicePath` and `/` + `servicePath` |
+//! | `rootUrl` + `servicePath` | one `servers[].url`, without its final `/` (`rootUrl` exactly `https://<host>[:<digits>]/`, the host non-empty dot-separated labels of letters, digits and inner hyphens; anything else refused) |
+//! | `baseUrl`, `basePath` | `baseUrl` must equal `rootUrl` + `servicePath`; `basePath` must equal `/` + `servicePath` exactly, or be empty when `servicePath` is (the pinned Gmail and Slides form) |
 //! | `auth`, `batchPath`, `canonicalName`, `fullyEncodeReservedExpansion`, `icons`, `id`, `mtlsRootUrl`, `name`, `ownerDomain`, `ownerName`, `version_module` | ignored, listed in the record (`auth` still declares the scopes methods may name) |
 //! | method `id` | `operationId`, verbatim; unique |
 //! | method `description` | the operation's `description` |
@@ -24,7 +24,7 @@
 //! | `httpMethod` | GET, POST, PUT, PATCH, DELETE; anything else refused |
 //! | `parameters` with `location` `path` / `query` | `in: path` / `in: query`; path parameters `required: true`, in template order, then query parameters by name |
 //! | parameter `required`, `description`, `deprecated` | on the parameter, as written |
-//! | parameter `type`, `format`, `enum`, `default`, `pattern`, `minimum`, `maximum` | on its `schema` (`default`, `minimum`, `maximum` are strings in Discovery and become the schema type's own values; a value that does not parse is refused) |
+//! | parameter `type`, `format`, `enum`, `default`, `pattern`, `minimum`, `maximum` | on its `schema` (`default`, `minimum`, `maximum` are strings in Discovery and become the schema type's own values; a value that does not parse, or does not fit its `format` — `int32`, `uint32`, `float`, and the digits of a string `int64`/`uint64` — is refused) |
 //! | `enumDescriptions` | `x-google-enum-descriptions` beside the `enum` |
 //! | `repeated: true` (query only) | `schema: {type: array, items: …}`, `style: form`, `explode: true` |
 //! | `request.$ref` | `requestBody` `application/json` → `#/components/schemas/<name>`, `required: true` |
@@ -32,7 +32,7 @@
 //! | `response.$ref` | `200` `application/json` → `#/components/schemas/<name>` |
 //! | no `response` | `200` with no content, or `application/octet-stream` when `supportsMediaDownload` |
 //! | `supportsMediaDownload` beside a `response` | ignored, listed: the media form needs `alt=media`, which is excluded |
-//! | `supportsMediaUpload` / `mediaUpload` | the metadata path is projected as above; each upload protocol path is excluded and listed |
+//! | `supportsMediaUpload` / `mediaUpload` | the metadata path is projected as above; each upload protocol path is excluded and listed; `mediaUpload.accept`, `maxSize` and `protocols.*.multipart` are ignored, listed |
 //! | `useMediaDownloadService`, `supportsSubscription`, `parameterOrder`, `flatPath` | ignored, listed |
 //! | `scopes` | `x-google-scopes` on the operation; each must be declared in `auth`; no `securitySchemes` |
 //! | document `parameters` | `fields` projected on every operation; `$.xgafv`, `access_token`, `alt`, `callback`, `key`, `oauth_token`, `prettyPrint`, `quotaUser`, `uploadType`, `upload_protocol`, `userIp` excluded and listed; a method parameter of any of those twelve names is refused |
@@ -46,7 +46,8 @@
 //! | `annotations.required` | `x-google-required-for` |
 //! | `$ref` inside schemas | `#/components/schemas/<name>`, beside the node's `description`, `readOnly`, `deprecated`, `annotations`; an unresolved name is refused |
 //! | nested `resources` and top-level `methods` | walked recursively; method ids are already fully qualified |
-//! | paths that differ only in template names | the spelling most methods use (the first in order on a tie) is projected; each method on another spelling is excluded, named with its reason in the record |
+//! | paths that differ only in template names, with different HTTP methods | the spelling most methods use (the first in order on a tie) is projected; each method on another spelling is excluded, named with its reason in the record (pinned: `gmail.users.settings.cse.identities.patch`) |
+//! | paths that differ only in template names, with the same HTTP method | refused: one OpenAPI path and one HTTP method |
 //! | two methods on one path and one HTTP method, or with one `id` | refused |
 //! | any key or value not in this table | refused, naming the JSON pointer |
 //!
@@ -309,10 +310,28 @@ impl Projection {
 }
 
 /// Canonical bytes: keys sorted at every depth, pretty-printed, one final newline.
+///
+/// The sorted value is serialised as it stands and never read back: a re-read
+/// goes through serde_json's float parser, whose result depends on which of its
+/// features the crate graph enables, so one document would project to different
+/// bytes in different builds (adversary pass 1, F2).
 fn canonical(value: &Value) -> Vec<u8> {
-    let sorted: Value = serde_json::from_slice(&connectors_core::canonical(value))
-        .expect("canonical JSON reads back");
-    let mut out = serde_json::to_vec_pretty(&sorted).expect("JSON Value is serializable");
+    fn sorted(value: &Value) -> Value {
+        match value {
+            Value::Object(map) => {
+                let mut keys: Vec<&String> = map.keys().collect();
+                keys.sort();
+                Value::Object(
+                    keys.into_iter()
+                        .map(|key| (key.clone(), sorted(&map[key])))
+                        .collect(),
+                )
+            }
+            Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+            other => other.clone(),
+        }
+    }
+    let mut out = serde_json::to_vec_pretty(&sorted(value)).expect("JSON Value is serializable");
     out.push(b'\n');
     out
 }
@@ -443,24 +462,33 @@ fn scalar(kind: &str, format: Option<&str>, pointer: &str) -> Result<Map<String,
     Ok(out)
 }
 
-/// A Discovery string holding a value of `kind`, as that kind's own JSON value.
-fn typed(kind: &str, text: &str, pointer: &str) -> Result<Value> {
-    let parsed = match kind {
-        "string" => Some(json!(text)),
-        "boolean" => match text {
+/// A Discovery string holding a value of `kind` and `format`, as that kind's own
+/// JSON value. The value must fit its format: `int32` and `uint32` bound an
+/// integer, `float` bounds a number, and the string formats `int64` and `uint64`
+/// bound the digits a string carries. A value outside its format is refused, so
+/// no schema contradicts its own `format` (adversary pass 1, F6).
+fn typed(kind: &str, format: Option<&str>, text: &str, pointer: &str) -> Result<Value> {
+    let parsed = match (kind, format) {
+        ("string", Some("int64")) => text.parse::<i64>().ok().map(|_| json!(text)),
+        ("string", Some("uint64")) => text.parse::<u64>().ok().map(|_| json!(text)),
+        ("string", _) => Some(json!(text)),
+        ("boolean", _) => match text {
             "true" => Some(json!(true)),
             "false" => Some(json!(false)),
             _ => None,
         },
-        "integer" => text
+        ("integer", Some("int32")) => text.parse::<i32>().ok().map(Value::from),
+        ("integer", Some("uint32")) => text.parse::<u32>().ok().map(Value::from),
+        ("integer", _) => text
             .parse::<i64>()
             .ok()
             .map(Value::from)
             .or_else(|| text.parse::<u64>().ok().map(Value::from)),
-        "number" => text
+        ("number", _) => text
             .parse::<f64>()
             .ok()
             .filter(|number| number.is_finite())
+            .filter(|number| format != Some("float") || (*number as f32).is_finite())
             .and_then(serde_json::Number::from_f64)
             .map(Value::Number),
         _ => {
@@ -470,21 +498,22 @@ fn typed(kind: &str, text: &str, pointer: &str) -> Result<Value> {
             );
         }
     };
+    let named = format.map_or_else(String::new, |format| format!(" (`{format}`)"));
     parsed.map_or_else(
-        || invalid(pointer, format!("`{text}` is not a `{kind}` value")),
+        || invalid(pointer, format!("`{text}` is not a `{kind}`{named} value")),
         Ok,
     )
 }
 
 /// A numeric bound, only on a numeric type.
-fn bound(kind: &str, text: &str, pointer: &str) -> Result<Value> {
+fn bound(kind: &str, format: Option<&str>, text: &str, pointer: &str) -> Result<Value> {
     if kind != "integer" && kind != "number" {
         return invalid(
             pointer,
             format!("a bound on type `{kind}` is not in the table"),
         );
     }
-    typed(kind, text, pointer)
+    typed(kind, format, text, pointer)
 }
 
 /// `enum` and `enumDescriptions`, into `out`; only on a string.
@@ -550,7 +579,8 @@ fn parameter(name: &str, value: &Value, pointer: &str) -> Result<Parameter> {
         }
     };
     let kind = required_string(map, "type", pointer)?;
-    let mut schema = scalar(kind, string(map, "format", pointer)?, pointer)?;
+    let format = string(map, "format", pointer)?;
+    let mut schema = scalar(kind, format, pointer)?;
     enumeration(map, kind, pointer, &mut schema)?;
     if let Some(pattern) = string(map, "pattern", pointer)? {
         if kind != "string" {
@@ -560,7 +590,7 @@ fn parameter(name: &str, value: &Value, pointer: &str) -> Result<Parameter> {
     }
     for key in ["minimum", "maximum"] {
         if let Some(text) = string(map, key, pointer)? {
-            schema.insert(key.into(), bound(kind, text, &child(pointer, key))?);
+            schema.insert(key.into(), bound(kind, format, text, &child(pointer, key))?);
         }
     }
     let repeated = boolean(map, "repeated", pointer)?.unwrap_or(false);
@@ -573,7 +603,7 @@ fn parameter(name: &str, value: &Value, pointer: &str) -> Result<Parameter> {
         }
         schema.insert(
             "default".into(),
-            typed(kind, text, &child(pointer, "default"))?,
+            typed(kind, format, text, &child(pointer, "default"))?,
         );
     }
 
@@ -763,12 +793,13 @@ fn schema(
             for key in ["properties", "items", "additionalProperties"] {
                 refuse_here(key)?;
             }
-            out.extend(scalar(kind, string(map, "format", pointer)?, pointer)?);
+            let format = string(map, "format", pointer)?;
+            out.extend(scalar(kind, format, pointer)?);
             enumeration(map, kind, pointer, &mut out)?;
             if let Some(text) = string(map, "default", pointer)? {
                 out.insert(
                     "default".into(),
-                    typed(kind, text, &child(pointer, "default"))?,
+                    typed(kind, format, text, &child(pointer, "default"))?,
                 );
             }
         }
@@ -777,18 +808,32 @@ fn schema(
     Ok(Value::Object(out))
 }
 
+/// `host[:port]`: one or more dot-separated labels, each non-empty, of ASCII
+/// letters, digits and inner hyphens, then optionally `:` and one or more digits.
+fn authority(text: &str) -> bool {
+    let (host, port) = match text.split_once(':') {
+        Some((host, port)) => (host, Some(port)),
+        None => (text, None),
+    };
+    let label = |label: &str| {
+        !label.is_empty()
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+            && label
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    };
+    let port = port.is_none_or(|port| !port.is_empty() && port.bytes().all(|b| b.is_ascii_digit()));
+    host.split('.').all(label) && port
+}
+
 /// `rootUrl` + `servicePath` as one server URL without its final `/`.
 fn server(document: &Map<String, Value>) -> Result<String> {
     let root = required_string(document, "rootUrl", "")?;
     let authority = root
         .strip_prefix("https://")
         .and_then(|rest| rest.strip_suffix('/'))
-        .filter(|host| {
-            !host.is_empty()
-                && host
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b':')
-        });
+        .filter(|host| authority(host));
     if authority.is_none() {
         return refuse("/rootUrl", Reason::NotAbsoluteHttps);
     }
@@ -818,8 +863,11 @@ fn server(document: &Map<String, Value>) -> Result<String> {
             format!("must equal rootUrl + servicePath, `{base}`"),
         );
     }
+    // Exactly `/` + servicePath. With an empty servicePath the pinned Gmail and
+    // Slides documents write an empty basePath, which names the same root.
     if let Some(path) = string(document, "basePath", "")?
-        && path.trim_start_matches('/') != service
+        && path != format!("/{service}")
+        && !(service.is_empty() && path.is_empty())
     {
         return invalid("/basePath", format!("must be `/{service}`"));
     }
@@ -931,7 +979,8 @@ type Selected = (
 /// names. Of such spellings the one most methods use is projected, the one that
 /// sorts first on a tie; methods on every other spelling are excluded and named.
 /// The choice reads the whole set, so it does not depend on declaration order.
-/// Two methods on one spelling and one HTTP method refuse the document.
+/// Two methods on one OpenAPI path and one HTTP method refuse the document,
+/// whether they spell the names alike or not.
 fn select(mut candidates: Vec<Candidate>) -> Result<Selected> {
     let mut spellings: BTreeMap<&str, BTreeMap<&str, usize>> = BTreeMap::new();
     for candidate in &candidates {
@@ -957,19 +1006,12 @@ fn select(mut candidates: Vec<Candidate>) -> Result<Selected> {
     let mut excluded = Vec::new();
     let mut rewritten = Vec::new();
     candidates.sort_by(|a, b| a.at.cmp(&b.at));
-    for candidate in candidates {
-        let chosen = &kept[&candidate.shape];
-        if candidate.path != *chosen {
-            excluded.push(ExcludedMethod {
-                id: candidate.id,
-                reason: format!(
-                    "path `{}` differs from the projected `{chosen}` only in parameter names, \
-                     which OpenAPI 3.0.3 does not admit",
-                    candidate.path
-                ),
-            });
-            continue;
-        }
+    // Every method on a kept spelling is placed first, so that a method on
+    // another spelling can be judged against all of them.
+    let (on_kept, elsewhere): (Vec<Candidate>, Vec<Candidate>) = candidates
+        .into_iter()
+        .partition(|candidate| candidate.path == kept[&candidate.shape]);
+    for candidate in on_kept {
         let item = paths.entry(candidate.path.clone()).or_default();
         if item.contains_key(candidate.verb) {
             return invalid(
@@ -984,6 +1026,31 @@ fn select(mut candidates: Vec<Candidate>) -> Result<Selected> {
         item.insert(candidate.verb.to_owned(), candidate.operation);
         operations.push(candidate.id);
         rewritten.extend(candidate.rewritten);
+    }
+    for candidate in elsewhere {
+        let chosen = &kept[&candidate.shape];
+        // One OpenAPI path and one HTTP method, whatever the names are spelled:
+        // the same collision as two methods on one spelling, and refused alike
+        // (adversary pass 1, F3). Only a method whose HTTP method the kept
+        // spelling does not carry is excluded instead.
+        if paths[chosen].contains_key(candidate.verb) {
+            return invalid(
+                &candidate.at,
+                format!(
+                    "a second {} method on `{chosen}`, spelled `{}`",
+                    candidate.verb.to_uppercase(),
+                    candidate.path
+                ),
+            );
+        }
+        excluded.push(ExcludedMethod {
+            id: candidate.id,
+            reason: format!(
+                "path `{}` differs from the projected `{chosen}` only in parameter names, \
+                 which OpenAPI 3.0.3 does not admit",
+                candidate.path
+            ),
+        });
     }
     operations.sort();
     excluded.sort_by(|a, b| a.id.cmp(&b.id));
@@ -1166,8 +1233,15 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
             let at = child(pointer, "mediaUpload");
             let media = object(media, &at)?;
             only(media, &at, &["accept", "maxSize", "protocols"])?;
-            strings(media, "accept", &at)?;
-            string(media, "maxSize", &at)?;
+            // The upload protocol is excluded, so what only it reads — the media
+            // types it accepts, its size limit, whether it is multipart — is
+            // carried nowhere; each is listed (adversary pass 1, F1).
+            if strings(media, "accept", &at)?.is_some() {
+                walk.ignored.insert(child(&at, "accept"));
+            }
+            if string(media, "maxSize", &at)?.is_some() {
+                walk.ignored.insert(child(&at, "maxSize"));
+            }
             let protocols_at = child(&at, "protocols");
             let Some(protocols) = media.get("protocols") else {
                 return invalid(&at, "media upload without `protocols`");
@@ -1178,7 +1252,9 @@ fn method(value: &Value, pointer: &str, walk: &mut Walk<'_>) -> Result<()> {
                 let here = child(&protocols_at, protocol);
                 let entry = object(value, &here)?;
                 only(entry, &here, &["multipart", "path"])?;
-                boolean(entry, "multipart", &here)?;
+                if boolean(entry, "multipart", &here)?.is_some() {
+                    walk.ignored.insert(child(&here, "multipart"));
+                }
                 let path = required_string(entry, "path", &here)?;
                 if !path.starts_with('/') {
                     return invalid(&child(&here, "path"), "an upload path is absolute");
