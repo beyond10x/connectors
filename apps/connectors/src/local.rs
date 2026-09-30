@@ -17,7 +17,7 @@ mod operations;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
-    let root_help = args.len() == 2 && matches!(args[1].to_str(), Some("--help" | "-h"));
+    let root_help = is_root_help(&args);
     let session = session::Session::new(&args);
     if let Some(output) = configuration_preflight(&session.borrow()) {
         return output;
@@ -33,6 +33,24 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         output.stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n  describe  Read a complete service descriptor\n  invoke    Invoke an explicit service operation\n  serve     Run the configured federation service\n");
     }
     output
+}
+
+/// Whether the argument list, after any leading process globals, is exactly
+/// root `--help` or `-h`.
+fn is_root_help(args: &[OsString]) -> bool {
+    let mut rest = args.iter().skip(1);
+    while let Some(arg) = rest.next() {
+        match arg.to_str() {
+            Some("--output" | "--config" | "--state-dir") if rest.next().is_some() => {}
+            Some(arg)
+                if ["--output=", "--config=", "--state-dir="]
+                    .iter()
+                    .any(|prefix| arg.starts_with(prefix)) => {}
+            Some("--help" | "-h") => return rest.next().is_none(),
+            _ => return false,
+        }
+    }
+    false
 }
 
 struct LocalHandler(session::Shared);
