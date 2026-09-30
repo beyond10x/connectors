@@ -6,6 +6,7 @@ rust-version = "1.91"
 license.workspace = true
 
 [dependencies]
+base64.workspace = true
 connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
@@ -17,6 +18,5 @@ tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-base64.workspace = true
 ring = "=0.17.14"
 tempfile.workspace = true

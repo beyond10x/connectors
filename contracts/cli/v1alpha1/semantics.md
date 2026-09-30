@@ -38,7 +38,12 @@ owner-qualified `connectors.auth_bindings.Connection.connection_ref`, and
 `acquisition` names its existing acquisition owner/ref. A profile selects the
 existing immutable AuthProfile under that adapter. Revisions retain the owning
 record's meaning. No CLI entity, persistence ledger, grant, tenant, fake view or
-domain command is introduced. Value observations cannot establish authority.
+domain command is introduced, except two owner-held records:
+`connectors.cli.LocalRuntimeRecord` (stop suppression and the cached bootstrap,
+§4) and `connectors.cli.ConnectionListCursor` (the opaque stale-page fence behind
+`connections list` cursors, `registry_cursors` in `docs/local-er-metadata.md`).
+Neither grants provider, connection or dispatch authority. Value observations
+cannot establish authority.
 
 The first local binding admits the current effective Linux UID as the configured
 owner, verified again at a protected Unix-domain socket using kernel peer
@@ -163,6 +168,9 @@ mode suppresses ordinary progress so stderr is also machine-readable. Diagnostic
 are fixed safe messages, never raw argv, file contents, keyring locators, provider
 responses, actionable URLs or exception debug dumps. Secret-entry paths are
 redacted too. Output framing is a codec obligation beyond the ESS value shape.
+`completions SHELL` is outside this envelope: it prints the raw completion script
+to stdout with exit 0 whatever `--output` selects. The `ess-cli/1` generator owns
+that behaviour; this binding adds nothing to it.
 
 | Exit | Meaning | Failure kind |
 |---|---|---|
@@ -172,7 +180,25 @@ redacted too. Output framing is a codec obligation beyond the ESS value shape.
 | 130 | interrupted command; no implicit retry | `interrupted` |
 
 Parse errors use this same selected output contract, including unknown commands
-and help/argument collisions. Interruption stops waiting and protected capture,
+and help/argument collisions. Failures the `ess-cli/1` presentation raises
+before the handler runs carry its fixed codes with empty data, exit 2 and empty
+stdout, never an application `Failure`:
+
+| Condition | `ess-cli/1` code |
+|---|---|
+| unknown command or flag, missing or malformed argument, two sources for one field | `cli_parse` |
+| an argument value that does not decode to its field type or the command's input shape | `cli_input` |
+| a selected source the presentation cannot read, when the owner recorded no refusal of its own | `cli_source` |
+| an `operations invoke` business JSON document that does not decode as exactly one JSON value (malformed, trailing document, 128 or more nesting levels counting the outermost value: the decoder's recursion limit, reached before the owner's depth bound) | `cli_dynamic_input` |
+
+When the owner's reader refused the selected source, the owner's `Failure`
+takes the place of `cli_source` (an unreadable business document file is
+`invalid_input`; a missing safe entry channel is the table row below). A
+decoded business document that the selected operation schema, its depth bound
+(64) or its byte bound refuses is the owner's `invalid_input` `Failure`
+(exit 2). `approvals prepare` and `approvals issue` hand their document to the
+owner undecoded, so there an undecodable or trailing document is the owner's
+`invalid_input` too, not `cli_dynamic_input`. Interruption stops waiting and protected capture,
 restores terminal settings and erases transient capture buffers. It does not
 claim rollback after a durable publication or possible provider dispatch. A
 publication whose acknowledgement is lost is `outcome_unknown`; a later status
@@ -189,6 +215,25 @@ is unwrapped when printing; it is not a new public wrapper. These legacy explici
 network routes are outside the no-launch/no-auth guarantee for local inspection.
 The current `serve --config` runtime stays a separate federation command; this
 contract does not claim its configuration starts the new local supervisor.
+
+These three compatibility commands accept the process global `--output` before
+or after the command word; it selects only the parse-refusal presentation, and
+successful results stay raw JSON. `--config` and `--state-dir` are not accepted
+before them (`serve --config` is that command's own argument). Their parse
+errors, including unknown, missing or malformed arguments, follow the output
+contract above: exit 2, empty stdout, and the fixed `cli_parse` code with empty
+data on stderr, never an argv echo. `COMMAND --help` prints that command's usage.
+Root `--help` or `-h`, alone or after leading process globals, prints the
+generated grouped help (the short form of the long help
+in `apps/connectors-cli-contract/help.txt`), one blank line and then this block,
+which the generated help does not carry:
+
+```text
+Explicit service commands (use COMMAND --help for options):
+  describe  Read a complete service descriptor
+  invoke    Invoke an explicit service operation
+  serve     Run the configured federation service
+```
 
 ## 3. Explicit local TOML configuration
 
@@ -297,7 +342,7 @@ restart rules above remain owner obligations.
 Bounds for this first binding are explicit, selected limits, not measured runtime
 performance: 64 configured entries; four concurrent launches; one live launch per
 instance; 10 seconds for readiness and 5 seconds for graceful stop; 1 MiB TOML;
-100 default/500 maximum list items per page; 256 UTF-8 bytes per selector; 4 KiB
+100 default/500 maximum list items per page; 128 UTF-8 bytes per selector; 4 KiB
 per path; 64 KiB protected credential document; 1 MiB business input; 8 MiB result;
 JSON depth 64; 30-second default/120-second maximum business deadline. Provider and
 descriptor limits may only lower these bounds. List cursors are opaque, admitted,
@@ -421,16 +466,18 @@ connection where required. Refreshed readiness/descriptor information that does
 not match the selected revision returns `stale_description` before provider
 dispatch; it never silently substitutes a new schema or retries the request.
 Operation absence, malformed field/type, missing permission and unreachable
-service remain separate errors. Bound input before parsing, validate current
+service remain separate errors. An operation id the adapter does not expose
+answers `not_found` before any grant check, so absence is never reported as
+`forbidden`. Bound input before parsing, validate current
 authority immediately before dispatch, preserve shared mutation uncertainty and
 never replay a possible write after interruption, timeout or lost response.
 
 | Condition | `Failure.code` | Exit |
 |---|---|---|
-| unknown flag/command, wrong field/type, secret source collision | `invalid_input` | 2 |
+| decoded business document the operation schema, depth or byte bound refuses; `approvals prepare` or `approvals issue` business document that does not decode or has a trailing document; unreadable business document file; argument value the handler refuses | `invalid_input` | 2 |
 | TOML syntax, unsupported startup/restart, duplicate identity, bad permissions | `invalid_configuration` | 2 |
 | configuration already exists | `configuration_exists` | 1 |
-| no safe entry channel | safe source error (`protected_entry_unavailable` in application data) | 2 |
+| no safe entry channel (in place of the presentation's `cli_source`) | `protected_entry_unavailable` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
@@ -442,6 +489,8 @@ never replay a possible write after interruption, timeout or lost response.
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
+| stale, expired or foreign list cursor (`stage = observation`, `next_action = retry_explicitly`) | `stale_cursor` | 1 |
+| connect whose acquisition failed before publication (`stage = dispatch`, `next_action = retry_explicitly`) | the acquisition owner's code | 1 |
 | known revoked connection | `revoked` | 1 |
 | current permission missing | `forbidden` (or shared `not_granted`) | 1 |
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
@@ -470,11 +519,18 @@ and next-action enum, plus optional opaque correlation refs under current result
 access; it never contains raw provider evidence or custody references.
 
 The stage names who refused, because the same code can come from either side.
-A refusal made before any provider request — by the host's admission, or by an
-adapter from its own configured scope (a namespace, resource kind or operation
-the adapter entry does not allow) — reports `stage = admission` (`forbidden`
-with `next_action = request_permission`, `not_found` with
-`check_configuration`). Only the provider's own answer to a dispatched call
+A refusal made before any provider request — by the host's admission (an
+unknown adapter alias included), or by an adapter from its own configured
+scope (a namespace, resource kind or operation the adapter entry does not
+allow) — reports `stage = admission` (`forbidden` with
+`next_action = request_permission`, `not_found` with `check_configuration`).
+`operations invoke`, `approvals prepare`, `approvals issue` and
+`approvals policy-set` read their business document before the adapter alias is
+admitted, so an unreadable or undecodable document is refused first (the
+document refusals above) and an unknown alias is `not_found` only once the
+document has been read. Every other command answers an unknown alias with
+`not_found` at admission.
+Only the provider's own answer to a dispatched call
 reports `stage = dispatch`: an upstream forbidden answer (HTTP 403) keeps
 `code = forbidden` with `next_action = request_permission`, and an upstream
 not-found answer (HTTP 404; the catalog provider also 410) is
