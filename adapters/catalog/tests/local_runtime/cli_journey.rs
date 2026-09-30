@@ -17,16 +17,16 @@ impl Drop for OwnedProcess {
     }
 }
 
-struct Custody {
+pub(super) struct Custody {
     daemon: Option<OwnedProcess>,
     _bus: OwnedProcess,
     directory: PathBuf,
-    socket: PathBuf,
+    pub(super) socket: PathBuf,
     epoch: u32,
 }
 
 impl Custody {
-    fn new(parent: &Path) -> Self {
+    pub(super) fn new(parent: &Path) -> Self {
         let directory = parent.join("custody");
         filesystem::directory(&directory, true, true).unwrap();
         filesystem::directory(&directory.join("home"), true, true).unwrap();
@@ -119,13 +119,13 @@ impl Custody {
     }
 }
 
-struct Cli {
+pub(super) struct Cli {
     binary: PathBuf,
-    paths: Paths,
+    pub(super) paths: Paths,
 }
 
 impl Cli {
-    fn new(root: &Path) -> Self {
+    pub(super) fn new(root: &Path) -> Self {
         let binary = std::env::var_os("CONNECTORS_TEST_CLI")
             .expect("built production CLI required")
             .into();
@@ -153,7 +153,7 @@ impl Cli {
         command
     }
 
-    fn run(&self, args: &[&str]) -> Output {
+    pub(super) fn run(&self, args: &[&str]) -> Output {
         self.command(args).output().unwrap()
     }
 
@@ -183,7 +183,7 @@ impl Drop for Cli {
 }
 
 #[track_caller]
-fn success(output: Output) -> Value {
+pub(super) fn success(output: Output) -> Value {
     assert!(
         output.status.success(),
         "CLI failed: {}",
@@ -533,7 +533,7 @@ fn adversary_basic_cli_wrong_token_is_unauthorized_and_malformed_is_invalid_inpu
 }
 
 #[track_caller]
-fn refused_data(output: Output) -> Value {
+pub(super) fn refused_data(output: Output) -> Value {
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
     assert!(!String::from_utf8_lossy(&output.stderr).contains("fixture-pat-one"));
