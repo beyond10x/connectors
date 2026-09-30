@@ -34,7 +34,8 @@ fn every_google_selection_names_the_quota_reasons() {
     assert!(
         seen.iter().any(|id| id.starts_with("google-drive "))
             && seen.iter().any(|id| id.starts_with("google-slides "))
-            && seen.iter().any(|id| id.starts_with("google-calendar ")),
+            && seen.iter().any(|id| id.starts_with("google-calendar "))
+            && seen.iter().any(|id| id.starts_with("google-gmail ")),
         "{seen:?}"
     );
     assert!(missing.is_empty(), "without {REASONS:?}: {missing:#?}");

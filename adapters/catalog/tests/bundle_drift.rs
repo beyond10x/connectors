@@ -17,7 +17,7 @@ use std::path::Path;
 /// a caller gives, as before arrays were read; shipped reads are among them
 /// (`labels` and `iids` on issues and merge requests, `topic` on projects), and
 /// none of them changes what is sent.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 6] = [
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 7] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -43,6 +43,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 6] = [
         "google-drive",
         "../google/generated/drive.openapi.json",
         Some("../google/upstream/drive/drive-api.json"),
+        "google.oauth",
+        0,
+    ),
+    (
+        "google-gmail",
+        "../google/generated/gmail.openapi.json",
+        Some("../google/upstream/gmail/gmail-api.json"),
         "google.oauth",
         0,
     ),

@@ -60,6 +60,9 @@ const PROJECTED: &str = "../google/generated/calendar.openapi.json";
 /// The page-size ceiling the pinned `events.list` states only in the text of
 /// its `maxResults` description ("can never be larger than 2500 events").
 const EVENTS_MAX_RESULTS: u64 = 2500;
+/// The ceiling the pinned `calendarList.list` states the same way ("can never be
+/// larger than 250 entries").
+const CALENDARS_MAX_RESULTS: u64 = 250;
 
 /// The shipped ids, their Discovery method id and the path the bundle records
 /// (the Discovery path below the server path `/calendar/v3`). A renamed,
@@ -194,28 +197,36 @@ fn the_bundle_is_derived_from_the_pinned_discovery_document() {
     assert!(index.find(PROVIDER).is_some());
 }
 
-/// `events.list` bounds `maxResults` at 1–2500: the pinned document's own
-/// `minimum` and the ceiling its description states. No other selection
-/// carries a bound.
+/// Both lists bound `maxResults`: the pinned document's own `minimum` and the
+/// ceiling its description states, 2500 for `events.list` and 250 for
+/// `calendarList.list`. `events.get` carries no bound.
 #[test]
-fn only_events_list_bounds_max_results_at_the_documented_range() {
+fn both_lists_bound_max_results_at_the_documented_range() {
     let document = pinned();
-    let max_results =
-        &document["resources"]["events"]["methods"]["list"]["parameters"]["maxResults"];
-    assert_eq!(max_results["minimum"], "1");
-    assert!(max_results.get("maximum").is_none());
-    assert!(
-        max_results["description"]
-            .as_str()
-            .unwrap()
-            .contains(&format!("never be larger than {EVENTS_MAX_RESULTS} events"))
-    );
+    for (resource, noun, maximum) in [
+        ("events", "events", EVENTS_MAX_RESULTS),
+        ("calendarList", "entries", CALENDARS_MAX_RESULTS),
+    ] {
+        let max_results =
+            &document["resources"][resource]["methods"]["list"]["parameters"]["maxResults"];
+        assert_eq!(max_results["minimum"], "1", "{resource}");
+        assert!(max_results.get("maximum").is_none(), "{resource}");
+        assert!(
+            max_results["description"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("never be larger than {maximum} {noun}")),
+            "{resource}"
+        );
+    }
     for selection in shipped() {
         let written = serde_json::to_value(&selection).unwrap();
-        let expected = if selection.id == "events.list" {
-            json!({"maxResults": {"minimum": 1, "maximum": EVENTS_MAX_RESULTS}})
-        } else {
-            Value::Null
+        let expected = match selection.id.as_str() {
+            "events.list" => json!({"maxResults": {"minimum": 1, "maximum": EVENTS_MAX_RESULTS}}),
+            "calendarList.list" => {
+                json!({"maxResults": {"minimum": 1, "maximum": CALENDARS_MAX_RESULTS}})
+            }
+            _ => Value::Null,
         };
         assert_eq!(written["bounds"], expected, "`{}`", selection.id);
     }
@@ -258,7 +269,7 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
             "calendarList.list",
             "calendar.calendarList.list",
             "/calendar/v3/users/me/calendarList",
-            "`pageToken`, `maxResults`",
+            "`pageToken`, `maxResults` (1–250)",
             "`nextPageToken` absent",
             "`syncToken`",
         ),
@@ -266,7 +277,7 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
             "events.list",
             "calendar.events.list",
             "/calendar/v3/calendars/{calendarId}/events",
-            "`pageToken`, `maxResults`",
+            "`pageToken`, `maxResults` (1–2500)",
             "`nextPageToken` absent",
             "`syncToken`",
         ),
@@ -926,40 +937,58 @@ fn an_expired_sync_token_is_refused_as_not_found() {
     );
 }
 
-/// `maxResults` 0 and 2501 are refused as `invalid_input` with nothing sent,
-/// as numbers and as strings; 1 and 2500 are sent.
-#[test]
-fn events_list_max_results_bounds() {
+/// `maxResults` 0 and one over `maximum` are refused as `invalid_input` with
+/// nothing sent, as numbers and as strings; 1 and `maximum` are sent.
+fn max_results_bounds(operation: &str, first: Value, route: &str, maximum: u64) {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    let first = json!({"calendarId": "primary", "maxResults": 2});
     // Exchange the token first, so "nothing sent" counts every request.
-    invoke(&mut child, "events.list", first.clone());
+    invoke(&mut child, operation, first.clone());
+    let over = maximum + 1;
     let mut escaped = Vec::new();
-    for size in [json!(0), json!(2501), json!("0"), json!("2501")] {
+    for size in [json!(0), json!(over), json!("0"), json!(over.to_string())] {
         let mut input = first.clone();
         input["maxResults"] = size.clone();
         let before = provider.requests().len();
-        let outcome = attempt(&mut child, "events.list", &input);
+        let outcome = attempt(&mut child, operation, &input);
         let sent = provider.requests().len() != before;
         if sent || !matches!(outcome, Err(Failure::InvalidInput)) {
-            escaped.push(format!("maxResults={size} sent={sent} {outcome:?}"));
+            escaped.push(format!(
+                "`{operation}` maxResults={size} sent={sent} {outcome:?}"
+            ));
         }
     }
     assert!(
         escaped.is_empty(),
         "not refused before any request: {escaped:#?}"
     );
-    for size in [1, EVENTS_MAX_RESULTS] {
+    for size in [1, maximum] {
         let mut input = first.clone();
         input["maxResults"] = json!(size);
         let before = provider.api_targets().len();
-        invoke(&mut child, "events.list", input);
+        invoke(&mut child, operation, input);
         let targets = provider.api_targets();
-        assert_eq!(targets.len(), before + 1, "{size}");
-        assert_eq!(
-            targets[before],
-            format!("/calendar/v3/calendars/primary/events?maxResults={size}"),
-        );
+        assert_eq!(targets.len(), before + 1, "`{operation}` {size}");
+        assert_eq!(targets[before], format!("{route}?maxResults={size}"));
     }
+}
+
+#[test]
+fn events_list_max_results_bounds() {
+    max_results_bounds(
+        "events.list",
+        json!({"calendarId": "primary", "maxResults": 2}),
+        "/calendar/v3/calendars/primary/events",
+        EVENTS_MAX_RESULTS,
+    );
+}
+
+#[test]
+fn calendar_list_max_results_bounds() {
+    max_results_bounds(
+        "calendarList.list",
+        json!({"maxResults": 1}),
+        "/calendar/v3/users/me/calendarList",
+        CALENDARS_MAX_RESULTS,
+    );
 }

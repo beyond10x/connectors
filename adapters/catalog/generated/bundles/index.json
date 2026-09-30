@@ -33,6 +33,14 @@
       "unsupported": 0
     },
     {
+      "provider": "google-gmail",
+      "file_name": "google-gmail.bundle.json",
+      "bundle_sha256": "1d710f5558654d22dcc69c0b54f5649b0c5f755bce1c46923e9937a815e60396",
+      "source_sha256": "91763efcd436a426b8e2c48465e2caadbcb52d2b6c4498e174d35be217b71b71",
+      "operations": 78,
+      "unsupported": 0
+    },
+    {
       "provider": "google-slides",
       "file_name": "google-slides.bundle.json",
       "bundle_sha256": "b85ad83010b6a95a44fe0baf11406dbc5193d91126f0dfb6f201f2a08774d1ba",

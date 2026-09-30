@@ -4,6 +4,7 @@
   "operations": [
     {"id": "calendarList.list", "operation_id": "calendar.calendarList.list", "effect": "read",
      "description": "List the calendars on the signed-in user's calendar list, one page per call; the walk follows nextPageToken as pageToken and ends on the page carrying nextSyncToken, which a later call sends as syncToken to read only the entries changed since; a 410 (not_found) means the sync token expired: drop it and walk again without it",
+     "bounds": {"maxResults": {"minimum": 1, "maximum": 250}},
      "rate_limit_reasons": ["rateLimitExceeded", "userRateLimitExceeded"]},
     {"id": "events.list", "operation_id": "calendar.events.list", "effect": "read",
      "description": "List the events of calendarId (primary for the signed-in user's own), one page per call, optionally within timeMin..timeMax or changed after updatedMin, with singleEvents to expand recurring events and eventTypes (an array) to select types; the walk follows nextPageToken as pageToken and ends on the page carrying nextSyncToken, which a later call sends as syncToken, without timeMin, timeMax, updatedMin, q, orderBy, iCalUID or the extended-property filters, to read only the events changed since; a 410 (not_found) means the sync token expired: drop it and walk again without it",
