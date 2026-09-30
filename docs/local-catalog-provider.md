@@ -26,7 +26,11 @@ cargo run --locked -p connectors-build -- catalog \
 The pipeline reads the source (JSON or YAML), records its SHA-256, extracts the
 operation inventory and writes `gitlab.bundle.json` plus `index.json`. The
 committed GitLab bundle carries every one of the 1,847 operations in the pinned
-source with none unsupported; `adapters/catalog/tests/bundle_drift.rs` refuses a
+source. It names 67 gaps, each an array query parameter the source declares
+`explode: false` (such as `labels` and `iids` on issues and merge requests);
+each of those is sent as the one value a caller gives, such as `"bug,ui"`, as it
+was before arrays were read (see [Array and required query
+parameters](#array-and-required-query-parameters)). `adapters/catalog/tests/bundle_drift.rs` refuses a
 committed bundle that a fresh run would not reproduce byte for byte. Nothing
 here reaches the network.
 
@@ -170,6 +174,17 @@ The complete configuration used against the sandbox is
   any request. A bound on a parameter the operation does not declare as a query
   parameter, or with a `minimum` above its `maximum`, is refused when the
   selection loads. The declared input schema carries both limits as well.
+- `required` is optional: `["<query parameter>", …]` marks query parameters the
+  provider requires although the pinned source does not. Each is then declared
+  required and refused as `invalid_input` when absent, before any request. A
+  name that is not a query parameter of the operation is refused when the
+  selection loads.
+- `rate_limit_reasons` is optional: `["<reason>", …]` names the reasons a
+  provider gives in a `403` when it means a quota rather than a permission. A
+  `403` whose JSON body carries one of them in `error.errors[].reason` or
+  `error.status` is `rate_limited`, for a read and for a write's definite
+  refusal; every other `403` stays `forbidden`. An empty reason is refused
+  when the selection loads.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
@@ -186,6 +201,36 @@ the one PUT: `/sha` equal to the pinned `body.sha`, `/state` literally `opened`,
 input `pipeline_id` and `/head_pipeline/status` literally `success`. After it:
 `/state` literally `merged` and `/sha` still the pinned head. Those are the
 checks the retired native `merge_request.validate` made in Rust, as five lines of data.
+
+### Array and required query parameters
+
+A query parameter the pinned source declares as an array with `style: form` and
+`explode: true` (OpenAPI's default for a query parameter) is repeated: its input
+takes a JSON array of scalars, sent as one `name=value` pair per element in the
+order given, each encoded as a single value is; an empty array sends nothing.
+The declared input schema gives it `"type": ["array", "string", "integer",
+"boolean"]` with `items` of the element type the source declares. One scalar is
+still accepted and sent as one pair, so a caller that already sends a
+comma-joined string, such as Jira's `fields` or Confluence's `space-id`, sends
+the same request as before. A `bounds` entry holds for each element. An array
+for a parameter that is not repeated, or an element that is itself an array, an
+object or `null`, is refused as `invalid_input` before any request.
+
+An array query parameter with any other `style`, or `explode: false`, is
+recorded as a gap in the bundle and keeps the one-value reading it had before:
+the caller sends the joined value itself. Array path and header parameters are
+not read as arrays.
+
+A selection's `required` list adds the provider's requirement where the source
+omits it; see the selection fields above.
+
+Reading arrays changed the declared input schema, and so the descriptor
+revision, of every shipped read with a repeated parameter: Jira `issues.search`;
+Confluence `pages.changed`, `space.pages`, `page.get` and `page.comments`; and
+GitLab `issues.list` (`assignee_username`, `not[labels]`, `not[iids]`,
+`not[assignee_username]`) and `merge_requests.list` (`assignee_username`,
+`not[assignee_username]`, `not[labels]`). An approval policy bound to the
+earlier revision must be issued again.
 
 ## Bind the provider to the local CLI
 
