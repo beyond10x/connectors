@@ -70,3 +70,22 @@ story:guarded-write-credential-refusal-says-repair.
 
 The unit commits and their correction commits, the merges into the integration branches, the
 closing store commit, and the merge into `main` through a pull request once the gate is green.
+
+## Handoff (session closed 2026-10-01)
+
+PR #61 (`wave/20260930c-google-oauth-discovery`) carries the whole wave. Docs check and planning
+validate pass; `common / Security and privacy` fails with "candidate exceeds scan limit" because
+the organization secret `B10X_GATES_POLICY` (CI's copy of the gates policy, last updated
+2026-09-27) still holds the old connectors baseline. Next owner, in order:
+
+1. Operator: `jq -c . ~/beyond10x/gates-policy/policy.json | gh secret set B10X_GATES_POLICY --org beyond10x --visibility all`
+   (the compact policy is 47,629 bytes; the committed policy is gates-policy `64c7ed9`).
+2. Re-run the failed check through the bot
+   (`POST /repos/beyond10x/connectors/actions/runs/<run id>/rerun-failed-jobs` via `b10x-gates api`),
+   then merge PR #61 through `b10x-gates api` once all three checks pass.
+3. Release 0.21.0 per AGENTS.md "Cutting a release"; the CHANGELOG entry is drafted in
+   `changelog-0.21.0-draft.md` beside this page.
+4. Operator: download a Google Desktop OAuth client JSON (the `{"installed": {…}}` form) and
+   `chmod 600` it; then `story:catalog-google-live-deck-read` and an agentic e2e trial can run.
+   `~/.config/b10x/google-oauth-client.json` holds only a flat `client_id`/`client_secret` and
+   does not work with the consent flow.
