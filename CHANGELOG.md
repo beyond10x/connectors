@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.21.1 — 2026-10-01
+
+### Fixed
+
+- `npm run build` in `website/` passes again with the pinned ESS 0.45.0. Its examples step built the
+  example model from every domain, and the CLI domain's `connectors-local/1` enum variant is not a Rust
+  identifier for the ESS Rust target (failing since 0.18.0). The example model now holds only the domains
+  the examples read and their references; wire values are unchanged.
+- The repository gate synthesizes the website example model for Rust and web, so a refusal like this one
+  fails the gate and CI.
+
+### Limits
+
+- ESS's Rust generator ignores `code:` on enum variants; the WASM example build still runs only in
+  `npm run build`.
+
 ## 0.21.0 — 2026-10-01
 
 ### Added

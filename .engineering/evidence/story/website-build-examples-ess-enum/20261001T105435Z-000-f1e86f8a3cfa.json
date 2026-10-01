@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-01T10:54:35Z",
+  "actor": "human:timo",
+  "artifact": "story:website-build-examples-ess-enum",
+  "kind": "story",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv at 10bda5555e (implementor run, short-root clone): all checks passed, 136 suites, 1098 passed, 0 failed, 43 ignored; gate prints 'website example model synthesizes for rust and web; exit=0'"
+  }
+}
