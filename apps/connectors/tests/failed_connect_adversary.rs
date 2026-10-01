@@ -9,15 +9,14 @@ use connectors_host::local::{
     owner::{Client, Code},
     registry, runtime,
 };
+#[path = "support/socket.rs"]
+mod sockets;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
     fs,
     io::{Read, Write},
-    os::unix::{
-        fs::PermissionsExt,
-        net::{UnixListener, UnixStream},
-    },
+    os::unix::{fs::PermissionsExt, net::UnixStream},
     time::Duration,
 };
 
@@ -96,7 +95,7 @@ fn serve(
     .unwrap();
     Config::initialize(&paths).unwrap();
     let socket = paths.state.join("owner.sock");
-    let listener = UnixListener::bind(&socket).unwrap();
+    let listener = sockets::bind(&paths.state, "owner.sock");
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
     let build = own_build();
     let owner = std::thread::spawn(move || {

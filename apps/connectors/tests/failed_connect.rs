@@ -16,15 +16,14 @@ use connectors_host::local::{
     owner::{self, Client, Code},
     registry, runtime,
 };
+#[path = "support/socket.rs"]
+mod sockets;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
     fs,
     io::{Read, Write},
-    os::unix::{
-        fs::PermissionsExt,
-        net::{UnixListener, UnixStream},
-    },
+    os::unix::{fs::PermissionsExt, net::UnixStream},
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     time::{Duration, Instant},
@@ -116,7 +115,7 @@ fn stand_in(
 /// `build`, for exactly one client connection.
 fn serve(paths: &Paths, build: String, answer: Answer) -> std::thread::JoinHandle<Vec<String>> {
     let socket = paths.state.join("owner.sock");
-    let listener = UnixListener::bind(&socket).unwrap();
+    let listener = sockets::bind(&paths.state, "owner.sock");
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
     std::thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
