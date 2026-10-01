@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T08:24:52Z",
+  "actor": "human:timo",
+  "artifact": "epic:google-workspace-reads",
+  "kind": "epic",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "Source release v0.21.0: tag v0.21.0 (b10x-bot[bot]) peels to c90adeaf40f60d7a80fe184fbb3966c4a551262d on main; release page by b10x-bot[bot], Latest. Live Google run not in scope (story:catalog-google-live-deck-read, blocked on credential-blocker:google-oauth-client)",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.21.0"
+  }
+}
