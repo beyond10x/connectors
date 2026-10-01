@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T09:12:19Z",
+  "actor": "human:timo",
+  "artifact": "story:ci-runs-the-repository-gate",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "rust-gate.yml on GitHub: run 36835676252 (probe PR #63, one assertion broken on purpose) failure at adapters/catalog/tests/hubspot.rs:133; run 36839187046 (wave PR #66, head 82658e5e5) success in 18m30s; runner disk 82G free, target 2.9G",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/36839187046"
+  }
+}

@@ -7,8 +7,8 @@ planning store, then select first wave to fix it". Status: approved by the opera
 
 | story | serves | agents | branch | worktree | build dir | scratch | stage |
 |---|---|---|---|---|---|---|---|
-| story:ci-runs-the-repository-gate | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/ci-runs-the-repository-gate | `<managed-trees>`/wave1001-ci (id wave1001-ci) | `<tree>`/target | `<tree>`/.local/tmp/unit | dispatched |
-| story:planning-store-hygiene-20261001 | vision:independent-contract-adapters | coordinator (store writes are the coordinator's) | wave/20261001-techdebt | `<managed-trees>`/connectors-techdebt | — | — | in progress |
+| story:ci-runs-the-repository-gate | vision:independent-contract-adapters | aep:implementor, aep:adversary | impl/ci-runs-the-repository-gate | `<managed-trees>`/wave1001-ci (id wave1001-ci) | `<tree>`/target | `<tree>`/.local/tmp/unit | merged (c4d2ba96b), target deleted |
+| story:planning-store-hygiene-20261001 | vision:independent-contract-adapters | coordinator (store writes are the coordinator's) | wave/20261001-techdebt | `<managed-trees>`/connectors-techdebt | — | — | implemented (0cd17f8c9) |
 
 Integration branch: `wave/20261001-techdebt` off `main` 5d861f9a1 (PR #62).
 
@@ -43,3 +43,24 @@ collision between them. Left out of this wave, with the reason:
 One unit commit, its merge into the integration branch, one store commit for the hygiene moves and
 the closing store commit, a push of the throwaway CI branch and its PR closed unmerged, and the merge
 of the integration branch into `main` through a pull request once the gate is green. No release.
+
+## Close
+
+- Gate: `cargo run -p connectors-build -- gate --msrv` at `82658e5e5` from a short-path clone, ESS 0.45.0,
+  AEP 0.65.0: `gate: all checks passed`, exit 0; 136 suites, 1096 passed, 0 failed, 43 ignored. The
+  first run at the same commit failed one test,
+  `google_calendar_gmail_adversary_pass2::an_attachment_under_the_named_limit_is_refused_and_the_texts_state_the_real_ceiling`
+  ("a 3144704-byte part failed: Unavailable"), which then passed 10 of 10 alone; filed as
+  `story:gmail-attachment-read-flaky-under-load`.
+- `story:ci-runs-the-repository-gate`: implemented. GitHub run 36835676252 on probe PR #63 (one
+  assertion broken on purpose) failed at `adapters/catalog/tests/hubspot.rs:133`; PR #63 closed unmerged
+  and its branch deleted. Run 36839187046 on this wave's PR passed in 18m30s; runner disk 82G free,
+  `target/` 2.9G. The adversary's concurrency finding was fixed in `9f0882e62` and re-checked green.
+- `story:planning-store-hygiene-20261001`: implemented. `release-plan:connectors-0-15-0` implemented;
+  `release-plan:gitlab-v020` superseded by `release-plan:connectors-v080`; the duplicate replay-flake
+  story had already been archived in `7e5015cf1`.
+- Open: the `repository gate` check is not a required status check in the `main` ruleset, so a red
+  Rust gate does not block a merge. Making it required changes the merge path for every session and
+  waits on the operator.
+- `main` gained wave `20260930c` during this wave; its merge brought one conflict in
+  `docs/development.md`, resolved by keeping both the SUN_LEN paragraph and the CI paragraph.
