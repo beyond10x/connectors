@@ -52,6 +52,8 @@ pub enum Failure {
     NotFound,
     NotAdmitted,
     MetadataUnavailable,
+    /// The metadata store changed under the write; nothing was written.
+    RevisionConflict,
     OutcomeUnknown,
     Capacity,
 }
@@ -60,6 +62,7 @@ impl From<super::Failure> for Failure {
     fn from(value: super::Failure) -> Self {
         match value {
             super::Failure::OutcomeUnknown => Self::OutcomeUnknown,
+            super::Failure::ConcurrentRevision => Self::RevisionConflict,
             _ => Self::MetadataUnavailable,
         }
     }
