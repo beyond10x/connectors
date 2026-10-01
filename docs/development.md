@@ -21,7 +21,18 @@ independent adapter-model compilation, the website examples model synthesis
 on the state directory (`/proc/self/fd/<fd>/owner.sock`), as the host does, so a long
 checkout path, such as a managed worktree under `~/.local/state/worktree/trees/…`, does not
 push a socket path past `SUN_LEN`. The ignored Secret Service tests still give `dbus-daemon`
-an absolute bus path and need a short `TMPDIR`. A compiler wrapper started under the gate's `TMPDIR` has the same limit: with `rustc-wrapper = "sccache"` in the Cargo configuration and no sccache server already running, run the gate from a long checkout with `RUSTC_WRAPPER=` set empty (story:gate-temporary-root-and-compiler-wrapper). `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
+an absolute bus path and need a short `TMPDIR`. Only test binaries run under the gate's
+temporary directory: the gate passes it to them through a Cargo runner for the host triple
+that `rustc -vV` reports (`--config target."<host>".runner = ["sh", "-c",
+"export TMPDIR=\"$0\"; exec \"$@\"", "<root>"]`), so neither the root nor a test binary's
+path is parsed as an assignment or as shell text. Cargo, the compiler, a configured compiler
+wrapper and build scripts keep the caller's `TMPDIR`; on Cargo older than 1.89 doctests do
+too. An sccache server started during the gate therefore binds its startup socket under the
+caller's `TMPDIR`, and a long checkout path does not push it past `SUN_LEN`; keep that
+`TMPDIR` short. During the gate this runner replaces any runner the user configures for the
+host: a command-line `--config` outranks `CARGO_TARGET_<TRIPLE>_RUNNER` and
+`[target.<triple>] runner` in a configuration file, and Cargo does not consult
+`[target.'cfg(…)'] runner` for a target whose triple has a runner. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`).
 
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
