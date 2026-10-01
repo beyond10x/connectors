@@ -7,6 +7,8 @@ use connectors_host::local::{
     config::{Config, Paths},
     registry, runtime,
 };
+#[path = "support/socket.rs"]
+mod sockets;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
@@ -362,8 +364,7 @@ fn owner_invoke(
     revision: &str,
 ) -> Value {
     use std::io::Write;
-    let mut stream =
-        std::os::unix::net::UnixStream::connect(root.path().join("state/owner.sock")).unwrap();
+    let mut stream = sockets::connect(&root.path().join("state"), "owner.sock");
     stream
         .set_read_timeout(Some(std::time::Duration::from_secs(20)))
         .unwrap();

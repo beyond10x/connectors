@@ -16,11 +16,11 @@ and the Eventlog-backed runtime roots on installed Rust 1.91.0. The Rust gate ru
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
 independent adapter-model compilation and AEP validation. It uses a task-owned temporary directory under
-`.local/tmp`, and the CLI owner tests bind Unix sockets inside it, so the repository root must
-be short: from a managed worktree under `~/.local/state/worktree/trees/…` the socket paths
-exceed `SUN_LEN` and eight `apps/connectors/tests/local_cli.rs` tests fail with "path must be
-shorter than SUN_LEN" (measured 2026-09-30). Run the gate from a short checkout, such as a
-`git clone --shared` of the exact commit under `~/.cache`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
+`.local/tmp`. The owner tests bind and connect Unix sockets inside it through a descriptor
+on the state directory (`/proc/self/fd/<fd>/owner.sock`), as the host does, so a long
+checkout path, such as a managed worktree under `~/.local/state/worktree/trees/…`, does not
+push a socket path past `SUN_LEN`. The ignored Secret Service tests still give `dbus-daemon`
+an absolute bus path and need a short `TMPDIR`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`).
 
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
