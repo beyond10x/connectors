@@ -15,7 +15,8 @@ it does not identify an installed executable.
 and the Eventlog-backed runtime roots on installed Rust 1.91.0. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
-independent adapter-model compilation and AEP validation. It uses a task-owned temporary directory under
+independent adapter-model compilation, the website examples model synthesis
+(`connectors-build examples` without its WASM build) and AEP validation. It uses a task-owned temporary directory under
 `.local/tmp`. The owner tests bind and connect Unix sockets inside it through a descriptor
 on the state directory (`/proc/self/fd/<fd>/owner.sock`), as the host does, so a long
 checkout path, such as a managed worktree under `~/.local/state/worktree/trees/…`, does not
