@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.23.0 — 2026-10-01
+
+### Added
+
+- GitLab catalog read `deployments.list`: a project's deployments, each with its `environment.name`
+  and the deploy job as `deployable`, filtered by `order_by`, `sort`, `updated_after`/`updated_before`,
+  `finished_after`/`finished_before`, `environment` and `status`, paged by `page`/`per_page` (1–100).
+  It needs only `read_api` and comes from the pinned GitLab document already in the bundle.
+
+### Changed
+
+- A metadata write that a concurrent commit changed under now fails with `revision_conflict`
+  (`stage = publication`, `next_action = retry_explicitly`; nothing was written) instead of
+  `metadata_unavailable`. That covers connections and the approval key and policy stores. Guarded
+  writes keep their own rule (`next_action = retry_status`). An unreadable store still answers
+  `metadata_unavailable`.
+
+### Fixed
+
+- The gate no longer hands its checkout-local temporary directory to cargo and the compiler wrapper,
+  so sccache starts from a checkout with a long path. Test binaries get that directory through a Cargo
+  runner keyed to the host triple, which a user's own runner for that triple does not override.
+
+### Limits
+
+- Values outside a pinned enum and strings that are not date-times are still sent to GitLab rather
+  than refused locally.
+- Build scripts get the caller's `TMPDIR`; on Cargo older than 1.89 doctests do too.
+- A non-host build target (`CARGO_BUILD_TARGET`) bypasses the gate's runner; the gate and CI set none.
+
 ## 0.22.0 — 2026-10-01
 
 ### Added
