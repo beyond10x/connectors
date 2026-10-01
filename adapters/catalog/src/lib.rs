@@ -120,6 +120,13 @@ pub struct Selection {
     /// any request. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub required: Vec<String>,
+    /// Declared parameters this selection does not expose, such as a paging
+    /// mode the provider cannot follow. Each must be a parameter of the
+    /// operation that nothing requires, that is not bounded and that no guard
+    /// reads as an input. It is left out of the declaration, so an input
+    /// carrying it is refused before any request. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub withhold: Vec<String>,
     /// The reasons a provider gives in a `403` answer when it means a quota,
     /// not a permission: a `403` whose JSON body carries one of them in
     /// `error.errors[].reason` or `error.status` is `rate_limited`. Every other
@@ -370,6 +377,54 @@ impl Engine {
                     )));
                 }
             }
+            // A withheld parameter leaves the operation this selection
+            // exposes: undeclared, so the closed input schema refuses it, and
+            // absent from the template, so it is never bound into a request.
+            let guard_inputs: Vec<&str> = selection
+                .guard
+                .iter()
+                .flat_map(|guard| {
+                    guard.preflight.values.values().chain(
+                        guard
+                            .preflight
+                            .checks
+                            .iter()
+                            .chain(&guard.postflight.checks)
+                            .filter_map(|check| match &check.expect {
+                                Expectation::Input(path) => Some(path),
+                                Expectation::Literal(_) => None,
+                            }),
+                    )
+                })
+                .map(|path| path.split('.').next().unwrap_or(path))
+                .collect();
+            for name in &selection.withhold {
+                let declared: Vec<_> = operation
+                    .parameters
+                    .iter()
+                    .filter(|p| &p.name == name)
+                    .collect();
+                let reason = if declared.is_empty() {
+                    Some("which is not a parameter of its operation")
+                } else if declared.iter().any(|p| p.required) {
+                    Some("which is required")
+                } else if selection.bounds.contains_key(name) {
+                    Some("which it also bounds")
+                } else if guard_inputs.contains(&name.as_str()) {
+                    Some("which its guard reads as an input")
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    return Err(refuse(format!(
+                        "selection `{}` withholds `{name}`, {reason}",
+                        selection.id
+                    )));
+                }
+            }
+            operation
+                .parameters
+                .retain(|p| !selection.withhold.contains(&p.name));
             if selection.rate_limit_reasons.iter().any(String::is_empty) {
                 return Err(refuse(format!(
                     "selection `{}` declares an empty rate-limit reason",

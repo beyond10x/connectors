@@ -135,27 +135,24 @@ fn adversary_declared_types_follow_the_pinned_document() {
 /// With keyset pagination GitLab does not read `page`, and the next-page
 /// link travels in a header the provider never returns: the documented
 /// walk ("stop on a short page") repeats page one while pages stay full.
-/// The selection sends it on unchanged today; the guide says `commits.list`
-/// supports offset paging only.
+/// The selection withholds `pagination` and `page_token` (the pinned
+/// document's "record from which to start the keyset pagination"), so the
+/// guide's offset-only paging holds: describe lists neither, and an input
+/// carrying either is refused.
 #[tokio::test]
-async fn adversary_keyset_pagination_is_sent_until_the_selection_excludes_it() {
+async fn adversary_keyset_pagination_is_refused_before_any_request() {
     let engine = engine();
-    let query = sent(
-        &engine,
-        "commits.list",
+    let declared = properties(&engine, "commits.list");
+    for name in ["pagination", "page_token"] {
+        assert!(!declared.contains_key(name), "commits.list declares {name}");
+    }
+    for input in [
         json!({"id": "org/project", "pagination": "keyset", "page": 2, "per_page": 100}),
-    )
-    .await;
-    assert_eq!(
-        query,
-        [
-            ("page".to_string(), "2".to_string()),
-            ("pagination".to_string(), "keyset".to_string()),
-            ("per_page".to_string(), "100".to_string()),
-        ],
-        "today `pagination=keyset` is sent; when story:catalog-selection-excludes-parameters \
-         lands this flips to a refusal before any request"
-    );
+        json!({"id": "org/project", "page_token": "abc123", "per_page": 100}),
+        json!({"id": "org/project", "pagination": "keyset", "page_token": "abc123"}),
+    ] {
+        refused(&engine, "commits.list", input).await;
+    }
 }
 
 /// `order` is an enum in the pinned document (`default`, `topo`); a value
