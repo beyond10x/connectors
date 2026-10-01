@@ -22,12 +22,17 @@ on the state directory (`/proc/self/fd/<fd>/owner.sock`), as the host does, so a
 checkout path, such as a managed worktree under `~/.local/state/worktree/trees/…`, does not
 push a socket path past `SUN_LEN`. The ignored Secret Service tests still give `dbus-daemon`
 an absolute bus path and need a short `TMPDIR`. Only test binaries run under the gate's
-temporary directory: the gate passes it to them through a Cargo runner
-(`target.'cfg(all())'.runner = ["env", "TMPDIR=…"]`). Cargo, the compiler and a configured
-compiler wrapper keep the caller's `TMPDIR`, so an sccache server started during the gate
-binds its startup socket there and a long checkout path does not push it past `SUN_LEN`.
-Keep that caller `TMPDIR` short, and do not configure a different Cargo runner for the host
-target while running the gate. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
+temporary directory: the gate passes it to them through a Cargo runner for the host triple
+that `rustc -vV` reports (`--config target."<host>".runner = ["sh", "-c",
+"export TMPDIR=\"$0\"; exec \"$@\"", "<root>"]`), so neither the root nor a test binary's
+path is parsed as an assignment or as shell text. Cargo, the compiler, a configured compiler
+wrapper and build scripts keep the caller's `TMPDIR`; on Cargo older than 1.89 doctests do
+too. An sccache server started during the gate therefore binds its startup socket under the
+caller's `TMPDIR`, and a long checkout path does not push it past `SUN_LEN`; keep that
+`TMPDIR` short. During the gate this runner replaces any runner the user configures for the
+host: a command-line `--config` outranks `CARGO_TARGET_<TRIPLE>_RUNNER` and
+`[target.<triple>] runner` in a configuration file, and Cargo does not consult
+`[target.'cfg(…)'] runner` for a target whose triple has a runner. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`).
 
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
