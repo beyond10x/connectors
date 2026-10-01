@@ -248,8 +248,14 @@ path in safe results identifies the selection; it is not a credential locator.
 
 `setup init` exclusively creates an owner-only file and directories with no
 symlink traversal, writes/fsyncs a temporary file, publishes without replacing an
-existing file, and fsyncs its directory before returning `created`. Existing
-configuration returns `configuration_exists`, never overwrites it. The file uses
+existing file, and fsyncs its directory before returning `created`. An existing
+configuration is never overwritten. When the selected state directory holds no
+metadata database and the existing configuration loads, `setup init` creates the
+owner-only state directory and initialises its metadata database, leaves the
+configuration byte-for-byte unchanged and returns `state_initialized`. An
+existing configuration with an existing metadata database, or one that does not
+load, returns `configuration_exists`; an existing database is never opened,
+migrated or recreated by `setup init`. The file uses
 the current `connectors-local/2` format, whose adapter entries each select a
 `private_protocol` ([private mutation extension](private-mutations.md)); an
 existing `connectors-local/1` file keeps loading unchanged. It records the
@@ -476,7 +482,7 @@ never replay a possible write after interruption, timeout or lost response.
 |---|---|---|
 | decoded business document the operation schema, depth or byte bound refuses; `approvals prepare` or `approvals issue` business document that does not decode or has a trailing document; unreadable business document file; argument value the handler refuses | `invalid_input` | 2 |
 | TOML syntax, unsupported startup/restart, duplicate identity, bad permissions | `invalid_configuration` | 2 |
-| configuration already exists | `configuration_exists` | 1 |
+| configuration already exists (`setup init`: with a metadata database, or one that does not load) | `configuration_exists` | 1 |
 | no safe entry channel (in place of the presentation's `cli_source`) | `protected_entry_unavailable` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
