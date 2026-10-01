@@ -1,0 +1,17 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {
+    "/things": {
+      "get": {
+        "operationId": "fixture.things.list",
+        "x-google-scopes": [
+          "https://www.googleapis.com/auth/fixture.readonly",
+          "https://www.googleapis.com/auth/fixture"
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}

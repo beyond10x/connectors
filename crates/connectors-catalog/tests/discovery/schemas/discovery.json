@@ -1,0 +1,51 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "schemas": {
+    "Everything": {
+      "id": "Everything",
+      "type": "object",
+      "description": "Every schema construct the table maps.",
+      "properties": {
+        "anyValue": {"type": "any", "description": "Anything."},
+        "count32": {"type": "integer", "format": "int32"},
+        "countU32": {"type": "integer", "format": "uint32"},
+        "size": {"type": "integer", "format": "int32", "default": "0"},
+        "ratioD": {"type": "number", "format": "double"},
+        "ratioF": {"type": "number", "format": "float"},
+        "big": {"type": "string", "format": "int64"},
+        "ubig": {"type": "string", "format": "uint64"},
+        "when": {"type": "string", "format": "google-datetime"},
+        "day": {"type": "string", "format": "date"},
+        "stamp": {"type": "string", "format": "date-time"},
+        "blob": {"type": "string", "format": "byte"},
+        "mask": {"type": "string", "format": "google-fieldmask"},
+        "span": {"type": "string", "format": "google-duration"},
+        "tags": {"type": "array", "items": {"type": "string"}},
+        "labels": {"type": "object", "additionalProperties": {"type": "string"}},
+        "nested": {
+          "type": "object",
+          "properties": {"flag": {"type": "boolean", "default": "true"}}
+        },
+        "state": {
+          "type": "string",
+          "enum": ["A", "B"],
+          "enumDescriptions": ["First.", "Second."]
+        },
+        "id": {"type": "string", "readOnly": true},
+        "old": {"type": "string", "deprecated": true},
+        "kind": {"type": "string", "default": "fixture#everything"},
+        "name": {
+          "type": "string",
+          "annotations": {"required": ["fixture.things.insert"]}
+        }
+      }
+    }
+  }
+}

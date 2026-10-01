@@ -1,0 +1,30 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://slides.fixture.googleapis.com/",
+  "servicePath": "",
+  "resources": {
+    "presentations": {
+      "methods": {
+        "get": {
+          "id": "slides.presentations.get",
+          "description": "Gets the latest version of the specified presentation.",
+          "path": "v1/presentations/{presentationId}",
+          "httpMethod": "GET",
+          "parameters": {
+            "presentationId": {
+              "type": "string",
+              "location": "path",
+              "required": true,
+              "description": "The ID of the presentation to retrieve."
+            }
+          }
+        }
+      }
+    }
+  }
+}

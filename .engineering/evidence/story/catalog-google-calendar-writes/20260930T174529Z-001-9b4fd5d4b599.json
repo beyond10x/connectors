@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T17:45:29Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-google-calendar-writes",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test google_calendar at 6c8fd8b31 vs 2530b784e",
+    "reference": "baseline: events.insert/patch/delete absent from google-calendar (3 reads); treatment: google_calendar 28 passed incl. cancelled/tentative event and stale etag send no write, sendUpdates required; adversary files 5+3 passed (r2-green.log in ~/.cache/w0930wc)"
+  }
+}

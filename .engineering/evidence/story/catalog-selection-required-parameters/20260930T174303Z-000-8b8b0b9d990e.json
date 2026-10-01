@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T17:43:03Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-selection-required-parameters",
+  "kind": "story",
+  "revision": 1,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog -p connectors-catalog-provider at 81b509745 vs f6c575948",
+    "reference": "baseline: an array query value is refused and a selection field required/rate_limit_reasons is refused as unknown at 81b509745; treatment: engine.rs 22, engine_adversary 4, engine_adversary_pass2 1 passed, 243 passed total (r2-test.log in ~/.cache/w0930en)"
+  }
+}

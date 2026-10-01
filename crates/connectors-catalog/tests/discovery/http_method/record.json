@@ -1,0 +1,17 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 5,
+  "operations": [
+    "fixture.things.delete",
+    "fixture.things.insert",
+    "fixture.things.list",
+    "fixture.things.patch",
+    "fixture.things.update"
+  ],
+  "excluded_methods": [],
+  "rewritten_paths": [],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [],
+  "ignored_keys": []
+}

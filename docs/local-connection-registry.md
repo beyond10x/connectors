@@ -118,5 +118,10 @@ composition, locked and unlocked restart, unknown write/delete acknowledgement,
 delayed-writer refusal and exact deletion after restart. See the
 [native test instructions](local-secret-service.md#disposable-qualification).
 
-Business approval, audit, idempotency, OAuth, refresh, configuration upgrades and
-the supervised provider journeys need their own implementation and evidence.
+Static-entry profiles include the OAuth-acquired non-rotating variant: the CLI
+obtains `{client_id, client_secret, refresh_token}` by browser consent inside the
+capture window and submits it as an ordinary entry, which the registry stores
+like any other and never refreshes ([Google OAuth guide](catalog-google-oauth.md)).
+Business approval, audit, idempotency, coordinator OAuth flows, host-owned
+refresh, configuration upgrades and the supervised provider journeys need their
+own implementation and evidence.
