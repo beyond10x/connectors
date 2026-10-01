@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.20.0
+# Source release v0.21.0
 
-Version **0.20.0** specifies at ESS source format `ess/15` with the released
+Version **0.21.0** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -37,6 +37,17 @@ runs from its pinned CRM Objects `2026-09` document with a private-app access to
 one object type's records, paged, and one record by id, for contacts, companies,
 deals and every other object type. It has no updated-since filter yet and has been
 exercised against local fixtures only.
+
+[Google](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-oauth.md)
+Drive, Slides, Calendar and Gmail run through the same catalog provider since 0.21.0,
+from Google Discovery documents projected to OpenAPI 3.0 by `connectors-build discovery`.
+Authentication is the `oauth2_refresh` scheme: `connections connect` with a Google
+Desktop OAuth client file runs browser consent and stores the refresh token. Reads
+cover Drive files, export and changes, Slides presentations and pages, Calendar
+lists and events, and Gmail messages, threads, history and labels. Guarded writes
+cover Drive metadata, Slides `batchUpdate`, Calendar events and Gmail drafts, with
+no direct `messages.send`. All four have been exercised against local fixtures only,
+not live Google.
 
 Local setup, adapter supervision and connection management use SQLite metadata
 and qualified Secret Service custody. Saved PATs can be reused after restarts,
