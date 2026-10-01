@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T14:03:50Z",
+  "actor": "human:timo",
+  "artifact": "story:socket-path-limit-in-long-checkouts",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "TMPDIR=<worktree>/.local/tmp/gate-X RUSTC_WRAPPER= cargo test -p connectors -p connectors-host --no-fail-fast (base b19027874: 387 passed, 26 failed, 24 SUN_LEN; treatment 93d553c95: 413 passed, 0 failed)",
+    "reference": "~/.cache/claude-tmp/wave-20261001b/socket/scratch/red.log vs green-repro2.log"
+  }
+}

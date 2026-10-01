@@ -6,7 +6,34 @@ status: draft
 title: An invoke on a connection whose evidence expired advises revalidate, not repair
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: inferred
+  path: apps/connectors-cli-contract/binding.json
+- confidence: cited
+  path: apps/connectors/src/local.rs
+- confidence: cited
+  path: apps/connectors/src/local/connections.rs
+- confidence: cited
+  path: contracts/auth/evidence/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/scenarios.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-host/src/local/owner.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/mutation/recovery.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry/observation.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/use_and_retirement.rs
+- confidence: cited
+  path: docs/local-catalog-provider.md
+- confidence: inferred
+  path: ess/domains/cli.yaml
+revision: 3
 ---
 ## Observed
 

@@ -2,11 +2,34 @@
 format: aep.planning-md/3
 id: story:socket-path-limit-in-long-checkouts
 kind: story
-status: draft
+status: implemented
 title: 'Gate fails from a checkout whose path is long: owner socket exceeds SUN_LEN'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+scope:
+- confidence: cited
+  path: apps/connectors/tests/absent_operation.rs
+- confidence: cited
+  path: apps/connectors/tests/failed_connect.rs
+- confidence: cited
+  path: apps/connectors/tests/failed_connect_adversary.rs
+- confidence: cited
+  path: apps/connectors/tests/local_cli.rs
+- confidence: cited
+  path: apps/connectors/tests/owner_build_security.rs
+- confidence: cited
+  path: apps/connectors/tests/socket_path_adversary.rs
+- confidence: cited
+  path: apps/connectors/tests/support/socket.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/transport.rs
+- confidence: cited
+  path: docs/development.md
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T11:06:17Z", actor: "human:timo", revision: 5}
+- {from: "proposed", to: "active", at: "2026-10-01T11:06:17Z", actor: "human:timo", revision: 6}
+- {from: "active", to: "implemented", at: "2026-10-01T14:52:46Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}}
 ---
 ## Defect
 

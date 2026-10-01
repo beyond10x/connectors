@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T14:10:13Z",
+  "actor": "human:timo",
+  "artifact": "story:terminal-sigint-test-flake",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "loaded loop of local::protected::tests::controlling_terminal_hides_input_and_restores_echo_after_sigint (base b19027874: 24/200 failed, InvalidInput; treatment 9e8dceacf: 0/200) and 20 full cargo test -p connectors-host --lib runs, 20/20",
+    "reference": "~/.cache/claude-tmp/wave-20261001b/sigint/scratch/before/summary vs after/summary, full20b/summary"
+  }
+}

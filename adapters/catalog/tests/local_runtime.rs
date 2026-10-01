@@ -185,6 +185,8 @@ impl Provider {
                         (404, json!({"message":"404 Project Not Found"}))
                     } else if let Some(page) = repository_page(route, &path) {
                         (200, page)
+                    } else if let Some(body) = commit_graph_page(route, &path) {
+                        (200, body)
                     } else if path.contains("/issues?") {
                         (200, json!([{"id":1,"title":"fixture"}]))
                     } else if path.contains("/repository/files/") {
@@ -733,4 +735,139 @@ fn repository_list_reads_walk_two_pages_and_stop_on_a_short_page() {
             "`{operation}` requests"
         );
     }
+}
+
+/// The recorded GitLab commit graph the fixture serves: `commits.list` pages
+/// of two and then one commit, and three compares keyed by `to`: `v0.3.0`
+/// has commits, `v0.1.0` is empty, and `main` is one GitLab cut short with
+/// `compare_timeout: true`. `None` for any other route.
+fn commit_graph_page(route: &str, path: &str) -> Option<Value> {
+    let query: Vec<&str> = path
+        .split_once('?')
+        .map(|(_, query)| query.split('&').collect())
+        .unwrap_or_default();
+    let commit = |id: &str, parents: &[&str]| {
+        json!({"id": id, "parent_ids": parents,
+               "created_at": "2026-09-10T08:00:00.000+00:00",
+               "committed_date": "2026-09-10T08:00:00.000+00:00",
+               "title": format!("fixture commit {id}"),
+               "author_name": "Fixture Author", "author_email": "author@example.test"})
+    };
+    if route.ends_with("/repository/commits") {
+        Some(if query.contains(&"page=2") {
+            json!([commit("c0ffee01", &[])])
+        } else {
+            json!([
+                commit("c0ffee03", &["c0ffee02"]),
+                commit("c0ffee02", &["c0ffee01", "beef0001"])
+            ])
+        })
+    } else if route.ends_with("/repository/compare") {
+        let (commits, timeout) = if query.contains(&"to=main") {
+            (json!([]), true)
+        } else if query.contains(&"to=v0.1.0") {
+            (json!([]), false)
+        } else {
+            (
+                json!([
+                    commit("c0ffee02", &["c0ffee01"]),
+                    commit("c0ffee03", &["c0ffee02"])
+                ]),
+                false,
+            )
+        };
+        Some(json!({"commits": commits, "diffs": [],
+                    "compare_timeout": timeout, "compare_same_ref": false}))
+    } else {
+        None
+    }
+}
+
+/// `commits.list` and `repository.compare` through the owned child and the TLS
+/// fixture: the exact request each sends, a `commits.list` walk that stops on
+/// the short second page, and what a caller receives for an empty compare and
+/// for one GitLab cut short. Both answer 200 with an empty `commits`; only
+/// `body.compare_timeout` tells them apart.
+#[test]
+fn commit_graph_reads_send_the_declared_request_and_tell_a_timeout_from_an_empty_compare() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let first = "/api/v4/projects/org%2Fproject/repository/commits?ref_name=main\
+                 &since=2026-09-01T00%3A00%3A00Z&until=2026-09-30T00%3A00%3A00Z\
+                 &first_parent=true&page=1&per_page=2";
+    let mut items = Vec::new();
+    let mut page = 1;
+    loop {
+        let before = provider.count();
+        let result = invoke(
+            &mut child,
+            "commits.list",
+            "one",
+            &token(true),
+            json!({"id": "org/project", "ref_name": "main",
+                   "since": "2026-09-01T00:00:00Z", "until": "2026-09-30T00:00:00Z",
+                   "first_parent": true, "page": page, "per_page": 2}),
+        )
+        .unwrap_or_else(|failure| panic!("`commits.list` page {page}: {failure:?}"));
+        let calls = provider.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), before + 1);
+        assert_eq!(
+            calls[before],
+            first.replace("page=1", &format!("page={page}")),
+            "page {page}"
+        );
+        assert_eq!(result["status"], 200);
+        let body = result["body"].as_array().unwrap().clone();
+        let short = body.len() < 2;
+        items.extend(body);
+        if short {
+            break;
+        }
+        page += 1;
+        assert!(page <= 3, "`commits.list` did not stop");
+    }
+    assert_eq!(page, 2);
+    let ids: Vec<&str> = items.iter().map(|c| c["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["c0ffee03", "c0ffee02", "c0ffee01"]);
+    assert_eq!(items[1]["parent_ids"], json!(["c0ffee01", "beef0001"]));
+
+    let mut compare = |to: &str| {
+        let before = provider.count();
+        let result = invoke(
+            &mut child,
+            "repository.compare",
+            "one",
+            &token(true),
+            json!({"id": "org/project", "from": "v0.1.0", "to": to, "straight": false}),
+        )
+        .unwrap_or_else(|failure| panic!("`repository.compare` to {to}: {failure:?}"));
+        let calls = provider.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), before + 1);
+        assert_eq!(
+            calls[before],
+            format!(
+                "/api/v4/projects/org%2Fproject/repository/compare?from=v0.1.0&to={to}&straight=false"
+            )
+        );
+        assert_eq!(result["status"], 200, "to {to}");
+        assert_eq!(
+            Some(&result["body"]),
+            commit_graph_page(
+                "/api/v4/projects/org%2Fproject/repository/compare",
+                &calls[before]
+            )
+            .as_ref(),
+            "to {to}"
+        );
+        result["body"].clone()
+    };
+    let full = compare("v0.3.0");
+    let empty = compare("v0.1.0");
+    let timed_out = compare("main");
+    assert_eq!(full["commits"].as_array().unwrap().len(), 2);
+    assert_eq!(full["compare_timeout"], json!(false));
+    assert_eq!(empty["commits"], json!([]));
+    assert_eq!(empty["compare_timeout"], json!(false));
+    assert_eq!(timed_out["commits"], json!([]));
+    assert_eq!(timed_out["compare_timeout"], json!(true));
 }
