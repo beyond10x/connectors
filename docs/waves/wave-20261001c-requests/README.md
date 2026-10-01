@@ -7,9 +7,9 @@ handle requests from other sessions first").
 
 | story | serves | scope | agents | branch | worktree | build dir | scratch | stage |
 |---|---|---|---|---|---|---|---|---|
-| story:catalog-gitlab-deployment-reads | vision:independent-contract-adapters | cited (one inferred test file) | aep:implementor, aep:adversary | impl/catalog-gitlab-deployment-reads | `<managed-trees>`/wave1001c-deploy | `<tree>`/target | `<wave-scratch>`/deploy | dispatched |
-| story:gate-temporary-root-and-compiler-wrapper | vision:independent-contract-adapters | cited | aep:implementor, aep:adversary | impl/gate-temporary-root-and-compiler-wrapper | `<managed-trees>`/wave1001c-gate | `<tree>`/target | `<wave-scratch>`/gate | dispatched |
-| story:revision-conflict-wire-code | vision:independent-contract-adapters | inferred | aep:implementor, aep:adversary | impl/revision-conflict-wire-code | `<managed-trees>`/wave1001c-revision | `<tree>`/target | `<wave-scratch>`/revision | dispatched |
+| story:catalog-gitlab-deployment-reads | vision:independent-contract-adapters | cited (one inferred test file) | aep:implementor, aep:adversary | impl/catalog-gitlab-deployment-reads | `<managed-trees>`/wave1001c-deploy | `<tree>`/target | `<wave-scratch>`/deploy | merged |
+| story:gate-temporary-root-and-compiler-wrapper | vision:independent-contract-adapters | cited | aep:implementor, aep:adversary | impl/gate-temporary-root-and-compiler-wrapper | `<managed-trees>`/wave1001c-gate | `<tree>`/target | `<wave-scratch>`/gate | merged |
+| story:revision-conflict-wire-code | vision:independent-contract-adapters | inferred | aep:implementor, aep:adversary | impl/revision-conflict-wire-code | `<managed-trees>`/wave1001c-revision | `<tree>`/target | `<wave-scratch>`/revision | merged |
 
 Integration branch: `wave/20261001c-requests` off `main` ac803ab1c.
 
@@ -37,3 +37,18 @@ read was asked for by a consumer session on 2026-10-01.
 
 One commit per unit, the merges into `wave/20261001c-requests`, the opening and closing store commits, the push and
 pull request through `b10x-gates`, and the merge into `main` once the gate is green. No tag and no release.
+
+## Close
+
+- Gate: `cargo run -p connectors-build -- gate --msrv` at 80a668c1b from the managed worktree `wave1001c-close` with
+  the machine's sccache wrapper on (no `RUSTC_WRAPPER=` workaround), ESS 0.45.0, AEP 0.65.0: `gate: all checks
+  passed`, exit 0; 146 suites, 1165 passed, 0 failed, 43 ignored; no `SUN_LEN`. That is the gate story's acceptance.
+- Implemented: catalog-gitlab-deployment-reads (a consumer's request), gate-temporary-root-and-compiler-wrapper,
+  revision-conflict-wire-code. Scopes rewritten from each unit's diff.
+- Adversary passes: deployments 1 (nothing found; 5 package runs of 322 passed), gate 2 (pass 1 found a false pass
+  for `=` in a binary path, fixed), revision 1 (correction verified by the coordinator).
+- Escalated, not fixed: the private `host_error` folds in audit, mutations and approvals/spend and the eight-retry
+  path in `registry.rs` still answer `metadata_unavailable` for a revision conflict; unreachable under the lifecycle
+  lock.
+- Not taken: service-failure-carries-upstream-reason waits for a decision on the CLI contract's "no raw provider
+  evidence" rule.

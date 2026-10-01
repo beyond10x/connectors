@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-01T19:23:36Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-gitlab-deployment-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run -p connectors-build -- gate --msrv at 80a668c1b from managed worktree wave1001c-close with sccache configured (ESS 0.45.0, AEP 0.65.0): all checks passed, 146 suites, 1165 passed, 0 failed, 43 ignored; no SUN_LEN"
+  }
+}
