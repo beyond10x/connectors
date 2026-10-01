@@ -64,8 +64,9 @@ on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
 `pipeline.jobs` and these six): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
-`X-Next-Page` header. Every other query parameter the pinned source declares
-is accepted by name, with the type the pinned source gives it: an integer as a
+`X-Next-Page` header. Every other query parameter the pinned source declares,
+except those a selection withholds (`commits.list` withholds `pagination` and
+`page_token`), is accepted by name, with the type the pinned source gives it: an integer as a
 JSON integer or its decimal string (`100` or `"100"`), a boolean as `true` or
 `false` (or those two strings), a string as any string or a JSON integer (sent as
 its decimal text); any other value, such as `per_page=true` or `page=2.0`, is
