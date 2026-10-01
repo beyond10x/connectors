@@ -20,7 +20,7 @@ independent adapter-model compilation and AEP validation. It uses a task-owned t
 on the state directory (`/proc/self/fd/<fd>/owner.sock`), as the host does, so a long
 checkout path, such as a managed worktree under `~/.local/state/worktree/trees/…`, does not
 push a socket path past `SUN_LEN`. The ignored Secret Service tests still give `dbus-daemon`
-an absolute bus path and need a short `TMPDIR`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
+an absolute bus path and need a short `TMPDIR`. A compiler wrapper started under the gate's `TMPDIR` has the same limit: with `rustc-wrapper = "sccache"` in the Cargo configuration and no sccache server already running, run the gate from a long checkout with `RUSTC_WRAPPER=` set empty (story:gate-temporary-root-and-compiler-wrapper). `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`).
 
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
