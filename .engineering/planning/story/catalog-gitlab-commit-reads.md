@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-gitlab-commit-reads
 kind: story
-status: active
+status: implemented
 title: 'GitLab catalog: list a ref''s commits and compare two refs'
 relations:
 - informed_by: story:catalog-gitlab-repository-reads
@@ -10,18 +10,25 @@ relations:
 scope:
 - confidence: cited
   path: adapters/catalog/providers/gitlab/operations.json
-- confidence: inferred
+- confidence: cited
+  path: adapters/catalog/tests/gateway_prefix.rs
+- confidence: cited
+  path: adapters/catalog/tests/gitlab_commit_reads.rs
+- confidence: cited
   path: adapters/catalog/tests/gitlab_commit_reads_adversary.rs
+- confidence: cited
+  path: adapters/catalog/tests/gitlab_commit_reads_adversary_pass2.rs
 - confidence: cited
   path: adapters/catalog/tests/local_runtime.rs
 - confidence: cited
   path: adapters/catalog/tests/shipped.rs
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 5
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T11:06:15Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T11:06:16Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-01T14:52:45Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":4,"verification":1}}}
 ---
 # GitLab catalog: list a ref's commits and compare two refs (read-only)
 

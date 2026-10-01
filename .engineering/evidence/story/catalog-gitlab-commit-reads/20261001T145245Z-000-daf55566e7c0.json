@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-01T14:52:45Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-gitlab-commit-reads",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "RUSTC_WRAPPER= cargo run -p connectors-build -- gate --msrv at 4891c038e from managed worktree wave1001b-gate (ESS 0.45.0, AEP 0.65.0): all checks passed, 142 suites, 1135 passed, 0 failed, 43 ignored; no SUN_LEN"
+  }
+}

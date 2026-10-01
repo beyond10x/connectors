@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T14:12:39Z",
+  "actor": "human:timo",
+  "artifact": "story:website-build-examples-ess-enum",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "Source release v0.21.1: tag v0.21.1 (b10x-bot[bot]) peels to 37f19c7cee4282e9ab009ca535a0ec0ef6425db2 on main (PR #70); release page by b10x-bot[bot], Latest",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.21.1"
+  }
+}

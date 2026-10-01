@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T13:37:45Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-gitlab-commit-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test gitlab_commit_reads --test shipped (new behaviour: base b19027874 exposes no commits.list/repository.compare; treatment 4e6158a25 serves both)",
+    "reference": "~/.cache/claude-tmp/wave-20261001b/gitlab/scratch/red.log vs green4.log"
+  }
+}
