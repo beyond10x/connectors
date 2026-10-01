@@ -143,35 +143,44 @@ types:
     kind: struct
     fields:
       - {name: secret_service_socket, type: "Optional<String>"}
-  # Lowercase hex SHA-256 of an executable, as owner.rs writes it (hex::encode).
+  # Lowercase hex SHA-256 of an executable, as owner/transport.rs writes it (hex::encode)
+  # in own_build.
   - name: connectors.cli.BuildDigest
     kind: newtype
     of: String
     alphabet: "0123456789abcdef"
     invariants:
       - value.count == 64
-  # Request::Hello in local/owner.rs, the greeting the CLI sends; build is absent
-  # only from callers built before the build handshake.
+  # Owner frames are serde `kind`-tagged (Request and Reply in local/owner.rs); each
+  # frame declares its tag as a `kind` field. Request::Hello and Reply::Hello both
+  # serialize as "hello".
+  - name: connectors.cli.LocalOwnerHelloKind
+    kind: enum
+    variants: [hello]
+  # Request::Hello, the greeting the CLI sends; build is absent only from callers
+  # built before the build handshake.
   - name: connectors.cli.LocalOwnerHello
     kind: struct
     fields:
+      - {name: kind, type: connectors.cli.LocalOwnerHelloKind}
       - {name: version, type: String}
-      - {name: challenge, type: String}
+      - {name: challenge, type: Uuid}
       - {name: configuration, type: String}
-      - {name: authority, type: String}
+      - {name: authority, type: Uuid}
       - {name: build, type: "Optional<connectors.cli.BuildDigest>"}
   - name: connectors.cli.LocalOwnerGreeting
     kind: struct
     fields:
+      - {name: kind, type: connectors.cli.LocalOwnerHelloKind}
       - {name: version, type: String}
-      - {name: challenge, type: String}
-      - {name: host_incarnation, type: String}
-      - {name: authority, type: String}
+      - {name: challenge, type: Uuid}
+      - {name: host_incarnation, type: Uuid}
+      - {name: authority, type: Uuid}
       - {name: build, type: "Optional<connectors.cli.BuildDigest>"}
     # build is returned only to a caller whose LocalOwnerHello carried its own; a
     # caller that omitted it may send LocalOwnerBuildRequest, answered with LocalOwnerBuild.
   # Request::Build is a unit variant: its whole frame is {"kind": "build"}. ESS refuses
-  # a struct with no fields (ESS-TYPE-007), so the frame's tag is its one field.
+  # a struct with no fields (ESS-TYPE-007).
   - name: connectors.cli.LocalOwnerBuildKind
     kind: enum
     variants: [build]
