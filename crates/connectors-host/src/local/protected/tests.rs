@@ -101,6 +101,20 @@ impl Drop for Child {
         let _ = self.0.wait();
     }
 }
+/// `--exact <name>` that matches nothing exits 0 with "0 passed", so a child's
+/// exit status alone does not show its fixture ran.
+fn assert_ran_one(stdout: File, fixture: &str) {
+    let mut report = String::new();
+    let mut stdout = stdout;
+    std::io::Seek::rewind(&mut stdout).unwrap();
+    stdout.read_to_string(&mut report).unwrap();
+    assert!(
+        report
+            .lines()
+            .any(|line| line.starts_with("test result: ok. 1 passed;")),
+        "{fixture} did not run exactly once: {report}"
+    );
+}
 fn attrs(file: &File) -> libc::termios {
     let mut mode = unsafe { std::mem::zeroed::<libc::termios>() };
     assert_eq!(unsafe { libc::tcgetattr(file.as_raw_fd(), &mut mode) }, 0);
@@ -150,6 +164,7 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         // The child's own assertion message is the only record of why it
         // failed; keep it where the failure below can report it.
         let diagnostics = tempfile::tempfile().unwrap();
+        let report = tempfile::tempfile().unwrap();
         let mut command = Command::new(std::env::current_exe().unwrap());
         command
             .args([
@@ -163,7 +178,7 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
                 (connectors_sdk::now_ms() + TERMINAL_BUDGET.as_millis() as u64).to_string(),
             )
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
+            .stdout(report.try_clone().unwrap())
             .stderr(diagnostics.try_clone().unwrap());
         // SAFETY: this child alone creates the session and adopts the already
         // owned slave. Parent retains both fds; no foreign process is signalled.
@@ -213,6 +228,7 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
             diagnostics.read_to_string(&mut stderr).unwrap();
             stderr
         });
+        assert_ran_one(report, "terminal_fixture");
         let restored = attrs(&slave);
         assert_eq!(restored.c_lflag, original.c_lflag);
         assert_eq!(restored.c_cc, original.c_cc);
@@ -342,6 +358,7 @@ fn flush_fixture() {
 fn interrupt_that_flushes_polled_input_before_the_read_is_reported_as_interrupted() {
     for mode in ["before", "after"] {
         let diagnostics = tempfile::tempfile().unwrap();
+        let report = tempfile::tempfile().unwrap();
         let mut child = Child(
             Command::new(std::env::current_exe().unwrap())
                 .args([
@@ -351,7 +368,7 @@ fn interrupt_that_flushes_polled_input_before_the_read_is_reported_as_interrupte
                 ])
                 .env("CONNECTORS_FLUSH_FIXTURE", mode)
                 .stdin(Stdio::null())
-                .stdout(Stdio::null())
+                .stdout(report.try_clone().unwrap())
                 .stderr(diagnostics.try_clone().unwrap())
                 .spawn()
                 .unwrap(),
@@ -371,5 +388,116 @@ fn interrupt_that_flushes_polled_input_before_the_read_is_reported_as_interrupte
             diagnostics.read_to_string(&mut stderr).unwrap();
             stderr
         });
+        assert_ran_one(report, "flush_fixture");
     }
+}
+
+// Adversary cases (wave 20261001b). A `WouldBlock` after `poll` is not always a
+// `^C`: another reader of the same descriptor can drain what `poll` saw. These
+// pin that the retry waits in `poll` rather than spinning or inventing an
+// interrupt. They run in the shared test process, where no test installs the
+// signal guard, so `INTERRUPTED` stays false here.
+fn adversary_nonblocking_pipe() -> (File, File) {
+    let mut fds = [-1; 2];
+    // SAFETY: two initialized output slots for pipe2.
+    assert_eq!(
+        unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK | libc::O_CLOEXEC) },
+        0
+    );
+    // SAFETY: both descriptors were just created and are owned here alone.
+    unsafe { (File::from_raw_fd(fds[0]), File::from_raw_fd(fds[1])) }
+}
+/// On its first read a competing consumer drains the queue `poll` reported,
+/// so that read finds it empty; later reads are plain.
+struct AdversaryStolen {
+    file: File,
+    reads: usize,
+    first: Option<std::io::ErrorKind>,
+}
+impl Read for AdversaryStolen {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        self.reads += 1;
+        if self.reads > 1 {
+            return self.file.read(buffer);
+        }
+        let mut sink = [0; 64];
+        while self.file.read(&mut sink).is_ok_and(|n| n > 0) {}
+        let result = self.file.read(buffer);
+        self.first = Some(match &result {
+            Ok(_) => std::io::ErrorKind::Other,
+            Err(e) => e.kind(),
+        });
+        result
+    }
+}
+impl AsRawFd for AdversaryStolen {
+    fn as_raw_fd(&self) -> i32 {
+        self.file.as_raw_fd()
+    }
+}
+
+#[test]
+fn adversary_empty_read_without_interrupt_waits_for_the_next_input() {
+    let (reader, mut writer) = adversary_nonblocking_pipe();
+    writer.write_all(b"x").unwrap();
+    let mut stolen = AdversaryStolen {
+        file: reader,
+        reads: 0,
+        first: None,
+    };
+    let helper = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(150));
+        writer.write_all(b"y").unwrap();
+        writer
+    });
+    let mut byte = [0];
+    let result = read_ready(&mut stolen, &mut byte, connectors_sdk::now_ms() + 5_000);
+    let _writer = helper.join().unwrap();
+    assert_eq!(stolen.first, Some(std::io::ErrorKind::WouldBlock));
+    assert_eq!(result.map_err(|e| e.code), Ok(1));
+    assert_eq!(byte, *b"y");
+    assert_eq!(stolen.reads, 2);
+}
+
+#[test]
+fn adversary_empty_read_with_nothing_further_blocks_in_poll_until_the_deadline() {
+    let (reader, mut writer) = adversary_nonblocking_pipe();
+    writer.write_all(b"x").unwrap();
+    let mut stolen = AdversaryStolen {
+        file: reader,
+        reads: 0,
+        first: None,
+    };
+    let started = Instant::now();
+    let mut byte = [0];
+    let result = read_ready(&mut stolen, &mut byte, connectors_sdk::now_ms() + 400);
+    let elapsed = started.elapsed();
+    drop(writer);
+    assert_eq!(stolen.first, Some(std::io::ErrorKind::WouldBlock));
+    assert_eq!(result.map_err(|e| e.code), Err(Code::Timeout));
+    // One read: the retry waited in poll, it did not spin on read.
+    assert_eq!(stolen.reads, 1);
+    assert!(elapsed >= Duration::from_millis(350), "{elapsed:?}");
+    assert!(elapsed < Duration::from_millis(1_000), "{elapsed:?}");
+}
+
+#[test]
+fn adversary_empty_read_then_writer_closes_reports_end_of_input() {
+    let (reader, mut writer) = adversary_nonblocking_pipe();
+    writer.write_all(b"x").unwrap();
+    let mut stolen = AdversaryStolen {
+        file: reader,
+        reads: 0,
+        first: None,
+    };
+    let helper = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(150));
+        drop(writer);
+    });
+    let mut byte = [0];
+    let result = read_ready(&mut stolen, &mut byte, connectors_sdk::now_ms() + 5_000);
+    helper.join().unwrap();
+    assert_eq!(stolen.first, Some(std::io::ErrorKind::WouldBlock));
+    assert_eq!(result.map_err(|e| e.code), Ok(0));
+    assert_eq!(stolen.reads, 2);
 }
