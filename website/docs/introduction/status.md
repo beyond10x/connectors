@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.22.0
+# Source release v0.23.0
 
-Version **0.22.0** specifies at ESS source format `ess/15` with the released
+Version **0.23.0** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -22,7 +22,8 @@ reads, and merge-request create, update and a guarded merge as approved writes,
 every one bound from the pinned source with no adapter code per endpoint. A
 live GitLab has answered all of them. Since 0.16.0 the GitLab selection also lists
 projects, tags, releases and project events, and bounds `per_page` to 1–100. Since 0.22.0
-it also lists a ref's commits and compares two refs, exercised against local fixtures only.
+it also lists a ref's commits and compares two refs, and since 0.23.0 a project's
+deployments with their environment, exercised against local fixtures only.
 
 [Jira Cloud](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) runs
 through the same catalog provider with HTTP basic authentication: issue search by
