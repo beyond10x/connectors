@@ -480,6 +480,7 @@ never replay a possible write after interruption, timeout or lost response.
 | no safe entry channel (in place of the presentation's `cli_source`) | `protected_entry_unavailable` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
+| a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
 | stale revision, occupied changed configuration | `lifecycle_conflict` | 1 |

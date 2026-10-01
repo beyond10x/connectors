@@ -6,7 +6,20 @@ status: draft
 title: A catalog selection can withhold a declared parameter
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: adapters/catalog/providers/gitlab/operations.json
+- confidence: cited
+  path: adapters/catalog/src/lib.rs
+- confidence: inferred
+  path: adapters/catalog/tests/engine.rs
+- confidence: inferred
+  path: adapters/catalog/tests/gateway_prefix.rs
+- confidence: cited
+  path: adapters/catalog/tests/gitlab_commit_reads_adversary.rs
+- confidence: cited
+  path: docs/local-catalog-provider.md
+revision: 3
 ---
 ## Observed
 

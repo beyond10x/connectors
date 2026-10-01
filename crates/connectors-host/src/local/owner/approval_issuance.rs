@@ -510,6 +510,7 @@ pub(super) fn policy_error(error: approval_policy::Failure) -> Error {
         NotFound => Code::NotFound,
         NotAdmitted => Code::Forbidden,
         MetadataUnavailable => Code::MetadataUnavailable,
+        RevisionConflict => Code::RevisionConflict,
         OutcomeUnknown => Code::OutcomeUnknown,
         Capacity => Code::Capacity,
     }
@@ -522,6 +523,7 @@ pub(super) fn key_error(error: approval_keys::Failure) -> Error {
         Conflict => Code::LifecycleConflict,
         NotFound => Code::NotFound,
         MetadataUnavailable => Code::MetadataUnavailable,
+        RevisionConflict => Code::RevisionConflict,
         CustodyUnavailable => Code::CustodyUnavailable,
         OutcomeUnknown => Code::OutcomeUnknown,
         Capacity => Code::Capacity,
