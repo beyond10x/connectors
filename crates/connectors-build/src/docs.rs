@@ -368,58 +368,179 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
     Ok(())
 }
 
-/// Assemble a disposable example model without modifying the canonical domains.
-pub fn examples(root: &Path, ess: &Path) -> Result<()> {
-    check_walkthrough_fixtures(root)?;
-    fn copy_changed(from: &Path, to: &Path) -> Result<()> {
-        if from.is_dir() {
-            fs::create_dir_all(to)?;
-            let mut entries = fs::read_dir(from)?.collect::<std::result::Result<Vec<_>, _>>()?;
-            entries.sort_by_key(|entry| entry.file_name());
-            for entry in entries {
-                copy_changed(&entry.path(), &to.join(entry.file_name()))?;
-            }
-        } else {
-            let bytes = fs::read(from)?;
-            if fs::read(to).ok().as_deref() != Some(bytes.as_slice()) {
-                fs::write(to, bytes)?;
+fn copy_changed(from: &Path, to: &Path) -> Result<()> {
+    if from.is_dir() {
+        fs::create_dir_all(to)?;
+        let mut entries = fs::read_dir(from)?.collect::<std::result::Result<Vec<_>, _>>()?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            copy_changed(&entry.path(), &to.join(entry.file_name()))?;
+        }
+    } else {
+        let bytes = fs::read(from)?;
+        if fs::read(to).ok().as_deref() != Some(bytes.as_slice()) {
+            fs::write(to, bytes)?;
+        }
+    }
+    Ok(())
+}
+
+/// The example targets, each synthesized to `<work>/generated/<target>/connectors`.
+const EXAMPLE_TARGETS: [&str; 2] = ["rust", "web"];
+
+/// The domains `website/examples/realization` reads through `connectors_types`. With the
+/// domains the example component owns, these are the roots of the example model, which carries
+/// them and every domain they reference and nothing else. A domain no example reads is not
+/// synthesized for the examples: the CLI presentation domain's `connectors-local/1` variants
+/// are a released wire spelling that the Rust target cannot spell as identifiers.
+const EXAMPLE_DOMAINS: [&str; 5] = [
+    "connectors.mutations",
+    "connectors.auth_bindings",
+    "connectors.connection_admission",
+    "connectors.discovery_state",
+    "connectors.idempotency",
+];
+
+fn yaml(path: &Path) -> Result<serde_yaml_ng::Value> {
+    serde_yaml_ng::from_slice(&fs::read(path)?)
+        .map_err(|error| format!("{}: {error}", path.display()).into())
+}
+
+fn yaml_strings<'a>(value: &'a serde_yaml_ng::Value, out: &mut Vec<&'a str>) {
+    match value {
+        serde_yaml_ng::Value::String(text) => out.push(text),
+        serde_yaml_ng::Value::Sequence(items) => {
+            items.iter().for_each(|item| yaml_strings(item, out))
+        }
+        serde_yaml_ng::Value::Mapping(map) => map.iter().for_each(|(key, value)| {
+            yaml_strings(key, out);
+            yaml_strings(value, out);
+        }),
+        serde_yaml_ng::Value::Tagged(tagged) => yaml_strings(&tagged.value, out),
+        _ => {}
+    }
+}
+
+/// `roots` and every domain they reference, transitively, as domain name -> domain file.
+///
+/// A domain references another by a qualified name, `<domain>.<Name>`, anywhere in its parsed
+/// document; comments are not read. A missing reference is not guessed: ESS validation of the
+/// assembled model refuses it.
+fn domain_closure(
+    domains_dir: &Path,
+    roots: &BTreeSet<String>,
+) -> Result<BTreeMap<String, PathBuf>> {
+    let mut documents = BTreeMap::new();
+    for entry in fs::read_dir(domains_dir)? {
+        let path = entry?.path();
+        let document = yaml(&path)?;
+        let name = document["domain"]
+            .as_str()
+            .ok_or_else(|| format!("{}: no `domain:`", path.display()))?
+            .to_owned();
+        documents.insert(name, (path, document));
+    }
+    let mut selected = BTreeMap::new();
+    let mut pending: Vec<String> = roots.iter().cloned().collect();
+    while let Some(name) = pending.pop() {
+        if selected.contains_key(&name) {
+            continue;
+        }
+        let (path, document) = documents
+            .get(&name)
+            .ok_or_else(|| format!("example domain `{name}` is not declared"))?;
+        selected.insert(name, path.clone());
+        let mut strings = Vec::new();
+        yaml_strings(document, &mut strings);
+        for other in documents.keys() {
+            let prefix = format!("{other}.");
+            if !selected.contains_key(other) && strings.iter().any(|s| s.contains(&prefix)) {
+                pending.push(other.clone());
             }
         }
-        Ok(())
     }
-    fs::create_dir_all(root.join(".local/tmp"))?;
-    let temp = tempfile::Builder::new()
-        .prefix("website-examples-")
-        .tempdir_in(root.join(".local/tmp"))?;
-    let model = temp.path().join("model");
-    copy_changed(&root.join("ess"), &model)?;
-    copy_changed(
-        &root.join("website/examples/components.yaml"),
-        &model.join("components.yaml"),
+    Ok(selected)
+}
+
+/// Copy the canonical model's system into `model`, keeping only the example domains and their
+/// references, and the example component in place of the canonical ones.
+fn assemble_example_model(root: &Path, model: &Path) -> Result<()> {
+    let components_path = root.join("website/examples/components.yaml");
+    let mut roots: BTreeSet<String> = EXAMPLE_DOMAINS.iter().map(|d| (*d).to_owned()).collect();
+    for component in yaml(&components_path)?["components"]
+        .as_sequence()
+        .ok_or("website/examples/components.yaml: no `components:`")?
+    {
+        for domain in component["owns"]["domains"]
+            .as_sequence()
+            .into_iter()
+            .flatten()
+        {
+            roots.insert(domain.as_str().ok_or("non-text owned domain")?.to_owned());
+        }
+    }
+    let selected = domain_closure(&root.join("ess/domains"), &roots)?;
+    let mut system = yaml(&root.join("ess/system.yaml"))?;
+    let listed = system["domains"]
+        .as_sequence_mut()
+        .ok_or("ess/system.yaml: no `domains:`")?;
+    listed.retain(|domain| domain.as_str().is_some_and(|d| selected.contains_key(d)));
+    if listed.len() != selected.len() {
+        return Err("an example domain is not listed in ess/system.yaml".into());
+    }
+    fs::create_dir_all(model.join("domains"))?;
+    fs::write(
+        model.join("system.yaml"),
+        serde_yaml_ng::to_string(&system)?,
     )?;
+    for path in selected.values() {
+        copy_changed(
+            path,
+            &model
+                .join("domains")
+                .join(path.file_name().ok_or("domain file has no name")?),
+        )?;
+    }
+    copy_changed(&components_path, &model.join("components.yaml"))
+}
+
+/// Assemble the disposable example model under `work` and synthesize it for every example
+/// target. Returns `<work>/generated`. The canonical domains are never modified.
+pub fn synthesize_examples(root: &Path, ess: &Path, work: &Path) -> Result<PathBuf> {
+    let model = work.join("model");
+    assemble_example_model(root, &model)?;
     let before = super::run(
         Command::new(ess)
             .args(["specify", "validate", "--path"])
             .arg(&model),
     )?;
     print!("{}", String::from_utf8_lossy(&before.stdout));
-    let dest = root.join("website/.cache/demo");
-    fs::create_dir_all(&dest)?;
-    for target in ["rust", "web"] {
-        let generated = temp
-            .path()
-            .join("generated")
-            .join(target)
-            .join("connectors");
+    let generated = work.join("generated");
+    for target in EXAMPLE_TARGETS {
         super::run(
             Command::new(ess)
                 .args(["generate", "synthesize", "--path"])
                 .arg(&model)
                 .args(["--target", target, "--out"])
-                .arg(&generated),
+                .arg(generated.join(target).join("connectors")),
         )?;
+    }
+    Ok(generated)
+}
+
+/// Assemble a disposable example model without modifying the canonical domains.
+pub fn examples(root: &Path, ess: &Path) -> Result<()> {
+    check_walkthrough_fixtures(root)?;
+    fs::create_dir_all(root.join(".local/tmp"))?;
+    let temp = tempfile::Builder::new()
+        .prefix("website-examples-")
+        .tempdir_in(root.join(".local/tmp"))?;
+    let generated = synthesize_examples(root, ess, temp.path())?;
+    let dest = root.join("website/.cache/demo");
+    fs::create_dir_all(&dest)?;
+    for target in EXAMPLE_TARGETS {
         copy_changed(
-            &generated,
+            &generated.join(target).join("connectors"),
             &dest.join("generated").join(target).join("connectors"),
         )?;
     }
@@ -601,6 +722,50 @@ mod tests {
         invalid = fixture;
         invalid["operation"] = json!("invented.operation");
         assert!(validate_walkthrough_fixtures(&descriptor, &invalid).is_err());
+    }
+    /// The `npm run build` examples step: the example model validates and both example
+    /// targets synthesize with the pinned ESS.
+    #[test]
+    fn example_model_synthesizes_for_every_example_target_with_the_pinned_ess() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let ess = connectors_spec::toolchain::resolve(None).unwrap();
+        let base = root.join(".local/tmp");
+        fs::create_dir_all(&base).unwrap();
+        let work = tempfile::Builder::new()
+            .prefix("examples-synthesis-")
+            .tempdir_in(base)
+            .unwrap();
+        let generated = synthesize_examples(&root, &ess, work.path()).unwrap();
+        for target in EXAMPLE_TARGETS {
+            assert!(
+                generated.join(target).join("connectors").is_dir(),
+                "{target}"
+            );
+        }
+    }
+    #[test]
+    fn example_model_carries_the_example_domains_and_their_references_only() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let work = tempfile::tempdir().unwrap();
+        assemble_example_model(&root, work.path()).unwrap();
+        let system = yaml(&work.path().join("system.yaml")).unwrap();
+        let listed: BTreeSet<&str> = system["domains"]
+            .as_sequence()
+            .unwrap()
+            .iter()
+            .map(|d| d.as_str().unwrap())
+            .collect();
+        for domain in EXAMPLE_DOMAINS {
+            assert!(listed.contains(domain), "{domain}");
+        }
+        // `connectors.mutations` references `connectors.sessions`; the realization does not.
+        assert!(listed.contains("connectors.sessions"));
+        assert!(!listed.contains("connectors.cli"));
+        assert!(!work.path().join("domains/cli.yaml").exists());
+        assert_eq!(
+            fs::read_dir(work.path().join("domains")).unwrap().count(),
+            listed.len()
+        );
     }
     #[test]
     fn public_audit_checks_embedded_binary_paths() {
