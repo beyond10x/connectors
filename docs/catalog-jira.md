@@ -55,7 +55,8 @@ the end of a walk are in it.
   token will be null"), and says `isLast: true`. Never send a null token back.
   The pinned document requires a bounded query: a JQL with a search
   restriction, not only an `ORDER BY`. Jira returns only issue ids unless
-  `fields` is given; send it as one comma-separated string, such as
+  `fields` is given; send it as a JSON array, such as
+  `["summary", "updated", "status"]`, or as one comma-separated string, such as
   `"summary,updated,status"` or `"*all"`. The pinned document states at most
   5,000 issues per page and a default `maxResults` of 50, and that Jira may
   return fewer items than asked, so a short page is not an end condition.
@@ -190,8 +191,12 @@ three reads and `myself` need; Atlassian names them per operation.
   run against a live site.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Jira's exact bytes.
-- `fields`, `properties` and `reconcileIssues` are declared as arrays by the
-  pinned document; the engine sends one value per parameter, so pass a
-  comma-separated string.
+- `fields`, `properties` and `reconcileIssues` on `issues.search` are declared
+  as arrays by the pinned document. Each takes a JSON array, sent as one
+  `name=value` pair per element in the order given (`reconcileIssues` elements
+  are integers), or one comma-separated string, sent as one pair as before;
+  for `reconcileIssues` that string must list integers, such as `"10001,10002"`,
+  or it is refused as `invalid_input` before any request. See
+  [array and required query parameters](local-catalog-provider.md#array-and-required-query-parameters).
 - The provider does not walk pages itself, does not bound `maxResults`, and does
   not retry on `429`; a rate-limited read is returned as a refusal.

@@ -1,0 +1,50 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "get": {
+          "id": "fixture.things.get",
+          "path": "things/{thingId}",
+          "httpMethod": "GET",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}}
+        },
+        "delete": {
+          "id": "fixture.things.delete",
+          "path": "things/{thingId}",
+          "httpMethod": "DELETE",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}}
+        },
+        "patch": {
+          "id": "fixture.things.patch",
+          "path": "things/{name}",
+          "httpMethod": "PATCH",
+          "parameters": {"name": {"type": "string", "location": "path", "required": true}}
+        }
+      }
+    },
+    "others": {
+      "methods": {
+        "get": {
+          "id": "fixture.others.get",
+          "path": "others/{a}",
+          "httpMethod": "GET",
+          "parameters": {"a": {"type": "string", "location": "path", "required": true}}
+        },
+        "delete": {
+          "id": "fixture.others.delete",
+          "path": "others/{b}",
+          "httpMethod": "DELETE",
+          "parameters": {"b": {"type": "string", "location": "path", "required": true}}
+        }
+      }
+    }
+  }
+}

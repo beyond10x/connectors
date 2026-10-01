@@ -1,0 +1,9 @@
+[
+  {
+    "file": "drive-api.json",
+    "url": "https://raw.githubusercontent.com/googleapis/google-api-go-client/ec13a0cd76ecc7fede8932d040a3156804515da9/drive/v3/drive-api.json",
+    "sha256": "50a01d9b5134f16b4782098bcc6694aa4edf810993432022aba49237b5c83048",
+    "bytes": 269729,
+    "archive": "vendor/drive-api.json.gz"
+  }
+]

@@ -1,0 +1,32 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "schemas": {
+    "Node": {
+      "id": "Node",
+      "type": "object",
+      "properties": {
+        "parent": {"$ref": "Node", "description": "The parent."},
+        "child": {"$ref": "Leaf", "deprecated": true, "description": "Old."},
+        "owner": {
+          "$ref": "Leaf",
+          "annotations": {"required": ["fixture.nodes.insert"]},
+          "description": "Required on insert."
+        },
+        "leaves": {"type": "array", "items": {"$ref": "Leaf"}},
+        "byName": {"type": "object", "additionalProperties": {"$ref": "Leaf"}}
+      }
+    },
+    "Leaf": {
+      "id": "Leaf",
+      "type": "object",
+      "properties": {"value": {"type": "string"}}
+    }
+  }
+}

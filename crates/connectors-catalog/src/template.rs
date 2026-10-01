@@ -61,6 +61,35 @@ pub enum Refusal {
     /// A cookie parameter. This pass carries none, and says so rather than
     /// binding the operation as though the cookie were not declared.
     CookieUnsupported(String),
+    /// Several values under a key whose parameter is not a repeated query
+    /// parameter. Joining them would invent a serialisation the document never
+    /// declared; sending one would drop the rest.
+    ValueNotRepeated(String),
+}
+
+/// A value supplied for one parameter: one scalar, or the elements of a
+/// repeated query parameter, each sent as its own `name=value` pair.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Supplied {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl Supplied {
+    /// The values this carries, in the order they are sent.
+    fn each(&self) -> &[String] {
+        match self {
+            Self::One(value) => std::slice::from_ref(value),
+            Self::Many(values) => values,
+        }
+    }
+}
+
+fn one_each(values: &BTreeMap<String, String>) -> BTreeMap<String, Supplied> {
+    values
+        .iter()
+        .map(|(key, value)| (key.clone(), Supplied::One(value.clone())))
+        .collect()
 }
 
 impl Refusal {
@@ -80,7 +109,8 @@ impl Refusal {
             | Self::HeaderUnsafe(subject)
             | Self::MediaTypeUnoffered(subject)
             | Self::MediaTypeUnsafe(subject)
-            | Self::CookieUnsupported(subject) => subject,
+            | Self::CookieUnsupported(subject)
+            | Self::ValueNotRepeated(subject) => subject,
         }
     }
 
@@ -124,6 +154,9 @@ impl Refusal {
             Self::CookieUnsupported(name) => {
                 format!("cookie parameter `{name}` is unsupported by this template pass")
             }
+            Self::ValueNotRepeated(key) => {
+                format!("`{key}` takes one value, and several were supplied")
+            }
         }
     }
 }
@@ -146,7 +179,8 @@ impl From<Refusal> for Error {
             | Refusal::PathDeclaredDotSegment(_)
             | Refusal::HeaderUnsafe(_)
             | Refusal::MediaTypeUnoffered(_)
-            | Refusal::MediaTypeUnsafe(_) => ErrorCode::InvalidInput,
+            | Refusal::MediaTypeUnsafe(_)
+            | Refusal::ValueNotRepeated(_) => ErrorCode::InvalidInput,
         };
         Error::new(code, value.reason())
     }
@@ -473,6 +507,18 @@ impl Template {
         values: &BTreeMap<String, String>,
         media_type: Option<&str>,
     ) -> std::result::Result<Binding, Refusal> {
+        self.bind_values(&one_each(values), media_type)
+    }
+
+    /// [`bind`](Self::bind) over supplied values that may carry several
+    /// elements. A repeated query parameter sends one pair per element, in the
+    /// order supplied, each encoded as a scalar value is; an empty list sends
+    /// none. Several values for any other parameter are refused.
+    pub fn bind_values(
+        &self,
+        values: &BTreeMap<String, Supplied>,
+        media_type: Option<&str>,
+    ) -> std::result::Result<Binding, Refusal> {
         let assigned = self.assign(values)?;
 
         let mut path = String::new();
@@ -488,23 +534,23 @@ impl Template {
         // Declared order, not the supplied map's: the output order is the
         // document's and does not move when a caller reorders its own values.
         for (index, parameter) in self.parameters.iter().enumerate() {
-            let carried = match assigned[index] {
-                Some(value) => value,
-                None if parameter.required => {
-                    return Err(Refusal::ValueAbsent(key_for(&self.parameters, parameter)));
-                }
-                None => continue,
+            let Some(carried) = self.carried(index, &assigned)? else {
+                continue;
             };
             match parameter.location {
-                Location::Query => query.push((
-                    encode(&parameter.name, QUERY_KEEP),
-                    encode(carried, QUERY_KEEP),
-                )),
+                Location::Query => query.extend(carried.iter().map(|value| {
+                    (
+                        encode(&parameter.name, QUERY_KEEP),
+                        encode(value, QUERY_KEEP),
+                    )
+                })),
                 Location::Header => {
-                    if !field_value_safe(carried) {
-                        return Err(Refusal::HeaderUnsafe(parameter.name.clone()));
+                    for value in carried {
+                        if !field_value_safe(value) {
+                            return Err(Refusal::HeaderUnsafe(parameter.name.clone()));
+                        }
+                        headers.push((parameter.name.clone(), value.clone()));
                     }
-                    headers.push((parameter.name.clone(), carried.clone()));
                 }
                 // Path parameters are already in the path; cookies never reach here.
                 Location::Path | Location::Cookie => {}
@@ -526,6 +572,16 @@ impl Template {
     pub fn resolve_raw(
         &self,
         values: &BTreeMap<String, String>,
+    ) -> std::result::Result<Resolved, Refusal> {
+        self.resolve_raw_values(&one_each(values))
+    }
+
+    /// [`resolve_raw`](Self::resolve_raw) over supplied values that may carry
+    /// several elements, with the refusals and the pairs of
+    /// [`bind_values`](Self::bind_values).
+    pub fn resolve_raw_values(
+        &self,
+        values: &BTreeMap<String, Supplied>,
     ) -> std::result::Result<Resolved, Refusal> {
         let assigned = self.assign(values)?;
         let mut segments: Vec<String> = Vec::new();
@@ -552,7 +608,12 @@ impl Template {
                         .enumerate()
                         .find(|(_, p)| p.location == Location::Path && &p.name == name)
                         .ok_or_else(|| Refusal::PlaceholderUndeclared(name.clone()))?;
-                    current.push_str(assigned[index].map(String::as_str).unwrap_or_default());
+                    current.push_str(
+                        assigned[index]
+                            .and_then(<[String]>::first)
+                            .map(String::as_str)
+                            .unwrap_or_default(),
+                    );
                 }
             }
         }
@@ -560,15 +621,15 @@ impl Template {
         segments.retain(|s| !s.is_empty());
         let mut query = Vec::new();
         for (index, parameter) in self.parameters.iter().enumerate() {
-            let carried = match assigned[index] {
-                Some(value) => value,
-                None if parameter.required => {
-                    return Err(Refusal::ValueAbsent(key_for(&self.parameters, parameter)));
-                }
-                None => continue,
+            let Some(carried) = self.carried(index, &assigned)? else {
+                continue;
             };
             match parameter.location {
-                Location::Query => query.push((parameter.name.clone(), carried.clone())),
+                Location::Query => query.extend(
+                    carried
+                        .iter()
+                        .map(|value| (parameter.name.clone(), value.clone())),
+                ),
                 Location::Header => return Err(Refusal::HeaderUnsafe(parameter.name.clone())),
                 Location::Path | Location::Cookie => {}
             }
@@ -576,41 +637,75 @@ impl Template {
         Ok(Resolved { segments, query })
     }
 
-    /// Which value each declared parameter is bound to, by position. Qualified
+    /// The values one parameter carries, `None` when it carries none and may
+    /// be left out. An empty list carries no value, so a required parameter
+    /// given one is as absent as a required parameter given nothing.
+    fn carried<'a>(
+        &self,
+        index: usize,
+        assigned: &[Option<&'a [String]>],
+    ) -> std::result::Result<Option<&'a [String]>, Refusal> {
+        let parameter = &self.parameters[index];
+        match assigned[index] {
+            Some(values) if !values.is_empty() => Ok(Some(values)),
+            _ if parameter.required => {
+                Err(Refusal::ValueAbsent(key_for(&self.parameters, parameter)))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    /// Which values each declared parameter is bound to, by position. Qualified
     /// keys are read first because each names exactly one parameter; a bare name
     /// then takes the best location still free, so no two keys share a parameter
-    /// and no key is read by none.
+    /// and no key is read by none. Only a repeated query parameter takes several
+    /// values; every other parameter bound to a list is refused under the key
+    /// that supplied it.
     fn assign<'a>(
         &self,
-        values: &'a BTreeMap<String, String>,
-    ) -> std::result::Result<Vec<Option<&'a String>>, Refusal> {
-        let mut assigned: Vec<Option<&String>> = vec![None; self.parameters.len()];
+        values: &'a BTreeMap<String, Supplied>,
+    ) -> std::result::Result<Vec<Option<&'a [String]>>, Refusal> {
+        let mut assigned: Vec<Option<&[String]>> = vec![None; self.parameters.len()];
         for key in values.keys() {
             if candidates(&self.parameters, key).is_empty() {
                 return Err(Refusal::ParameterUndeclared(key.clone()));
             }
         }
+        let place = |assigned: &mut Vec<Option<&'a [String]>>,
+                     index: usize,
+                     key: &String,
+                     value: &'a Supplied| {
+            let parameter = &self.parameters[index];
+            if matches!(value, Supplied::Many(_))
+                && !(parameter.location == Location::Query && parameter.repeated)
+            {
+                return Err(Refusal::ValueNotRepeated(key.clone()));
+            }
+            assigned[index] = Some(value.each());
+            Ok(())
+        };
         let literal = |key: &String| self.parameters.iter().any(|p| &p.name == key);
         for (key, value) in values.iter().filter(|(key, _)| !literal(key)) {
             let index = candidates(&self.parameters, key)[0];
-            assigned[index] = Some(value);
+            place(&mut assigned, index, key, value)?;
         }
         for (key, value) in values.iter().filter(|(key, _)| literal(key)) {
             let index = candidates(&self.parameters, key)
                 .into_iter()
                 .find(|index| assigned[*index].is_none())
                 .ok_or_else(|| Refusal::KeyUnread(key.clone()))?;
-            assigned[index] = Some(value);
+            place(&mut assigned, index, key, value)?;
         }
         Ok(assigned)
     }
 
     /// One path placeholder's replacement: present, non-empty, and unable to move
-    /// the path once a client resolves it.
+    /// the path once a client resolves it. A path parameter is never bound to a
+    /// list (`assign` refuses one), so it carries exactly one value.
     fn resolve(
         &self,
         name: &str,
-        assigned: &[Option<&String>],
+        assigned: &[Option<&[String]>],
     ) -> std::result::Result<String, Refusal> {
         let (index, parameter) = self
             .parameters
@@ -619,6 +714,7 @@ impl Template {
             .find(|(_, p)| p.location == Location::Path && p.name == name)
             .ok_or_else(|| Refusal::PlaceholderUndeclared(name.to_owned()))?;
         let value = assigned[index]
+            .and_then(<[String]>::first)
             .ok_or_else(|| Refusal::ValueAbsent(key_for(&self.parameters, parameter)))?;
         if value.is_empty() {
             return Err(Refusal::PathValueEmpty(name.to_owned()));

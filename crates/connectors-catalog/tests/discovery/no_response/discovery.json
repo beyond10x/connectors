@@ -1,0 +1,41 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "delete": {
+          "id": "fixture.things.delete",
+          "path": "things/{thingId}",
+          "httpMethod": "DELETE",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}}
+        },
+        "download": {
+          "id": "fixture.things.download",
+          "path": "things/{thingId}/download",
+          "httpMethod": "GET",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}},
+          "supportsMediaDownload": true,
+          "useMediaDownloadService": true
+        },
+        "get": {
+          "id": "fixture.things.get",
+          "path": "things/{thingId}",
+          "httpMethod": "GET",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}},
+          "response": {"$ref": "Thing"},
+          "supportsMediaDownload": true
+        }
+      }
+    }
+  },
+  "schemas": {
+    "Thing": {"id": "Thing", "type": "object", "properties": {"name": {"type": "string"}}}
+  }
+}

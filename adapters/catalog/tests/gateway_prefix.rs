@@ -117,25 +117,28 @@ fn refusal(config: &Value) -> String {
 /// existed (base `94d7d25e3`), as the SHA-256 of `--print-local-bootstrap`'s
 /// stdout, with its configuration revision. The GitLab example is loaded
 /// without its `ca_file`, whose digest would depend on a generated CA. A
-/// rebuilt bundle changes these, and `bundle_drift.rs` pins the bundles.
+/// rebuilt bundle changes these, and `bundle_drift.rs` pins the bundles. They
+/// were re-pinned when the bundles were rebuilt to record repeated query
+/// parameters, and again when a repeated parameter's declared schema was typed
+/// like its elements.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "9c285601772b479aed9af5b45f735b4bf93b1bc919e2c7de08bf70a7a8473cbf",
-        "b7745324b4d2bcb5717d37823e27653e9bc9d9d44cc6fbd4fceae703d2cd649d",
+        "3fe50e13d4ffa3aebc78634b2e14a94fe66c235c38af5569a79fcbf972fd5a9d",
+        "f87354a4d17235768ef1745c5693296658c66e7fedd179fbe00aac2a58b5bb80",
     ),
     (
         "catalog-jira.md",
         "jira",
-        "a399749054660866799a950b400e24f693a983430a13dae4167170929ea4e04b",
-        "96dd02a410ff612ed9b1a4b62279c6b0c67dfdbb9181c6d8caf664cffc09d9a4",
+        "285ef4ae7a2543c531aaf0de24366edd6a911027875335f8beb241e8c86f8a35",
+        "a365c570b8410d96a46906986efe97b668a7e061c121ee46180ac0cfadef35a0",
     ),
     (
         "catalog-confluence.md",
         "confluence",
-        "20d9d3f5a54228294bfd31e61671aa4cd78e5f42359d915356062a59bd804768",
-        "94bef30f4ad9edc5331a23306b912e580f93dff92896ad9cac3f969b1cb32b38",
+        "211317303cd6fa5c21355bc440b15593beb3170f78831fad711fd22ab8a2bf61",
+        "e5c2788b2e079a0cf80bf6803180382f4d4b647836be297ec8e7aa1c3691770e",
     ),
 ];
 

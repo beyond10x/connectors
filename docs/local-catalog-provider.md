@@ -26,7 +26,11 @@ cargo run --locked -p connectors-build -- catalog \
 The pipeline reads the source (JSON or YAML), records its SHA-256, extracts the
 operation inventory and writes `gitlab.bundle.json` plus `index.json`. The
 committed GitLab bundle carries every one of the 1,847 operations in the pinned
-source with none unsupported; `adapters/catalog/tests/bundle_drift.rs` refuses a
+source. It names 67 gaps, each an array query parameter the source declares
+`explode: false` (such as `labels` and `iids` on issues and merge requests);
+each of those is sent as the one value a caller gives, such as `"bug,ui"`, as it
+was before arrays were read (see [Array and required query
+parameters](#array-and-required-query-parameters)). `adapters/catalog/tests/bundle_drift.rs` refuses a
 committed bundle that a fresh run would not reproduce byte for byte. Nothing
 here reaches the network.
 
@@ -141,6 +145,68 @@ The complete configuration used against the sandbox is
   "identity": {"path": "myself", "kind": "tracker.user", "subject_pointer": "/accountId"}
 }
 ```
+- `oauth2_refresh` is for providers that issue expiring OAuth access tokens
+  from a refresh token that does not rotate, such as Google for installed apps
+  (`architecture-decision-record:oauth-material-as-static-entry`). The protected
+  entry is `{"client_id":"...","client_secret":"...","refresh_token":"..."}`,
+  each field under the token rules, and nothing else. The provider posts it
+  form-encoded (`grant_type=refresh_token`) to `token_url`, with no credential
+  header, and sends the access token it gets back as
+  `Authorization: Bearer <access token>`, so the profile must state
+  `"header": "Authorization"` and `"bearer": true`. The access token lives in
+  the provider process only, keyed by a digest of the entry, until 60 seconds
+  before its `expires_in`; a read or write the API refuses as an invalid credential
+  evicts it, and `validate` always exchanges afresh. A token answer carrying a
+  different `refresh_token` is refused as an invalid credential and nothing is
+  kept. `invalid_grant` and `invalid_client` are an invalid credential; on an
+  `operations invoke` of a read on an existing connection the CLI reports it
+  with `next_action: repair_connection`, and while connecting with
+  `retry_explicitly`. A guarded write refused for its credential reports
+  `retry_status` until `story:guarded-write-credential-refusal-says-repair`
+  lands; a 429 is a provider
+  rate limit and a 5xx is `unavailable`. `token_url` and `authorize_url` must
+  be `https` URLs without credentials, query or fragment, written in canonical
+  form. `authorize_url` and `requested_scopes` are never called or checked by
+  the provider: they reach the host as the profile's `acquisition`, next to
+  `token_url`, for the CLI to obtain the entry by consent
+  ([Google OAuth guide](catalog-google-oauth.md)).
+  `token_ca_file` names trust roots for the token host only; omit it to use
+  the platform roots. Like `ca_file`, its bytes enter the configuration
+  revision and its path does not. It applies to the provider's refresh and
+  validation exchanges, not to the code exchange the CLI makes during consent,
+  which uses the platform roots only. Each `minimum_scopes` and
+  `requested_scopes` entry is one scope: an empty entry or one holding
+  whitespace is refused at load. The profile is offered to the host as
+  `http_bearer` with the fields `client_id`, `client_secret` and
+  `refresh_token`.
+- `identity.source` is `api` when omitted, the read shown above. `id_token`,
+  for `oauth2_refresh` only, takes the subject from the `sub` of the token
+  answer's `id_token`, after checking that its `iss` is
+  `https://accounts.google.com` or `accounts.google.com` and its `aud` is the
+  entry's `client_id`, that its `exp` is after now and that its `iat`, if
+  present, is at most five minutes ahead, and the granted scopes from the answer's
+  space-separated `scope`, which `minimum_scopes` is checked against. The
+  `id_token` came straight from the token endpoint over verified TLS, so its
+  signature is not checked. When the answer has no `id_token`, the provider
+  asks `tokeninfo` on the token host for the fresh access token and reads the
+  same `sub`, `aud` and `scope` there. A wrong issuer or audience, or an expired
+  `id_token`, is refused as a protocol failure. An `id_token` identity names no `path`,
+  `subject_pointer` or `scopes` read.
+
+```json
+"auth": {
+  "profile": "google.drive",
+  "scheme": "oauth2_refresh",
+  "header": "Authorization",
+  "bearer": true,
+  "label": "Google refresh token",
+  "identity": {"source": "id_token", "kind": "google.user"},
+  "minimum_scopes": ["https://www.googleapis.com/auth/drive.readonly"],
+  "token_url": "https://oauth2.googleapis.com/token",
+  "authorize_url": "https://accounts.google.com/o/oauth2/auth",
+  "requested_scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly"]
+}
+```
 - `request_prefix` is optional, for a provider reached through an API gateway
   that adds path segments in front of the document's paths, such as
   `/ex/jira/<cloud id>`. It names the leading part of the `api_base` path that
@@ -171,6 +237,31 @@ The complete configuration used against the sandbox is
   any request. A bound on a parameter the operation does not declare as a query
   parameter, or with a `minimum` above its `maximum`, is refused when the
   selection loads. The declared input schema carries both limits as well.
+- `required` is optional: `["<query parameter>", …]` marks query parameters the
+  provider requires although the pinned source does not. Each is then declared
+  required and refused as `invalid_input` when absent, before any request. A
+  name that is not a query parameter of the operation is refused when the
+  selection loads.
+- `rate_limit_reasons` is optional: `["<reason>", …]` names the reasons a
+  provider gives in a `403` when it means a quota rather than a permission. A
+  `403` whose JSON body carries one of them in `error.errors[].reason` or
+  `error.status` is `rate_limited`, for a read and for a write's definite
+  refusal; every other `403` stays `forbidden`. An empty reason is refused
+  when the selection loads.
+- `body_keys` is optional, for a write: `["<key>", …]` closes its JSON body to
+  exactly those top-level keys. The declared input schema types `body` as an
+  object with those properties and no others, and a body carrying any other key
+  is refused as `invalid_input` before any request, the preflight read
+  included. Each key a guard reads is required and compared by that guard; one
+  it reads as `body.<key>` itself is declared as the scalar it compares. A key
+  no guard reads takes any JSON value and is compared by nothing: closing the
+  body only keeps out keys outside the set. It is for a write whose provider
+  would act on a body field the guard does not compare, such as a Gmail draft
+  send given a replacement message. A read, an operation
+  without a request body, an empty, dotted or repeated name, or a guard reading
+  a `body.<key>` the set does not admit is refused when the selection loads.
+  The bundle records no body schema, so the names are not checked against the
+  provider's.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
@@ -187,6 +278,61 @@ the one PUT: `/sha` equal to the pinned `body.sha`, `/state` literally `opened`,
 input `pipeline_id` and `/head_pipeline/status` literally `success`. After it:
 `/state` literally `merged` and `/sha` still the pinned head. Those are the
 checks the retired native `merge_request.validate` made in Rust, as five lines of data.
+
+### Array and required query parameters
+
+A query parameter the pinned source declares as an array with `style: form` and
+`explode: true` (OpenAPI's default for a query parameter) is repeated: its input
+takes a JSON array of scalars, sent as one `name=value` pair per element in the
+order given, each encoded as a single value is; an empty array sends nothing.
+One scalar is still accepted and sent as one pair, so a caller that already
+sends a comma-joined string, such as Jira's `fields` or Confluence's
+`space-id`, sends the same request as before. That scalar is typed like the
+elements: for integer elements, an integer or a string of comma-separated
+integers (`"65538,98305"`); for boolean elements, `true`, `false` or a string
+of them separated by commas; for string elements, any string (or a JSON
+integer, as for any string parameter); for elements of no declared type, any
+scalar. The declared input schema says the same: its `type` is `array` together
+with those scalar types, `items` is the element type, a `pattern` constrains
+the joined string, and a required repeated parameter declares `minItems: 1`
+because an empty array is refused as absent. A `bounds` entry holds for each
+element, and a comma-joined string for a bounded parameter is refused. An
+array for a parameter that is not repeated, an element that is itself an
+array, an object or `null`, or a scalar that fits none of the forms above, is
+refused as `invalid_input` before any request.
+
+An array query parameter with any other `style`, or `explode: false`, is
+recorded as a gap in the bundle and keeps the one-value reading it had before:
+the caller sends the joined value itself. Array path and header parameters are
+not read as arrays.
+
+A selection's `required` list adds the provider's requirement where the source
+omits it; see the selection fields above.
+
+The bundles were rebuilt to record repeated parameters. The configuration
+revision digests the bundle's SHA-256, so the rebuild moves the configuration
+revision, and with it the descriptor revision, of every GitLab, Jira and
+Confluence instance, including one whose selections have no repeated
+parameter. After upgrading:
+
+1. Print the bootstrap again and copy its `configuration_revision` into the
+   adapter entry (see [Bind the provider to the local
+   CLI](#bind-the-provider-to-the-local-cli)). Until then the adapter does not
+   start: the host refuses a bootstrap whose revision differs from the entry's.
+2. An instance that was already connected cannot reconnect or be repaired under
+   the new binding: the connection registry keeps an instance id bound to the
+   configuration revision it first connected under, and refuses the new one
+   (`Conflict` on connect, `IdentityMismatch` on repair). Connect it again under
+   a new `instance` id, or with fresh local state. Configuration upgrades are
+   not implemented (see [the connection registry](local-connection-registry.md)).
+3. Issue every write approval policy bound to the instance again.
+
+Separately, the declared input of these shipped reads changed, because each
+has a repeated parameter: Jira `issues.search`; Confluence `pages.changed`,
+`space.pages`, `page.get` and `page.comments`; and GitLab `issues.list`
+(`assignee_username`, `not[labels]`, `not[iids]`, `not[assignee_username]`)
+and `merge_requests.list` (`assignee_username`, `not[assignee_username]`,
+`not[labels]`).
 
 ## Bind the provider to the local CLI
 
@@ -297,10 +443,12 @@ appeared, which opened merge request 11 at the moved head and was classified
   supplies it and validated only by the provider.
 - Header and cookie parameters are not carried; a selection whose operation
   requires one is refused at load.
-- One authentication profile per configuration: a token in one header, or a
+- One authentication profile per configuration: a token in one header, a
   basic profile (`"scheme": "basic"`) sending an account and API token as HTTP
-  basic. OAuth and signing profiles are not offered by this provider yet. The
-  basic profile has run only against the local fixture, not a live provider.
+  basic, or an OAuth refresh profile (`"scheme": "oauth2_refresh"`). Signing
+  profiles and rotating refresh tokens are not offered by this provider. The
+  basic and OAuth refresh profiles have run only against the local fixture, not
+  a live provider, and the provider does not acquire the OAuth entry itself.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
 - A guard compares scalars for equality. It cannot express "any of", ordering or

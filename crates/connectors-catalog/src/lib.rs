@@ -6,6 +6,7 @@
 pub mod authored;
 pub mod bundle;
 pub mod coverage;
+pub mod discovery;
 pub mod inventory;
 pub mod pipeline;
 pub mod template;
@@ -87,6 +88,29 @@ pub struct SourceRecord {
     pub info_version: Option<String>,
     /// `info.license.name`, when the document carries one.
     pub license: Option<String>,
+    /// The document this source was projected from, when it was. Absent for a
+    /// source pinned as written, and then absent from the serialised record too,
+    /// so every bundle built from an OpenAPI source keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derivation: Option<Derivation>,
+}
+
+/// Where a projected source came from: the pinned document's own name, digest
+/// and length, what format it is, and which projector turned it into this
+/// source. Recorded only after the projection was recomputed and found equal to
+/// the source byte for byte.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Derivation {
+    pub from_file: String,
+    pub from_sha256: String,
+    pub from_bytes: usize,
+    /// `google-discovery/v1`.
+    pub format: String,
+    /// The Discovery document's own `revision`.
+    pub discovery_revision: String,
+    /// `discovery-openapi/1`.
+    pub projector: String,
 }
 
 fn dialect(openapi: &str) -> std::result::Result<Dialect, Refusal> {
@@ -142,6 +166,7 @@ pub fn ingest(file_name: &str, bytes: &[u8]) -> std::result::Result<SourceRecord
         openapi,
         info_version: text(&document, &["info", "version"]),
         license: text(&document, &["info", "license", "name"]),
+        derivation: None,
     })
 }
 

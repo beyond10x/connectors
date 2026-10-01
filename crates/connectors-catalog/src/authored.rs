@@ -267,6 +267,7 @@ fn parameter(table: &Table) -> Refused<Parameter> {
         location,
         required: flag(table, SCOPE, "required")?,
         value_type: None,
+        repeated: false,
     })
 }
 

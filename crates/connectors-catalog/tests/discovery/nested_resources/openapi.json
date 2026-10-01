@@ -1,0 +1,36 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com"}],
+  "paths": {
+    "/fixture/v1:batchGet": {
+      "get": {
+        "operationId": "fixture.batchGet",
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    },
+    "/fixture/v1/users/{userId}/profile": {
+      "get": {
+        "operationId": "fixture.users.getProfile",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "default": "me"}
+          }
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    },
+    "/fixture/v1/users/{userId}/settings/filters": {
+      "get": {
+        "operationId": "fixture.users.settings.filters.list",
+        "parameters": [
+          {"name": "userId", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}

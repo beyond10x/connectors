@@ -116,6 +116,7 @@ fn bootstrap(instance: &str) -> runtime::Bootstrap {
                 label: "Token".into(),
                 max_bytes: 1024,
             }],
+            acquisition: None,
         }],
         requirements: OPERATIONS
             .iter()
