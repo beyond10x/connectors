@@ -28,6 +28,9 @@ pub enum Code {
     ProtectedEntryUnavailable,
     InvalidConfiguration,
     MetadataUnavailable,
+    /// A metadata write was definitely not committed because the store's
+    /// recorded revision moved under it; the store itself is readable.
+    RevisionConflict,
     CustodyUnavailable,
     OutcomeUnknown,
     Forbidden,
@@ -91,9 +94,8 @@ impl From<super::Failure> for Error {
             super::Failure::InvalidConfiguration | super::Failure::ConfigurationExists => {
                 Code::InvalidConfiguration
             }
-            super::Failure::MetadataUnavailable | super::Failure::ConcurrentRevision => {
-                Code::MetadataUnavailable
-            }
+            super::Failure::MetadataUnavailable => Code::MetadataUnavailable,
+            super::Failure::ConcurrentRevision => Code::RevisionConflict,
             super::Failure::OutcomeUnknown => Code::OutcomeUnknown,
         }
         .into()
@@ -103,7 +105,8 @@ impl From<registry::Failure> for Error {
     fn from(e: registry::Failure) -> Self {
         use registry::Failure as F;
         match e {
-            F::MetadataUnavailable | F::ConcurrentRevision => Code::MetadataUnavailable,
+            F::MetadataUnavailable => Code::MetadataUnavailable,
+            F::ConcurrentRevision => Code::RevisionConflict,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
             F::Conflict => Code::LifecycleConflict,
