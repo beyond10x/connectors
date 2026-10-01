@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.22.0 — 2026-10-01
+
+### Added
+
+- GitLab catalog reads `commits.list` (one ref's commits, filtered by `ref_name`, `since`, `until`,
+  `first_parent`, `path`, `author` and more, paged by `page`/`per_page` with `per_page` 1–100) and
+  `repository.compare` (`from`, `to`, `straight`; not paged). A compare GitLab cut short answers with
+  `"compare_timeout": true`, which the caller reads to tell it from an empty compare. Both need only
+  `read_api`, and both come from the pinned GitLab document already in the bundle.
+
+### Fixed
+
+- A `^C` that flushes typed terminal input before it is read is reported as interrupted, not as
+  invalid input. An empty read after `poll` now waits again within the deadline on the terminal,
+  standard input and document reads.
+- The owner-socket tests reach the socket through a descriptor on the state directory, so the
+  test suite and the gate pass from a checkout with a long path, such as a managed worktree.
+
+### Changed
+
+- The CLI specification declares the owner handshake frames: the greeting the CLI sends, the
+  owner's reply and the fallback build request, each with its `kind` tag, UUID fields and a
+  64-character lowercase-hex build digest. Contract citations point at the current lines. No
+  generated CLI contract byte changed.
+
+### Limits
+
+- `commits.list` supports offset paging only; `pagination=keyset` is passed to GitLab unchanged and
+  is not supported, because the provider does not follow GitLab's `Link` header.
+- Values outside a pinned enum and strings that are not date-times are sent to GitLab rather than
+  refused locally.
+- A compare body over the provider's 4 MiB response limit answers `capacity` with no body; walk
+  `commits.list` to place commits between two tags.
+- With `rustc-wrapper = "sccache"` and no sccache server running, the gate from a long checkout
+  needs `RUSTC_WRAPPER=` set empty.
+
 ## 0.21.1 — 2026-10-01
 
 ### Fixed
