@@ -64,8 +64,9 @@ on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
 `pipeline.jobs` and these six): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
-`X-Next-Page` header. Every other query parameter the pinned source declares
-is accepted by name, with the type the pinned source gives it: an integer as a
+`X-Next-Page` header. Every other query parameter the pinned source declares,
+except those a selection withholds (`commits.list` withholds `pagination` and
+`page_token`), is accepted by name, with the type the pinned source gives it: an integer as a
 JSON integer or its decimal string (`100` or `"100"`), a boolean as `true` or
 `false` (or those two strings), a string as any string or a JSON integer (sent as
 its decimal text); any other value, such as `per_page=true` or `page=2.0`, is
@@ -77,7 +78,7 @@ refused as `invalid_input` before any request.
 | `tags.list` | `getApiV4ProjectsIdRepositoryTags` | `GET /projects/{id}/repository/tags` | none; each tag carries its commit id | read |
 | `releases.list` | `getApiV4ProjectsIdReleases` | `GET /projects/{id}/releases` | none; each release carries `released_at` | read |
 | `project.events` | `getApiV4ProjectsIdEvents` | `GET /projects/{id}/events` | `after`, `before` (dates) | read |
-| `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; offset paging (`page`, `per_page`) only: `pagination=keyset` is not supported, because the provider does not follow GitLab's `Link` header; `read_api` scope | `since`, `until`: a string that GitLab reads as an ISO 8601 date-time | read |
+| `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; offset paging (`page`, `per_page`) only: the selection withholds `pagination` and its keyset cursor `page_token`, so an input carrying either (`pagination=keyset` included) is refused as `invalid_input` before any request, because the provider does not follow GitLab's `Link` header; `read_api` scope | `since`, `until`: a string that GitLab reads as an ISO 8601 date-time | read |
 | `repository.compare` | `getApiV4ProjectsIdRepositoryCompare` | `GET /projects/{id}/repository/compare` with `from` and `to` (both required) and `straight`; not paged; `read_api` scope. The body is GitLab's own: an empty compare answers `200` with `"commits": []` and `"compare_timeout": false`, a compare GitLab cut short also answers `200`, possibly with `"commits": []`, but with `"compare_timeout": true`; so read `body.compare_timeout`, not the length of `commits`, to tell them apart. GitLab always includes `diffs`, and a body over the provider's 4 MiB response limit answers `capacity` with no body at all; to place commits between two tags, walk `commits.list` instead, which carries no diffs | none | read |
 | `deployments.list` | `getApiV4ProjectsIdDeployments` | `GET /projects/{id}/deployments`, e.g. `environment`, `status`, `order_by`, `sort`; the body is GitLab's own, so each deployment carries `environment.name` and `deployable`, the job that ran it (`deployable.id`); a project the token cannot read answers GitLab's `403` or `404` with the refusal the other list reads answer; `read_api` scope | `updated_after`, `updated_before`, `finished_after`, `finished_before`: strings that GitLab reads as ISO 8601 date-times | read |
 
@@ -245,6 +246,13 @@ The complete configuration used against the sandbox is
   required and refused as `invalid_input` when absent, before any request. A
   name that is not a query parameter of the operation is refused when the
   selection loads.
+- `withhold` is optional: `["<parameter>", …]` names declared parameters the
+  selection does not expose, such as a paging mode the provider cannot follow.
+  Each is left out of the declared input schema, so `operations describe` does
+  not list it, and an input carrying it is refused as `invalid_input` before
+  any request. A name that is not a parameter of the operation, one the source
+  or the selection's `required` marks required, one the selection also bounds,
+  or one its guard reads as an input is refused when the selection loads.
 - `rate_limit_reasons` is optional: `["<reason>", …]` names the reasons a
   provider gives in a `403` when it means a quota rather than a permission. A
   `403` whose JSON body carries one of them in `error.errors[].reason` or
