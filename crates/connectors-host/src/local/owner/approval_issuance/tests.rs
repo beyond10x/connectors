@@ -131,6 +131,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_address: &str) -> Target {
                 label: "Token".into(),
                 max_bytes: 1024,
             }],
+            acquisition: None,
         }],
         requirements: vec![
             runtime::Requirement {

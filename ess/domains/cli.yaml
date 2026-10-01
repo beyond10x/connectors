@@ -187,6 +187,15 @@ types:
       - {name: minimum_scopes, type: "List<String>"}
       - {name: evidence_lifetime_ms, type: Integer}
       - {name: fields, type: "List<connectors.cli.PrivateEntryField>"}
+      - {name: acquisition, type: "Optional<connectors.cli.PrivateProfileAcquisition>"}
+  # Present only for a profile whose entry is acquired by OAuth consent; the
+  # authorize and token endpoints and the requested scopes, all nonsecret.
+  - name: connectors.cli.PrivateProfileAcquisition
+    kind: struct
+    fields:
+      - {name: authorize_url, type: String}
+      - {name: token_url, type: String}
+      - {name: scopes, type: "List<String>"}
   - name: connectors.cli.PrivateOperationEffect
     kind: enum
     variants: [read, write, unknown]

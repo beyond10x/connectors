@@ -1,0 +1,36 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "id": "fixture:v1",
+  "name": "fixture",
+  "canonicalName": "Fixture",
+  "version_module": true,
+  "fullyEncodeReservedExpansion": true,
+  "ownerDomain": "google.com",
+  "ownerName": "Google",
+  "icons": {"x16": "https://www.gstatic.com/images/branding/product/1x/googleg_16dp.png"},
+  "mtlsRootUrl": "https://fixture.mtls.googleapis.com/",
+  "batchPath": "batch/fixture/v1",
+  "auth": {"oauth2": {"scopes": {}}},
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "get": {
+          "id": "fixture.things.get",
+          "path": "things/{thingId}",
+          "flatPath": "things/{thingId}",
+          "httpMethod": "GET",
+          "parameterOrder": ["thingId"],
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}},
+          "supportsSubscription": true
+        }
+      }
+    }
+  }
+}
