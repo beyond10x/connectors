@@ -77,7 +77,7 @@ types:
       - {name: adapter, type: String}
       - {name: observation, type: connectors.clock.Observation}
     # ESS-LIMIT: clock.md:84 orders an observation (upper >= lower). The comparison
-    # is writable here, but ESS 0.40 `specify cli` refuses any invariant on a CLI
+    # is writable here, but ESS 0.45 `specify cli` refuses any invariant on a CLI
     # type ("unsupported invariants or union semantics"), so it is not declared.
   - name: connectors.cli.ApprovalKeyState
     kind: enum
@@ -143,13 +143,55 @@ types:
     kind: struct
     fields:
       - {name: secret_service_socket, type: "Optional<String>"}
+  # Lowercase hex SHA-256 of an executable, as owner/transport.rs writes it (hex::encode)
+  # in own_build.
+  - name: connectors.cli.BuildDigest
+    kind: newtype
+    of: String
+    alphabet: "0123456789abcdef"
+    invariants:
+      - value.count == 64
+  # Owner frames are serde `kind`-tagged (Request and Reply in local/owner.rs); each
+  # frame declares its tag as a `kind` field. Request::Hello and Reply::Hello both
+  # serialize as "hello".
+  - name: connectors.cli.LocalOwnerHelloKind
+    kind: enum
+    variants: [hello]
+  # Request::Hello, the greeting the CLI sends; build is absent only from callers
+  # built before the build handshake.
+  - name: connectors.cli.LocalOwnerHello
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerHelloKind}
+      - {name: version, type: String}
+      - {name: challenge, type: Uuid}
+      - {name: configuration, type: String}
+      - {name: authority, type: Uuid}
+      - {name: build, type: "Optional<connectors.cli.BuildDigest>"}
   - name: connectors.cli.LocalOwnerGreeting
     kind: struct
     fields:
+      - {name: kind, type: connectors.cli.LocalOwnerHelloKind}
       - {name: version, type: String}
-      - {name: challenge, type: String}
-      - {name: host_incarnation, type: String}
-      - {name: authority, type: String}
+      - {name: challenge, type: Uuid}
+      - {name: host_incarnation, type: Uuid}
+      - {name: authority, type: Uuid}
+      - {name: build, type: "Optional<connectors.cli.BuildDigest>"}
+    # build is returned only to a caller whose LocalOwnerHello carried its own; a
+    # caller that omitted it may send LocalOwnerBuildRequest, answered with LocalOwnerBuild.
+  # Request::Build is a unit variant: its whole frame is {"kind": "build"}. ESS refuses
+  # a struct with no fields (ESS-TYPE-007).
+  - name: connectors.cli.LocalOwnerBuildKind
+    kind: enum
+    variants: [build]
+  - name: connectors.cli.LocalOwnerBuildRequest
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerBuildKind}
+  - name: connectors.cli.LocalOwnerBuild
+    kind: struct
+    fields:
+      - {name: build, type: connectors.cli.BuildDigest}
   - name: connectors.cli.LocalCaptureAdmission
     kind: struct
     fields:
@@ -291,7 +333,7 @@ types:
       - {name: configuration_format, type: "Optional<connectors.cli.ConfigurationFormat>"}
       # ESS-LIMIT: instance_id is an admitted selector (connectors_core::valid_id, at most
       # 128 bytes) and appears only with configuration_format on invalid_configuration.
-      # ESS 0.40 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
+      # ESS 0.45 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
       # so both rules are enforced by the host and pinned by tests, not declared here.
       - {name: instance_id, type: "Optional<String>"}
   - name: connectors.cli.Prerequisite
@@ -698,7 +740,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:294, docs/local-connection-registry.md:105-106;
+    # contracts/cli/v1alpha1/semantics.md:345, docs/local-connection-registry.md:105-106;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -820,8 +862,8 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:297-298) and the host
-    # removal path (er.rs:3114-3118) only expires Active cursors. The error name is
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:349) and the host
+    # removal path (er.rs:3538-3540) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:
