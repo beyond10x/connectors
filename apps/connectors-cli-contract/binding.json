@@ -9797,7 +9797,8 @@
             "disposition": {
               "kind": "enum",
               "variants": [
-                "created"
+                "created",
+                "state_initialized"
               ]
             },
             "os": {
