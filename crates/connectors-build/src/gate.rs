@@ -1,6 +1,27 @@
 use super::Result;
 use std::{path::Path, process::Command};
 
+/// Cargo as the gate runs it. Test binaries get the task-owned temporary root as `TMPDIR`
+/// through a runner. Cargo itself, and so the compiler wrapper it starts, keeps the caller's
+/// `TMPDIR`: sccache binds its startup socket there, and the checkout-local root of a long
+/// checkout pushes that path past `SUN_LEN`.
+fn cargo(root: &Path, temp: &Path, ess: &Path, toolchain: Option<&str>) -> Result<Command> {
+    let temp = temp
+        .to_str()
+        .ok_or("gate temporary root is not valid UTF-8")?;
+    let runner = serde_json::to_string(&["env".to_owned(), format!("TMPDIR={temp}")])?;
+    let mut cmd = Command::new("cargo");
+    if let Some(toolchain) = toolchain {
+        cmd.arg(format!("+{toolchain}"));
+    }
+    cmd.current_dir(root)
+        .arg("--config")
+        .arg(format!("target.'cfg(all())'.runner={runner}"))
+        .env("CARGO_BUILD_JOBS", "2")
+        .env("CONNECTORS_ESS", ess);
+    Ok(cmd)
+}
+
 pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     connectors_spec::v2::check_ess(ess)?;
     super::metadata_entities::run(root, true)?;
@@ -14,14 +35,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     // example model fails here rather than only in `npm run build`.
     super::docs::synthesize_examples(root, ess, &temp.path().join("examples"))?;
     println!("gate: website example model synthesizes for rust and web; exit=0");
-    let command = |program: &str| {
-        let mut cmd = Command::new(program);
-        cmd.current_dir(root)
-            .env("TMPDIR", temp.path())
-            .env("CARGO_BUILD_JOBS", "2")
-            .env("CONNECTORS_ESS", ess);
-        cmd
-    };
+    let command = |toolchain: Option<&str>| cargo(root, temp.path(), ess, toolchain);
     let execute = |cmd: &mut Command| -> Result<()> {
         println!("gate: {:?}", cmd.get_args().collect::<Vec<_>>());
         let status = cmd.status()?;
@@ -37,7 +51,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     // `fmt --all` follows excluded path dependencies too. Only authored workspace
     // members belong to rustfmt; generated dependencies retain their pinned bytes.
     let metadata: serde_json::Value = serde_json::from_slice(
-        &super::run(command("cargo").args([
+        &super::run(command(None)?.args([
             "metadata",
             "--no-deps",
             "--format-version",
@@ -53,7 +67,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     let packages = metadata["packages"]
         .as_array()
         .ok_or("missing Cargo packages")?;
-    let mut format = command("cargo");
+    let mut format = command(None)?;
     format.arg("fmt");
     let mut selected = 0;
     for package in packages.iter().filter(|p| members.contains(&p["id"])) {
@@ -80,9 +94,9 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         println!("gate: {adapter} descriptor matches; exit=0");
     }
     // Generation fixtures verify the full pinned bundle, reproducibility and refusals.
-    execute(command("cargo").args(["build", "--workspace", "--locked", "--offline"]))?;
-    execute(command("cargo").args(["test", "--workspace", "--locked", "--offline"]))?;
-    execute(command("cargo").args([
+    execute(command(None)?.args(["build", "--workspace", "--locked", "--offline"]))?;
+    execute(command(None)?.args(["test", "--workspace", "--locked", "--offline"]))?;
+    execute(command(None)?.args([
         "clippy",
         "--workspace",
         "--all-targets",
@@ -94,7 +108,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     ]))?;
     for adapter in ["kubernetes", "sql", "catalog-provider"] {
         let package = format!("connectors-{adapter}");
-        execute(command("cargo").args([
+        execute(command(None)?.args([
             "build",
             "--locked",
             "--offline",
@@ -103,7 +117,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "--lib",
             "--no-default-features",
         ]))?;
-        let output = super::run(command("cargo").args([
+        let output = super::run(command(None)?.args([
             "tree",
             "--locked",
             "--offline",
@@ -132,7 +146,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         }
         println!("gate: {package} library boundary holds; exit=0");
     }
-    let output = super::run(command("cargo").args([
+    let output = super::run(command(None)?.args([
         "tree",
         "--locked",
         "--offline",
@@ -167,9 +181,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-sdk",
         ] {
             execute(
-                command("cargo")
+                command(Some("1.88.0"))?
                     .args([
-                        "+1.88.0",
                         "check",
                         "--package",
                         package,
@@ -186,9 +199,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-sql",
         ] {
             execute(
-                command("cargo")
+                command(Some("1.88.0"))?
                     .args([
-                        "+1.88.0",
                         "check",
                         "--package",
                         package,
@@ -201,9 +213,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             )?;
         }
         execute(
-            command("cargo")
+            command(Some("1.91.0"))?
                 .args([
-                    "+1.91.0",
                     "check",
                     "--workspace",
                     "--all-targets",
@@ -290,4 +301,58 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     execute(planning.args(["plan", "artifact", "validate"]))?;
     println!("gate: all checks passed");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::cargo;
+    use std::{ffi::OsStr, path::Path};
+
+    const ROOT: &str = "/checkout/.local/tmp/gate-AbCdEf";
+
+    fn build(toolchain: Option<&str>) -> std::process::Command {
+        cargo(
+            Path::new("/checkout"),
+            Path::new(ROOT),
+            Path::new("/ess"),
+            toolchain,
+        )
+        .expect("gate cargo command")
+    }
+
+    /// The compiler wrapper cargo starts (sccache) inherits cargo's own `TMPDIR` and puts
+    /// its startup socket there, so the gate's long root must not be cargo's `TMPDIR`.
+    #[test]
+    fn gate_cargo_leaves_the_compiler_wrapper_on_the_callers_tmpdir() {
+        let command = build(None);
+        assert!(
+            command
+                .get_envs()
+                .all(|(name, _)| name != OsStr::new("TMPDIR")),
+            "gate cargo sets or clears TMPDIR: {:?}",
+            command.get_envs().collect::<Vec<_>>()
+        );
+    }
+
+    /// Test binaries still run under the gate's task-owned root, through a runner that
+    /// cargo applies to target executables and never to the compiler.
+    #[test]
+    fn gate_cargo_hands_the_temporary_root_to_test_binaries_through_a_runner() {
+        let args: Vec<_> = build(None).get_args().map(OsStr::to_owned).collect();
+        let expected = format!(r#"target.'cfg(all())'.runner=["env","TMPDIR={ROOT}"]"#);
+        assert_eq!(
+            args,
+            [OsStr::new("--config"), OsStr::new(&expected)],
+            "gate cargo arguments"
+        );
+    }
+
+    /// A rustup toolchain selector must stay the first argument for the proxy to see it.
+    #[test]
+    fn gate_cargo_keeps_the_toolchain_selector_first() {
+        let command = build(Some("1.88.0"));
+        let args: Vec<_> = command.get_args().collect();
+        assert_eq!(args.first(), Some(&OsStr::new("+1.88.0")));
+        assert_eq!(args.get(1), Some(&OsStr::new("--config")));
+    }
 }
