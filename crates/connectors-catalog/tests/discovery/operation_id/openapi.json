@@ -1,0 +1,23 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://slides.fixture.googleapis.com"}],
+  "paths": {
+    "/v1/presentations/{presentationId}": {
+      "get": {
+        "operationId": "slides.presentations.get",
+        "description": "Gets the latest version of the specified presentation.",
+        "parameters": [
+          {
+            "name": "presentationId",
+            "in": "path",
+            "required": true,
+            "description": "The ID of the presentation to retrieve.",
+            "schema": {"type": "string"}
+          }
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}

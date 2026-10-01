@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T06:53:09Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-repeated-query-parameters",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv at 1aa2653ab from a short clone under ~/.cache, CONNECTORS_ESS=0.45.0, CONNECTORS_AEP=0.65.0",
+    "reference": "gate: all checks passed, exit 0; 136 test suites, 1096 passed, 0 failed, 43 ignored; includes the engine corrections 86266164c and f6c575948"
+  }
+}

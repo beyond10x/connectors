@@ -1,5 +1,5 @@
 use connectors_catalog::inventory::{Location, Operation, Parameter};
-use connectors_catalog::template::{Refusal, Template};
+use connectors_catalog::template::{Refusal, Supplied, Template};
 use std::collections::BTreeMap;
 
 fn parameter(name: &str, location: Location, required: bool) -> Parameter {
@@ -8,6 +8,7 @@ fn parameter(name: &str, location: Location, required: bool) -> Parameter {
         location,
         required,
         value_type: None,
+        repeated: false,
     }
 }
 
@@ -507,4 +508,142 @@ fn a_declared_path_carrying_a_dot_segment_is_refused_when_the_template_is_bound(
         .bind(&values(&[("id", "42"), ("tenant", "acme")]), None)
         .expect("binds");
     assert_eq!(bound.path, "/files/v1.0/42");
+}
+
+/// A path parameter, a scalar query parameter declared first, and a repeated
+/// one declared after it.
+fn repeating() -> Template {
+    let mut labels = parameter("labelIds", Location::Query, false);
+    labels.repeated = true;
+    Template::from_operation(&Operation {
+        method: "get".into(),
+        path: "/users/{id}/messages".into(),
+        operation_id: Some("listMessages".into()),
+        parameters: vec![
+            parameter("id", Location::Path, true),
+            parameter("q", Location::Query, false),
+            labels,
+        ],
+        request_media_types: Vec::new(),
+        responses: Vec::new(),
+    })
+    .expect("representable")
+}
+
+fn supplied(pairs: &[(&str, Supplied)]) -> BTreeMap<String, Supplied> {
+    pairs
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), value.clone()))
+        .collect()
+}
+
+fn many(elements: &[&str]) -> Supplied {
+    Supplied::Many(elements.iter().map(|e| (*e).to_owned()).collect())
+}
+
+#[test]
+fn template_repeats_query_pairs() {
+    let values = supplied(&[
+        ("id", Supplied::One("me".into())),
+        ("q", Supplied::One("a b".into())),
+        ("labelIds", many(&["UNREAD", "IN BOX", "a&b=c", "UNREAD"])),
+    ]);
+    // One pair per element, in input order, duplicates kept, each escaped as a
+    // scalar value is: no element can add a pair of its own.
+    let bound = repeating().bind_values(&values, None).expect("binds");
+    assert_eq!(
+        bound.query,
+        vec![
+            ("q".to_string(), "a%20b".to_string()),
+            ("labelIds".to_string(), "UNREAD".to_string()),
+            ("labelIds".to_string(), "IN%20BOX".to_string()),
+            ("labelIds".to_string(), "a%26b%3Dc".to_string()),
+            ("labelIds".to_string(), "UNREAD".to_string()),
+        ]
+    );
+    assert_eq!(
+        bound.query_string(),
+        "q=a%20b&labelIds=UNREAD&labelIds=IN%20BOX&labelIds=a%26b%3Dc&labelIds=UNREAD"
+    );
+    // The unencoded form carries the same pairs in the same order.
+    let raw = repeating().resolve_raw_values(&values).expect("resolves");
+    assert_eq!(raw.segments, vec!["users", "me", "messages"]);
+    assert_eq!(
+        raw.query,
+        vec![
+            ("q".to_string(), "a b".to_string()),
+            ("labelIds".to_string(), "UNREAD".to_string()),
+            ("labelIds".to_string(), "IN BOX".to_string()),
+            ("labelIds".to_string(), "a&b=c".to_string()),
+            ("labelIds".to_string(), "UNREAD".to_string()),
+        ]
+    );
+    // A single value for a repeated parameter is one pair, as it was before.
+    let one = repeating()
+        .bind_values(
+            &supplied(&[
+                ("id", Supplied::One("me".into())),
+                ("labelIds", Supplied::One("INBOX".into())),
+            ]),
+            None,
+        )
+        .expect("binds");
+    assert_eq!(one.query_string(), "labelIds=INBOX");
+}
+
+#[test]
+fn template_empty_array_omits() {
+    let values = supplied(&[("id", Supplied::One("me".into())), ("labelIds", many(&[]))]);
+    let bound = repeating().bind_values(&values, None).expect("binds");
+    assert!(bound.query.is_empty(), "{:?}", bound.query);
+    assert_eq!(bound.query_string(), "");
+    let raw = repeating().resolve_raw_values(&values).expect("resolves");
+    assert!(raw.query.is_empty(), "{:?}", raw.query);
+    // An empty array carries no value, so a required repeated parameter given
+    // one is as absent as one given nothing.
+    let mut required = parameter("labelIds", Location::Query, true);
+    required.repeated = true;
+    let template = Template::from_operation(&Operation {
+        method: "get".into(),
+        path: "/messages".into(),
+        operation_id: None,
+        parameters: vec![required],
+        request_media_types: Vec::new(),
+        responses: Vec::new(),
+    })
+    .expect("representable");
+    let empty = supplied(&[("labelIds", many(&[]))]);
+    assert_eq!(
+        template.bind_values(&empty, None),
+        Err(Refusal::ValueAbsent("labelIds".into()))
+    );
+    assert_eq!(
+        template.resolve_raw_values(&empty),
+        Err(Refusal::ValueAbsent("labelIds".into()))
+    );
+}
+
+#[test]
+fn several_values_for_a_parameter_that_is_not_repeated_are_refused() {
+    for (key, value) in [("q", many(&["a", "b"])), ("id", many(&["me"]))] {
+        let mut values = supplied(&[(key, value)]);
+        values
+            .entry("id".into())
+            .or_insert(Supplied::One("me".into()));
+        let expected = Refusal::ValueNotRepeated(key.into());
+        assert_eq!(
+            repeating().bind_values(&values, None),
+            Err(expected.clone())
+        );
+        assert_eq!(
+            repeating().resolve_raw_values(&values),
+            Err(expected.clone())
+        );
+        assert_eq!(expected.subject(), key);
+        assert!(expected.reason().contains(&format!("`{key}`")));
+        assert_eq!(
+            connectors_core::Error::from(expected).code,
+            connectors_core::ErrorCode::InvalidInput
+        );
+    }
 }

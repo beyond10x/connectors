@@ -1,0 +1,11 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 1,
+  "operations": ["slides.presentations.get"],
+  "excluded_methods": [],
+  "rewritten_paths": [],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [],
+  "ignored_keys": []
+}
