@@ -48,6 +48,16 @@ Integration: `wave/20260930c-google-oauth-discovery` (store and wave page) and
 story:http-empty-query-no-trailing-question-mark, story:catalog-guard-optional-preflight-values,
 story:guarded-write-credential-refusal-says-repair.
 
+## Close
+
+- Gate at b3fdab0a0 (wave/20260930c-final): all checks passed, 134 suites, 1089 passed.
+- The engine lane's two correction rounds (86266164c, f6c575948) had been left out when the
+  Calendar/Gmail lane merged it at 2e14b1e18; they were merged at 1aa2653ab, gated again: all
+  checks passed, 136 suites, 1096 passed, 0 failed, 43 ignored.
+- The push was refused at 522 MiB of the 512 MiB pre-push scan budget counted from the
+  connectors baseline; the operator approved advancing it, done in gates-policy 64c7ed9
+  (baseline 05051d37c).
+
 ## Pre-flight and environment
 
 - `/` fell to 100% (1.1G free) at dispatch; the operator freed space. `/dev/shm` builds do not work
