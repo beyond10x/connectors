@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-selection-excludes-parameters
 kind: story
-status: draft
+status: active
 title: A catalog selection can withhold a declared parameter
 relations:
 - serves: vision:independent-contract-adapters
@@ -19,7 +19,10 @@ scope:
   path: adapters/catalog/tests/gitlab_commit_reads_adversary.rs
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 3
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
 ---
 ## Observed
 

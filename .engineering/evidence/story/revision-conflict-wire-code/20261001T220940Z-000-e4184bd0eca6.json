@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T22:09:40Z",
+  "actor": "human:timo",
+  "artifact": "story:revision-conflict-wire-code",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "Source release v0.23.0: tag v0.23.0 (b10x-bot[bot]) peels to 4d308c09a771347d77a8d85c44a4b1662cff1063 on main (PR #75); release page by b10x-bot[bot], Latest; release gate at 5cb8d2bfa: 146 suites, 1165 passed, 0 failed; website build exit 0",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.23.0"
+  }
+}
