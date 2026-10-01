@@ -309,7 +309,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn initialize(paths: &Paths) -> Result<()> {
+    pub fn initialize(paths: &Paths) -> Result<Initialized> {
         let parent = fs::directory(
             paths.config.parent().ok_or(Failure::InvalidConfiguration)?,
             true,
@@ -318,7 +318,7 @@ impl Config {
         // Refuse an existing destination before touching state, including an
         // unsafe existing destination. The final publication is also exclusive.
         match std::fs::symlink_metadata(&paths.config) {
-            Ok(_) => return Err(Failure::ConfigurationExists),
+            Ok(_) => return Self::initialize_state(paths),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err(Failure::InvalidConfiguration),
         }
@@ -344,7 +344,49 @@ impl Config {
                 .file_name()
                 .ok_or(Failure::InvalidConfiguration)?,
             text.as_bytes(),
-        )
+        )?;
+        Ok(Initialized::Created)
+    }
+
+    /// An existing configuration is never rewritten. Its state is initialised
+    /// only when no metadata database exists at the selected state path and
+    /// the configuration itself loads; any existing database, and any
+    /// configuration that does not load, is refused as an existing
+    /// configuration. A present database is never opened, migrated or
+    /// recreated here.
+    fn initialize_state(paths: &Paths) -> Result<Initialized> {
+        match std::fs::symlink_metadata(paths.state.join(METADATA_DATABASE)) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            _ => return Err(Failure::ConfigurationExists),
+        }
+        Self::load(&paths.config).map_err(|_| Failure::ConfigurationExists)?;
+        let state = fs::directory(&paths.state, true, true)?;
+        super::metadata::Metadata::initialize(&paths.state)?;
+        state.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
+        Ok(Initialized::StateInitialized)
+    }
+}
+
+/// The metadata database's file name in the state directory (owned by
+/// `metadata.rs`); only its absence is observed here.
+const METADATA_DATABASE: &str = "metadata.sqlite3";
+
+/// What `setup init` did.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Initialized {
+    /// A new configuration and its state were created.
+    Created,
+    /// The existing configuration was kept and its missing state created.
+    StateInitialized,
+}
+
+impl Initialized {
+    /// The CLI's `InitDisposition` variant.
+    pub fn disposition(self) -> &'static str {
+        match self {
+            Self::Created => "created",
+            Self::StateInitialized => "state_initialized",
+        }
     }
 }
 

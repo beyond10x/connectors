@@ -290,9 +290,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     )
     .map_err(host_failure)?;
     if call.callable == "setup-init" {
-        Config::initialize(&paths).map_err(host_failure)?;
+        let initialized = Config::initialize(&paths).map_err(host_failure)?;
         return Ok(
-            json!({"disposition":"created", "config_path":paths.config, "state_path":paths.state, "os":"linux"}),
+            json!({"disposition":initialized.disposition(), "config_path":paths.config, "state_path":paths.state, "os":"linux"}),
         );
     }
     let config = Config::read(&paths.config).map_err(configuration_refusal)?;

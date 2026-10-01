@@ -26,7 +26,10 @@ directory search or migration from an existing installed Connectors deployment.
 
 Initialization creates an empty `connectors-local/2` TOML configuration bound to
 the effective Linux UID, owner-only directories and a private SQLite database.
-It refuses an existing configuration without replacing it. Failed or uncertain
+It never replaces an existing configuration. When that configuration loads and
+its state directory holds no metadata database, it initialises the state and
+answers `state_initialized`; otherwise it refuses with `configuration_exists`.
+Failed or uncertain
 filesystem publication is not reported as successful initialization. A database
 left by interrupted initialization contains no credentials or usable connection.
 
