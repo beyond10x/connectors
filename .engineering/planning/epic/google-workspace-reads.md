@@ -2,14 +2,17 @@
 format: aep.planning-md/3
 id: epic:google-workspace-reads
 kind: epic
-status: draft
+status: active
 title: Google Slides, Drive, Calendar and Gmail through the catalog provider, with OAuth
 summary: Discovery ingest, OAuth with refresh, reads for four Google APIs, then guarded writes.
 relations:
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 - informed_by: specification:catalog-http-runtime-handoff
 - serves: vision:independent-contract-adapters
-revision: 6
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T10:10:52Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"artifact":1,"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-01T10:10:52Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1,"artifact":1,"review_outcome":1}}}
 ---
 ## Outcome
 
@@ -93,3 +96,7 @@ parallel with each other. Guides are one file per provider (`docs/catalog-google
 Service accounts and domain-wide delegation; push notifications (Drive/Calendar watch, Gmail
 Pub/Sub); media upload; binary downloads (PDF, images); one OAuth grant shared across the four
 connections (each connection consents on its own); Sheets and Docs APIs.
+
+## Status
+
+2026-10-01: all 13 delivery stories are implemented and released in v0.21.0 (tag v0.21.0, merge c90adeaf4; gate --msrv 136 suites, 1096 passed, 0 failed). The epic stays active for one item: `story:catalog-google-live-deck-read`, the human live test, blocked on `credential-blocker:google-oauth-client`. It moves to implemented when that story does.
