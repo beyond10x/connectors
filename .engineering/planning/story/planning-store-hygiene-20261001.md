@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:planning-store-hygiene-20261001
 kind: story
-status: active
+status: implemented
 title: Close shipped release plans and a duplicate story
 relations:
 - decomposes: epic:tech-debt-review-20260930
@@ -14,10 +14,11 @@ scope:
   path: .engineering/planning/release-plan/gitlab-v020.md
 - confidence: cited
   path: .engineering/planning/story/registry-replay-test-flaky-under-load.md
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T07:32:48Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-01T07:32:48Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-01T07:33:56Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 
