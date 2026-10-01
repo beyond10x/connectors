@@ -306,7 +306,7 @@ types:
     variants: [connectors-local/1, connectors-local/2]
   - name: connectors.cli.InitDisposition
     kind: enum
-    variants: [created]
+    variants: [created, state_initialized]
   - name: connectors.cli.AcquisitionState
     kind: enum
     variants: [pending, completed, failed]
