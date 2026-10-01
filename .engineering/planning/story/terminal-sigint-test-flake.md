@@ -2,11 +2,19 @@
 format: aep.planning-md/3
 id: story:terminal-sigint-test-flake
 kind: story
-status: draft
+status: active
 title: The controlling-terminal SIGINT test holds under load
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connectors-host/src/local/protected.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/protected/tests.rs
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T11:06:15Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-01T11:06:15Z", actor: "human:timo", revision: 4}
 ---
 ## Observed
 
