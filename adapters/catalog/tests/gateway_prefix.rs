@@ -122,13 +122,13 @@ fn refusal(config: &Value) -> String {
 /// parameters, and again when a repeated parameter's declared schema was typed
 /// like its elements. The GitLab example loads the shipped selection set, so
 /// its pair was re-pinned again when that set gained `commits.list` and
-/// `repository.compare`.
+/// `repository.compare`, and again when it gained `deployments.list`.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "b16841334344b517d7b646dd9bb82895f016fb844f819e45fa3ca143d4c1c2da",
-        "0cd915bd706d450d2d344ff1b2a305da369c679bb2ed77622e5bae4cf664c4f5",
+        "43a7609d66ee0d4bd5c9ca621a788f0b296ad4ecc89a922adcc2993552dc0ab7",
+        "64e92f3f29c4da4e54888d48c0935fccd74e929a6f42041b348db0354a0889ac",
     ),
     (
         "catalog-jira.md",

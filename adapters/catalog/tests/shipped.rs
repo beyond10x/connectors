@@ -51,10 +51,11 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "project.events",
         "commits.list",
         "repository.compare",
+        "deployments.list",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 20);
+    assert_eq!(declared.len(), 21);
     assert_eq!(engine.effect("merge_request.merge"), Some(Effect::Write));
     assert_eq!(engine.effect("job.trace"), Some(Effect::Read));
 
@@ -67,6 +68,7 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         ("project.events", "getApiV4ProjectsIdEvents"),
         ("commits.list", "getApiV4ProjectsIdRepositoryCommits"),
         ("repository.compare", "getApiV4ProjectsIdRepositoryCompare"),
+        ("deployments.list", "getApiV4ProjectsIdDeployments"),
     ] {
         let selection = selections
             .iter()
@@ -116,6 +118,7 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
         paged,
         [
             "commits.list",
+            "deployments.list",
             "issues.list",
             "merge_requests.list",
             "pipeline.jobs",
