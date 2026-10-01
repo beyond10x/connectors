@@ -309,10 +309,11 @@ async fn adversary_base_twin_projects_list_last_activity_after_not_a_date_time_i
 }
 
 /// The re-pinned GitLab bootstrap digest in `gateway_prefix.rs` is explained
-/// by the two added selections alone: the documented site-form configuration,
-/// loaded with the shipped selection set minus `commits.list` and
-/// `repository.compare`, prints the bootstrap whose digest and revision the
-/// base pinned (`3fe50e13…`, `f87354a4…`).
+/// by the added selections alone: the documented site-form configuration,
+/// loaded with the shipped selection set cut back to the eighteen ids the base
+/// shipped (so without `commits.list`, `repository.compare` and every
+/// selection added after them), prints the bootstrap whose digest and revision
+/// the base pinned (`3fe50e13…`, `f87354a4…`).
 #[test]
 fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
     use connectors_host::local::filesystem;
@@ -333,15 +334,38 @@ fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
         &std::fs::read(root.join("providers/gitlab/operations.json")).unwrap(),
     )
     .unwrap();
-    let before = selection["operations"].as_array().unwrap().len();
+    // The ids the base shipped, in its order; `retain` keeps that order.
+    let base = [
+        "project.get",
+        "issues.list",
+        "file.get",
+        "branch.get",
+        "merge_requests.list",
+        "merge_request.get",
+        "pipelines.list",
+        "pipeline.get",
+        "pipeline.jobs",
+        "job.get",
+        "job.trace",
+        "projects.list",
+        "tags.list",
+        "releases.list",
+        "project.events",
+        "merge_request.create",
+        "merge_request.update",
+        "merge_request.merge",
+    ];
     selection["operations"]
         .as_array_mut()
         .unwrap()
-        .retain(|o| o["id"] != "commits.list" && o["id"] != "repository.compare");
-    assert_eq!(
-        selection["operations"].as_array().unwrap().len(),
-        before - 2
-    );
+        .retain(|o| base.iter().any(|id| o["id"] == *id));
+    let kept: Vec<&str> = selection["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| o["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(kept, base);
 
     let directory = tempfile::tempdir().unwrap();
     let private = directory.path().join("private");
