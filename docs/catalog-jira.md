@@ -194,7 +194,9 @@ three reads and `myself` need; Atlassian names them per operation.
 - `fields`, `properties` and `reconcileIssues` on `issues.search` are declared
   as arrays by the pinned document. Each takes a JSON array, sent as one
   `name=value` pair per element in the order given (`reconcileIssues` elements
-  are integers), or one comma-separated string, sent as one pair as before. See
+  are integers), or one comma-separated string, sent as one pair as before;
+  for `reconcileIssues` that string must list integers, such as `"10001,10002"`,
+  or it is refused as `invalid_input` before any request. See
   [array and required query parameters](local-catalog-provider.md#array-and-required-query-parameters).
 - The provider does not walk pages itself, does not bound `maxResults`, and does
   not retry on `429`; a rate-limited read is returned as a refusal.
