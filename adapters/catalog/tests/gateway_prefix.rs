@@ -119,24 +119,25 @@ fn refusal(config: &Value) -> String {
 /// without its `ca_file`, whose digest would depend on a generated CA. A
 /// rebuilt bundle changes these, and `bundle_drift.rs` pins the bundles. They
 /// were re-pinned when the bundles were rebuilt to record repeated query
-/// parameters.
+/// parameters, and again when a repeated parameter's declared schema was typed
+/// like its elements.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "ba984e4baa12438fa01b2e74b428300c180e488f4499ff01df77cbbd0a5ed7ed",
+        "3fe50e13d4ffa3aebc78634b2e14a94fe66c235c38af5569a79fcbf972fd5a9d",
         "f87354a4d17235768ef1745c5693296658c66e7fedd179fbe00aac2a58b5bb80",
     ),
     (
         "catalog-jira.md",
         "jira",
-        "ffcc0d61ddf420bb003b2854b9b779d9197583935af2edfab29cc6e21a025eb7",
+        "285ef4ae7a2543c531aaf0de24366edd6a911027875335f8beb241e8c86f8a35",
         "a365c570b8410d96a46906986efe97b668a7e061c121ee46180ac0cfadef35a0",
     ),
     (
         "catalog-confluence.md",
         "confluence",
-        "4218893cd48eef6f5a515acb804e39d64aab24366d9a238d211cad580966d419",
+        "211317303cd6fa5c21355bc440b15593beb3170f78831fad711fd22ab8a2bf61",
         "e5c2788b2e079a0cf80bf6803180382f4d4b647836be297ec8e7aa1c3691770e",
     ),
 ];
