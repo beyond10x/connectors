@@ -12,7 +12,7 @@ scope:
   path: .github/workflows/rust-gate.yml
 - confidence: cited
   path: docs/development.md
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T07:32:47Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-01T07:32:48Z", actor: "human:timo", revision: 4}
@@ -49,3 +49,7 @@ ESS and AEP releases by checksum the way `planning.yml` installs AEP, and runs
 - ESS and AEP are the versions in `crates/connectors-spec/toolchain.json` and
   `crates/connectors-build/aep-toolchain.json`, verified against the release's `SHA256SUMS`.
 - `docs/development.md` names the workflow instead of saying there is no CI.
+
+## Required
+
+Ruleset 23511229 ("Required shared and repository gates", `refs/heads/main`) requires `repository gate` (integration 15368) beside `common / Security and privacy` and `planning validate` since 2026-10-01T12:10:20+02:00, on the operator's instruction ("sure gate is mandatory"). Strict mode stays on, so a pull request merges only after the gate passes on a branch that is up to date with `main`.
