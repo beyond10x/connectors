@@ -230,3 +230,146 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         );
     }
 }
+
+/// Stands in for the line discipline handling `^C` between `wait` seeing a
+/// queued byte and the read that follows: the queue is flushed, so the
+/// non-blocking read finds it empty. In `before` the interrupt is handled
+/// before that read; in `after` it reaches the waiting thread only once the
+/// read has returned, which is the order a loaded machine produced.
+struct Flushing {
+    file: File,
+    mode: String,
+    armed: bool,
+    flushed_read: Option<std::io::ErrorKind>,
+    helper: Option<std::thread::JoinHandle<()>>,
+}
+impl Read for Flushing {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        if !std::mem::take(&mut self.armed) {
+            return self.file.read(buffer);
+        }
+        // SAFETY: a live descriptor this fixture owns.
+        assert_eq!(
+            unsafe { libc::tcflush(self.file.as_raw_fd(), libc::TCIFLUSH) },
+            0
+        );
+        if self.mode == "before" {
+            // SAFETY: the guard installed by the fixture handles SIGINT.
+            assert_eq!(unsafe { libc::raise(libc::SIGINT) }, 0);
+        } else {
+            // SAFETY: scalar identity of the calling thread.
+            let target = unsafe { libc::pthread_self() };
+            self.helper = Some(std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(200));
+                // SAFETY: the fixture joins this helper before its target
+                // thread can finish, so the target is alive.
+                unsafe {
+                    libc::pthread_kill(target, libc::SIGINT);
+                }
+            }));
+        }
+        let result = self.file.read(buffer);
+        self.flushed_read = Some(match &result {
+            Ok(_) => std::io::ErrorKind::Other,
+            Err(e) => e.kind(),
+        });
+        result
+    }
+}
+impl AsRawFd for Flushing {
+    fn as_raw_fd(&self) -> i32 {
+        self.file.as_raw_fd()
+    }
+}
+
+// Re-entered in its own process by the owning test below, so the signal flag
+// and handler it installs are not shared with any other test.
+#[test]
+fn flush_fixture() {
+    let Ok(mode) = std::env::var("CONNECTORS_FLUSH_FIXTURE") else {
+        return;
+    };
+    let signals = Signals::install().unwrap();
+    let (mut master_fd, mut slave_fd) = (-1, -1);
+    // SAFETY: initialized output slots; default terminal size/mode requested.
+    assert_eq!(
+        unsafe {
+            libc::openpty(
+                &mut master_fd,
+                &mut slave_fd,
+                std::ptr::null_mut(),
+                std::ptr::null(),
+                std::ptr::null(),
+            )
+        },
+        0
+    );
+    let (mut master, slave) =
+        unsafe { (File::from_raw_fd(master_fd), File::from_raw_fd(slave_fd)) };
+    // The protected terminal is opened non-blocking; so is this one.
+    assert_eq!(
+        unsafe { libc::fcntl(slave_fd, libc::F_SETFL, libc::O_NONBLOCK) },
+        0
+    );
+    master.write_all(b"x\n").unwrap();
+    let mut flushing = Flushing {
+        file: slave,
+        mode,
+        armed: true,
+        flushed_read: None,
+        helper: None,
+    };
+    let mut byte = [0];
+    let result = read_ready(
+        &mut flushing,
+        &mut byte,
+        connectors_sdk::now_ms() + TERMINAL_BUDGET.as_millis() as u64,
+    );
+    if let Some(helper) = flushing.helper.take() {
+        helper.join().unwrap();
+    }
+    assert_eq!(
+        flushing.flushed_read,
+        Some(std::io::ErrorKind::WouldBlock),
+        "the forced interleaving did not happen"
+    );
+    let code = result.as_ref().err().map(|e| e.code);
+    assert_eq!(code, Some(Code::Interrupted));
+    assert!(signals.interrupted());
+}
+
+#[test]
+fn interrupt_that_flushes_polled_input_before_the_read_is_reported_as_interrupted() {
+    for mode in ["before", "after"] {
+        let diagnostics = tempfile::tempfile().unwrap();
+        let mut child = Child(
+            Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "local::protected::tests::flush_fixture",
+                    "--nocapture",
+                ])
+                .env("CONNECTORS_FLUSH_FIXTURE", mode)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(diagnostics.try_clone().unwrap())
+                .spawn()
+                .unwrap(),
+        );
+        let until = Instant::now() + TERMINAL_BUDGET;
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break status;
+            }
+            assert!(Instant::now() < until, "flush fixture did not finish");
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        assert!(status.success(), "flush fixture failed ({mode}): {}", {
+            let mut stderr = String::new();
+            let mut diagnostics = diagnostics;
+            std::io::Seek::rewind(&mut diagnostics).unwrap();
+            diagnostics.read_to_string(&mut stderr).unwrap();
+            stderr
+        });
+    }
+}
