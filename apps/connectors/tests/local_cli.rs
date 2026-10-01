@@ -1,6 +1,8 @@
 use serde_json::Value;
 #[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
 mod clock_fixture;
+#[path = "support/socket.rs"]
+mod sockets;
 use std::{
     fs,
     os::unix::fs::PermissionsExt,
@@ -534,16 +536,19 @@ fn adversary_read_control(stream: &mut std::os::unix::net::UnixStream) -> Value 
 /// every later one to the real owner.
 #[test]
 fn adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mismatch() {
-    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::os::unix::net::UnixStream;
     let root = adversary_owner_root();
     let started = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let _owner = start_owner(started, &root);
     let state = root.path().join("state");
     fs::rename(state.join("owner.sock"), state.join("real.sock")).unwrap();
-    let listener = UnixListener::bind(state.join("owner.sock")).unwrap();
+    let directory = sockets::Directory::open(&state);
+    let listener = directory.bind("owner.sock");
     fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
-    let real = state.join("real.sock");
+    let real = directory.path("real.sock");
     std::thread::spawn(move || {
+        // `real` names the socket through this descriptor.
+        let _directory = &directory;
         let mut first = true;
         for stream in listener.incoming() {
             let Ok(client) = stream else { return };
@@ -586,7 +591,6 @@ fn adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mis
 #[test]
 fn adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest() {
     use std::io::Write;
-    use std::os::unix::net::UnixStream;
     let root = adversary_owner_root();
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let _owner = start_owner(binary, &root);
@@ -609,7 +613,7 @@ fn adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest() {
         .map(|b| format!("{b:02x}"))
         .collect::<String>();
     let greet = |build: Option<&str>| {
-        let mut stream = UnixStream::connect(state.join("owner.sock")).unwrap();
+        let mut stream = sockets::connect(&state, "owner.sock");
         let mut hello = serde_json::json!({
             "kind": "hello", "version": "connectors-owner/1",
             "challenge": "00000000-0000-4000-8000-000000000002",
@@ -630,7 +634,6 @@ fn adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest() {
 
 #[test]
 fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
-    use std::os::unix::net::UnixStream;
     let root = tempfile::tempdir().unwrap();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
@@ -642,11 +645,9 @@ fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
     fs::write(&config_path, config).unwrap();
     let started = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let _owner = start_owner(started, &root);
-    let socket = root.path().join("state/owner.sock");
+    let directory = sockets::Directory::open(&root.path().join("state"));
     // 32 silent clients occupy every slot until the owner's greeting timeout.
-    let held: Vec<_> = (0..32)
-        .map(|_| UnixStream::connect(&socket).unwrap())
-        .collect();
+    let held: Vec<_> = (0..32).map(|_| directory.connect("owner.sock")).collect();
     let refused = command(&root, &["adapters", "status", "--adapter", "forge"]);
     assert_eq!(refused.status.code(), Some(1));
     let error: Value = serde_json::from_slice(&refused.stderr).unwrap();
@@ -691,15 +692,18 @@ fn adversary2_relay(
     drop_first: impl Fn(usize, &Value) -> bool + Send + 'static,
 ) -> std::sync::Arc<std::sync::atomic::AtomicUsize> {
     use std::io::{Read, Write};
-    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::os::unix::net::UnixStream;
     let state = root.path().join("state");
     fs::rename(state.join("owner.sock"), state.join("real.sock")).unwrap();
-    let listener = UnixListener::bind(state.join("owner.sock")).unwrap();
+    let directory = sockets::Directory::open(&state);
+    let listener = directory.bind("owner.sock");
     fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
-    let real = state.join("real.sock");
+    let real = directory.path("real.sock");
     let relayed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counter = relayed.clone();
     std::thread::spawn(move || {
+        // `real` names the socket through this descriptor.
+        let _directory = &directory;
         for (index, stream) in listener.incoming().enumerate() {
             let Ok(mut client) = stream else { return };
             let mut sizes = [0u8; 12];
@@ -759,11 +763,10 @@ fn adversary2_code(output: &Output) -> Value {
 /// the owner as another build.
 #[test]
 fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs() {
-    use std::os::unix::net::UnixStream;
     let root = adversary_owner_root();
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let mut owner = start_owner(binary, &root);
-    let socket = root.path().join("state/owner.sock");
+    let directory = sockets::Directory::open(&root.path().join("state"));
     let mut seed: u64 = 0x5eed_2026_0929;
     let mut tally = std::collections::BTreeMap::<String, usize>::new();
     for _ in 0..100 {
@@ -771,9 +774,7 @@ fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_run
             .wrapping_mul(6364136223846793005)
             .wrapping_add(1442695040888963407);
         let delay = (seed >> 33) % 300;
-        let mut held: Vec<_> = (0..32)
-            .map(|_| UnixStream::connect(&socket).unwrap())
-            .collect();
+        let mut held: Vec<_> = (0..32).map(|_| directory.connect("owner.sock")).collect();
         let child = Command::new(binary)
             .args(["--output", "json", "--config"])
             .arg(root.path().join("config/config.toml"))
@@ -808,15 +809,12 @@ fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_run
 /// The CLI must say `capacity`, not another build and not `unavailable`.
 #[test]
 fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
-    use std::os::unix::net::UnixStream;
     let root = adversary_owner_root();
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let _owner = start_owner(binary, &root);
     let _relayed = adversary2_relay(&root, |index, _| index == 0);
-    let real = root.path().join("state/real.sock");
-    let held: Vec<_> = (0..32)
-        .map(|_| UnixStream::connect(&real).unwrap())
-        .collect();
+    let directory = sockets::Directory::open(&root.path().join("state"));
+    let held: Vec<_> = (0..32).map(|_| directory.connect("real.sock")).collect();
     std::thread::sleep(std::time::Duration::from_millis(200));
     let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
     assert_eq!(
@@ -912,7 +910,6 @@ fn adversary2_a_real_pre_handshake_owner_is_refused_by_name_and_the_reverse_is_o
 #[test]
 fn an_owner_still_serves_a_caller_that_never_named_its_build() {
     use std::io::Write;
-    use std::os::unix::net::UnixStream;
     let root = adversary_owner_root();
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let _owner = start_owner(binary, &root);
@@ -927,7 +924,7 @@ fn an_owner_still_serves_a_caller_that_never_named_its_build() {
         .unwrap()
         .trim()
         .to_owned();
-    let mut stream = UnixStream::connect(state.join("owner.sock")).unwrap();
+    let mut stream = sockets::connect(&state, "owner.sock");
     let hello = serde_json::json!({
         "kind": "hello", "version": "connectors-owner/1",
         "challenge": "00000000-0000-4000-8000-000000000003",
@@ -1022,7 +1019,7 @@ fn a_connected_client_keeps_an_owner_past_its_idle_bound() {
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let mut owner = start_owner_with(binary, &root, Some(1500));
     // Held without a greeting; the owner waits up to 10 s for one.
-    let held = std::os::unix::net::UnixStream::connect(state.join("owner.sock")).unwrap();
+    let held = sockets::connect(&state, "owner.sock");
     assert!(
         owner_exit(&mut owner, std::time::Duration::from_secs(4)).is_none(),
         "the owner exited with a client connected"
