@@ -119,6 +119,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         response: None,
         bounds: BTreeMap::new(),
         required: Vec::new(),
+        withhold: Vec::new(),
         rate_limit_reasons: Vec::new(),
         body_keys: Vec::new(),
     }
@@ -843,6 +844,166 @@ async fn a_bounded_parameter_is_checked_as_an_integer_before_any_request() {
             "per_page={per_page}"
         );
     }
+}
+
+#[test]
+fn a_selection_can_withhold_only_an_optional_declared_parameter() {
+    // A name the operation does not declare, a path parameter (required
+    // upstream), one the selection itself requires, one it also bounds, and
+    // one a guard reads as an input: each is refused when the selection loads.
+    for (id, selection) in [
+        (
+            "undeclared",
+            json!({"id": "one", "operation_id": "listMergeRequests", "effect": "read",
+                   "withhold": ["limit"]}),
+        ),
+        (
+            "empty",
+            json!({"id": "one", "operation_id": "listMergeRequests", "effect": "read",
+                   "withhold": [""]}),
+        ),
+        (
+            "path_parameter",
+            json!({"id": "one", "operation_id": "listMergeRequests", "effect": "read",
+                   "withhold": ["id"]}),
+        ),
+        (
+            "selection_required",
+            json!({"id": "one", "operation_id": "listMergeRequests", "effect": "read",
+                   "required": ["state"], "withhold": ["state"]}),
+        ),
+        (
+            "bounded",
+            json!({"id": "one", "operation_id": "listMergeRequests", "effect": "read",
+                   "bounds": {"per_page": {"maximum": 100}}, "withhold": ["per_page"]}),
+        ),
+    ] {
+        let error = Engine::new(&bundle(), "/api/v4", &[written(selection)])
+            .err()
+            .unwrap_or_else(|| panic!("`{id}` loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "`{id}`");
+        assert!(
+            error.message.contains("withholds"),
+            "`{id}`: {}",
+            error.message
+        );
+    }
+    // A guard that reads a withheld name as an input would declare it again.
+    let bytes = serde_json::to_vec(&json!({
+        "openapi": "3.0.0",
+        "info": {"title": "guarded", "version": "1"},
+        "paths": {"/v1/things/{id}": {
+            "get": {
+                "operationId": "getThing",
+                "parameters": [{"name": "id", "in": "path", "required": true, "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
+            },
+            "put": {
+                "operationId": "putThing",
+                "parameters": [
+                    {"name": "id", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "mode", "in": "query", "schema": {"type": "string"}}
+                ],
+                "requestBody": {"required": true, "content": {"application/json": {"schema": {"type": "object"}}}},
+                "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
+            }
+        }}
+    }))
+    .unwrap();
+    let guarded = Bundle {
+        provider: "guarded".into(),
+        source: ingest("guarded.json", &bytes).unwrap(),
+        inventory: inventory::extract(&serde_json::from_slice(&bytes).unwrap()),
+        auth_profile: "fixture.token".into(),
+    };
+    let guard = |reads: &str| {
+        json!({
+            "preflight": {"operation_id": "getThing", "values": {"id": "id"},
+                          "checks": [{"pointer": "/mode", "expect": {"input": reads}}]},
+            "postflight": {"checks": []}
+        })
+    };
+    let error = Engine::new(
+        &guarded,
+        "/v1",
+        &[written(json!({
+            "id": "thing.put", "operation_id": "putThing", "effect": "write",
+            "withhold": ["mode"], "guard": guard("mode")
+        }))],
+    )
+    .err()
+    .expect("a guard reading a withheld name loaded");
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+    assert!(error.message.contains("withholds"), "{}", error.message);
+    // The same guard reading another input loads, and `mode` is not declared.
+    let engine = Engine::new(
+        &guarded,
+        "/v1",
+        &[written(json!({
+            "id": "thing.put", "operation_id": "putThing", "effect": "write",
+            "withhold": ["mode"], "guard": guard("expected_mode")
+        }))],
+    )
+    .unwrap();
+    let declared = &engine.declarations(&[Effect::Write])[0].input_schema["properties"];
+    assert!(declared.get("mode").is_none(), "{declared}");
+    // The field round-trips, and a selection without it serialises as before.
+    let withheld = written(json!({
+        "id": "merge_requests.list", "operation_id": "listMergeRequests", "effect": "read",
+        "withhold": ["state"]
+    }));
+    assert_eq!(
+        serde_json::to_value(&withheld).unwrap()["withhold"],
+        json!(["state"])
+    );
+    let plain = serde_json::to_value(select(
+        "merge_requests.list",
+        "listMergeRequests",
+        Effect::Read,
+    ))
+    .unwrap();
+    assert!(plain.get("withhold").is_none(), "{plain}");
+}
+
+#[tokio::test]
+async fn a_withheld_parameter_is_not_declared_and_is_refused_before_any_request() {
+    let withheld = written(json!({
+        "id": "merge_requests.list", "operation_id": "listMergeRequests", "effect": "read",
+        "bounds": {"per_page": {"minimum": 1, "maximum": 100}}, "withhold": ["state"]
+    }));
+    let engine = Engine::new(&bundle(), "/api/v4", &[withheld]).unwrap();
+    // Describe lists every other parameter, and not the withheld one.
+    let declared = &engine.declarations(&[Effect::Read])[0].input_schema;
+    let names: Vec<&String> = declared["properties"].as_object().unwrap().keys().collect();
+    assert_eq!(names, ["id", "per_page"], "{declared}");
+    // An input carrying it, with any value, is refused with nothing sent.
+    for state in [json!("opened"), json!(""), json!(1), json!(true)] {
+        assert_eq!(
+            refused_with_nothing_sent(
+                &engine,
+                "merge_requests.list",
+                json!({"id": "org/project", "state": state}),
+            )
+            .await,
+            ErrorCode::InvalidInput,
+            "state={state}"
+        );
+    }
+    // Without it the read goes out with the parameters it does carry.
+    let http = reads(vec![response(200, json!([]))]);
+    engine
+        .read(
+            http.as_ref(),
+            "fixture",
+            "merge_requests.list",
+            json!({"id": "org/project", "per_page": 20}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        http.calls.lock().unwrap()[0].1,
+        [("per_page".to_string(), "20".to_string())]
+    );
 }
 
 /// A second fixture for the parameter and answer shapes: a repeated string, a
