@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-01T08:21:11Z",
+  "actor": "human:timo",
+  "artifact": "epic:google-workspace-reads",
+  "kind": "epic",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv at 9bafa48a7 (tree of v0.21.0 merge c90adeaf4): all checks passed, 136 suites, 1096 passed, 0 failed, 43 ignored"
+  }
+}
