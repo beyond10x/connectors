@@ -143,6 +143,23 @@ types:
     kind: struct
     fields:
       - {name: secret_service_socket, type: "Optional<String>"}
+  # Lowercase hex SHA-256 of an executable, as owner.rs writes it (hex::encode).
+  - name: connectors.cli.BuildDigest
+    kind: newtype
+    of: String
+    alphabet: "0123456789abcdef"
+    invariants:
+      - value.count == 64
+  # Request::Hello in local/owner.rs, the greeting the CLI sends; build is absent
+  # only from callers built before the build handshake.
+  - name: connectors.cli.LocalOwnerHello
+    kind: struct
+    fields:
+      - {name: version, type: String}
+      - {name: challenge, type: String}
+      - {name: configuration, type: String}
+      - {name: authority, type: String}
+      - {name: build, type: "Optional<connectors.cli.BuildDigest>"}
   - name: connectors.cli.LocalOwnerGreeting
     kind: struct
     fields:
@@ -150,14 +167,22 @@ types:
       - {name: challenge, type: String}
       - {name: host_incarnation, type: String}
       - {name: authority, type: String}
-      - {name: build, type: "Optional<String>"}
-    # build is the owner's executable SHA-256, returned only to a caller whose
-    # greeting carried its own; a caller that omitted it may send the fallback
-    # `build` request, answered with LocalOwnerBuild.
+      - {name: build, type: "Optional<connectors.cli.BuildDigest>"}
+    # build is returned only to a caller whose LocalOwnerHello carried its own; a
+    # caller that omitted it may send LocalOwnerBuildRequest, answered with LocalOwnerBuild.
+  # Request::Build is a unit variant: its whole frame is {"kind": "build"}. ESS refuses
+  # a struct with no fields (ESS-TYPE-007), so the frame's tag is its one field.
+  - name: connectors.cli.LocalOwnerBuildKind
+    kind: enum
+    variants: [build]
+  - name: connectors.cli.LocalOwnerBuildRequest
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerBuildKind}
   - name: connectors.cli.LocalOwnerBuild
     kind: struct
     fields:
-      - {name: build, type: String}
+      - {name: build, type: connectors.cli.BuildDigest}
   - name: connectors.cli.LocalCaptureAdmission
     kind: struct
     fields:
@@ -829,7 +854,7 @@ commands:
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
     # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:349) and the host
-    # removal path (er.rs:3114-3118) only expires Active cursors. The error name is
+    # removal path (er.rs:3538-3540) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:
