@@ -4,6 +4,8 @@ id: story:configuration-change-error
 kind: story
 status: draft
 title: A connect under a changed native configuration names the cause
+relations:
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: apps/connectors-cli-contract/binding.json
