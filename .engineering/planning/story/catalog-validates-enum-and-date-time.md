@@ -6,7 +6,42 @@ status: draft
 title: The catalog engine refuses values outside an enum or a date-time format
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/confluence.bundle.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/gitlab.bundle.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/google-calendar.bundle.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/google-drive.bundle.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/google-gmail.bundle.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/google-slides.bundle.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/hubspot.bundle.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/index.json
+- confidence: inferred
+  path: adapters/catalog/generated/bundles/jira.bundle.json
+- confidence: cited
+  path: adapters/catalog/src/lib.rs
+- confidence: cited
+  path: adapters/catalog/tests/gitlab_commit_reads_adversary.rs
+- confidence: inferred
+  path: adapters/catalog/tests/parameter_types.rs
+- confidence: cited
+  path: crates/connectors-catalog/src/authored.rs
+- confidence: cited
+  path: crates/connectors-catalog/src/inventory.rs
+- confidence: inferred
+  path: crates/connectors-catalog/tests/template.rs
+- confidence: cited
+  path: docs/local-catalog-provider.md
+revision: 3
 ---
 ## Observed
 

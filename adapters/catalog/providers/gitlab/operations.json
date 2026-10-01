@@ -46,6 +46,9 @@
      "bounds": {"per_page": {"minimum": 1, "maximum": 100}}},
     {"id": "repository.compare", "operation_id": "getApiV4ProjectsIdRepositoryCompare", "effect": "read",
      "description": "Compare two refs; a true compare_timeout means GitLab stopped early, not that no commits lie between them"},
+    {"id": "deployments.list", "operation_id": "getApiV4ProjectsIdDeployments", "effect": "read",
+     "description": "List a project's deployments with their environment and job, one page per call; updated_after, updated_before, finished_after and finished_before filter by time",
+     "bounds": {"per_page": {"minimum": 1, "maximum": 100}}},
     {"id": "merge_request.create", "operation_id": "postApiV4ProjectsIdMergeRequests", "effect": "write",
      "description": "Open a merge request whose source branch head is the pinned sha",
      "guard": {

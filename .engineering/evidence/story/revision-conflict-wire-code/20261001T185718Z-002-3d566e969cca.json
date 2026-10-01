@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T18:57:18Z",
+  "actor": "human:timo",
+  "artifact": "story:revision-conflict-wire-code",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors -p connectors-host --test revision_conflict --test revision_conflict_adversary (base 00fade41e: metadata_unavailable for a revision conflict, red log; treatment HEAD: revision_conflict, 5 passed)",
+    "reference": "<wave-scratch>/revision/scratch/red.log vs green2.log"
+  }
+}

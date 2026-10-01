@@ -43,7 +43,7 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the HubSpot guide](catalog-hubspot.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
-serves the provider from the pinned source alone, plus six repository reads:
+serves the provider from the pinned source alone, plus seven repository reads:
 
 | id | source operation | effect |
 |---|---|---|
@@ -61,7 +61,7 @@ GitLab serves at most 100 items per page, so with a larger value every page
 would be short and the walk would stop after page one. The pinned source
 declares no range, so the shipped selection bounds `per_page` to 1 through 100
 on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
-`pipeline.jobs` and these five): a value of zero or below never ends a walk on a
+`pipeline.jobs` and these six): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares
@@ -79,9 +79,10 @@ refused as `invalid_input` before any request.
 | `project.events` | `getApiV4ProjectsIdEvents` | `GET /projects/{id}/events` | `after`, `before` (dates) | read |
 | `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; offset paging (`page`, `per_page`) only: `pagination=keyset` is not supported, because the provider does not follow GitLab's `Link` header; `read_api` scope | `since`, `until`: a string that GitLab reads as an ISO 8601 date-time | read |
 | `repository.compare` | `getApiV4ProjectsIdRepositoryCompare` | `GET /projects/{id}/repository/compare` with `from` and `to` (both required) and `straight`; not paged; `read_api` scope. The body is GitLab's own: an empty compare answers `200` with `"commits": []` and `"compare_timeout": false`, a compare GitLab cut short also answers `200`, possibly with `"commits": []`, but with `"compare_timeout": true`; so read `body.compare_timeout`, not the length of `commits`, to tell them apart. GitLab always includes `diffs`, and a body over the provider's 4 MiB response limit answers `capacity` with no body at all; to place commits between two tags, walk `commits.list` instead, which carries no diffs | none | read |
+| `deployments.list` | `getApiV4ProjectsIdDeployments` | `GET /projects/{id}/deployments`, e.g. `environment`, `status`, `order_by`, `sort`; the body is GitLab's own, so each deployment carries `environment.name` and `deployable`, the job that ran it (`deployable.id`); a project the token cannot read answers GitLab's `403` or `404` with the refusal the other list reads answer; `read_api` scope | `updated_after`, `updated_before`, `finished_after`, `finished_before`: strings that GitLab reads as ISO 8601 date-times | read |
 
 `projects.list` returns each project unchanged, including `archived`,
-`created_at`, `last_activity_at` and `path_with_namespace`. All six need only
+`created_at`, `last_activity_at` and `path_with_namespace`. All seven need only
 the `read_api` token scope.
 
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle

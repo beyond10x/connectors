@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T18:29:03Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-gitlab-deployment-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test gitlab_deployment_reads (new behaviour: base 00fade41e has no deployments.list — red log 'deployments.list is not a declared read'; treatment 73b643041: 4 passed)",
+    "reference": "<wave-scratch>/deploy/scratch/red.log vs green.log"
+  }
+}
