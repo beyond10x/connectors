@@ -2,11 +2,23 @@
 format: aep.planning-md/3
 id: story:metadata-invoke-cost-flat-in-store-size
 kind: story
-status: draft
+status: active
 title: Per-invoke metadata cost does not grow with the store
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+scope:
+- confidence: inferred
+  path: crates/connectors-host/src/local/metadata.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/metadata/er.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry/tests.rs
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
 ---
 ## Source
 
@@ -44,3 +56,17 @@ The default local store (`~/.local/state/connectors`, 837 events, 29.5 MB, 24 MB
 answering `outcome_unknown` at `publication`; new connections stayed `pending`. The same adapter
 configuration revalidated in a 3.7 MB store. The store was moved to `connectors.grown-20260930` and
 re-initialised to restore use.
+
+## Observed on a fresh store (2026-10-01, 0.22.0)
+
+The default store was reset at 22:49. One consumer run of paged Jira reads failed after 313 s with `timeout` on an
+invoke and `outcome_unknown` on a revalidate. Measured in the same store:
+
+| events | `issues.search` (maxResults 1) |
+|---|---|
+| about 50 (after reconnect) | 1.75 s |
+| 577 (8 minutes later) | 13.5 s |
+
+One invoke appended 10 events (567 to 577). At about 22 ms per recorded event, a paged source (one search per 100
+issues plus one comment read per issue) reaches the 30 s bridge deadline after roughly 100 invokes, so no paged
+source can complete. The consumer has parked its Jira run until this story ships.
