@@ -1540,7 +1540,8 @@ mod tests {
         )
         .unwrap();
         Config::initialize(&paths).unwrap();
-        let socket = paths.state.join("owner.sock");
+        let directory = fs::directory(&paths.state, false, true).unwrap();
+        let socket = socket_path(&directory);
         let listener = UnixListener::bind(&socket).unwrap();
         std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
         let seen = Arc::new(Mutex::new(Vec::new()));
@@ -1594,7 +1595,7 @@ mod tests {
             unsafe { libc::flock(held.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
             0
         );
-        let socket = paths.state.join("owner.sock");
+        let socket = socket_path(&directory);
         let retiring = UnixListener::bind(&socket).unwrap();
         std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
         let cli = {
@@ -1787,12 +1788,15 @@ mod idle_sweep_tests {
             clients: AtomicUsize::new(0),
         });
         let recovery = maintenance::Background::start(paths, owner.pool.clone()).unwrap();
-        let socket = state.join("owner.sock");
+        let directory = fs::directory(state, false, true).unwrap();
+        let socket = socket_path(&directory);
         let mut listener = listen(&socket).unwrap();
         let (done, finished) = std::sync::mpsc::channel();
         let serving = owner.clone();
         let started = Instant::now();
         let loop_thread = std::thread::spawn(move || {
+            // Keeps the descriptor that `socket` names open while the loop uses it.
+            let _directory = &directory;
             let (result, retired) = accept(&serving, &recovery, &mut listener, &socket, bound);
             let _ = done.send(started.elapsed());
             recovery.stop().unwrap();
