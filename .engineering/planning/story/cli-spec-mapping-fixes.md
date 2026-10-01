@@ -2,11 +2,21 @@
 format: aep.planning-md/3
 id: story:cli-spec-mapping-fixes
 kind: story
-status: draft
+status: active
 title: CLI spec matches the owner greeting and cites the contract correctly
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: inferred
+  path: apps/connectors-cli-contract
+- confidence: inferred
+  path: crates/connectors-host/src/local/metadata/entity-runtime-definitions.json
+- confidence: cited
+  path: ess/domains/cli.yaml
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T11:06:17Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-10-01T11:06:18Z", actor: "human:timo", revision: 5}
 ---
 ## Source
 
