@@ -120,13 +120,15 @@ fn refusal(config: &Value) -> String {
 /// rebuilt bundle changes these, and `bundle_drift.rs` pins the bundles. They
 /// were re-pinned when the bundles were rebuilt to record repeated query
 /// parameters, and again when a repeated parameter's declared schema was typed
-/// like its elements.
+/// like its elements. The GitLab example loads the shipped selection set, so
+/// its pair was re-pinned again when that set gained `commits.list` and
+/// `repository.compare`.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "3fe50e13d4ffa3aebc78634b2e14a94fe66c235c38af5569a79fcbf972fd5a9d",
-        "f87354a4d17235768ef1745c5693296658c66e7fedd179fbe00aac2a58b5bb80",
+        "b16841334344b517d7b646dd9bb82895f016fb844f819e45fa3ca143d4c1c2da",
+        "0cd915bd706d450d2d344ff1b2a305da369c679bb2ed77622e5bae4cf664c4f5",
     ),
     (
         "catalog-jira.md",
