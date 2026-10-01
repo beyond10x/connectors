@@ -89,3 +89,13 @@ the organization secret `B10X_GATES_POLICY` (CI's copy of the gates policy, last
    `chmod 600` it; then `story:catalog-google-live-deck-read` and an agentic e2e trial can run.
    `~/.config/b10x/google-oauth-client.json` holds only a flat `client_id`/`client_secret` and
    does not work with the consent flow.
+
+## Release (2026-10-01)
+
+Steps 1–3 of the handoff are done. The secret was updated at 07:39:39Z; the re-run of the
+security check passed (run 36831098431, attempt 2). PR #61 was brought up to date with `main`
+(`206e4022c`) and merged as `44bcb7806`. Release PR #64 merged as `c90adeaf4`, whose tree is the
+tree `connectors-build gate --msrv` passed on at `9bafa48a7` (136 suites, 1096 passed, 0 failed,
+43 ignored). Tag `v0.21.0` and its release page are by `b10x-bot[bot]`; the page is Latest.
+`npm run build` in `website/` still fails at `connectors-build examples`
+(`story:website-build-examples-ess-enum`, unchanged since 0.18.0). Step 4 remains open.
