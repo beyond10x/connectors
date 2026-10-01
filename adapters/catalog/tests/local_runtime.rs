@@ -183,10 +183,16 @@ impl Provider {
                         (403, json!({"message":"403 Forbidden"}))
                     } else if route.ends_with("fixture-missing") {
                         (404, json!({"message":"404 Project Not Found"}))
+                    } else if route.contains("/projects/fixture-refused/") {
+                        (403, json!({"message":"403 Forbidden"}))
+                    } else if route.contains("/projects/fixture-missing/") {
+                        (404, json!({"message":"404 Project Not Found"}))
                     } else if let Some(page) = repository_page(route, &path) {
                         (200, page)
                     } else if let Some(body) = commit_graph_page(route, &path) {
                         (200, body)
+                    } else if let Some(page) = deployment_page(route, &path) {
+                        (200, page)
                     } else if path.contains("/issues?") {
                         (200, json!([{"id":1,"title":"fixture"}]))
                     } else if path.contains("/repository/files/") {
@@ -870,4 +876,113 @@ fn commit_graph_reads_send_the_declared_request_and_tell_a_timeout_from_an_empty
     assert_eq!(empty["compare_timeout"], json!(false));
     assert_eq!(timed_out["commits"], json!([]));
     assert_eq!(timed_out["compare_timeout"], json!(true));
+}
+
+/// The recorded GitLab deployments the fixture serves: two on page one and one
+/// on page two, each carrying the environment it went to and the job that ran
+/// it. `None` for any other route.
+fn deployment_page(route: &str, path: &str) -> Option<Value> {
+    if !route.ends_with("/deployments") {
+        return None;
+    }
+    let second = path
+        .split_once('?')
+        .is_some_and(|(_, query)| query.split('&').any(|pair| pair == "page=2"));
+    let deployment = |id: u64, environment: &str, job: u64| {
+        json!({"id": id, "iid": id, "ref": "main", "sha": format!("c0ffee{id:02}"),
+               "status": "success", "created_at": "2026-09-10T08:00:00.000Z",
+               "updated_at": "2026-09-10T08:05:00.000Z",
+               "environment": {"id": 3, "name": environment},
+               "deployable": {"id": job, "name": "release", "stage": "deploy",
+                              "status": "success"}})
+    };
+    Some(if second {
+        json!([deployment(1, "review/fix-1", 7001)])
+    } else {
+        json!([
+            deployment(3, "production", 7003),
+            deployment(2, "staging", 7002)
+        ])
+    })
+}
+
+/// `deployments.list` through the owned child and the TLS fixture: the exact
+/// request it sends, a walk that stops on the short second page with every
+/// record carrying `environment.name` and `deployable.id`, and a project the
+/// token cannot read (GitLab's 403 and 404) answered with the failure
+/// `pipelines.list` answers for the same project.
+#[test]
+fn deployments_list_sends_the_declared_request_and_walks_to_a_short_page() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let first = "/api/v4/projects/org%2Fproject/deployments?order_by=updated_at&sort=desc\
+                 &updated_after=2026-09-01T00%3A00%3A00Z&environment=production\
+                 &status=success&page=1&per_page=2";
+    let mut items = Vec::new();
+    let mut page = 1;
+    loop {
+        let before = provider.count();
+        let result = invoke(
+            &mut child,
+            "deployments.list",
+            "one",
+            &token(true),
+            json!({"id": "org/project", "order_by": "updated_at", "sort": "desc",
+                   "updated_after": "2026-09-01T00:00:00Z", "environment": "production",
+                   "status": "success", "page": page, "per_page": 2}),
+        )
+        .unwrap_or_else(|failure| panic!("`deployments.list` page {page}: {failure:?}"));
+        let calls = provider.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), before + 1);
+        let mut sent: Vec<&str> = calls[before].split(['?', '&']).collect();
+        let expected = first.replace("page=1", &format!("page={page}"));
+        let mut expected: Vec<&str> = expected.split(['?', '&']).collect();
+        sent.sort();
+        expected.sort();
+        assert_eq!(sent, expected, "page {page}");
+        assert_eq!(result["status"], 200);
+        assert_eq!(
+            Some(&result["body"]),
+            deployment_page("/api/v4/projects/org%2Fproject/deployments", &calls[before]).as_ref(),
+            "page {page}"
+        );
+        let body = result["body"].as_array().unwrap().clone();
+        let short = body.len() < 2;
+        items.extend(body);
+        if short {
+            break;
+        }
+        page += 1;
+        assert!(page <= 3, "`deployments.list` did not stop");
+    }
+    assert_eq!(page, 2);
+    let environments: Vec<&str> = items
+        .iter()
+        .map(|d| d["environment"]["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(environments, ["production", "staging", "review/fix-1"]);
+    let jobs: Vec<u64> = items
+        .iter()
+        .map(|d| d["deployable"]["id"].as_u64().unwrap())
+        .collect();
+    assert_eq!(jobs, [7003, 7002, 7001]);
+
+    for project in ["fixture-refused", "fixture-missing"] {
+        let mut refusal = |operation: &str| {
+            let before = provider.count();
+            let failure = invoke(
+                &mut child,
+                operation,
+                "one",
+                &token(true),
+                json!({"id": project}),
+            )
+            .expect_err("a refusal");
+            assert_eq!(provider.count(), before + 1, "`{operation}` {project}");
+            failure
+        };
+        let pipelines = refusal("pipelines.list");
+        let deployments = refusal("deployments.list");
+        assert_eq!(deployments, pipelines, "{project}");
+    }
 }
