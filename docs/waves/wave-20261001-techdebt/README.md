@@ -59,8 +59,7 @@ of the integration branch into `main` through a pull request once the gate is gr
 - `story:planning-store-hygiene-20261001`: implemented. `release-plan:connectors-0-15-0` implemented;
   `release-plan:gitlab-v020` superseded by `release-plan:connectors-v080`; the duplicate replay-flake
   story had already been archived in `7e5015cf1`.
-- Open: the `repository gate` check is not a required status check in the `main` ruleset, so a red
-  Rust gate does not block a merge. Making it required changes the merge path for every session and
-  waits on the operator.
+- Required since 2026-10-01 12:10 (operator: "sure gate is mandatory"): ruleset 23511229 lists
+  `repository gate` beside `common / Security and privacy` and `planning validate`; strict mode on.
 - `main` gained wave `20260930c` during this wave; its merge brought one conflict in
   `docs/development.md`, resolved by keeping both the SUN_LEN paragraph and the CI paragraph.
