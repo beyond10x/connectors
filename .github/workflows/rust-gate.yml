@@ -1,0 +1,63 @@
+name: Rust gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-gate-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gate:
+    name: repository gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Check required system tools
+        run: for tool in gzip sha256sum sqlite3 jq; do command -v "$tool"; done
+      - name: Install Rust 1.98.1
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
+          rustup default 1.98.1
+          rustc --version
+          cargo fmt --version
+          cargo clippy --version
+      - name: Install the pinned ess release
+        working-directory: ${{ runner.temp }}
+        run: |
+          version="$(jq -r .ess "$GITHUB_WORKSPACE/crates/connectors-spec/toolchain.json")"
+          archive="ess-$version-x86_64-unknown-linux-gnu.tar.gz"
+          base="https://github.com/beyond10x/ess/releases/download/$version"
+          curl -fsSLO "$base/$archive"
+          curl -fsSL -o ess-SHA256SUMS "$base/SHA256SUMS"
+          grep " $archive\$" ess-SHA256SUMS | sha256sum -c -
+          tar -xzf "$archive"
+          echo "$PWD/ess-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
+      - name: Install the pinned aep release
+        working-directory: ${{ runner.temp }}
+        run: |
+          version="$(jq -r .aep "$GITHUB_WORKSPACE/crates/connectors-build/aep-toolchain.json")"
+          archive="aep-$version-x86_64-unknown-linux-gnu.tar.gz"
+          base="https://github.com/beyond10x/aep/releases/download/$version"
+          curl -fsSLO "$base/$archive"
+          curl -fsSL -o aep-SHA256SUMS "$base/SHA256SUMS"
+          grep " $archive\$" aep-SHA256SUMS | sha256sum -c -
+          tar -xzf "$archive"
+          echo "$PWD/aep-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+      - name: Run the repository gate
+        run: cargo run --locked -p connectors-build -- gate
+      - name: Report disk use
+        if: always()
+        run: |
+          df -h /
+          du -sh target || true
