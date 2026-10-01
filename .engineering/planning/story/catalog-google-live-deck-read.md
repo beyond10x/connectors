@@ -16,7 +16,7 @@ scope:
   path: docs/catalog-google-oauth.md
 - confidence: inferred
   path: docs/catalog-google-slides.md
-revision: 2
+revision: 3
 ---
 ## Outcome
 
@@ -45,3 +45,7 @@ Each observation recorded with `aep plan artifact evidence` against this story, 
 ## Out of scope
 
 Calendar, Gmail and writes live runs.
+
+## Performed by
+
+The operator runs this test by hand: the browser consent and the reading of the deck happen at a person's keyboard, against live Google, with the operator's own Desktop OAuth client (`credential-blocker:google-oauth-client`). Kept open on 2026-10-01 as the one human test of the Google work; every other story under `epic:google-workspace-reads` is implemented and released in v0.21.0.
