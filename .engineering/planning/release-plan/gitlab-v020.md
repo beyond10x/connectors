@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:gitlab-v020
 kind: release-plan
-status: active
+status: superseded
 title: Release v0.2.0 from the verified GitLab CLI increment
 relations:
 - informed_by: initiative:complete-local-connectors
 - informed_by: story:gitlab-mr-validation
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "active", at: "2026-09-10T23:29:22Z", actor: "human:timo", revision: 2, imported: true}
+- {from: "active", to: "superseded", at: "2026-10-01T07:33:34Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Scope and authority
 
@@ -48,3 +49,7 @@ The operator subsequently instructed this side conversation to push the tag and 
 Resolve planning conflicts by selecting the existing main planning snapshot and replaying the release records through AEP. The original release journal and revisions remain available in the second merge parent. This store carries a fresh replay and explicit evidence reference, retaining every pre-existing main journal entry. No provider story is closed and no implementation decomposition is changed.
 
 Push the merged main and exact v0.2.0 tag to the only configured remote, ess-recovery. This is the requested available push destination; no external source URL was supplied and external publication remains unverified. The publication-target blocker therefore remains open. Verify local main ancestry and remote refs after integration, then clean up this integration worktree.
+
+## Closed
+
+Closed 2026-10-01 by `story:planning-store-hygiene-20261001` as superseded. This plan pushed its v0.2.0 tag to the `ess-recovery` remote, not to GitHub. The `v0.2.0` tag on `beyond10x/connectors` is the predecessor lineage's (`062c21d5547ad7bdd15c411fc939f838eb7c9044`, 2026-08-25); this lineage publishes from v0.8.0 on (`AGENTS.md`, Atlas ADR 0051). Whether the recovery push took place is not established here.

@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-01T07:33:55Z",
+  "actor": "human:timo",
+  "artifact": "story:planning-store-hygiene-20261001",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "aep plan artifact list --kind release-plan --status active: 0 rows; aep plan artifact validate: valid; story:registry-replay-test-flaky-under-load archived with ## Closed naming story:grown-store-replay-test-flake"
+  }
+}

@@ -6,7 +6,7 @@ status: archived
 title: Grown-store replay test saw two replays under load
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "archived", at: "2026-09-30T16:59:08Z", actor: "human:timo", revision: 3}
 ---
@@ -34,3 +34,7 @@ Duplicate of story:grown-store-replay-test-flake, implemented in wave 20260930b 
 `impl/grown-store-replay-test-flake`, merged at `5a438dc0e`). Cause named there: the idle-handle pool in
 `metadata/er.rs` was shared by every test in the binary, and other tests' releases evicted the owner's handle;
 the limit now applies per process. 10 of 10 full `--lib` runs after the fix. The 100-run acceptance above was not run.
+
+## Closed
+
+Archived 2026-09-30 (commit `7e5015cf1`, "plan: archive the duplicate replay-flake story") as a duplicate of `story:grown-store-replay-test-flake`. `story:planning-store-hygiene-20261001` listed it before that archive reached its reading of the store.

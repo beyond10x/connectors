@@ -21,8 +21,15 @@ be short: from a managed worktree under `~/.local/state/worktree/trees/…` the 
 exceed `SUN_LEN` and eight `apps/connectors/tests/local_cli.rs` tests fail with "path must be
 shorter than SUN_LEN" (measured 2026-09-30). Run the gate from a short checkout, such as a
 `git clone --shared` of the exact commit under `~/.cache`. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
-its `msrv/` subdirectory (default `target/msrv`). This local repository has no
-configured CI or publication target.
+its `msrv/` subdirectory (default `target/msrv`).
+
+[`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
+gate without `--msrv` on every pull request and every push to `main`. It installs
+Rust 1.98.1 with rustfmt and Clippy, installs the pinned ESS and AEP releases after
+checking each archive against its release's `SHA256SUMS`, fetches the locked
+dependencies and runs `cargo run --locked -p connectors-build -- gate`. It reads the
+repository with `contents: read` only and carries no credential. The `--msrv`
+checks remain local.
 
 The local Entity Runtime/Eventlog adapter replays the complete recorded store
 once per process and store; later opens and writes in that process read back
