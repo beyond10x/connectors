@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T15:58:48Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-oauth2-refresh-profile",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test local_runtime oauth (and -- --ignored with CONNECTORS_TEST_CLI) at b3a287d02 vs df1e316e3",
+    "reference": "baseline: an auth.scheme oauth2_refresh configuration is refused at load (only token|basic exist, adapters/catalog/src/local.rs:46-52 at b3a287d02); treatment: local_runtime 45 passed, ignored CLI journeys 8 passed, including oauth_exchange_sends_form_and_uses_bearer and oauth_invalid_grant_reports_repair"
+  }
+}

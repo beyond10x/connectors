@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T17:46:28Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-google-gmail-draft-writes",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test google_gmail --test google_gmail_writes_adversary --test body_keys_adversary at 307c82dd0 vs 785a898c7",
+    "reference": "baseline: users.drafts.create/send absent from google-gmail; treatment: google_gmail 32 passed incl. changed draft sends nothing, body_keys refuses a replacement message before any request, adversary files 2+4 passed (c2-green.log in ~/.cache/w0930wg)"
+  }
+}

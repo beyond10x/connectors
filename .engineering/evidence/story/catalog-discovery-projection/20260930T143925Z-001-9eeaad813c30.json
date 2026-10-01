@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T14:39:25Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-discovery-projection",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "connectors-build catalog on adapters/google/upstream/drive/drive-api.json, raw (baseline) vs projected with --derived-from (treatment), at 71d80b25a",
+    "reference": "baseline: exit 1 'source declares no openapi version'; treatment: exit 0, 64 inventoried, 0 unsupported, derivation.from_sha256 50a01d9b…; outputs in ~/.cache/connectors-wave0930c/projection/verify"
+  }
+}
