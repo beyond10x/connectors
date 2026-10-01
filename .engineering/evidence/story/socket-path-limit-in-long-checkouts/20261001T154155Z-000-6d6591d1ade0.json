@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T15:41:55Z",
+  "actor": "human:timo",
+  "artifact": "story:socket-path-limit-in-long-checkouts",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "artifact",
+    "source": "Source release v0.22.0: tag v0.22.0 (b10x-bot[bot]) peels to 3e65864a12d7f6ef4127f45dcbaf14a45fd2af92 on main (PR #72); release page by b10x-bot[bot], Latest; release gate at d349d99ee: 142 suites, 1135 passed, 0 failed",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.22.0"
+  }
+}
