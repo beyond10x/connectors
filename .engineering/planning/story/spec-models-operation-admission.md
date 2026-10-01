@@ -6,7 +6,20 @@ status: draft
 title: 'The ESS spec models operation admission: absent, not granted, stale description'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: apps/connectors-cli-contract
+- confidence: inferred
+  path: crates/connectors-build/src/metadata_conformance.rs
+- confidence: inferred
+  path: crates/connectors-build/src/metadata_entities.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/metadata/entity-runtime-definitions.json
+- confidence: inferred
+  path: crates/connectors-host/src/local/metadata/er.rs
+- confidence: cited
+  path: ess/domains/declarations.yaml
+revision: 3
 ---
 ## Source
 

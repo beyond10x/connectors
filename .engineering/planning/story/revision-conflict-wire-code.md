@@ -4,6 +4,8 @@ id: story:revision-conflict-wire-code
 kind: story
 status: draft
 title: A revision conflict has its own CLI error code
+relations:
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: apps/connectors-cli-contract

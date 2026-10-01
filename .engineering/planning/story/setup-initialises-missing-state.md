@@ -6,7 +6,28 @@ status: draft
 title: An existing configuration with no metadata store can be initialised
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: apps/connectors-cli-contract
+- confidence: cited
+  path: apps/connectors/spec/cli.yaml
+- confidence: cited
+  path: apps/connectors/src/local.rs
+- confidence: inferred
+  path: apps/connectors/tests/cli_surface_minor.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-host/src/local/config.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/metadata.rs
+- confidence: cited
+  path: crates/connectors-host/tests/local_foundation.rs
+- confidence: inferred
+  path: docs/local-runtime-foundation.md
+- confidence: inferred
+  path: ess/domains/cli.yaml
+revision: 3
 ---
 ## Source
 

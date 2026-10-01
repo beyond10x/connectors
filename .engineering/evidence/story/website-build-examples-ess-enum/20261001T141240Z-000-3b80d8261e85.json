@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-01T14:12:40Z",
+  "actor": "human:timo",
+  "artifact": "story:website-build-examples-ess-enum",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run -p connectors-build -- gate --msrv at 2806bc677 (tree of 37f19c7ce), ESS 0.45.0, AEP 0.65.0: all checks passed, 136 suites, 1098 passed, 0 failed, 43 ignored; npm run build in website/ exit 0"
+  }
+}
