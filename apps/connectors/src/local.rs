@@ -139,6 +139,8 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         InvalidConfiguration => ("configuration", "check_configuration", true),
         ProtectedEntryUnavailable => ("protected_entry", "select_protected_source", true),
         MetadataUnavailable => ("observation", "retry_status", false),
+        // Not committed, so the same command is safe to run again.
+        RevisionConflict => ("publication", "retry_explicitly", false),
         CustodyUnavailable => ("custody", "unlock_keyring", false),
         OutcomeUnknown => ("publication", "retry_status", false),
         Forbidden => ("admission", "request_permission", false),
@@ -206,9 +208,15 @@ fn host_failure(error: Failure) -> HandlerReply {
             "check_configuration",
             false,
         ),
-        Failure::MetadataUnavailable | Failure::ConcurrentRevision => {
+        Failure::MetadataUnavailable => {
             failure("metadata_unavailable", "observation", "retry_status", false)
         }
+        Failure::ConcurrentRevision => failure(
+            "revision_conflict",
+            "publication",
+            "retry_explicitly",
+            false,
+        ),
         Failure::OutcomeUnknown => failure("outcome_unknown", "publication", "retry_status", false),
     }
 }
@@ -471,6 +479,58 @@ mod tests {
         assert_eq!(
             stage(error(Code::Unsupported, Origin::Provider)),
             (json!("admission"), json!("none"))
+        );
+    }
+
+    fn reply(reply: HandlerReply) -> (Value, Value, Value) {
+        let (HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. }) = reply
+        else {
+            panic!("not a failure");
+        };
+        (
+            data["code"].clone(),
+            data["stage"].clone(),
+            data["next_action"].clone(),
+        )
+    }
+
+    #[test]
+    fn a_revision_conflict_is_not_an_unreadable_store_at_any_mapping_site() {
+        use connectors_host::local::registry;
+        let conflict = (
+            json!("revision_conflict"),
+            json!("publication"),
+            json!("retry_explicitly"),
+        );
+        let unavailable = (
+            json!("metadata_unavailable"),
+            json!("observation"),
+            json!("retry_status"),
+        );
+        assert_eq!(reply(host_failure(Failure::ConcurrentRevision)), conflict);
+        assert_eq!(
+            reply(connections::registry_failure(
+                registry::Failure::ConcurrentRevision
+            )),
+            conflict
+        );
+        assert_eq!(
+            reply(owner_failure(registry::Failure::ConcurrentRevision.into())),
+            conflict
+        );
+        assert_eq!(
+            reply(host_failure(Failure::MetadataUnavailable)),
+            unavailable
+        );
+        assert_eq!(
+            reply(connections::registry_failure(
+                registry::Failure::MetadataUnavailable
+            )),
+            unavailable
+        );
+        assert_eq!(
+            reply(owner_failure(registry::Failure::MetadataUnavailable.into())),
+            unavailable
         );
     }
 }

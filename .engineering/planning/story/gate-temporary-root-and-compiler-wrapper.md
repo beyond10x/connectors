@@ -2,11 +2,20 @@
 format: aep.planning-md/3
 id: story:gate-temporary-root-and-compiler-wrapper
 kind: story
-status: draft
+status: implemented
 title: The gate starts its compiler wrapper outside the checkout-local temporary root
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connectors-build/src/gate.rs
+- confidence: cited
+  path: docs/development.md
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T18:10:57Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-10-01T18:10:57Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-01T19:23:38Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
 ---
 ## Observed
 

@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-01T18:39:19Z",
+  "actor": "human:timo",
+  "artifact": "story:gate-temporary-root-and-compiler-wrapper",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-gate-temporary-root-and-compiler-wrapper-pass-2",
+    "review": "review-result:adversary-gate-temporary-root-and-compiler-wrapper-pass-2",
+    "outcome": "no-op"
+  }
+}

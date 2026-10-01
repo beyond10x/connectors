@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T18:39:19Z",
+  "actor": "human:timo",
+  "artifact": "story:gate-temporary-root-and-compiler-wrapper",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "from managed worktree wave1001c-gate with a fresh sccache server on its own port: base 00fade41e (TMPDIR = 92-byte gate root) 'sccache: error: path must be shorter than SUN_LEN' EXIT=101; treatment 903a5dfc1 (caller TMPDIR + host-triple runner, two decoy runners) build and 4 tests passed EXIT=0",
+    "reference": "<wave-scratch>/gate/scratch/repro2.log"
+  }
+}

@@ -6,7 +6,34 @@ status: draft
 title: A dispatch service failure carries the upstream reason, not only its code
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: adapters/catalog/src/lib.rs
+- confidence: inferred
+  path: adapters/catalog/tests/local_runtime/cli_journey.rs
+- confidence: cited
+  path: apps/connectors-cli-contract/binding.json
+- confidence: cited
+  path: apps/connectors/src/local.rs
+- confidence: inferred
+  path: apps/connectors/src/local/operations.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/private-adapter.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: inferred
+  path: crates/connectors-core/src/lib.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner/mutation.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/runtime
+- confidence: cited
+  path: crates/connectors-host/src/local/runtime.rs
+- confidence: cited
+  path: ess/domains/cli.yaml
+revision: 3
 ---
 ## Observed
 
