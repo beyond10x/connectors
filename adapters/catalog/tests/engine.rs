@@ -860,6 +860,7 @@ fn shapes_bundle() -> Bundle {
                     {"name": "labelIds", "in": "query", "schema": {"type": "array", "items": {"type": "string"}}},
                     {"name": "ids", "in": "query", "style": "form", "explode": true,
                      "schema": {"type": "array", "items": {"type": "integer"}}},
+                    {"name": "flags", "in": "query", "schema": {"type": "array", "items": {"type": "boolean"}}},
                     {"name": "q", "in": "query", "schema": {"type": "string"}}
                 ],
                 "responses": {"200": {"description": "OK", "content": {"application/json": {}}}}
@@ -955,25 +956,23 @@ async fn engine_sends_repeated_pairs() {
 fn engine_declares_array_schema() {
     let engine = messages();
     let declared = &engine.declarations(&[Effect::Read])[0].input_schema["properties"];
-    for (name, items) in [
-        ("labelIds", json!({"type": ["string", "integer"]})),
-        (
-            "ids",
-            json!({"anyOf": [{"type": "integer"}, {"type": "string", "pattern": "^-?[0-9]+$"}],
-                   "minimum": 1, "maximum": 10}),
-        ),
-    ] {
-        let schema = &declared[name];
-        let types = schema["type"]
-            .as_array()
-            .unwrap_or_else(|| panic!("{schema}"));
-        assert!(types.contains(&json!("array")), "{name}: {schema}");
-        // The scalar one value was accepted as before this pass stays accepted.
-        for scalar in ["string", "integer", "boolean"] {
-            assert!(types.contains(&json!(scalar)), "{name}: {schema}");
-        }
-        assert_eq!(schema["items"], items, "{name}");
-    }
+    // An array of the element type, or one scalar typed like the elements (a
+    // comma-joined list of them included), which is what callers sent before
+    // arrays were read.
+    assert_eq!(
+        declared["labelIds"],
+        json!({"type": ["array", "string", "integer"], "items": {"type": ["string", "integer"]}})
+    );
+    assert_eq!(
+        declared["ids"],
+        json!({
+            "type": ["array", "integer", "string"],
+            "pattern": "^-?[0-9]+(,-?[0-9]+)*$",
+            "items": {"anyOf": [{"type": "integer"}, {"type": "string", "pattern": "^-?[0-9]+$"}],
+                      "minimum": 1, "maximum": 10},
+            "minimum": 1, "maximum": 10
+        })
+    );
     // A parameter that is not repeated declares no array.
     assert_eq!(declared["q"], json!({"type": ["string", "integer"]}));
 }
@@ -1459,5 +1458,96 @@ fn body_keys_are_refused_at_load_unless_they_close_a_write_body() {
         json!({"type": "object",
                "properties": {"sha": {"type": ["string", "integer", "boolean"]}, "note": {}},
                "required": ["sha"], "additionalProperties": false})
+    );
+}
+
+#[tokio::test]
+async fn a_scalar_for_a_repeated_parameter_is_typed_like_its_elements() {
+    let engine = Engine::new(
+        &shapes_bundle(),
+        "/v1",
+        &[select("messages.list", "listMessages", Effect::Read)],
+    )
+    .unwrap();
+    // One element, or a comma-joined list of elements: sent as one pair, as
+    // it was given.
+    for (name, value, sent) in [
+        ("ids", json!(3), "3"),
+        ("ids", json!("-3"), "-3"),
+        ("ids", json!("1,2,-3"), "1,2,-3"),
+        ("flags", json!(true), "true"),
+        ("flags", json!("true,false"), "true,false"),
+        ("labelIds", json!("INBOX,UNREAD"), "INBOX,UNREAD"),
+        ("labelIds", json!("any text at all"), "any text at all"),
+        ("labelIds", json!(7), "7"),
+    ] {
+        let http = reads(vec![response(200, json!({}))]);
+        engine
+            .read(
+                http.as_ref(),
+                "fixture",
+                "messages.list",
+                json!({"userId": "me", name: value}),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("{name}={value}: {error}"));
+        assert_eq!(
+            http.calls.lock().unwrap()[0].1,
+            [(name.to_string(), sent.to_string())],
+            "{name}={value}"
+        );
+    }
+    // Anything else is refused as invalid input with nothing sent.
+    for (name, value) in [
+        ("ids", json!("abc")),
+        ("ids", json!("1,,2")),
+        ("ids", json!("1, 2")),
+        ("ids", json!("")),
+        ("ids", json!(2.5)),
+        ("ids", json!(2.0)),
+        ("ids", json!(true)),
+        ("flags", json!("yes")),
+        ("flags", json!("true,1")),
+        ("flags", json!(1)),
+        ("labelIds", json!(true)),
+        ("labelIds", json!(1.5)),
+    ] {
+        assert_eq!(
+            refused_with_nothing_sent(
+                &engine,
+                "messages.list",
+                json!({"userId": "me", name: value})
+            )
+            .await,
+            ErrorCode::InvalidInput,
+            "{name}={value}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_required_repeated_parameter_declares_and_refuses_an_empty_list() {
+    let selection = written(json!({
+        "id": "messages.list", "operation_id": "listMessages", "effect": "read",
+        "required": ["labelIds"]
+    }));
+    let engine = Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap();
+    let schema = &engine.declarations(&[Effect::Read])[0].input_schema;
+    assert_eq!(schema["properties"]["labelIds"]["minItems"], json!(1));
+    assert!(connectors_sdk::validate(schema, &json!({"userId": "me", "labelIds": []})).is_err());
+    assert_eq!(
+        refused_with_nothing_sent(
+            &engine,
+            "messages.list",
+            json!({"userId": "me", "labelIds": []})
+        )
+        .await,
+        ErrorCode::InvalidInput
+    );
+    // Optional, it declares no minimum and an empty list sends nothing.
+    assert!(
+        messages().declarations(&[Effect::Read])[0].input_schema["properties"]["labelIds"]
+            .get("minItems")
+            .is_none()
     );
 }
