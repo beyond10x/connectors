@@ -1,22 +1,45 @@
 use super::Result;
-use std::{path::Path, process::Command};
+use std::{path::Path, process::Command, sync::OnceLock};
+
+/// The host triple from `rustc -vV`, read once per process.
+fn host_triple() -> Result<&'static str> {
+    static HOST: OnceLock<std::result::Result<String, String>> = OnceLock::new();
+    let host = HOST.get_or_init(|| {
+        let output = Command::new("rustc")
+            .arg("-vV")
+            .output()
+            .map_err(|error| format!("rustc -vV: {error}"))?;
+        if !output.status.success() {
+            return Err(format!("rustc -vV failed: {}", output.status));
+        }
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find_map(|line| line.strip_prefix("host: "))
+            .map(str::to_owned)
+            .ok_or_else(|| "rustc -vV names no host".to_owned())
+    });
+    host.as_deref().map_err(|error| error.clone().into())
+}
 
 /// Cargo as the gate runs it. Test binaries get the task-owned temporary root as `TMPDIR`
 /// through a runner. Cargo itself, and so the compiler wrapper it starts, keeps the caller's
 /// `TMPDIR`: sccache binds its startup socket there, and the checkout-local root of a long
-/// checkout pushes that path past `SUN_LEN`.
+/// checkout pushes that path past `SUN_LEN`. The runner passes the root as the shell's `$0`
+/// and the binary and its arguments as `"$@"`, so no path is parsed as an assignment or as
+/// shell text; it is keyed to the host triple so it outranks a user's host runner.
 fn cargo(root: &Path, temp: &Path, ess: &Path, toolchain: Option<&str>) -> Result<Command> {
     let temp = temp
         .to_str()
         .ok_or("gate temporary root is not valid UTF-8")?;
-    let runner = serde_json::to_string(&["env".to_owned(), format!("TMPDIR={temp}")])?;
+    let runner = serde_json::to_string(&["sh", "-c", r#"export TMPDIR="$0"; exec "$@""#, temp])?;
+    let host = serde_json::to_string(host_triple()?)?;
     let mut cmd = Command::new("cargo");
     if let Some(toolchain) = toolchain {
         cmd.arg(format!("+{toolchain}"));
     }
     cmd.current_dir(root)
         .arg("--config")
-        .arg(format!("target.'cfg(all())'.runner={runner}"))
+        .arg(format!("target.{host}.runner={runner}"))
         .env("CARGO_BUILD_JOBS", "2")
         .env("CONNECTORS_ESS", ess);
     Ok(cmd)
@@ -334,16 +357,56 @@ mod tests {
         );
     }
 
+    /// The host triple as rustc reports it, read independently of the gate.
+    fn rustc_host() -> String {
+        let output = std::process::Command::new("rustc")
+            .arg("-vV")
+            .output()
+            .expect("rustc -vV");
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .lines()
+            .find_map(|line| line.strip_prefix("host: "))
+            .expect("rustc -vV names its host")
+            .to_owned()
+    }
+
     /// Test binaries still run under the gate's task-owned root, through a runner that
-    /// cargo applies to target executables and never to the compiler.
+    /// cargo applies to target executables and never to the compiler. The root is the
+    /// shell's `$0`, never parsed as an assignment or as shell text.
     #[test]
     fn gate_cargo_hands_the_temporary_root_to_test_binaries_through_a_runner() {
         let args: Vec<_> = build(None).get_args().map(OsStr::to_owned).collect();
-        let expected = format!(r#"target.'cfg(all())'.runner=["env","TMPDIR={ROOT}"]"#);
+        let host = rustc_host();
+        let expected = format!(
+            r#"target."{host}".runner=["sh","-c","export TMPDIR=\"$0\"; exec \"$@\"","{ROOT}"]"#
+        );
         assert_eq!(
             args,
             [OsStr::new("--config"), OsStr::new(&expected)],
             "gate cargo arguments"
+        );
+    }
+
+    /// The runner is keyed to the host triple, so it outranks a user's
+    /// `[target.<triple>] runner` and `CARGO_TARGET_<TRIPLE>_RUNNER`; a `cfg(...)` key
+    /// would lose to either.
+    #[test]
+    fn gate_cargo_keys_the_runner_to_the_host_triple() {
+        let host = rustc_host();
+        assert!(
+            host.starts_with(std::env::consts::ARCH) && host.contains(std::env::consts::OS),
+            "rustc host {host} is not this machine"
+        );
+        let command = build(None);
+        let config = command
+            .get_args()
+            .nth(1)
+            .and_then(OsStr::to_str)
+            .expect("--config value");
+        assert!(
+            config.starts_with(&format!(r#"target."{host}".runner="#)),
+            "runner key is not the host triple {host}: {config}"
         );
     }
 
@@ -354,5 +417,122 @@ mod tests {
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args.first(), Some(&OsStr::new("+1.88.0")));
         assert_eq!(args.get(1), Some(&OsStr::new("--config")));
+    }
+}
+
+/// Adversary cases: the runner the gate configures is executed the way Cargo executes it,
+/// `<runner...> <test binary> <args...>`, against real programs.
+#[cfg(test)]
+mod adversary_tests {
+    use super::cargo;
+    use std::{os::unix::fs::symlink, path::Path, process::Command};
+
+    fn runner(root: &str) -> Vec<String> {
+        let command = cargo(
+            Path::new("/checkout"),
+            Path::new(root),
+            Path::new("/ess"),
+            None,
+        )
+        .expect("gate cargo command");
+        let config = command
+            .get_args()
+            .map(|arg| arg.to_str().expect("utf-8 argument").to_owned())
+            .find_map(|arg| {
+                arg.split_once(".runner=")
+                    .map(|(_, runner)| runner.to_owned())
+            })
+            .expect("runner --config argument");
+        serde_json::from_str(&config).expect("runner is a JSON/TOML string array")
+    }
+
+    /// Run `program` through the gate's runner as Cargo would, with an empty environment
+    /// so nothing sensitive can be printed.
+    fn through_runner(root: &str, program: &Path) -> std::process::Output {
+        let argv = runner(root);
+        Command::new(&argv[0])
+            .args(&argv[1..])
+            .arg(program)
+            .env_clear()
+            .output()
+            .expect("spawn runner")
+    }
+
+    fn link(dir: &Path, name: &str, target: &str) -> std::path::PathBuf {
+        std::fs::create_dir_all(dir).unwrap();
+        let path = dir.join(name);
+        symlink(target, &path).unwrap();
+        path
+    }
+
+    /// A test binary under a target directory whose path contains `=` (a checkout or
+    /// `CARGO_TARGET_DIR` such as `.../build=1/target`) must still be executed, and its
+    /// failure must still fail. `env` reads every leading `NAME=VALUE` word as an
+    /// assignment, so it never runs the binary, prints its environment and exits 0.
+    #[test]
+    fn runner_executes_a_failing_test_binary_whose_path_contains_an_equals_sign() {
+        let scratch = tempfile::tempdir().unwrap();
+        let binary = link(
+            &scratch.path().join("build=1/debug/deps"),
+            "fails",
+            "/usr/bin/false",
+        );
+        let output = through_runner("/checkout/.local/tmp/gate-AbCdEf", &binary);
+        assert!(
+            !output.status.success(),
+            "a failing test binary at {} reported success through the gate runner \
+             (status {:?}, {} bytes of stdout instead of running it)",
+            binary.display(),
+            output.status,
+            output.stdout.len()
+        );
+    }
+
+    /// Same path shape, observable effect: the binary runs and sees the gate root.
+    #[test]
+    fn runner_hands_the_root_to_a_binary_whose_path_contains_an_equals_sign() {
+        let scratch = tempfile::tempdir().unwrap();
+        let binary = link(&scratch.path().join("a=b"), "printenv", "/usr/bin/printenv");
+        let root = "/checkout/.local/tmp/gate-AbCdEf";
+        let argv = runner(root);
+        let output = Command::new(&argv[0])
+            .args(&argv[1..])
+            .arg(&binary)
+            .arg("TMPDIR")
+            .env_clear()
+            .output()
+            .expect("spawn runner");
+        assert_eq!(String::from_utf8_lossy(&output.stdout), format!("{root}\n"));
+    }
+
+    /// Roots with spaces, quotes, a single quote, a backslash, `=` and shell metacharacters
+    /// reach the binary byte for byte.
+    #[test]
+    fn runner_preserves_awkward_roots() {
+        let scratch = tempfile::tempdir().unwrap();
+        let binary = link(scratch.path(), "printenv", "/usr/bin/printenv");
+        for root in [
+            "/c/gate a b",
+            "/c/gate\"q",
+            "/c/gate'q",
+            "/c/gate\\b",
+            "/c/gate=e",
+            "/c/gate$x`y`;|&",
+            "/c/gaté",
+        ] {
+            let argv = runner(root);
+            let output = Command::new(&argv[0])
+                .args(&argv[1..])
+                .arg(&binary)
+                .arg("TMPDIR")
+                .env_clear()
+                .output()
+                .expect("spawn runner");
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                format!("{root}\n"),
+                "root {root:?}"
+            );
+        }
     }
 }
