@@ -5,13 +5,15 @@ use connectors_host::local::{
     config::Paths,
     owner::{Client, Code, WriteClient, mutation::Deadline},
 };
+#[path = "support/socket.rs"]
+mod sockets;
 use serde_json::{Value, json};
 use std::{
     fs,
     io::{Read, Write},
     os::unix::{
         fs::{OpenOptionsExt, PermissionsExt},
-        net::{UnixListener, UnixStream},
+        net::UnixStream,
     },
     process::{Command, Output},
     time::{Duration, Instant},
@@ -183,7 +185,7 @@ fn write_frame(stream: &mut UnixStream, control: &Value, document: &[u8]) {
 fn an_owner_of_the_same_build_that_sheds_one_connection_is_not_reported_as_another_build() {
     let root = configured();
     let socket = root.path().join("state/owner.sock");
-    let listener = UnixListener::bind(&socket).unwrap();
+    let listener = sockets::bind(&root.path().join("state"), "owner.sock");
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
     let build = sha256_hex(&fs::read(env!("CARGO_BIN_EXE_connectors")).unwrap());
     let server = std::thread::spawn(move || {
