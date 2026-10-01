@@ -86,6 +86,7 @@ fn error(failure: Failure) -> Error {
         Failure::Conflict => Code::LifecycleConflict,
         Failure::NotFound => Code::NotFound,
         Failure::MetadataUnavailable => Code::MetadataUnavailable,
+        Failure::RevisionConflict => Code::RevisionConflict,
         Failure::CustodyUnavailable => Code::CustodyUnavailable,
         Failure::OutcomeUnknown => Code::OutcomeUnknown,
         Failure::Capacity => Code::Capacity,
