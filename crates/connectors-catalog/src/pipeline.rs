@@ -5,8 +5,8 @@
 use crate::bundle::{self, Bundle, Entry};
 use crate::coverage::{self, Report};
 use crate::inventory;
-use crate::{Refusal, SourceRecord, ingest};
-use connectors_core::Error;
+use crate::{Derivation, Refusal, SourceRecord, ingest};
+use connectors_core::{Error, ErrorCode};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -159,19 +159,73 @@ fn refused(
 /// as it was. The ordering is the whole guarantee; there is no cleanup path here
 /// to undo a partial write, because no earlier step can make one.
 pub fn run(request: &Request<'_>) -> std::result::Result<Run, Box<Failure>> {
+    run_from(request, None)
+}
+
+/// [`run`] over a source projected from the Google Discovery document at
+/// `discovery`. The projection is recomputed from that document's bytes and
+/// must equal the source byte for byte; anything else is refused at the ingest
+/// step, before the directory is touched. The bundle's source record then names
+/// the document it was derived from.
+pub fn run_derived(
+    request: &Request<'_>,
+    discovery: &Path,
+) -> std::result::Result<Run, Box<Failure>> {
+    run_from(request, Some(discovery))
+}
+
+/// The name a record carries for a file: its own, not the path it was read
+/// through, so a record does not carry a home directory — the rule
+/// `ingest_file` states, applied here because this run needs the bytes as well.
+fn own_name(path: &Path) -> Option<&str> {
+    path.file_name().and_then(|name| name.to_str())
+}
+
+/// The derivation of `source`, or the refusal that it is not one.
+fn derivation(discovery: &Path, source: &[u8]) -> std::result::Result<Derivation, Box<Failure>> {
+    let unreadable = || refused(Step::Read, Refusal::Unreadable.into(), None, None);
+    let bytes = std::fs::read(discovery).map_err(|_| unreadable())?;
+    let from_file = own_name(discovery).ok_or_else(unreadable)?;
+    let projection = crate::discovery::project(&bytes)
+        .map_err(|refusal| refused(Step::Ingest, refusal.into(), None, None))?;
+    if projection.openapi != source {
+        return Err(refused(
+            Step::Ingest,
+            Error::new(
+                ErrorCode::InvalidInput,
+                format!(
+                    "source is not the projection of `{from_file}`: the recomputed projection \
+                     differs from it"
+                ),
+            ),
+            None,
+            None,
+        ));
+    }
+    Ok(Derivation {
+        from_file: from_file.to_owned(),
+        from_sha256: projection.record.source_sha256,
+        from_bytes: projection.record.source_bytes,
+        format: crate::discovery::FORMAT.to_owned(),
+        discovery_revision: projection.record.discovery_revision,
+        projector: projection.record.projector,
+    })
+}
+
+fn run_from(
+    request: &Request<'_>,
+    discovery: Option<&Path>,
+) -> std::result::Result<Run, Box<Failure>> {
     let unreadable = || refused(Step::Read, Refusal::Unreadable.into(), None, None);
     let bytes = std::fs::read(request.source).map_err(|_| unreadable())?;
-    // The recorded name is the file's own, not the path it was read through, so
-    // a record does not carry a home directory — the same rule `ingest_file`
-    // states, applied here because this run needs the bytes as well.
-    let file_name = request
-        .source
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(unreadable)?;
+    let file_name = own_name(request.source).ok_or_else(unreadable)?;
+    let derived = discovery
+        .map(|discovery| derivation(discovery, &bytes))
+        .transpose()?;
 
-    let source = ingest(file_name, &bytes)
+    let mut source = ingest(file_name, &bytes)
         .map_err(|refusal| refused(Step::Ingest, refusal.into(), None, None))?;
+    source.derivation = derived;
 
     // The same bytes, read once more: `inventory::extract` reads the document
     // rather than a shape cached by the ingest.

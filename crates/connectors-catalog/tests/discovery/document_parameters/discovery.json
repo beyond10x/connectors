@@ -1,0 +1,58 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "parameters": {
+    "$.xgafv": {
+      "description": "V1 error format.",
+      "enum": ["1", "2"],
+      "enumDescriptions": ["v1 error format", "v2 error format"],
+      "location": "query",
+      "type": "string"
+    },
+    "access_token": {"description": "OAuth access token.", "location": "query", "type": "string"},
+    "alt": {
+      "default": "json",
+      "description": "Data format for response.",
+      "enum": ["json", "media", "proto"],
+      "enumDescriptions": ["JSON", "Media", "Protobuf"],
+      "location": "query",
+      "type": "string"
+    },
+    "callback": {"description": "JSONP", "location": "query", "type": "string"},
+    "fields": {
+      "description": "Selector specifying which fields to include in a partial response.",
+      "location": "query",
+      "type": "string"
+    },
+    "key": {"description": "API key.", "location": "query", "type": "string"},
+    "oauth_token": {"description": "OAuth 2.0 token for the current user.", "location": "query", "type": "string"},
+    "prettyPrint": {"default": "true", "description": "Indent.", "location": "query", "type": "boolean"},
+    "quotaUser": {"description": "Quota.", "location": "query", "type": "string"},
+    "uploadType": {"description": "Legacy upload protocol.", "location": "query", "type": "string"},
+    "upload_protocol": {"description": "Upload protocol.", "location": "query", "type": "string"},
+    "userIp": {"description": "Deprecated. Please use quotaUser instead.", "location": "query", "type": "string"}
+  },
+  "resources": {
+    "things": {
+      "methods": {
+        "list": {
+          "id": "fixture.things.list",
+          "path": "things",
+          "httpMethod": "GET",
+          "parameters": {"q": {"type": "string", "location": "query"}}
+        },
+        "count": {
+          "id": "fixture.things.count",
+          "path": "things:count",
+          "httpMethod": "GET"
+        }
+      }
+    }
+  }
+}

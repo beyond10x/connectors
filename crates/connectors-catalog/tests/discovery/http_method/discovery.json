@@ -1,0 +1,36 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "list": {"id": "fixture.things.list", "path": "things", "httpMethod": "GET"},
+        "insert": {"id": "fixture.things.insert", "path": "things", "httpMethod": "POST"},
+        "update": {
+          "id": "fixture.things.update",
+          "path": "things/{thingId}",
+          "httpMethod": "PUT",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}}
+        },
+        "patch": {
+          "id": "fixture.things.patch",
+          "path": "things/{thingId}",
+          "httpMethod": "PATCH",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}}
+        },
+        "delete": {
+          "id": "fixture.things.delete",
+          "path": "things/{thingId}",
+          "httpMethod": "DELETE",
+          "parameters": {"thingId": {"type": "string", "location": "path", "required": true}}
+        }
+      }
+    }
+  }
+}

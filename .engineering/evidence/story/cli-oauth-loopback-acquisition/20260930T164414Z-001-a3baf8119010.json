@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T16:44:14Z",
+  "actor": "human:timo",
+  "artifact": "story:cli-oauth-loopback-acquisition",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "CONNECTORS_TEST_CLI=... cargo test -p connectors-catalog-provider --test local_runtime -- --ignored, and headless Chrome cases, at 5c95cd9e4 vs a5a6cfc0f",
+    "reference": "baseline: --credential-file with Google's installed-client JSON is passed through as an opaque entry (no flow); treatment: oauth_connect_journey and oauth_repair_journey pass (8 of 8 journeys), Chrome redirect accepted 15/15 and with loopback cookies 10/10 (r2-chrome.log in ~/.cache/w0930aq)"
+  }
+}

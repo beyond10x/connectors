@@ -1,0 +1,12 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "description": "Reads fixtures.",
+  "documentationLink": "https://developers.google.com/fixture/",
+  "version": "v2",
+  "revision": "20260202",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v2/"
+}

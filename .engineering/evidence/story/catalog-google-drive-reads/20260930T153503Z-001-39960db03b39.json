@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T15:35:03Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-google-drive-reads",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test google_drive at 5c95cd9e4 (baseline) vs the reads lane head (treatment)",
+    "reference": "baseline: tests/google_drive.rs absent and the google-drive bundle absent from index.json at 5c95cd9e4; treatment: google_drive passed (drive 13, slides 7), bundle_drift reproduces google-drive from the pinned Discovery, per the implementor's c2-gate-test.log in ~/.cache/w0930rd"
+  }
+}

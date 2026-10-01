@@ -1,0 +1,13 @@
+{
+  "at": "2026-09-30T15:35:03Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-google-slides-reads",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test google_slides at 5c95cd9e4 (baseline) vs the reads lane head (treatment)",
+    "reference": "baseline: tests/google_slides.rs absent and the google-slides bundle absent from index.json at 5c95cd9e4; treatment: google_slides passed (drive 13, slides 7), bundle_drift reproduces google-slides from the pinned Discovery, per the implementor's c2-gate-test.log in ~/.cache/w0930rd"
+  }
+}

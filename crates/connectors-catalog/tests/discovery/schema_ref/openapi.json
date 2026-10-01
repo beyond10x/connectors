@@ -1,0 +1,31 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {},
+  "components": {
+    "schemas": {
+      "Leaf": {
+        "type": "object",
+        "properties": {"value": {"type": "string"}}
+      },
+      "Node": {
+        "type": "object",
+        "properties": {
+          "parent": {"$ref": "#/components/schemas/Node", "description": "The parent."},
+          "child": {"$ref": "#/components/schemas/Leaf", "deprecated": true, "description": "Old."},
+          "owner": {
+            "$ref": "#/components/schemas/Leaf",
+            "x-google-required-for": ["fixture.nodes.insert"],
+            "description": "Required on insert."
+          },
+          "leaves": {"type": "array", "items": {"$ref": "#/components/schemas/Leaf"}},
+          "byName": {
+            "type": "object",
+            "additionalProperties": {"$ref": "#/components/schemas/Leaf"}
+          }
+        }
+      }
+    }
+  }
+}
