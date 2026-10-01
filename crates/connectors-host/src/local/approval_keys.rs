@@ -28,6 +28,8 @@ pub enum Failure {
     Conflict,
     NotFound,
     MetadataUnavailable,
+    /// The metadata store changed under the write; nothing was written.
+    RevisionConflict,
     CustodyUnavailable,
     OutcomeUnknown,
     Capacity,
@@ -35,10 +37,10 @@ pub enum Failure {
 pub type Result<T> = std::result::Result<T, Failure>;
 impl From<super::Failure> for Failure {
     fn from(value: super::Failure) -> Self {
-        if value == super::Failure::OutcomeUnknown {
-            Self::OutcomeUnknown
-        } else {
-            Self::MetadataUnavailable
+        match value {
+            super::Failure::OutcomeUnknown => Self::OutcomeUnknown,
+            super::Failure::ConcurrentRevision => Self::RevisionConflict,
+            _ => Self::MetadataUnavailable,
         }
     }
 }
