@@ -193,7 +193,23 @@ pub fn stdin(deadline: u64) -> Result<Secret> {
     }
     read(file, 65536, deadline)
 }
-fn wait(file: &File, deadline: u64) -> Result<()> {
+/// Reads once `wait` reports input. A terminal `^C` can flush the queue `poll`
+/// saw before this read runs, possibly before its SIGINT is handled; the empty
+/// non-blocking read then waits again, so the interrupt is reported, not the
+/// empty queue.
+fn read_ready(file: &mut (impl Read + AsRawFd), buffer: &mut [u8], deadline: u64) -> Result<usize> {
+    loop {
+        wait(file, deadline)?;
+        match file.read(buffer) {
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => continue,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                return Err(Code::Interrupted.into());
+            }
+            result => return result.map_err(source_error),
+        }
+    }
+}
+fn wait(file: &impl AsRawFd, deadline: u64) -> Result<()> {
     loop {
         check(deadline)?;
         let ms = deadline.saturating_sub(connectors_sdk::now_ms()).min(1000) as i32;
@@ -221,15 +237,8 @@ fn read(mut file: File, limit: usize, deadline: u64) -> Result<Secret> {
     let mut data = Secret(Vec::with_capacity(limit + 1));
     let mut buffer = Secret(vec![0; 4096]);
     loop {
-        wait(&file, deadline)?;
         let remaining = (limit + 1 - data.0.len()).min(buffer.0.len());
-        let count = file.read(&mut buffer.0[..remaining]).map_err(|e| {
-            if e.kind() == std::io::ErrorKind::Interrupted {
-                Code::Interrupted.into()
-            } else {
-                source_error(e)
-            }
-        })?;
+        let count = read_ready(&mut file, &mut buffer.0[..remaining], deadline)?;
         if count == 0 {
             break;
         }
@@ -388,14 +397,7 @@ pub fn terminal(fields: &[EntryField], deadline: u64) -> Result<Secret> {
         let mut value = Secret(Vec::with_capacity(field.max_bytes as usize));
         let mut byte = Secret(vec![0]);
         loop {
-            wait(&terminal.file, deadline)?;
-            let count = terminal.file.read(&mut byte.0).map_err(|e| {
-                if e.kind() == std::io::ErrorKind::Interrupted {
-                    Code::Interrupted.into()
-                } else {
-                    source_error(e)
-                }
-            })?;
+            let count = read_ready(&mut terminal.file, &mut byte.0, deadline)?;
             if count == 0 {
                 return Err(Code::InvalidInput.into());
             }
