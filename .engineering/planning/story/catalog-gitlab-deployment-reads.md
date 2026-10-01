@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-gitlab-deployment-reads
 kind: story
-status: active
+status: implemented
 title: 'GitLab catalog: list a project''s deployments with their environment'
 relations:
 - serves: vision:independent-contract-adapters
@@ -12,18 +12,23 @@ scope:
   path: adapters/catalog/providers/gitlab/operations.json
 - confidence: cited
   path: adapters/catalog/tests/gateway_prefix.rs
-- confidence: inferred
+- confidence: cited
+  path: adapters/catalog/tests/gitlab_commit_reads_adversary.rs
+- confidence: cited
   path: adapters/catalog/tests/gitlab_deployment_reads.rs
+- confidence: cited
+  path: adapters/catalog/tests/gitlab_deployment_reads_adversary.rs
 - confidence: cited
   path: adapters/catalog/tests/local_runtime.rs
 - confidence: cited
   path: adapters/catalog/tests/shipped.rs
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 5
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T18:10:57Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T18:10:57Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-01T19:23:37Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}}
 ---
 ## Source
 
