@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:ci-runs-the-repository-gate
 kind: story
-status: draft
+status: active
 title: CI runs the repository gate on every pull request
 relations:
 - decomposes: epic:tech-debt-review-20260930
@@ -12,7 +12,10 @@ scope:
   path: .github/workflows/rust-gate.yml
 - confidence: cited
   path: docs/development.md
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-01T07:32:47Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-01T07:32:48Z", actor: "human:timo", revision: 4}
 ---
 ## Defect
 
