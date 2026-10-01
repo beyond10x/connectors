@@ -536,3 +536,127 @@ mod adversary_tests {
         }
     }
 }
+
+/// Adversary pass 2: the `sh -c` runner must be transparent to the test binary's exit
+/// status, its signals and the arguments Cargo appends, and must hand over any root.
+#[cfg(test)]
+mod adversary_pass2_tests {
+    use super::cargo;
+    use std::{
+        os::unix::process::ExitStatusExt,
+        path::Path,
+        process::{Command, Output},
+    };
+
+    fn runner(root: &str) -> Vec<String> {
+        let command = cargo(
+            Path::new("/checkout"),
+            Path::new(root),
+            Path::new("/ess"),
+            None,
+        )
+        .expect("gate cargo command");
+        let args: Vec<String> = command
+            .get_args()
+            .map(|arg| arg.to_str().expect("utf-8 argument").to_owned())
+            .collect();
+        assert_eq!(args.len(), 2, "exactly --config and its value: {args:?}");
+        assert_eq!(args[0], "--config");
+        let (_, value) = args[1].split_once("\".runner=").expect("host-keyed runner");
+        serde_json::from_str(value).expect("runner is a string array")
+    }
+
+    /// `<runner...> <binary> <args...>`, exactly as Cargo spawns a test binary.
+    fn run(root: &str, binary: &str, args: &[&str]) -> Output {
+        let argv = runner(root);
+        Command::new(&argv[0])
+            .args(&argv[1..])
+            .arg(binary)
+            .args(args)
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .output()
+            .expect("spawn runner")
+    }
+
+    const ROOT: &str = "/checkout/.local/tmp/gate-AbCdEf";
+
+    /// A test binary exiting 101 (libtest's failure code) or any other code > 1 keeps it.
+    #[test]
+    fn runner_preserves_exit_codes_above_one() {
+        for code in [2, 101, 255] {
+            let output = run(ROOT, "/bin/sh", &["-c", &format!("exit {code}")]);
+            assert_eq!(output.status.code(), Some(code), "{:?}", output.status);
+        }
+    }
+
+    /// A test binary killed by a signal is reported as killed, not as a shell exit code.
+    #[test]
+    fn runner_preserves_a_killing_signal() {
+        for signal in [9, 6, 11] {
+            let output = run(ROOT, "/bin/sh", &["-c", &format!("kill -{signal} $$")]);
+            assert_eq!(output.status.signal(), Some(signal), "{:?}", output.status);
+        }
+    }
+
+    /// Filters with spaces and newlines, empty arguments, leading dashes and shell text
+    /// reach the test binary unchanged and in order.
+    #[test]
+    fn runner_passes_test_arguments_byte_for_byte() {
+        let args = [
+            "--exact",
+            "module::name with space",
+            "line1\nline2",
+            "--nocapture",
+            "-",
+            "--",
+            "",
+            "$HOME `id` *",
+            "--test-threads=1",
+        ];
+        let mut argv = vec!["-c", r#"printf '%s\0' "$@""#, "argv0"];
+        argv.extend(args);
+        let output = run(ROOT, "/bin/sh", &argv);
+        assert!(output.status.success(), "{:?}", output.status);
+        let expected: String = args.iter().map(|arg| format!("{arg}\0")).collect();
+        assert_eq!(String::from_utf8_lossy(&output.stdout), expected);
+    }
+
+    /// The binary is executed even when its path begins with a dash or holds a newline.
+    #[test]
+    fn runner_executes_awkward_binary_paths() {
+        let scratch = tempfile::tempdir().unwrap();
+        for name in ["-dash", "new\nline", "sp ace", "--"] {
+            let path = scratch.path().join(name);
+            std::os::unix::fs::symlink("/usr/bin/printenv", &path).unwrap();
+            let output = run(ROOT, path.to_str().unwrap(), &["TMPDIR"]);
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                format!("{ROOT}\n"),
+                "binary {name:?}: {:?}",
+                output.status
+            );
+        }
+    }
+
+    /// A root that begins with a dash or holds a newline still becomes `TMPDIR`.
+    #[test]
+    fn runner_hands_over_roots_with_a_leading_dash_or_newline() {
+        for root in [
+            "-x/gate",
+            "--/gate",
+            "-c",
+            "+o/gate",
+            "/c/new\nline",
+            "/c/tab\tx",
+        ] {
+            let output = run(root, "/usr/bin/printenv", &["TMPDIR"]);
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                format!("{root}\n"),
+                "root {root:?}: {:?}",
+                output.status
+            );
+        }
+    }
+}
