@@ -108,7 +108,9 @@ to ordinary Cargo builds. See [development](../docs/development.md).
   implementation into the example engine.
 - `.cache/`, `static/examples/`, `.docusaurus/` and `build/` are generated. Do not
   edit or commit them. Canonical contract and ESS inputs stay in their existing
-  owners; the example model is assembled in disposable storage.
+  owners; the example model is assembled in disposable storage from the domains the
+  realization reads and every domain they reference (`EXAMPLE_DOMAINS` in
+  `crates/connectors-build/src/docs.rs`). The repository gate synthesizes it.
 
 The three examples use a fixed namespace/principal, one mutation key, deterministic
 injected time bounded to the first fictional hour, fictional observations and
