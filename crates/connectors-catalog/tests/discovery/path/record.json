@@ -1,0 +1,20 @@
+{
+  "projector": "discovery-openapi/1",
+  "discovery_revision": "20260101",
+  "method_count": 2,
+  "operations": [
+    "fixture.presentations.batchUpdate",
+    "fixture.presentations.get"
+  ],
+  "excluded_methods": [],
+  "rewritten_paths": [
+    {
+      "operation_id": "fixture.presentations.get",
+      "discovery_path": "v1/presentations/{+presentationId}",
+      "path": "/v1/presentations/{presentationId}"
+    }
+  ],
+  "excluded_parameters": [],
+  "excluded_upload_paths": [],
+  "ignored_keys": []
+}

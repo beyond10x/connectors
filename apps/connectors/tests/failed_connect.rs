@@ -78,6 +78,7 @@ fn profile() -> runtime::Profile {
             label: "Token".into(),
             max_bytes: 1024,
         }],
+        acquisition: None,
     }
 }
 

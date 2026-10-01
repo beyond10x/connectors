@@ -14,6 +14,7 @@ fn parameter(name: &str, location: Location, required: bool) -> Parameter {
         location,
         required,
         value_type: None,
+        repeated: false,
     }
 }
 

@@ -1,0 +1,68 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "Fixture API", "version": "v1"},
+  "servers": [{"url": "https://fixture.googleapis.com/fixture/v1"}],
+  "paths": {
+    "/things": {
+      "get": {
+        "operationId": "fixture.things.list",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {"type": "string", "format": "date-time"}
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": true,
+            "schema": {"type": "string", "pattern": "^[a-z]+$"}
+          },
+          {
+            "name": "includeDeleted",
+            "in": "query",
+            "deprecated": true,
+            "schema": {"type": "boolean", "default": false}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {"type": "integer", "format": "uint32", "default": 10}
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["NAME", "TIME"],
+              "x-google-enum-descriptions": ["By name.", "By time."]
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Page size.",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "ratio",
+            "in": "query",
+            "schema": {"type": "number", "format": "double", "minimum": 0.5, "maximum": 1.5}
+          },
+          {
+            "name": "startId",
+            "in": "query",
+            "schema": {"type": "string", "format": "uint64"}
+          }
+        ],
+        "responses": {"200": {"description": "Successful response"}}
+      }
+    }
+  }
+}

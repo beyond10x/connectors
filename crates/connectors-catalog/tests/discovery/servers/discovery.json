@@ -1,0 +1,23 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v3",
+  "revision": "20260101",
+  "rootUrl": "https://www.fixture.googleapis.com/",
+  "servicePath": "fixture/v3/",
+  "baseUrl": "https://www.fixture.googleapis.com/fixture/v3/",
+  "basePath": "/fixture/v3/",
+  "resources": {
+    "about": {
+      "methods": {
+        "get": {
+          "id": "fixture.about.get",
+          "path": "about",
+          "httpMethod": "GET"
+        }
+      }
+    }
+  }
+}

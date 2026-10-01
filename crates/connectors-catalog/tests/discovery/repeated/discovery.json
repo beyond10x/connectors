@@ -1,0 +1,36 @@
+{
+  "kind": "discovery#restDescription",
+  "discoveryVersion": "v1",
+  "protocol": "rest",
+  "title": "Fixture API",
+  "version": "v1",
+  "revision": "20260101",
+  "rootUrl": "https://fixture.googleapis.com/",
+  "servicePath": "fixture/v1/",
+  "resources": {
+    "things": {
+      "methods": {
+        "list": {
+          "id": "fixture.things.list",
+          "path": "things",
+          "httpMethod": "GET",
+          "parameters": {
+            "labelIds": {
+              "type": "string",
+              "location": "query",
+              "repeated": true,
+              "description": "Only things with every label."
+            },
+            "eventTypes": {
+              "type": "string",
+              "location": "query",
+              "repeated": true,
+              "enum": ["default", "focusTime"],
+              "enumDescriptions": ["Regular events.", "Focus time."]
+            }
+          }
+        }
+      }
+    }
+  }
+}
