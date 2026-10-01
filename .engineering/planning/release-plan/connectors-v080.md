@@ -7,6 +7,7 @@ title: Release v0.8.0 from the merged local Connectors increment
 relations:
 - informed_by: initiative:complete-local-connectors
 - supersedes: release-plan:connectors-v030
+- supersedes: release-plan:gitlab-v020
 revision: 2
 transitions:
 - {from: "draft", to: "implemented", at: "2026-09-13T13:36:58Z", actor: "human:timo", revision: 2, decided_on: {"recorded":{"test_result":1}}, imported: true}
