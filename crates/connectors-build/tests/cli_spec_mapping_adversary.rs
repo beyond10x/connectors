@@ -56,6 +56,14 @@ fn struct_fields(ty: &serde_yaml_ng::Value) -> BTreeSet<String> {
         .collect()
 }
 
+/// The fields a frame carries besides its serde `kind` tag, which the host's variant
+/// does not list as a field (decided in the pass-2 correction).
+fn payload_fields(ty: &serde_yaml_ng::Value) -> BTreeSet<String> {
+    let mut fields = struct_fields(ty);
+    fields.remove("kind");
+    fields
+}
+
 fn field_type(ty: &serde_yaml_ng::Value, name: &str) -> String {
     ty["fields"]
         .as_sequence()
@@ -93,7 +101,12 @@ fn the_owner_greeting_reply_is_declared_with_the_hosts_fields() {
         "parser read the wrong Reply::Hello"
     );
     let greeting = named("connectors.cli.LocalOwnerGreeting");
-    assert_eq!(struct_fields(&greeting), host);
+    assert_eq!(payload_fields(&greeting), host);
+    assert_eq!(
+        field_type(&greeting, "kind"),
+        "connectors.cli.LocalOwnerHelloKind",
+        "the greeting declares its serde tag"
+    );
     assert_eq!(
         field_type(&greeting, "build"),
         "Optional<connectors.cli.BuildDigest>",
@@ -121,7 +134,7 @@ fn the_owner_greeting_request_the_cli_sends_is_declared() {
     );
     let declared: Vec<String> = cli_types()
         .iter()
-        .filter(|t| struct_fields(t) == host)
+        .filter(|t| payload_fields(t) == host && struct_fields(t).contains("kind"))
         .map(|t| t["name"].as_str().unwrap().to_owned())
         .collect();
     assert!(
