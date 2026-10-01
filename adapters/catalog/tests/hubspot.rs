@@ -130,7 +130,7 @@ fn the_pinned_source_is_the_one_the_bundle_and_its_record_name() {
     let index = bundle::read_index(&root().join("generated/bundles")).unwrap();
     let entry = index.find("hubspot").unwrap();
     assert_eq!(entry.source_sha256, digest);
-    assert_eq!(entry.operations, 11);
+    assert_eq!(entry.operations, 12);
     assert_eq!(entry.unsupported, 0);
     let bundle = bundle::load(&root().join("generated/bundles"), "hubspot").unwrap();
     assert_eq!(bundle.source.source_bytes, bytes.len());
