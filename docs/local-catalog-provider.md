@@ -43,7 +43,7 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the HubSpot guide](catalog-hubspot.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
-serves the provider from the pinned source alone, plus four repository reads:
+serves the provider from the pinned source alone, plus six repository reads:
 
 | id | source operation | effect |
 |---|---|---|
@@ -55,13 +55,13 @@ serves the provider from the pinned source alone, plus four repository reads:
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
 
-The repository reads list one page per call. Each takes `page` and `per_page`;
+The repository reads other than `repository.compare` list one page per call. Each takes `page` and `per_page`;
 a caller has walked the list when a page comes back shorter than `per_page`.
 GitLab serves at most 100 items per page, so with a larger value every page
 would be short and the walk would stop after page one. The pinned source
 declares no range, so the shipped selection bounds `per_page` to 1 through 100
 on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
-`pipeline.jobs` and these four): a value of zero or below never ends a walk on a
+`pipeline.jobs` and these five): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares
@@ -77,9 +77,11 @@ refused as `invalid_input` before any request.
 | `tags.list` | `getApiV4ProjectsIdRepositoryTags` | `GET /projects/{id}/repository/tags` | none; each tag carries its commit id | read |
 | `releases.list` | `getApiV4ProjectsIdReleases` | `GET /projects/{id}/releases` | none; each release carries `released_at` | read |
 | `project.events` | `getApiV4ProjectsIdEvents` | `GET /projects/{id}/events` | `after`, `before` (dates) | read |
+| `commits.list` | `getApiV4ProjectsIdRepositoryCommits` | `GET /projects/{id}/repository/commits`, e.g. `ref_name`, `first_parent`; each commit carries `parent_ids`; `read_api` scope | `since`, `until` (date-times) | read |
+| `repository.compare` | `getApiV4ProjectsIdRepositoryCompare` | `GET /projects/{id}/repository/compare` with `from` and `to` (both required) and `straight`; not paged; `read_api` scope. The body is GitLab's own: an empty compare answers `200` with `"commits": []` and `"compare_timeout": false`, a compare GitLab cut short also answers `200`, possibly with `"commits": []`, but with `"compare_timeout": true`; so read `body.compare_timeout`, not the length of `commits`, to tell them apart | none | read |
 
 `projects.list` returns each project unchanged, including `archived`,
-`created_at`, `last_activity_at` and `path_with_namespace`. All four need only
+`created_at`, `last_activity_at` and `path_with_namespace`. All six need only
 the `read_api` token scope.
 
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
