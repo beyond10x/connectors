@@ -14,7 +14,7 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1/projection.md
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/scenarios
-revision: 2
+revision: 3
 ---
 ## Acceptance
 
@@ -35,22 +35,25 @@ advertised capability carries a guarantee weaker than the operation it projects.
 
 ## Domain relations
 
-**`McpAdvertisedCapability → connectors.declarations.OperationDeclaration`,
-many-to-one, the `AdapterSpecification` owning the operation — inferable from
-`ess/domains/declarations.yaml:119-123`**, where
-`connectors.declarations.AdapterSpecification.operations` is declared `kind:
-owns`, `cardinality: many`, `via: adapter_id`. An advertised MCP tool is a
-projection of an already-owned declaration, never a second record of it, and
-removing the declaration removes the projection. The epic requires this reuse
-rather than a new owner: "Reuse established owners instead of making MCP the
-universal internal contract."
+Each `McpAdvertisedCapability` projects exactly one already declared operation.
+The scalar `operation_ref` and its stated-edge commentary in
+`adapters/mcp/spec/ess/domains/state.yaml` own that fact. The independent native
+ESS root deliberately does not declare a cross-root relation to
+`connectors.declarations.OperationDeclaration`.
 
-`ess/domains/mutations.yaml:100-101` supplies the qualification this projection
-must respect: "UNMAPPED: the operation reference needs instance/adapter
-qualification; OperationDeclaration.operation_id alone is not a runtime operation
-identity." An MCP tool name that is a bare `operation_id` is therefore ambiguous
-by the shared model's own admission, and this document must state the qualified
-name it advertises instead.
+`ess/domains/declarations.yaml` declares that `AdapterSpecification` owns many
+`OperationDeclaration` records. That is the existing declaration owner, a different
+pair from the advertised-capability projection; it neither establishes this
+projection's cardinality nor a durable deletion cascade. Specify withdrawal from
+discovery when the declaration is no longer selected/admitted without inventing
+persistent record deletion.
+
+An `operation_id` alone is not a runtime operation identity. Preserve the instance
+and adapter qualification required by the shared mutation model, and define an
+unambiguous MCP advertised name and inverse selection. This story does not assign
+another caller's provider connection. The existing single-owner local binding
+admits the configured owner, while the eight unresolved MCP relation markers stay
+intact. No `McpCaller` entity or hidden Connection assignment is introduced.
 
 ## What this story must establish
 
