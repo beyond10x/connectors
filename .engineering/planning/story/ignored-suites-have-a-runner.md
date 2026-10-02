@@ -10,12 +10,16 @@ relations:
 - informed_by: specification:milestone-acceleration-20261002
 scope:
 - confidence: inferred
+  path: Cargo.lock
+- confidence: inferred
+  path: crates/connectors-build/Cargo.toml
+- confidence: inferred
   path: crates/connectors-build/src/ignored.rs
 - confidence: cited
   path: crates/connectors-build/src/main.rs
 - confidence: cited
   path: docs/development.md
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T11:48:33Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T11:48:33Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}

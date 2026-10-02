@@ -6,7 +6,7 @@ status: draft
 title: 'Wave 20261002b: metadata timeout safety and acceptance reliability'
 relations:
 - informed_by: specification:milestone-acceleration-20261002
-revision: 1
+revision: 3
 ---
 ## Authority and preflight
 
@@ -16,16 +16,56 @@ Primary status is exactly `?? .agents/`; no unit touches it. Work resumes the ex
 
 ## Selected units
 
-All serve vision:independent-contract-adapters. Existing typed scopes are cited with explicitly marked inferred test/module files. The computed draft waves, collisions and unassessed lists were retained verbatim in the task scratch waves-before.json before activation. The three selected units share no edit paths. The clock experiment shares metadata paths and is excluded until bridge cleanup lands. Unrelated unassessed backlog items are not scheduled.
+All serve vision:independent-contract-adapters. The draft waves, collisions and unassessed lists were retained verbatim in waves-before.json before activation. The three selected units share no edit paths. Clock experiments share metadata paths and remain sequenced after bridge cleanup. Unrelated backlog items are not scheduled.
 
 | Unit | Managed id and branch | Stage |
 | --- | --- | --- |
-| story:bridge-drop-waits-for-dispatched-batch | cb26b-bridge; impl/cb26b-bridge | preparing |
-| story:sql-fixture-accepts-stray-connections | cb26b-sql; impl/cb26b-sql | preparing |
-| story:ignored-suites-have-a-runner | cb26b-runner; impl/cb26b-runner | preparing |
+| story:bridge-drop-waits-for-dispatched-batch | cb26b-bridge; impl/cb26b-bridge | four timeout regressions red then green; final package checks |
+| story:sql-fixture-accepts-stray-connections | cb26b-sql; impl/cb26b-sql | package tests/Clippy/fmt green; adversary pass 1; 50 load repetitions pending |
+| story:ignored-suites-have-a-runner | cb26b-runner; impl/cb26b-runner | eight orchestration cases red then green; compiled workspace inventory and actual fixture execution pending |
 
-Integration is managed id connectors-plan-20261002 on plan/milestones-20261002. Unit paths are returned by worktree create and recorded before dispatch. Each build is <unit-tree>/target; each scratch is <unit-tree>/.local/wave-20261002b. Coordinator scratch is .local/wave-20261002b in the integration tree. Coordinator is sole planning-store writer. aep:implementor then aep:adversary procedures run through Codex subagents, since this host has no plugin agent-type selector. All committed executable code is Rust with clap derive for CLIs; no Python.
+Integration is connectors-plan-20261002 on plan/milestones-20261002; its HEAD is b3ddded7618b5a4a23fe74dbec739e0938ecc296 plus uncommitted coordinator planning, resolver evidence and intended v0.25.0 release metadata. Every unit remains based on that same opening commit, with source changes uncommitted. Only root writes the store. Each build directory is <tree>/target and scratch is <tree>/.local/wave-20261002b. Codex subagents execute the aep:implementor and aep:adversary procedures; this host has no plugin agent-type selector. All committed runnable code is Rust with clap derive.
+
+A workspace build is warming integration target for the final gate. Current free space fluctuates around 20–23 GiB; retain the 8 GiB floor. SQL target stays available for 50 repeated runs during the runner's actual workspace tests. Adversary lease is codex-cb26b-sql-adversary; SQL implementor has released its lease. Bridge and runner retain their worker leases; root retains codex-connectors-delivery-20261002.
+
+Coordinator approved a narrow scratch exception for ignored fixture validation: $HOME/.cache/cb26b-runner/tmp, owner-private and task-owned, because absolute Secret Service sockets cannot fit the long managed path and custody deliberately rejects symlink aliases. The runner will expose --tmpdir with physical owner-private directory validation and report missing short-root prerequisites explicitly. Root owns cleanup of that exact external scratch path after evidence is retained.
 
 ## Completion
 
 Package-scoped red/green, format/lint, independent adversarial cases, coordinator verification, then one integrated gate/MSRV and affected website checks on the release candidate. Bot commits and PR checks must pass before merge/tag/page. Preserve exact test summaries and outcome evidence. Do not close an upstream or product decision without its actual clearing evidence.
+
+## Dispatch paths
+
+All three trees were created from b3ddded7618b5a4a23fe74dbec739e0938ecc296 by worktree create under the configured managed root. Relative to that root's connectors/ directory: cb26b-bridge, cb26b-sql, cb26b-runner. Each uses target/ and .local/wave-20261002b/ for build and scratch; each scratch/brief.md is the immutable unit assignment. Branches impl/cb26b-bridge, impl/cb26b-sql, impl/cb26b-runner. Worker leases codex-cb26b-<lane>. SQL holds the first measured compile slot; bridge and runner start source discovery/test authoring immediately and wait for compilation admission. Sccache show-stats responded; current repository profiles already disable debug symbols/incremental output and retain debug assertions.
+
+## Measured build capacity and diagnosis
+
+SQL baseline package suite completed in 163 seconds, target 889092 KiB (about 868 MiB); local_runtime 4 passed/1 ignored and protocol 7 passed. Free disk about 27 GiB afterward. Bridge and runner package builds admitted concurrently with two jobs each, with workspace builds still coordinated. Source discovery remains parallel. SQL reproduction found valid SUT PostgreSQL CancelRequest control traffic, not proof of a foreign process; acceptance keeps malformed packet and extra-session negative controls.
+
+## Provider acceptance preparation — 2026-10-02
+
+Root owns one disposable container: connectors-20261002-pg, id 7097eef0c3f4eda82b574f9890db1719b0a7f96e7eaaf6cdc92686861b0f3fb6, label connectors.acceptance=codex-connectors-20261002, image sha256:d741b376874687de90374fd34f55c6b2760e8f7bd7e4ae5cd47f50757fc08cf8 (postgres:17.6-alpine3.22), bound at 127.0.0.1:33096. It has the incidents database, a SELECT-only reader role and three rows (two critical/one minor), matching the live CLI journey. Private bootstrap files are under this tree's .local/provider-acceptance-20261002 (mode700); do not publish their contents. Readiness passed; no Connectors live journey has run yet. Verify exact id and label before cleanup. Do not touch pre-existing provider containers.
+
+Installed gnome-keyring-daemon digest matches the repository qualification exactly: b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02f5f2ca53958b. The PostgreSQL journey explicitly uses plaintext loopback; it does not prove TLS. Kubernetes acceptance fixture is not started yet. Catalog production CLI port scope is now recorded on story:catalog-cli-journeys, still draft.
+
+## Kubernetes fixture ownership — 2026-10-02
+
+Root created connectors-20261002-k3s, exact id eb54025175eb8134d2752d11528ee5a638ca42363ddc09b242c9cc292a4c1646, image sha256:efe65d76faac869ca7329373cb5a5c5676cb3dbfc0a48d0574c6f4d7fa285d2a (rancher/k3s:v1.31.5-k3s1), label connectors.acceptance=codex-connectors-20261002. API is https://127.0.0.1:33097; node readiness passed. A private explicitly selected kubeconfig created the fixture namespace, a reader ServiceAccount and namespaced get/list access for pods/services/endpointslices only, plus one pod and service. Pod readiness is not yet asserted. Eight-hour bearer token and CA files are in .local/provider-acceptance-20261002, mode600; never print or commit token/kubeconfig. No default Kubernetes context is selected. All resources belong to this disposable container; verify exact id/label before cleanup. Live Connectors acceptance has not run yet.
+
+## Integration checkpoint — 2026-10-02T12:30Z
+
+Bridge unit commit 91511f4379579d0605af80420d5c34ea4874d162 merged as 294477ba213635bdc68f9285da954e308456eae2. SQL unit commit ef5a08f87f4c641325bbd46810b5aeb38666913b merged as f43fdbb00f3193be222935e62e8ce1cf82d125a1. Every direct author and committer was verified as b10x-bot[bot]. The bot wrapper supports commit/tag/push/fetch, so merge preparation used git merge --no-commit; only b10x-gates bot commit created the commits. No source has been pushed yet.
+
+Both independent adversary passes returned nothing found; their exact reports are immutable review-result:wave-20261002b-{bridge,sql}-adversary-1. Bridge package runs 335 cases, 26 ignored. SQL package runs 19 cases; its 50 repeated local_runtime runs each passed 10 cases under actual workspace load from12:22:53–12:24:29UTC. The load ran12:22:19–12:30:13UTC and itself ended1187 passed/1 failed/45 ignored: one new runner temporary-directory test failed, then its corrected package passed. Full reports and load evidence live under docs/evidence/reliability-20261002/. These are unit proofs; the integrated gate has not run.
+
+Runner remains in adversarial verification. Two tests reproduce descendants surviving both successful and failed fixture exits. Root awaits the immutable report before routing the fix; no runner commit or integration yet. Scope now additionally includes its Cargo.toml and Cargo.lock for a possible existing libc dependency used to preserve group-leader identity through cleanup. Its actual compiled inventory is45 ignored tests,5 helpers,0 unknown across134 executables. Do not replace these measured counts with the earlier source count.
+
+Intended release v0.25.0 metadata is prepared, not released. Initial workspace build, website typecheck/build and public-path audit passed before final runner integration. Repeat only affected validation after final changes and run the required full gate/MSRV before publication. Catalog next-story scope has been independently audited and corrected; its ER observation/fault-injection seams still need implementation proof. Clock candidate preflight is read-only until the bridge dependency closes on the integrated gate.
+
+## Publication checkout and path-only redaction
+
+The previous integration tree remains private recovery evidence. Gates refused its uncommitted coordinator commit with37 personal-path findings, all machine-specific paths in reports or workspace records. No rejected commit was created or pushed. AEP cannot change immutable review bodies, so a fresh managed publication checkout cb26b-publish, branch delivery/reliability-20261002, starts at the exact merged source commit294477ba213635bdc68f9285da954e308456eae2. Root recreated the pending planning updates, evidence and review records through the AEP CLI; it did not delete or edit the original immutable records. Current revision numbers differ because the pending operations were reconstructed into this publication store.
+
+Public report copies replace the literal operator home prefix with the portable $HOME marker. That is the only report-text transformation; test names, commands, results, assertions, timing, findings and verdicts are unchanged. Raw reports remain in the unit scratch and original private integration tree. This explicitly disclosed path redaction takes precedence over verbatim-publication guidance. No raw report containing personal paths is admitted to Git. The report provenance table in docs/evidence/reliability-20261002/README.md records raw and publication digests.
+
+Publication checkout build target will be transferred exclusively from the inactive original integration target; no concurrent build shares it. Original private fixture credentials remain in the original tree until provider acceptance and exact fixture cleanup finish. Root lease in publication tree is codex-cb26b-publish. The original tree is retained until archive/handoff and owns no future publication.
