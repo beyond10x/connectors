@@ -1,0 +1,2175 @@
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.45
+   Compiling rustls-webpki v0.103.15
+   Compiling rcgen v0.14.10
+   Compiling tokio-rustls v0.26.6
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling tokio-postgres-rustls v0.14.0
+   Compiling reqwest v0.13.5
+   Compiling connectors-client v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/crates/connectors-client)
+   Compiling connectors-host v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/crates/connectors-host)
+   Compiling connectors-catalog-provider v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/adapters/catalog)
+   Compiling connectors-spec v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/crates/connectors-spec)
+   Compiling connectors-kubernetes v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/adapters/kubernetes)
+   Compiling connectors-sql v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/adapters/sql)
+   Compiling connectors-build v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/crates/connectors-build)
+   Compiling connectors-conformance v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/crates/connectors-conformance)
+   Compiling connectors v0.24.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-runner/apps/connectors)
+    Finished `test` profile [optimized] target(s) in 2m 02s
+     Running unittests src/main.rs (target/debug/deps/connectors-e038cf1df3c2a833)
+
+running 5 tests
+test local::cursor::tests::a_cursor_expires_after_its_lifetime_and_never_before_its_issue ... ok
+test local::cursor::tests::the_encoding_rejects_padding_other_alphabets_and_non_canonical_bits ... ok
+test local::tests::a_provider_timeout_or_capacity_answer_reports_dispatch_and_the_hosts_own_admission ... ok
+test local::tests::a_revision_conflict_is_not_an_unreadable_store_at_any_mapping_site ... ok
+test local::cursor::tests::the_limit_is_checked_before_the_cursor ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/absent_operation.rs (target/debug/deps/absent_operation-557cfd98584e8f70)
+
+running 5 tests
+test operations_list_keeps_hiding_ungranted_operations ... ok
+test approvals_prepare_answers_not_found_before_the_grant_and_the_revision ... ok
+test describe_answers_not_found_for_an_operation_the_adapter_does_not_expose ... ok
+test invoke_answers_not_found_before_the_grant_and_the_revision ... ok
+test the_owner_invoke_request_answers_not_found_before_the_grant ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.41s
+
+     Running tests/absent_operation_adversary.rs (target/debug/deps/absent_operation_adversary-0d27e67fb740863f)
+
+running 3 tests
+test absent_id_is_not_found_everywhere_when_the_profile_is_not_granted ... ok
+test an_ill_formed_operation_id_gets_one_answer_from_every_verb ... ok
+test describe_agrees_with_invoke_when_the_operation_profile_is_not_granted ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.46s
+
+     Running tests/adversary_legacy_edges.rs (target/debug/deps/adversary_legacy_edges-f4151d233b992929)
+
+running 4 tests
+test output_after_the_separator_does_not_select_json ... ok
+test root_help_after_a_global_output_carries_the_service_block ... ok
+test non_utf8_and_long_argv_are_the_fixed_envelope ... ok
+test routing_edges_answer_like_the_grouped_parser ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests/cli_surface_minor.rs (target/debug/deps/cli_surface_minor-41948104fcba2e19)
+
+running 11 tests
+test completions_emit_the_raw_script_under_json_output ... ok
+test a_wrong_argument_type_is_cli_input ... ok
+test an_unknown_flag_or_command_is_cli_parse ... ok
+test document_commands_refuse_the_document_before_an_unknown_alias ... ok
+test every_adapter_command_answers_an_unknown_alias_at_admission ... ok
+test approvals_refuse_an_undecodable_document_with_owner_invalid_input ... ok
+test c05_depth_past_the_decoder_limit_is_cli_dynamic_input ... ok
+test c05_business_input_sources ... ok
+test setup_check_reports_no_next_action_for_ready_metadata ... ok
+test c05_wrong_business_input_codes ... ok
+test a_configured_alias_is_bounded_at_128_bytes ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.08s
+
+     Running tests/cli_surface_minor_adversary.rs (target/debug/deps/cli_surface_minor_adversary-bf153d8c001582f3)
+
+running 2 tests
+test every_list_cursor_this_tree_cannot_honour_is_stale_cursor ... ok
+test c05_wrong_input_is_classified_the_same_from_inline_and_stdin ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.83s
+
+     Running tests/compatibility.rs (target/debug/deps/compatibility-77081f0548edc40f)
+
+running 3 tests
+test version_flags_print_name_and_workspace_version_and_succeed ... ok
+test compatibility_inventory_matches_existing_help ... ok
+test legacy_describe_is_complete_and_invoke_prints_raw_result_once ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/configuration_refusal_adversary.rs (target/debug/deps/configuration_refusal_adversary-b1d69b4b770ec489)
+
+running 1 test
+test every_cli_command_refusing_a_mismatched_entry_names_format_and_entry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s
+
+     Running tests/failed_connect.rs (target/debug/deps/failed_connect-304e7c12aa29182e)
+
+running 6 tests
+test a_connect_to_an_unreachable_provider_reports_the_owners_cause_at_dispatch ... ignored, requires dbus-daemon, gnome-keyring-daemon and CONNECTORS_TEST_CATALOG_PROVIDER
+test a_revalidation_the_owner_definitely_fails_reports_dispatch_at_the_cli ... ignored, requires dbus-daemon and gnome-keyring-daemon
+test a_revalidation_reply_that_never_arrives_is_outcome_unknown ... ok
+test a_connect_reply_that_never_arrives_is_outcome_unknown ... ok
+test an_owners_definite_connect_failure_keeps_its_code_and_acquisition ... ok
+test an_owners_definite_revalidation_failure_keeps_its_code ... ok
+
+test result: ok. 4 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.94s
+
+     Running tests/failed_connect_adversary.rs (target/debug/deps/failed_connect_adversary-a7f2663aa8452c95)
+
+running 8 tests
+test a_connect_answered_with_a_non_json_frame_is_outcome_unknown ... ok
+test a_connect_reply_cut_mid_frame_is_outcome_unknown ... ok
+test a_revalidation_reply_cut_mid_frame_is_outcome_unknown ... ok
+test a_revalidation_answered_with_an_unknown_reply_kind_is_outcome_unknown ... ok
+test a_connect_answered_with_an_unknown_reply_kind_is_outcome_unknown ... ok
+test a_connect_answered_with_an_unreadable_failed_reply_is_outcome_unknown ... ok
+test a_revalidation_whose_reply_times_out_is_outcome_unknown ... ok
+test a_connect_whose_reply_times_out_is_outcome_unknown ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.80s
+
+     Running tests/input.rs (target/debug/deps/input-cd6658534849f434)
+
+running 1 test
+test duplicate_input_keys_are_refused_before_service_contact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/legacy_commands.rs (target/debug/deps/legacy_commands-429ab71b85bf7f63)
+
+running 5 tests
+test root_help_is_the_generated_help_plus_the_contract_service_block ... ok
+test legacy_parse_envelope_is_the_grouped_parse_envelope ... ok
+test output_before_the_legacy_command_word_is_accepted ... ok
+test legacy_parse_errors_are_the_human_envelope_without_argv ... ok
+test legacy_parse_errors_are_the_json_envelope_before_or_after_the_command_word ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+     Running tests/list_paging.rs (target/debug/deps/list_paging-fcb8f81c77ee3e57)
+
+running 4 tests
+test adapters_list_pages_with_a_cursor_and_ends_without_one ... ok
+test operations_list_checks_the_limit_before_reading_the_cached_description ... ok
+test adapters_list_refuses_a_stale_expired_or_undecodable_cursor ... ok
+test operations_list_pages_with_a_cursor_and_refuses_a_stale_one ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.14s
+
+     Running tests/list_paging_adversary.rs (target/debug/deps/list_paging_adversary-8df2a859c3c7d6a4)
+
+running 7 tests
+test a_limit_outside_one_to_five_hundred_is_invalid_input ... ok
+test the_encoding_admits_exactly_one_spelling_of_a_cursor ... ok
+test a_forged_offset_outside_the_list_is_stale ... ok
+test operations_pages_cover_every_permitted_operation_once_and_nothing_else ... ok
+test an_operations_cursor_is_bound_to_the_adapter_it_was_issued_for ... ok
+test a_cursor_does_not_cross_between_the_two_lists ... ok
+test every_entry_appears_exactly_once_around_the_limit ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.64s
+
+     Running tests/local_cli.rs (target/debug/deps/local_cli-ab2288c323221305)
+
+running 17 tests
+test adversary2_a_real_pre_handshake_owner_is_refused_by_name_and_the_reverse_is_observed ... ignored
+test protected_sources_are_not_consumed_before_configuration_admission ... ok
+test clock_check_uses_current_configured_key_without_metadata_or_service_start ... ok
+test setup_init_admits_an_adapter_entry_that_selects_its_private_protocol ... ok
+test production_parser_initializes_and_inspects_across_processes ... ok
+test an_owner_still_serves_a_caller_that_never_named_its_build ... ok
+test a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build ... ok
+test adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest ... ok
+test adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mismatch ... ok
+test a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_entry ... ok
+test adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity ... ok
+test inventory_and_unavailable_status_never_launch_configured_executable ... ok
+test a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running ... ok
+test an_idle_owner_exits_and_the_next_start_gets_a_new_owner ... ok
+test a_connected_client_keeps_an_owner_past_its_idle_bound ... ok
+test adversary2_the_identification_retry_loop_ends_at_its_deadline_without_flooding_the_owner ... ok
+test adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs ... ok
+
+test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 58.88s
+
+     Running tests/owner_build_security.rs (target/debug/deps/owner_build_security-384167c264dc1e55)
+
+running 2 tests
+test an_owner_of_the_same_build_that_sheds_one_connection_is_not_reported_as_another_build ... ok
+test every_work_request_is_refused_before_it_reaches_an_owner_of_another_build ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.65s
+
+     Running tests/owner_idle_exit_adversary.rs (target/debug/deps/owner_idle_exit_adversary-eb268c77a6c3d8fb)
+
+running 1 test
+test idle_owners_exit_within_their_bound_when_it_spans_several_recovery_sweeps ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 34.89s
+
+     Running tests/revision_conflict.rs (target/debug/deps/revision_conflict-8c7c537fd067ff61)
+
+running 3 tests
+test the_owner_reports_a_revision_conflict_under_its_own_code ... ok
+test an_unreadable_store_still_answers_metadata_unavailable ... ok
+test a_revision_conflict_reaches_the_cli_as_revision_conflict ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.62s
+
+     Running tests/revision_conflict_adversary.rs (target/debug/deps/revision_conflict_adversary-d31401002538f1b5)
+
+running 2 tests
+test approval_stores_do_not_fold_a_revision_conflict_into_an_unreadable_store ... ok
+test a_guarded_write_revision_conflict_reports_what_the_semantics_row_says ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/setup_init_format_adversary.rs (target/debug/deps/setup_init_format_adversary-22444f65a6d8f8fb)
+
+running 5 tests
+test initialized_empty_configuration_is_byte_stable_apart_from_owner ... ok
+test documented_catalog_entry_passes_setup_check_after_init ... ok
+test documented_postgres_entry_passes_setup_check_after_init ... ok
+test documented_kubernetes_entry_passes_setup_check_after_init ... ok
+test existing_v1_files_load_and_are_never_rewritten ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.52s
+
+     Running tests/setup_missing_state.rs (target/debug/deps/setup_missing_state-33d30f2675861175)
+
+running 4 tests
+test configuration_and_state_both_present_still_answer_configuration_exists ... ok
+test invalid_existing_configuration_is_refused_and_unchanged ... ok
+test missing_state_directory_is_initialised_for_an_existing_configuration ... ok
+test state_directory_without_a_metadata_store_is_initialised ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.38s
+
+     Running tests/socket_path_adversary.rs (target/debug/deps/socket_path_adversary-073bf0bdebcae8ca)
+
+running 2 tests
+test a_socket_far_past_sun_len_is_bound_and_reached_through_the_directory ... ok
+test concurrent_directories_never_cross_sockets ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_build-23068725d8dfb69a)
+
+running 55 tests
+test docs::tests::rejects_duplicate_and_escaping_routes ... ok
+test docs::tests::cannot_publish_a_source_outside_its_owner ... ok
+test cli::tests::public_acquisition_examples_cannot_expose_internal_states_or_wrong_terminal_fields ... ok
+test ess_boundary::tests::allows_shared_protocols_and_separate_provider_models ... ok
+test ess_boundary::tests::admits_a_root_component_source_that_owns_only_declared_domains ... ok
+test ess_boundary::tests::matches_case_and_separator_variants_without_substring_false_positives ... ok
+test docs::tests::imported_markdown_cannot_execute_html_or_script_links ... ok
+test docs::tests::reference_title_keeps_anchor_and_text_without_a_second_h1 ... ok
+test ess_boundary::tests::refuses_linked_source_files_and_directories ... ok
+test docs::tests::resolves_only_selected_local_links ... ok
+test docs::tests::preserves_rules_and_stable_heading_anchors ... ok
+test aep_toolchain::tests::the_pin_is_one_exact_release ... ok
+test ess_boundary::tests::refuses_a_component_source_owning_undeclared_domains_or_outside_the_root ... ok
+test cli::tests::cache_labels_and_page_deadlines_cannot_assert_unobserved_freshness ... ok
+test docs::tests::refuses_unknown_projection_nodes ... ok
+test ess_boundary::tests::checks_all_paths_and_requires_complete_local_domain_inventory ... ok
+test gate::tests::gate_cargo_keys_the_runner_to_the_host_triple ... ok
+test gate::tests::gate_cargo_leaves_the_compiler_wrapper_on_the_callers_tmpdir ... ok
+test gate::tests::gate_cargo_keeps_the_toolchain_selector_first ... ok
+test docs::tests::public_audit_checks_embedded_binary_paths ... ok
+test ignored::tests::ignored_runner_has_an_explicit_cli_and_defaults_to_disposable ... ok
+test gate::adversary_pass2_tests::runner_passes_test_arguments_byte_for_byte ... ok
+test gate::adversary_pass2_tests::runner_preserves_exit_codes_above_one ... ok
+test gate::tests::gate_cargo_hands_the_temporary_root_to_test_binaries_through_a_runner ... ok
+test ess_boundary::tests::protocol_adapter_does_not_ban_shared_protocol_or_suppress_native_leaks ... ok
+test ess_boundary::tests::rejects_malformed_optional_alias_inputs_and_model_sources ... ok
+test metadata_conformance::tests::kernel_invariant_violation_is_a_failed_command_not_unsupported ... ok
+test gate::adversary_tests::runner_executes_a_failing_test_binary_whose_path_contains_an_equals_sign ... ok
+test ignored::tests::missing_prerequisite_is_explicit ... FAILED
+test ess_boundary::tests::discovers_design_only_and_spec_only_owners_without_runtime_declarations ... ok
+test gate::adversary_tests::runner_hands_the_root_to_a_binary_whose_path_contains_an_equals_sign ... ok
+test metadata_conformance::tests::other_kernel_errors_stay_unsupported ... ok
+test metadata_conformance::tests::named_optional_members_round_trip_through_the_runtime_form ... ok
+test metadata_conformance::tests::unknown_fixture_is_an_error_not_a_default ... ok
+test source_hashes::tests::a_manifest_without_retained_archives_is_not_this_check ... ok
+test gate::adversary_pass2_tests::runner_executes_awkward_binary_paths ... ok
+test gate::adversary_pass2_tests::runner_hands_over_roots_with_a_leading_dash_or_newline ... ok
+test docs::tests::walkthrough_fixtures_follow_the_shipped_selection ... ok
+test gate::adversary_tests::runner_preserves_awkward_roots ... ok
+test ignored::tests::unknown_inventory_refuses_before_any_execution ... ok
+test tests::catalog_without_derived_from_records_none ... ok
+test tests::discovery_writes_the_projection_and_its_record ... ok
+test tests::catalog_records_derivation ... ok
+test ignored::tests::zero_test_success_is_not_execution ... ok
+test ignored::tests::selected_test_failure_is_nonzero ... ok
+test ignored::tests::ignored_inventory_accounted ... ok
+test ignored::tests::inventory_mode_never_executes_selected_cases ... ok
+test tests::catalog_derived_from_mismatch_refused ... ok
+test ignored::tests::subprocess_helper_never_top_level ... ok
+test source_hashes::tests::recorded_digests_are_rederived_from_the_archived_bytes ... ok
+test docs::tests::example_model_carries_the_example_domains_and_their_references_only ... ok
+test ess_boundary::tests::rejects_names_comments_fields_encoded_values_and_new_adapter_ids ... ok
+test gate::adversary_pass2_tests::runner_preserves_a_killing_signal ... ok
+test docs::tests::example_model_synthesizes_for_every_example_target_with_the_pinned_ess ... ok
+test metadata_conformance::tests::emitted_manifest_is_admitted_by_the_pinned_ess ... ok
+
+failures:
+
+---- ignored::tests::missing_prerequisite_is_explicit stdout ----
+
+thread 'ignored::tests::missing_prerequisite_is_explicit' (1508347) panicked at crates/connectors-build/src/ignored.rs:716:63:
+called `Result::unwrap()` on an `Err` value: "--tmpdir must be an owner-private directory (mode 700) owned by this user"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ignored::tests::missing_prerequisite_is_explicit
+
+test result: FAILED. 54 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.64s
+
+error: test failed, to rerun pass `-p connectors-build --bin connectors-build`
+     Running tests/cli_spec_mapping_adversary.rs (target/debug/deps/cli_spec_mapping_adversary-1567bcb914039cee)
+
+running 5 tests
+test the_corrected_semantics_citations_land_on_their_rules ... ok
+test the_owner_greeting_request_the_cli_sends_is_declared ... ok
+test the_owner_greeting_reply_is_declared_with_the_hosts_fields ... ok
+test the_build_digest_format_is_declared ... ok
+test the_er_rs_citation_lands_on_the_cursor_expiry_path ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/cli_spec_mapping_adversary_pass2.rs (target/debug/deps/cli_spec_mapping_adversary_pass2-53808d41937562af)
+
+running 5 tests
+test the_build_digest_admits_exactly_lowercase_64_hex ... ok
+test the_owner_frame_tag_is_modelled_the_same_way_on_every_frame ... ok
+test the_build_digest_comment_cites_the_file_that_encodes_it ... ok
+test the_owner_greeting_types_its_uuid_fields ... ok
+test the_owner_hello_types_its_uuid_fields ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/mcp_domain_model_adversary.rs (target/debug/deps/mcp_domain_model_adversary-f1b17572e53171b2)
+
+running 3 tests
+test the_one_stated_census_edge_agrees_with_the_field_that_realises_it ... ok
+test a_binding_can_select_every_version_a_server_can_report_as_supported ... ok
+test the_adapter_owner_document_does_not_deny_the_model_this_unit_added ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/mcp_domain_model_adversary_pass2.rs (target/debug/deps/mcp_domain_model_adversary_pass2-c68503d69664c40e)
+
+running 3 tests
+test every_relation_no_source_answers_carries_the_marker_the_acceptance_names ... ok
+test a_census_rows_verdict_cannot_be_supplied_by_the_row_beside_it ... ok
+test no_state_carrier_closes_a_set_the_pinned_schema_leaves_open ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/mcp_domain_model_census.rs (target/debug/deps/mcp_domain_model_census-a04f655f4ea972c2)
+
+running 4 tests
+test the_protocol_domain_still_disclaims_making_a_selection ... ok
+test the_protocol_revision_values_are_the_negotiated_strings_not_the_trap_constants ... ok
+test the_three_credential_kinds_are_three_distinct_declared_types ... ok
+test every_census_edge_is_marked_and_no_unreadable_one_is_realised ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/mcp_inbound_local_binding.rs (target/debug/deps/mcp_inbound_local_binding-3d2911a38f533aab)
+
+running 16 tests
+test an_acceptance_that_states_both_a_count_and_a_rule_is_refused_rather_than_resolved - should panic ... ok
+test the_acceptance_rule_is_read_from_the_statement_in_either_form_it_can_take ... ok
+test the_binding_names_no_cloud_identity_or_network_dependency_it_does_not_refuse ... ok
+test the_document_states_the_lease_obligation_its_traces_inherit ... ok
+test every_named_transition_is_one_the_sessions_lifecycle_declares ... ok
+test every_behaviour_the_acceptance_names_has_an_outcome_a_transition_and_a_scenario ... ok
+test every_behaviour_states_what_the_selected_transport_does_not_offer ... ok
+test every_transition_a_behaviour_section_asserts_is_bound_to_one_of_its_traces ... ok
+test the_document_specifies_the_transport_the_matrix_selected_and_selects_nothing ... ok
+test every_close_deadline_a_trace_records_is_bounded_by_the_contract_and_the_live_lease ... ok
+test no_scenario_this_story_owns_names_an_outcome_the_document_does_not ... ok
+test the_directory_ships_what_the_story_acceptance_states ... ok
+test no_trace_issues_a_lease_longer_than_the_contract_ceiling ... ok
+test the_single_principal_boundary_is_stated_and_no_scenario_crosses_it ... ok
+test each_scenario_performs_the_transition_its_behaviour_names ... ok
+test no_trace_admits_data_or_renews_after_its_live_lease_deadline ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+     Running tests/mcp_inbound_local_binding_adversary.rs (target/debug/deps/mcp_inbound_local_binding_adversary-2964054846279790)
+
+running 3 tests
+test no_lease_a_trace_issues_outlives_the_ceiling_the_sessions_contract_sets ... ok
+test no_data_act_is_admitted_after_the_lease_that_admits_it_can_legally_be_live ... ok
+test no_close_records_a_cutoff_later_than_the_lease_it_ends ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/mcp_inbound_local_binding_adversary_pass2.rs (target/debug/deps/mcp_inbound_local_binding_adversary_pass2-755fc7aab2cc626b)
+
+running 2 tests
+test the_story_ships_the_number_of_scenario_files_its_acceptance_states ... ok
+test no_act_that_needs_a_live_lease_is_admitted_at_or_after_its_effective_expiry ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mcp_outbound_connection_lifecycle.rs (target/debug/deps/mcp_outbound_connection_lifecycle-d7b0aec84c553093)
+
+running 11 tests
+test every_refusal_names_a_declared_wire_code_and_loss_is_not_failure ... ok
+test the_document_does_not_close_the_revision_set_the_model_leaves_open ... ok
+test every_state_the_story_names_has_a_named_outcome_and_a_scenario_file ... ok
+test outbound_stdio_is_held_by_its_blocker_and_nothing_else_is ... ok
+test every_refusal_names_whose_act_it_reports ... ok
+test no_citation_into_an_editable_document_carries_a_line_number ... ok
+test no_state_is_answered_by_sending_the_request_again ... ok
+test every_scenario_this_story_owns_names_a_row_of_the_register ... ok
+test every_citation_resolves_into_an_archived_file_of_the_pin ... ok
+test every_section_and_scenario_resolves_which_revision_it_holds_for ... ok
+test no_sentence_writes_a_field_of_the_binding_entity ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.23s
+
+     Running tests/mcp_outbound_connection_lifecycle_adversary.rs (target/debug/deps/mcp_outbound_connection_lifecycle_adversary-8c4ca61e33a96cca)
+
+running 6 tests
+test a_selection_names_as_many_revisions_as_the_outcome_and_the_model_can_hold ... ok
+test the_document_does_not_call_a_four_family_transport_space_a_pair ... ok
+test cancellation_says_which_revision_its_signal_holds_for ... ok
+test a_request_the_interoperability_revision_makes_this_client_answer_has_an_outcome ... ok
+test an_answer_that_was_never_streamed_can_also_be_lost ... ok
+test no_binding_field_is_both_unchanged_by_an_observation_and_written_from_one ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/mcp_outbound_connection_lifecycle_adversary_pass2.rs (target/debug/deps/mcp_outbound_connection_lifecycle_adversary_pass2-e1d944b03c39aec4)
+
+running 5 tests
+test a_state_does_not_carry_two_outcomes_that_deny_each_other_s_precondition ... ok
+test a_refusal_does_not_name_the_peer_for_a_reason_in_which_no_peer_was_seen ... ok
+test the_advertised_capability_scenario_reads_a_result_the_interoperability_revision_has_not ... ok
+test the_selection_scenario_states_a_framing_the_interoperability_revision_has_not ... ok
+test no_sentence_of_this_contract_writes_a_field_of_the_binding_entity ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/mcp_profile_selection_matrix.rs (target/debug/deps/mcp_profile_selection_matrix-671198dcbbe880da)
+
+running 12 tests
+test no_row_resting_on_an_open_decision_blocker_claims_support_or_refusal ... ok
+test no_revision_outside_the_pin_is_dispositioned_supported ... ok
+test the_matrix_states_that_a_supported_row_is_a_selection_not_implemented_support ... ok
+test each_pinned_schema_declares_exactly_two_capability_interfaces_with_optional_fields ... ok
+test every_nested_capability_setting_is_named_in_the_section_of_the_side_that_declares_it ... ok
+test an_inbound_header_refusal_excepts_every_supported_revision_whose_opener_carries_none ... ok
+test every_deferred_row_names_a_record_and_every_quoted_marker_exists_in_the_model ... ok
+test each_row_carries_a_named_disposition_a_reason_and_a_resolvable_source_line ... ok
+test every_deferred_row_inheriting_the_other_sides_marker_is_stated_as_inheriting_it ... ok
+test every_revision_exclusion_is_stated_by_the_matrix_and_still_removes_a_token ... ok
+test every_extension_the_pinned_revisions_identify_is_named_by_the_matrix ... ok
+test every_feature_the_pinned_specification_names_is_dispositioned_once_per_direction ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/mcp_profile_selection_matrix_adversary.rs (target/debug/deps/mcp_profile_selection_matrix_adversary-e79bf351857d59f5)
+
+running 3 tests
+test every_nested_setting_is_named_in_the_section_of_the_side_whose_schema_declares_it ... ok
+test every_protocol_version_the_archives_tell_a_peer_to_assume_is_dispositioned ... ok
+test every_deferred_row_rests_on_a_blocker_whose_own_record_names_that_feature ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/mcp_profile_selection_matrix_adversary_pass2.rs (target/debug/deps/mcp_profile_selection_matrix_adversary_pass2-75a0613daf6d8549)
+
+running 2 tests
+test the_inbound_refusal_of_a_header_less_request_excepts_the_legacy_initialize_it_supports ... ok
+test every_extension_the_pinned_revisions_identify_is_named_by_the_matrix ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/mcp_specification_pin_adversary.rs (target/debug/deps/mcp_specification_pin_adversary-d878fad2c3732356)
+
+running 4 tests
+test manifest_provenance_fields_agree_with_the_revision_each_entry_claims ... ok
+test version_negotiation_row_cites_the_interop_revisions_negotiation_section ... ok
+test interop_revision_names_its_own_version_string_outside_a_documentation_path ... ok
+test every_recorded_digest_and_byte_length_rederives_from_the_archived_bytes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/mcp_specification_pin_adversary_pass2.rs (target/debug/deps/mcp_specification_pin_adversary_pass2-74477ff6c380e967)
+
+running 4 tests
+test record_does_not_count_a_banner_document_twice_when_naming_running_text_mentions ... ok
+test documented_provenance_check_refuses_a_path_repointed_within_its_own_revision ... ok
+test documented_provenance_check_refuses_a_wholesale_revision_to_commit_swap ... ok
+test design_document_accounts_for_every_transport_binding_the_pinned_revisions_specify ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/metadata_conformance_fixture_adversary.rs (target/debug/deps/metadata_conformance_fixture_adversary-a260f7432559ddec)
+
+running 5 tests
+test an_invariant_violation_is_failed_through_the_runner ... ok
+test a_well_formed_anchor_passes ... ok
+test an_unknown_fixture_name_errors_the_run ... ok
+test a_planted_wrong_outcome_fails_the_run ... ok
+test an_unobservable_invariant_is_failed_as_a_violation_is ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.48s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_catalog-7bc59f9fd79dc19b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/authored.rs (target/debug/deps/authored-13e22c58527d7979)
+
+running 28 tests
+test a_document_over_the_bounded_size_is_refused_rather_than_read_in_part ... ok
+test a_file_this_reader_may_not_open_is_refused_as_forbidden ... ok
+test a_path_that_exists_and_is_not_a_document_is_not_reported_as_absent ... ok
+test a_media_type_offered_twice_is_refused ... ok
+test a_cookie_is_read_as_a_cookie_and_left_to_the_template_to_refuse ... ok
+test a_missing_required_field_is_refused_by_its_dotted_name ... ok
+test an_action_names_the_auth_profile_it_authenticates_under ... ok
+test a_template_refusal_is_reported_as_itself_rather_than_rewritten ... ok
+test a_path_that_does_not_begin_with_a_slash_is_refused_by_its_path ... ok
+test a_parameter_repeated_under_one_name_and_location_is_refused ... ok
+test a_document_of_exactly_the_limit_is_read_and_one_byte_more_is_not ... ok
+test a_file_reads_as_its_bytes_do_and_an_absent_one_is_not_found ... ok
+test a_method_is_read_regardless_of_the_case_it_is_written_in ... ok
+test an_unknown_field_is_refused_rather_than_ignored ... ok
+test a_document_that_is_not_toml_is_refused_as_malformed ... ok
+test an_unknown_method_is_refused_by_the_value_as_written ... ok
+test a_field_of_the_wrong_type_is_refused_by_its_dotted_name ... ok
+test find_names_one_action_and_reports_the_rest_absent ... ok
+test each_location_the_model_carries_reaches_the_part_of_the_request_it_names ... ok
+test the_offered_media_types_are_the_set_the_equivalent_import_offers ... ok
+test every_refusal_names_its_subject_in_the_reason_it_gives ... ok
+test one_name_in_two_locations_is_not_a_repeat ... ok
+test every_published_operation_is_one_the_inventory_could_have_emitted ... ok
+test two_actions_with_one_name_are_refused_rather_than_the_last_kept ... ok
+test a_parameter_location_the_model_does_not_carry_is_refused_by_its_value ... ok
+test an_empty_action_array_is_refused_by_what_the_document_actually_did ... ok
+test a_placeholder_with_no_declared_parameter_refuses_as_the_template_says ... ok
+test an_authored_action_binds_exactly_as_the_equivalent_operation ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/authored_adversarial.rs (target/debug/deps/authored_adversarial-ea794c1a9c138841)
+
+running 4 tests
+test a_repeated_parameter_does_not_lose_the_required_it_declares ... ok
+test a_document_that_exists_but_cannot_be_read_is_not_reported_as_absent ... ok
+test an_authored_operation_declares_each_parameter_once ... ok
+test the_default_request_media_type_is_the_one_the_equivalent_import_picks ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/bundle.rs (target/debug/deps/bundle-29c2677fddca48da)
+
+running 6 tests
+test an_empty_directory_reads_as_an_empty_index_rather_than_an_error ... ok
+test an_unknown_provider_and_a_missing_file_refuse_differently ... ok
+test a_written_bundle_loads_back_unchanged ... ok
+test one_altered_byte_makes_the_load_refuse ... ok
+test replacing_an_indexed_provider_needs_asking ... ok
+test the_index_lists_providers_in_a_stable_order ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/coverage.rs (target/debug/deps/coverage-a28a2d342dfeaed6)
+
+running 15 tests
+test an_empty_bundle_reports_zeroes_rather_than_refusing ... ok
+test the_text_form_states_the_unsupported_count_even_when_it_is_zero ... ok
+test a_written_backslash_n_and_a_newline_do_not_render_alike ... ok
+test a_file_name_cannot_forge_the_digest_beside_it ... ok
+test no_string_a_report_carries_can_add_a_line_to_the_text_form ... ok
+test the_two_reasons_are_grouped_with_the_designations_they_were_raised_against ... ok
+test one_reason_carries_every_designation_under_it_in_a_stable_order ... ok
+test three_operations_and_two_unsupported_entries_report_both_counts ... ok
+test no_line_states_one_count_without_the_other ... ok
+test the_report_round_trips_through_json ... ok
+test the_methods_present_are_reported_with_a_count_each ... ok
+test the_text_form_carries_the_provenance_and_the_grouped_reasons ... ok
+test a_bundle_the_document_order_permuted_renders_byte_identically ... ok
+test neither_rendering_computes_a_percentage ... ok
+test no_document_can_add_a_line_through_the_ingest_or_the_inventory ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/coverage_adversarial.rs (target/debug/deps/coverage_adversarial-f4da6aac71f96825)
+
+running 4 tests
+test a_parameter_name_cannot_add_a_line_that_states_one_count_alone ... ok
+test the_text_form_and_the_serialised_form_agree_on_how_many_reasons_there_are ... ok
+test no_document_can_put_a_percentage_in_the_text_form ... ok
+test an_info_version_cannot_add_a_line_that_states_one_count_alone ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/discovery.rs (target/debug/deps/discovery-c877fb1cc4ace530)
+
+running 40 tests
+test discovery_refuses_malformed_json ... ok
+test discovery_refuses_unresolved_ref ... ok
+test discovery_refuses_colliding_operations ... ok
+test discovery_refuses_values_outside_their_format ... ok
+test discovery_refuses_media_upload_without_a_protocol ... ok
+test discovery_accepts_values_at_their_edges ... ok
+test discovery_name_only_collision_is_order_independent ... ok
+test discovery_refuses_unknown_key ... ok
+test discovery_refuses_non_https_root ... ok
+test discovery_accepts_string_defaults_in_their_format ... ok
+test discovery_refuses_values_outside_the_table ... ok
+test discovery_refuses_string_defaults_outside_their_format ... ok
+test discovery_rule_document_info ... ok
+test discovery_rule_excluded_methods ... ok
+test discovery_rule_operation_id ... ok
+test discovery_rule_request_ref ... ok
+test discovery_rule_ignored_keys ... ok
+test discovery_rule_path ... ok
+test discovery_rule_parameter_location ... ok
+test discovery_rule_document_parameters ... ok
+test discovery_rule_media_upload ... ok
+test discovery_rule_parameter_keys ... ok
+test discovery_rule_nested_resources ... ok
+test discovery_rule_http_method ... ok
+test discovery_rule_repeated ... ok
+test discovery_rule_scopes ... ok
+test discovery_rule_no_response ... ok
+test discovery_rule_servers ... ok
+test discovery_rule_schemas ... ok
+test discovery_rule_response_ref ... ok
+test discovery_rule_schema_ref ... ok
+test the_base_document_is_accepted ... ok
+test every_rule_fixture_has_its_case ... ok
+test google_sources_pinned ... ok
+test discovery_refs_resolve ... ok
+test discovery_conserves_methods ... ok
+test discovery_openapi_parses_independently ... ok
+test discovery_ingests ... ok
+test discovery_no_credential_parameters ... ok
+test discovery_is_deterministic ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests/discovery_adversary_pass1.rs (target/debug/deps/discovery_adversary_pass1-b8407a36feb7b7f9)
+
+running 6 tests
+test adversary_base_path_is_one_slash_and_the_service_path ... ok
+test adversary_integer_values_fit_their_format ... ok
+test adversary_root_url_without_a_host_is_refused ... ok
+test adversary_second_get_on_a_renamed_template_is_refused ... ok
+test adversary_number_bound_keeps_its_value ... ok
+test adversary_media_upload_keys_are_named_not_dropped ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/discovery_adversary_pass2.rs (target/debug/deps/discovery_adversary_pass2-0a3f3db36d07d8c4)
+
+running 4 tests
+test adversary2_media_upload_without_protocols_leaves_a_trace ... ok
+test adversary2_upload_paths_belong_to_projected_methods ... ok
+test adversary2_same_verb_off_the_kept_spelling_is_refused ... ok
+test adversary2_string_format_defaults_fit_their_format ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/ingest.rs (target/debug/deps/ingest-1cf5362144563386)
+
+running 6 tests
+test a_missing_file_is_refused_rather_than_panicking ... ok
+test both_supported_dialects_report_their_own_version ... ok
+test the_same_bytes_ingest_to_the_same_record ... ok
+test each_unsupported_shape_is_refused_by_its_own_reason ... ok
+test a_file_records_its_own_name_and_not_its_path ... ok
+test a_document_over_the_limit_is_refused_without_parsing ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/inventory.rs (target/debug/deps/inventory-56acbbd5d3d62cc8)
+
+running 15 tests
+test a_path_is_recorded_below_its_servers_base_path ... ok
+test coverage_reports_its_two_numbers_apart ... ok
+test a_servers_override_is_named_and_not_recorded_under_the_document_base ... ok
+test an_operation_level_parameter_replaces_the_path_level_one_it_overrides ... ok
+test a_document_without_paths_is_empty_rather_than_an_error ... ok
+test an_overridden_array_parameter_records_no_gap_for_the_declaration_it_replaced ... ok
+test a_parameter_in_another_location_is_not_an_override ... ok
+test inventory_marks_form_explode_array_repeated ... ok
+test inventory_records_unsupported_array_style ... ok
+test an_operation_without_an_id_is_still_inventoried ... ok
+test servers_at_the_root_leave_the_paths_as_written ... ok
+test path_level_parameters_reach_the_operations_under_them ... ok
+test every_unrepresentable_thing_is_named_with_its_operation ... ok
+test servers_without_one_base_path_are_named_and_the_paths_kept ... ok
+test the_same_document_yields_a_byte_identical_inventory_twice ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/pipeline.rs (target/debug/deps/pipeline-97b24425d387c303)
+
+running 8 tests
+test an_absent_source_names_the_read_step ... ok
+test an_ingest_refusal_leaves_the_bundle_directory_uncreated ... ok
+test a_failure_carries_through_the_question_mark_operator ... ok
+test a_bundle_write_refusal_leaves_the_index_exactly_as_it_was ... ok
+test a_refusal_leaves_an_existing_index_byte_identical ... ok
+test an_indexed_provider_refuses_at_the_write_step_with_the_earlier_results ... ok
+test two_runs_over_the_same_bytes_record_the_same_thing ... ok
+test a_valid_document_is_written_indexed_and_recorded ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/pipeline_adversarial.rs (target/debug/deps/pipeline_adversarial-08d887a9ae8121fb)
+
+running 8 tests
+test every_step_label_is_its_serialised_name ... ok
+test a_directory_as_the_source_names_the_read_step ... ok
+test a_provider_named_index_does_not_collide_with_the_index_file ... ok
+test a_second_provider_leaves_the_first_bundle_intact ... ok
+test a_symlinked_source_records_the_link_name ... ok
+test a_write_step_refusal_leaves_a_bundle_file_behind ... ok
+test replacement_restores_an_indexed_bundle_whose_file_is_missing ... ok
+test concurrent_runs_into_one_directory_lose_index_entries ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/server_path_adversary.rs (target/debug/deps/server_path_adversary-d72f120083f58c91)
+
+running 3 tests
+test authority_shapes_do_not_move_the_base ... ok
+test a_path_item_servers_override_is_honoured_or_named ... ok
+test an_operation_servers_override_is_honoured_or_named ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/template.rs (target/debug/deps/template-53be3d9145069f59)
+
+running 32 tests
+test a_declared_path_parameter_with_no_placeholder_is_refused_by_name ... ok
+test a_declared_path_carrying_a_dot_segment_is_refused_when_the_template_is_bound ... ok
+test a_header_name_the_document_wrote_with_a_control_byte_is_refused_by_name ... ok
+test a_cookie_parameter_is_declared_unsupported_rather_than_dropped ... ok
+test a_key_no_parameter_is_left_to_read_is_refused_by_name ... ok
+test a_header_value_holding_a_line_break_is_refused_by_name ... ok
+test a_name_in_two_locations_is_reached_by_qualifying_the_key ... ok
+test a_media_type_the_operation_does_not_offer_is_refused_by_name ... ok
+test a_dot_segment_path_value_is_refused_by_name ... ok
+test a_parameter_declared_twice_in_one_location_binds_once ... ok
+test a_document_header_name_that_is_not_a_token_is_refused_by_name ... ok
+test a_request_media_type_holding_a_control_byte_is_refused_by_name ... ok
+test a_parameter_no_key_can_reach_is_refused_at_construction ... ok
+test a_required_parameter_a_bare_key_cannot_reach_is_named_by_its_qualified_key ... ok
+test a_required_parameter_without_a_value_is_refused_by_name ... ok
+test a_request_media_type_that_is_not_a_type_and_subtype_is_refused_by_name ... ok
+test a_parameter_named_like_a_qualified_key_takes_that_key_for_itself ... ok
+test a_qualified_key_claims_its_parameter_and_the_bare_key_falls_to_the_next ... ok
+test a_slash_or_a_space_is_encoded_rather_than_changing_the_path ... ok
+test a_path_placeholder_with_no_parameter_is_refused_by_name ... ok
+test an_operation_offering_no_request_media_type_binds_without_one ... ok
+test an_unterminated_placeholder_refuses_as_a_malformed_path ... ok
+test an_empty_path_value_is_refused_by_name ... ok
+test an_offered_media_type_is_selected_as_asked ... ok
+test a_value_for_an_undeclared_parameter_is_refused_by_name ... ok
+test a_supplied_map_binds_to_an_exact_path_query_and_header_set ... ok
+test an_optional_parameter_without_a_value_is_simply_absent ... ok
+test several_values_for_a_parameter_that_is_not_repeated_are_refused ... ok
+test template_empty_array_omits ... ok
+test template_repeats_query_pairs ... ok
+test the_same_inputs_bind_byte_identically_twice ... ok
+test the_media_types_a_document_really_writes_are_accepted ... ok
+
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/template_adversarial.rs (target/debug/deps/template_adversarial-ccc1b3004190a6d4)
+
+running 7 tests
+test a_dot_segment_value_cannot_move_the_path_the_operation_identifies ... ok
+test a_path_parameter_with_no_placeholder_is_not_silently_dropped ... ok
+test an_operation_level_override_of_required_is_honoured ... ok
+test a_header_value_holding_a_line_break_is_not_carried_verbatim ... ok
+test an_unterminated_placeholder_is_not_reported_as_an_undeclared_parameter ... ok
+test an_operation_level_parameter_replaces_the_path_level_one_it_overrides ... ok
+test a_name_shared_across_two_locations_does_not_leak_one_value_into_both ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/template_adversarial_two.rs (target/debug/deps/template_adversarial_two-3367f006cc78a519)
+
+running 4 tests
+test one_supplied_value_never_populates_two_parameters ... ok
+test a_value_under_an_accepted_key_is_not_silently_dropped ... ok
+test a_document_header_name_that_is_not_an_http_token_is_refused ... ok
+test a_value_absent_refusal_names_a_key_the_caller_has_not_already_supplied ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_catalog_provider-b0d5d34602c26c42)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_catalog_provider-61bcdb9627a4f0e9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/body_keys_adversary.rs (target/debug/deps/body_keys_adversary-4b2e0836bd536596)
+
+running 4 tests
+test a_postflight_reading_outside_the_set_is_refused_and_a_nested_read_is_not ... ok
+test a_write_without_a_request_body_cannot_close_one ... ok
+test the_send_declares_its_guarded_draft_id_as_the_scalar_the_engine_accepts ... ok
+test every_body_shape_but_the_draft_id_is_refused_before_any_request ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/bundle_drift.rs (target/debug/deps/bundle_drift-23859240597f1b3c)
+
+running 1 test
+test every_committed_bundle_matches_a_fresh_pipeline_run ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.04s
+
+     Running tests/confluence.rs (target/debug/deps/confluence-2fc98bab9a12cd61)
+
+running 11 tests
+test guide_cites_each_operation_its_paging_and_its_deltas ... ok
+test a_selection_the_pinned_source_lacks_is_refused_at_load ... ok
+test confluence_and_jira_document_one_profile ... ok
+test every_shipped_list_bounds_limit_at_the_pinned_maximum ... ok
+test the_cutoff_field_is_in_the_pinned_list_schema ... ok
+test shipped_confluence_selections_are_exactly_the_four_reads ... ok
+test the_pinned_source_is_the_one_the_bundle_and_its_record_name ... ok
+test each_list_walks_two_pages_and_stops_at_its_documented_end_condition ... ok
+test each_read_sends_the_declared_request_with_basic_auth_and_returns_the_recorded_body ... ok
+test a_limit_outside_the_pinned_range_is_refused_before_any_request ... ok
+test pages_changed_stops_at_the_cutoff_or_at_the_last_link ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+     Running tests/confluence_reads_adversary.rs (target/debug/deps/confluence_reads_adversary-9f4055c6f72f3965)
+
+running 4 tests
+test the_changelog_records_the_jira_profile_break ... ok
+test pages_changed_passes_space_ids_sort_and_cursor_through_raw ... ok
+test the_stop_rule_says_what_a_page_without_a_version_does ... ok
+test a_selection_outside_the_configured_base_is_still_refused ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/engine.rs (target/debug/deps/engine-09cfaa27101e3607)
+
+running 27 tests
+test a_rate_limit_reason_must_be_a_nonempty_string ... ok
+test a_selection_can_require_only_a_query_parameter_of_its_operation ... ok
+test a_bound_must_name_a_declared_query_parameter_and_is_omitted_when_absent ... ok
+test a_declared_rate_limit_reason_on_a_403_is_rate_limited ... ok
+test a_selection_required_parameter_is_declared_and_refused_before_any_request ... ok
+test a_body_key_outside_the_closed_set_is_refused_before_any_request ... ok
+test a_withheld_parameter_is_not_declared_and_is_refused_before_any_request ... ok
+test a_bounded_parameter_is_checked_as_an_integer_before_any_request ... ok
+test a_required_repeated_parameter_declares_and_refuses_an_empty_list ... ok
+test a_write_refused_for_a_declared_rate_limit_reason_is_refused_as_rate_limited ... ok
+test a_refused_write_keeps_the_providers_status_as_its_marked_code ... ok
+test a_selection_can_withhold_only_an_optional_declared_parameter ... ok
+test body_keys_close_the_declared_body ... ok
+test an_empty_text_body_is_the_empty_string ... ok
+test text_bodies_come_from_the_bundle_or_the_reviewed_exception ... ok
+test engine_refuses_array_on_scalar_parameter ... ok
+test body_keys_are_refused_at_load_unless_they_close_a_write_body ... ok
+test every_other_403_stays_forbidden ... ok
+test engine_declares_array_schema ... ok
+test read_binds_path_and_query_and_projects_the_observation ... ok
+test multi_check_guard_holds_every_check_before_and_after_dispatch ... ok
+test declarations_carry_parameters_body_and_guard_inputs_and_refuse_bad_selections ... ok
+test guarded_write_refuses_before_dispatch_and_classifies_after ... ok
+test engine_refuses_nested_array_element ... ok
+test engine_sends_repeated_pairs ... ok
+test engine_bounds_apply_per_element ... ok
+test a_scalar_for_a_repeated_parameter_is_typed_like_its_elements ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/engine_adversary.rs (target/debug/deps/engine_adversary-0bdbb162fb9e21e8)
+
+running 4 tests
+test adversary_repeated_parameter_declares_type_array ... ok
+test adversary_a_required_repeated_parameter_declares_what_the_engine_refuses ... ok
+test adversary_a_scalar_for_a_repeated_integer_parameter_is_typed_like_its_elements ... ok
+test adversary_an_instance_without_repeated_parameters_still_moves_its_descriptor_revision ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/engine_adversary_pass2.rs (target/debug/deps/engine_adversary_pass2-60eca8c650888953)
+
+running 1 test
+test adversary2_an_instance_connected_before_the_rebuild_is_refused_under_the_same_id_after_it ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.60s
+
+     Running tests/gateway_prefix.rs (target/debug/deps/gateway_prefix-3d0938267c8b122e)
+
+running 7 tests
+test a_document_path_outside_the_base_after_the_prefix_is_still_refused ... ok
+test without_a_prefix_the_gateway_base_is_still_outside_the_document_base ... ok
+test a_configuration_without_a_prefix_prints_the_bootstrap_it_printed_before ... ok
+test a_confluence_read_and_its_identity_read_go_through_the_gateway_prefix ... ok
+test the_documented_gateway_forms_load_and_differ_from_the_site_form ... ok
+test a_jira_read_and_its_identity_read_go_through_the_gateway_prefix ... ok
+test a_prefix_that_is_not_plain_leading_path_text_is_invalid_configuration ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.55s
+
+     Running tests/gateway_prefix_adversary.rs (target/debug/deps/gateway_prefix_adversary-07b27854cb925550)
+
+running 4 tests
+test two_valid_prefixes_on_one_api_base_give_two_revisions ... ok
+test the_acceptance_form_with_the_gateway_root_as_api_base_sends_the_full_document_paths ... ok
+test each_guide_documents_the_basic_gateway_form_a_service_account_token_uses ... ok
+test prefix_parsing_edges ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.71s
+
+     Running tests/gitlab_commit_reads.rs (target/debug/deps/gitlab_commit_reads-505ef60b93e03be4)
+
+running 5 tests
+test repository_compare_sends_from_to_and_straight ... ok
+test commits_list_sends_its_filters_and_walks_to_a_short_page ... ok
+test commits_list_refuses_per_page_outside_one_to_one_hundred ... ok
+test commit_reads_are_declared_reads_with_their_source_parameters ... ok
+test compare_timeout_is_distinguishable_from_an_empty_compare ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/gitlab_commit_reads_adversary.rs (target/debug/deps/gitlab_commit_reads_adversary-48fb8150376f01d4)
+
+running 10 tests
+test adversary_keyset_pagination_is_refused_before_any_request ... ok
+test adversary_bootstrap_without_the_two_reads_is_the_base_pin ... ok
+test adversary_commits_list_per_page_bounds ... ok
+test adversary_declared_types_follow_the_pinned_document ... ok
+test adversary_commits_list_since_that_is_not_a_date_time_is_sent_today ... ok
+test adversary_commits_list_order_outside_its_enum_is_sent_today ... ok
+test adversary_compare_without_from_or_to_is_refused ... ok
+test adversary_base_twin_projects_list_order_by_outside_its_enum_is_sent_today ... ok
+test adversary_base_twin_projects_list_last_activity_after_not_a_date_time_is_sent_today ... ok
+test adversary_compare_does_not_take_page_parameters ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/gitlab_commit_reads_adversary_pass2.rs (target/debug/deps/gitlab_commit_reads_adversary_pass2-e327b1c58433afa5)
+
+running 4 tests
+test adversary2_untried_parameters_are_declared_with_the_pinned_types ... ok
+test adversary2_untried_parameters_are_sent_verbatim_and_mistyped_ones_refused ... ok
+test adversary2_project_id_reaches_the_wire_as_one_encoded_segment ... ok
+test adversary2_compare_over_the_response_limit_is_a_capacity_error_not_a_compare ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests/gitlab_deployment_reads.rs (target/debug/deps/gitlab_deployment_reads-e221613449fc6694)
+
+running 4 tests
+test deployments_list_is_a_declared_read_with_its_pinned_inputs ... ok
+test an_unreadable_project_is_refused_as_pipelines_list_refuses_it ... ok
+test deployments_list_sends_its_filters_and_walks_to_a_short_page ... ok
+test deployments_list_refuses_per_page_outside_one_to_one_hundred ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/gitlab_deployment_reads_adversary.rs (target/debug/deps/gitlab_deployment_reads_adversary-a06ab4bd4e82dddc)
+
+running 7 tests
+test adversary_declared_once_as_a_read ... ok
+test adversary_integer_id_alone_sends_the_bare_route ... ok
+test adversary_missing_id_is_refused_before_any_request ... ok
+test adversary_undeclared_filter_is_refused_not_dropped ... ok
+test adversary_unreadable_project_matches_every_project_list_read ... ok
+test adversary_body_is_returned_unchanged_for_unusual_records ... ok
+test adversary_per_page_decimal_text_edges ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests/gitlab_repository_reads_adversary.rs (target/debug/deps/gitlab_repository_reads_adversary-e9c2668ddaa85573)
+
+running 5 tests
+test planted_wrong_operation_id_sends_a_different_path ... ok
+test undeclared_parameter_is_refused_before_any_request ... ok
+test time_filters_reach_the_transport_verbatim_and_bodies_are_unchanged ... ok
+test per_page_above_the_provider_cap_is_refused_before_any_request ... ok
+test repository_reads_cannot_be_declared_as_writes ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+     Running tests/google_authorize_url.rs (target/debug/deps/google_authorize_url-ff44d8b386519207)
+
+running 1 test
+test no_google_guide_names_the_v2_authorize_endpoint ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+
+     Running tests/google_calendar.rs (target/debug/deps/google_calendar-eaffea0bcf5c3580)
+
+running 30 tests
+test events_list_description_keeps_the_full_walk_parameters_for_the_delta ... ok
+test a_selection_the_projection_lacks_is_refused_at_load ... ok
+test guide_cites_each_operation_its_paging_and_its_deltas ... ok
+test guide_cites_each_write_its_guard_and_the_write_scope ... ok
+test both_lists_bound_max_results_at_the_documented_range ... ok
+test events_list_declares_event_types_repeated ... ok
+test guide_states_what_the_engine_leaves_to_the_approver_and_the_caller ... ok
+test guide_documents_the_oauth_refresh_configuration ... ok
+test guide_documents_the_write_configuration_with_the_calendar_events_scope ... ok
+test guide_documents_time_windows_sync_tokens_and_the_full_sync_reset ... ok
+test write_descriptions_name_their_effects_and_the_digest_binding ... ok
+test shipped_calendar_selections_are_the_three_reads_and_three_writes ... ok
+test the_bundle_is_derived_from_the_pinned_discovery_document ... ok
+test calendar_list_walks_two_pages_to_next_sync_token ... ok
+test events_list_walks_two_pages_to_next_sync_token_and_reads_the_delta ... ok
+test events_list_repeats_event_types ... ok
+test calendar_list_max_results_bounds ... ok
+test events_list_max_results_bounds ... ok
+test a_write_to_an_event_google_does_not_have_sends_no_write ... ok
+test an_expired_sync_token_is_refused_as_not_found ... ok
+test each_write_sends_exactly_its_request_and_body_and_returns_the_answer ... ok
+test a_write_approved_for_a_different_input_is_refused ... ok
+test patch_and_delete_without_an_etag_are_refused_before_any_request ... ok
+test a_stale_etag_fails_the_preflight_and_sends_no_write ... ok
+test each_read_sends_the_declared_request_with_the_exchanged_bearer_and_returns_the_recorded_body ... ok
+test approval_binds_send_updates ... ok
+test a_write_to_an_event_that_is_not_confirmed_sends_no_write ... ok
+test events_list_sends_an_event_type_outside_the_enumeration ... ok
+test calendar_write_config_requires_calendar_events_scope ... ok
+test each_write_without_an_approval_is_refused_before_any_request ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running tests/google_calendar_gmail_adversary.rs (target/debug/deps/google_calendar_gmail_adversary-5fcf94628b36a0ce)
+
+running 6 tests
+test gmail_reset_rule_takes_the_baseline_before_the_full_walk ... ok
+test the_calendar_sync_token_section_names_the_show_deleted_restriction ... ok
+test a_daily_quota_403_is_rate_limited_not_forbidden ... ok
+test an_expired_sync_token_and_an_unknown_calendar_are_documented_as_one_answer ... ok
+test max_attendees_below_its_discovery_minimum_is_documented_as_sent ... ok
+test every_google_paging_description_warns_that_fields_must_keep_the_end_condition ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/google_calendar_gmail_adversary_pass2.rs (target/debug/deps/google_calendar_gmail_adversary_pass2-4112abb0ba80c049)
+
+running 5 tests
+test the_first_gmail_baseline_is_ordered_before_the_first_walk ... ok
+test the_sync_fields_examples_keep_the_deletion_markers ... ok
+test the_sync_token_descriptions_name_the_show_deleted_restriction ... ok
+test the_calendar_reset_recheck_does_not_misjudge_primary_or_hidden_calendars ... ok
+test an_attachment_under_the_named_limit_is_refused_and_the_texts_state_the_real_ceiling ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/google_calendar_writes_adversary.rs (target/debug/deps/google_calendar_writes_adversary-d721b933a93b67e1)
+
+running 5 tests
+test every_google_guide_names_one_authorize_url ... ok
+test patch_warns_that_a_truncated_guest_list_replaces_every_guest ... ok
+test a_write_to_an_event_google_deleted_sends_no_write ... ok
+test a_write_without_send_updates_is_refused_before_any_request ... ok
+test a_write_naming_both_notification_parameters_sends_both ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/google_calendar_writes_adversary_pass2.rs (target/debug/deps/google_calendar_writes_adversary_pass2-717c07993b436f6d)
+
+running 3 tests
+test the_truncated_guest_list_warning_covers_the_answers_of_insert_and_patch ... ok
+test a_write_google_answers_429_is_unknown_as_the_guide_says ... ok
+test send_updates_outside_its_three_values_is_sent_as_given ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/google_drive.rs (target/debug/deps/google_drive-120f5c4479066f14)
+
+running 21 tests
+test guide_cites_each_operation_its_paging_and_its_deltas ... ok
+test guide_documents_the_oauth_refresh_configuration ... ok
+test guide_cites_each_write_its_guard_and_the_write_scope ... ok
+test guide_documents_the_write_configuration_with_the_drive_file_scope ... ok
+test a_selection_the_projection_lacks_is_refused_at_load ... ok
+test shipped_drive_selections_are_the_six_reads_and_three_writes ... ok
+test both_lists_bound_page_size_at_the_pinned_range ... ok
+test a_drive_write_approval_for_a_different_body_is_refused ... ok
+test the_bundle_is_derived_from_the_pinned_discovery_document ... ok
+test files_get_refuses_a_media_download ... ok
+test each_read_sends_the_declared_request_with_the_exchanged_bearer_and_returns_the_recorded_body ... ok
+test changes_list_walks_two_pages_until_new_start_page_token ... ok
+test files_update_without_its_pin_or_fields_is_refused_before_any_request ... ok
+test changes_list_requires_a_page_token ... ok
+test each_write_sends_exactly_its_request_and_body_and_returns_the_answer ... ok
+test files_list_page_size_bounds ... ok
+test files_list_walks_two_pages_until_next_page_token_is_absent ... ok
+test changes_list_page_size_bounds ... ok
+test files_update_with_a_stale_version_fails_the_preflight_and_sends_no_write ... ok
+test drive_writes_are_refused_on_the_read_transport_before_any_request ... ok
+test drive_write_config_requires_the_drive_file_scope ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.36s
+
+     Running tests/google_drive_writes_adversary.rs (target/debug/deps/google_drive_writes_adversary-58ed12e7c6c49546)
+
+running 3 tests
+test files_update_declares_fields_required ... ok
+test files_update_preflight_reads_under_the_shared_drive_mode_of_the_patch ... ok
+test files_update_says_it_moves_trashes_and_changes_access ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/google_drive_writes_adversary_pass2.rs (target/debug/deps/google_drive_writes_adversary_pass2-edc7b47fb8f2f72d)
+
+running 3 tests
+test drive_writes_say_a_name_is_not_unique_in_a_folder ... ok
+test files_copy_says_where_a_copy_without_parents_lands ... ok
+test drive_writes_name_the_lock_download_and_comment_effects_they_forward ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/google_gmail.rs (target/debug/deps/google_gmail-e4d57eac7a4e6f09)
+
+running 33 tests
+test draft_write_descriptions_name_every_effect ... ok
+test guide_cites_each_operation_its_paging_and_its_deltas ... ok
+test a_selection_the_projection_lacks_is_refused_at_load ... ok
+test guide_cites_the_draft_writes_the_compose_scope_and_the_write_instance ... ok
+test guide_documents_user_id_formats_and_history_deltas ... ok
+test guide_documents_the_write_instance ... ok
+test repeated_parameters_are_declared_as_arrays ... ok
+test shipped_gmail_selections_are_the_eight_reads_and_two_draft_writes ... ok
+test drafts_send_is_guarded_on_the_drafts_message_id ... ok
+test guide_documents_the_oauth_refresh_configuration ... ok
+test history_list_declares_start_history_id_required ... ok
+test the_three_lists_bound_max_results_at_the_documented_range ... ok
+test the_bundle_is_derived_from_the_pinned_discovery_document ... ok
+test users_messages_send_is_not_selected ... ok
+test users_drafts_create_sends_one_post_with_its_body_and_no_preflight ... ok
+test history_list_requires_a_start_history_id ... ok
+test threads_list_max_results_bounds ... ok
+test messages_list_walks_two_pages_until_next_page_token_is_absent ... ok
+test messages_get_sends_each_format ... ok
+test each_read_sends_the_declared_request_with_the_exchanged_bearer_and_returns_the_recorded_body ... ok
+test history_list_walks_two_pages_from_the_profile_baseline ... ok
+test threads_list_walks_two_pages_until_next_page_token_is_absent ... ok
+test messages_list_repeats_label_ids ... ok
+test users_drafts_send_refuses_a_body_beyond_the_draft_id ... ok
+test a_write_approved_for_a_different_input_is_refused ... ok
+test messages_attachments_get_reads_a_part_named_by_a_full_message ... ok
+test history_list_max_results_bounds ... ok
+test users_drafts_send_of_a_changed_draft_fails_the_preflight_and_sends_nothing ... ok
+test an_out_of_date_start_history_id_is_refused_as_not_found ... ok
+test messages_list_max_results_bounds ... ok
+test each_write_without_an_approval_is_refused_before_any_request ... ok
+test gmail_write_config_requires_compose_scope ... ok
+test the_documented_write_instance_starts_a_fresh_acquisition ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.18s
+
+     Running tests/google_gmail_writes_adversary.rs (target/debug/deps/google_gmail_writes_adversary-c2aee60ea8ac4526)
+
+running 2 tests
+test the_send_declaration_refuses_a_body_message ... ok
+test a_send_whose_body_replaces_the_draft_message_sends_nothing ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/google_quota_reasons.rs (target/debug/deps/google_quota_reasons-c0cf77d23d7ecc45)
+
+running 2 tests
+test every_google_guide_names_the_quota_reasons ... ok
+test every_google_selection_names_the_quota_reasons ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/google_reads_adversary.rs (target/debug/deps/google_reads_adversary-ad55dc4d3d0e8f59)
+
+running 5 tests
+test the_drive_absent_selection_case_is_refused_for_its_absence ... ok
+test about_get_declares_fields_required ... ok
+test files_export_of_non_utf8_bytes_is_refused_as_upstream_protocol ... ok
+test files_export_at_and_over_the_response_limit ... ok
+test drive_file_id_never_splits_or_leaks_into_the_query ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/google_reads_adversary_pass2.rs (target/debug/deps/google_reads_adversary_pass2-737c40d63569720b)
+
+running 4 tests
+test a_drive_permission_answer_stays_forbidden ... ok
+test about_get_without_fields_is_refused_before_any_request ... ok
+test an_empty_text_export_is_the_empty_string ... ok
+test a_drive_usage_limit_answer_is_rate_limited_not_forbidden ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/google_slides.rs (target/debug/deps/google_slides-aa12b189c9c6fae6)
+
+running 12 tests
+test a_selection_the_projection_lacks_is_refused_at_load ... ok
+test guide_cites_each_operation_the_write_scope_the_response_cap_and_fields ... ok
+test shipped_slides_selections_are_the_three_reads_and_two_writes ... ok
+test guide_documents_the_oauth_refresh_configuration ... ok
+test the_bundle_is_derived_from_the_pinned_discovery_document ... ok
+test batch_update_with_a_stale_required_revision_fails_the_preflight_and_sends_no_write ... ok
+test a_write_approved_for_a_different_body_is_refused ... ok
+test each_read_sends_the_declared_request_with_the_exchanged_bearer_and_returns_the_recorded_body ... ok
+test create_sends_one_post_with_its_body_and_no_preflight ... ok
+test each_write_without_an_approval_is_refused_before_any_request ... ok
+test slides_write_config_requires_presentations_scope ... ok
+test presentations_get_refuses_slash_in_id ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s
+
+     Running tests/google_slides_writes_adversary.rs (target/debug/deps/google_slides_writes_adversary-cc4957f95332896f)
+
+running 2 tests
+test a_batch_update_narrowed_without_presentation_id_is_reported_unknown_as_the_guide_warns ... ok
+test the_documented_write_instance_starts_a_fresh_acquisition ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.67s
+
+     Running tests/google_slides_writes_adversary_pass2.rs (target/debug/deps/google_slides_writes_adversary_pass2-92263d18cec33d2d)
+
+running 3 tests
+test the_documented_write_instance_can_connect_from_the_google_client_file ... ok
+test an_image_url_published_by_batch_update_is_named_where_the_thumbnail_warning_is ... ok
+test a_batch_whose_comment_updates_failed_is_not_reported_as_all_applied ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/hubspot.rs (target/debug/deps/hubspot-b8414e1f2f91bb62)
+
+running 10 tests
+test guide_cites_each_operation_its_paging_and_its_deltas ... ok
+test the_documented_profile_is_a_bearer_token_with_the_portal_as_identity ... ok
+test shipped_hubspot_selections_are_exactly_the_two_reads ... ok
+test search_cannot_ship_as_a_read ... ok
+test the_paging_cursor_is_in_the_pinned_list_schema ... ok
+test the_pinned_source_is_the_one_the_bundle_and_its_record_name ... ok
+test connecting_records_the_portal_as_the_identity ... ok
+test an_undeclared_parameter_is_refused_before_any_request ... ok
+test each_read_sends_the_declared_request_with_bearer_auth_and_returns_the_recorded_body ... ok
+test the_list_walks_two_pages_and_stops_without_paging_next ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+
+     Running tests/jira.rs (target/debug/deps/jira-51e1990038d52096)
+
+running 6 tests
+test guide_cites_each_operation_its_paging_and_its_deltas ... ok
+test a_selection_the_pinned_source_lacks_is_refused_at_load ... ok
+test shipped_jira_selections_are_exactly_the_three_reads ... ok
+test the_pinned_source_is_the_one_the_bundle_and_its_record_name ... ok
+test each_list_walks_two_pages_and_stops_at_its_documented_end_condition ... ok
+test each_read_sends_the_declared_request_with_basic_auth_and_returns_the_recorded_body ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+     Running tests/jira_cloud_reads_adversary.rs (target/debug/deps/jira_cloud_reads_adversary-13ae1dfc803833b3)
+
+running 4 tests
+test guide_end_condition_for_search_covers_the_null_token_the_pinned_document_names ... ok
+test reserved_characters_in_jql_and_token_reach_the_wire_form_encoded ... ok
+test an_undeclared_parameter_is_refused_before_any_request ... ok
+test the_basic_credential_is_in_no_argv_environ_or_failure ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+
+     Running tests/local_runtime.rs (target/debug/deps/local_runtime-2f5b6055d88940e8)
+
+running 57 tests
+test cli_journey::a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::adversary_basic_cli_wrong_token_is_unauthorized_and_malformed_is_invalid_input ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::basic_catalog_cli_refuses_a_credential_below_minimum_scopes ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::oauth_connect_journey ... ignored, requires built debug production CLI and qualified disposable Secret Service
+test cli_journey::oauth_repair_journey ... ignored, requires built debug production CLI and qualified disposable Secret Service
+test oauth2_refresh::oauth_connect_refusal_does_not_say_repair ... ignored, requires built production CLI and qualified disposable Secret Service
+test oauth2_refresh::oauth_configuration_refuses_inconsistent_profiles ... ok
+test basic_auth_adversary_pass2::adversary2_documented_basic_auth_example_loads_as_http_basic ... ok
+test basic_auth_adversary::adversary_explicit_token_scheme_keeps_revisions_of_an_omitted_scheme ... ok
+test oauth2_refresh::oauth_authorize_url_must_be_https ... ok
+test oauth2_refresh::oauth_invalid_grant_reports_repair ... ignored, requires built production CLI and qualified disposable Secret Service
+test basic_auth_adversary_pass2::adversary2_duplicate_account_key_refuses_before_any_request ... ok
+test oauth2_refresh::oauth_entry_unknown_field_refused ... ok
+test commit_graph_reads_send_the_declared_request_and_tell_a_timeout_from_an_empty_compare ... ok
+test oauth2_refresh::oauth_existing_configuration_revisions_unchanged ... ok
+test basic_auth::basic_profile_loads_and_sends_the_exact_basic_authorization ... ok
+test deployments_list_sends_the_declared_request_and_walks_to_a_short_page ... ok
+test basic_auth::basic_profile_below_minimum_scopes_refuses_as_insufficient ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_provider_work ... ok
+test oauth2_refresh::oauth_cache_evicted_on_invalid_credential ... ok
+test basic_auth_adversary::adversary_inconsistent_basic_profiles_refuse_at_load ... ok
+test basic_auth_adversary_pass2::adversary2_maximum_account_encodes_exactly ... ok
+test oauth2_refresh::oauth_invalid_grant_is_an_invalid_credential ... ok
+test basic_auth_adversary::adversary_basic_header_encodes_utf8_accounts_and_colon_bearing_tokens ... ok
+test basic_auth::token_profile_rejects_a_basic_document ... ok
+test basic_auth_adversary::adversary_basic_account_limit_is_1024_bytes_not_characters ... ok
+test oauth2_refresh::oauth_scope_entries_with_whitespace_refused_at_load ... ok
+test oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart ... ignored, requires built production CLI and qualified disposable Secret Service
+test oauth2_refresh::oauth_exchange_sends_form_and_uses_bearer ... ok
+test lost_validation_response_closes_the_owned_channel_without_replay ... ok
+test oauth2_refresh_adversary_pass2::adversary2_host_bootstrap_check_bounds_acquisition ... ok
+test oauth2_refresh::oauth_rate_limit_and_unavailable ... ok
+test oauth2_refresh_adversary_pass2::adversary2_unsatisfiable_minimum_scope_is_refused_at_load ... ok
+test oauth2_refresh::oauth_token_url_must_be_https ... ok
+test oauth2_refresh::oauth_rotated_refresh_token_refused ... ok
+test oauth2_refresh_adversary_pass2::adversary2_token_ca_path_is_not_part_of_the_revision ... ok
+test oauth2_refresh::oauth_profile_carries_acquisition ... ok
+test oauth2_refresh::oauth_validate_identity_from_tokeninfo ... ok
+test oauth2_refresh::oauth_validate_identity_from_id_token ... ok
+test oauth2_refresh::oauth_validate_wrong_iss_refused ... ok
+test oauth2_refresh_adversary::adversary_expired_id_token_refused ... ok
+test oauth2_refresh_adversary::adversary_distinct_entries_never_share_a_cached_token ... ok
+test catalog_child_validates_reads_and_stops_with_exact_incarnations ... ok
+test oauth2_refresh_adversary::adversary_malformed_id_token_refused ... ok
+test oauth2_refresh_adversary::adversary_token_redirect_is_not_followed ... ok
+test oauth2_refresh_adversary::adversary_write_401_evicts_cached_access_token ... ok
+test oauth2_refresh_adversary_pass2::adversary2_id_token_time_claims_are_enforced ... ok
+test repository_reads_send_the_declared_request_and_return_the_recorded_body ... ok
+test oauth2_refresh_adversary_pass2::adversary2_write_credential_refusal_names_repair_like_a_read ... ok
+test oauth2_refresh_adversary_pass2::adversary2_scope_whitespace_forms ... ok
+test oauth2_refresh_adversary_pass2::adversary2_oversized_token_answers_cache_nothing ... ok
+test repository_list_reads_walk_two_pages_and_stop_on_a_short_page ... ok
+test oauth2_refresh_adversary_pass2::adversary2_token_ca_bytes_are_bound_and_enforced ... ok
+test oauth2_refresh_adversary::adversary_expires_in_extremes ... ok
+test oauth2_refresh::oauth_cache_reuses_token_until_skew ... ok
+
+test result: ok. 47 passed; 0 failed; 10 ignored; 0 measured; 0 filtered out; finished in 6.30s
+
+     Running tests/parameter_types.rs (target/debug/deps/parameter_types-a94eab8350ff79ce)
+
+running 9 tests
+test confluence_limit_of_another_type_is_refused_before_any_request ... ok
+test booleans_refuse_anything_but_true_or_false ... ok
+test integers_refuse_fractions_and_exponents ... ok
+test integers_as_numbers_or_decimal_strings_are_still_sent ... ok
+test strings_take_integers_as_text_and_refuse_other_types ... ok
+test declared_page_sizes_do_not_admit_booleans ... ok
+test gitlab_per_page_of_another_type_is_refused_before_any_request ... ok
+test unbounded_integers_refuse_booleans_and_non_decimal_strings ... ok
+test string_and_boolean_parameters_from_the_pinned_documents_keep_working ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/parameter_types_adversary.rs (target/debug/deps/parameter_types_adversary-f5eda814aca97965)
+
+running 3 tests
+test adversary_numeric_project_id_is_still_accepted_where_the_document_types_it_string ... ok
+test adversary_a_declared_integer_is_never_sent_as_a_float ... ok
+test adversary_integer_and_boolean_boundary_forms_are_refused_before_any_request ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/selection_bounds_adversary.rs (target/debug/deps/selection_bounds_adversary-b7f1d53bde738079)
+
+running 5 tests
+test bounds_round_trip_and_unbounded_selections_serialise_as_before ... ok
+test a_bound_on_a_non_query_parameter_is_refused_at_load ... ok
+test a_bounded_guarded_write_is_refused_before_its_preflight ... ok
+test non_positive_per_page_is_refused_before_any_request ... ok
+test unusual_integer_forms_are_refused_or_sent_as_checked ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests/selection_withhold_adversary.rs (target/debug/deps/selection_withhold_adversary-afec0a6d2ce0088e)
+
+running 8 tests
+test adversary_every_guard_reference_to_a_withheld_name_is_refused_at_load ... ok
+test adversary_withhold_load_refusals_the_unit_does_not_take ... ok
+test adversary_a_name_in_query_and_header_is_withheld_from_both ... ok
+test adversary_a_withheld_write_parameter_reaches_neither_the_preflight_nor_the_write ... ok
+test adversary_a_withheld_repeated_parameter_is_refused_in_every_form ... ok
+test adversary_no_spelling_or_value_of_the_keyset_parameters_reaches_commits_list ... ok
+test adversary_the_published_descriptor_lists_no_keyset_parameter ... ok
+test adversary_a_keyset_input_to_the_adapter_process_is_invalid_input ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/shipped.rs (target/debug/deps/shipped-e7a55bbb609c9b4d)
+
+running 2 tests
+test shipped_gitlab_selections_resolve_and_cover_the_former_native_surface ... ok
+test every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_client-e48344c00432d690)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_conformance-9a090cbafc5d8bff)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cli_surface.rs (target/debug/deps/cli_surface-8a92311828268479)
+
+running 8 tests
+test inputless_setup_keeps_configuration_in_context_and_emits_one_typed_result ... ok
+test the_selected_inventory_has_twenty_seven_grouped_commands_and_explicit_runtime_obligations ... ok
+test a_configuration_refusal_may_name_the_format_and_entry_and_nothing_else ... ok
+test protected_source_conflicts_and_parser_errors_never_capture_or_echo_values ... ok
+test dynamic_business_sources_are_acquired_once_and_validate_both_directions ... ok
+test typed_application_usage_operational_and_interrupt_outcomes_use_distinct_exits ... ok
+test native_schema_refusals_prevent_handler_dispatch_and_bad_results_never_reach_stdout ... ok
+test every_local_action_dispatches_once_with_its_declared_result_type ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests/configuration_refusal_adversary.rs (target/debug/deps/configuration_refusal_adversary-ea450798d63e1c0d)
+
+running 2 tests
+test the_contract_refuses_configuration_coordinates_that_are_not_the_declared_ones ... ignored, ESS-LIMIT: CLI types carry no invariants in ESS 0.40; host-enforced
+test the_contract_refuses_parser_text_as_the_configuration_format ... ok
+
+test result: ok. 1 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_contracts-e74f5e89114beb40)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_core-5dc7a1d3a4f31a82)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/wire.rs (target/debug/deps/wire-306900f078d0db7e)
+
+running 8 tests
+test canonicalization_is_recursive_and_order_independent ... ok
+test duplicate_keys_are_refused_at_every_depth ... ok
+test document_keys_spelled_like_serde_json_private_tokens_are_refused ... ok
+test negative_zero_integer_reads_as_the_float_the_default_build_reads ... ok
+test response_roundtrips_success_and_error ... ok
+test canonical_bytes_do_not_depend_on_number_spelling_or_build ... ok
+test contradictory_response_payloads_are_refused ... ok
+test the_strict_reader_admits_typed_floats ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_host-dc6c4eb7733848a8)
+
+running 314 tests
+test local::approval_keys::tests::durable_key_management_with_qualified_custody ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::key_crash_child ... ignored, auxiliary child entry; parent invokes exact phases
+test local::approval_keys::tests::key_use_excludes_rotation_and_concurrent_init_has_one_winner ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::process_exits_keep_pre_and_post_publication_distinct ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::production_cli_key_journey ... ignored, requires built production CLI and qualified disposable GNOME Secret Service
+test local::approval_keys::tests::purpose_isolation_for_identical_private_uuid_tuples ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::restart_failed_rotation_recovery_and_revocation_fences ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::uncertain_deletion_keeps_retirement_fence_and_exact_retry ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::unknown_storage_acknowledgement_requires_exact_reconfirmation ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+test local::approval_keys::tests::wrong_recovery_material_never_publishes ... ignored, requires qualified disposable GNOME Secret Service; run explicitly
+
+running 1 test
+test local::adversary_w3_tests::expiring_an_expired_cursor_refuses_with_cursor_state_conflict ... ok
+test http::tests::a_probe_endpoint_is_one_bounded_fixed_path ... ok
+test local::adversary_w3_tests::publish_binding_allowed_on_a_revoked_connection_refuses_with_connection_state_conflict ... ok
+test local::approval_policy::tests::policy_child ... ignored, child fixture; launched by process serialization tests
+test http::tests::an_oversized_probe_document_is_refused_without_any_request ... ok
+test http::tests::an_oversized_or_unaddressed_form_is_refused_without_any_request ... ok
+test http::tests::a_form_post_sends_the_encoded_form_and_never_the_credential_header ... ok
+test local::approvals::tests::all_subject_coordinates_and_unicode_identity_are_bound ... ok
+test http::tests::a_sent_request_whose_deadline_passes_is_marked_as_the_providers_timeout ... ok
+test local::approvals::tests::canonical_framing_rejects_omission_duplicates_unknown_fields_and_alternate_spellings ... ok
+test local::approval_keys::tests::passive_status_does_not_migrate_or_touch_custody ... ok
+
+running 1 test
+test local::adversary_w2_tests::preparation_whose_deadline_passes_in_preflight_times_out_and_terminates_the_child ... ok
+test local::approvals::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+test local::approval_policy::tests::passive_status_and_missing_issuer_never_install_policy ... ok
+
+running 1 test
+test local::approval_policy::tests::status_and_snapshot_exclude_private_authority_and_custody_coordinates ... ok
+test local::approvals::tests::issuer_audience_time_key_and_clock_refusals_are_current ... ok
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+test local::approval_policy::tests::invalid_publication_cannot_replace_a_valid_policy ... ok
+test local::approval_policy::tests::inherited_policy_use_is_not_valid_in_a_forked_process ... ok
+test local::approval_keys::tests::unavailable_write_leaves_exact_candidate_and_no_duplicate_allocation ... ok
+test local::approvals::tests::protected_document_decoding_is_closed_bounded_and_verifiable ... ok
+test local::approvals::tests::rfc8032_vector_and_exact_fixed_algorithm_round_trip ... ok
+test local::approval_policy::tests::concurrent_initial_publication_has_one_winner ... ok
+test local::approval_policy::tests::exact_selections_and_operations_are_required_for_use ... ok
+test local::approval_policy::tests::durable_guards_retain_identity_revision_and_instance_binding ... ok
+test local::approval_policy::tests::exhausted_revision_never_wraps_or_reuses_identity ... ok
+test local::approval_policy::tests::failed_sql_write_preserves_policy_but_lost_ack_requires_observation ... ok
+test local::approval_policy::tests::child_exit_releases_lease_and_committed_unacknowledged_revision_survives ... ok
+test local::approval_policy::tests::restart_preserves_identity_revision_principal_and_snapshot ... ok
+
+running 1 test
+test local::approvals::tests::approved_gate_requires_original_spend_and_abort_never_refunds ... ok
+
+running 1 test
+test local::approvals::tests::unavailable_live_binding_is_storage_failure_without_receipt_or_retry ... ok
+test local::approvals::tests::concurrent_substituted_reference_cannot_rebind_one_attempt ... ok
+test local::approvals::tests::expiry_during_acknowledgement_retains_spend_without_granting_receipt ... ok
+test local::audit::tests::crash_child ... ignored, subprocess entry point exercised by abrupt_process_exits
+test local::approvals::tests::policy_guard_survives_commit_and_clock_is_rechecked_after_storage ... ok
+test local::audit::tests::exact_private_identity_is_injective_bounded_and_strictly_decoded ... ok
+test local::approvals::tests::unavailable_redemption_evidence_cannot_open_dispatch ... ok
+test local::audit::tests::byte_bounds_safe_shapes_and_aggregate_budget_are_enforced ... ok
+
+running 1 test
+test local::approvals::tests::tombstone_capacity_and_migrations_survive_restart_without_secret_storage ... ok
+
+running 1 test
+test local::audit::tests::anchor_failure_or_lost_ack_never_returns_an_admission_receipt ... ok
+test local::approvals::tests::unkeyed_preparation_retains_authority_and_old_records_cannot_gain_it ... ok
+test local::approvals::tests::policy_schema_supports_audit_spend_dispatch_and_restart_observation ... ok
+test local::audit::tests::corrupted_or_unavailable_metadata_is_not_absence_or_recovered_acknowledgement ... ok
+test local::audit::tests::failed_final_append_preserves_live_answer_and_unknown_ack_recovers_exactly ... ok
+
+running 1 test
+
+running 1 test
+test local::audit::tests::concurrent_finalization_has_one_immutable_winner_and_exact_retry ... ok
+test local::audit::tests::passive_old_schema_inspection_never_installs_audit_and_migration_preserves_history ... ok
+test local::clock::protocol::tests::authentic_unknown_fields_versions_and_both_merkle_directions_work ... ok
+test local::clock::protocol::tests::duplicate_tags_bad_offsets_nested_lengths_and_signature_substitutions_refuse ... ok
+test local::clock::protocol::tests::every_truncation_and_single_byte_change_in_known_reply_refuses ... ok
+test local::clock::protocol::tests::independent_signed_fixture_verifies_without_a_wall_clock ... ok
+test local::clock::protocol::tests::signed_semantic_errors_do_not_supply_time ... ok
+test local::clock::tests::authenticated_acquisition_and_wrong_key_refusal ... ok
+test local::clock::tests::configuration_never_discovers_or_defaults_trust ... ok
+test local::clock::tests::elapsed_bounds_cover_both_rate_extremes_with_outward_rounding ... ok
+test local::clock::tests::independent_live_source ... ignored, Explicit public Roughtime network interoperability; no physical clock guarantee
+test local::approvals::tests::rollback_or_lost_ack_never_reconstructs_receipt ... ok
+test local::clock::tests::interval_includes_full_network_delay_and_ages_without_sliding ... ok
+test local::clock::tests::no_estimate_extrapolates_through_a_possible_utc_leap ... ok
+test local::clock::tests::oversized_and_unavailable_peers_refuse ... ok
+test local::clock::tests::process_suspend_backward_time_and_unsafe_bounds_refuse ... ok
+test local::clock::tests::inherited_clock_refuses_in_an_actual_fork ... ok
+test local::keyring::custody::gnome::tests::daemon_environment_mapping_refuses_ambiguous_or_injected_layouts ... ok
+test local::keyring::custody::tests::custody_locks_wait_as_long_as_the_test_sets ... ok
+test local::keyring::custody::tests::custody_neither_reads_nor_changes_the_default_alias ... ignored, requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR
+test local::keyring::custody::tests::disposable_changed_keyring_format_is_refused_before_transfer ... ignored, requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR
+test local::keyring::custody::tests::disposable_registry_publication_cli_and_retirement_restart ... ignored, requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI
+test local::keyring::custody::tests::disposable_secret_service_restart_and_failures ... ignored, requires qualified GNOME Keyring 50.0, dbus-daemon and task-owned TMPDIR
+test local::keyring::custody::tests::private_custody_identities_are_non_nil ... ok
+test local::audit::tests::recovering_append_stops_after_one_failed_retry ... ok
+test local::audit::tests::recovering_append_requires_a_readable_exact_original_anchor ... ok
+test local::metadata::er::tests::acquisition_completion_refuses_a_result_other_than_its_target ... ok
+test local::metadata::er::tests::approval_policy_exhausted_revision_is_refused ... ok
+test local::metadata::er::tests::approval_policy_identity_is_not_nil ... ok
+test local::approvals::tests::abrupt_process_exits_recover_without_refunding_or_resending ... ok
+test local::audit::tests::recovery_budget_expiring_after_first_read_prevents_retry ... ok
+test local::metadata::er::tests::approval_policy_revision_must_advance ... ok
+test local::audit::tests::expired_recovery_budget_performs_no_extra_storage_calls ... ok
+test local::clock::tests::timeout_and_excessive_signed_radius_supply_no_capability ... ok
+test local::metadata::er::tests::approval_redemption_subject_carries_the_fixed_format ... ok
+test local::metadata::er::tests::approval_policy_revision_is_bounded ... ok
+test local::metadata::er::tests::audit_anchor_fields_are_set_from_the_acknowledged_input ... ok
+test local::metadata::er::tests::auth_binding_commands_store_the_facts_they_carry ... ok
+
+running 1 test
+test local::approvals::tests::mismatched_receipt_missing_subject_and_existing_key_never_open_new_gate ... ok
+test local::metadata::er::tests::approval_policy_lists_at_most_256_operations ... ok
+test local::audit::tests::capacity_is_atomic_per_instance_without_eviction_or_append_restriction ... ok
+test local::metadata::er::tests::approval_redemption_subject_couples_origin_and_route ... ok
+test local::metadata::er::tests::audit_anchor_co_presence_is_enforced_at_acknowledgement ... ok
+test local::metadata::er::tests::attempt_settlement_exists_only_for_a_known_terminal_outcome ... ok
+test local::metadata::er::tests::clock_floor_advance_refuses_a_lower_floor_and_accepts_the_same_one ... ok
+test local::metadata::er::tests::auth_binding_invariants_refuse_custody_without_generation_and_oversized_material ... ok
+test local::metadata::er::tests::final_projection_row_cannot_invent_missing_lifecycle_history ... ok
+test local::metadata::er::tests::attempt_transitions_are_decided_recorded_replayed_and_rebuilt_by_er ... ok
+test local::metadata::er::tests::approval_policy_revise_at_the_maximum_answers_revision_exhausted ... ok
+test local::metadata::er::tests::binding_publication_refuses_a_stale_publication_fence ... ok
+test local::metadata::er::tests::inspected_admission_sets_its_capture_from_the_input ... ok
+test local::metadata::er::tests::connection_list_cursor_page_limit_is_bounded ... ok
+test local::metadata::er::tests::cursor_expiry_is_recorded_in_the_expired_state ... ok
+test local::audit::tests::abrupt_process_exits_preserve_acknowledgement_boundaries_without_resend ... ok
+test local::metadata::er::tests::key_reservation_commands_store_their_inputs ... ok
+test local::metadata::er::tests::clock_floor_is_never_negative ... ok
+test local::metadata::er::tests::final_append_stores_the_observation_and_emits_the_owner_id ... ok
+test local::audit::tests::same_public_ref_is_independent_per_instance_and_gateway_and_leaf ... ok
+test local::metadata::er::tests::dispatch_refuses_a_generation_other_than_the_admitted_one ... ok
+test local::metadata::er::tests::postcommit_business_projection_requires_its_own_clock_state ... ok
+test local::metadata::er::tests::postcommit_prepared_observation_ignores_only_unread_runtime_records ... ok
+test local::metadata::er::tests::postcommit_runtime_state_accepts_only_an_authored_registry_clock_advance ... ok
+test local::metadata::er::tests::read_use_capture_sets_its_bindings_from_the_input ... ok
+test local::metadata::er::tests::read_use_creation_requires_the_admitted_registry_operation ... ok
+test local::metadata::er::tests::fingerprints_record_the_adapter_v1_canonicalization ... ok
+test local::metadata::er::tests::issuer_revision_advance_is_a_cas_to_a_fresh_revision ... ok
+test local::approvals::tests::fresh_spend_rechecks_policy_key_time_and_exact_initial_proof ... ok
+test local::metadata::er::tests::key_publication_is_recorded_in_the_active_state ... ok
+test local::metadata::er::tests::host_derived_commands_without_a_suite_caller_are_accepted ... ok
+test local::metadata::er::tests::key_reservation_refuses_an_empty_caller_key ... ok
+test local::metadata::er::tests::key_reservation_couples_origin_and_route ... ok
+test local::metadata::er::tests::key_reservation_settlement_exists_only_for_a_settled_known_result ... ok
+test local::metadata::er::tests::registry_epoch_advance_refuses_a_lower_epoch_and_accepts_the_same_one ... ok
+test local::approvals::tests::concurrent_reference_and_attempt_spend_produce_one_receipt ... ok
+test local::metadata::er::tests::required_approval_dispatch_needs_the_captured_subject ... ok
+test local::metadata::er::tests::issuer_and_audience_carry_their_prefixes ... ok
+test local::audit::tests::early_refusal_and_malformed_or_mismatched_facts_cannot_satisfy_the_gate ... ok
+test local::audit::tests::retained_cross_owner_references_are_checked_and_never_cascade_deleted ... ok
+test local::metadata::er::tests::signing_key_validity_bounds_are_enforced ... ok
+test local::metadata::er::tests::handles_another_process_releases_never_evict_this_process_held_handle ... ok
+test local::metadata::er::tests::one_sequence_records_the_same_decisions_twice ... ok
+test local::metadata::tests::a_sidecar_retired_during_admission_is_absent_not_unavailable ... ok
+test local::audit::tests::recovering_append_reuses_exact_fields_and_reads_a_lost_acknowledgement ... ok
+test local::metadata::tests::a_business_batch_cannot_commit_behind_an_unrecorded_clock_advance ... ok
+test local::metadata::tests::an_unmodeled_sql_deletion_cannot_erase_recorded_metadata ... ok
+test local::metadata::metamorphic_tests::mr11_same_millisecond_and_regressed_observations_leave_views_unchanged ... ok
+test local::audit::tests::recovering_append_never_substitutes_a_different_final_observation ... ok
+test local::metadata::tests::altered_legacy_and_retained_recovery_schemas_are_refused ... ok
+test local::metadata::tests::metadata_file_verification_preserves_an_existing_sqlite_wal_lock ... ok
+test local::metadata::metamorphic_tests::mr10_repeated_final_audit_observation_is_a_pure_replay ... ok
+test local::metadata::tests::only_the_handing_parent_binds_a_lock_wait ... ok
+test local::metadata::tests::initialize_resumes_a_committed_switch_before_installing_its_required_projection ... ok
+test local::metadata::metamorphic_tests::mr6_repeated_revoke_is_a_pure_replay ... ok
+test local::metadata::tests::fresh_setup_selects_the_recorded_authority_and_reopens_after_a_real_mutation ... ok
+test local::metadata::tests::passive_v1_inspection_cannot_migrate_or_claim_an_empty_registry ... ok
+test local::metadata::tests::prepared_observation_commits_across_an_interleaved_runtime_record_write ... ok
+test local::metadata::metamorphic_tests::mr7_refused_registry_actions_change_only_the_clock ... ok
+test local::metadata::tests::runtime_migration_is_admitted_and_retains_the_v2_authority ... ok
+test local::metadata::tests::runtime_state_persist_refuses_a_changed_registry_clock ... ok
+test local::metadata::tests::interrupted_import_and_committed_switch_resume_without_resetting_authority ... ok
+test local::metadata::metamorphic_tests::mr4_a_settled_attempt_ignores_every_later_settlement ... ok
+test local::metadata::metamorphic_tests::mr3_replayed_keyed_mutation_has_one_attempt_and_the_original_result ... ok
+test local::metadata::tests::revoked_legacy_connection_retains_both_read_use_histories_without_invented_admission ... ok
+test local::metadata::tests::nonempty_level_eight_migrates_without_changing_identity_or_retained_facts ... ok
+test local::mutations::tests::crash_child ... ignored, subprocess entry point, exercised by abrupt_process_exit
+test local::metadata::tests::unchanged_clock_business_batch_succeeds_without_advancing_time ... ok
+test local::metadata::metamorphic_tests::mr13_refused_mutation_commands_leave_every_view_unchanged ... ok
+test local::mutations::tests::ledger_limits_default_and_configured_bounds ... ok
+test local::approval_policy::tests::policy_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 313 filtered out; finished in 30.31s
+
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 313 filtered out; finished in 34.61s
+
+test local::adversary_w2_tests::blocked_policy_child_keeps_production_wait_when_the_variable_is_inherited ... ok
+test local::approval_policy::tests::policy_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 313 filtered out; finished in 30.29s
+
+test local::metadata::metamorphic_tests::mr8_refused_key_and_policy_commands_leave_every_view_unchanged ... ok
+test local::approval_policy::tests::policy_child ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 313 filtered out; finished in 31.18s
+
+test local::approval_policy::tests::held_use_blocks_cross_process_revocation_until_release ... ok
+test local::approval_policy::tests::child_process_waits_on_the_lock_wait_its_parent_hands_it ... ok
+test local::mutations::tests::pending_scan_does_not_install_mutation_state ... ok
+test local::metadata::metamorphic_tests::mr5_revoke_changes_only_the_revoked_connection ... ok
+test local::mutations::tests::capacity_and_corrupt_or_unavailable_reads_do_not_become_absence ... ok
+test local::mutations::tests::instance_recovery_preserves_fault_uncertainty_and_ignores_revoked_business_grants ... ok
+test local::oauth::tests::a_head_over_the_limit_is_not_a_request ... ok
+test local::oauth::tests::a_request_off_the_redirect_path_does_not_decide ... ok
+test local::oauth::tests::cancellation_fixture ... ok
+test local::oauth::tests::cancellation_stores_nothing ... ok
+test local::oauth::tests::client_file_uri_mismatch_refused ... ok
+test local::oauth::tests::consent_submits_the_acquired_triple ... ok
+test local::oauth::tests::documents_other_than_a_google_client_pass_through ... ok
+test local::oauth::tests::error_redirect_refused ... ok
+test local::oauth::tests::pkce_challenge_matches_rfc7636_appendix_b ... ok
+test local::oauth::tests::profile_field_mismatch_refused ... ok
+test local::oauth::tests::second_request_refused ... ok
+test local::oauth::tests::state_mismatch_refused ... ok
+test local::oauth::tests::the_consent_address_without_a_terminal_is_one_marked_line ... ok
+test local::oauth::tests::timeout_stores_nothing ... ok
+test local::mutations::tests::terminal_first_fact_is_immutable_and_unknown_never_expires ... ok
+test local::mutations::tests::version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authority ... ok
+test local::mutations::tests::concurrent_duplicate_prepare_has_one_live_receipt_and_original_correlation ... ok
+test local::oauth_adversary_pass2_tests::a_redirect_carrying_the_browsers_loopback_cookies_is_accepted ... ok
+test local::oauth_adversary_pass2_tests::chrome_with_loopback_cookies_following_the_redirect_is_accepted ... ignored, requires google-chrome-stable
+test local::oauth_adversary_pass2_tests::a_connection_flood_during_the_exchange_does_not_hold_the_flow_open ... ok
+test local::oauth_adversary_pass2_tests::pass2_flow_fixture ... ok
+test local::mutations::tests::unkeyed_attempts_still_require_the_gate_and_retain_outcome ... ok
+test local::oauth_adversary_pass2_tests::a_connection_flood_does_not_hold_the_flow_past_its_deadline ... ok
+test local::oauth_adversary_pass2_tests::standard_error_carries_only_the_consent_line ... ok
+test local::oauth_adversary_pass2_tests::the_listener_is_closed_once_the_flow_returns ... ok
+test local::oauth_adversary_tests::adversary_flow_fixture ... ok
+test local::oauth_adversary_pass2_tests::sixty_four_idle_connections_delay_the_redirect_until_a_slot_frees ... ok
+test local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted ... ignored, requires google-chrome-stable
+test local::oauth_adversary_tests::chrome_opens_one_connection_per_navigation ... ignored, requires google-chrome-stable
+test local::mutations::tests::retention_uses_trusted_bounds_and_cas_cannot_retire_a_replacement ... ok
+test local::mutations::tests::every_fingerprint_coordinate_conflicts_including_exact_route_revisions ... ok
+test local::oauth_adversary_tests::an_idle_connection_first_does_not_hide_the_redirect ... ok
+test local::oauth_adversary_tests::a_queued_connection_without_a_request_is_not_a_second_request ... ok
+test local::mutations::tests::atomic_prepare_faults_never_return_a_handle_or_leave_a_half_reservation ... ok
+test local::owner::approval_issuance::tests::production_cli_approval_issuance_and_restart ... ignored, requires built production CLI and qualified disposable GNOME Secret Service
+test local::mutations::tests::namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys ... ok
+test local::owner::mutation::tests::a_write_failure_names_its_stage_and_never_suggests_retrying_a_possible_effect ... ok
+test local::owner::approval_issuance::tests::publication_refusal_and_unknown_acknowledgement_preserve_the_protected_file ... ok
+test local::metadata::tests::every_recognized_legacy_level_uses_the_same_explicit_cutover ... ok
+test local::metadata::metamorphic_tests::mr9_independent_namespaces_and_runtime_records_commute ... ok
+test local::oauth_adversary_pass2_tests::a_head_completing_at_the_idle_limit ... ok
+test local::owner::mutation::tests::production_finish_audit_recovers_a_lost_acknowledgement_on_the_real_clock ... ok
+test local::owner::mutation::tests::replay::a_host_refusal_is_stored_without_an_origin_and_keeps_retry_status ... ok
+test local::owner::supervisor::maintenance_tests::a_live_worker_with_an_idle_hint_queues_one_recovery_instead_of_taking_ownership ... ok
+test local::oauth_adversary_pass2_tests::how_long_sixty_four_idle_connections_delay_the_redirect ... ok
+test local::owner::supervisor::suppression_tests::only_explicit_resume_actions_clear_stop_suppression ... ok
+test local::owner::supervisor::revalidate_wait_tests::a_revalidation_the_pool_stopped_waiting_for_is_outcome_unknown ... ok
+test local::owner::supervisor::idle_tests::a_live_idle_child_leaves_the_pool_quiet_and_a_request_in_flight_does_not ... ok
+test local::mutations::tests::abrupt_process_exit_preserves_each_durable_boundary_without_resend ... ok
+test local::mutations::tests::malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention ... ok
+test local::mutations::tests::ambiguous_gate_is_unknown_and_ambiguous_terminal_preserves_known_live_answer ... ok
+test local::protected::tests::adversary_empty_read_then_writer_closes_reports_end_of_input ... ok
+test local::protected::tests::adversary_empty_read_without_interrupt_waits_for_the_next_input ... ok
+test local::protected::tests::bounded_document_uses_original_deadline_and_rejects_links_and_excess_input ... ok
+test local::protected::tests::adversary_empty_read_with_nothing_further_blocks_in_poll_until_the_deadline ... ok
+test local::protected::tests::flush_fixture ... ok
+test local::owner::approval_issuance::tests::preparation_bounds_the_target_envelope_and_keeps_original_deadline ... ok
+test local::protected::tests::interrupt_that_flushes_polled_input_before_the_read_is_reported_as_interrupted ... ok
+test local::protected::tests::terminal_fixture ... ok
+test local::metadata::metamorphic_tests::mr12_guard_refused_projection_changes_leave_recorded_views_unchanged ... ok
+test local::registry::store_cost_tests::batch_cost_by_subject ... ignored, timing measurement; run explicitly
+test local::registry::store_cost_tests::read_invoke_cost_by_store_size ... ignored, timing measurement; run explicitly
+test local::protected::tests::source_admission_rejects_links_modes_and_oversized_files ... ok
+test local::owner::transport::tests::a_connection_closed_by_a_retiring_owner_reaches_the_next_owner ... ok
+test local::owner::transport::tests::an_owner_from_an_earlier_build_is_refused_by_name_and_left_running ... ok
+test local::owner::approval_issuance::tests::prepare_is_passive_and_digests_the_strict_input_and_current_policy ... ok
+test local::owner::approval_issuance::tests::changed_clock_or_connection_refuses_without_issuing_or_contacting_services ... ok
+test local::owner::approval_issuance::tests::clock_exchange_precedes_leases_and_policy_is_rechecked_after_network ... ok
+test local::owner::mutation::tests::replay::a_stored_provider_refusal_replays_at_dispatch_with_its_next_action_after_a_restart ... ok
+test local::metadata::metamorphic_tests::mr1_restart_and_every_open_path_yield_identical_views ... ok
+test local::metadata::metamorphic_tests::mr2_fresh_and_migrated_installations_record_the_same_subjects ... ok
+test local::registry::tests::acknowledged_deletion_cannot_keep_the_byte_size ... ok
+test local::registry::tests::acquisition_deadline_closes_consumption_and_publication_at_expiry ... ok
+test local::registry::tests::abandoned_candidates_require_acknowledged_retirement_and_full_retention ... ok
+test local::owner::mutation::tests::replay::a_ledger_entry_written_before_the_origin_existed_still_replays ... ok
+test local::mutations::tests::pending_scan_pages_existing_instances_and_keyed_or_unkeyed_attempts ... ok
+test local::owner::approval_issuance::tests::policy_and_prepare_refuse_wrong_permissions_pins_input_and_revision ... ok
+test local::protected::tests::controlling_terminal_hides_input_and_restores_echo_after_sigint ... ok
+test local::mutations::tests::connection_fences_authority_and_process_identity_refuse_stale_handles ... ok
+test local::registry::tests::an_observation_raced_on_every_unlocked_replay_still_completes ... ok
+test local::registry::tests::a_second_instance_of_the_same_adapter_connects ... ok
+test local::registry::tests::allocation_custody_and_publication_are_distinct_and_restartable ... ok
+test local::registry::tests::approval_target_is_passive_but_requires_exact_retained_admission ... ok
+test local::registry::tests::read_invoke_metadata_time ... ignored, timing measurement; run explicitly
+test local::registry::tests::production_clock_samples_after_locking_and_still_rejects_regression ... ok
+test local::registry::tests::expiry_sweep_retires_a_pending_acquisition_that_was_never_consumed ... ok
+test local::registry::tests::refused_business_action_still_advances_the_restart_clock_floor ... ok
+test local::owner::transport::idle_sweep_tests::an_idle_owner_exits_at_a_bound_spanning_several_empty_recovery_sweeps ... ok
+test local::registry::tests::observation_after_a_recorded_read_use_expiry_is_admitted ... ok
+test local::registry::tests::repeated_binding_after_reopen_keeps_the_original_profile_declaration ... ok
+test local::registry::tests::concurrent_observations_replay_current_clock_without_losing_a_floor ... ok
+test local::registry::tests::publication_preserves_unobserved_scope_and_credential_expiry ... ok
+test local::owner::transport::idle_sweep_tests::an_unsettleable_pending_attempt_does_not_keep_an_owner_alive ... ok
+test local::registry::tests::retained_scopes_are_nonempty ... ok
+test local::registry::tests::prepared_same_millisecond_observation_refuses_stale_registry_state ... ok
+test local::registry::tests::approval_target_refuses_known_invalid_material_without_custody_access ... ok
+test local::registry::tests::retained_scopes_are_at_most_sixty_four ... ok
+test local::runtime::artifact::tests::admitted_snapshot_survives_source_changes_and_refuses_mutation ... ok
+test local::runtime::artifact::tests::configured_capture_requires_both_path_admission_and_matching_content ... ok
+test local::registry::tests::lost_publication_acknowledgement_is_resolved_without_repeating_capture ... ok
+test local::runtime::channel::tests::malformed_frames_are_refused_without_unbounded_reads ... ok
+test local::runtime::channel::tests::separate_protected_section_and_bounded_document_depth ... ok
+test local::runtime::channel::tests::stalled_partial_frame_uses_the_original_deadline ... ok
+test local::runtime::failure_tests::a_provider_refusal_keeps_its_code_and_names_the_provider_as_origin ... ok
+test local::runtime::failure_tests::a_provider_timeout_or_capacity_answer_is_the_providers_and_the_hosts_own_is_not ... ok
+test local::runtime::failure_tests::provider_codes_survive_the_private_boundary_without_raw_error_data ... ok
+test local::runtime::channel::tests::cancellation_observes_a_stalled_partial_reply_without_resetting_the_deadline ... ok
+test local::runtime::process::tests::protocol_fixture ... ok
+test local::registry::tests::identity_scope_and_expiry_failures_preserve_the_usable_generation ... ok
+test local::runtime::process::tests::malformed_replies_terminate_and_reap_only_the_owned_child ... ok
+test local::runtime::process::write_tests::a_provider_timeout_is_the_providers_and_the_host_deadline_stays_the_hosts ... ok
+test local::runtime::process::write_tests::a_provider_refusal_of_a_write_names_the_provider_and_a_fitting_next_action ... ok
+test local::runtime::process::write_tests::fixture ... ok
+test local::runtime::process::write_tests::duplicate_commit_refuses_and_legacy_selection_never_exposes_a_write ... ok
+test local::registry::tests::competing_repairs_have_one_winner_and_old_dispatch_is_fenced ... ok
+test local::registry::tests::receipt_identity_and_known_missing_material_cannot_be_substituted ... ok
+test local::registry::tests::revocation_clears_the_baseline_with_the_active_material ... ok
+test local::runtime::process::write_tests::prepared_request_does_not_send_until_commit_and_cancel_destroys_before_ack ... ok
+test local::runtime::process::write_tests::mismatched_readiness_refuses_before_any_credential_frame ... ok
+test local::runtime::process::write_tests::schema_preflight_and_read_path_refusals_have_no_write ... ok
+test local::runtime::writes::tests::old_codecs_refuse_new_variants_and_result_documents_remain_closed_and_bounded ... ok
+test local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt has been running for over 60 seconds
+test local::registry::tests::revalidation_profile_discovers_identity_without_persisting_clock_or_granting_admission ... ok
+test local::runtime::state::tests::remembered_runtime_state_survives_an_interleaved_registry_clock_advance ... ok
+test server::tests::oversized_adapter_result_is_refused_after_schema_validation ... ok
+test server::tests::service_deadline_cancels_the_adapter_and_releases_capacity ... ok
+test server::tests::thirty_two_inflight_calls_refuse_the_next_until_one_is_dropped ... ok
+test local::runtime::process::write_tests::malformed_preparation_cancel_and_result_replies_reap_the_exact_child ... ok
+test local::runtime::process::write_tests::drop_eof_and_original_deadline_destroy_pending_without_a_write ... ok
+test local::registry::tests::cursors_are_scoped_bounded_and_invalidated_by_metadata_change ... ok
+test local::registry::tests::revalidation_capture_and_completion_are_one_use_and_keep_original_deadline ... ok
+test local::registry::tests::revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledgement ... ok
+test local::runtime::process::write_tests::replacement_material_wrong_ids_and_other_requests_close_pending_without_send ... ok
+test local::security_replay_tests::an_owner_batch_over_a_subject_another_process_wrote_equals_a_fresh_replay ... ok
+test local::runtime::process::write_tests::native_outcomes_and_lost_replies_never_repeat_a_send ... ok
+test local::registry::tests::the_same_identity_connects_again_after_revoke ... ok
+test local::registry::tests::cursors_expire_at_the_original_five_minute_deadline ... ok
+test local::security_replay_tests::a_held_authority_refuses_every_in_place_alteration_a_fresh_open_refuses ... ok
+test local::owner::mutation::tests::final_audit_recovery_preserves_every_live_business_result has been running for over 60 seconds
+test local::registry::tests::terminal_revoke_invalidates_repair_and_dispatch_without_custody ... ok
+test local::registry::store_cost_tests::a_reopen_after_its_own_write_refuses_every_blob_altered_since has been running for over 60 seconds
+test local::registry::tests::a_read_invoke_against_a_grown_store_replays_it_at_most_once has been running for over 60 seconds
+test local::registry::tests::revalidation_orders_competing_recollection_repair_revoke_and_pending_reads ... ok
+test local::registry::tests::revalidation_preserves_transient_failures_but_cannot_resurrect_known_invalidity ... ok
+test local::registry::tests::concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence has been running for over 60 seconds
+test local::registry::tests::a_read_invoke_against_a_grown_store_replays_it_at_most_once ... ok
+test local::registry::tests::concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence ... ok
+test local::mutations::tests::abort_and_gate_compete_and_recovery_never_reconstructs_a_send_receipt ... ok
+test local::registry::store_cost_tests::a_reopen_after_its_own_write_refuses_every_blob_altered_since ... ok
+test local::owner::mutation::tests::final_audit_recovery_preserves_every_live_business_result ... ok
+
+test result: ok. 288 passed; 0 failed; 26 ignored; 0 measured; 0 filtered out; finished in 162.60s
+
+     Running tests/configuration_refusal_adversary.rs (target/debug/deps/configuration_refusal_adversary-d40b01a3e23acf61)
+
+running 1 test
+test a_file_invalid_for_another_reason_names_no_mismatched_entry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/http.rs (target/debug/deps/http-f4e922cf42cd2b71)
+
+running 3 tests
+test upstream_redirects_cannot_exfiltrate_bound_credentials ... ok
+test error_bodies_are_not_exposed_and_large_responses_are_bounded ... ok
+test custom_ca_accepts_its_endpoint_and_refuses_other_roots ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/http_prefix.rs (target/debug/deps/http_prefix-9da2afcff336d6fc)
+
+running 6 tests
+test prefix_header_bytes_are_bounded_and_errors_do_not_include_provider_secrets ... ok
+test invalid_limits_and_unsupported_ports_refuse_before_work ... ok
+test excess_bytes_return_without_waiting_for_a_stalled_remainder ... ok
+test premature_fixed_or_chunked_closure_is_an_error_even_after_exact_prefix ... ok
+test prefix_distinguishes_eof_from_omitted_bytes_for_fixed_and_chunked_bodies ... ok
+test exact_prefix_still_obeys_original_deadline_and_caller_cancellation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+     Running tests/http_write.rs (target/debug/deps/http_write-050e794ff7eb28fe)
+
+running 5 tests
+test put_preserves_exact_segments_body_and_native_response_without_redirect ... ok
+test post_sends_one_json_document_with_the_selected_method ... ok
+test native_failures_are_returned_once_and_body_limits_remain_errors ... ok
+test invalid_target_segments_refuse_before_credential_resolution ... ok
+test lost_reply_after_complete_put_is_never_retried ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.33s
+
+     Running tests/local_foundation.rs (target/debug/deps/local_foundation-c0b11501c7caf35a)
+
+running 10 tests
+test symlinks_hardlinks_and_broad_permissions_are_refused ... ok
+test a_format_and_private_protocol_mismatch_names_the_format_and_entry ... ok
+test private_protocol_requires_explicit_v2_configuration_without_rewriting_v1 ... ok
+test exclusive_setup_persists_private_metadata_and_refuses_overwrite ... ok
+test unavailable_or_unrecognized_metadata_is_never_reinitialized ... ok
+test sidecar_symlink_is_refused_without_touching_its_target ... ok
+test owner_and_migration_tampering_refuse_inspection ... ok
+test contending_metadata_open_waits_for_a_live_holder_instead_of_reporting_it_unavailable ... ok
+test concurrent_initialization_has_one_authority_and_one_configuration ... ok
+test contending_metadata_open_refuses_at_its_bound_and_recovers_after_release ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.18s
+
+     Running tests/metadata_reopen_adversary.rs (target/debug/deps/metadata_reopen_adversary-5b73587d4447cf00)
+
+running 4 tests
+test a_write_after_the_store_is_replaced_at_its_path_lands_in_the_new_store ... ok
+test concurrent_writers_leave_a_reopen_equal_to_a_full_replay ... ok
+test a_reopen_refuses_every_altered_event_a_full_replay_refuses ... ok
+test a_reopen_refuses_every_altered_blob_a_full_replay_refuses ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.44s
+
+     Running tests/provider_timeout_adversary.rs (target/debug/deps/provider_timeout_adversary-65eb1522d4039bcb)
+
+running 2 tests
+test a_tls_handshake_that_never_completes_sent_no_request_and_is_not_marked ... ok
+test a_body_that_stalls_after_the_provider_answered_is_the_providers_timeout ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.04s
+
+     Running tests/service.rs (target/debug/deps/service-4936203dea2e98cb)
+
+running 7 tests
+test credential_stores_are_substitutable_and_file_permissions_are_enforced ... ok
+test configuration_yaml_and_json_remain_strict ... ok
+test environment_credentials_apply_the_same_value_bounds_as_files ... ok
+test wire_admission_and_freshness_refuse_before_dispatch ... ok
+test federation_refreshes_atomically_without_replaying_and_rotates_credentials ... ok
+test invalid_identifiers_cannot_inject_log_lines_or_terminal_controls ... ok
+test federation_preserves_result_and_reports_downstream_failure ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_kubernetes-bfe892e0a723dae9)
+
+running 10 tests
+test helm::tests::a_release_name_helm_would_refuse_is_refused_here ... ok
+test helm::tests::a_body_disagreeing_with_its_object_labels_is_refused ... ok
+test helm::tests::a_payload_that_is_not_a_release_record_never_projects_as_complete ... ok
+test helm::tests::a_revision_record_is_read_only_from_a_helm_release_secret ... ok
+test helm::tests::manifest_documents_are_positions_and_digests_not_text ... ok
+test helm::tests::each_published_digest_covers_exactly_the_bytes_its_documents_name ... ok
+test helm::tests::a_path_outside_its_declared_bound_is_dropped_and_the_page_says_so ... ok
+test helm::tests::an_observation_carries_observed_values_inside_their_declared_bounds ... ok
+test helm::tests::every_recorded_shape_is_projected_and_no_literal_survives ... ok
+test helm::tests::both_stored_encodings_decode_and_neither_invents_a_shape ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_kubernetes-5cd256cfa4a61ad1)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/helm_contract_adversary.rs (target/debug/deps/helm_contract_adversary-30d87e3ee047f94d)
+
+running 5 tests
+test the_cli_document_does_not_contradict_its_own_limit_examples ... ok
+test a_stored_payload_that_is_not_a_release_record_is_not_reported_complete ... ok
+test manifest_content_digest_is_sha256_over_the_document_text ... ok
+test an_empty_recorded_key_stays_inside_the_published_path_bound ... ok
+test a_deeply_nested_recorded_value_stays_inside_the_published_path_bound ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/helm_contract_adversary_pass2.rs (target/debug/deps/helm_contract_adversary_pass2-1a80c27123872b61)
+
+running 6 tests
+test present_but_unestablished_object_metadata_is_not_read_as_an_omission ... ok
+test the_manifest_digest_is_reproducible_by_sha256sum_over_the_stored_document ... ok
+test a_release_revision_outside_its_declared_input_bound_is_refused ... ok
+test a_values_page_under_its_limit_returns_one_entry_per_recorded_path ... ok
+test a_continuation_the_binding_cannot_read_does_not_report_the_page_complete ... ok
+test the_same_unread_continuation_reports_a_resource_page_complete ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/local_runtime.rs (target/debug/deps/local_runtime-2f33aeabf90b936b)
+
+running 16 tests
+test cli_journey::a_real_cluster_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_K8S_SANDBOX, a built production CLI and qualified disposable Secret Service
+test cli_journey::kubernetes_cli_reads_helm_release_history_and_redacted_values ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_credential ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::persistent_kubernetes_cli_owner_and_keyring_restart ... ignored, requires built production CLI and qualified disposable Secret Service
+test an_unaccepted_credential_refuses_before_any_business_read ... ok
+test configured_host_discovery_is_advertised_and_reads_nodes ... ok
+test an_accepted_anonymous_request_is_refused_rather_than_saved_as_an_identity ... ok
+test an_out_of_scope_release_and_an_unreadable_namespace_are_distinct_from_an_empty_history ... ok
+test review_status_codes_map_to_distinct_failures_without_a_business_read ... ok
+test a_backendless_endpointslice_reads_as_no_observations_rather_than_malformed ... ok
+test helm_release_history_status_values_and_manifest_come_from_named_release_secrets ... ok
+test an_uncompressed_release_body_reads_and_bounded_pages_report_their_own_completeness ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_provider_work ... ok
+test private_kubernetes_validates_through_selfsubjectreview_and_reads_scoped_resources ... ok
+test helm_reads_are_unadvertised_until_configured_and_content_needs_its_own_disclosure ... ok
+test lost_validation_response_closes_the_owned_channel_without_replay ... ok
+
+test result: ok. 12 passed; 0 failed; 4 ignored; 0 measured; 0 filtered out; finished in 1.55s
+
+     Running tests/provider.rs (target/debug/deps/provider-511e7ce6e16382ae)
+
+running 3 tests
+test disabled_host_discovery_is_not_advertised_or_dispatched ... ok
+test endpoint_cross_product_is_bounded_even_for_one_source_slice ... ok
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/stage_origin_adversary.rs (target/debug/deps/stage_origin_adversary-3b269fcb2bba7d1e)
+
+running 3 tests
+test disabled_host_discovery_is_not_reported_as_a_provider_refusal ... ok
+test a_resource_kind_outside_the_configured_scope_is_not_reported_as_a_provider_refusal ... ok
+test a_namespace_outside_the_configured_scope_is_not_reported_as_a_provider_refusal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sdk-39c9cdb89152ed48)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/cursor.rs (target/debug/deps/cursor-d485f6cc6d56b4f7)
+
+running 1 test
+test cursors_cannot_be_rebound_forged_or_reused_after_restart ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_spec-c16cfb12e6584854)
+
+running 5 tests
+test toolchain::tests::the_pin_is_one_exact_release ... ok
+test toolchain::tests::the_ess_libraries_follow_the_pin ... ok
+test toolchain::tests::a_missing_release_names_the_record_and_every_searched_path ... ok
+test toolchain::tests::default_search_is_independent_of_path_version_order ... ok
+test toolchain::tests::explicit_overrides_win_and_wrong_paths_do_not_fall_back ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_spec-7b6cdd88ba11078d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/adversary_ess_limit_notes.rs (target/debug/deps/adversary_ess_limit_notes-4dcdb657e74d3328)
+
+running 1 test
+test the_observation_id_equality_note_holds_for_the_pinned_ess ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.33s
+
+     Running tests/compiler.rs (target/debug/deps/compiler-184e253f5db37e2f)
+
+running 4 tests
+test configuration_examples_are_data_not_imports ... ok
+test shared_configuration_imports_keep_constraints_and_reject_unknown_versions ... ok
+test ambiguous_unmapped_and_duplicate_declarations_are_refused ... ok
+test all_adapter_descriptors_are_reproducible_and_schema_valid ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running tests/generation.rs (target/debug/deps/generation-fe8591c699503364)
+
+running 7 tests
+test mapped_date_time_is_preserved_and_other_format_semantics_refuse ... ok
+test strict_v1_and_v2_refuse_unimplemented_or_ambiguous_mappings ... ok
+test response_prefix_is_explicit_bounded_and_absent_in_legacy_serialization ... ok
+test pinned_source_and_required_source_semantics_are_enforced ... ok
+test public_import_refuses_specs_changed_after_validation ... ok
+test regeneration_refuses_unowned_files_and_output_symlinks ... ok
+test regeneration_is_reproducible_preserves_handwritten_files_and_detects_drift ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.72s
+
+     Running unittests src/lib.rs (target/debug/deps/connectors_sql-861cb50e391b1f0a)
+
+running 2 tests
+test error_tests::the_databases_statement_timeout_and_capacity_answers_are_marked_and_own_deadlines_are_not ... ok
+test tls_tests::configured_ca_replaces_public_roots_and_requires_certificates ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/connectors_sql-ce7ed5bd73791757)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/local_runtime.rs (target/debug/deps/local_runtime-b305ac3857280aae)
+
+running 5 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+
+test result: ok. 4 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+     Running tests/protocol.rs (target/debug/deps/protocol-2e694a13122cd970)
+
+running 7 tests
+test parsing_and_limits_refuse_before_credentials_or_connection ... ok
+test dropping_the_invocation_still_cancels_the_database ... ok
+test text_null_and_empty_parameters_reach_bind_without_interpolation ... ok
+test rows_nulls_native_types_and_truncation_are_preserved ... ok
+test authentication_database_errors_and_row_capacity_are_sanitized ... ok
+test unresponsive_database_cannot_extend_the_cleanup_budget ... ok
+test deadline_sends_the_backend_cancel_key_and_drains_the_connection ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.10s
+
+   Doc-tests connectors_catalog
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_catalog_provider
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_client
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_contracts
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_host
+
+running 3 tests
+test crates/connectors-host/src/local/runtime/process.rs - local::runtime::process::PreparedInvocation (line 456) - compile fail ... ok
+test crates/connectors-host/src/http.rs - http::ScopedHttp::probe_capability (line 179) - compile fail ... ok
+test crates/connectors-host/src/http.rs - http::ScopedHttp::into_write (line 162) - compile fail ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sdk
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_spec
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: 1 target failed:
+    `-p connectors-build --bin connectors-build`

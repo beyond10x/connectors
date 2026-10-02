@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.25.0 — 2026-10-02
+
+### Added
+
+- `connectors-build ignored` inventories compiled ignored tests, classifies their
+  prerequisites and reports executed, failed and skipped cases. Disposable
+  fixtures are selected by default; live-provider and timing tests require
+  explicit family selection. `--required` fails on missing prerequisites.
+
+### Fixed
+
+- Timed-out metadata work retains the lifecycle lock until its worker has
+  finished. Cleanup runs outside the caller's destructor, preserving bounded
+  return while preventing a second owner from racing an unfinished batch.
+- SQL test fixtures recognize PostgreSQL cancellation requests separately from
+  authenticated sessions, retaining exact session counts and rejecting malformed
+  control traffic.
+
+### Limits
+
+- Metadata operation cost still grows with event-store size. This release does
+  not resolve Entity Runtime issue 51 or complete sustained-read acceptance.
+- Provider acceptance and MCP delivery remain work in progress. A skipped
+  ignored test is reported as missing evidence, not as a passing provider check.
+
 ## 0.24.0 — 2026-10-02
 
 ### Added

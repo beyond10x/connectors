@@ -1,0 +1,1301 @@
+{
+  "task": {
+    "id": "connectors-kubernetes-spec-service",
+    "kind": "feature",
+    "objective": {
+      "summary": "kubernetes-spec-service"
+    },
+    "protocol": "adp/1",
+    "profile": "development.standard",
+    "constraints": {
+      "facts": {
+        "change.architectural": true,
+        "change.code": true,
+        "change.public_contract": true
+      },
+      "notes": [
+        "The Acceptance and Work sequence and evidence sections of .engineering/planning/story/kubernetes-spec-service.md own the outcome. Select and record the current main baseline before implementation. Historical 801b8d5 checks remain evidence of that revision; do not reset the source to it. Reuse verified checks only for unchanged exact inputs and obtain any missing baseline/image proof before extending Kubernetes generation and packaging.",
+        "Resolve the current crates/connectors-spec/toolchain.json through the repository's exact-source receipt checks. At integration the pin is 6f7ef46163e758f3401945d1a946e0fc80ebc003. Do not restore the old release pin, downgrade global tools or repeat the already-completed GitLab migration.",
+        "Preserve resources.list for pods, services, deployments and EndpointSlices, endpoints.discover and configuration-gated hosts.discover. Pin upstream bytes and retain namespace/kind admission, cursor binding, completeness, provenance and explicit missing-semantics refusals. Resolve the existing generation mapping limitation before implementing selection.",
+        "Follow current shared and adapter-owned ESS declarations. Model and validate any necessary typed extension first. Keep provider semantics in the adapter and preserve GitLab generation plus SQL behavior. Reuse the Rust executor for exact-image packaging and direct/federated three-adapter acceptance.",
+        "Follow AGENTS.md for bot-authored commits, verified authority, managed checkouts and leases, two Cargo jobs and task-owned TMPDIR. Keep credentials out of source and evidence. Use connectors for integrations and report gaps before alternative clients. Retain evidence and clean only owned fixtures.",
+        "This draft authorizes no paid launch by itself. Recheck current protocol loading and let the driver select its map. A selected run needs operator budget-usd and assume-usd-per-run plus pause-on-approval. Relay refusals. Run applicable local gates for changed implementation; do not duplicate already-passing unchanged gates remotely.",
+        "Keep this outcome local: no external publication, Atlas enrollment, consumer rollout, other providers, writes, watches, automatic discovery activation or changes to sibling AEP, ESS or original Connectors repositories."
+      ]
+    },
+    "artifacts": {
+      "derived_from": [
+        "story:kubernetes-spec-service"
+      ]
+    }
+  },
+  "protocol": {
+    "id": "adp",
+    "version": 1,
+    "title": "Agentic Development Protocol",
+    "summary": "AEP for software development work: specification, decomposition, test-driven implementation, contract and property verification, and review.",
+    "extends": "aep/1",
+    "capabilities": [
+      "repository.read",
+      "repository.write",
+      "tests.execute",
+      "command.execute",
+      "network.read",
+      "network.write",
+      "telemetry.read",
+      "production.read",
+      "production.write",
+      "deployment.create",
+      "deployment.rollback",
+      "secret.read",
+      "artifact.read",
+      "artifact.write",
+      "planning.read",
+      "planning.write",
+      "review.request",
+      "approval.request"
+    ],
+    "approval_floor": [
+      "network.read:private",
+      "production.write",
+      "deployment.create:production"
+    ],
+    "evidence_kinds": [
+      "test_result",
+      "static_analysis",
+      "contract_result",
+      "property_test_result",
+      "deployment_result",
+      "metric_observation",
+      "health_observation",
+      "approval",
+      "diff",
+      "artifact",
+      "review",
+      "review_outcome",
+      "verification",
+      "specification",
+      "ess_conformance",
+      "trace_conformance"
+    ],
+    "verifiers": [
+      "compiler",
+      "test-runner",
+      "contract-runner",
+      "static-analyzer",
+      "property-tester",
+      "model-checker",
+      "telemetry-query",
+      "policy-engine",
+      "human-approval",
+      "human-review",
+      "artifact-validator",
+      "conformance-runner",
+      "trace-checker"
+    ],
+    "artifact_kinds": [
+      "vision",
+      "product-requirements",
+      "initiative",
+      "epic",
+      "story",
+      "task",
+      "specification",
+      "acceptance-criteria",
+      "design",
+      "feature-design",
+      "component-design",
+      "architecture-design",
+      "api-design",
+      "data-design",
+      "architecture-decision-record",
+      "test-plan",
+      "evaluation-plan",
+      "verification-report",
+      "review-result",
+      "approval-record",
+      "release-plan",
+      "migration-plan",
+      "runbook",
+      "incident-report",
+      "postmortem",
+      "executable-system-specification"
+    ],
+    "phases": [
+      "adversarial-verification",
+      "completion",
+      "decomposition",
+      "implementation",
+      "intake",
+      "learning",
+      "planning",
+      "review",
+      "specification",
+      "verification",
+      "verification-setup"
+    ],
+    "observables": [
+      "ess_conformance.**",
+      "trace_conformance.**",
+      "mutation.**",
+      "differential.**",
+      "invariant.**",
+      "clean_room.**",
+      "build.**",
+      "types.**",
+      "task.**",
+      "change.**",
+      "risk",
+      "severity",
+      "state.**",
+      "workflow.**",
+      "principle.**",
+      "evidence.**",
+      "required_evidence.**",
+      "tests.**",
+      "test.**",
+      "unit_tests.**",
+      "contract_tests.**",
+      "regression_suite.**",
+      "static_analysis.**",
+      "contracts.**",
+      "property_test.**",
+      "coverage.**",
+      "specification.**",
+      "diff.**",
+      "source_diff.**",
+      "artifact.**",
+      "review.**",
+      "verification.**",
+      "approval.**",
+      "approvals.**",
+      "deployment.**",
+      "metric.**",
+      "service.**"
+    ],
+    "scales": {
+      "health": [
+        "unhealthy",
+        "degraded",
+        "healthy"
+      ],
+      "risk": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "severity": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "default_failure_policy": "block"
+  },
+  "profile": {
+    "id": "development.standard",
+    "version": 1,
+    "title": "Standard development",
+    "summary": "Choose this for anything with an external consumer, persisted data or a customer-visible path — it is the sensible default. Drop to `development.fast` only for contained internal work; move up to `development.critical` when a defect would be expensive to discover late: authentication, authorisation, money, data migration, anything whose failure is silent.",
+    "protocol": "adp/1",
+    "extends": "development.fast",
+    "workflow": "adp/default",
+    "principles": [
+      "spec-driven",
+      "test-driven",
+      "static-analysis",
+      "least-privilege",
+      "provenance-tracking",
+      "contract-testing",
+      "property-based-testing",
+      "approval-gates",
+      "reversible-changes"
+    ],
+    "capabilities": {
+      "allow": [
+        "repository.read",
+        "repository.write",
+        "tests.execute",
+        "artifact.read",
+        "artifact.write",
+        "review.request",
+        "approval.request"
+      ]
+    },
+    "completion": {
+      "predicates": [
+        {
+          "all": [
+            "tests.unit.failed == 0",
+            "static_analysis.errors == 0",
+            "evidence.missing == 0"
+          ]
+        },
+        {
+          "all": [
+            "specification.satisfied",
+            "contracts.failed == 0"
+          ]
+        }
+      ]
+    }
+  },
+  "principles": [
+    {
+      "id": "spec-driven",
+      "version": 1,
+      "title": "Specification before implementation",
+      "summary": "An approved specification must exist before implementation starts, and every requirement it states must be satisfied before the task completes. Without it, \"done\" means whatever the implementer remembers wanting.",
+      "applicability": {
+        "task.kind": {
+          "any_of": [
+            "feature",
+            "bugfix",
+            "refactor",
+            "migration"
+          ]
+        }
+      },
+      "obligations": [
+        {
+          "id": "spec-driven/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "predicates": [
+              "specification.satisfied"
+            ]
+          }
+        },
+        {
+          "id": "spec-driven/before-implementation",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "implementation"
+            }
+          },
+          "requires": {
+            "artifacts": [
+              {
+                "kind": "specification",
+                "status": "approved",
+                "at_least": 1,
+                "relation": {
+                  "kind": "specifies",
+                  "target": "task"
+                },
+                "fresh": true
+              }
+            ]
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "specification",
+          "at_least": 1,
+          "independent": false
+        }
+      ],
+      "failure_policy": "block"
+    },
+    {
+      "id": "test-driven",
+      "version": 1,
+      "title": "Test-driven development",
+      "summary": "A failing test must exist before the implementation that makes it pass, and the suite must be green at completion. Without the ordering, a passing test only proves the code does what it does.",
+      "applicability": {
+        "task.kind": {
+          "any_of": [
+            "feature",
+            "bugfix"
+          ]
+        }
+      },
+      "obligations": [
+        {
+          "id": "test-driven/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "predicates": [
+              "tests.unit.failed == 0",
+              "regression_suite.result == passed",
+              "evidence.first_seq.test_result < evidence.first_seq.diff"
+            ]
+          }
+        },
+        {
+          "id": "test-driven/before-implementation",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "implementation"
+            }
+          },
+          "requires": {
+            "predicates": [
+              "test.exists",
+              "test.first_result == failed"
+            ]
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "test_result",
+          "at_least": 1,
+          "verifier": "test-runner",
+          "independent": true
+        },
+        {
+          "kind": "diff",
+          "at_least": 1,
+          "independent": false
+        }
+      ],
+      "verification": [
+        {
+          "verifier": "test-runner",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          }
+        }
+      ],
+      "failure_policy": "block"
+    },
+    {
+      "id": "static-analysis",
+      "version": 1,
+      "title": "Static analysis",
+      "summary": "No task completes with an unresolved static-analysis error. Without it, a defect the compiler or the linter already found ships anyway, because nobody was obliged to read the output.",
+      "applicability": true,
+      "obligations": [
+        {
+          "id": "static-analysis/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "predicates": [
+              "static_analysis.errors == 0"
+            ]
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "static_analysis",
+          "at_least": 1,
+          "independent": true
+        }
+      ],
+      "failure_policy": "block"
+    },
+    {
+      "id": "least-privilege",
+      "version": 1,
+      "title": "Least privilege",
+      "summary": "An agent holds the capabilities its task needs and nothing else, so the damage a wrong instruction can do is bounded by the task rather than by the token.",
+      "applicability": true,
+      "obligations": [],
+      "capabilities": {
+        "approval_required": [
+          "network.write",
+          "production.write",
+          "deployment.create"
+        ],
+        "deny": [
+          "secret.read"
+        ]
+      },
+      "failure_policy": "block"
+    },
+    {
+      "id": "provenance-tracking",
+      "version": 1,
+      "title": "Provenance tracking",
+      "summary": "Every claim a finished run makes points at the thing that produced it. Without it, six months later nobody can tell whether a test result came from a test runner or from an agent's summary of one, and the only way to find out is to run everything again.",
+      "applicability": true,
+      "obligations": [
+        {
+          "id": "provenance-tracking/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "evidence": [
+              {
+                "kind": "verification",
+                "at_least": 1,
+                "independent": true
+              }
+            ],
+            "conditional": [
+              {
+                "when": {
+                  "task.kind": {
+                    "none_of": [
+                      "incident"
+                    ]
+                  }
+                },
+                "require": {
+                  "evidence": [
+                    {
+                      "kind": "diff",
+                      "at_least": 1,
+                      "independent": false
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "failure_policy": "block"
+    },
+    {
+      "id": "contract-testing",
+      "version": 1,
+      "title": "Contract testing",
+      "summary": "Published interfaces stay compatible: contract checks pass and report no breaking change before a task can complete. Without it, a compatible-looking refactor ships as someone else's outage.",
+      "applicability": {
+        "all": [
+          {
+            "task.kind": {
+              "any_of": [
+                "feature",
+                "bugfix",
+                "refactor"
+              ]
+            }
+          },
+          "change.code"
+        ]
+      },
+      "obligations": [
+        {
+          "id": "contract-testing/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "predicates": [
+              "contracts.checked > 0",
+              "contracts.failed == 0",
+              "contracts.breaking_changes == 0"
+            ]
+          }
+        },
+        {
+          "id": "contract-testing/before-review",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "review"
+            }
+          },
+          "requires": {
+            "predicates": [
+              "contracts.breaking_changes == 0"
+            ]
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "contract_result",
+          "at_least": 1,
+          "verifier": "contract-runner",
+          "independent": true
+        }
+      ],
+      "verification": [
+        {
+          "verifier": "contract-runner",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          }
+        }
+      ],
+      "failure_policy": "block"
+    },
+    {
+      "id": "property-based-testing",
+      "version": 1,
+      "title": "Property-based testing",
+      "summary": "Named properties must hold over generated inputs, not just over the examples someone thought of. A suite of examples documents the cases its author imagined and says nothing about the rest.",
+      "applicability": "change.code",
+      "obligations": [
+        {
+          "id": "property-based-testing/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "predicates": [
+              "evidence.count.property_test_result >= 1"
+            ]
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "kind": "property_test_result",
+          "at_least": 1,
+          "verifier": "property-tester",
+          "independent": true
+        }
+      ],
+      "failure_policy": "block"
+    },
+    {
+      "id": "approval-gates",
+      "version": 1,
+      "title": "Approval gates",
+      "summary": "Production mutation and irreversible steps need an approval a person actually granted, recorded where an auditor can find it. Without it, the record of who agreed to the change is whatever the agent wrote in its own summary.",
+      "applicability": true,
+      "obligations": [
+        {
+          "id": "approval-gates/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "conditional": [
+              {
+                "when": "defined(deployment.production.status)",
+                "require": {
+                  "evidence": [
+                    {
+                      "kind": "approval",
+                      "at_least": 1,
+                      "verifier": "human-approval",
+                      "independent": true
+                    }
+                  ],
+                  "approvals": [
+                    {
+                      "approval": "production-change",
+                      "human": true
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "capabilities": {
+        "approval_required": [
+          "production.write",
+          "deployment.create:production"
+        ]
+      },
+      "failure_policy": "block"
+    },
+    {
+      "id": "reversible-changes",
+      "version": 1,
+      "title": "Reversible changes",
+      "summary": "A change either has a known previous revision to go back to, or it is not finished. Without it the recovery plan gets invented while the service is down, by whoever happens to be awake.",
+      "applicability": true,
+      "obligations": [
+        {
+          "id": "reversible-changes/before-completion",
+          "timing": {
+            "timing": "before",
+            "target": {
+              "phase": "completion"
+            }
+          },
+          "requires": {
+            "conditional": [
+              {
+                "when": "defined(deployment.revision)",
+                "require": {
+                  "predicates": [
+                    "deployment.previous_revision.exists"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "failure_policy": {
+        "action": "rollback",
+        "rollback": {
+          "require": "deployment.previous_revision.exists"
+        }
+      }
+    }
+  ],
+  "workflow": {
+    "id": "adp/default",
+    "version": 2,
+    "title": "Standard development workflow",
+    "summary": "Specification, decomposition, verifier setup, implementation, verification, adversarial verification and review, with an explicit route back to implementation when verification fails.",
+    "initial": "receive",
+    "states": {
+      "adversarial_verify": {
+        "id": "adversarial_verify",
+        "title": "Adversarial verify",
+        "summary": "Try to break what the previous state just declared working: mutants, edge cases, property violations, contract drift.",
+        "kind": "normal",
+        "phases": [
+          "adversarial-verification"
+        ],
+        "requires": {
+          "evidence": [
+            {
+              "kind": "test_result",
+              "at_least": 1,
+              "verifier": "test-runner",
+              "independent": true
+            }
+          ]
+        },
+        "irreversible": false
+      },
+      "complete": {
+        "id": "complete",
+        "title": "Complete",
+        "summary": "The change is verified, reviewed and accounted for.",
+        "kind": "terminal",
+        "phases": [
+          "completion"
+        ],
+        "irreversible": false
+      },
+      "declined": {
+        "id": "declined",
+        "title": "Declined",
+        "summary": "No change was made, and the record says why — the specification found the request already satisfied or not worth building, or review rejected the change outright. A terminal state rather than an abandoned run, because *we decided not to* is a result somebody has to be able to read later, and a run that simply stopped says only that it stopped.",
+        "kind": "terminal",
+        "phases": [
+          "completion"
+        ],
+        "irreversible": false
+      },
+      "decompose": {
+        "id": "decompose",
+        "title": "Decompose",
+        "summary": "Break the specification into units that can each be implemented and verified on their own.",
+        "kind": "normal",
+        "phases": [
+          "decomposition",
+          "planning"
+        ],
+        "irreversible": false
+      },
+      "establish_verifiers": {
+        "id": "establish_verifiers",
+        "title": "Establish verifiers",
+        "summary": "Write the tests, contracts and checks that will decide whether the work is done — before there is an implementation for them to be shaped around.",
+        "kind": "normal",
+        "phases": [
+          "verification-setup"
+        ],
+        "irreversible": false
+      },
+      "implement": {
+        "id": "implement",
+        "title": "Implement",
+        "summary": "Make the smallest change that satisfies the decomposed unit and its verifiers.",
+        "kind": "normal",
+        "phases": [
+          "implementation"
+        ],
+        "irreversible": false
+      },
+      "receive": {
+        "id": "receive",
+        "title": "Receive",
+        "summary": "Take in the request and record what is being asked for, unedited.",
+        "kind": "normal",
+        "phases": [
+          "intake"
+        ],
+        "irreversible": false
+      },
+      "review": {
+        "id": "review",
+        "title": "Review",
+        "summary": "Judge the change as a whole — intent, fit and risk, not just green checks.",
+        "kind": "normal",
+        "phases": [
+          "review"
+        ],
+        "irreversible": false
+      },
+      "specify": {
+        "id": "specify",
+        "title": "Specify",
+        "summary": "State the required behaviour. Anything left only in the prompt cannot be checked later, so this is where an objective becomes something a verifier can disagree with.",
+        "kind": "normal",
+        "phases": [
+          "specification"
+        ],
+        "irreversible": false
+      },
+      "verify": {
+        "id": "verify",
+        "title": "Verify",
+        "summary": "Run the verifiers established earlier against the change.",
+        "kind": "normal",
+        "phases": [
+          "verification"
+        ],
+        "irreversible": false
+      }
+    },
+    "transitions": [
+      {
+        "from": "receive",
+        "to": "specify",
+        "when": true,
+        "description": "Intake is done when there is something to specify; nothing else gates it."
+      },
+      {
+        "from": "specify",
+        "to": "declined",
+        "when": "specification.declines_the_request",
+        "description": "The specification concluded there is nothing to build — the behaviour already exists, or the request should not be satisfied. Nothing in this repository mints `specification.declines_the_request`, exactly as nothing mints `review.approved`: both are somebody's judgement, recorded, and the run stops and waits for it rather than a harness deciding it was not worth doing."
+      },
+      {
+        "from": "specify",
+        "to": "decompose",
+        "when": "artifact.specification.exists",
+        "description": "Work is only broken up once there is a specification to break up."
+      },
+      {
+        "from": "decompose",
+        "to": "establish_verifiers",
+        "when": true,
+        "description": "With units identified, each one's acceptance check can be written."
+      },
+      {
+        "from": "establish_verifiers",
+        "to": "implement",
+        "when": "test.exists",
+        "description": "A test must exist before implementation begins. This is the mechanical form of test-driven work: the guard, not the agent's good intentions, is what enforces the order."
+      },
+      {
+        "from": "implement",
+        "to": "verify",
+        "when": "diff.exists",
+        "description": "There is nothing to verify until the working tree has actually changed."
+      },
+      {
+        "from": "verify",
+        "to": "adversarial_verify",
+        "when": {
+          "all": [
+            "tests.unit.failed == 0",
+            "tests.contract.failed == 0",
+            "static_analysis.errors == 0"
+          ]
+        },
+        "description": "Unit and contract suites green and static analysis clean. Contracts are in the guard because a change that passes its own tests can still break a consumer."
+      },
+      {
+        "from": "verify",
+        "to": "implement",
+        "when": {
+          "any": [
+            "tests.unit.failed > 0",
+            "tests.contract.failed > 0",
+            "static_analysis.errors > 0"
+          ]
+        },
+        "description": "Verification failed, so the work goes back to implementation. Any failing check sends it back, not just the unit suite — a static-analysis error is a defect that has not been symptomatic yet."
+      },
+      {
+        "from": "adversarial_verify",
+        "to": "implement",
+        "when": {
+          "any": [
+            "tests.unit.failed > 0",
+            "tests.contract.failed > 0",
+            "static_analysis.errors > 0"
+          ]
+        },
+        "description": "The adversary broke it. Same shape as `verify -> implement` and for the same reason: a defect found here is a defect, and the alternative to a route back is deleting the case that found it."
+      },
+      {
+        "from": "adversarial_verify",
+        "to": "review",
+        "when": "evidence.missing == 0",
+        "description": "No required evidence outstanding. A reviewer reading a change with gaps in its evidence is being asked to guess, and will guess in favour of the author."
+      },
+      {
+        "from": "review",
+        "to": "complete",
+        "when": "review.approved",
+        "description": "Review concluded in approval."
+      },
+      {
+        "from": "review",
+        "to": "implement",
+        "when": "review.changes_requested",
+        "description": "Review asked for changes. The work goes back to implementation with the review's own record as the reason, rather than the run stopping and the reason living in somebody's message."
+      },
+      {
+        "from": "review",
+        "to": "declined",
+        "when": "review.rejected",
+        "description": "Review rejected the change outright. Not the same as asking for changes and deliberately not routed to `implement`: *make this different* and *do not make this* are different verdicts, and collapsing them would let a rejection be answered with a revision."
+      }
+    ]
+  },
+  "capability_policy": {
+    "allow": [
+      "repository.read",
+      "repository.write",
+      "tests.execute",
+      "artifact.read",
+      "artifact.write",
+      "review.request",
+      "approval.request"
+    ],
+    "approval_required": [
+      "network.write",
+      "production.write",
+      "deployment.create",
+      "deployment.create:production"
+    ],
+    "deny": [
+      "secret.read"
+    ]
+  },
+  "capability_rationale": [
+    {
+      "capability": "repository.read",
+      "effect": "allowed",
+      "source": {
+        "source": "profile",
+        "profile": "development.standard"
+      }
+    },
+    {
+      "capability": "repository.write",
+      "effect": "allowed",
+      "source": {
+        "source": "profile",
+        "profile": "development.standard"
+      }
+    },
+    {
+      "capability": "tests.execute",
+      "effect": "allowed",
+      "source": {
+        "source": "profile",
+        "profile": "development.standard"
+      }
+    },
+    {
+      "capability": "artifact.read",
+      "effect": "allowed",
+      "source": {
+        "source": "profile",
+        "profile": "development.standard"
+      }
+    },
+    {
+      "capability": "artifact.write",
+      "effect": "allowed",
+      "source": {
+        "source": "profile",
+        "profile": "development.standard"
+      }
+    },
+    {
+      "capability": "review.request",
+      "effect": "allowed",
+      "source": {
+        "source": "profile",
+        "profile": "development.standard"
+      }
+    },
+    {
+      "capability": "approval.request",
+      "effect": "allowed",
+      "source": {
+        "source": "profile",
+        "profile": "development.standard"
+      }
+    },
+    {
+      "capability": "network.write",
+      "effect": "requires_approval",
+      "source": {
+        "source": "principle",
+        "principle": "least-privilege"
+      }
+    },
+    {
+      "capability": "production.write",
+      "effect": "requires_approval",
+      "source": {
+        "source": "principle",
+        "principle": "least-privilege"
+      }
+    },
+    {
+      "capability": "deployment.create",
+      "effect": "requires_approval",
+      "source": {
+        "source": "principle",
+        "principle": "least-privilege"
+      }
+    },
+    {
+      "capability": "secret.read",
+      "effect": "denied",
+      "source": {
+        "source": "principle",
+        "principle": "least-privilege"
+      }
+    },
+    {
+      "capability": "production.write",
+      "effect": "requires_approval",
+      "source": {
+        "source": "principle",
+        "principle": "approval-gates"
+      }
+    },
+    {
+      "capability": "deployment.create:production",
+      "effect": "requires_approval",
+      "source": {
+        "source": "principle",
+        "principle": "approval-gates"
+      }
+    }
+  ],
+  "obligations": [
+    {
+      "principle": "spec-driven",
+      "id": "spec-driven/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "predicates": [
+          "specification.satisfied"
+        ]
+      }
+    },
+    {
+      "principle": "spec-driven",
+      "id": "spec-driven/before-implementation",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "implementation"
+        }
+      },
+      "requires": {
+        "artifacts": [
+          {
+            "kind": "specification",
+            "status": "approved",
+            "at_least": 1,
+            "relation": {
+              "kind": "specifies",
+              "target": "task"
+            },
+            "fresh": true
+          }
+        ]
+      }
+    },
+    {
+      "principle": "test-driven",
+      "id": "test-driven/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "predicates": [
+          "tests.unit.failed == 0",
+          "regression_suite.result == passed",
+          "evidence.first_seq.test_result < evidence.first_seq.diff"
+        ]
+      }
+    },
+    {
+      "principle": "test-driven",
+      "id": "test-driven/before-implementation",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "implementation"
+        }
+      },
+      "requires": {
+        "predicates": [
+          "test.exists",
+          "test.first_result == failed"
+        ]
+      }
+    },
+    {
+      "principle": "static-analysis",
+      "id": "static-analysis/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "predicates": [
+          "static_analysis.errors == 0"
+        ]
+      }
+    },
+    {
+      "principle": "provenance-tracking",
+      "id": "provenance-tracking/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "evidence": [
+          {
+            "kind": "verification",
+            "at_least": 1,
+            "independent": true
+          }
+        ],
+        "conditional": [
+          {
+            "when": {
+              "task.kind": {
+                "none_of": [
+                  "incident"
+                ]
+              }
+            },
+            "require": {
+              "evidence": [
+                {
+                  "kind": "diff",
+                  "at_least": 1,
+                  "independent": false
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "principle": "contract-testing",
+      "id": "contract-testing/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "predicates": [
+          "contracts.checked > 0",
+          "contracts.failed == 0",
+          "contracts.breaking_changes == 0"
+        ]
+      }
+    },
+    {
+      "principle": "contract-testing",
+      "id": "contract-testing/before-review",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "review"
+        }
+      },
+      "requires": {
+        "predicates": [
+          "contracts.breaking_changes == 0"
+        ]
+      }
+    },
+    {
+      "principle": "property-based-testing",
+      "id": "property-based-testing/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "predicates": [
+          "evidence.count.property_test_result >= 1"
+        ]
+      }
+    },
+    {
+      "principle": "approval-gates",
+      "id": "approval-gates/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "conditional": [
+          {
+            "when": "defined(deployment.production.status)",
+            "require": {
+              "evidence": [
+                {
+                  "kind": "approval",
+                  "at_least": 1,
+                  "verifier": "human-approval",
+                  "independent": true
+                }
+              ],
+              "approvals": [
+                {
+                  "approval": "production-change",
+                  "human": true
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "principle": "reversible-changes",
+      "id": "reversible-changes/before-completion",
+      "timing": {
+        "timing": "before",
+        "target": {
+          "phase": "completion"
+        }
+      },
+      "requires": {
+        "conditional": [
+          {
+            "when": "defined(deployment.revision)",
+            "require": {
+              "predicates": [
+                "deployment.previous_revision.exists"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "completion": {
+    "predicates": [
+      {
+        "all": [
+          "tests.unit.failed == 0",
+          "static_analysis.errors == 0",
+          "evidence.missing == 0"
+        ]
+      },
+      {
+        "all": [
+          "specification.satisfied",
+          "contracts.failed == 0"
+        ]
+      }
+    ]
+  },
+  "facts": {
+    "facts": {
+      "change.architectural": true,
+      "change.code": true,
+      "change.public_contract": true,
+      "principle.approval-gates.active": true,
+      "principle.contract-testing.active": true,
+      "principle.least-privilege.active": true,
+      "principle.property-based-testing.active": true,
+      "principle.provenance-tracking.active": true,
+      "principle.reversible-changes.active": true,
+      "principle.spec-driven.active": true,
+      "principle.static-analysis.active": true,
+      "principle.test-driven.active": true,
+      "task.id": "connectors-kubernetes-spec-service",
+      "task.kind": "feature",
+      "task.objective": "kubernetes-spec-service",
+      "task.profile": "development.standard"
+    },
+    "scales": {
+      "health": [
+        "unhealthy",
+        "degraded",
+        "healthy"
+      ],
+      "risk": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "severity": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    }
+  },
+  "dropped_principles": []
+}
