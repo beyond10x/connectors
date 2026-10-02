@@ -34,7 +34,7 @@ scope:
   path: examples
 - confidence: cited
   path: spec-kinds
-revision: 6
+revision: 7
 ---
 ## Context and current status
 
@@ -145,3 +145,12 @@ optional-continuation omission remains an explicit obligation, and packaging mus
 verify all private bundle manifests plus public aggregate coverage. No source/
 model/compiler change is accepted by this planning preflight. Select and model
 those bounded composition/import/serialization semantics before implementation.
+
+## Scalar keyword rule source
+
+The upstream evidence report now cites OpenAPI3.0.0 Schema Object and its JSON
+Schema Validation draft-wright-00 sections4.1/5.12. Their type-specific applicability
+supports the proposed recognition of boolean uniqueItems on already admitted
+string/integer mapped schemas. It remains a reviewed compiler-rule proposal, with
+non-boolean/unsupported-type/unknown-keyword refusals preserved and original source
+bytes retained. No runtime or importer acceptance was executed.
