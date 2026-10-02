@@ -23,7 +23,7 @@ scope:
   path: apps/connectors
 - confidence: cited
   path: docs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-11T11:11:57Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":3}}, imported: true}
 - {from: "proposed", to: "active", at: "2026-09-11T11:12:02Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":3}}, imported: true}
@@ -73,3 +73,14 @@ already records.
 The per-operation SelfSubjectAccessReview profile and its `authorization` coverage
 payload remain unadvertised and unimplemented, as the Sequence and boundaries
 section states.
+
+## Current runtime evidence, 2026-10-02
+
+The 2026-10-02 disposable real-provider restart journeys now both pass on the
+integrated bridge/SQL candidate: PostgreSQL 1 passed in 30.81s and Kubernetes 1
+passed in 21.23s. Receipt: docs/evidence/provider-restarts-20261002/README.md.
+This supersedes the earlier statement that no reachable sandbox evidence exists.
+No additional lifecycle move is made: historical implemented status is retained,
+and this one journey does not close the broader provider initiative. Kubernetes
+per-operation authorization coverage, workload logs/exec/mutations/tunnels and Helm
+are not proven. Its fixture pod was Pending under node disk pressure.

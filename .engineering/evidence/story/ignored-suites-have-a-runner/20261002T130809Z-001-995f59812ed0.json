@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:08:09Z",
+  "actor": "human:timo",
+  "artifact": "story:ignored-suites-have-a-runner",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Final package 151 passed; Clippy -D warnings and fmt exit 0. Operator family run exit 1 preserved separately, no blanket ignored-suite success claimed.",
+    "reference": "docs/evidence/reliability-20261002/runner/implementor.md"
+  }
+}

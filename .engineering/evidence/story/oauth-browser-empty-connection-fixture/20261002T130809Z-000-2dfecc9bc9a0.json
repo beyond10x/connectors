@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:08:09Z",
+  "actor": "human:timo",
+  "artifact": "story:oauth-browser-empty-connection-fixture",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Disposable runner observed two empty Chrome connections; original exactly-one assertion failed",
+    "reference": "docs/evidence/reliability-20261002/runner/browser-failure.log"
+  }
+}
