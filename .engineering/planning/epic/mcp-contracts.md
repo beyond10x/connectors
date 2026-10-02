@@ -8,7 +8,7 @@ relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:contract-driven-connectors-design
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 1
+revision: 2
 ---
 ## Operator request
 
@@ -45,3 +45,40 @@ Review wire/protocol fidelity and security/credential boundaries, then prove map
 ## Scope and status
 
 Backlog recording only. No MCP connection, server startup, cloud deployment, credential migration or provider operation is authorized by this record. Implementation remains future work after the contracts are selected. The broader recent-usage analysis continues independently.
+
+## Current delivery preparation — 2026-10-02
+
+The operator's later approval-record:milestones-delivery-20261002 authorizes
+selected implementation and verified source release. The original Scope and status
+paragraph is the historical recording boundary, not a new request for permission.
+MCP follows the initial provider acceptance work; no MCP runtime is accepted yet.
+
+The landed contract/model stories establish directional profiles, not runtime
+ownership for every census noun. All eight unresolved relations remain unresolved
+by accepted contracts. Five concern configuration/Connection/custody, snapshot
+retention and legacy session lifetime and require explicit reviewed design; they
+are not five additional operator approval gates. The inbound-session/caller model
+belongs with the existing caller-assignment decision. The separate outbound
+process-ownership blocker remains open. Single-owner inbound stdio can avoid a
+new durable caller model, and outbound HTTP executes no provider process.
+
+The next independent contract slices are outbound invocation/results and inbound
+single-owner capability projection. They require no new durable relation merely
+to specify mappings. Outbound auth/runtime binding then needs a cohesive recorded
+mapping to the existing configuration, Connection, acquisition, credential generation
+and custody owners. Native/shared ESS roots remain independent; use qualified
+projection carriers instead of importing cross-root entity targets. Snapshot and
+legacy-session persistence must be selected explicitly before runtime uses them.
+The projection draft now cites its actual scalar operation_ref edge rather than
+inferring it from the different AdapterSpecification ownership relation.
+
+The sibling MCP library has reusable tools/HTTP/stdio/OAuth mechanics but lacks
+resources/prompts/server APIs and some required bounded collection/atomic auth
+seams. Retrofit its shipped behavior and establish its governed plan before
+changing runtime. Preserve tools-only consumers, add consumer-owned transport and
+auth coordination, publish the independently verified sibling revision, then pin
+it here. No Harness repin or hosted deployment is included automatically.
+
+Preparation is retained privately in `.local/next-milestones/mcp-preflight.md` and
+`mcp-relations-preflight.md`. These source audits establish work scope, not passing
+wire interoperability or persistent-auth conformance.

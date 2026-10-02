@@ -17,11 +17,7 @@ scope:
 - confidence: cited
   path: README.md
 - confidence: cited
-  path: adapters/gitlab
-- confidence: cited
   path: adapters/kubernetes
-- confidence: cited
-  path: contracts/service/v1alpha1
 - confidence: cited
   path: crates/connectors-build
 - confidence: cited
@@ -29,14 +25,16 @@ scope:
 - confidence: cited
   path: crates/connectors-spec
 - confidence: cited
-  path: docs
+  path: docs/development.md
 - confidence: cited
-  path: ess
+  path: docs/local-kubernetes-cli.md
+- confidence: cited
+  path: ess/domains/declarations.yaml
 - confidence: cited
   path: examples
 - confidence: cited
   path: spec-kinds
-revision: 3
+revision: 5
 ---
 ## Context and current status
 
@@ -79,3 +77,41 @@ Cited from the original draft and current owners: Cargo.toml, Cargo.lock, README
 ## Current preflight, 2026-10-02
 
 The explicit configured protocol snapshot resolves with both AEP 0.65.0 and 0.68.0; tooling-blocker:kubernetes-driver-protocol-loading is cleared with retained output in docs/evidence/kubernetes-resolver-20261002/. Use that exact --root selection; implicit discovery remains broken. Runtime baseline is v0.24.0 at c7a9d5b1db1ff4e3b2af568db19c6eaa60d79d90; project tools are ESS 0.45.0 / AEP 0.65.0. The earlier source-pin, native-GitLab and local-only statements describe historical preparation, not the current implementation path. Native GitLab was retired; regressions now target the catalog provider. approval-record:milestones-delivery-20261002 authorizes the selected implementation and verified source release, not a paid drive or deployment. Re-scope actual generation ownership before scheduling this story alongside other source edits.
+
+## Re-scoping conclusion — 2026-10-02
+
+Read-only current-source preflight is retained in
+`docs/evidence/milestone-preflight-20261002/kubernetes-generation.md`. The smallest
+coherent unit remains actual specification-derived request construction/dispatch
+for the three existing Kubernetes read/discovery operations, plus the independent
+HTTP-service image, retaining authored admission, cursors, response/provenance and
+four existing Helm operations. Descriptor generation alone cannot satisfy it.
+Native GitLab restoration, catalog packaging repair, new logs/restart/execution
+and broad shared service-contract changes are not part of this unit.
+
+Five Connectors-owned design selections precede runtime dispatch: finite kind
+mapping alternatives, /api versus /apis root ownership, closed typed selector
+enum lowering, mixed three-generated/four-authored handler coverage, and an actual
+immutable official Kubernetes OpenAPI pin with digest/license and operation IDs.
+These are engineering design work for ESS/spec-kind ownership, not new requests
+for operator permission. They remain unselected by this read-only audit. Do not
+silently extend v2, downgrade pins or remove supported operations to fit it.
+
+Required conformance names for the eventual selected implementation are:
+`kubernetes_generation_is_deterministic_and_required_branches_are_complete`,
+`kubernetes_generated_dispatch_serves_all_selected_kinds_from_exact_image`,
+`kubernetes_generated_continuations_preserve_every_selection_partition`,
+`kubernetes_generated_binding_preserves_helm_and_credential_authority`, and
+`kubernetes_image_discovery_requires_explicit_sql_activation`. The source report
+states their exact observable inputs and assertions. The same recorded image
+must serve direct and federated cases; path/query evidence must establish actual
+use of generated dispatch. Actual generation, image and runtime evidence is still
+missing. No paid driver is authorized or needed for interactive work.
+
+Scope is narrowed to Kubernetes-owned spec/source/generated/realization paths,
+the shared declaration model, Connectors spec-kind/compiler and focused build/
+conformance integration, plus the owning development/Kubernetes guides. Exact new
+mapping-profile filenames remain inferred until the five selections are made.
+Catalog GitLab, SQL and existing Helm code are regression owners, not migration
+surfaces. Preserve all original three-operation/four-kind and explicit SQL
+activation acceptance; do not treat this re-scope as completion.
