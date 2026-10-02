@@ -34,7 +34,7 @@ scope:
   path: examples
 - confidence: cited
   path: spec-kinds
-revision: 5
+revision: 6
 ---
 ## Context and current status
 
@@ -115,3 +115,33 @@ mapping-profile filenames remain inferred until the five selections are made.
 Catalog GitLab, SQL and existing Helm code are regression owners, not migration
 surfaces. Preserve all original three-operation/four-kind and explicit SQL
 activation acceptance; do not treat this re-scope as completion.
+
+## Source measurement and smaller composition option — 2026-10-02
+
+The subsequent bounded source measurement resolves the unknown upstream bytes:
+official Kubernetes tag v1.31.5 peels to
+`af64d838aacd9173317b39cf273741816bd82377`. Its three official OpenAPI3.0 group
+documents for core, apps and discovery are below the existing16MiB bound and name
+all five required provider endpoints. Exact URLs, SHA256, sizes, Apache2.0 license,
+parameter schemas and source-reference checks are retained in
+`docs/evidence/milestone-preflight-20261002/kubernetes-upstream.md`. This is not
+an importer or runtime pass; the K3s fixture's version is not independently proven
+merely by verifying the upstream Kubernetes tag.
+
+The smaller proposed design uses three private existing-v2 bundles with six fixed
+internal mappings, explicit authored public composition and unchanged public seven
+operations. It avoids a new generalized selector/mixed-coverage compiler profile.
+`kubernetes-generation-options.md` beside the source report documents actual
+parser/renderer/integration support and the required aggregate coverage. No new
+public operation, provider instance or credential owner is introduced by a private
+bundle. Public operation/cursor/connection identities remain authoritative.
+
+The concrete mapped-parameter importer gap is `uniqueItems:true` on scalar namespace,
+limit and continue schemas. Selected mapped parameters do not have the earlier
+hypothesized int64/ref obstacles. A narrowly reviewed rule may recognize the
+array-only keyword as inapplicable to admitted scalar types; no source rewrite or
+arbitrary-unknown-keyword allowance is authorized by this observation. Exact
+optional-continuation omission remains an explicit obligation, and packaging must
+verify all private bundle manifests plus public aggregate coverage. No source/
+model/compiler change is accepted by this planning preflight. Select and model
+those bounded composition/import/serialization semantics before implementation.
