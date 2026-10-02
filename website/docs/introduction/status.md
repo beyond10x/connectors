@@ -83,6 +83,7 @@ fix, and the timeout cleanup change does not remove that performance limit.
 Other adapter pages distinguish designs and typed specifications from running
 implementations; a release does not imply completion of the full provider plan.
 
-This is a source release for Linux x86_64, built with Rust 1.88 or later. Existing
-installed configuration and credentials are not automatically migrated.
+This is a source release for Linux x86_64. The local runtime requires Rust 1.91;
+the independent libraries are checked on Rust 1.88. Existing installed
+configuration and credentials are not automatically migrated.
 Binary/package distribution and website/cloud deployment are separate.
