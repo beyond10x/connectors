@@ -21,7 +21,7 @@ scope:
   path: crates/connectors-build/src/ignored.rs
 - confidence: cited
   path: docs/evidence/catalog-cli-20261002
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T15:17:51Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}, correlation: "wave-20261002d-provider-acceptance"}
 - {from: "proposed", to: "active", at: "2026-10-02T15:17:51Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":4}}, correlation: "wave-20261002d-provider-acceptance"}
@@ -193,3 +193,55 @@ Source-grounded feasibility is recorded in the coordinator's assigned
 .local/provider-wave-briefs/owner-replay-feasibility/report.md. It is not executed
 proof. If actual inherited-FD startup, cleanup or replay assertions fail, retain the
 failure and return the unmet obligation without weakening deadlines or authority.
+
+## Settlement fixture correction — 2026-10-02
+
+The frozen first pass is partial: eight of ten logical obligations and eleven of
+fifteen historical variants passed. Unchanged-permission control12 passed; chmod
+mode8 failed because current Entity Runtime successfully settled despite0400.
+Modes9–11 were not executed and remain unmet. This rejects the injection, not the
+product. Ordinary package332 passed/0 failed/21 ignored; final Clippy/fmt passed.
+Original author report SHA256445aca6ac928d61e9064fc54f59d077ae95f67528b35217dd378008069dcadb9;
+deciding merge-settlement-1.log SHA2569269829524f6ba8ad61601aac25cbb7c5e3c77ec1371a0d3fb62ffebc44e046f.
+Pre-held typed assertions passed, but no complete pre-snapshot was serialized;
+do not imply otherwise. Preserve this red and all original evidence.
+
+A separate single throwaway Rust seccomp USER_NOTIF smoke measured genuine writes
+through an already-open descriptor: write/fsync succeeded before arm, both returned
+EIO after arm, unrelated writes succeeded, and target writes resumed after disarm.
+The filter survived exec; child exited0 and listener/control closed. This establishes
+kernel feasibility only, not interception of actual ER settlement writes.
+
+Authorize one bounded test-only replacement inside the existing catalog integration
+test scope, with a narrow settlement_fault.rs helper if useful. No production hook,
+new dependency, file corruption, descriptor theft, upstream change or relaxed
+assertion. Install the filter only on the fixture-owned production CLI before exec;
+its genuine owner descendants inherit it. Service the listener in the unfiltered
+test process before spawn can block on the exec-error pipe. Transfer the listener
+through SCM_RIGHTS with validated ancillary data and close every descriptor.
+
+Before arming, serialize complete typed before/held snapshots and prove exact
+Dispatching/Pending attempt, Spent proof, incomplete audit and one native effect
+(or exact refusal/no effect). At arm identify only the assigned metadata.sqlite3,
+its WAL/journal siblings by exact canonical parent/name plus device/inode. Return
+EIO only for observed write/sync/truncate syscalls on those exact files; continue
+unrelated syscalls. Record syscall, target identity and denial counts without
+credentials. This is a controlled test fixture, not a security boundary; account
+for fd identity races and unknown/closed descriptors explicitly.
+
+First run the unchanged-fault control, then one known-Applied mode8. Require actual
+denied ER I/O and unchanged original known-outcome/attempt_store/incomplete-audit
+assertions, plus serialized fresh durable Dispatching/Pending state. Reject a
+normal settlement or a different failure; do not tune expected outcomes to pass.
+Only after this pair passes execute9–11 with all historical assertions. Disarm
+before recovery and prove actual resumed writes/recovery. Retain monitor until
+the exact owner has shut down/exited, since it setsid and outlives the CLI process
+group. Bounded cleanup must work on panic, join the observer, reap helpers, release
+the lifetime lock and leave no owned fixture processes. Unsupported kernel/arch
+is an explicit missing prerequisite, never a skipped success.
+
+Stop and return the first ineffective fault, unexplained result or unsafe cleanup;
+do not widen damage or deadlines. All fifteen variants and ten obligations remain
+required. Root owns shared classifier and AEP. This scoped fixture correction has
+one implementation unit, so no multi-item decomposition panel applies. Final
+independent adversarial review and repository gate remain required before acceptance.
