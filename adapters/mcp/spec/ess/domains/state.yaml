@@ -363,9 +363,10 @@ entities:
   # projection's flat carrier, the shape
   # adapters/docker/spec/ess/domains/mutations.yaml:12-13 already uses.
   #
-  # UNMAPPED: which Connectors operations are advertised, and under which admission.
-  # epic:mcp-contracts acceptance 2 requires a client to discover "only supported/admitted
-  # capabilities"; no source says what the admitted set is, and this model declares none.
+  # Admission and advertised-name rules are specified in
+  # adapters/mcp/contracts/server/v1alpha1/projection.md. Its document checks
+  # do not execute runtime projection; this entity declares no new admission policy
+  # or caller/Connection relation. The eight unresolved relation markers remain.
   - name: connectors_mcp.state.McpAdvertisedCapability
     identity: {name: advertised_ref, type: String}
     fields:

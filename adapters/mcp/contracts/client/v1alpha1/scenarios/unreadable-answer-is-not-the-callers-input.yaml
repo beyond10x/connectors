@@ -20,8 +20,9 @@ then:
     and what could not be read.
   - The act reported is the peer's, because the client asked for both media types the
     transport defines and the answer was neither of them, nor readable.
-  - The caller's request is not carried out, and the outcome is reported on both
-    revisions alike.
+  - The dispatched request has no valid completed observation; its business effect
+    remains unknown. An unreadable answer proves neither non-execution nor rollback,
+    on either revision. The request is not sent again automatically.
 never:
   - The outcome is `invalid_input`; the caller supplied no framing.
   - The outcome is `internal`; nothing about this answer was produced by this client.

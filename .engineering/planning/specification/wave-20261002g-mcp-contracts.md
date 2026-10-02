@@ -6,7 +6,7 @@ status: draft
 title: MCP invocation and local projection contract wave
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 ---
 ## Selected work and authority
 
@@ -1006,3 +1006,28 @@ items; none of those entries is an authorization to implement it.
   "cycles": []
 }
 ```
+
+## Dispatch and coordinator reconciliation update
+
+Both worker trees were created from opening commit a2955675cb70b5811589ce86b40be95427ead888:
+cb26g-out/unit/mcp-invocation-20261002 and cb26g-in/unit/mcp-projection-20261002.
+Own target/ directories and assigned scratch roots remain as above. Full briefs were
+written to coordinator-local scratch after dispatch; the original assignments were
+not changed. This timing is recorded rather than claiming the brief files preceded
+the dispatch. Source opening commit passed bot hooks after removing an actual
+personal absolute path from the wave page; no hook bypass occurred.
+
+Outbound first RED: missing contract,0passed4failed; then28targetedtests passed,
+including6new guards, with40authored document cases, fmt/Clippy0. Its modern
+CacheableResult check exposed an additional omitted required metadata rule,1RED
+then corrected andGREEN. Handoff/report pending. Inbound begins its first RED after
+outbound released the serialized worker build window. Root MCP gate work used its
+already-built xtask target for small tests while authors' large builds stayed serial;
+free space remained above8GiB. Do not describe this as all Cargo being exclusive.
+
+Root added story:mcp-framing-refusal-preserves-uncertainty (active4) before editing
+the existing framing paragraph and its exact unreadable-answer scenario. The
+outbound worker's prose patch omitted the same contradiction in the scenario;
+coordinator inspection expanded the correction to both owned statements. These
+are separate exact write paths, not an expansion of either worker's authority.
+Fresh outbound review must inspect both corrected owners alongside invocation.

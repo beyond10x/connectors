@@ -9,12 +9,16 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:mcp-outbound-invocation-results
 - depends_on: story:mcp-inbound-capability-projection
+- depends_on: story:mcp-outbound-auth-lifecycle
+- depends_on: story:mcp-inbound-mutation-replay
 scope:
 - confidence: inferred
-  path: adapters/mcp/contracts/composition/v1alpha1/scenarios
-- confidence: inferred
+  path: adapters/mcp/contracts/composition/v1alpha1/composition-cases.json
+- confidence: cited
   path: adapters/mcp/contracts/composition/v1alpha1/semantics.md
-revision: 2
+- confidence: inferred
+  path: crates/connectors-build/tests/mcp_composition_provenance.rs
+revision: 5
 ---
 ## Acceptance
 
@@ -66,8 +70,8 @@ parent connection's admitted binding", and its ESS carrier is visible in
 type `Optional<connectors.discovery.MediatedRouteBinding>` — with the file's own
 comment at lines 121-122 stating the constraint that matters here: "Fixed mediated route and
 parent are present together only for a via binding; parent identity is this field,
-not duplicated route authority." An MCP composition is the same shape and must not
-be looser.
+not duplicated route authority." This is a precedent for explicit boundaries, not proof that MCP operation
+composition has the same transport shape or credential relation.
 
 `story:contracts-host-composition` ("Assign mediated adapter wiring to an explicit
 composition owner", implemented) established that composition has a named owner
@@ -91,3 +95,38 @@ This document specifies the single-principal local composition and says so.
 
 No composition is configured or exercised; this is an authored document and its
 scenarios.
+
+## Scope — confirmed 2026-10-03
+
+Cited: adapters/mcp/contracts/composition/v1alpha1/semantics.md.
+Inferred: adapters/mcp/contracts/composition/v1alpha1/composition-cases.json and
+crates/connectors-build/tests/mcp_composition_provenance.rs. Replace the old broad
+scenario directory allocation. Confidence high for primary contract, medium for
+case/guard allocation. Exact three paths are the only collisions; source-inspected
+safety at level2, not runtime proof. Existing serde dependencies and gate discovery
+suffice. Single-owner local placement and eight unresolved relation markers remain.
+
+## Source corrections before implementation
+
+Mediated HTTP routing is not the same semantic shape as MCP operation composition:
+contracts/discovery/mediated_route/v1alpha1/semantics.md section4 requires transport-
+only substitution, material-free mediated child, one hop and private same-process
+ports. MCP projection crosses protocol/operation boundaries and can authenticate
+outbound independently. Reuse explicit ownership, independent admission and no
+fallback principles; do not infer mediated_route, parent_connection_ref, GET-only
+access, process placement or credential custody from the analogy.
+
+SourceAudit is an instance-qualified opaque correlation, not a general provenance
+chain or lookup authority (service_wire.yaml:41; compatibility.md:80-82). Only an
+acknowledged trustworthy downstream observation supplies it. Remote MCP metadata or
+self-reported identity cannot manufacture audit evidence; preserve admitted local
+identity and keep remote content untrusted. Existing federation is an analogy only.
+
+Auth and mutation contracts must finish before composition describes their behavior;
+this story now depends on both. Mutation advertisement remains unavailable until its
+actual executable binding exists. Cases cover threefamilies, independent revision
+pairs, fixedtarget/account selection, credential locality, independent admission,
+safeprovenance, wrapperbyteoverhead, remainingdeadline, partial/unknown results,
+metadata-no-authority, missingmutationbinding and unresolved durable ownership.
+Document guards derive applicable vocabulary from authoritative owners, reject
+missing/duplicate/contradictory copied cases, and claim no network/runtime conformance.
