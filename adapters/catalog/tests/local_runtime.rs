@@ -13,6 +13,7 @@ use connectors_host::local::{
 use connectors_sdk::Secret;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use std::sync::atomic::{AtomicU8, AtomicU16, AtomicUsize, Ordering};
 use std::{
     fs,
     os::unix::fs::PermissionsExt,
@@ -38,12 +39,16 @@ mod basic_auth_adversary;
 mod basic_auth_adversary_pass2;
 #[path = "local_runtime/cli_journey.rs"]
 mod cli_journey;
+#[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
+mod clock_fixture;
 #[path = "local_runtime/oauth2_refresh.rs"]
 mod oauth2_refresh;
 #[path = "local_runtime/oauth2_refresh_adversary.rs"]
 mod oauth2_refresh_adversary;
 #[path = "local_runtime/oauth2_refresh_adversary_pass2.rs"]
 mod oauth2_refresh_adversary_pass2;
+#[path = "local_runtime/recorded_state.rs"]
+mod recorded_state;
 
 /// Fictional HTTP basic material the fixture accepts, and the exact header it
 /// expects: `Basic base64("fixture-account@example.test:fixture-api-token-one")`,
@@ -71,6 +76,12 @@ struct Provider {
     /// never printed, so fixture credentials stay out of failure diagnostics.
     authorizations: Authorizations,
     pause: Arc<std::sync::atomic::AtomicBool>,
+    response_status: Arc<AtomicU16>,
+    methods: Arc<Mutex<Vec<String>>>,
+    merge_mode: Arc<AtomicU8>,
+    merge_effects: Arc<AtomicUsize>,
+    merge_held: Arc<AtomicUsize>,
+    merge_preflight_merged: Arc<std::sync::atomic::AtomicBool>,
 }
 impl Provider {
     fn new() -> Self {
@@ -82,7 +93,10 @@ impl Provider {
         Self::with_auth(Some(minimum_scope))
     }
     fn with_auth(basic: Option<&str>) -> Self {
-        let root = tempfile::tempdir().unwrap();
+        let root = tempfile::Builder::new()
+            .permissions(fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
         let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
@@ -109,6 +123,18 @@ impl Provider {
         let basic_mode = basic.is_some();
         let pause = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let paused = pause.clone();
+        let response_status = Arc::new(AtomicU16::new(0));
+        let forced_status = response_status.clone();
+        let methods = Arc::new(Mutex::new(Vec::new()));
+        let observed_methods = methods.clone();
+        let merge_mode = Arc::new(AtomicU8::new(0));
+        let merge_behavior = merge_mode.clone();
+        let merge_effects = Arc::new(AtomicUsize::new(0));
+        let effects = merge_effects.clone();
+        let merge_held = Arc::new(AtomicUsize::new(0));
+        let held = merge_held.clone();
+        let merge_preflight_merged = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let preflight_merged = merge_preflight_merged.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -135,6 +161,11 @@ impl Provider {
                         }
                     }
                     let request = String::from_utf8(header).unwrap();
+                    // Latch before publishing any observation. Releasing the
+                    // barrier must never turn a held refusal into success.
+                    let merge = merge_behavior.load(Ordering::SeqCst);
+                    let method = request.split_whitespace().next().unwrap_or_default();
+                    observed_methods.lock().unwrap().push(method.to_owned());
                     let path = request
                         .split_whitespace()
                         .nth(1)
@@ -150,6 +181,11 @@ impl Provider {
                     };
                     let credential = header("private-token");
                     let authorization = header("authorization");
+                    let content_length = header("content-length")
+                        .map(|v| v.parse::<usize>().unwrap()).unwrap_or(0);
+                    assert!(content_length <= 4096);
+                    let mut request_body = vec![0; content_length];
+                    stream.read_exact(&mut request_body).await.unwrap();
                     // Only fictional fixture material is accepted. Do not retain
                     // raw headers in failure diagnostics.
                     let valid = if basic_mode {
@@ -167,10 +203,44 @@ impl Provider {
                         .lock()
                         .unwrap()
                         .push((route.to_owned(), authorization));
+                    if route == "/api/v4/projects/org%2Fproject/merge_requests/4" {
+                        while merge_behavior.load(Ordering::SeqCst) == 4 {
+                            tokio::select! { _=&mut stopped=>return, _=tokio::time::sleep(Duration::from_millis(10))=>{} }
+                        }
+                    }
                     if paused.load(std::sync::atomic::Ordering::SeqCst) {
                         tokio::select! {_=&mut stopped=>break,_=tokio::time::sleep(Duration::from_secs(2))=>{}}
                     }
-                    let (status, body) = if !valid {
+                    if valid && method == "PUT" && route == "/api/v4/projects/org%2Fproject/merge_requests/4/merge" {
+                        let input: Value = serde_json::from_slice(&request_body).unwrap();
+                        assert_eq!(input, json!({"sha":"0123456789abcdef0123456789abcdef01234567"}));
+                        let refused = merge == 2 || merge == 6;
+                        if !refused {
+                            effects.fetch_add(1, Ordering::SeqCst);
+                        }
+                        if merge == 1 { continue; }
+                        if matches!(merge, 3 | 5 | 6) {
+                            held.fetch_add(1, Ordering::SeqCst);
+                            while merge_behavior.load(Ordering::SeqCst) == merge {
+                                tokio::select! { _=&mut stopped=>return, _=tokio::time::sleep(Duration::from_millis(10))=>{} }
+                            }
+                        }
+                        if merge == 3 { continue; }
+                        let (status, body) = if refused {
+                            (409, json!({"message":"head changed"}))
+                        } else {
+                            (200, merge_record(true))
+                        };
+                        let body = serde_json::to_vec(&body).unwrap();
+                        let header = format!("HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                        let _ = stream.write_all(header.as_bytes()).await;
+                        let _ = stream.write_all(&body).await;
+                        continue;
+                    }
+                    let forced = forced_status.load(Ordering::SeqCst);
+                    let (status, body) = if forced != 0 {
+                        (forced, json!({"error":"fixture override"}))
+                    } else if !valid {
                         (401, json!({"error":"fixture refusal"}))
                     } else if route == "/api/v4/user" {
                         (200, json!({"id":user,"state":"active"}))
@@ -179,6 +249,12 @@ impl Provider {
                             200,
                             json!({"id":99,"user_id":user,"active":true,"revoked":false,"scopes":["api"],"expires_at":null}),
                         )
+                    } else if route == "/api/v4/projects/org%2Fproject/merge_requests/4" {
+                        // Keep the pinned preflight snapshot stable so reused
+                        // proofs reach the independent spend fence. The PUT
+                        // response carries merged state for catalog postflight;
+                        // merge_effects separately counts every actual effect.
+                        (200, merge_record(preflight_merged.load(Ordering::SeqCst)))
                     } else if route.ends_with("fixture-refused") {
                         (403, json!({"message":"403 Forbidden"}))
                     } else if route.ends_with("fixture-missing") {
@@ -269,6 +345,12 @@ impl Provider {
             calls,
             authorizations,
             pause,
+            response_status,
+            methods,
+            merge_mode,
+            merge_effects,
+            merge_held,
+            merge_preflight_merged,
         }
     }
     fn selection(&self) -> Adapter {
@@ -311,6 +393,11 @@ impl Provider {
     fn count(&self) -> usize {
         self.calls.lock().unwrap().len()
     }
+}
+fn merge_record(merged: bool) -> Value {
+    json!({"id":40,"iid":4,"sha":"0123456789abcdef0123456789abcdef01234567",
+        "state":if merged {"merged"} else {"opened"}, "detailed_merge_status":"mergeable",
+        "head_pipeline":{"id":12,"status":"success"}})
 }
 impl Drop for Provider {
     fn drop(&mut self) {
