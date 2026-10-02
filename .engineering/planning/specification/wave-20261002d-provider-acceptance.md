@@ -9,13 +9,13 @@ relations:
 - informed_by: story:catalog-cli-journeys
 - informed_by: story:kubernetes-real-read-acceptance
 - informed_by: story:postgres-real-provider-acceptance
-revision: 2
+revision: 5
 ---
 ## Selection and existing authorization
 
-AEP implementing skill0.19.1; preparation for the next wave under the operator's
-approval-record:milestones-delivery-20261002. Select only these three existing
-stories after the bounded clock experiment has an independently checked decision:
+AEP implementing skill 0.19.1. The bounded clock experiment completed with an
+independently reviewed rejection decision. Under the operator's existing
+approval-record:milestones-delivery-20261002, select and activate:
 
 - story:catalog-cli-journeys — ten production catalog-child lifecycle/mutation
   obligations and fifteen variants, with exact current ER audit/key observation.
@@ -23,10 +23,12 @@ stories after the bounded clock experiment has an independently checked decision
 - story:postgres-real-provider-acceptance — five real-provider query/lifecycle
   cases, including direct adapter-future cancellation and its no-drop control.
 
-This is preparation, not dispatch. Kubernetes/PostgreSQL have completed their
-bounded critic panel. Catalog revision5 is undergoing its first critic round.
-Resolve any actionable findings before accepting its implementation. No further
-operator approval is inferred to be needed for the already-authorized scope.
+Catalog revision5 received four approvals in round1; Kubernetes revision5 and
+PostgreSQL revision6 received their recorded bounded panels. No findings remain
+open on these selected plans. This authorizes one source/test commit per accepted
+unit, integration commits, AEP closure and verified bot publication/releases under
+the standing goal. It does not select unrelated drafts or answer pending product
+decisions. No repeated approval or paid drive is required.
 
 ## Independence and ownership
 
@@ -1101,17 +1103,52 @@ implicitly selected by this proposal.
 Catalog revision5 received approve from all four named perspectives in round1:
 aep:plan-critic-acceptance, aep:plan-critic-design, aep:plan-critic-scope and
 aep:plan-critic-parallel-safety. Four immutable review-results retain exact reports;
-four no-op outcomes record that there were no findings requiring revision. No
-second round is needed for an unchanged all-approve set. This is acceptance of the
-plan, not proof of the ten executed journeys.
+four no-op outcomes record no required revision. This is acceptance of the plan,
+not proof of the ten executed journeys.
 
-Host adaptation: three workers reviewed independently without seeing other
-findings; root supplied parallel-safety and is not independent of the plan author.
-The acceptance reviewer completed its already-running bounded preflight before
-reading the story, so starts were staggered. The clock worker used a read-only
-waiting interval for design critique without interrupting the cost process.
+Three workers reviewed independently without seeing other findings; root supplied
+parallel-safety and is not independent of the plan author. Starts were staggered
+around a bounded read-only preflight and the clock worker's waiting interval.
 Sonnet is unavailable; reviewers inherited the session model. No claim of four
 independent simultaneous Sonnet reviews is made.
 
-The clock experiment remains active. This proposal is ready for dispatch only
-after its checked decision; no provider story has yet been activated or assigned.
+The clock experiment now has a checked rejection decision. The three provider
+stories are active under the existing delivery authorization; the dispatch record
+below names their isolated worktrees and ownership. No provider acceptance is
+claimed until its actual tests and independent review complete.
+
+## Dispatch preflight — 2026-10-02
+
+The clock worker is finished, restored and independently reviewed; its target was
+cleaned and its evidence archived as cb26c-clock. The next wave uses the clean
+managed integration branch plan/acceptance-20261002, not the primary checkout.
+Primary branch main has exactly `?? .agents/`; that unrelated user directory is
+preserved and outside every assigned surface. This existing managed-worktree
+arrangement follows the operator's explicit isolation rule.
+
+All three stories serve vision:independent-contract-adapters, matching their
+parent initiative. Activation initially refused the missing serves edges on the
+two real-provider stories. Those edges were supplied through AEP and activation
+then succeeded; neither acceptance nor source scope changed.
+
+Measured release target cost is 763 MiB for the clock unit; prior full integration
+target was 7.2 GiB. Free space recovered to approximately30GiB before dispatch.
+Keep8GiB reserve, two Cargo jobs and /usr/bin/sccache. No shared target and no
+remaining old worker target. Root's target was already cleaned. Three workers fit
+the host's four total agent slots including root; no explicit token budget exists
+for the authorized goal. Expensive build windows remain coordinator-controlled.
+
+Planned managed triples, relative to $HOME/.local/state/worktree/trees/b10x/connectors:
+
+| Story | Tree / branch | Build | Scratch | Lease / worker |
+| --- | --- | --- | --- | --- |
+| catalog-cli-journeys | cb26d-catalog / acceptance/cb26d-catalog | cb26d-catalog/target | cb26d-catalog/.local/provider-wave/catalog | codex-cb26d-catalog / scope_next |
+| kubernetes-real-read-acceptance | cb26d-k8s / acceptance/cb26d-k8s | cb26d-k8s/target | cb26d-k8s/.local/provider-wave/kubernetes | codex-cb26d-k8s / adversary_runner |
+| postgres-real-provider-acceptance | cb26d-pg / acceptance/cb26d-pg | cb26d-pg/target | cb26d-pg/.local/provider-wave/postgres | codex-cb26d-pg / implement_runner |
+
+Each exact tree base is the opening commit containing this record. Private briefs
+will record its full identity, physical TMPDIR and assigned fixture authority.
+Source authoring starts only after creation, lease and cheap opening checks.
+Root owns Cargo.lock, ignored classification, AEP and bot publication. Workers
+return source/test changes without committing. Independent review rotates away
+from each implementor. No unit has passing runtime evidence yet.

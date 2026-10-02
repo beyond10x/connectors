@@ -7,7 +7,7 @@ title: 'Wave 20261002c: one bounded registry-clock experiment'
 relations:
 - informed_by: specification:milestone-acceleration-20261002
 - informed_by: story:registry-clock-outside-shared-batches
-revision: 5
+revision: 6
 ---
 ## Selection and authority
 
@@ -1187,3 +1187,34 @@ historical sandbox identity and is not selected for destructive acceptance.
 No GitLab API request, revalidation, repair or mutation was performed in this
 recheck. Docker read-only inspection was used only for local fixture inventory,
 after the already recorded Connectors Docker capability gap.
+
+## Completed rejection experiment — 2026-10-02
+
+The single candidate was rejected after all required measurements completed.
+Verification-report:registry-clock-mitigation-decision-20261002 and
+review-result:registry-clock-experiment-20261002 retain the decision and independent
+review. Public logs, exact candidate patch, fixture identities and numeric matrix
+are in docs/evidence/clock-experiment-20261002/. Implemented means this bounded
+investigation delivered its required rejection decision; it does not mean the
+candidate was adopted or the upstream performance milestone completed.
+
+Baseline 9/9 invariants; candidate 8/9, with the same-millisecond revision fence
+returning MetadataUnavailable instead of ConcurrentRevision. All 15 measured
+invokes and 3 warmups per profile passed. Candidate large/small median ratio
+25.9185 exceeds the accepted maximum2. Production source was restored exactly.
+No second candidate, deadline extension or verification weakening occurred.
+Entity Runtime issue51 remains OPEN; M1 remains outstanding.
+
+Scope confirmation from the worker: metadata.rs owns admission/lifecycle/ER
+activation; registry/tests.rs contains the exact deciding clock/fence/race tests.
+These previously inferred reading owners are now source-checked. The sole actual
+source edit was the one-condition candidate in metadata/er.rs, then reversed;
+public evidence and AEP records are the only retained repository changes.
+
+Both worker and independent reviewer released their leases after all subprocesses
+exited. The task-owned Cargo target was cleaned through cargo clean. Recovery
+archive cb26c-clock was verified at
+$HOME/.local/state/worktree/archives/connectors/cb26c-clock, holding the original
+frozen report, logs, hashes, retained patch and saved task fixtures. No candidate
+binary is retained after reproducible build-output cleanup; its measured hash is
+in the archive. The experiment produced no production commit to integrate.
