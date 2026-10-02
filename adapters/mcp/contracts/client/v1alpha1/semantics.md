@@ -365,8 +365,10 @@ revision — the client offered both media types and the answer was neither one 
 readable —
 and it is deliberately **not** `invalid_input`: the caller supplied no framing, so blaming
 the caller's input for a framing disagreement would be a false attribution. The caller's
-request is not carried out. What a truthful result looks like once an answer *is* readable
-belongs to `story:mcp-outbound-invocation-results`.
+request has no valid completed observation. If it was already dispatched, an unreadable
+answer does not establish non-execution or rollback: its business effect remains unknown,
+and the request is not sent again automatically. What a truthful result looks like once
+an answer *is* readable belongs to `story:mcp-outbound-invocation-results`.
 
 ### `mcp.outbound.header-mismatch-reported-by-the-server`
 

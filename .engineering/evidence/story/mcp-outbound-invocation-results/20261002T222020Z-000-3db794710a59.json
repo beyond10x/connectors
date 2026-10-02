@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-02T22:20:20Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-outbound-invocation-results",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "Stale integration paragraph replaced with accurate lifecycle and scenario links; followup source-only nothingfound SHA9332a009873c0813488bc695e0602508e849ec014c584f69c39d90b426feef9b. Previous31testpassed, finalintegrationgate pending.",
+    "review": "review-result:mcp-invocation-20261002",
+    "outcome": "fixed"
+  }
+}

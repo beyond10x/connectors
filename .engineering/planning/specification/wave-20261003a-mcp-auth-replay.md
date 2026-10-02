@@ -1,84 +1,80 @@
 ---
 format: aep.planning-md/3
-id: specification:wave-20261002g-mcp-contracts
+id: specification:wave-20261003a-mcp-auth-replay
 kind: specification
 status: draft
-title: MCP invocation and local projection contract wave
+title: 'First authorized MCP wave: outbound auth and inbound replay contracts'
 relations:
+- informed_by: specification:wave-20261002g-mcp-contracts
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 1
 ---
-## Selected work and authority
+## Authorization and selected units
 
-Skill version 0.19.1 — aep:implementing. This is the next wave under the operator's
-existing instruction to complete the provider milestones, then deliver MCP and cut
-new versions. It follows verified Connectors v0.25.1 at merge
-e1cc88088fff3cfeb07fdbce39b9aed586ab48a6, not its earlier queued candidate.
-The standing request authorizes scoped unit commits, integration/store commits,
-verified bot publication and eventual source release; no new deployment or consumer
-pin promotion is included. No approval record is fabricated.
+AEP skill version0.19.1, wave mode. approval-record:mcp-next-two-waves-20261003
+contains the operator's explicit instruction to dispatch two waves using multiple
+agents and clean up. This is the first of those two, after completion of the current
+invocation/projection wave. Root is sole AEP writer. Codex collaboration agents run
+the aep:story-scoper, aep:implementor and aep:adversary reference procedures; this
+host has no plugin-specific subagent_type selector. Model overrides are not selected.
 
-Selected `story:mcp-outbound-invocation-results` and
-`story:mcp-inbound-capability-projection` serve
-`vision:independent-contract-adapters`. Their declared dependencies are implemented.
-Separate read-only scopers returned the scope reports recorded in both story bodies.
-Each owns one new contract, one JSON document-case file and one Rust guard; primary
-contract paths are cited, case/guard paths inferred. Both are in computed wave 1
-following explicit replacement of the old shared-directory write allocations.
+- story:mcp-outbound-auth-lifecycle: authored HTTP credential lifecycle, serving
+  vision:independent-contract-adapters. One cited contract plus two inferred new
+  JSON/guard paths; existing unresolved native ownership remains explicit.
+- story:mcp-inbound-mutation-replay: authored local single-owner mutation/replay
+  mapping, serving the same vision. One cited contract plus two inferred new
+  JSON/guard paths. Requires the integrated projection story implemented first.
 
-Root is the only planning-store writer. Codex exposes named collaboration workers,
-not Claude plugin `subagent_type`; workers receive the full `aep:implementor` and
-`aep:adversary` reference procedures. This is a host adaptation, not a claim that the
-Claude plugin agents ran. Each author gets a separate managed tree, then a fresh
-adversary pass. No source writing in primary checkouts.
+Both units are authored specification checks, not runtime MCP interoperability,
+Secret Service persistence, no-duplicate-effect execution or end-to-end delivery.
+The separate sibling HTTP native-model review prepares actual runtime work.
 
-## Boundaries and exclusions
+Each unit gets one managed tree and one independent review, with at most two full
+attacks. Author base remains pending until the current integration gate passes and
+the opening commit exists. No candidate receives a dirty partial source snapshot.
+Authorization covers two unit commits, integration commits, closing store commit,
+merge to base and existing bot publication authorization. No additional product
+relations or deployment are selected.
 
-JSON cases are authored contract checks, not runtime conformance and not ESS
-session traces. The inbound YAML collector cannot execute projection semantics;
-outbound custom YAML is excluded from synthesis. Neither fact is concealed by
-passing document checks. Model validation, existing synthesis and actual metadata
-conformance remain separate integration gate results. Root reviews any necessary
-new native product type before dependent implementation. All eight unresolved MCP
-relation markers remain; caller assignment and outbound process ownership remain
-open decisions. Auth, cloud, mutation replay and composition are not selected merely
-because their files are disjoint. Mutation/composition consume this wave's settled
-semantics. Other providers and unrelated unassessed backlog items below are outside
-this explicitly selected MCP contract candidate set, not silently deemed safe.
+## Preflight and ownership
 
-Sibling MCP partial constructor target is under review in its own repository. Nine
-passing target cases do not close the full retrofit, transport/client/server or
-Connectors runtime delivery. No sibling dependency pin changes in this wave.
+Primary checkouts remain untouched. The coordinator reuses its owned managed
+cb26c-plan tree and existing build cache; current uncommitted changes belong to
+this authorized integration and planning work, retained in private preflight status.
+Prior worker cb26g-in/out are frozen, all leases released, reports read/copied and
+recovery archives verified. Their exact Cargo targets were cleaned:1.7GiB each.
+Finish/GC follows publication of wanted source. Integration root is retained because
+it owns the next work. No unrelated tree or process is a cleanup candidate.
 
-## Worktree, resource and gate record
+Measured worker build cost about1.6GiB, root fullgate already has its own target.
+Available disk14GiB at this preflight; floor8GiB, recheck before every new build.
+Two implementors maximum, each2Cargo jobs with /usr/bin/sccache and isolated target.
+Host concurrency4 including coordinator; no separate token budget stated. Builds
+may be serialized to preserve reserve. Sourcepins ESS0.45/AEP0.65 remain fixed.
 
-Integration: cb26c-plan, branch plan/mcp-contracts-20261002, base e1cc88088fff3cfeb07fdbce39b9aed586ab48a6.
-Root path: managed tree cb26c-plan; absolute path retained only in local scratch.
-- Outbound: planned cb26g-out, unit/mcp-invocation-20261002, same released source base; own target/ and .local/mcp-invocation/ scratch.
-- Inbound: planned cb26g-in, unit/mcp-projection-20261002, same released source base; own target/ and .local/mcp-projection/ scratch.
-Worker stages: not yet dispatched; unit heads and evidence will be added on handoff.
+Managed records planned:
+- cb26i-auth, branch unit/mcp-auth-20261003, target within that tree, scratch
+  .local/mcp-two-waves/auth; unit story:mcp-outbound-auth-lifecycle.
+- cb26i-replay, branch unit/mcp-replay-20261003, target within that tree, scratch
+  .local/mcp-two-waves/replay; unit story:mcp-inbound-mutation-replay.
+The private wave directory holds exact resolved paths, leases and immutable briefs.
+Their source base and stage are updated after creation, never inferred from age.
 
-At preparation, free disk about 15 GiB, reserve 8 GiB, two Cargo jobs per permitted
-build. MCP reviewer owns current build window. Document authoring may run in
-parallel; Rust builds are serialized with that review and each other until measured
-storage permits overlap. No shared targets. Use task-owned TMPDIR. Root's current
-Connectors target is about 6.6 GiB; new targets may need several GiB, so monitor and
-stop before reserve, never delete another agent's outputs.
+## Scope and deferrals
 
-Targeted validation checks new guards and existing direction-specific contract
-checks, package formatting and Clippy, meaningful mutated-copy negative controls.
-Root owns the full connectors-build gate on integration with ESS0.45.0 and AEP0.65.0,
-plus appropriate generation/documentation checks. Preserve each exit status and
-synthesis/execution counts separately. Existing v0.25.1 gate evidence applies only
-to unchanged baseline, not the newly authored source. Fresh adversary cases precede
-any reviewer suite run. Review records remain immutable. No story closes until
-integrated required checks pass.
+Read-only scopers confirmed exact new files; each story now records typed scopes.
+The replay story corrected a false request-id-to-business-key inference; terminal
+Indeterminate alone never supplied the entire dispatch fence. Auth remains an
+obligation until its separate native custody/Connection mapping is designed.
 
-## Computed pre-dispatch sets
+Second wave candidates are composition plus CLI/discovery, separately re-read and
+recomputed after these two units close. Cloud caller isolation, outbound stdio child
+ownership, external execution and unrelated unassessed backlog remain excluded.
+The computed broad-store lists below are retained verbatim; they are candidates,
+not authorization for every returned artifact. No unassessed item is selected here.
 
-Command: pinned AEP0.65.0 plan artifact waves --kind story --status draft --format json.
-The complete result follows unchanged, including unrelated collisions and unassessed
-items; none of those entries is an authorization to implement it.
+## Computed scope lists before dispatch
+
 
 ```json
 {
@@ -225,20 +221,16 @@ items; none of those entries is an authorization to implement it.
           ]
         },
         {
-          "id": "story:mcp-inbound-capability-projection",
+          "id": "story:mcp-composition-provenance",
           "inferred": true,
           "scope": [
             {
               "confidence": "inferred",
-              "path": "adapters/mcp/contracts/server/v1alpha1/projection-cases.json"
-            },
-            {
-              "confidence": "cited",
-              "path": "adapters/mcp/contracts/server/v1alpha1/projection.md"
+              "path": "adapters/mcp/contracts/composition/v1alpha1/scenarios"
             },
             {
               "confidence": "inferred",
-              "path": "crates/connectors-build/tests/mcp_inbound_capability_projection.rs"
+              "path": "adapters/mcp/contracts/composition/v1alpha1/semantics.md"
             }
           ]
         },
@@ -257,34 +249,38 @@ items; none of those entries is an authorization to implement it.
           ]
         },
         {
+          "id": "story:mcp-inbound-mutation-replay",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/server/v1alpha1/mutation-cases.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/mcp/contracts/server/v1alpha1/mutations.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-build/tests/mcp_inbound_mutation_replay.rs"
+            }
+          ]
+        },
+        {
           "id": "story:mcp-outbound-auth-lifecycle",
           "inferred": true,
           "scope": [
             {
               "confidence": "inferred",
+              "path": "adapters/mcp/contracts/client/v1alpha1/auth-cases.json"
+            },
+            {
+              "confidence": "cited",
               "path": "adapters/mcp/contracts/client/v1alpha1/auth.md"
             },
             {
               "confidence": "inferred",
-              "path": "adapters/mcp/contracts/client/v1alpha1/scenarios"
-            }
-          ]
-        },
-        {
-          "id": "story:mcp-outbound-invocation-results",
-          "inferred": true,
-          "scope": [
-            {
-              "confidence": "inferred",
-              "path": "adapters/mcp/contracts/client/v1alpha1/invocation-cases.json"
-            },
-            {
-              "confidence": "cited",
-              "path": "adapters/mcp/contracts/client/v1alpha1/invocation.md"
-            },
-            {
-              "confidence": "inferred",
-              "path": "crates/connectors-build/tests/mcp_outbound_invocation_results.rs"
+              "path": "crates/connectors-build/tests/mcp_outbound_auth_lifecycle.rs"
             }
           ]
         },
@@ -406,30 +402,24 @@ items; none of those entries is an authorization to implement it.
           ]
         },
         {
-          "id": "story:mcp-composition-provenance",
+          "id": "story:mcp-cli-journey-discovery-contract",
           "inferred": true,
           "scope": [
             {
               "confidence": "inferred",
-              "path": "adapters/mcp/contracts/composition/v1alpha1/scenarios"
+              "path": "adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md"
             },
             {
               "confidence": "inferred",
-              "path": "adapters/mcp/contracts/composition/v1alpha1/semantics.md"
-            }
-          ]
-        },
-        {
-          "id": "story:mcp-inbound-mutation-replay",
-          "inferred": true,
-          "scope": [
-            {
-              "confidence": "inferred",
-              "path": "adapters/mcp/contracts/server/v1alpha1/mutations.md"
+              "path": "apps/connectors/spec/compatibility.json"
             },
             {
               "confidence": "inferred",
-              "path": "adapters/mcp/contracts/server/v1alpha1/scenarios"
+              "path": "contracts/cli/v1alpha1/semantics.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/local-mcp-cli.md"
             }
           ]
         },
@@ -709,33 +699,6 @@ items; none of those entries is an authorization to implement it.
           ]
         }
       ]
-    },
-    {
-      "wave": 6,
-      "artifacts": [
-        {
-          "id": "story:mcp-cli-journey-discovery-contract",
-          "inferred": true,
-          "scope": [
-            {
-              "confidence": "inferred",
-              "path": "adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md"
-            },
-            {
-              "confidence": "inferred",
-              "path": "apps/connectors/spec/compatibility.json"
-            },
-            {
-              "confidence": "inferred",
-              "path": "contracts/cli/v1alpha1/semantics.md"
-            },
-            {
-              "confidence": "inferred",
-              "path": "docs/local-mcp-cli.md"
-            }
-          ]
-        }
-      ]
     }
   ],
   "collisions": [
@@ -1005,29 +968,5 @@ items; none of those entries is an authorization to implement it.
   ],
   "cycles": []
 }
+
 ```
-
-## Dispatch and coordinator reconciliation update
-
-Both worker trees were created from opening commit a2955675cb70b5811589ce86b40be95427ead888:
-cb26g-out/unit/mcp-invocation-20261002 and cb26g-in/unit/mcp-projection-20261002.
-Own target/ directories and assigned scratch roots remain as above. Full briefs were
-written to coordinator-local scratch after dispatch; the original assignments were
-not changed. This timing is recorded rather than claiming the brief files preceded
-the dispatch. Source opening commit passed bot hooks after removing an actual
-personal absolute path from the wave page; no hook bypass occurred.
-
-Outbound first RED: missing contract,0passed4failed; then28targetedtests passed,
-including6new guards, with40authored document cases, fmt/Clippy0. Its modern
-CacheableResult check exposed an additional omitted required metadata rule,1RED
-then corrected andGREEN. Handoff/report pending. Inbound begins its first RED after
-outbound released the serialized worker build window. Root MCP gate work used its
-already-built xtask target for small tests while authors' large builds stayed serial;
-free space remained above8GiB. Do not describe this as all Cargo being exclusive.
-
-Root added story:mcp-framing-refusal-preserves-uncertainty (active4) before editing
-the existing framing paragraph and its exact unreadable-answer scenario. The
-outbound worker's prose patch omitted the same contradiction in the scenario;
-coordinator inspection expanded the correction to both owned statements. These
-are separate exact write paths, not an expansion of either worker's authority.
-Fresh outbound review must inspect both corrected owners alongside invocation.
