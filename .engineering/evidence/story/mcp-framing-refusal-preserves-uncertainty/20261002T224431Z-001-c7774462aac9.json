@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T22:44:31Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-framing-refusal-preserves-uncertainty",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "VERIFIED authored mapping against baseline absence/contradiction, retained review controls and integrated gate; not runtime MCP conformance",
+    "reference": ".local/mcp-next-wave/integration/gate.log"
+  }
+}

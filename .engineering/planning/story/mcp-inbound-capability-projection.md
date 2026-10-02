@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-inbound-capability-projection
 kind: story
-status: active
+status: implemented
 title: Specify which Connectors capabilities the inbound MCP binding advertises and how results map
 relations:
 - decomposes: epic:mcp-contracts
@@ -10,16 +10,23 @@ relations:
 - depends_on: story:mcp-domain-model
 - depends_on: story:mcp-inbound-local-binding
 scope:
+- confidence: cited
+  path: adapters/mcp/contracts/protocol/v1alpha1/selection.md
 - confidence: inferred
   path: adapters/mcp/contracts/server/v1alpha1/projection-cases.json
 - confidence: cited
   path: adapters/mcp/contracts/server/v1alpha1/projection.md
+- confidence: cited
+  path: adapters/mcp/contracts/server/v1alpha1/semantics.md
+- confidence: cited
+  path: adapters/mcp/spec/ess/domains/state.yaml
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_inbound_capability_projection.rs
-revision: 8
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T21:46:59Z", actor: "human:timo", revision: 7}
 - {from: "proposed", to: "active", at: "2026-10-02T21:46:59Z", actor: "human:timo", revision: 8}
+- {from: "active", to: "implemented", at: "2026-10-02T22:44:31Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
 ---
 ## Acceptance
 
@@ -140,3 +147,26 @@ addition before introducing a new actual product type/entity/command. Preserve
 all eight unresolved relations, single-owner placement and caller-assignment
 blocker. Mutation replay remains its dependent story; no new authority, Connection
 assignment or durable deletion cascade is selected by this contract.
+
+## Integration reconciliation — 2026-10-03
+
+After author and adversary freeze, the coordinator also owns three cited comment/
+prose paths: server/v1alpha1/semantics.md, protocol/v1alpha1/selection.md and
+spec/ess/domains/state.yaml under adapters/mcp. Their statements that no source
+specifies capability admission are now stale. Replace only those pointers with the
+reviewed projection contract; preserve all eight unresolved relation markers,
+all typed fields and lifecycle behavior. This is serial coordinator work after
+both unit freezes, not an expanded concurrent worker allocation.
+
+## Verified integration — 2026-10-03
+
+Three exact assigned files integrated; contract and JSON hashes match author freeze. Initial missing-document run failed five checks. First adversary proved a contradictory duplicate row was accepted. Correction checks complete unique inventory for every row across all four tables; original regression unchanged. Bounded second pass added fenced/blockquote attacks and passed31 affected tests. Review fixed/no-op records retained. Root also reconciled three stale prose/comment pointers; no typed model change or unresolved relation removal.
+
+Full repository gate `cargo run --locked -p connectors-build -- gate --msrv`
+exited0. Runner totals:150 summaries,1227passed,0failed,65ignored. Format, Clippy,
+Rust1.88 library and1.91 workspace checks, independent adapter models, descriptor
+and generated-output checks and AEP validation passed. ESS synthesis emitted498
+scenarios(43authored) with21retainedrefusals; metadata target289passed remains
+coverage-unknown/inconclusive. No new MCP runtime conformance is claimed.
+Gate log SHA256:2d2dd6c294b1746e5dcb3792b44d3385d2cbe6fa00863d9dccc66ea04b5440b5.
+Records retained in task-owned mcp-next-wave/integration/gate.log and worker archives.

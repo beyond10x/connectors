@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-outbound-invocation-results
 kind: story
-status: active
+status: implemented
 title: Specify outbound MCP invocation results, error preservation, bounds and unknown outcomes
 relations:
 - decomposes: epic:mcp-contracts
@@ -15,10 +15,11 @@ scope:
   path: adapters/mcp/contracts/client/v1alpha1/invocation.md
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_outbound_invocation_results.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T21:46:58Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-02T21:46:58Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-10-02T22:44:30Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
 ---
 ## Acceptance
 
@@ -121,3 +122,16 @@ If the mapping requires a new actual product type/entity/command, report its mis
 native ESS home before dependent implementation. All eight unresolved relation
 markers and the stdio ownership decision remain intact. No new durable invocation
 ledger or automatic credential/Connection selection follows from this story.
+
+## Verified integration — 2026-10-03
+
+Three exact assigned files integrated. Forty authored JSON cases plus nine native guard/negative-control tests. The baseline lacked the contract and the first guard run failed four checks. Fresh review added three cases; 31 affected tests passed before a four-line stale-document correction. Source-only follow-up found nothing further. Review bodies and fixed/no-op outcomes remain immutable in this store.
+
+Full repository gate `cargo run --locked -p connectors-build -- gate --msrv`
+exited0. Runner totals:150 summaries,1227passed,0failed,65ignored. Format, Clippy,
+Rust1.88 library and1.91 workspace checks, independent adapter models, descriptor
+and generated-output checks and AEP validation passed. ESS synthesis emitted498
+scenarios(43authored) with21retainedrefusals; metadata target289passed remains
+coverage-unknown/inconclusive. No new MCP runtime conformance is claimed.
+Gate log SHA256:2d2dd6c294b1746e5dcb3792b44d3385d2cbe6fa00863d9dccc66ea04b5440b5.
+Records retained in task-owned mcp-next-wave/integration/gate.log and worker archives.

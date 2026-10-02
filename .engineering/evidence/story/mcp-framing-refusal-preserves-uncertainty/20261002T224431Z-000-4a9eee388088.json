@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T22:44:31Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-framing-refusal-preserves-uncertainty",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full integration gate --msrv exit0:1227passed,0failed,65ignored",
+    "reference": "sha256:2d2dd6c294b1746e5dcb3792b44d3385d2cbe6fa00863d9dccc66ea04b5440b5"
+  }
+}

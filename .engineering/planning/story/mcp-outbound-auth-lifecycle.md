@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-outbound-auth-lifecycle
 kind: story
-status: draft
+status: active
 title: Specify outbound MCP credential entry, persistence, refresh, repair and revocation
 relations:
 - decomposes: epic:mcp-contracts
@@ -11,10 +11,15 @@ relations:
 - depends_on: story:mcp-outbound-connection-lifecycle
 scope:
 - confidence: inferred
+  path: adapters/mcp/contracts/client/v1alpha1/auth-cases.json
+- confidence: cited
   path: adapters/mcp/contracts/client/v1alpha1/auth.md
 - confidence: inferred
-  path: adapters/mcp/contracts/client/v1alpha1/scenarios
-revision: 2
+  path: crates/connectors-build/tests/mcp_outbound_auth_lifecycle.rs
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-02T22:44:32Z", actor: "human:timo", revision: 6}
+- {from: "proposed", to: "active", at: "2026-10-02T22:44:32Z", actor: "human:timo", revision: 7}
 ---
 ## Acceptance
 
@@ -92,3 +97,27 @@ Session establishment and transport — `story:mcp-outbound-connection-lifecycle
 Any inbound caller credential — that is a different trust boundary and is not
 specified here. No credential is acquired, stored or exercised; this is an
 authored document and its scenarios.
+
+## Scope — confirmed 2026-10-03
+
+Read-only aep:story-scoper inspected integration a2955675 and its reviewed candidate.
+Cited: adapters/mcp/contracts/client/v1alpha1/auth.md, named in acceptance.
+Inferred: adapters/mcp/contracts/client/v1alpha1/auth-cases.json and
+crates/connectors-build/tests/mcp_outbound_auth_lifecycle.rs, new named document
+cases and Rust guard. These replace the broad scenarios directory allocation.
+Confidence medium: exact document is cited; sufficient guard design is inferred.
+Collisions are limited to these three paths. Existing shared/native models,
+contracts, scenario YAML, manifests and gates remain read-only. The gate excludes
+outbound lifecycle YAML from ESS synthesis (gate.rs:258-268); JSON document cases
+must not be called runtime conformance. Safety is source-inspected, not executed.
+
+Document-only requirements can specify persistence, refresh, repair and revocation
+without choosing the unresolved McpServerBinding/Connection/custody relations.
+Those relations need native ESS design before executable persistence implementation.
+The four failures remain distinct named outcomes without inventing new shared error
+variants. Derive revision-specific discovery/registration from pinned archives.
+Cover acknowledged restart binding, protected completion, issuer/audience mismatch,
+uncertain rotating-token refresh with no second exchange, publication-only recovery,
+identity-preserving repair, local versus provider revocation, and maintenance never
+replaying a business call. Use mutated-copy controls for the same failure classes.
+No actual credentials, restart acceptance, stdio ownership or provider forwarding.
