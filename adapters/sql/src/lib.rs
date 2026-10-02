@@ -408,6 +408,7 @@ fn database_error(error: tokio_postgres::Error) -> Error {
 }
 fn sqlstate_error(state: Option<&str>) -> Error {
     let code = match state {
+        Some("0A000") => ErrorCode::Unsupported,
         Some("57014") => ErrorCode::Timeout,
         Some("25006" | "42501") => ErrorCode::Forbidden,
         Some("28P01" | "28000") => ErrorCode::Unauthorized,

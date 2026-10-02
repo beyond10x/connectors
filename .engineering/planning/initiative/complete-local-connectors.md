@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 36
+revision: 37
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-10T09:49:45Z", actor: "human:timo", revision: 2, imported: true}
 - {from: "proposed", to: "active", at: "2026-09-10T09:49:46Z", actor: "human:timo", revision: 3, imported: true}
@@ -301,3 +301,31 @@ MCP and the remaining providers keep their order.
 ## Planning handoff — 2026-10-02
 
 specification:milestone-acceleration-20261002 records the verified v0.24.0 publication at c7a9d5b1db1ff4e3b2af568db19c6eaa60d79d90, the still-open Entity Runtime #51 throughput blocker, and the next batch proposal. Sustained reads are the immediate priority; provider acceptance preparation can proceed while upstream work is pending, followed by MCP under this initiative's existing order. It preserves every provider/sandbox obligation and the three open product decisions. No runtime completion or implementation-wave approval is inferred from this planning update.
+
+## Delivery state — 2026-10-02
+
+The authorized reliability batch is released as v0.25.0 at
+b1f432766057fb8b7db60736363926cc44fe0db8, with verified required source checks,
+annotated tag, bot-authored GitHub Release and source archives. Documentation
+publication remains pending. Release evidence: docs/evidence/reliability-20261002/.
+
+The one bounded clock experiment is complete as a rejection, independently checked
+in review-result:registry-clock-experiment-20261002. Production source is restored;
+verification-report:registry-clock-mitigation-decision-20261002 records all required
+numeric/invariant evidence. Candidate 8/9 invariants and25.9185x large/small ratio
+reject adoption. Entity Runtime issue51 and sustained-workload M1 remain open.
+
+Wave specification:wave-20261002d-provider-acceptance now runs three isolated units:
+catalog-cli-journeys, kubernetes-real-read-acceptance and
+postgres-real-provider-acceptance. Workers own adapter tests, fixture helpers and
+assigned documentation; root owns AEP, shared dependencies/classification and
+publication. The selected scopes do not silently close richer Kubernetes/Helm
+capabilities, real GitLab obligations or MCP. Source-backed fixture/repair
+clarifications are recorded on their stories. No new passing provider suite is
+claimed yet.
+
+Next after checked provider handoffs: retain remaining provider obligations and
+finish the MCP contracts/runtime sequence. Caller-to-Connection assignment,
+outbound stdio process ownership and the external execution family are still
+unanswered product decisions. Their blockers stay open; independent technical
+work can proceed without treating silence as approval.

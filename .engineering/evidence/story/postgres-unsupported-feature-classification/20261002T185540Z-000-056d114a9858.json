@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T18:55:40Z",
+  "actor": "human:timo",
+  "artifact": "story:postgres-unsupported-feature-classification",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integrated 0.25.1 gate --msrv: exit0; 1207 ordinary passed, 65 ignored; metadata289 passed with undeclared coverage",
+    "reference": "docs/evidence/provider-release-20261002/README.md"
+  }
+}

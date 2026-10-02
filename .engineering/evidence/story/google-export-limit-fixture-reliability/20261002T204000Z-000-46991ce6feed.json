@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T20:40:00Z",
+  "actor": "human:timo",
+  "artifact": "story:google-export-limit-fixture-reliability",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full corrected candidate gate --msrv exit0:1208passed/0failed/65ignored; authored formatting/Clippy/Rust1.88 libraries/Rust1.91 workspace passed; unchanged coverage limitations retained",
+    "reference": "docs/evidence/google-export-ci-20261002/README.md"
+  }
+}

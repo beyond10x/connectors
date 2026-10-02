@@ -1,0 +1,18 @@
+    Finished `release` profile [optimized] target(s) in 0.49s
+     Running tests/local_runtime.rs (target/release/deps/local_runtime-3575a67e13ecbb3d)
+
+running 1 test
+test cli_journey::kubernetes_cli_reuses_each_admitted_read_after_restart ... 
+thread 'cli_journey::kubernetes_cli_reuses_each_admitted_read_after_restart' (1486274) panicked at adapters/kubernetes/tests/local_runtime/cli_journey.rs:1125:59:
+built production CLI required
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    cli_journey::kubernetes_cli_reuses_each_admitted_read_after_restart
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p connectors-kubernetes --test local_runtime`

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T16:41:50Z",
+  "actor": "human:timo",
+  "artifact": "story:kubernetes-real-read-acceptance",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Four new real-provider cases and four existing ignored CLI journeys, ordinary39, Clippy/fmt exit0",
+    "reference": "docs/evidence/kubernetes-acceptance-20261002/README.md"
+  }
+}

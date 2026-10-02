@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:37:11Z",
+  "actor": "human:timo",
+  "artifact": "story:sql-fixture-accepts-stray-connections",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integrated candidate 7e6a33db463a581cb171c20215f98662b401bc1c: full gate --msrv exit 0; independent 1.88 and workspace 1.91 checks, metadata conformance and AEP included",
+    "reference": "docs/evidence/reliability-20261002/integration/README.md"
+  }
+}

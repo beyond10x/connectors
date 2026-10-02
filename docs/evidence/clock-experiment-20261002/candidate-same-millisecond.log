@@ -1,0 +1,21 @@
+   Compiling connectors-host v0.25.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26c-clock/crates/connectors-host)
+    Finished `release` profile [optimized] target(s) in 28.77s
+     Running unittests src/lib.rs (target/release/deps/connectors_host-2cdd9fa232962295)
+
+running 1 test
+test local::registry::tests::prepared_same_millisecond_observation_refuses_stale_registry_state ... 
+thread 'local::registry::tests::prepared_same_millisecond_observation_refuses_stale_registry_state' (472795) panicked at crates/connectors-host/src/local/registry/tests.rs:528:5:
+assertion `left == right` failed
+  left: Err(MetadataUnavailable)
+ right: Err(ConcurrentRevision)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    local::registry::tests::prepared_same_millisecond_observation_refuses_stale_registry_state
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 319 filtered out; finished in 0.78s
+
+error: test failed, to rerun pass `-p connectors-host --lib`
