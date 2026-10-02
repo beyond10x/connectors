@@ -9,7 +9,7 @@ repository gate and release remain separate steps.
 
 | Observation | Retained result |
 | --- | --- |
-| Production CLI/live database | [6 passed, 0 failed](final-live.log) |
+| Live database: five CLI cases and one native invocation-drop case | [6 passed, 0 failed](final-live.log) |
 | SQL package | [19 passed, 6 ignored](final-package.log) |
 | Missing prerequisite control | [1 selected case refused, exit 101](missing-prerequisite.log) |
 | Exact SQLSTATE regression before correction | [0A000 returned Unavailable instead of Unsupported, exit 101](sqlstate-existing-regression-red.log) |

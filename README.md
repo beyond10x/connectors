@@ -107,7 +107,7 @@ The current services provide:
 
 | Adapter | Implemented operations | Binding |
 |---|---|---|
-| GitLab (catalog provider) | `project.get`, `issues.list`, `file.get`, `branch.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.create`, `merge_request.update`, `merge_request.merge` | GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks; the host's permitted operation ids are the scope |
+| GitLab (catalog provider) | `projects.list`, `project.get`, `project.events`, `issues.list`, `file.get`, `branch.get`, `tags.list`, `releases.list`, `commits.list`, `repository.compare`, `deployments.list`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.create`, `merge_request.update`, `merge_request.merge` | GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks; the host's permitted operation ids are the scope |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, and optionally the `helm_releases.*` release reads | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
 
