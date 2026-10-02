@@ -1,0 +1,76 @@
+    Finished `release` profile [optimized] target(s) in 0.20s
+     Running tests/local_runtime.rs (target/release/deps/local_runtime-3575a67e13ecbb3d)
+
+running 1 test
+test cli_journey::kubernetes_cli_reuses_each_admitted_read_after_restart ... owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned CLI process 1487596 exit=exit status: 0
+owned CLI process 1487730 exit=exit status: 0
+real fixture cb26d-1487182-1790956851763 connection_revision=4534ffdf-6be6-4a06-937d-fcc6d9e28d9a objects=[{"kind":"Service","name":"cb26d-1487182-1790956851763-a","resourceVersion":"4608","uid":"ab74f45b-e449-4188-baaa-7d0c3165c1b4"},{"kind":"Service","name":"cb26d-1487182-1790956851763-b","resourceVersion":"4610","uid":"3745ed3a-7950-4bbd-a6f1-109e55f4e84a"},{"kind":"Service","name":"cb26d-1487182-1790956851763-c","resourceVersion":"4612","uid":"ea30df07-36a8-4336-8467-cd4fbfd20200"},{"kind":"EndpointSlice","name":"cb26d-1487182-1790956851763","resourceVersion":"4613","uid":"dad2b33b-b3c9-4a19-8e52-ff8ae40eb55d"},{"kind":"Deployment","name":"cb26d-1487182-1790956851763","resourceVersion":"4614","uid":"3fffd433-418f-4560-8efc-f413c85d71aa"},{"kind":"Pod","name":"cb26d-1487182-1790956851763","resourceVersion":"4619","uid":"f6dc7957-4a9e-4872-a5c3-1e666e550524"}]
+owned provisioning process exit=exit status: 0
+owned CLI process 1487872 exit=exit status: 0
+owned CLI process 1487879 exit=exit status: 0
+owned CLI process 1487884 exit=exit status: 0
+phase=0 kind=services provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956855150,"resource":"fixture/services","source_revision":"4621"}
+owned CLI process 1487930 exit=exit status: 0
+owned CLI process 1487937 exit=exit status: 0
+phase=0 kind=deployments provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956855857,"resource":"fixture/deployments","source_revision":"4622"}
+owned CLI process 1488004 exit=exit status: 0
+owned CLI process 1488054 exit=exit status: 0
+phase=0 kind=endpointslices provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956856679,"resource":"fixture/endpointslices","source_revision":"4622"}
+owned CLI process 1488080 exit=exit status: 0
+owned CLI process 1488086 exit=exit status: 0
+phase=0 kind=pods provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956857552,"resource":"fixture/pods","source_revision":"4623"}
+owned CLI process 1488221 exit=exit status: 0
+owned CLI process 1488226 exit=exit status: 0
+owned CLI process 1488291 exit=exit status: 0
+owned CLI process 1488296 exit=exit status: 0
+phase=0 endpoints={"instance":"k8s-sandbox","observed_at_unix_ms":1790956858474,"resource":"fixture/endpointslices","source_revision":"4623"} hosts={"instance":"k8s-sandbox","observed_at_unix_ms":1790956859403,"resource":"/nodes","source_revision":"4623"} node_uid="bddf18b7-e13c-43fb-a614-6da65279a571" node_revision="4565"
+owned CLI process 1488324 exit=exit status: 0
+owner f0218606-0415-4f04-95b1-a5876337777f acknowledged shutdown and removed its socket
+owned custody process 1487587 exit=Ok(ExitStatus(unix_wait_status(9)))
+owned CLI process 1488341 exit=exit status: 0
+owned CLI process 1488375 exit=exit status: 0
+phase=1 kind=services provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956861309,"resource":"fixture/services","source_revision":"4624"}
+owned CLI process 1488415 exit=exit status: 0
+owned CLI process 1488420 exit=exit status: 0
+phase=1 kind=deployments provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956862279,"resource":"fixture/deployments","source_revision":"4624"}
+owned CLI process 1488503 exit=exit status: 0
+owned CLI process 1488510 exit=exit status: 0
+phase=1 kind=endpointslices provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956863358,"resource":"fixture/endpointslices","source_revision":"4624"}
+owned CLI process 1488621 exit=exit status: 0
+owned CLI process 1488707 exit=exit status: 0
+phase=1 kind=pods provenance={"instance":"k8s-sandbox","observed_at_unix_ms":1790956864656,"resource":"fixture/pods","source_revision":"4624"}
+owned CLI process 1488935 exit=exit status: 0
+owned CLI process 1488956 exit=exit status: 0
+owned CLI process 1488972 exit=exit status: 0
+owned CLI process 1488977 exit=exit status: 0
+phase=1 endpoints={"instance":"k8s-sandbox","observed_at_unix_ms":1790956865778,"resource":"fixture/endpointslices","source_revision":"4625"} hosts={"instance":"k8s-sandbox","observed_at_unix_ms":1790956866928,"resource":"/nodes","source_revision":"4625"} node_uid="bddf18b7-e13c-43fb-a614-6da65279a571" node_revision="4565"
+owned CLI process 1489039 exit=exit status: 0
+owned CLI process 1489047 exit=exit status: 0
+owner 1207e900-0987-4fd1-8daf-66554b639664 acknowledged shutdown and removed its socket
+owned custody process 1488334 exit=Ok(ExitStatus(unix_wait_status(9)))
+owned custody process 1487584 exit=Ok(ExitStatus(unix_wait_status(9)))
+observed upstream method/path/status=[("POST", "/apis/authentication.k8s.io/v1/selfsubjectreviews", 201), ("GET", "/api/v1/namespaces/fixture/services", 200), ("GET", "/apis/apps/v1/namespaces/fixture/deployments", 200), ("GET", "/apis/discovery.k8s.io/v1/namespaces/fixture/endpointslices", 200), ("GET", "/api/v1/namespaces/fixture/pods", 200), ("GET", "/apis/discovery.k8s.io/v1/namespaces/fixture/endpointslices", 200), ("GET", "/api/v1/nodes", 200), ("GET", "/api/v1/namespaces/fixture/services", 200), ("GET", "/apis/apps/v1/namespaces/fixture/deployments", 200), ("GET", "/apis/discovery.k8s.io/v1/namespaces/fixture/endpointslices", 200), ("GET", "/api/v1/namespaces/fixture/pods", 200), ("GET", "/apis/discovery.k8s.io/v1/namespaces/fixture/endpointslices", 200), ("GET", "/api/v1/nodes", 200)]
+owned fixture cleanup kind="Pod" name="cb26d-1487182-1790956851763" exit=exit status: 0
+owned fixture cleanup kind="Deployment" name="cb26d-1487182-1790956851763" exit=exit status: 0
+owned fixture cleanup kind="EndpointSlice" name="cb26d-1487182-1790956851763" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1487182-1790956851763-c" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1487182-1790956851763-b" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1487182-1790956851763-a" exit=exit status: 0
+owned fixture cleanup kind="RoleBinding" name="cb26d-1487182-1790956851763" exit=exit status: 0
+owned fixture cleanup kind="RoleBinding" name="cb26d-1487182-1790956851763" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1487182-1790956851763" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1487182-1790956851763" exit=exit status: 0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 16.41s
+

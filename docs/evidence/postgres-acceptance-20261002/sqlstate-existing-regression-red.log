@@ -1,0 +1,21 @@
+   Compiling connectors-sql v0.25.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26d-pg/adapters/sql)
+    Finished `release` profile [optimized] target(s) in 1.17s
+     Running tests/protocol.rs (target/release/deps/protocol-ac09d42148fc3a16)
+
+running 1 test
+
+thread 'authentication_database_errors_and_row_capacity_are_sanitized' (1393310) panicked at adapters/sql/tests/protocol.rs:383:9:
+assertion `left == right` failed
+  left: Unavailable
+ right: Unsupported
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test authentication_database_errors_and_row_capacity_are_sanitized ... FAILED
+
+failures:
+
+failures:
+    authentication_database_errors_and_row_capacity_are_sanitized
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.21s
+
+error: test failed, to rerun pass `-p connectors-sql --test protocol`

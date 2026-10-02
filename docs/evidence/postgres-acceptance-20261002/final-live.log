@@ -1,0 +1,89 @@
+
+running 6 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... CLI action=["setup", "init"] exit=exit status: 0
+CLI action=["setup", "check"] exit=exit status: 0
+CLI action=["connections", "connect"] exit=exit status: 1
+CLI action=["connections", "connect"] exit=exit status: 0
+CLI action=["operations", "describe"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 1
+fixture process pid=1429495 exit=signal: 9 (SIGKILL)
+CLI action=["connections", "revalidate"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["connections", "status"] exit=exit status: 0
+CLI action=["operations", "describe"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+fixture process pid=1430386 exit=signal: 9 (SIGKILL)
+fixture process pid=1429494 exit=signal: 9 (SIGKILL)
+ok
+test cli_journey::postgres_cli_cannot_escape_read_only_transaction ... CLI action=["setup", "init"] exit=exit status: 0
+CLI action=["setup", "check"] exit=exit status: 0
+CLI action=["connections", "connect"] exit=exit status: 0
+CLI action=["operations", "describe"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 1
+CLI action=["operations", "invoke"] exit=exit status: 2
+CLI action=["operations", "invoke"] exit=exit status: 1
+CLI action=["operations", "invoke"] exit=exit status: 2
+CLI action=["operations", "invoke"] exit=exit status: 1
+CLI action=["operations", "invoke"] exit=exit status: 1
+CLI action=["operations", "invoke"] exit=exit status: 0
+fixture process pid=1431035 exit=signal: 9 (SIGKILL)
+fixture process pid=1431034 exit=signal: 9 (SIGKILL)
+ok
+test cli_journey::postgres_cli_distinguishes_empty_truncated_capacity_and_timeout ... CLI action=["setup", "init"] exit=exit status: 0
+CLI action=["setup", "check"] exit=exit status: 0
+CLI action=["connections", "connect"] exit=exit status: 0
+CLI action=["operations", "describe"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 1
+CLI action=["operations", "invoke"] exit=exit status: 1
+postgres timeout elapsed_ms=11110
+CLI action=["operations", "invoke"] exit=exit status: 0
+fixture process pid=1433305 exit=signal: 9 (SIGKILL)
+fixture process pid=1433296 exit=signal: 9 (SIGKILL)
+ok
+test cli_journey::postgres_cli_preserves_join_group_utc_and_quoted_parameters ... CLI action=["setup", "init"] exit=exit status: 0
+CLI action=["setup", "check"] exit=exit status: 0
+CLI action=["connections", "connect"] exit=exit status: 0
+CLI action=["operations", "describe"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+fixture process pid=1439430 exit=signal: 9 (SIGKILL)
+fixture process pid=1439411 exit=signal: 9 (SIGKILL)
+ok
+test cli_journey::postgres_dropped_invocation_cancels_its_backend ... postgres backend observation={"backend_start":"2026-10-02T15:55:32.169386+00:00","pid":1706,"query":"SELECT CASE WHEN (COALESCE(octet_length(result.c0::text),0)::bigint) > 4194304 THEN NULL::text[] ELSE ARRAY[result.c0::text] END FROM (SELECT pg_sleep(60) /* sql_acceptance_1429414_1790956532168_3 */) AS result(c0)"}
+postgres no-drop control active_after_ms=5045
+postgres cancellation drop=false pid=1706 marker=sql_acceptance_1429414_1790956532168_3 observed_ms=44 elapsed_after_observation_ms=5090
+postgres backend observation={"backend_start":"2026-10-02T15:55:37.349644+00:00","pid":1736,"query":"SELECT CASE WHEN (COALESCE(octet_length(result.c0::text),0)::bigint) > 4194304 THEN NULL::text[] ELSE ARRAY[result.c0::text] END FROM (SELECT pg_sleep(60) /* sql_acceptance_1429414_1790956537349_4 */) AS result(c0)"}
+postgres cancellation drop=true pid=1736 marker=sql_acceptance_1429414_1790956537349_4 observed_ms=42 elapsed_after_observation_ms=44
+ok
+test cli_journey::postgres_repair_revoke_and_busy_stop_preserve_authority ... CLI action=["setup", "init"] exit=exit status: 0
+CLI action=["setup", "check"] exit=exit status: 0
+CLI action=["connections", "connect"] exit=exit status: 0
+CLI action=["operations", "describe"] exit=exit status: 0
+CLI action=["connections", "repair"] exit=exit status: 1
+CLI action=["connections", "status"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["connections", "repair"] exit=exit status: 1
+CLI action=["connections", "status"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+postgres backend observation={"backend_start":"2026-10-02T15:55:43.694685+00:00","pid":1855,"query":"SELECT CASE WHEN (COALESCE(octet_length(result.c0::text),0)::bigint) > 4194304 THEN NULL::text[] ELSE ARRAY[result.c0::text] END FROM (SELECT pg_sleep(60) /* sql_acceptance_1429414_1790956542957_6 */) AS result(c0)"}
+CLI action=["adapters", "status"] exit=exit status: 0
+CLI action=["adapters", "stop"] exit=exit status: 0
+postgres busy stop pid=1855 elapsed_ms=414 invocation_exit=exit status: 1
+CLI action=["connections", "status"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 0
+CLI action=["connections", "revoke"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 1
+CLI action=["connections", "status"] exit=exit status: 0
+fixture process pid=1442982 exit=exit status: 1
+fixture process pid=1441499 exit=signal: 9 (SIGKILL)
+fixture process pid=1441481 exit=signal: 9 (SIGKILL)
+ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out; finished in 58.17s
+

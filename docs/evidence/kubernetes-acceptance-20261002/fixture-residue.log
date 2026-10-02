@@ -1,0 +1,8 @@
+KIND             NAME
+Pod              acceptance-pod
+Service          acceptance-pod
+EndpointSlice    acceptance-pod-jxk8f
+Role             connector-reader
+RoleBinding      connector-reader
+ServiceAccount   connector-reader
+ServiceAccount   default

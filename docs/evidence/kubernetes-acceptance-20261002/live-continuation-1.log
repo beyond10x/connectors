@@ -1,0 +1,46 @@
+    Finished `release` profile [optimized] target(s) in 0.16s
+     Running tests/local_runtime.rs (target/release/deps/local_runtime-3575a67e13ecbb3d)
+
+running 1 test
+test cli_journey::kubernetes_cli_continuation_preserves_scope_and_revision ... owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned CLI process 1497704 exit=exit status: 0
+owned CLI process 1497983 exit=exit status: 0
+real fixture cb26d-1497306-1790956941612 connection_revision=233eaf75-27ef-4d56-9baf-cb17b43d2842 objects=[{"kind":"Service","name":"cb26d-1497306-1790956941612-a","resourceVersion":"4711","uid":"6d5ee738-21f7-4bfc-993c-6a9f04148315"},{"kind":"Service","name":"cb26d-1497306-1790956941612-b","resourceVersion":"4713","uid":"6e9a43bf-1546-466f-a1b0-923d127bc91a"},{"kind":"Service","name":"cb26d-1497306-1790956941612-c","resourceVersion":"4715","uid":"a154ea0e-1751-4b6c-9c8e-78c6cad6936d"},{"kind":"EndpointSlice","name":"cb26d-1497306-1790956941612","resourceVersion":"4716","uid":"2481b1a1-a277-48bb-82f2-776204641f7d"},{"kind":"Deployment","name":"cb26d-1497306-1790956941612","resourceVersion":"4717","uid":"dc5c7cac-08bf-4c92-a90b-c415c25e07db"},{"kind":"Pod","name":"cb26d-1497306-1790956941612","resourceVersion":"4722","uid":"0948b80e-7f9a-4ca5-a083-df9b6a95a406"}]
+owned CLI process 1498104 exit=exit status: 0
+owned CLI process 1498109 exit=exit status: 0
+owned CLI process 1498127 exit=exit status: 0
+owned CLI process 1498132 exit=exit status: 0
+owned CLI process 1498147 exit=exit status: 0
+owned CLI process 1498153 exit=exit status: 0
+owned CLI process 1498306 exit=exit status: 0
+owned CLI process 1498317 exit=exit status: 0
+owned CLI process 1498387 exit=exit status: 0
+owned CLI process 1498428 exit=exit status: 1
+
+thread 'cli_journey::kubernetes_cli_continuation_preserves_scope_and_revision' (1497307) panicked at adapters/kubernetes/tests/local_runtime/cli_journey.rs:1663:9:
+assertion `left == right` failed: {"error":{"code":"failure","data":{"code":"service_failure","kind":"operational","next_action":"retry_explicitly","service_code":"stale_cursor","stage":"dispatch"}},"ok":false}
+  left: String("service_failure")
+ right: "stale_cursor"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+owner 9309a48d-7305-4601-98bc-8839cdf43778 acknowledged shutdown and removed its socket
+owned custody process 1497695 exit=Ok(ExitStatus(unix_wait_status(9)))
+owned custody process 1497694 exit=Ok(ExitStatus(unix_wait_status(9)))
+FAILED
+
+failures:
+
+failures:
+    cli_journey::kubernetes_cli_continuation_preserves_scope_and_revision
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 19 filtered out; finished in 8.99s
+
+error: test failed, to rerun pass `-p connectors-kubernetes --test local_runtime`
