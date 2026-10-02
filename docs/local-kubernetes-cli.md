@@ -296,6 +296,52 @@ specifies a SelfSubjectAccessReview target set, fan-out budget and an
 implemented and no result claims coverage. A read is dispatched and the cluster's
 own RBAC decision is reported.
 
-No runtime evidence against a dedicated Kubernetes sandbox has been recorded yet.
-The journeys above are verified against a local TLS fixture cluster and a
-disposable Secret Service.
+The [recorded provider restart checks](evidence/provider-restarts-20261002/README.md)
+include a task-owned Kubernetes sandbox. Real-provider acceptance is separate from
+the deterministic TLS fixture checks and requires explicit disposable resources.
+
+## Run the bounded real-provider acceptance
+
+The four `cli_journey::kubernetes_cli_*` acceptance cases in the `local_runtime`
+test target exercise read reuse after owner/keyring restart, authenticated RBAC
+denial, real continuation binding, and repair/revocation/stop behavior. They are
+ignored by default and fail when explicitly selected without their prerequisites.
+
+Build the optimized production CLI and adapter first. Set `CONNECTORS_TEST_CLI`
+to the absolute CLI binary path, `CONNECTORS_K8S_SANDBOX` to the disposable HTTPS
+API root, and `CONNECTORS_K8S_CA`, `CONNECTORS_K8S_TOKEN`, and
+`CONNECTORS_K8S_KUBECONFIG` to protected files. The token file contains the raw
+bearer token; the kubeconfig is used only for fixture provisioning. Never select
+a default kubeconfig or place a token in arguments. Use an owner-private, short
+physical `TMPDIR` and a separate Cargo target for the checkout.
+
+The fixture requires `/usr/bin/kubectl`, `/usr/bin/dbus-daemon`, and
+`/usr/bin/gnome-keyring-daemon`. It owns a private bus/keyring, uniquely named API
+objects and namespaced Roles/RoleBindings in `fixture` and
+`fixture-cb26d-empty`. The latter namespace's Service collection must be empty.
+The `fixture/connector-reader` service account needs SelfSubjectReview and the
+explicit node get/list grant for the host-discovery case; the test does not create
+cluster-scoped permissions. Provision these disposable namespaces and cluster
+permissions deliberately before running. A different pods-only service account
+provides the authenticated Services-denial control.
+
+The test-only loopback HTTPS observer verifies the real upstream CA, forwards
+only the selected reads and SelfSubjectReview, disables redirects/retries, and
+records method/path/status without credentials or query values. It counts before
+forwarding, so a zero-request assertion includes unfinished requests. A bounded
+barrier can hold one completed real response for a lifecycle race; it does not
+simulate a provider failure. The fixture records exact object identities and
+revisions and deletes only its own objects. Its deliberately unschedulable Pod
+and zero-replica Deployment establish API-object existence, not workload readiness.
+
+Select each of these exact names separately, using `--exact --ignored --nocapture
+--test-threads=1` with `cargo test --locked --release -p connectors-kubernetes
+--test local_runtime`:
+
+- `cli_journey::kubernetes_cli_reuses_each_admitted_read_after_restart`
+- `cli_journey::kubernetes_cli_provider_rbac_denial_is_not_empty_success`
+- `cli_journey::kubernetes_cli_continuation_preserves_scope_and_revision`
+- `cli_journey::kubernetes_cli_repair_revoke_and_stop_preserve_authority`
+
+Retain each runner result and fixture cleanup outcome. A successful deterministic
+fixture run or a missing sandbox does not count as these real-provider cases.

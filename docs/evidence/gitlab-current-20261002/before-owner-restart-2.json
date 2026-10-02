@@ -1,0 +1,1 @@
+{"ok":true,"result":{"observation":{"adapter":"gitlab","child_incarnation":"c16cda8f-28ee-4f51-838d-a1cb0871be4e","configuration_revision":"0c1ddf490ca35d336fe687af5370d0d870ba49536111eef0850be0099a0350e8","host_incarnation":"2eb02256-f7ef-48bb-a731-cc370550188e","observed_at_ms":1790958752863,"state":"ready"}}}

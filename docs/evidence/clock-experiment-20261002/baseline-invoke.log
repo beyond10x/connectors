@@ -1,0 +1,59 @@
+    Finished `release` profile [optimized] target(s) in 0.26s
+     Running unittests src/lib.rs (target/release/deps/connectors_host-2cdd9fa232962295)
+
+running 1 test
+test local::registry::store_cost_tests::read_invoke_cost_by_store_size ... events=55 invokes=5 failed=0 appended_per_invoke=7 median_ms=545 min_ms=516 max_ms=582 median_cpu_ms=474
+events=55   step 0.cli.inspect          ms_per_invoke=81.0 of_which_execute_batch_ms=0.0
+events=55   step 1.cli.inspect          ms_per_invoke=7.9 of_which_execute_batch_ms=0.0
+events=55   step 2.cli.admit_read       ms_per_invoke=101.8 of_which_execute_batch_ms=83.3
+events=55   step 3.cli.inspect          ms_per_invoke=7.8 of_which_execute_batch_ms=0.0
+events=55   step 4.owner.capture_read   ms_per_invoke=127.0 of_which_execute_batch_ms=91.2
+events=55   step 5.owner.dispatch_read  ms_per_invoke=107.5 of_which_execute_batch_ms=85.7
+events=55   step 6.owner.release_read   ms_per_invoke=114.7 of_which_execute_batch_ms=92.8
+events=55   kind er.complete_snapshot   calls_per_invoke=1.0 ms_per_invoke=5.3
+events=55   kind er.execute_batch       calls_per_invoke=4.0 ms_per_invoke=352.9
+events=55   kind er.lookup_batch        calls_per_invoke=4.0 ms_per_invoke=31.2
+events=55   kind er.read_history        calls_per_invoke=6.0 ms_per_invoke=38.7
+events=55   kind er.start               calls_per_invoke=1.0 ms_per_invoke=66.9
+events=55   kind host.capture_sql       calls_per_invoke=15.0 ms_per_invoke=1.8
+events=55   kind host.feed              calls_per_invoke=12.0 ms_per_invoke=3.3
+events=55   kind host.projection        calls_per_invoke=7.0 ms_per_invoke=7.8
+events=55   kind host.validate          calls_per_invoke=14.0 ms_per_invoke=14.9
+events=601 invokes=5 failed=0 appended_per_invoke=7 median_ms=13805 min_ms=13034 max_ms=15021 median_cpu_ms=13559
+events=601   step 0.cli.inspect          ms_per_invoke=636.9 of_which_execute_batch_ms=0.0
+events=601   step 1.cli.inspect          ms_per_invoke=42.6 of_which_execute_batch_ms=0.0
+events=601   step 2.cli.admit_read       ms_per_invoke=3169.7 of_which_execute_batch_ms=3037.5
+events=601   step 3.cli.inspect          ms_per_invoke=45.3 of_which_execute_batch_ms=0.0
+events=601   step 4.owner.capture_read   ms_per_invoke=3467.8 of_which_execute_batch_ms=2797.7
+events=601   step 5.owner.dispatch_read  ms_per_invoke=3099.6 of_which_execute_batch_ms=2964.1
+events=601   step 6.owner.release_read   ms_per_invoke=3444.6 of_which_execute_batch_ms=3294.6
+events=601   kind er.complete_snapshot   calls_per_invoke=1.0 ms_per_invoke=57.6
+events=601   kind er.execute_batch       calls_per_invoke=4.0 ms_per_invoke=12093.9
+events=601   kind er.lookup_batch        calls_per_invoke=4.0 ms_per_invoke=320.6
+events=601   kind er.read_history        calls_per_invoke=6.0 ms_per_invoke=760.0
+events=601   kind er.start               calls_per_invoke=1.0 ms_per_invoke=541.5
+events=601   kind host.capture_sql       calls_per_invoke=15.0 ms_per_invoke=2.1
+events=601   kind host.feed              calls_per_invoke=12.0 ms_per_invoke=4.8
+events=601   kind host.projection        calls_per_invoke=7.0 ms_per_invoke=9.7
+events=601   kind host.validate          calls_per_invoke=14.0 ms_per_invoke=60.5
+events=1203 invokes=5 failed=0 appended_per_invoke=7 median_ms=31349 min_ms=25603 max_ms=32330 median_cpu_ms=30918
+events=1203   step 0.cli.inspect          ms_per_invoke=1402.7 of_which_execute_batch_ms=0.0
+events=1203   step 1.cli.inspect          ms_per_invoke=79.5 of_which_execute_batch_ms=0.0
+events=1203   step 2.cli.admit_read       ms_per_invoke=6582.5 of_which_execute_batch_ms=6359.4
+events=1203   step 3.cli.inspect          ms_per_invoke=86.7 of_which_execute_batch_ms=0.0
+events=1203   step 4.owner.capture_read   ms_per_invoke=7879.6 of_which_execute_batch_ms=6454.2
+events=1203   step 5.owner.dispatch_read  ms_per_invoke=6617.0 of_which_execute_batch_ms=6367.8
+events=1203   step 6.owner.release_read   ms_per_invoke=7332.7 of_which_execute_batch_ms=7087.4
+events=1203   kind er.complete_snapshot   calls_per_invoke=1.0 ms_per_invoke=132.1
+events=1203   kind er.execute_batch       calls_per_invoke=4.0 ms_per_invoke=26268.9
+events=1203   kind er.lookup_batch        calls_per_invoke=4.0 ms_per_invoke=573.1
+events=1203   kind er.read_history        calls_per_invoke=6.0 ms_per_invoke=1609.3
+events=1203   kind er.start               calls_per_invoke=1.0 ms_per_invoke=1201.4
+events=1203   kind host.capture_sql       calls_per_invoke=15.0 ms_per_invoke=2.0
+events=1203   kind host.feed              calls_per_invoke=12.0 ms_per_invoke=6.5
+events=1203   kind host.projection        calls_per_invoke=7.0 ms_per_invoke=9.4
+events=1203   kind host.validate          calls_per_invoke=14.0 ms_per_invoke=93.4
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 319 filtered out; finished in 2413.05s
+

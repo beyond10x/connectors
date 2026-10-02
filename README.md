@@ -25,7 +25,7 @@ separate steps.
 
 ## Where the project stands
 
-Source release **v0.25.0** keeps connection metadata in Entity Runtime over an
+Source release **v0.25.1** keeps connection metadata in Entity Runtime over an
 Eventlog SQLite store, specified at ESS source format `ess/15`, with GitLab, Jira Cloud, Confluence Cloud and HubSpot CRM served from their pinned OpenAPI sources, and Google Drive, Slides, Calendar and Gmail from pinned Discovery documents projected to OpenAPI, through
 the catalog provider. The [changelog](CHANGELOG.md) records its scope and
 remaining work.
@@ -48,6 +48,10 @@ all of its reads, merge-request create, update and a guarded merge have run
 against a live GitLab through it, the preconditions declared as data. Explicit
 revalidation renews the 60-second validation evidence without credential
 re-entry; see [the sandbox evidence](docs/evidence/gitlab-sandbox-20260913/README.md).
+The [2026-10-02 read replay](docs/evidence/gitlab-current-20261002/README.md)
+covers all eighteen current reads and saved-credential reuse after an owner
+restart. It retains one unexplained initial revalidation refusal and identifies
+the three empty-list results; historical live mutation evidence remains separate.
 
 This catalog is a second implementation, not a migration of the first: the
 predecessor it re-implements ships at `crates/catalog` in the v1 component, and both
@@ -64,14 +68,18 @@ Kubernetes now has the same local lifecycle binding: a saved bearer token, an
 identity validated by one SelfSubjectReview probe, and its three reads through the
 local owner. Disposable TLS cluster and keyring fixtures prove reuse after CLI,
 owner and keyring restarts. Per-operation SelfSubjectAccessReview permission
-checks are not implemented and no result claims authorization coverage; dedicated
-Kubernetes sandbox acceptance remains open.
+checks are not implemented and no result claims complete authorization coverage.
+[Real k3s acceptance](docs/evidence/kubernetes-acceptance-20261002/README.md)
+now covers selected reads, RBAC refusal, continuation binding and local lifecycle
+controls. Additional Kubernetes and Helm workflows remain open.
 
 PostgreSQL now has it too, as the third execution family: it speaks its own wire
 protocol rather than HTTP, so the session itself is the credential check and the
 saved identity is the role and database. Its two reads run inside a read-only
-transaction with fixed statement and lock timeouts. A loopback wire fixture
-proves the journey; dedicated sandbox acceptance remains open. See the
+transaction with fixed statement and lock timeouts.
+[Six real PostgreSQL cases](docs/evidence/postgres-acceptance-20261002/README.md)
+cover restart, incident reads, read-only refusals, native drop cancellation and
+local lifecycle controls. The plaintext fixture does not establish TLS. See the
 [PostgreSQL CLI guide](docs/local-postgres-cli.md). MCP and the remaining
 providers follow. The explicit network commands below remain compatible.
 
@@ -99,7 +107,7 @@ The current services provide:
 
 | Adapter | Implemented operations | Binding |
 |---|---|---|
-| GitLab (catalog provider) | `project.get`, `issues.list`, `file.get`, `branch.get`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.create`, `merge_request.update`, `merge_request.merge` | GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks; the host's permitted operation ids are the scope |
+| GitLab (catalog provider) | `projects.list`, `project.get`, `project.events`, `issues.list`, `file.get`, `branch.get`, `tags.list`, `releases.list`, `commits.list`, `repository.compare`, `deployments.list`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `merge_request.create`, `merge_request.update`, `merge_request.merge` | GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks; the host's permitted operation ids are the scope |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, and optionally the `helm_releases.*` release reads | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
 
@@ -136,7 +144,8 @@ describe what was checked and its limits.
 
 ## Get started
 
-Build from the repository root with Rust 1.88.0 or later:
+Build the workspace from the repository root with Rust 1.91.0 or later. The
+independent libraries are also checked on Rust 1.88.0:
 
 ```sh
 cargo build --workspace --locked

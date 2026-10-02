@@ -1,0 +1,9 @@
+   Compiling connectors-sql v0.25.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26d-pg/adapters/sql)
+    Finished `release` profile [optimized] target(s) in 1.81s
+     Running tests/protocol.rs (target/release/deps/protocol-ac09d42148fc3a16)
+
+running 1 test
+test adversary_only_exact_feature_not_supported_changes_classification ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.62s
+

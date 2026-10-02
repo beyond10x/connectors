@@ -1,0 +1,11 @@
+    Finished `release` profile [optimized] target(s) in 1.03s
+     Running unittests src/lib.rs (target/release/deps/connectors_host-2cdd9fa232962295)
+
+running 1 test
+test local::registry::store_cost_tests::batch_cost_by_subject ... events=55 runtime_record_batch_ms=[47, 24, 29] registry_clock_batch_ms=[66, 67, 59]
+events=601 runtime_record_batch_ms=[50, 35, 44] registry_clock_batch_ms=[2400, 2596, 2946]
+events=1203 runtime_record_batch_ms=[67, 79, 28] registry_clock_batch_ms=[6303, 7931, 6318]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 319 filtered out; finished in 33.49s
+

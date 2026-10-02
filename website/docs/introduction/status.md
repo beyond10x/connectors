@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.25.0
+# Source release v0.25.1
 
-Version **0.25.0** specifies at ESS source format `ess/15` with the released
+Version **0.25.1** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -23,7 +23,12 @@ every one bound from the pinned source with no adapter code per endpoint. A
 live GitLab has answered all of them. Since 0.16.0 the GitLab selection also lists
 projects, tags, releases and project events, and bounds `per_page` to 1–100. Since 0.22.0
 it also lists a ref's commits and compares two refs, and since 0.23.0 a project's
-deployments with their environment, exercised against local fixtures only.
+deployments with their environment. The 2026-10-02 dedicated sandbox replay
+returned HTTP 200 for all eighteen current reads, each within its requested page
+bounds, and reused saved credentials across an owner restart. Tags, releases and
+deployments returned empty lists. An initial revalidation refusal remains
+unexplained; later explicit retries succeeded. The replay made no provider writes;
+the live mutation evidence above comes from earlier runs.
 
 [Jira Cloud](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) runs
 through the same catalog provider with HTTP basic authentication: issue search by
@@ -70,14 +75,24 @@ sandbox acceptance is recorded in the source checkout's evidence directory.
 Local approval policy, protected proof issuance and guarded GitLab writes run
 through private protocol two. The retired native GitLab adapter had production
 CLI fixtures joining the mutation ledger, audit, approval spend and provider
-effects, including lost-response observation without resending. Porting those
-journeys to the catalog child remains required; engine fixtures and earlier live
-sandbox runs do not replace that evidence. Public/version-one interfaces retain
-reads.
+effects, including lost-response observation without resending. The catalog port
+now has passing evidence for all ten logical obligations and fifteen historical
+variants. Exact-file seccomp faults exercise settlement failure; cleanup controls
+distinguish strongly owned processes from observation-only child handles. The
+original effects use the production CLI; some settled replay observations use a
+same-image host-library helper. Results span multiple runs with documented reuse
+where relevant source is unchanged, rather than one final executable running all
+variants. The fault cases require Linux x86_64 seccomp user notifications.
+Public/version-one interfaces retain reads.
 
 Kubernetes and PostgreSQL implement persistent local connections, saved credential
-reuse and owner restarts. Their dedicated sandbox acceptance and remaining
-selected workflows precede MCP and the remaining providers. Metadata operation
+reuse and owner restarts. Four new k3s v1.31.5 cases passed for selected reads,
+RBAC denial versus empty results, continuation binding and lifecycle controls;
+four existing CLI journeys also passed. Six PostgreSQL 17.6 cases passed: five
+production CLI cases and one direct adapter invocation-drop cancellation case.
+The PostgreSQL fixture used plaintext loopback, and its cancellation timing is
+an observation rather than a universal deadline. SSAR and remaining Kubernetes/
+Helm workflows are still open. MCP delivery remains pending. Metadata operation
 cost still grows with the event store; Entity Runtime issue 51 tracks the upstream
 fix, and the timeout cleanup change does not remove that performance limit.
 Other adapter pages distinguish designs and typed specifications from running

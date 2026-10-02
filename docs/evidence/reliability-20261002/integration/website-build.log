@@ -1,0 +1,78 @@
+npm notice run connectors-website@0.2.0 prebuild
+npm notice run npm run reference && npm run examples
+npm notice run connectors-website@0.2.0 reference
+npm notice run cd .. && cargo run --locked -p connectors-build -- docs
+   Compiling ring v0.17.14
+   Compiling rustls v0.23.45
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-rustls v0.26.6
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.5
+   Compiling connectors-client v0.25.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/crates/connectors-client)
+   Compiling connectors-host v0.25.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/crates/connectors-host)
+   Compiling connectors-spec v0.25.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/crates/connectors-spec)
+   Compiling connectors-build v0.25.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/crates/connectors-build)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 8.07s
+     Running `target/debug/connectors-build docs`
+website: 43 contract pages, 97 total reference pages; generated
+npm notice run connectors-website@0.2.0 examples
+npm notice run cd .. && cargo run --locked -p connectors-build -- examples
+    Finished `dev` profile [optimized + debuginfo] target(s) in 0.18s
+     Running `target/debug/connectors-build examples`
+website: walkthrough input/result match the shipped GitLab selection
+connectors v1 — 16 file(s), valid
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling connectors-types v1.0.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/website/.cache/demo/generated/rust/connectors/crates/connectors-types)
+   Compiling serde_json v1.0.151
+   Compiling contract-examples v1.0.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/website/.cache/demo/generated/rust/connectors/crates/contract-examples)
+   Compiling connectors-system v1.0.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/website/.cache/demo/generated/rust/connectors/crates/connectors-system)
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling connectors-web v1.0.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/website/.cache/demo/generated/web/connectors/crates/connectors-web)
+   Compiling connectors-contract-examples v0.1.0 ($HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/website/examples/realization)
+    Finished `release` profile [optimized] target(s) in 6.40s
+website: 3 public files checked; no private path markers
+website: Rust/WASM contract examples built
+npm notice run connectors-website@0.2.0 build
+npm notice run DOCUSAURUS_GENERATED_FILES_DIR_NAME=.cache/build-docusaurus docusaurus build
+[INFO] [en] Creating an optimized production build...
+[webpackbar] ℹ Compiling Client
+[webpackbar] ℹ Compiling Server
+[webpackbar] ✔ Server: Compiled successfully in 9.93s
+[webpackbar] ✔ Client: Compiled successfully in 48.50s
+[WARNING] {"file":"assets/css/styles.eb420fed.css","message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:43534. Ignoring.","compilerPath":"client"}
+[WARNING] {"file":"assets/css/styles.eb420fed.css","message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:45259. Ignoring.","compilerPath":"client"}
+[WARNING] {"file":"assets/css/styles.eb420fed.css","message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:74889. Ignoring.","compilerPath":"client"}
+[WARNING] {"file":"assets/css/styles.eb420fed.css","message":"assets/css/styles.eb420fed.css from Css Minimizer plugin\nMissing font size at assets/css/styles.eb420fed.css:25:80835. Ignoring.","compilerPath":"client"}
+website: 335 public files checked; no private path markers
+
+Running Pagefind v1.5.2 (Extended)
+Running from: "$HOME/.local/state/worktree/trees/b10x/connectors/cb26b-publish/website"
+Source:       "build"
+Output:       "build/pagefind"
+
+[Walking source directory]
+Found 120 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 118 pages
+  Indexed 8181 words
+  Indexed 3 filters
+  Indexed 0 sorts
+
+Finished in 0.206 seconds
+website: 482 public files checked; no private path markers
+website: local full-text search indexed and preview refreshed
+[SUCCESS] Generated static files in "build".
+[INFO] Use `npm run serve` command to test your build locally.

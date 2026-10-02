@@ -1,0 +1,57 @@
+    Finished `release` profile [optimized] target(s) in 0.28s
+     Running unittests src/lib.rs (target/release/deps/connectors_sql-ae8de4e0264c5706)
+
+running 2 tests
+test error_tests::the_databases_statement_timeout_and_capacity_answers_are_marked_and_own_deadlines_are_not ... ok
+test tls_tests::configured_ca_replaces_public_roots_and_requires_certificates ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/release/deps/connectors_sql-79e02e23017a24d4)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/local_runtime.rs (target/release/deps/local_runtime-a24700cdb1049868)
+
+running 16 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, CONNECTORS_PG_CONTAINER, a built production CLI and qualified disposable Secret Service
+test cli_journey::postgres_cli_cannot_escape_read_only_transaction ... ignored, requires CONNECTORS_PG_SANDBOX, CONNECTORS_PG_CONTAINER, built CONNECTORS_TEST_CLI and qualified disposable Secret Service
+test cli_journey::postgres_cli_distinguishes_empty_truncated_capacity_and_timeout ... ignored, requires CONNECTORS_PG_SANDBOX, CONNECTORS_PG_CONTAINER, built CONNECTORS_TEST_CLI and qualified disposable Secret Service
+test cli_journey::postgres_cli_preserves_join_group_utc_and_quoted_parameters ... ignored, requires CONNECTORS_PG_SANDBOX, CONNECTORS_PG_CONTAINER, built CONNECTORS_TEST_CLI and qualified disposable Secret Service
+test cli_journey::postgres_dropped_invocation_cancels_its_backend ... ignored, requires CONNECTORS_PG_SANDBOX and CONNECTORS_PG_CONTAINER for owned PostgreSQL observation
+test cli_journey::postgres_repair_revoke_and_busy_stop_preserve_authority ... ignored, requires CONNECTORS_PG_SANDBOX, CONNECTORS_PG_CONTAINER, built CONNECTORS_TEST_CLI and qualified disposable Secret Service
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+     Running tests/protocol.rs (target/release/deps/protocol-ac09d42148fc3a16)
+
+running 8 tests
+test parsing_and_limits_refuse_before_credentials_or_connection ... ok
+test dropping_the_invocation_still_cancels_the_database ... ok
+test text_null_and_empty_parameters_reach_bind_without_interpolation ... ok
+test adversary_only_exact_feature_not_supported_changes_classification ... ok
+test rows_nulls_native_types_and_truncation_are_preserved ... ok
+test authentication_database_errors_and_row_capacity_are_sanitized ... ok
+test unresponsive_database_cannot_extend_the_cleanup_budget ... ok
+test deadline_sends_the_backend_cancel_key_and_drains_the_connection ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.08s
+
+   Doc-tests connectors_sql
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -21,6 +21,9 @@ operation of the pinned source under a local id with a declared effect:
 | id | effect | what it binds |
 |---|---|---|
 | `project.get`, `issues.list`, `file.get`, `branch.get` | read | one GET each on the project, its issues, a repository file, a branch |
+| `projects.list`, `project.events` | read | visible projects, one project's events |
+| `tags.list`, `releases.list`, `commits.list`, `repository.compare` | read | repository tags, releases, commits for a ref, comparison of two refs |
+| `deployments.list` | read | a project's deployments with their environment |
 | `merge_requests.list`, `merge_request.get` | read | the project's merge requests, one merge request by IID |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | read | pipelines, one pipeline, its jobs, one job |
 | `job.trace` | read | a job's log, answered as text |
@@ -52,11 +55,13 @@ uncertain.
 
 ## Against a live GitLab
 
-Through the shipped selection set, a dedicated sandbox answered all eleven reads,
+The 2026-10-02 replay returned HTTP 200 for all eighteen current reads and reused saved credentials after an owner restart. Tags, releases and deployments returned empty lists; job.trace returned text. One initial revalidation returned unavailable before a later explicit retry succeeded, and that failure remains recorded. This replay performed no provider writes.
+
+The earlier dedicated sandbox run answered the eleven reads then selected,
 the job trace as text; refused a merge with a stale pinned head and a merge
 naming the wrong pipeline before any request; merged one request with exactly
 one PUT; and refused an update of the merged request on the state check. Earlier
-the same day, a create opened a request at its pinned head, a duplicate was
+in that sandbox run, a create opened a request at its pinned head, a duplicate was
 refused by GitLab's 409, and a create whose branch moved between the preflight
 read and the POST was classified uncertain.
 

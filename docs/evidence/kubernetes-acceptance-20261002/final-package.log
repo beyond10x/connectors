@@ -1,0 +1,96 @@
+    Finished `release` profile [optimized] target(s) in 0.17s
+     Running unittests src/lib.rs (target/release/deps/connectors_kubernetes-cee8efd9ccb7ad35)
+
+running 10 tests
+test helm::tests::a_release_name_helm_would_refuse_is_refused_here ... ok
+test helm::tests::a_body_disagreeing_with_its_object_labels_is_refused ... ok
+test helm::tests::a_payload_that_is_not_a_release_record_never_projects_as_complete ... ok
+test helm::tests::a_path_outside_its_declared_bound_is_dropped_and_the_page_says_so ... ok
+test helm::tests::manifest_documents_are_positions_and_digests_not_text ... ok
+test helm::tests::a_revision_record_is_read_only_from_a_helm_release_secret ... ok
+test helm::tests::an_observation_carries_observed_values_inside_their_declared_bounds ... ok
+test helm::tests::every_recorded_shape_is_projected_and_no_literal_survives ... ok
+test helm::tests::each_published_digest_covers_exactly_the_bytes_its_documents_name ... ok
+test helm::tests::both_stored_encodings_decode_and_neither_invents_a_shape ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/release/deps/connectors_kubernetes-37a714faf1010c3b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/helm_contract_adversary.rs (target/release/deps/helm_contract_adversary-25931fb01adeb587)
+
+running 5 tests
+test the_cli_document_does_not_contradict_its_own_limit_examples ... ok
+test a_stored_payload_that_is_not_a_release_record_is_not_reported_complete ... ok
+test manifest_content_digest_is_sha256_over_the_document_text ... ok
+test an_empty_recorded_key_stays_inside_the_published_path_bound ... ok
+test a_deeply_nested_recorded_value_stays_inside_the_published_path_bound ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/helm_contract_adversary_pass2.rs (target/release/deps/helm_contract_adversary_pass2-19bac6528f6151c9)
+
+running 6 tests
+test the_manifest_digest_is_reproducible_by_sha256sum_over_the_stored_document ... ok
+test present_but_unestablished_object_metadata_is_not_read_as_an_omission ... ok
+test a_release_revision_outside_its_declared_input_bound_is_refused ... ok
+test the_same_unread_continuation_reports_a_resource_page_complete ... ok
+test a_continuation_the_binding_cannot_read_does_not_report_the_page_complete ... ok
+test a_values_page_under_its_limit_returns_one_entry_per_recorded_path ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/local_runtime.rs (target/release/deps/local_runtime-3575a67e13ecbb3d)
+
+running 20 tests
+test cli_journey::a_real_cluster_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_K8S_SANDBOX, a built production CLI and qualified disposable Secret Service
+test cli_journey::kubernetes_cli_continuation_preserves_scope_and_revision ... ignored, requires explicit disposable Kubernetes sandbox, production CLI and qualified private custody
+test cli_journey::kubernetes_cli_provider_rbac_denial_is_not_empty_success ... ignored, requires explicit disposable Kubernetes sandbox, production CLI and qualified private custody
+test cli_journey::kubernetes_cli_reads_helm_release_history_and_redacted_values ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_credential ... ignored, requires built production CLI and qualified disposable Secret Service
+test cli_journey::kubernetes_cli_repair_revoke_and_stop_preserve_authority ... ignored, requires explicit disposable Kubernetes sandbox, production CLI and qualified private custody
+test cli_journey::kubernetes_cli_reuses_each_admitted_read_after_restart ... ignored, requires explicit disposable Kubernetes sandbox, production CLI and qualified private custody
+test cli_journey::persistent_kubernetes_cli_owner_and_keyring_restart ... ignored, requires built production CLI and qualified disposable Secret Service
+test configured_host_discovery_is_advertised_and_reads_nodes ... ok
+test an_out_of_scope_release_and_an_unreadable_namespace_are_distinct_from_an_empty_history ... ok
+test helm_release_history_status_values_and_manifest_come_from_named_release_secrets ... ok
+test an_unaccepted_credential_refuses_before_any_business_read ... ok
+test a_backendless_endpointslice_reads_as_no_observations_rather_than_malformed ... ok
+test review_status_codes_map_to_distinct_failures_without_a_business_read ... ok
+test an_accepted_anonymous_request_is_refused_rather_than_saved_as_an_identity ... ok
+test an_uncompressed_release_body_reads_and_bounded_pages_report_their_own_completeness ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_provider_work ... ok
+test private_kubernetes_validates_through_selfsubjectreview_and_reads_scoped_resources ... ok
+test helm_reads_are_unadvertised_until_configured_and_content_needs_its_own_disclosure ... ok
+test lost_validation_response_closes_the_owned_channel_without_replay ... ok
+
+test result: ok. 12 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 1.20s
+
+     Running tests/provider.rs (target/release/deps/provider-0a3ee9d9d9e56251)
+
+running 3 tests
+test disabled_host_discovery_is_not_advertised_or_dispatched ... ok
+test endpoint_cross_product_is_bounded_even_for_one_source_slice ... ok
+test discovery_is_attributed_paged_and_does_not_activate_observed_endpoints ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running tests/stage_origin_adversary.rs (target/release/deps/stage_origin_adversary-c7b1ee6452e1f944)
+
+running 3 tests
+test a_namespace_outside_the_configured_scope_is_not_reported_as_a_provider_refusal ... ok
+test disabled_host_discovery_is_not_reported_as_a_provider_refusal ... ok
+test a_resource_kind_outside_the_configured_scope_is_not_reported_as_a_provider_refusal ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+   Doc-tests connectors_kubernetes
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

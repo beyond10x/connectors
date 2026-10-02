@@ -96,9 +96,14 @@ const PROVIDER: &str = "CONNECTORS_TEST_CATALOG_PROVIDER";
 const CHROME: &str = "google-chrome-stable";
 const OLD_CLI: &str = "CONNECTORS_ADVERSARY_PRE_HANDSHAKE";
 const PG: &str = "CONNECTORS_PG_SANDBOX";
+const PG_CONTAINER: &str = "CONNECTORS_PG_CONTAINER";
+const DOCKER: &str = "docker";
 const K8S: &str = "CONNECTORS_K8S_SANDBOX";
 const CA: &str = "CONNECTORS_K8S_CA";
 const TOKEN: &str = "CONNECTORS_K8S_TOKEN";
+const KUBECONFIG: &str = "CONNECTORS_K8S_KUBECONFIG";
+const KUBECTL: &str = "/usr/bin/kubectl";
+const SECCOMP: &str = "Linux x86_64 seccomp USER_NOTIF";
 // Same qualified artifact as the custody implementation; a test below detects pin drift.
 const GNOME_SHA256: &str = "b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02f5f2ca53958b";
 
@@ -155,6 +160,36 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         (
             "connectors-catalog-provider",
             "local_runtime",
+            "cli_journey::guarded_merge::prepared_attempt_exit_fixture"
+            | "cli_journey::guarded_merge::owner_replay::catalog_same_image_owner_fixture",
+        ) => {
+            entry.helper = true;
+            return entry;
+        }
+        (
+            "connectors-catalog-provider",
+            "local_runtime",
+            "cli_journey::lifecycle::catalog_cli_explicit_revalidation_after_real_expiry_without_reentry",
+        ) => Some((Timing, vec![CUSTODY, CLI])),
+        (
+            "connectors-catalog-provider",
+            "local_runtime",
+            "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority"
+            | "cli_journey::guarded_merge::catalog_cli_guarded_merge_applied_refused_and_lost_response_restart"
+            | "cli_journey::guarded_merge::catalog_cli_guarded_merge_revocation_finishes_admitted_audit"
+            | "cli_journey::guarded_merge::catalog_cli_recovers_abandoned_preparation_only_with_trusted_time"
+            | "cli_journey::guarded_merge::catalog_cli_background_recovery_waits_for_live_work_and_recovers_unkeyed_attempts"
+            | "cli_journey::guarded_merge::catalog_cli_background_recovers_revoked_removed_target_without_disclosure",
+        ) => Some((Disposable, vec![CUSTODY, CLI])),
+        (
+            "connectors-catalog-provider",
+            "local_runtime",
+            "cli_journey::guarded_merge::catalog_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively"
+            | "cli_journey::guarded_merge::catalog_adversary_revoked_disclosure_of_an_applied_merge_never_answers_not_attempted",
+        ) => Some((Disposable, vec![CUSTODY, CLI, SECCOMP])),
+        (
+            "connectors-catalog-provider",
+            "local_runtime",
             "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart"
             | "cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code"
             | "cli_journey::basic_catalog_cli_refuses_a_credential_below_minimum_scopes"
@@ -175,13 +210,29 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "cli_journey::a_real_cluster_session_persists_across_cli_and_owner_restart" => {
                 Some((Live, vec![CUSTODY, CLI, K8S, CA, TOKEN]))
             }
+            "cli_journey::kubernetes_cli_reuses_each_admitted_read_after_restart"
+            | "cli_journey::kubernetes_cli_provider_rbac_denial_is_not_empty_success"
+            | "cli_journey::kubernetes_cli_continuation_preserves_scope_and_revision"
+            | "cli_journey::kubernetes_cli_repair_revoke_and_stop_preserve_authority" => Some((
+                Live,
+                vec![CUSTODY, CLI, K8S, CA, TOKEN, KUBECONFIG, KUBECTL],
+            )),
             _ => None,
         },
         (
             "connectors-sql",
             "local_runtime",
-            "cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart",
-        ) => Some((Live, vec![CUSTODY, CLI, PG])),
+            "cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart"
+            | "cli_journey::postgres_cli_preserves_join_group_utc_and_quoted_parameters"
+            | "cli_journey::postgres_cli_distinguishes_empty_truncated_capacity_and_timeout"
+            | "cli_journey::postgres_cli_cannot_escape_read_only_transaction"
+            | "cli_journey::postgres_repair_revoke_and_busy_stop_preserve_authority",
+        ) => Some((Live, vec![CUSTODY, CLI, PG, PG_CONTAINER, DOCKER])),
+        (
+            "connectors-sql",
+            "local_runtime",
+            "cli_journey::postgres_dropped_invocation_cancels_its_backend",
+        ) => Some((Live, vec![PG, PG_CONTAINER, DOCKER])),
         (
             "connectors",
             "failed_connect",
@@ -469,6 +520,9 @@ fn executable(path: &Path) -> bool {
 }
 fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static str, String> {
     let mut missing = BTreeMap::new();
+    if !seccomp_notification_abi_available() {
+        missing.insert(SECCOMP, "settlement fixtures require Linux x86_64, the user_notif kernel action and notification ABI sizes 80/24/64; runtime policy must also permit listener installation and owned-process fd inspection".into());
+    }
     let custody = executable(Path::new("/usr/bin/dbus-daemon"))
         && std::fs::read("/usr/bin/gnome-keyring-daemon")
             .is_ok_and(|bytes| crate::hash(&bytes) == GNOME_SHA256);
@@ -502,14 +556,42 @@ fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static st
             "CONNECTORS_PG_SANDBOX must name the prepared sandbox as host:port".into(),
         );
     }
+    if !std::env::var(PG_CONTAINER).is_ok_and(|value| {
+        value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(&byte))
+    }) {
+        missing.insert(
+            PG_CONTAINER,
+            "CONNECTORS_PG_CONTAINER must name the owned disposable PostgreSQL container with psql"
+                .into(),
+        );
+    }
+    if !std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .any(|path| executable(&path.join(DOCKER)))
+    {
+        missing.insert(DOCKER, "docker is not executable on PATH".into());
+    }
     if !std::env::var(K8S).is_ok_and(|value| !value.trim().is_empty()) {
         missing.insert(
             K8S,
             "CONNECTORS_K8S_SANDBOX must name the prepared sandbox API base".into(),
         );
     }
-    for key in [CA, TOKEN] {
-        if !std::env::var_os(key).is_some_and(|path| Path::new(&path).is_file()) {
+    if !executable(Path::new(KUBECTL)) {
+        missing.insert(KUBECTL, "/usr/bin/kubectl is not executable".into());
+    }
+    for key in [CA, TOKEN, KUBECONFIG] {
+        if !std::env::var_os(key).is_some_and(|path| {
+            std::fs::metadata(path).is_ok_and(|metadata| {
+                metadata.is_file()
+                    && (key != KUBECONFIG || metadata.permissions().mode() & 0o077 == 0)
+            })
+        }) {
             missing.insert(
                 key,
                 format!("{key} must name the sandbox's owner-only file"),
@@ -517,6 +599,30 @@ fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static st
         }
     }
     missing
+}
+
+fn seccomp_notification_abi_available() -> bool {
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        if !std::fs::read_to_string("/proc/sys/kernel/seccomp/actions_avail").is_ok_and(|actions| {
+            actions
+                .split_whitespace()
+                .any(|action| action == "user_notif")
+        }) {
+            return false;
+        }
+        const GET_NOTIF_SIZES: libc::c_uint = 3;
+        let mut sizes = [0_u16; 3];
+        // SAFETY: GET_NOTIF_SIZES only writes the documented three-u16 output;
+        // it installs no filter and changes no process policy.
+        let result =
+            unsafe { libc::syscall(libc::SYS_seccomp, GET_NOTIF_SIZES, 0, sizes.as_mut_ptr()) };
+        result == 0 && sizes == [80, 24, 64]
+    }
+    #[cfg(not(all(target_os = "linux", target_arch = "x86_64")))]
+    {
+        false
+    }
 }
 
 /// Build every default-feature workspace test target, then query the actual
@@ -859,6 +965,42 @@ mod local {{
         assert_eq!(report.executed, 0);
         assert!(!report.accepted(false));
     }
+    #[test]
+    fn adversary_nonprivate_kubeconfig_is_missing_before_dispatch() {
+        const CHILD: &str = "CONNECTORS_CLASSIFIER_MODE_PROBE";
+        if let Ok(expected) = std::env::var(CHILD) {
+            let missing = prerequisites(&BTreeMap::new());
+            assert_eq!(
+                missing.contains_key(KUBECONFIG),
+                expected == "missing",
+                "kubeconfig prerequisite must distinguish mode-0644 from mode-0600"
+            );
+            return;
+        }
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("kubeconfig");
+        std::fs::write(&path, b"fixture configuration, no credential\n").unwrap();
+        for (mode, expected) in [(0o644, "missing"), (0o600, "present")] {
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+            let output = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "ignored::tests::adversary_nonprivate_kubeconfig_is_missing_before_dispatch",
+                    "--nocapture",
+                ])
+                .env(CHILD, expected)
+                .env(KUBECONFIG, &path)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "isolated prerequisite probe failed: {}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
     #[test]
     fn inventory_mode_never_executes_selected_cases() {
         let mut opts = options();

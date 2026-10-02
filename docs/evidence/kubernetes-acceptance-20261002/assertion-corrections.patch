@@ -1,0 +1,50 @@
+--- .local/provider-wave/kubernetes/authored-first-live.rs	2026-10-02 18:05:43.037850576 +0200
++++ adapters/kubernetes/tests/local_runtime/cli_journey.rs	2026-10-02 18:07:20.905442886 +0200
+@@ -1660,12 +1660,14 @@
+         json!({"namespace":"fixture","kind":"services","limit":2,"cursor":original}),
+     ] {
+         let before = journey.observer.count();
+-        refusal(
++        let error = refusal(
+             journey
+                 .command("resources.list", input, &journey.connection)
+                 .observed_output(),
+-            "stale_cursor",
++            "service_failure",
+         );
++        assert_eq!(error["service_code"], "stale_cursor");
++        assert_eq!(error["stage"], "dispatch");
+         assert_eq!(journey.observer.count(), before);
+     }
+     // A second connection is a separate cursor partition even with the same token.
+@@ -1683,7 +1685,7 @@
+     let second = second["summary"]["connection"].as_str().unwrap();
+     assert_ne!(second, journey.connection);
+     let before = journey.observer.count();
+-    refusal(
++    let error = refusal(
+         journey
+             .command(
+                 "resources.list",
+@@ -1691,8 +1693,10 @@
+                 second,
+             )
+             .observed_output(),
+-        "stale_cursor",
++        "service_failure",
+     );
++    assert_eq!(error["service_code"], "stale_cursor");
++    assert_eq!(error["stage"], "dispatch");
+     assert_eq!(journey.observer.count(), before);
+     refusal(
+         journey
+@@ -1769,7 +1773,8 @@
+         status["child_incarnation"].as_str().unwrap(),
+     ]));
+     journey.observer.release();
+-    refusal(pending.finish(), "interrupted");
++    let terminated = refusal(pending.finish(), "unavailable");
++    assert_eq!(terminated["stage"], "readiness");
+     assert_eq!(
+         journey.observer.count(),
+         before + 1,

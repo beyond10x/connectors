@@ -158,13 +158,25 @@ cargo run --locked -p connectors-build -- ignored --family disposable,live,timin
 
 The `live` family includes the public Roughtime interoperability check and the
 prepared PostgreSQL and Kubernetes sandboxes. PostgreSQL requires
-`CONNECTORS_PG_SANDBOX=host:port`; Kubernetes requires `CONNECTORS_K8S_SANDBOX`,
-`CONNECTORS_K8S_CA` and `CONNECTORS_K8S_TOKEN`. Both provider journeys also need
-custody and the production CLI. Selecting `live` authorizes those existing tests;
+`CONNECTORS_PG_SANDBOX=127.0.0.1:port`, `CONNECTORS_PG_CONTAINER` naming the owned
+PostgreSQL 17.6 fixture with local `psql`, and Docker on PATH. Kubernetes requires
+`CONNECTORS_K8S_SANDBOX`, `CONNECTORS_K8S_CA` and `CONNECTORS_K8S_TOKEN`; its new
+provisioning cases also require a private `CONNECTORS_K8S_KUBECONFIG` file and
+`/usr/bin/kubectl`. CLI journeys need custody and the production CLI; native
+PostgreSQL future-drop cancellation needs only its database observation fixture.
+Selecting `live` authorizes those existing tests;
 the runner does not provision sandboxes. The `deferred` family contains the known
 CLI contract invariant limitation and can be explicitly run to observe its
 current result. Subprocess helpers are always excluded from top-level execution;
 their owning parent tests invoke them.
+
+The two catalog settlement-failure cases additionally require Linux x86_64 with
+seccomp `USER_NOTIF` and the supported notification ABI. The runner queries those
+capabilities without installing a filter. The fixtures must then be permitted to
+install a listener on their own CLI descendants and inspect those processes' file
+descriptors; a runtime policy refusal is an explicit test failure. The filter
+returns `EIO` only for the fixture's selected metadata files during the armed
+settlement window, and continues ordinary system calls outside it.
 
 The JSON report defaults to `.local/ignored-suites.json`; `--report <path>` selects
 another destination. It records every fully qualified test name, family,
