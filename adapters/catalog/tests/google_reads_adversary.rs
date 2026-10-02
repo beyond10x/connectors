@@ -143,6 +143,76 @@ struct Provider {
     config: PathBuf,
     requests: Requests,
 }
+
+async fn write_fixture_response(
+    stream: &mut (impl tokio::io::AsyncWrite + Unpin),
+    head: &[u8],
+    body: &[u8],
+) {
+    // The over-limit client may close early; its refusal is asserted by the caller.
+    let _ = stream.write_all(head).await;
+    let _ = stream.write_all(body).await;
+    // write_all may accept plaintext while TLS ciphertext is still buffered.
+    let _ = stream.flush().await;
+}
+
+/// Real TLS over a bounded byte stream makes pending ciphertext deterministic.
+/// This checks the fixture writer, independently of the production-child size test.
+#[tokio::test]
+async fn tls_fixture_delivers_the_complete_response_under_backpressure() {
+    tokio::time::timeout(Duration::from_secs(5), async {
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let mut server = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![cert.cert.der().clone()],
+            PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der()).into(),
+        )
+        .unwrap();
+        // Neither side drives application reads until both handshakes finish.
+        server.send_tls13_tickets = 0;
+        let mut roots = rustls::RootCertStore::empty();
+        roots.add(cert.cert.der().clone()).unwrap();
+        let client = rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+        let acceptor = TlsAcceptor::from(Arc::new(server));
+        let connector = tokio_rustls::TlsConnector::from(Arc::new(client));
+        let (client_io, server_io) = tokio::io::duplex(64);
+        let (server, client) = tokio::join!(
+            acceptor.accept(server_io),
+            connector.connect("localhost".try_into().unwrap(), client_io),
+        );
+        let mut server = server.unwrap();
+        let mut client = client.unwrap();
+        let body = vec![b'x'; 1024];
+        let head = b"HTTP/1.1 200 fixture\r\nContent-Length: 1024\r\nConnection: close\r\n\r\n";
+        let expected = [head.as_slice(), body.as_slice()].concat();
+        let send = async move {
+            write_fixture_response(&mut server, head, &body).await;
+        };
+        let receive = async move {
+            let mut received = vec![0; expected.len()];
+            client
+                .read_exact(&mut received)
+                .await
+                .expect("the fixture must deliver every declared response byte before drop");
+            assert_eq!(received, expected);
+        };
+        tokio::join!(send, receive);
+    })
+    .await
+    .expect("the bounded TLS fixture must finish");
+}
+
 impl Provider {
     fn new() -> Self {
         let root = tempfile::tempdir().unwrap();
@@ -252,8 +322,7 @@ impl Provider {
                         "HTTP/1.1 {status} fixture\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
                         answer.len()
                     );
-                    let _ = stream.write_all(head.as_bytes()).await;
-                    let _ = stream.write_all(&answer).await;
+                    write_fixture_response(&mut stream, head.as_bytes(), &answer).await;
                 }
             });
         });

@@ -54,3 +54,12 @@ on a task-owned loopback server and the installed matching Playwright Chromium.
 No website/cloud deployment was performed. Publication and exact tag/release
 verification remain pending at this record. npm reported 29 dependency audit advisories
 (1 low, 25 moderate, 3 high); this patch changes no website dependencies.
+
+## Follow-up to the first PR run
+
+The first PR 79 repository gate exposed an intermittent, pre-existing Google
+export fixture truncation. The [scoped correction and refreshed integration
+checks](../google-export-ci-20261002/README.md) supersede the original local gate
+for the corrected candidate: 1,208 tests pass, with the same 65 ignored cases and
+unchanged conformance limitations. The original failed CI and red/green regression
+are retained. The fixture correction changes no production limits or behavior.

@@ -6,6 +6,9 @@
 
 - PostgreSQL SQLSTATE `0A000` now returns `unsupported` instead of `unavailable`.
   Neighboring custom SQLSTATE values retain their existing classification.
+- The Google export test fixture flushes its TLS response before closing, fixing
+  intermittent truncation at the 4 MiB acceptance boundary. A bounded TLS
+  regression detects the missing flush; production response limits are unchanged.
 
 ### Verified
 
