@@ -5,7 +5,7 @@ use std::{
     sync::{Arc, Barrier},
 };
 
-const NOW: u64 = 1_788_998_400_000;
+pub(super) const NOW: u64 = 1_788_998_400_000;
 
 #[test]
 fn approval_target_is_passive_but_requires_exact_retained_admission() {
@@ -744,7 +744,7 @@ fn concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence() {
     }
 }
 
-fn fixture() -> (tempfile::TempDir, Registry) {
+pub(super) fn fixture() -> (tempfile::TempDir, Registry) {
     let root = tempfile::tempdir().unwrap();
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     super::super::filesystem::directory(root.path(), false, true).unwrap();
@@ -752,7 +752,7 @@ fn fixture() -> (tempfile::TempDir, Registry) {
     let registry = Registry::new(root.path());
     (root, registry)
 }
-fn binding() -> Binding {
+pub(super) fn binding() -> Binding {
     Binding {
         instance_id: "fixture-instance".into(),
         adapter_id: "fixture-adapter".into(),
@@ -780,7 +780,7 @@ fn baseline(subject: &str, now: u64) -> ValidatedBaseline {
         valid_until_ms: now + 60_000,
     }
 }
-fn prepared(registry: &Registry, subject: &str, now: u64) -> (Claim, PreparedCandidate) {
+pub(super) fn prepared(registry: &Registry, subject: &str, now: u64) -> (Claim, PreparedCandidate) {
     let acquisition = registry.begin(&binding(), now).unwrap();
     let claim = registry.consume(acquisition, now).unwrap();
     let prepared = registry
@@ -816,7 +816,11 @@ fn repeated_binding_after_reopen_keeps_the_original_profile_declaration() {
         .unwrap();
     assert_eq!(profiles, 1);
 }
-fn publish_fixture(registry: &Registry, prepared: PreparedCandidate, now: u64) -> String {
+pub(super) fn publish_fixture(
+    registry: &Registry,
+    prepared: PreparedCandidate,
+    now: u64,
+) -> String {
     let receipt = custody::WrittenVersion::fixture(prepared.version());
     let stored = registry.acknowledge(prepared, receipt, now).unwrap();
     registry.publish(stored, now).unwrap()
@@ -1587,7 +1591,7 @@ fn seed_recorded_events(root: &Path, events: i64) {
     }
 }
 
-fn recorded_events(root: &Path) -> i64 {
+pub(super) fn recorded_events(root: &Path) -> i64 {
     rusqlite::Connection::open_with_flags(
         root.join("metadata.sqlite3"),
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,

@@ -203,16 +203,16 @@ fn the_corrected_semantics_citations_land_on_their_rules() {
     let semantics = read("contracts/cli/v1alpha1/semantics.md");
     let lines: Vec<&str> = semantics.lines().collect();
     let spec = read("ess/domains/cli.yaml");
-    assert!(spec.contains("semantics.md:345"));
-    assert!(spec.contains("semantics.md:349"));
+    assert!(spec.contains("semantics.md:351"));
+    assert!(spec.contains("semantics.md:355"));
     assert!(
-        lines[344].contains("500 maximum list items per page"),
+        lines[350].contains("500 maximum list items per page"),
         "{}",
-        lines[344]
+        lines[350]
     );
     assert!(
-        lines[348].contains("stale cursors refuse"),
+        lines[354].contains("stale cursors refuse"),
         "{}",
-        lines[348]
+        lines[354]
     );
 }
