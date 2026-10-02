@@ -11,6 +11,8 @@ relations:
 - serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
+  path: adapters/kubernetes/Cargo.toml
+- confidence: cited
   path: adapters/kubernetes/tests/local_runtime.rs
 - confidence: cited
   path: adapters/kubernetes/tests/local_runtime/cli_journey.rs
@@ -18,7 +20,7 @@ scope:
   path: adapters/kubernetes/tests/provider.rs
 - confidence: cited
   path: docs/local-kubernetes-cli.md
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T15:18:27Z", actor: "human:timo", revision: 6, correlation: "wave-20261002d-provider-acceptance"}
 - {from: "proposed", to: "active", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 7, correlation: "wave-20261002d-provider-acceptance"}
@@ -73,3 +75,28 @@ fixture kubeconfig. A Pending pod is not workload readiness. This unit covers
 existing selected reads, not missing SelfSubjectAccessReview binding, C12 logs,
 C15 restart/rollout, C16 exec/copy/tunnels, Helm or deterministic packaging. Those
 remain separate initiative obligations and decision blockers where recorded.
+
+## Acceptance observation seam — 2026-10-02
+
+The assigned worker proposed a bounded test-only loopback HTTPS reverse proxy in
+adapters/kubernetes/tests/local_runtime/cli_journey.rs. Root accepted this concrete
+fixture seam: existing rcgen/tokio-rustls terminate fixture TLS; workspace-pinned
+reqwest verifies the exact real-cluster CA upstream. Forward only selected GETs
+for fixture pods/services/deployments/EndpointSlices and nodes, plus the existing
+SelfSubjectReview identity POST. Disable redirects/retries; bound requests to64KiB
+and actual streamed responses to4MiB; join shutdown. Record method/path/status
+only, never credential headers, tokens or bodies. Bracket unsupported-kind refusal
+with successful observed reads and exact forwarded-request counters.
+
+An explicitly latched single real GET response may establish busy-stop/revocation
+ordering after upstream completion. This is a test barrier, not a claim of provider
+failure. Production CLI/child and real provider responses remain under test.
+Root adds only reqwest.workspace=true under the adapter's dev-dependencies and
+serializes Cargo.lock. No production dependency or upstream version changes.
+
+Scope addition, cited: adapters/kubernetes/Cargo.toml dev-dependencies, root-owned
+for this dependency update. Cargo.lock is root-owned shared integration work.
+The worker may provision only namespace fixture and root-created
+fixture-cb26d-empty; the latter supports an admitted empty collection and changed
+namespace cursor boundary. Node reads use the explicitly opted-in identity and
+root-created exact ClusterRole/Binding. No other cluster-scoped writes are granted.
