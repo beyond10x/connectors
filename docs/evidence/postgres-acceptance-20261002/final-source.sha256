@@ -1,0 +1,5 @@
+c9a99dbc726a24f9e3cb10e4758dac577659eae48bffae95696bb9af5b41500b  adapters/sql/src/lib.rs
+a6436a98f45711759b739309585010df23e507f2055ddfded13129cd61ee823d  adapters/sql/tests/protocol.rs
+88d622bb70b5dc752f412a9a0c5a01c884315c196fe4ae94940d235cf3f9003d  adapters/sql/tests/local_runtime/cli_journey.rs
+1246a9ba29b84e3f9aed2b9a327e0dcab4f952f495e610213fce722187bbe41a  adapters/sql/contracts/reads/v1alpha1/semantics.md
+3d3c2fdb2366ee60376c8e8d4cc0354fe34f99bb07396c45e0453b9ce2f35c6d  docs/local-postgres-cli.md

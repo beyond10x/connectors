@@ -20,7 +20,7 @@ scope:
   path: adapters/sql/tests/protocol.rs
 - confidence: cited
   path: docs/local-postgres-cli.md
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}, correlation: "wave-20261002d-provider-acceptance"}
 - {from: "proposed", to: "active", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}, correlation: "wave-20261002d-provider-acceptance"}
@@ -111,3 +111,14 @@ configuration/repair receives its exact binding refusal and cannot replace the
 original authority. The unchanged original connection must still execute its
 admitted read after each refusal. Report actual outcomes and source citations.
 The five named acceptance cases and their runtime scope remain unchanged.
+
+## Live acceptance observation — 2026-10-02T15:55:46Z
+
+The frozen PostgreSQL source patch c583e40f88483081519eb9c192c159807341b0030f38c227b3ef027f585a9665
+passed six explicitly selected live cases against the owned PostgreSQL17.6 fixture.
+The ordinary package separately passed19 cases with6 live cases ignored. The exact
+0A000 wire assertion was observed red before the one-line mapping correction;
+final package, live acceptance, Clippy and formatting passed. Public path-redacted
+logs and original-byte provenance are in docs/evidence/postgres-acceptance-20261002/.
+Cross-review and integration remain pending; both stories stay active. The root's
+source/hash read-through is not substituted for the assigned cross-review.

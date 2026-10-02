@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: task:gitlab-catalog-current-sandbox-read-replay
 kind: task
-status: active
+status: implemented
 title: Recheck the current catalog CLI against the dedicated GitLab sandbox
 relations:
 - decomposes: initiative:complete-local-connectors
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T15:38:19Z", actor: "human:timo", revision: 2, correlation: "wave-20261002d-provider-acceptance"}
 - {from: "proposed", to: "active", at: "2026-10-02T15:38:19Z", actor: "human:timo", revision: 3, correlation: "wave-20261002d-provider-acceptance"}
+- {from: "active", to: "implemented", at: "2026-10-02T16:47:30Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 
@@ -57,3 +58,29 @@ stays ignored. Parent authority is initiative:complete-local-connectors and
 approval-record:milestones-delivery-20261002. Missing sandbox capabilities or
 credentials remain named limitations. Existing historical live write evidence
 is retained rather than silently invalidated or relabelled as a fresh run.
+
+## Observed completion — 2026-10-02
+
+Eighteen distinct shipped reads returned HTTP200 through current production copied
+binaries and the dedicated sandbox. Exact per-operation input, body kind/count and
+provenance agree with raw outputs; a separate read review checked all18 rows and22
+private-response hashes. Eleven historical and seven additional reads remain
+separate; tags/releases/deployments were empty. Descriptions were cached/stale,
+not fresh vendor discovery. The declared descriptor/configuration inputs were
+unchanged. Public evidence: docs/evidence/gitlab-current-20261002/README.md.
+
+Initial credential admission succeeded. First explicit revalidation returned
+unavailable/dispatch once; the connection became pending and four reads refused
+not_granted. All failures remain in private evidence and are disclosed publicly.
+Cause is unknown. Subsequent explicit revalidation succeeded with the same
+connection/revision, all18 reads passed, and a new owner incarnation reused saved
+credentials and passed revalidation/project.get. No lifetime/deadline was changed.
+Exact child stop preceded identity-verified owner termination. Detached owner
+executable disappearance was observed; no numeric wait status is claimed for it.
+Both private custody daemons were waited exit0. No sandbox API write occurred.
+
+This completes only the bounded read-replay task. It does not close catalog
+mutation/recovery acceptance, all provider workflows, sustained ER cost or MCP.
+The isolated initial refusal remains an unexplained observation, not silently
+reclassified as success or a confirmed runtime defect. Cross-review found no
+evidence discrepancy and made no new calls.

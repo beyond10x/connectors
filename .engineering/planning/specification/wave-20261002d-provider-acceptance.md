@@ -9,7 +9,7 @@ relations:
 - informed_by: story:catalog-cli-journeys
 - informed_by: story:kubernetes-real-read-acceptance
 - informed_by: story:postgres-real-provider-acceptance
-revision: 7
+revision: 8
 ---
 ## Selection and existing authorization
 
@@ -1212,3 +1212,52 @@ catalog baseline compilation is complete with its exact baseline executable
 retained. Catalog expanded compilation follows PostgreSQL's correction, then
 Kubernetes receives its live window. All provider units remain unaccepted until
 actual final suites and review complete.
+
+## Current executable admission and replay fixture — 2026-10-02
+
+The first expanded repair case failed with OwnerBuildMismatch because the libtest
+Client::begin called a production-CLI owner. Current transport.rs:351-358,487-492,
+519-536 requires the caller and owner to have the same measured executable image.
+This is intentional, and apps/connectors/tests/owner_build_security.rs protects it.
+The retained failure is not a production defect.
+
+Capture invalidation remains production-CLI acceptance: hold protected stdin after
+connections connect has admitted Begin (apps/connectors/src/local/session.rs:177-201),
+observe the exact new Pending Acquisition through the existing ER observer, stop the
+busy child, then supply the fixture credential. Require lifecycle_conflict and no
+new provider send. No fabricated capture or build digest is allowed.
+
+Settled public CLI retries return locally before WriteClient
+(apps/connectors/src/local/operations.rs:123-151). Keep those passive controls and
+label them accurately. Preserve the separate successful owner/2 replay obligation
+using the existing catalog fixture and a same-image host-library helper. This is a
+sequential replacement of the invalid cross-image test seam within the same owned
+test files, not a new runtime feature or removal of an acceptance obligation.
+
+After original settlement through the production CLI/catalog child, stop and wait
+for that exact owner. Spawn the same libtest executable with one exact ignored
+helper that calls existing unmodified public owner::serve. Pass a real startup
+UnixStream on FD3 and the exact verified private owner.lock lifetime file on FD4,
+following production descriptor duplication, flock and isolated process rules.
+The libtest parent WriteClient and helper naturally share actual /proc/self/exe
+bytes; never forge a greeting/digest, change same_build, construct a fake Owner,
+add a production test hook, or run fixed-FD mutation in a shared test thread.
+Use start=false; no production-only hidden-command fallback through libtest.
+
+Label this segment same-build host-library transport acceptance, distinct from the
+production-CLI original effect. First measure successful handshake, exact owner
+incarnation and bounded shutdown/lock release. Then prove one applied settled
+replay before refusal/lost-response variants. Preserve all original request/attempt,
+exact delivery/refusal, key, spent proof, clock, provider PUT/effect and audit checks.
+A replay has its own correlated final audit; zero clock/provider calls does not
+mean zero metadata writes. Stop custody/delete proof before replay, pass no proof,
+and observe no new native child. Keep pending mode3 on its genuine public CLI owner
+path and preserve all fifteen variants, including independent settlement-fault
+feasibility controls. Helper source and deps remain in current test scope; no new
+Cargo dependency is justified. Root adds its exact name as an excluded helper and
+it never counts as a journey. The helper refuses absent private fixture selection.
+
+Source-grounded feasibility is recorded in the coordinator's assigned
+.local/provider-wave-briefs/owner-replay-feasibility/report.md. It is not executed
+proof. If actual inherited-FD startup, cleanup or replay assertions fail, retain the
+failure and return the unmet obligation without weakening deadlines or authority.

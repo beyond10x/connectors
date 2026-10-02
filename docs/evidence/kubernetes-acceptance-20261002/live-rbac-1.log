@@ -1,0 +1,51 @@
+    Finished `release` profile [optimized] target(s) in 0.17s
+     Running tests/local_runtime.rs (target/release/deps/local_runtime-3575a67e13ecbb3d)
+
+running 1 test
+test cli_journey::kubernetes_cli_provider_rbac_denial_is_not_empty_success ... owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned CLI process 1493456 exit=exit status: 0
+owned CLI process 1493470 exit=exit status: 0
+real fixture cb26d-1493207-1790956894162 connection_revision=caabe334-269a-4906-8b23-4bd2ba68a586 objects=[{"kind":"Service","name":"cb26d-1493207-1790956894162-a","resourceVersion":"4655","uid":"43ad4bee-09ab-4cf4-828c-89948446142d"},{"kind":"Service","name":"cb26d-1493207-1790956894162-b","resourceVersion":"4657","uid":"e484bf11-f0a3-4556-af98-6aaa282d44e1"},{"kind":"Service","name":"cb26d-1493207-1790956894162-c","resourceVersion":"4659","uid":"73721ccc-6a17-483c-b130-fddf0e08a263"},{"kind":"EndpointSlice","name":"cb26d-1493207-1790956894162","resourceVersion":"4660","uid":"7bb0b49c-7c53-401e-a1e2-8c55d8588119"},{"kind":"Deployment","name":"cb26d-1493207-1790956894162","resourceVersion":"4661","uid":"e8c0d889-cc57-4d18-8148-059f5b765809"},{"kind":"Pod","name":"cb26d-1493207-1790956894162","resourceVersion":"4666","uid":"ab42cc91-4bbf-4658-9f63-3b5c7e3ae53d"}]
+owned CLI process 1493602 exit=exit status: 1
+owned CLI process 1493610 exit=exit status: 1
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned CLI process 1493741 exit=exit status: 0
+owned CLI process 1493919 exit=exit status: 0
+owned CLI process 1493925 exit=exit status: 1
+owned CLI process 1493958 exit=exit status: 0
+owned CLI process 1493970 exit=exit status: 0
+owned CLI process 1494002 exit=exit status: 0
+owned CLI process 1494009 exit=exit status: 1
+owner 0d5fc048-3e89-43f0-9ece-314422b98783 acknowledged shutdown and removed its socket
+owned custody process 1493447 exit=Ok(ExitStatus(unix_wait_status(9)))
+owned custody process 1493446 exit=Ok(ExitStatus(unix_wait_status(9)))
+observed upstream method/path/status=[("POST", "/apis/authentication.k8s.io/v1/selfsubjectreviews", 201), ("POST", "/apis/authentication.k8s.io/v1/selfsubjectreviews", 401), ("POST", "/apis/authentication.k8s.io/v1/selfsubjectreviews", 201), ("GET", "/api/v1/namespaces/fixture/services", 403), ("GET", "/api/v1/namespaces/fixture-cb26d-empty/services", 200)]
+owned fixture cleanup kind="RoleBinding" name="cb26d-1493207-1790956894162-denied" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1493207-1790956894162-denied" exit=exit status: 0
+owned fixture cleanup kind="ServiceAccount" name="cb26d-1493207-1790956894162-denied" exit=exit status: 0
+owned fixture cleanup kind="Pod" name="cb26d-1493207-1790956894162" exit=exit status: 0
+owned fixture cleanup kind="Deployment" name="cb26d-1493207-1790956894162" exit=exit status: 0
+owned fixture cleanup kind="EndpointSlice" name="cb26d-1493207-1790956894162" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1493207-1790956894162-c" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1493207-1790956894162-b" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1493207-1790956894162-a" exit=exit status: 0
+owned fixture cleanup kind="RoleBinding" name="cb26d-1493207-1790956894162" exit=exit status: 0
+owned fixture cleanup kind="RoleBinding" name="cb26d-1493207-1790956894162" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1493207-1790956894162" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1493207-1790956894162" exit=exit status: 0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 8.54s
+
