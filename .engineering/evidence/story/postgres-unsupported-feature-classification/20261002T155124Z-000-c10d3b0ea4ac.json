@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T15:51:24Z",
+  "actor": "human:timo",
+  "artifact": "story:postgres-unsupported-feature-classification",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Production CLI read-only escape case red2/2; first-CTE probe red; reader-role wrapped prepare diagnostic observed0A000, child ready and SELECT1 succeeds",
+    "reference": "cb26d-pg:.local/provider-wave/postgres/sqlstate-diagnostic.log"
+  }
+}
