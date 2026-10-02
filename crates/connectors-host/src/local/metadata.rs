@@ -192,23 +192,23 @@ pub struct Metadata {
     // Field drop order matters: this physical connection closes while the
     // lifecycle lock is still held. Releasing at open/validate left a race with
     // another process admitting a sidecar that the last connection was deleting.
-    // The recorded authority is not closed here: `Drop` returns it to the
-    // process pool, and its Eventlog SQLite handle outlives the lock (see
-    // `lifecycle_lock`).
+    // A verified recorded authority returns to the process pool. A refused
+    // authority instead takes the lock into retirement until its worker joins;
+    // its compatibility connection here is already an in-memory projection.
     pub(super) connection: Connection,
     er: Option<er::ErAuthority>,
     durable_path: PathBuf,
     _directory: std::fs::File,
-    _lifecycle_lock: std::fs::File,
+    _lifecycle_lock: Option<std::fs::File>,
     concurrent_observation: bool,
 }
 
 impl Drop for Metadata {
     fn drop(&mut self) {
-        // The replayed authority outlives this handle: the next open of the
-        // same store in this process reads only what was appended since.
+        // Reuse verified baselines; a failed batch retains lifecycle ownership
+        // until its dispatched work can no longer commit.
         if let Some(er) = self.er.take() {
-            er::release(er);
+            er::release_handle(er, &mut self._lifecycle_lock);
         }
     }
 }
@@ -363,7 +363,11 @@ impl Metadata {
         }
         #[cfg(test)]
         run_relock_hook();
-        acquire_lifecycle_lock(&self._lifecycle_lock)?;
+        acquire_lifecycle_lock(
+            self._lifecycle_lock
+                .as_ref()
+                .ok_or(Failure::MetadataUnavailable)?,
+        )?;
         self.concurrent_observation = false;
         Ok(())
     }
@@ -568,8 +572,22 @@ impl Metadata {
         }
         let authority_id = self.authority()?;
         let rows = er::capture(&self.connection, level)?;
-        let (authority, coordinates, source_digest) =
-            er::provision(&self.durable_path, authority_id, level, rows)?;
+        // A failed import can outlive this call before `self.er` is installed.
+        // A duplicate keeps the same flock alive through either order of
+        // physical-connection close and asynchronous provider retirement.
+        let import_lock = self
+            ._lifecycle_lock
+            .as_ref()
+            .ok_or(Failure::MetadataUnavailable)?
+            .try_clone()
+            .map_err(|_| Failure::MetadataUnavailable)?;
+        let (authority, coordinates, source_digest) = er::provision_with_lock(
+            &self.durable_path,
+            authority_id,
+            level,
+            rows,
+            Some(import_lock),
+        )?;
         let projection = er::projection(authority_id, &authority)?;
         if er::capture_digest(&projection, level)? != source_digest {
             return Err(Failure::MetadataUnavailable);
@@ -663,7 +681,11 @@ impl Metadata {
                 .close()
                 .map_err(|_| Failure::MetadataUnavailable)?;
             // SAFETY: the live file owns this descriptor; Drop still closes it.
-            if unsafe { libc::flock(self._lifecycle_lock.as_raw_fd(), libc::LOCK_UN) } != 0 {
+            let lock = self
+                ._lifecycle_lock
+                .as_ref()
+                .ok_or(Failure::MetadataUnavailable)?;
+            if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_UN) } != 0 {
                 return Err(Failure::MetadataUnavailable);
             }
         }
@@ -731,7 +753,7 @@ impl Metadata {
             er: None,
             durable_path: path.join(NAME),
             _directory: dir,
-            _lifecycle_lock: lock,
+            _lifecycle_lock: Some(lock),
             concurrent_observation: false,
         })
     }
