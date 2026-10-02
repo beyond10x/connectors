@@ -42,6 +42,7 @@ struct Database {
     root: tempfile::TempDir,
     config: PathBuf,
     sessions: Arc<AtomicUsize>,
+    cancellations: Arc<AtomicUsize>,
     passwords: Arc<Mutex<Vec<String>>>,
 }
 
@@ -53,6 +54,8 @@ impl Database {
         let (address_tx, address_rx) = std::sync::mpsc::channel();
         let (stop, mut stopped) = oneshot::channel();
         let sessions = Arc::new(AtomicUsize::new(0));
+        let cancellations = Arc::new(AtomicUsize::new(0));
+        let cancelled = cancellations.clone();
         let counted = sessions.clone();
         let passwords = Arc::new(Mutex::new(Vec::new()));
         let observed = passwords.clone();
@@ -71,16 +74,35 @@ impl Database {
                         _ = &mut stopped => break,
                         value = listener.accept() => value.unwrap().0,
                     };
-                    counted.fetch_add(1, Ordering::SeqCst);
-                    // Startup packet, then cleartext password.
-                    let Ok(len) = stream.read_i32().await else {
-                        continue;
-                    };
-                    let mut startup = vec![0; (len as usize).saturating_sub(4)];
-                    if stream.read_exact(&mut startup).await.is_err() {
+                    // PostgreSQL cancellation uses a separate TCP connection,
+                    // not another authenticated session. Only the exact packet
+                    // and key advertised below qualify as cancellation traffic.
+                    let len = stream.read_i32().await.expect("truncated startup length");
+                    assert!((8..=65536).contains(&len), "invalid startup length");
+                    let mut startup = vec![0; len as usize - 4];
+                    stream
+                        .read_exact(&mut startup)
+                        .await
+                        .expect("truncated startup");
+                    if startup[..4] == 80_877_102_i32.to_be_bytes() {
+                        assert_eq!(startup.len(), 12, "invalid cancellation length");
+                        assert_eq!(&startup[4..8], &42_i32.to_be_bytes(), "invalid backend pid");
+                        assert_eq!(
+                            &startup[8..12],
+                            &1234_i32.to_be_bytes(),
+                            "invalid backend key"
+                        );
+                        cancelled.fetch_add(1, Ordering::SeqCst);
                         continue;
                     }
+                    counted.fetch_add(1, Ordering::SeqCst);
+                    assert_eq!(
+                        &startup[..4],
+                        &196_608_i32.to_be_bytes(),
+                        "invalid startup protocol"
+                    );
                     assert!(startup.windows(7).any(|w| w == b"reader\0"));
+                    // Startup packet, then cleartext password.
                     // AuthenticationCleartextPassword
                     let _ = stream.write_u8(b'R').await;
                     let _ = stream.write_i32(8).await;
@@ -188,6 +210,7 @@ impl Database {
             root,
             config,
             sessions,
+            cancellations,
             passwords,
         }
     }
@@ -235,7 +258,10 @@ impl Database {
 impl Drop for Database {
     fn drop(&mut self) {
         let _ = self.stop.take().unwrap().send(());
-        let _ = self.thread.take().unwrap().join();
+        let result = self.thread.take().unwrap().join();
+        if !std::thread::panicking() {
+            result.expect("fixture worker failed");
+        }
     }
 }
 fn private(path: &std::path::Path, bytes: &[u8]) {
@@ -250,6 +276,128 @@ fn password(one: bool) -> Secret {
 }
 fn deadline() -> u64 {
     connectors_sdk::now_ms() + 30_000
+}
+
+fn inject_packet(database: &Database, body: &[u8]) {
+    use std::io::{Read, Write};
+    let config: serde_json::Value =
+        serde_json::from_slice(&fs::read(&database.config).unwrap()).unwrap();
+    let port = config["port"].as_u64().unwrap() as u16;
+    let host = config["host"].as_str().unwrap();
+    let mut stream = std::net::TcpStream::connect((host, port)).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
+    stream
+        .write_all(&((body.len() + 4) as i32).to_be_bytes())
+        .unwrap();
+    stream.write_all(body).unwrap();
+    stream.shutdown(std::net::Shutdown::Write).unwrap();
+    let mut reply = Vec::new();
+    if let Err(error) = stream.read_to_end(&mut reply) {
+        assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);
+    }
+}
+
+#[test]
+fn sql_fixture_counts_cancel_requests_separately() {
+    let database = Database::new();
+    // This is a CancelRequest, not a second authenticated session. The
+    // adapter's refusal cleanup sends the same bytes to this selected endpoint.
+    inject_packet(&database, &[4, 210, 22, 46, 0, 0, 0, 42, 0, 0, 4, 210]);
+    assert_eq!(
+        database.sessions(),
+        0,
+        "control traffic became a SUT session"
+    );
+    assert_eq!(database.cancellations.load(Ordering::SeqCst), 1);
+    assert_dispatched_read_reaches_the_database(&database);
+}
+
+#[test]
+fn sql_fixture_rejects_cancellation_length_and_pid_boundaries() {
+    let valid = [4, 210, 22, 46, 0, 0, 0, 42, 0, 0, 4, 210];
+    let mut wrong_pid = valid;
+    wrong_pid[7] = 43;
+    let mut too_long = valid.to_vec();
+    too_long.push(0);
+    for body in [&valid[..4], &valid[..8], &wrong_pid, &too_long] {
+        let database = Database::new();
+        inject_packet(&database, body);
+        assert_eq!(database.sessions(), 0);
+        assert_eq!(database.cancellations.load(Ordering::SeqCst), 0);
+        let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(database)))
+            .expect_err("malformed cancellation was accepted");
+        let message = panic
+            .downcast_ref::<String>()
+            .map(String::as_str)
+            .or_else(|| panic.downcast_ref::<&str>().copied())
+            .unwrap_or("");
+        assert!(message.contains("fixture worker failed"), "{message}");
+    }
+}
+
+#[test]
+fn sql_fixture_repeated_control_packets_preserve_provider_refusal() {
+    let database = Database::new();
+    for _ in 0..3 {
+        inject_packet(&database, &[4, 210, 22, 46, 0, 0, 0, 42, 0, 0, 4, 210]);
+    }
+    assert_eq!(database.sessions(), 0);
+    assert_eq!(database.cancellations.load(Ordering::SeqCst), 3);
+    let mut child = Child::spawn(&database.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let result = child.invoke(
+        "query.read",
+        &revision,
+        "one",
+        &password(true),
+        br#"{"query":"SELECT 1","parameters":[],"limit":1}"#,
+        deadline(),
+    );
+    assert!(matches!(result, Err(Failure::Forbidden)), "{result:?}");
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while database.cancellations.load(Ordering::SeqCst) < 4 {
+        assert!(
+            std::time::Instant::now() < until,
+            "missing read cancellation"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(database.sessions(), 1);
+    assert_eq!(database.cancellations.load(Ordering::SeqCst), 4);
+    assert_eq!(
+        database.passwords.lock().unwrap().as_slice(),
+        [PASSWORD_ONE]
+    );
+}
+
+#[test]
+#[should_panic(expected = "fixture worker failed")]
+fn sql_fixture_rejects_an_unexpected_startup() {
+    let database = Database::new();
+    inject_packet(&database, b"\0\x03\0\0user\0stray\0database\0unrelated\0\0");
+    drop(database);
+}
+
+#[test]
+#[should_panic(expected = "fixture worker failed")]
+fn sql_fixture_rejects_a_malformed_cancellation() {
+    let database = Database::new();
+    // Correct packet type and process id, incorrect backend secret key.
+    inject_packet(&database, &[4, 210, 22, 46, 0, 0, 0, 42, 0, 0, 4, 211]);
+    drop(database);
+}
+
+#[test]
+#[should_panic(expected = "the read must open exactly one session")]
+fn sql_fixture_rejects_an_extra_sut_session() {
+    let database = Database::new();
+    let mut child = Child::spawn(&database.selection()).unwrap();
+    child
+        .validate("postgres.password", &password(true), deadline())
+        .unwrap();
+    assert_dispatched_read_reaches_the_database(&database);
 }
 
 #[test]
@@ -338,9 +486,13 @@ fn a_rejected_password_and_a_malformed_entry_are_distinguishable() {
 #[test]
 fn a_dispatched_read_reaches_the_database_and_returns_its_refusal() {
     let database = Database::new();
+    assert_dispatched_read_reaches_the_database(&database);
+}
+
+fn assert_dispatched_read_reaches_the_database(database: &Database) {
     let mut child = Child::spawn(&database.selection()).unwrap();
     let revision = child.bootstrap().descriptor().unwrap().revision;
-    let before = database.sessions();
+    let cancellations_before = database.cancellations.load(Ordering::SeqCst);
     let result = child.invoke(
         "query.read",
         &revision,
@@ -351,9 +503,22 @@ fn a_dispatched_read_reaches_the_database_and_returns_its_refusal() {
     );
     // The fixture refuses every statement, so a result here would be fabricated.
     assert!(result.is_err(), "the fixture refuses every statement");
-    assert!(
-        database.sessions() > before,
-        "the read must open its own session"
+    assert_eq!(
+        database.sessions(),
+        1,
+        "the read must open exactly one session"
+    );
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while database.cancellations.load(Ordering::SeqCst) == cancellations_before {
+        assert!(
+            std::time::Instant::now() < until,
+            "read cleanup did not cancel"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(
+        database.cancellations.load(Ordering::SeqCst),
+        cancellations_before + 1
     );
     // Input bounds are checked before a session is opened.
     let before = database.sessions();
