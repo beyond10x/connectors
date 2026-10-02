@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:registry-clock-outside-shared-batches
 kind: story
-status: active
+status: implemented
 title: Investigate keeping the registry clock out of every registry batch
 relations:
 - serves: vision:independent-contract-adapters
@@ -20,10 +20,11 @@ scope:
   path: crates/connectors-host/src/local/registry/store_cost_tests.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 9
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T13:56:03Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T13:56:03Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-02T15:16:40Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}, correlation: "wave-20261002c-clock-experiment"}
 ---
 ## Hypothesis
 Entity Runtime 0.25.1 follows co-batched subjects through the registry clock, growing its closure across the store. Isolating that clock might bound the work, but must preserve the atomic revision guard in crates/connectors-host/src/local/metadata/er.rs:3215.
@@ -44,3 +45,34 @@ Depends on story:bridge-drop-waits-for-dispatched-batch for safe unknown-outcome
 ## Required conformance cases
 
 The named conformance case registry-clock-mitigation-decision records adoption or rejection against the existing batch_cost_by_subject and read_invoke_cost_by_store_size probes at requested event counts 50,600,1200 (actual counts recorded), while clock-floor-monotonic, registry-observation-revision-fenced and reopen-corruption-refused preserve current semantics.
+
+## Completed rejection experiment — 2026-10-02
+
+The single candidate was rejected after all required measurements completed.
+Verification-report:registry-clock-mitigation-decision-20261002 and
+review-result:registry-clock-experiment-20261002 retain the decision and independent
+review. Public logs, exact candidate patch, fixture identities and numeric matrix
+are in docs/evidence/clock-experiment-20261002/. Implemented means this bounded
+investigation delivered its required rejection decision; it does not mean the
+candidate was adopted or the upstream performance milestone completed.
+
+Baseline 9/9 invariants; candidate 8/9, with the same-millisecond revision fence
+returning MetadataUnavailable instead of ConcurrentRevision. All 15 measured
+invokes and 3 warmups per profile passed. Candidate large/small median ratio
+25.9185 exceeds the accepted maximum2. Production source was restored exactly.
+No second candidate, deadline extension or verification weakening occurred.
+Entity Runtime issue51 remains OPEN; M1 remains outstanding.
+
+Scope confirmation from the worker: metadata.rs owns admission/lifecycle/ER
+activation; registry/tests.rs contains the exact deciding clock/fence/race tests.
+These previously inferred reading owners are now source-checked. The sole actual
+source edit was the one-condition candidate in metadata/er.rs, then reversed;
+public evidence and AEP records are the only retained repository changes.
+
+Both worker and independent reviewer released their leases after all subprocesses
+exited. The task-owned Cargo target was cleaned through cargo clean. Recovery
+archive cb26c-clock was verified at
+$HOME/.local/state/worktree/archives/connectors/cb26c-clock, holding the original
+frozen report, logs, hashes, retained patch and saved task fixtures. No candidate
+binary is retained after reproducible build-output cleanup; its measured hash is
+in the archive. The experiment produced no production commit to integrate.

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-cli-journeys
 kind: story
-status: draft
+status: active
 title: Re-run the production CLI mutation journeys with the catalog provider as the child
 relations:
 - decomposes: initiative:complete-local-connectors
@@ -21,7 +21,10 @@ scope:
   path: crates/connectors-build/src/ignored.rs
 - confidence: cited
   path: docs/evidence/catalog-cli-20261002
-revision: 5
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-02T15:17:51Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}, correlation: "wave-20261002d-provider-acceptance"}
+- {from: "proposed", to: "active", at: "2026-10-02T15:17:51Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":4}}, correlation: "wave-20261002d-provider-acceptance"}
 ---
 ## Outcome
 
