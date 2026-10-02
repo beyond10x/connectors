@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.24.0 — 2026-10-02
+
+### Added
+
+- Catalog selections can withhold a declared parameter (`withhold` in `operations.json`): the
+  operation no longer declares it, `operations describe` does not list it, and an input carrying it
+  is refused as `invalid_input` before any request.
+- `setup init` with an existing configuration and no metadata database creates the state and
+  answers the new disposition `state_initialized`. An existing configuration is never rewritten and
+  an existing database is never touched.
+
+### Changed
+
+- GitLab `commits.list` withholds `pagination` and its keyset cursor `page_token`: both are now
+  refused as `invalid_input` (they were sent to GitLab before). The provider pages by
+  `page`/`per_page` only.
+
+### Compatibility
+
+- A catalog provider binary older than 0.24.0 refuses a GitLab `operations.json` that uses
+  `withhold` (selections reject unknown fields). Keep the binary and the selection file at the same
+  release.
+- Every GitLab catalog configuration's revision changes with the new selection; cached operation
+  descriptions go stale and are refreshed by `operations describe`.
+
 ## 0.23.0 — 2026-10-01
 
 ### Added
