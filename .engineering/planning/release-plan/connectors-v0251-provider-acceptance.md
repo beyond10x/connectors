@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0251-provider-acceptance
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.25.1: verified provider acceptance and precise SQL refusals'
 relations:
 - informed_by: specification:wave-20261002d-provider-acceptance
 - serves: vision:independent-contract-adapters
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "active", at: "2026-10-02T16:50:11Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-02T21:27:43Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Outcome and standing authorization
 
@@ -159,3 +160,32 @@ This completes the scoped local fixture correction. Fresh required CI on the
 updated PR79 head, App merge, exact immutabletag and hostedrelease checks remain
 required. The earlier failed CI and initial candidate's checks remain historical;
 no version release is claimed by this observation.
+
+## Verified source release — 2026-10-02
+
+Version0.25.1 is released at
+https://github.com/beyond10x/connectors/releases/tag/v0.25.1.
+PR79 was merged by b10x-bot[bot]; candidate76d844c70240fe96d79480137886266fb696bddf
+and mergee1cc88088fff3cfeb07fdbce39b9aed586ab48a6 share exacttree
+c22b6765b147cc4b3e57373b9c6dd261ccfc29b5. Every candidate commit author/committer
+is the bot. The App performed the merge under the active App-only branch authority;
+GitHub's web-flow merge committer is the permitted platform exception.
+
+The immutable annotated tagv0.25.1 is1727c8b7e965fd94fc6f5b75c94d6e9b57e5445c,
+peeled to that verifiedmainmerge, with bottagger. PRrepositorygate37062356416,
+merged-headrepositorygate37064416132 and tagsecurityrun37064603111 all succeeded;
+planning/security/documentation-source checks and signedlocal evidence also passed.
+Hostedrelease402155173 is bot-authored, non-draft, non-prerelease and Latest. ZIP
+and tar sourcearchive URLs eachreturnedHTTP200. No additional binary assets are
+required by this repository's release contract.
+
+The initial failed Google fixture CI remains preserved. Corrected source passed
+1208ordinary tests/0failed/65ignored, scopedred/greenregression and two100-run loops.
+MCP, sustained-loadacceptance, EntityRuntime51 and remainingprovider decisions/work
+remain open. Documentation bundle success is not verified public publication;
+documentation stays pending asynchronously. No Website/Atlas/consumerpin or deployment.
+
+All provider unit worktrees and the Google fixture worker were archived and removed
+through exact-reviewed managedGC. The Google archive retains logs, patches and exact
+executables; manifestSHA256b865ad57139157b16ff255671684639b1f42295f38c9fd13f1778e6f301c74b2.
+Root integration checkout is retained for the next authorized MCP work on a newbranch.

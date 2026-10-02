@@ -16,6 +16,8 @@ relations:
 - depends_on: story:mcp-outbound-auth-lifecycle
 scope:
 - confidence: inferred
+  path: adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json
+- confidence: inferred
   path: adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md
 - confidence: inferred
   path: apps/connectors/spec/compatibility.json
@@ -23,7 +25,7 @@ scope:
   path: contracts/cli/v1alpha1/semantics.md
 - confidence: inferred
   path: docs/local-mcp-cli.md
-revision: 2
+revision: 4
 ---
 ## Acceptance
 
@@ -100,3 +102,19 @@ Any behaviour behind `decision-blocker:mcp-outbound-stdio-process-ownership` or
 stop, and says which question it stopped at. No runtime, parser or handler is
 implemented, and no command is made to work; this story writes the documents that
 say what the commands are.
+
+## Refined acceptance boundary — 2026-10-03
+
+The original working-journey acceptance remains open until actual MCP runtime and
+parser support exist. task:mcp-cli-selected-intent-contract now owns only proposed
+syntax plus authored human/static discovery correspondence; completing that child
+cannot complete this story. Keep compatibility.json mcp=deferred until actual support
+is verified. CLI FailureCode, optional service_code and MCP protocol errors have
+separate owners. The cited local-gitlab-cli.md is absent; use existing local-catalog-
+provider.md and local-gitlab-merge.md patterns instead.
+
+AEP0.65 refused scope writes on the child: `scope` is a story field and tasks inherit
+the parent surface. The static discovery-contract.json path is therefore recorded
+here as inferred. The child is restricted to its exact three authored documents;
+parser, generated output, compatibility metadata and runtime remain read-only.
+Source/model expressibility and stdout binding must be resolved before runtime work.
