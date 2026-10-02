@@ -28,6 +28,14 @@ clap = { workspace = true, optional = true }
 sha2.workspace = true
 
 [dev-dependencies]
+entity-core.workspace = true
+entity-eventlog.workspace = true
+entity-store.workspace = true
+eventlog-core.workspace = true
+time.workspace = true
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
+libc = "0.2"
+ring = "0.17"
 tokio.workspace = true
 tempfile.workspace = true
 hex.workspace = true

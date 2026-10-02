@@ -6,7 +6,7 @@ status: draft
 title: 'Wave 20261002b: metadata timeout safety and acceptance reliability'
 relations:
 - informed_by: specification:milestone-acceleration-20261002
-revision: 6
+revision: 8
 ---
 ## Authority and preflight
 
@@ -90,3 +90,42 @@ The previous integration tree remains private recovery evidence. Gates refused i
 Public report copies replace the literal operator home prefix with the portable $HOME marker. That is the only report-text transformation; test names, commands, results, assertions, timing, findings and verdicts are unchanged. Raw reports remain in the unit scratch and original private integration tree. This explicitly disclosed path redaction takes precedence over verbatim-publication guidance. No raw report containing personal paths is admitted to Git. The report provenance table in docs/evidence/reliability-20261002/README.md records raw and publication digests.
 
 Publication checkout build target will be transferred exclusively from the inactive original integration target; no concurrent build shares it. Original private fixture credentials remain in the original tree until provider acceptance and exact fixture cleanup finish. Root lease in publication tree is codex-cb26b-publish. The original tree is retained until archive/handoff and owns no future publication.
+
+## Verified source release v0.25.0 — 2026-10-02
+
+Released at 2026-10-02T13:50:25Z:
+https://github.com/beyond10x/connectors/releases/tag/v0.25.0
+Release id 401858682 is non-draft, non-prerelease, Latest, authored by b10x-bot[bot].
+PR 78 was merged by app/b10x-bot after all four PR checks succeeded:
+https://github.com/beyond10x/connectors/pull/78
+The exact candidate was 7e6a33db463a581cb171c20215f98662b401bc1c; its verified tree
+e6cc76674fefa57507a1642d4ba83544dd1ad5fc equals merge commit
+b1f432766057fb8b7db60736363926cc44fe0db8 on fetched origin/main. All direct commits
+have bot author and committer. The GitHub merge has bot author and GitHub/web-flow
+committer; the merge App and App-only all-ref branch authority were verified.
+Required shared/repository checks have no bypass actors.
+
+Annotated tag v0.25.0 is object 16b1464c24f14021485dcf012dc81e9257657067,
+with b10x-bot[bot] tagger, peeling exactly to that merge commit. Remote tag refs
+match and the peeled commit is on origin/main. Tag source gates passed:
+https://github.com/beyond10x/connectors/actions/runs/37015553177
+GitHub-generated tar.gz and zip source archives both returned HTTP 200 after redirect.
+No binary artifacts are required or claimed by this repository's release procedure.
+Documentation publication is pending; no Atlas/Website delivery or consumer repin
+was performed or awaited.
+
+Local full gate --msrv exited 0 on the candidate, with Rust 1.88 independent libraries,
+Rust 1.91 workspace, workspace tests/Clippy and metadata conformance (289 scenarios,
+21 retained synthesis refusals). Website build/public-path audit passed. Evidence:
+docs/evidence/reliability-20261002/integration/. Real provider restart and six
+federated/direct groups passed as recorded separately. The actual ignored-family
+operator run remains 31 passed/1 existing Chrome failure/1 missing historical binary;
+its required-family command correctly exits 1. Release notes state that limitation.
+
+The three reliability stories moved to implemented on this gate evidence. Unit
+trees and their three local branches were retired after publication with retained
+raw archives. This next planning branch carries the post-verification receipt;
+it does not alter the already checked/tagged release tree. The active goal is not
+complete: one bounded clock experiment, first-three-provider acceptance and MCP
+remain. Entity Runtime issue 51 was rechecked and is OPEN with no comments:
+https://github.com/beyond10x/entity-runtime/issues/51

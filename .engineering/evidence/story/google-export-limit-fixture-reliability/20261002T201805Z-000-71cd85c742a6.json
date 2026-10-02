@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T20:18:05Z",
+  "actor": "human:timo",
+  "artifact": "story:google-export-limit-fixture-reliability",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "PR79 repository gate fails exact4MiB Google export with Unavailable",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/37051606475"
+  }
+}

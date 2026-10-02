@@ -1,0 +1,31 @@
+--- .local/provider-wave/postgres/pre-diagnostic-cli_journey.rs	2026-10-02 17:45:45.326359083 +0200
++++ adapters/sql/tests/local_runtime/cli_journey.rs	2026-10-02 17:47:25.641222575 +0200
+@@ -1082,3 +1082,28 @@
+     ]));
+     assert_eq!(status["connection"]["summary"]["state"], "revoked");
+ }
++
++#[tokio::test]
++#[ignore = "temporary diagnostic; not release acceptance"]
++async fn postgres_cte_sqlstate_diagnostic() {
++    let pg = LivePg::new();
++    let before = pg.snapshot();
++    let query = format!("WITH changed AS (DELETE FROM {}.events RETURNING id) SELECT * FROM changed", pg.schema);
++    refusal(pg.read(&query, json!([]), 1), "unavailable");
++    eprintln!("diagnostic child observation={}", success(pg.cli.run(&["adapters", "status", "--adapter", "warehouse"])));
++    assert_eq!(pg.rows("SELECT 1 AS alive", json!([]), 1)["rows"], json!([["1"]]));
++    let (host, port) = required_sandbox();
++    let (mut client, connection) = tokio_postgres::Config::new().host(host).port(port).user("reader").password("sandbox-reader-pw").dbname("incidents").connect(tokio_postgres::NoTls).await.unwrap();
++    let driver = tokio::spawn(connection);
++    let tx = client.build_transaction().read_only(true).start().await.unwrap();
++    tx.batch_execute("SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog").await.unwrap();
++    tx.prepare(&query).await.unwrap();
++    let wrapped = format!("SELECT CASE WHEN (COALESCE(octet_length(result.c0::text),0)::bigint) > {} THEN NULL::text[] ELSE ARRAY[result.c0::text] END FROM ({query}) AS result(c0)", connectors_core::RESPONSE_LIMIT);
++    let error = tx.prepare(&wrapped).await.unwrap_err();
++    eprintln!("diagnostic wrapped_prepare_sqlstate={:?}", error.code().map(|code| code.code()));
++    assert_eq!(error.code().map(|code| code.code()), Some("0A000"));
++    tx.rollback().await.unwrap();
++    drop(client);
++    driver.await.unwrap().unwrap();
++    assert_eq!(pg.snapshot(), before);
++}

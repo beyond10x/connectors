@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:sql-fixture-accepts-stray-connections
 kind: story
-status: active
+status: implemented
 title: The SQL adapter's fake server test fails when a stray connection reaches its port
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,10 +10,11 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/local_runtime.rs
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T11:48:33Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-02T13:37:11Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":2,"review_outcome":1}}}
 ---
 ## Observed
 The 2026-10-02 closing gate at 67fb9da30 failed a_dispatched_read_reaches_the_database_and_returns_its_refusal in adapters/sql/tests/local_runtime.rs:339. The fixture saw an unexpected startup packet and a second session; five isolated repeats passed. Unrelated traffic remains a hypothesis.

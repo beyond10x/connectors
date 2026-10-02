@@ -1,0 +1,17 @@
+
+running 1 test
+test cli_journey::postgres_cte_sqlstate_diagnostic ... CLI action=["setup", "init"] exit=exit status: 0
+CLI action=["setup", "check"] exit=exit status: 0
+CLI action=["connections", "connect"] exit=exit status: 0
+CLI action=["operations", "describe"] exit=exit status: 0
+CLI action=["operations", "invoke"] exit=exit status: 1
+CLI action=["adapters", "status"] exit=exit status: 0
+diagnostic child observation={"observation":{"adapter":"warehouse","child_incarnation":"fee4b60b-7926-4704-8af2-b716be240270","configuration_revision":"2b5987437855be93371b0d5497fda029febe1d95d19f37ebec14b9fed2be23c6","host_incarnation":"880e5f29-c3a1-4295-b9d9-124050bb772c","observed_at_ms":1790956052447,"state":"ready"}}
+CLI action=["operations", "invoke"] exit=exit status: 0
+diagnostic wrapped_prepare_sqlstate=Some("0A000")
+fixture process pid=1228929 exit=signal: 9 (SIGKILL)
+fixture process pid=1228926 exit=signal: 9 (SIGKILL)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 4.07s
+

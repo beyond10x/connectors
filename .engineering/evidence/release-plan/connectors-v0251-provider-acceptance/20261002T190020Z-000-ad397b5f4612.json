@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T19:00:20Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0251-provider-acceptance",
+  "kind": "release-plan",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "0.25.1 local gate --msrv and website checks all exit0; exact scope and limits retained",
+    "reference": "docs/evidence/provider-release-20261002/README.md"
+  }
+}

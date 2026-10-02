@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T19:24:56Z",
+  "actor": "human:timo",
+  "artifact": "story:google-export-limit-fixture-reliability",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Unchanged exact boundary test loop: iteration27 fails Unavailable after26passes; privateTMPDIR",
+    "reference": ".local/provider-wave-briefs/google-export-ci/baseline-loop.log"
+  }
+}

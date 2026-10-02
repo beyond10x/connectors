@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'cli_journey::postgres_dropped_invocation_cancels_its_backend' (1126757) panicked at adapters/sql/tests/local_runtime/cli_journey.rs:520:10:
+CONNECTORS_PG_SANDBOX=127.0.0.1:PORT is required; case unexecuted without it
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test cli_journey::postgres_dropped_invocation_cancels_its_backend ... FAILED
+
+failures:
+
+failures:
+    cli_journey::postgres_dropped_invocation_cancels_its_backend
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 0.00s
+

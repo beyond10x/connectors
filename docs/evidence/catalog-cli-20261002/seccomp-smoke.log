@@ -1,0 +1,12 @@
+kernel notification sizes=80/24/64
+notif pid=2185774 fd=3 syscall=1 target=true armed=false response=CONTINUE
+notif pid=2185774 fd=3 syscall=74 target=true armed=false response=CONTINUE
+ARM after genuine write/fsync, file=A
+notif pid=2185774 fd=3 syscall=1 target=true armed=true response=EIO
+notif pid=2185774 fd=3 syscall=74 target=true armed=true response=EIO
+notif pid=2185774 fd=4 syscall=1 target=false armed=true response=CONTINUE
+notif pid=2185774 fd=4 syscall=74 target=false armed=true response=CONTINUE
+DISARM after target EIO write/fsync and unrelated real success
+notif pid=2185774 fd=3 syscall=1 target=true armed=false response=CONTINUE
+notif pid=2185774 fd=3 syscall=74 target=true armed=false response=CONTINUE
+PASS child exit=0; EIO=2 CONTINUE=6; same preopened fd; target=AD unrelated=C; listener/control closed; exact files removed

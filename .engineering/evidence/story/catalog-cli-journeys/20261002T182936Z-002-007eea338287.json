@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T18:29:36Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-cli-journeys",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Catalog final author checks: 334 ordinary passing, 2 affected ignored cases, 2 cleanup controls; retained historical variants with documented reuse",
+    "reference": "docs/evidence/catalog-cli-20261002/cleanup-fix-report.md"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T15:55:46Z",
+  "actor": "human:timo",
+  "artifact": "story:postgres-unsupported-feature-classification",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Exact 0A000 wire regression red before fix; package and real read-only acceptance green after fix",
+    "reference": "docs/evidence/postgres-acceptance-20261002/README.md"
+  }
+}
