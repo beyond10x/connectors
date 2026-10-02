@@ -9,17 +9,17 @@ relations:
 - serves: vision:independent-contract-adapters
 - informed_by: specification:milestone-acceleration-20261002
 scope:
-- confidence: inferred
+- confidence: cited
   path: Cargo.lock
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-build/Cargo.toml
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-build/src/ignored.rs
 - confidence: cited
   path: crates/connectors-build/src/main.rs
 - confidence: cited
   path: docs/development.md
-revision: 11
+revision: 15
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T11:48:33Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T11:48:33Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
@@ -36,8 +36,14 @@ Implement a Rust clap-derived connectors-build command. Classify disposable loca
 Report exact selected/executed/skipped/failed names and counts. A required release family refuses missing prerequisites rather than counting skips as acceptance. Existing gate behavior stays unchanged until explicit enrollment is reviewed. Retain one operator-host run and its missing prerequisites.
 
 ## Scope
-Cited: crates/connectors-build/src/main.rs, docs/development.md. Inferred new module: crates/connectors-build/src/ignored.rs. Do not edit gate.rs, workflow YAML or inventoried tests.
-Coordinate the inventory with the SQL fixture unit without editing its file. Coordinator owns store writes, evidence and release metadata. No runtime entity is introduced.
+
+Confirmed by the implementor and unit commit a2f408dbed07e2558a11db3bc38e4eac70fa1ea7:
+crates/connectors-build/src/main.rs (existing dispatch),
+crates/connectors-build/src/ignored.rs (new Rust module, previously inferred),
+crates/connectors-build/Cargo.toml and Cargo.lock (existing resolved libc dependency
+name only, previously inferred), and docs/development.md. No gate.rs, workflow or
+inventoried provider-test changes. Root reconciled the lock entry with the 0.25.0
+version updates; the merge applied cleanly.
 
 ## Required conformance cases
 

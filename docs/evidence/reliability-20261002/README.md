@@ -1,11 +1,13 @@
 # Reliability batch verification
 
-The bridge and SQL unit reports establish their targeted acceptance and retain
-independent adversarial cases. The ignored-suite runner, final integrated gate,
-MSRV checks and source release are pending. No published release is claimed here.
+The three unit reports establish their targeted acceptance and retain independent
+adversarial cases. The runner correctly reports an existing failed browser fixture
+and a missing prerequisite. The final integrated gate, MSRV checks and source
+release are pending. No published release is claimed here.
 
 - [Bridge ownership results](bridge/README.md)
 - [SQL cancellation and 50-run results](sql/README.md)
+- [Ignored runner and actual operator outcomes](runner/README.md)
 
 ## Publication redaction
 

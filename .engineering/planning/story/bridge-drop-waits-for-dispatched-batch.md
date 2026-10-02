@@ -13,9 +13,11 @@ scope:
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: cited
   path: crates/connectors-host/src/local/metadata/er.rs
-- confidence: inferred
+- confidence: cited
   path: crates/connectors-host/src/local/metadata/metamorphic_tests.rs
-revision: 11
+- confidence: cited
+  path: ess/domains/cli.yaml
+revision: 15
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
@@ -35,9 +37,27 @@ These are proposed runtime conformance case names, not existing-test claims. Bin
 If upstream cannot prove completion safely, record that missing guarantee; do not implement an unbounded Drop wait or mark this story done.
 
 ## Scope
-Cited: crates/connectors-host/src/local/metadata.rs and crates/connectors-host/src/local/metadata/er.rs. Inferred tests: crates/connectors-host/src/local/metadata/metamorphic_tests.rs.
-Serialize with story:registry-clock-outside-shared-batches and story:metadata-invoke-cost-flat-in-store-size. No upstream edits in this unit. Changed model semantics require ESS authoring first.
+
+Confirmed by the implementor and unit commit 91511f4379579d0605af80420d5c34ea4874d162:
+crates/connectors-host/src/local/metadata.rs,
+crates/connectors-host/src/local/metadata/er.rs, and
+crates/connectors-host/src/local/metadata/metamorphic_tests.rs (previously inferred).
+The integrated gate additionally required a comment-only source-line citation
+correction in ess/domains/cli.yaml; compiled ESS JSON is byte-identical.
+Serialize with the clock experiment and upstream metadata adoption. No upstream
+code or model semantics changed.
 
 ## Required conformance cases
 
 The named conformance cases batch-timeout-retains-ownership, queued-batch-cancelled-before-release and next-invoke-after-unknown-outcome prove no dispatched batch commits after ownership release, a subsequent invoke recovers without a duplicate provider effect, and uncertainty remains until observed. The additional metadata_timeout_safety_legacy_import_retains_ownership case covers the same boundary while Metadata::adopt_er imports legacy state before installing its authority. The implementation's exact test names and outputs are retained in its report; all four must pass. This closes a reachable import path discovered during review rather than excluding it as migration-only.
+
+## Integrated gate citation correction
+
+The first integrated gate at 05f9ce537f7b8e0de3064a82d1ec5f985a62a473 exited 1
+because its workspace-test step exited 101. The existing
+`the_er_rs_citation_lands_on_the_cursor_expiry_path` assertion found that
+`ess/domains/cli.yaml` still cited er.rs:3610-3612 after this unit moved the
+cursor-removal branch to 3760-3762. The correction updates that comment only.
+ESS 0.45.0 validates all 24 files and compiled JSON before/after is byte-identical.
+No model semantics, test assertion or generated source is changed.
+The retained first-run log is integration-gate-1.log in coordinator scratch.
