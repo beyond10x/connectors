@@ -170,6 +170,14 @@ CLI contract invariant limitation and can be explicitly run to observe its
 current result. Subprocess helpers are always excluded from top-level execution;
 their owning parent tests invoke them.
 
+The two catalog settlement-failure cases additionally require Linux x86_64 with
+seccomp `USER_NOTIF` and the supported notification ABI. The runner queries those
+capabilities without installing a filter. The fixtures must then be permitted to
+install a listener on their own CLI descendants and inspect those processes' file
+descriptors; a runtime policy refusal is an explicit test failure. The filter
+returns `EIO` only for the fixture's selected metadata files during the armed
+settlement window, and continues ordinary system calls outside it.
+
 The JSON report defaults to `.local/ignored-suites.json`; `--report <path>` selects
 another destination. It records every fully qualified test name, family,
 selection, outcome and skip reason, plus exact inventory, selected, executed,

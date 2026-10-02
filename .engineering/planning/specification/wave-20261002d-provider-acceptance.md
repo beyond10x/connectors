@@ -9,7 +9,7 @@ relations:
 - informed_by: story:catalog-cli-journeys
 - informed_by: story:kubernetes-real-read-acceptance
 - informed_by: story:postgres-real-provider-acceptance
-revision: 9
+revision: 15
 ---
 ## Selection and existing authorization
 
@@ -1313,3 +1313,184 @@ do not widen damage or deadlines. All fifteen variants and ten obligations remai
 required. Root owns shared classifier and AEP. This scoped fixture correction has
 one implementation unit, so no multi-item decomposition panel applies. Final
 independent adversarial review and repository gate remain required before acceptance.
+
+## Measured injection and bounded recovery diagnostic — 2026-10-02
+
+Filtered control12 passed with zero EIO (3270 target and8972 unrelated CONTINUE).
+Mode8 produced four actual pwrite64 EIO replies to its exact metadata.sqlite3-wal
+identity, with no monitor errors/cancellations. It preserved known Applied,
+Unavailable/AttemptStore, incomplete audit and original Dispatching/Pending with
+no settlement/expiry. Source/binary identities remain in worker raw evidence.
+The selected case still failed: after disarm, proof-spend refusal and a top-level
+outcome_unknown response, the fixture unwrapped owner::Client::connect(false) and
+received Unavailable. Remaining response/state assertions did not execute.
+No successful recovery or mode8 completion is claimed. Modes9–11 remain unrun.
+Raw seccomp-settlement-1.log SHA256
+0f2f5d5ee1c784a04fd6b0fa37401eeb2d0bfae721d4660eaff9151e2181ce93.
+Cleanup observed graceful captured owner/child exits and joined observer/monitors.
+
+Authorize one diagnostic rerun of the existing control12/mode8 pair, changing only
+retained observations before the unchanged failing assertion: serialize the full
+recovery response, exact original typed attempt/key/audit/redemption rows, socket/
+incarnation observations where naturally reachable, and monitor counters. No new
+provider request, altered deadline, forced owner start, relaxed assertion or mode9–11
+execution. The competing source paths are passive final replay at
+apps/connectors/src/local/operations.rs:121–127 and pending transport error mapping
+at155–171; top-level outcome_unknown alone distinguishes neither.
+
+If observation establishes prior background recovery in the real replacement
+owner started by the spent-proof control, record that actual incarnation/state
+before its shutdown. Do not yet move/delete the failing owner assertion: return
+the exact measured distinction for the coordinator's scoped fixture correction.
+Final filtered-owner cleanup must additionally prove the exact verified lifetime
+lock is reacquirable after observed exit, matching the existing helper invariant.
+
+## Recovery observation correction — 2026-10-02
+
+The one authorized diagnostic control12/mode8 run passed in23.26s with all original
+mode8 assertions unchanged. The exact original remained Dispatching/Pending after
+the spent-proof control under a different real owner. Following its shutdown,
+the retry started another owner and returned unknown/replayed=true/cause=null,
+complete audit and matching original attempt/request; durable state became
+Indeterminate/Quarantined without timestamps and without another PUT/effect.
+Resumed target I/O, captured process exits and lifetime-lock reacquisition passed.
+Diagnostic log SHA256ac38c5b090a43bf21c82e29aedb801cb01cb0f9f16cdd05e28be43ac3af3b890.
+This does not establish which path produced the earlier missing-owner failure.
+
+Authorize the narrow deterministic fixture correction grounded in both existing
+production paths. Record the actual replacement owner created by the spent-proof
+control and prove its incarnation differs from the original. After its exact
+shutdown/exit, capture the original durable state before final retry. If it is
+Dispatching/Pending, require retry to create a different reachable owner as before.
+If already Indeterminate/Quarantined, require passive replay with no owner. Refuse
+every other state pair; require absent settlement/expiry in either branch. Keep
+the existing final original request/attempt, unknown/replayed=true, complete audit,
+quarantine, no timestamp, resumed persistence and no duplicate effect assertions
+unconditional. No sleep, forced startup, deadline extension or product mutation.
+This selects assertions from an observed quiescent precondition, not from whichever
+result happens to arrive. Retain both paths and report which actually ran.
+
+After this correction, execute control12 and modes8,9,10, then11 with all retained
+historical assertions; stop on first unexplained failure. A mode8 pass is only one
+additional historical variant, not completion of the multi-variant obligation.
+Finish ordinary tests/Clippy/fmt and freeze for whole-candidate review only after
+the required matrix is green. The original red and diagnostic remain immutable.
+
+## Revoked-path restoration control — 2026-10-02
+
+The corrected control12/modes8–10 run passed37.62s and11 passed7.64s. During final
+cleanup review the worker removed a panic-while-holding-monitor-mutex risk without
+changing product assertions. The justified final repeat passed8/9, including the
+pending/new-owner path, but mode10 failed the added assert_resumed: after correct
+revoked disclosure, passive retry and exact owner/child exit/lock release, no target
+metadata syscall occurred. All earlier mode10 product assertions passed. The
+fixture must not require incidental metadata I/O from a revoked passive path.
+Retain red log SHA2566cc69e8e8bc49df54776e13f1b9c2bd03561c2f61108cd8e2181bccf3f069c47.
+
+Execution protocol deviation: a tool cell launched11 without conditioning on the
+returned10 exit code. That already-started owned run finished green13.77s with clean
+exits/lock release; then all execution stopped. Its log SHA256
+2d719d09be83f72590791025ef7b4896a365de42f30f9ace6e4a3e9d3901f80a.
+Do not describe the sequence as stopping before11. Future dependent launches must
+explicitly inspect the previous result before starting the next run.
+
+Authorize one explicit test-fixture restoration control for revoked10/11 after
+all original revoked/no-owner/state/effect assertions and exact owner exit. Open
+only the existing verified exact metadata file read-only. In a task-owned filtered
+child, perform genuine fsync on that preopened descriptor in an async-signal-safe
+pre_exec hook after filter installation, then exec the production CLI --version.
+The listener service must already be running; require fsync success, child exit0,
+a new exact-target CONTINUE notification while disarmed, no owner socket, unchanged
+original typed state and provider effect counts. No metadata bytes may be written,
+no authority provisioned or provider invoked. Label this fixture fsync restoration,
+not production recovery or a write by revoked replay. Keep unrevoked8/9's actual
+production recovery/resumed-I/O assertions. Preserve all original product checks.
+
+Run the affected control12/8/9/10 pair first; start11 only after an observed exit0.
+Stop and report any new unexplained failure. Then ordinary/Clippy/fmt as warranted
+by the final source, freeze, and whole-candidate review. No production, dependency,
+deadline, guard or outcome change is authorized.
+
+## Adversary cleanup correction — 2026-10-02
+
+The whole-candidate source review records one introduced blocker: list-derived
+numeric child PIDs are converted to pidfds without post-acquisition ownership
+validation, and the new fault cleanup then signals those handles. A stable pidfd
+does not prove the process was still the owned child when captured. No wrong-process
+signal or PID-reuse reproduction occurred. Immutable review:
+review-result:catalog-whole-candidate-20261002, report SHA256
+feb48e9c79a8bdd79c1a28eb9a600fa840105cb16fad91fabce7bd8950a50653.
+
+Authorize the smallest fault-only correction: preserve list-derived child handles
+as observation-only. Never send a signal through them. Keep the strongly identified
+SO_PEERPIDFD owner handle separate; only it and handles captured while a live
+filtered notification proves identity may authorize forced retirement. Failure to
+observe an untrusted/list-derived child's exit is a fixture failure/diagnostic,
+not permission to signal it. During unwind avoid a second panic that would bypass
+listener/observer cleanup. Keep shared capture/crash semantics unchanged, so this
+does not expand the modes0–7 rerun surface.
+
+Add a safe task-owned negative control at this cleanup boundary before the fix:
+an observation-only handle to a process not owned by the selected owner must never
+be signalled, while proven-owner cleanup remains effective. Every process used by
+the control must itself be created and reaped by the test. Retain its red under
+the old signal behavior and green after correction. Label it a constructed
+observation-handle boundary control, not reproduction of kernel PID reuse. Never
+try to force system PID reuse or target unrelated live processes.
+
+The same review identifies a bounded cache limitation: a numeric Tgid key can hold
+an exited pidfd and hide a later filtered process that reuses the number. In the
+same test-only helper, expire an exited cached handle before capturing a replacement
+under a still-valid notification ID; do not weaken notification validation. Use
+real task-owned live/exited handles to verify the cache distinction if a narrow
+control is feasible; do not claim an actual PID-wrap experiment.
+
+Preserve the frozen pre-fix eight sources and hashes. Change only fault cleanup,
+its notification cache and the exact new controls; no production/dependency/guard/
+deadline/authority changes. Rerun the two affected fault selections in order,
+checking the first exit before the second, and appropriate ordinary/Clippy/fmt.
+If shared owner capture/crash behavior changes, stop and return for explicit added
+modes0–3 and6 verification. Final reviewer must inspect the corrected candidate;
+the lifecycle remains active until that and the integrated gate pass.
+
+## Corrected candidate and release handoff — 2026-10-02
+
+Whole-candidate review found an introduced signal-authority defect in test cleanup.
+The author separated strongly owned owner handles from observation-only list-derived
+child handles, and expires exited cached notification handles before reacquisition.
+The constructed boundary control failed on the original cleanup, then both boundary
+and cache controls passed. No real PID-reuse race or unrelated process was targeted.
+Shared capture/crash semantics remain unchanged; the two affected fault selections
+passed sequentially with checked exits. Final package334passed/0failed/21ignored,
+Clippy/fmt/diff-check0. Detailed public evidence is
+`docs/evidence/catalog-cli-20261002/cleanup-fix-report.md`, SHA256
+a3d6090bd12ec43a84d5ac00e06fd08e2bd9ca25f1d99677f3b7b8fdf933b6cc.
+Final source manifest SHA256b545c005ffa28b7dbd19605909d388dde3fd843a02dcd805509ab5137b625c8f.
+
+All ten logical obligations/fifteen historical variants have passing evidence across
+retained runs; lifecycle/modes0–7 are not rerun on the final executable. Preserve
+this unchanged-relevant-source reuse limit and the actual CLI/host-library seam
+split. Correction review and integrated gate remain pending; this update alone
+does not close the story. No production/dependency/authority/guard changes.
+
+## Integrated release candidate ready — 2026-10-02
+
+All required local checks passed. The full gate --msrv exited0:1207ordinary
+passed/0failed/65ignored, Clippy/fmt/production/independent-model/source/CLI checks,
+Rust1.88 libraries and1.91workspace. Metadata conformance289passed/0failed retains
+Inconclusive coverage-undeclared status; synthesis498scenarios/43authored/21refusals
+is not498executions. Compiledignoredinventory65cases/134binaries/unknown0 executed0,
+selected41/missing38/skipped65 in the intentionally unconfigured inventory.
+Selectedprovideracceptance remains its separately reviewed evidence.
+
+Website npmci/typecheck/build/referencecheck/examples15/browser/UI all exited0;
+482publicfiles audited withoutprivatepaths. No dependency upgrades or deployment.
+Detailed commands/counts/limits: docs/evidence/provider-release-20261002/README.md.
+The author/reviewer/public reports preserve all earlier reds and scoped evidence reuse.
+Final release prose review found no concrete issue. Catalog, PG real acceptance,
+exact SQLSTATE correction and Kubernetes acceptance stories are implemented.
+
+Remote publication is still pending. Next: bot commit/push, App PR, requiredchecks,
+App merge, verifyexactmain/tree, immutableannotatedv0.25.1tag, successfultagchecks,
+App-authoredLatestrelease and sourcearchives. Release plan staysactive until verified.
+MCP and the sustained-load/upstreamclock and decision-gated provider remainder stayopen.

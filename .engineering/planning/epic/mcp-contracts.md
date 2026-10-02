@@ -8,7 +8,7 @@ relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:contract-driven-connectors-design
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 3
+revision: 6
 ---
 ## Operator request
 
@@ -122,3 +122,65 @@ server/resources/prompts capabilities remain new specification and implementatio
 not behavior that may be asserted by the retrofit. Detailed source citations are
 retained in the task-owned mcp-retrofit-inventory/report.md, SHA256
 cb744d5de42ca204e8c72095787c494383150b244c83b127486e9f359eaac242.
+
+## Parallel draft preparation — 2026-10-02
+
+While the provider acceptance fixture is completed, prepare a scratch-only minimal
+ESS system/domain and named scenarios for the source-inventoried sibling tools/HTTP
+boundary. This uses the existing Connectors ESS0.45.0 executable solely to check
+draft syntax; it selects no sibling toolchain or release dependency. No MCP checkout,
+runtime/store/source mutation, actual conformance target or delivery is authorized
+by this preparation step. Sibling adoption and integration still follow provider
+handoff under the existing delivery authorization.
+
+Scope the shipped public value constructors and connected-handle snapshot/call
+behavior cited in the mcp-retrofit-inventory report. Keep all UNMAPPED facts and
+actual caller/process decisions open. No invented durable server/session/request
+entities, credential lifecycle, new capability, schema guarantee on arbitrary
+public serde values or universal wire-losslessness. Name actual failures and
+source citations; label structural checks separately from executed conformance.
+Root's assigned scratch mcp-retrofit-draft owns all draft files. Return the precise
+remaining conformance-adapter seam, with no new runtime implementation/build.
+
+## Scratch structural draft result — 2026-10-02
+
+The scoped draft now contains six source-cited public value types and eighteen
+named constructor/HTTP behavioral obligations. The supplied ESS0.45.0 command
+`ess specify validate --path .local/provider-wave-briefs/mcp-retrofit-draft/spec`
+exited0 with `mcp v1 — 2 file(s), valid`. This is structural validation only.
+The manifest has no executable scenarios; the eighteen obligations are prose and
+no conformance synthesis or execution occurred. No sibling source/store/runtime
+was changed. Draft report SHA256
+a31627567bf3987d1919be1308ad80d53b9666759f5e18528c61796e7c5f4676.
+
+The draft does not invent persistent Connection/Session/Request entities to fit
+opaque live handles. A reviewed direct-return and target-local handle routing
+binding is still needed before authoring executable scenarios and their Rust
+target over real constructors/connect_http_with_client. Target routing tokens
+are not new persistent product identities. Constructor guarantees are kept distinct
+from public serde shapes, and decoded SDK JSON from original wire bytes. Limits/
+error representation is an explicit additional binding gap; all original eight
+source/model disagreements remain. This is preparation, not MCP delivery.
+
+## Direct-return mapping resolved — 2026-10-02
+
+Source inspection of exact ESS0.45.0 tag eff6aa70085ffd341c503834582acfe1088c8d86
+establishes that source format ess/17, typed command response, returns:true and
+scenario4 response assertions model direct library functions without invented
+entities/events/views. The earlier scratch ess/15 header was unnecessarily narrow;
+no upstream ESS direct-function blocker exists. A successor draft should bind real
+constructors plus a scenario-scoped actual HTTP Connection in begin/end_scenario.
+The supplied draft is not yet revised, synthesized or executed.
+
+No general direct-response-to-handle capture was found in scenario4. Use the actual
+single receiver or an explicitly target-local fixture slot; do not invent product
+handle IDs or persistent ownership. Provider-call counters are not product return
+fields. Keep their zero-dispatch/positive-control checks explicit Rust integration
+obligations until a separate observation declaration is reviewed. Preserve exact
+JSON/numeric observation limits, absent/null projection distinctions, real error
+payloads and all existing UNMAPPED lifecycle/bounds/consumer decisions.
+
+Detailed source-cited mapping report in task scratch mcp-target-mapping/report.md,
+SHA256d7bfe91a04cb1176a62627cd45026c87cd930b372036bf2267ac22ea8dc413ec.
+No sibling source/store/toolchain adoption or runtime/conformance execution occurred.
+This prepares the already-authorized MCP delivery after the provider release handoff.
