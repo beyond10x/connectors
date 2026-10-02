@@ -1,0 +1,23 @@
+
+running 1 test
+catalog settlement control 12: start
+catalog settlement control: held Applied response settled; audit complete
+catalog settlement control 12: passed
+catalog historical variant 8: start
+catalog settlement injection mode 8: classification="applied" cause=null audit="complete" durable=("completed", "replayable", Some(1789076482762), Some(1789162882762))
+
+thread 'cli_journey::guarded_merge::catalog_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively' (2031185) panicked at adapters/catalog/tests/local_runtime/guarded_merge.rs:788:9:
+assertion `left == right` failed: {"adapter":"gitlab","mutation":{"attempt":{"id":"030d7eee-642a-4727-b8d6-74b203487550","instance":"fixture-gitlab"},"cause":null,"classification":"applied","original_request_id":"6cb54add-5f18-4605-86b0-5cc59d2d3b8a","replayed":false},"operation":"merge_request.merge","request_id":"6cb54add-5f18-4605-86b0-5cc59d2d3b8a","result":"{\"body\":{\"detailed_merge_status\":\"mergeable\",\"head_pipeline\":{\"id\":12,\"status\":\"success\"},\"id\":40,\"iid\":4,\"sha\":\"0123456789abcdef0123456789abcdef01234567\",\"state\":\"merged\"},\"provenance\":{\"instance\":\"fixture-gitlab\",\"observed_at_unix_ms\":1790960140747,\"resource\":\"/api/v4/projects/{id}/merge_requests/{merge_request_iid}/merge\",\"source_revision\":\"f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530\"},\"status\":200}","revision":"83d0e283b13af016f754ec8cbc63d569ec59fc3800d53fb9ca10021ed34827b9","source_audit":{"audit_ref":"61850c2e-4798-43fd-88db-14615956a8e2","audit_status":"complete","instance":"fixture-gitlab"}}
+  left: Null
+ right: "unavailable"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+catalog observer shutdown during unwinding: Joined { provider: Ok(()) }
+test cli_journey::guarded_merge::catalog_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively ... FAILED
+
+failures:
+
+failures:
+    cli_journey::guarded_merge::catalog_cli_failed_settlement_keeps_the_known_effect_and_recovers_conservatively
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 67 filtered out; finished in 12.00s
+

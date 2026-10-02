@@ -7,7 +7,7 @@ title: 'Release 0.25.1: verified provider acceptance and precise SQL refusals'
 relations:
 - informed_by: specification:wave-20261002d-provider-acceptance
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-02T16:50:11Z", actor: "human:timo", revision: 2}
 ---
@@ -65,3 +65,13 @@ semantics, sustained ER workload, the unexplained isolated GitLab revalidation
 observation or MCP delivery. The three product decisions stay open. This is one
 release artifact over already-reviewed work, not a new multi-story decomposition;
 a new decomposition critic panel is not applicable.
+
+## Release documentation reconciliation — 2026-10-02
+
+Root also owns website/docs/introduction/status.md for this handoff. The source
+audit found stale fixture-only GitLab claims and future-sounding PG/K8S acceptance;
+these are corrected to the actual reviewed evidence. README and the GitLab guide
+now list all eighteen already-shipped read operations. The PG evidence table names
+five CLI cases and one direct native cancellation case. Catalog remains explicitly
+partial until all required variants and review finish. Versions are still unchanged.
+Audit report SHA2566e103fcb1fbe4c5b8828deddc20914b21b2c836e87d4015fb4741886134d0704.

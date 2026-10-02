@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T17:13:17Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-cli-journeys",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Catalog partial acceptance: 8/10 obligations, 11/15 variants; ineffective chmod injection, mode8 failed, modes9-11 unmet; ordinary332 passed",
+    "reference": "docs/evidence/catalog-cli-20261002/partial-report.md"
+  }
+}
