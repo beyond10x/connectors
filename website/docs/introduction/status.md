@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.25.0
+# Source release v0.25.1
 
-Version **0.25.0** specifies at ESS source format `ess/15` with the released
+Version **0.25.1** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -75,12 +75,15 @@ sandbox acceptance is recorded in the source checkout's evidence directory.
 Local approval policy, protected proof issuance and guarded GitLab writes run
 through private protocol two. The retired native GitLab adapter had production
 CLI fixtures joining the mutation ledger, audit, approval spend and provider
-effects, including lost-response observation without resending. The first catalog
-port passed eight of ten logical obligations and eleven of fifteen historical
-variants. The settlement-failure injection was ineffective, so four variants
-remain unmet while a separate fault fixture is tested. Engine fixtures and earlier
-live sandbox runs do not replace those assertions. Public/version-one interfaces
-retain reads.
+effects, including lost-response observation without resending. The catalog port
+now has passing evidence for all ten logical obligations and fifteen historical
+variants. Exact-file seccomp faults exercise settlement failure; cleanup controls
+distinguish strongly owned processes from observation-only child handles. The
+original effects use the production CLI; some settled replay observations use a
+same-image host-library helper. Results span multiple runs with documented reuse
+where relevant source is unchanged, rather than one final executable running all
+variants. The fault cases require Linux x86_64 seccomp user notifications.
+Public/version-one interfaces retain reads.
 
 Kubernetes and PostgreSQL implement persistent local connections, saved credential
 reuse and owner restarts. Four new k3s v1.31.5 cases passed for selected reads,
