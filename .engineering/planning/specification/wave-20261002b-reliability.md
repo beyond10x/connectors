@@ -6,7 +6,7 @@ status: draft
 title: 'Wave 20261002b: metadata timeout safety and acceptance reliability'
 relations:
 - informed_by: specification:milestone-acceleration-20261002
-revision: 3
+revision: 5
 ---
 ## Authority and preflight
 
@@ -16,19 +16,21 @@ Primary status is exactly `?? .agents/`; no unit touches it. Work resumes the ex
 
 ## Selected units
 
-All serve vision:independent-contract-adapters. The draft waves, collisions and unassessed lists were retained verbatim in waves-before.json before activation. The three selected units share no edit paths. Clock experiments share metadata paths and remain sequenced after bridge cleanup. Unrelated backlog items are not scheduled.
+All units serve vision:independent-contract-adapters. The selected source scopes remain disjoint; the runner's added Cargo dependency/lock update is reconciled by root with release metadata. Root is the sole planning-store writer.
 
-| Unit | Managed id and branch | Stage |
+| Unit | Managed id and branch | Current stage |
 | --- | --- | --- |
-| story:bridge-drop-waits-for-dispatched-batch | cb26b-bridge; impl/cb26b-bridge | four timeout regressions red then green; final package checks |
-| story:sql-fixture-accepts-stray-connections | cb26b-sql; impl/cb26b-sql | package tests/Clippy/fmt green; adversary pass 1; 50 load repetitions pending |
-| story:ignored-suites-have-a-runner | cb26b-runner; impl/cb26b-runner | eight orchestration cases red then green; compiled workspace inventory and actual fixture execution pending |
+| story:bridge-drop-waits-for-dispatched-batch | cb26b-bridge; impl/cb26b-bridge | commit 91511f4379, integrated in 294477ba21; package 335 passed, independent adversary found nothing |
+| story:sql-fixture-accepts-stray-connections | cb26b-sql; impl/cb26b-sql | commit ef5a08f87f, integrated in f43fdbb00f; package 19 passed, 50/50 loaded runs passed, independent adversary found nothing |
+| story:ignored-suites-have-a-runner | cb26b-runner; impl/cb26b-runner | adversary 1 introduced child cleanup finding fixed; package 150 passed; final attack and operator-host run ongoing |
 
-Integration is connectors-plan-20261002 on plan/milestones-20261002; its HEAD is b3ddded7618b5a4a23fe74dbec739e0938ecc296 plus uncommitted coordinator planning, resolver evidence and intended v0.25.0 release metadata. Every unit remains based on that same opening commit, with source changes uncommitted. Only root writes the store. Each build directory is <tree>/target and scratch is <tree>/.local/wave-20261002b. Codex subagents execute the aep:implementor and aep:adversary procedures; this host has no plugin agent-type selector. All committed runnable code is Rust with clap derive.
+Publication integration is now cb26b-publish, branch delivery/reliability-20261002, HEAD 0f9d56f994009b19490f609ced3239f85a0c7953. It contains bot-authored source merges and intended v0.25.0 metadata. No branch/tag/release has been published. Stories stay active pending the required integrated gate. The clock experiment remains sequenced afterward; catalog scope/preflight is recorded but not dispatched.
 
-A workspace build is warming integration target for the final gate. Current free space fluctuates around 20–23 GiB; retain the 8 GiB floor. SQL target stays available for 50 repeated runs during the runner's actual workspace tests. Adversary lease is codex-cb26b-sql-adversary; SQL implementor has released its lease. Bridge and runner retain their worker leases; root retains codex-connectors-delivery-20261002.
+Every managed tree is below the configured b10x/connectors tree root, uses target/ for build output and .local/wave-20261002b/ for scratch. Publication target and website/node_modules were transferred exclusively from the inactive original integration; no two worktrees share a mutable build directory. Root precompiles final test dependencies while runner acceptance finishes. Keep 8 GiB free and two Cargo jobs per active build.
 
-Coordinator approved a narrow scratch exception for ignored fixture validation: $HOME/.cache/cb26b-runner/tmp, owner-private and task-owned, because absolute Secret Service sockets cannot fit the long managed path and custody deliberately rejects symlink aliases. The runner will expose --tmpdir with physical owner-private directory validation and report missing short-root prerequisites explicitly. Root owns cleanup of that exact external scratch path after evidence is retained.
+Original connectors-plan-20261002 is private evidence, archived with worktree archive --replace at HEAD 294477ba21; archive patch SHA256 b2fee61ee81a91da6b5101aad57e8214b7f86148accac9102cc03f82e4fa19d6. Its fixture credentials remain needed for provider acceptance, so retain its lease and directory until exact fixture teardown. It owns no future public store mutation. Root leases: codex-cb26b-publish and codex-connectors-delivery-20261002; completed source trees have coordinator leases codex-cb26b-{bridge,sql}-coordinator. Worker and adversary leases belong to those agents only.
+
+Approved short physical scratch exceptions are $HOME/.cache/cb26b-runner/tmp and $HOME/.cache/cb26b-runner-adversary/tmp, mode 700, task-owned; root cleans them after retained evidence. The runner's --tmpdir explicitly admits physical private directories and reports overly long custody paths as missing prerequisites. Symlink aliases are refused by custody and are not used.
 
 ## Completion
 

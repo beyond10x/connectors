@@ -24,6 +24,10 @@
   not resolve Entity Runtime issue 51 or complete sustained-read acceptance.
 - Provider acceptance and MCP delivery remain work in progress. A skipped
   ignored test is reported as missing evidence, not as a passing provider check.
+- The first disposable-suite run exposed an existing browser connection-count
+  assertion failure and a missing pre-handshake adversary binary. The command
+  reports both and exits unsuccessfully; this release does not claim that all
+  ignored fixtures pass.
 
 ## 0.24.0 — 2026-10-02
 

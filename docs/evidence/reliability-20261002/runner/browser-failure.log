@@ -1,0 +1,17 @@
+
+running 1 test
+test local::oauth_adversary_tests::chrome_opens_one_connection_per_navigation ... 
+thread 'local::oauth_adversary_tests::chrome_opens_one_connection_per_navigation' (2150815) panicked at crates/connectors-host/src/local/oauth_adversary_tests.rs:290:5:
+assertion `left == right` failed: (accepted at, request bytes) per connection: [(1.156390656s, 0), (1.161485241s, 0)]
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    local::oauth_adversary_tests::chrome_opens_one_connection_per_navigation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 313 filtered out; finished in 3.65s
+
