@@ -9,6 +9,8 @@ pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions
 pub use revalidation::{Revalidation, RevalidationDispatch};
 pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retirement};
 #[cfg(test)]
+mod store_cost_tests;
+#[cfg(test)]
 mod tests;
 
 use super::{keyring::custody, metadata::Metadata};
