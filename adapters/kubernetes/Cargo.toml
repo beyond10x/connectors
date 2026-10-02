@@ -32,6 +32,7 @@ tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
 connectors-client.workspace = true
+reqwest.workspace = true
 axum.workspace = true
 tempfile.workspace = true
 rcgen = "0.14"
