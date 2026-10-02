@@ -58,6 +58,18 @@ pub(super) fn simulate_process(id: u64) {
     er::simulate_process(id);
 }
 
+#[cfg(test)]
+pub(super) fn exit_process() {
+    er::exit_process();
+}
+
+/// Calls and wall time per kind of metadata work on this thread since the
+/// last take.
+#[cfg(test)]
+pub(super) fn take_costs() -> std::collections::BTreeMap<&'static str, (u64, Duration)> {
+    er::take_costs()
+}
+
 /// Runs on this thread each time an observation, having replayed ER outside
 /// the lifecycle lock, is about to take that lock back: the exact window in
 /// which another writer can advance what the observation read.
@@ -725,6 +737,10 @@ impl Metadata {
     }
 
     fn validate(&self) -> Result<()> {
+        er::timed("host.validate", || self.validate_now())
+    }
+
+    fn validate_now(&self) -> Result<()> {
         let app: i64 = self
             .connection
             .pragma_query_value(None, "application_id", |row| row.get(0))
