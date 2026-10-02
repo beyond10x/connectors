@@ -638,6 +638,10 @@ fn presence(name: &str) -> String {
 }
 
 pub(super) fn capture(connection: &Connection, level: i64) -> Result<Vec<RowImage>> {
+    timed("host.capture_sql", || capture_rows(connection, level))
+}
+
+fn capture_rows(connection: &Connection, level: i64) -> Result<Vec<RowImage>> {
     let mut images = Vec::new();
     for table in TABLES.iter().filter(|table| table.level <= level) {
         let available = table
@@ -1684,16 +1688,19 @@ pub(super) fn open(
         }
     }
     let definitions = registry()?;
-    let facade = RecordedProviderFacade::start(
-        definitions,
-        EventlogRecordedStoreOwner::Sqlite {
-            path: utf8_path(path)?,
-            prefix: PREFIX.into(),
-            authority,
-            limits: LIMITS,
-        },
-        bridge_config(),
-    )
+    let path_text = utf8_path(path)?;
+    let facade = timed("er.start", || {
+        RecordedProviderFacade::start(
+            definitions,
+            EventlogRecordedStoreOwner::Sqlite {
+                path: path_text,
+                prefix: PREFIX.into(),
+                authority,
+                limits: LIMITS,
+            },
+            bridge_config(),
+        )
+    })
     .map_err(|_| Failure::MetadataUnavailable)?;
     let mut er = ErAuthority::new(facade, path, source_level, projection_level);
     resynchronize(&mut er)?;
@@ -1805,12 +1812,12 @@ fn read_since(er: &mut ErAuthority, own: Option<&BatchKey>) -> Result<Option<Obs
         }
         return read_subjects(er, head, &feed, Vec::new());
     };
-    let batch = er
-        .facade
-        .lookup_batch(key, call_wait())
-        .map_err(|_| Failure::MetadataUnavailable)?
-        .filter(|batch| batch.key == *key)
-        .ok_or(Failure::MetadataUnavailable)?;
+    let batch = timed("er.lookup_batch", || {
+        er.facade.lookup_batch(key, call_wait())
+    })
+    .map_err(|_| Failure::MetadataUnavailable)?
+    .filter(|batch| batch.key == *key)
+    .ok_or(Failure::MetadataUnavailable)?;
     read_subjects(er, head, &feed, batch.records)
 }
 
@@ -1929,9 +1936,10 @@ fn row_image(instance: &EntityInstance) -> RowImage {
 
 fn read_history(facade: &RecordedProviderFacade, entity: &str, id: &str) -> Result<SubjectHistory> {
     let subject = Subject::new(entity, id).map_err(|_| Failure::MetadataUnavailable)?;
-    let history = facade
-        .read_history(&subject, call_wait())
-        .map_err(|_| Failure::MetadataUnavailable)?;
+    let history = timed("er.read_history", || {
+        facade.read_history(&subject, call_wait())
+    })
+    .map_err(|_| Failure::MetadataUnavailable)?;
     if history.subject != subject {
         return Err(Failure::MetadataUnavailable);
     }
@@ -1969,6 +1977,10 @@ fn feed_connection(path: &Path) -> Result<Connection> {
 
 /// The tenant's head and every event after `after`, read in one transaction.
 fn feed_after(path: &Path, tenant: &str, after: i64) -> Result<(Head, Vec<FeedEvent>)> {
+    timed("host.feed", || read_feed_after(path, tenant, after))
+}
+
+fn read_feed_after(path: &Path, tenant: &str, after: i64) -> Result<(Head, Vec<FeedEvent>)> {
     let mut connection = feed_connection(path)?;
     let tx = connection.transaction().map_err(unavailable)?;
     let head = tx
@@ -2011,6 +2023,10 @@ fn feed_after(path: &Path, tenant: &str, after: i64) -> Result<(Head, Vec<FeedEv
 
 /// Every recorded entry's position and subject stream.
 fn subject_streams(path: &Path, tenant: &str) -> Result<Vec<(i64, String)>> {
+    timed("host.feed", || read_subject_streams(path, tenant))
+}
+
+fn read_subject_streams(path: &Path, tenant: &str) -> Result<Vec<(i64, String)>> {
     let connection = feed_connection(path)?;
     let mut statement = connection
         .prepare(&format!(
@@ -2149,12 +2165,64 @@ pub(super) fn simulate_process(id: u64) {
     PROCESS.with(|process| process.set(id));
 }
 
+/// Ends the process this thread acts as: the handles it holds are closed,
+/// as they are when a real process exits.
+#[cfg(test)]
+pub(super) fn exit_process() {
+    let process = process();
+    let exited = IDLE.lock().map_or_else(
+        |_| Vec::new(),
+        |mut idle| {
+            let (exited, kept) = std::mem::take(&mut *idle)
+                .into_iter()
+                .partition::<Vec<_>, _>(|held| held.process == process);
+            *idle = kept;
+            exited
+        },
+    );
+    drop(exited);
+}
+
+#[cfg(test)]
+thread_local! {
+    static COSTS: std::cell::RefCell<BTreeMap<&'static str, (u64, Duration)>> =
+        const { std::cell::RefCell::new(BTreeMap::new()) };
+}
+
+/// Runs `call`. Tests also count it, with its wall time, under `kind`.
+#[cfg(not(test))]
+pub(super) fn timed<T>(_kind: &'static str, call: impl FnOnce() -> T) -> T {
+    call()
+}
+
+/// Runs `call` and adds one call and its wall time to `kind` on this thread,
+/// so a measurement can say where an invoke's time went.
+#[cfg(test)]
+pub(super) fn timed<T>(kind: &'static str, call: impl FnOnce() -> T) -> T {
+    let started = Instant::now();
+    let value = call();
+    COSTS.with(|costs| {
+        let mut costs = costs.borrow_mut();
+        let entry = costs.entry(kind).or_default();
+        entry.0 += 1;
+        entry.1 += started.elapsed();
+    });
+    value
+}
+
+/// Calls and wall time per kind on this thread since the last take.
+#[cfg(test)]
+pub(super) fn take_costs() -> BTreeMap<&'static str, (u64, Duration)> {
+    COSTS.with(|costs| std::mem::take(&mut *costs.borrow_mut()))
+}
+
 fn complete_snapshot(facade: &RecordedProviderFacade) -> Result<CompleteStoreSnapshot> {
     #[cfg(test)]
     FULL_REPLAYS.with(|count| count.set(count.get() + 1));
-    facade
-        .complete_snapshot(call_wait())
-        .map_err(|_| Failure::MetadataUnavailable)
+    timed("er.complete_snapshot", || {
+        facade.complete_snapshot(call_wait())
+    })
+    .map_err(|_| Failure::MetadataUnavailable)
 }
 
 fn terminal_rows(snapshot: CompleteStoreSnapshot) -> Result<BTreeMap<(String, String), RowImage>> {
@@ -2189,6 +2257,10 @@ fn terminal_rows(snapshot: CompleteStoreSnapshot) -> Result<BTreeMap<(String, St
 }
 
 pub(super) fn projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connection> {
+    timed("host.projection", || build_projection(authority_id, er))
+}
+
+fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connection> {
     let level = er.projection_level;
     let connection = Connection::open_in_memory().map_err(unavailable)?;
     connection
@@ -3176,15 +3248,15 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         "connectors-metadata-batch-{}",
         uuid::Uuid::new_v4()
     ));
-    let outcome = er
-        .facade
-        .execute_batch(
+    let outcome = timed("er.execute_batch", || {
+        er.facade.execute_batch(
             context("metadata-mutation"),
             batch.clone(),
             actions,
             call_wait(),
         )
-        .map_err(map_execution_failure)?;
+    })
+    .map_err(map_execution_failure)?;
     let receipt = outcome.receipt().ok_or(Failure::MetadataUnavailable)?;
     let clocks_before = er
         .baseline
