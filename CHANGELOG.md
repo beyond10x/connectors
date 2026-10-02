@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.25.1 — 2026-10-02
+
+### Fixed
+
+- PostgreSQL SQLSTATE `0A000` now returns `unsupported` instead of `unavailable`.
+  Neighboring custom SQLSTATE values retain their existing classification.
+
+### Verified
+
+- Six real PostgreSQL 17.6 cases cover saved-credential restart, incident reads,
+  result bounds, read-only refusals, native invocation-drop cancellation and
+  local lifecycle controls. Five use the production CLI; cancellation invokes
+  the production adapter directly.
+- Four new k3s v1.31.5 cases cover reads across restart, RBAC denial versus empty
+  results, continuation scope/revision binding and lifecycle controls. Four
+  existing CLI journeys also passed separately.
+- All eighteen current GitLab catalog reads returned HTTP 200 in the dedicated
+  sandbox, followed by saved-credential reuse across an owner restart. Tags,
+  releases and deployments returned empty lists. This replay made no provider writes.
+- Catalog acceptance covers ten logical obligations and fifteen historical
+  lifecycle/mutation variants, including uncertain effects, approval spend,
+  owner recovery and post-effect revocation. Exact-file fault injection exercises
+  settlement failure. Production CLI invocations establish original effects;
+  some settled replay observations use a same-image host-library helper.
+  Results span multiple runs with documented unchanged-source reuse.
+- The ignored-test runner classifies these additional provider cases, excludes
+  subprocess helpers and reports their Docker, Kubernetes and seccomp prerequisites.
+
+### Limits
+
+- The first GitLab revalidation refused before a later explicit retry succeeded;
+  its cause remains unexplained. Empty-list observations do not establish
+  nonempty payload behavior.
+- PostgreSQL acceptance used plaintext loopback, not TLS. Native cancellation
+  timing is a fixture observation, not a universal deadline. Kubernetes
+  acceptance does not establish SSAR or remaining execution/Helm workflows.
+- Catalog fault cases require Linux x86_64 seccomp user notifications. The
+  fixture's revoked-path restoration control is a read-only fsync, not a
+  production recovery write. These checks do not claim every variant ran on
+  one final executable or establish all failure-cleanup paths.
+- The registry-clock candidate was rejected and reverted: it broke the
+  same-millisecond revision fence and failed the store-size cost bound.
+  Production clock behavior is unchanged. Entity Runtime issue 51, sustained-read
+  acceptance, MCP delivery and the remaining provider plan stay open.
+- The browser connection-count and missing pre-handshake adversary fixture
+  observations recorded in 0.25.0 remain open; this release does not claim a
+  passing complete ignored suite.
+
 ## 0.25.0 — 2026-10-02
 
 ### Added

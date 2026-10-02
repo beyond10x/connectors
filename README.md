@@ -25,7 +25,7 @@ separate steps.
 
 ## Where the project stands
 
-Source release **v0.25.0** keeps connection metadata in Entity Runtime over an
+Source release **v0.25.1** keeps connection metadata in Entity Runtime over an
 Eventlog SQLite store, specified at ESS source format `ess/15`, with GitLab, Jira Cloud, Confluence Cloud and HubSpot CRM served from their pinned OpenAPI sources, and Google Drive, Slides, Calendar and Gmail from pinned Discovery documents projected to OpenAPI, through
 the catalog provider. The [changelog](CHANGELOG.md) records its scope and
 remaining work.
@@ -144,7 +144,8 @@ describe what was checked and its limits.
 
 ## Get started
 
-Build from the repository root with Rust 1.88.0 or later:
+Build the workspace from the repository root with Rust 1.91.0 or later. The
+independent libraries are also checked on Rust 1.88.0:
 
 ```sh
 cargo build --workspace --locked
