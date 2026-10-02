@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T22:40:36Z",
+  "actor": "human:timo",
+  "artifact": "story:setup-initialises-missing-state",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors --test setup_missing_state (base 1db016b25: setup init answered configuration_exists with no state, 2 failed; treatment: state_initialized, 4 passed)",
+    "reference": "<wave-scratch>/setup/scratch/red.log vs green.log"
+  }
+}

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:setup-initialises-missing-state
 kind: story
-status: active
+status: implemented
 title: An existing configuration with no metadata store can be initialised
 relations:
 - serves: vision:independent-contract-adapters
@@ -25,10 +25,11 @@ scope:
   path: docs/local-runtime-foundation.md
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-02T01:24:17Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"verification":1}}}
 ---
 ## Source
 

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-01T22:34:41Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-selection-excludes-parameters",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test -p connectors-catalog-provider --test gitlab_commit_reads_adversary -- keyset (base 1db016b25: pagination=keyset and page_token sent upstream; treatment 96171aa76: refused as invalid_input with nothing sent)",
+    "reference": "<wave-scratch>/params/scratch/red2.log vs full4.log"
+  }
+}
