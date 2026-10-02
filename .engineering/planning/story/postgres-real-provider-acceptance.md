@@ -19,7 +19,7 @@ scope:
   path: adapters/sql/tests/protocol.rs
 - confidence: cited
   path: docs/local-postgres-cli.md
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}, correlation: "wave-20261002d-provider-acceptance"}
 - {from: "proposed", to: "active", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}, correlation: "wave-20261002d-provider-acceptance"}
@@ -93,3 +93,20 @@ already tests that invocation-drop trigger against a fake server. The real-provi
 case supplies missing backend evidence. contracts/cli/v1alpha1/owner.md permits
 already dispatched reads to finish after CLI disconnect, and the SQL read contract
 explicitly disclaims guaranteed remote termination after bounded local cleanup.
+
+## Reachable repair boundary — 2026-10-02
+
+Source inspection by the assigned worker found that SQL identity is the configured
+user@database; the protected repair document carries only a password
+(adapters/sql/src/local.rs:159-167,207-212). A different role cannot be selected by
+that credential document. Changing the configured user changes the bootstrap
+configuration revision and must refuse at the binding/startup boundary before
+identity validation. This is a source-grounded acceptance clarification, not a
+product semantic change or permission to fabricate identity_mismatch.
+
+Retain both reachable controls: failed password repair for the original configured
+identity leaves the admitted credential/authority intact; an attempted changed-role
+configuration/repair receives its exact binding refusal and cannot replace the
+original authority. The unchanged original connection must still execute its
+admitted read after each refusal. Report actual outcomes and source citations.
+The five named acceptance cases and their runtime scope remain unchanged.
