@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:18:29Z",
+  "actor": "human:timo",
+  "artifact": "story:bridge-drop-waits-for-dispatched-batch",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integrated stale citation case red, corrected comment then five cli_spec_mapping_adversary cases passed; ESS compiled JSON unchanged",
+    "reference": "crates/connectors-build/tests/cli_spec_mapping_adversary.rs"
+  }
+}

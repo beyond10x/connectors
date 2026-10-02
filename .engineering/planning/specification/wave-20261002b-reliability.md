@@ -6,7 +6,7 @@ status: draft
 title: 'Wave 20261002b: metadata timeout safety and acceptance reliability'
 relations:
 - informed_by: specification:milestone-acceleration-20261002
-revision: 5
+revision: 6
 ---
 ## Authority and preflight
 
@@ -16,21 +16,40 @@ Primary status is exactly `?? .agents/`; no unit touches it. Work resumes the ex
 
 ## Selected units
 
-All units serve vision:independent-contract-adapters. The selected source scopes remain disjoint; the runner's added Cargo dependency/lock update is reconciled by root with release metadata. Root is the sole planning-store writer.
+All three source units are integrated in publication tree cb26b-publish,
+branch delivery/reliability-20261002. Root is the sole planning-store writer.
 
-| Unit | Managed id and branch | Current stage |
+| Unit | Managed id / source commit | Integrated verification |
 | --- | --- | --- |
-| story:bridge-drop-waits-for-dispatched-batch | cb26b-bridge; impl/cb26b-bridge | commit 91511f4379, integrated in 294477ba21; package 335 passed, independent adversary found nothing |
-| story:sql-fixture-accepts-stray-connections | cb26b-sql; impl/cb26b-sql | commit ef5a08f87f, integrated in f43fdbb00f; package 19 passed, 50/50 loaded runs passed, independent adversary found nothing |
-| story:ignored-suites-have-a-runner | cb26b-runner; impl/cb26b-runner | adversary 1 introduced child cleanup finding fixed; package 150 passed; final attack and operator-host run ongoing |
+| story:bridge-drop-waits-for-dispatched-batch | cb26b-bridge / 91511f4379 | 335 package cases; independent adversary found nothing |
+| story:sql-fixture-accepts-stray-connections | cb26b-sql / ef5a08f87f | 19 package cases; 50/50 repetitions during actual workspace load; adversary found nothing |
+| story:ignored-suites-have-a-runner | cb26b-runner / a2f408dbed | 151 package cases; two introduced descendant leaks fixed; final private-boundary warning is infeasible via public CLI |
 
-Publication integration is now cb26b-publish, branch delivery/reliability-20261002, HEAD 0f9d56f994009b19490f609ced3239f85a0c7953. It contains bot-authored source merges and intended v0.25.0 metadata. No branch/tag/release has been published. Stories stay active pending the required integrated gate. The clock experiment remains sequenced afterward; catalog scope/preflight is recorded but not dispatched.
+Source integration commit is 05f9ce537f7b8e0de3064a82d1ec5f985a62a473. No push,
+PR, tag or release exists yet. The first gate stopped at an existing stale
+source-citation assertion, now corrected without changing the compiled ESS model.
+Final gate/MSRV remain required before story closure. Website build passed with
+482 public files audited. The actual runner-host command exited 1: 31 passed,
+one unchanged Chrome assertion failed, one historical binary prerequisite missing.
+That result is retained; the new command correctly reports it.
 
-Every managed tree is below the configured b10x/connectors tree root, uses target/ for build output and .local/wave-20261002b/ for scratch. Publication target and website/node_modules were transferred exclusively from the inactive original integration; no two worktrees share a mutable build directory. Root precompiles final test dependencies while runner acceptance finishes. Keep 8 GiB free and two Cargo jobs per active build.
+All worker sessions ended and their exact target directories were cleaned with
+Cargo. A generic rm -f command was rejected by execution policy; Cargo clean was
+the supported safer cleanup. Raw evidence and diagnostic source are retained in
+worktree archives for cb26b-bridge, cb26b-sql and cb26b-runner. Their source commits
+remain unpublished, so no tree has been finished or removed. Free disk after
+cleanup was 27 GiB; keep the 8 GiB minimum. Root maintains each coordinator lease.
 
-Original connectors-plan-20261002 is private evidence, archived with worktree archive --replace at HEAD 294477ba21; archive patch SHA256 b2fee61ee81a91da6b5101aad57e8214b7f86148accac9102cc03f82e4fa19d6. Its fixture credentials remain needed for provider acceptance, so retain its lease and directory until exact fixture teardown. It owns no future public store mutation. Root leases: codex-cb26b-publish and codex-connectors-delivery-20261002; completed source trees have coordinator leases codex-cb26b-{bridge,sql}-coordinator. Worker and adversary leases belong to those agents only.
+The original private integration remains archived and owns provider credentials;
+publication source/build ownership remains exclusive. Real PostgreSQL/Kubernetes
+restart tests and all six direct/federated conformance groups passed, with exact
+limits in docs/evidence/provider-restarts-20261002/. Task-owned provider containers
+remain available for later acceptance. The three direct/federated service
+processes were observed exiting 0 after SIGTERM.
 
-Approved short physical scratch exceptions are $HOME/.cache/cb26b-runner/tmp and $HOME/.cache/cb26b-runner-adversary/tmp, mode 700, task-owned; root cleans them after retained evidence. The runner's --tmpdir explicitly admits physical private directories and reports overly long custody paths as missing prerequisites. Symlink aliases are refused by custody and are not used.
+Clock work remains sequenced after this batch's gate; provider acceptance scopes
+are audited, and product-decision blockers remain open. No model token/tool-use
+counts are exposed by the worker result API; do not invent per-agent costs.
 
 ## Completion
 
