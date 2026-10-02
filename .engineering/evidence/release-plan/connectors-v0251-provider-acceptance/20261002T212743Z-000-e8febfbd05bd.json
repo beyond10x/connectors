@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T21:27:43Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0251-provider-acceptance",
+  "kind": "release-plan",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Exact v0.25.1 merge/tag verified; PR and merged-head repository gates, tag security and required checks succeeded; bot-authored Latest release402155173 and both source archivesHTTP200",
+    "reference": "https://github.com/beyond10x/connectors/releases/tag/v0.25.1"
+  }
+}
