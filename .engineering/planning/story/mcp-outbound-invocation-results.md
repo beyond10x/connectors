@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-outbound-invocation-results
 kind: story
-status: draft
+status: active
 title: Specify outbound MCP invocation results, error preservation, bounds and unknown outcomes
 relations:
 - decomposes: epic:mcp-contracts
@@ -10,10 +10,15 @@ relations:
 - depends_on: story:mcp-outbound-connection-lifecycle
 scope:
 - confidence: inferred
+  path: adapters/mcp/contracts/client/v1alpha1/invocation-cases.json
+- confidence: cited
   path: adapters/mcp/contracts/client/v1alpha1/invocation.md
 - confidence: inferred
-  path: adapters/mcp/contracts/client/v1alpha1/scenarios
-revision: 2
+  path: crates/connectors-build/tests/mcp_outbound_invocation_results.rs
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-02T21:46:58Z", actor: "human:timo", revision: 6}
+- {from: "proposed", to: "active", at: "2026-10-02T21:46:58Z", actor: "human:timo", revision: 7}
 ---
 ## Acceptance
 
@@ -23,15 +28,6 @@ output, output byte bounds, the preservation of a provider error as distinct fro
 a protocol error, malformed input, partial output, and an outcome that was never
 observed — such that a remote tool annotation cannot make an invocation a local
 write, and an unobserved outcome is reported as unknown rather than retried.
-
-## Scope
-
-- `adapters/mcp/contracts/client/v1alpha1/invocation.md` — new. No other story
-  writes this file.
-- `adapters/mcp/contracts/client/v1alpha1/scenarios/` — shared directory, also
-  written by `story:mcp-outbound-connection-lifecycle` and
-  `story:mcp-outbound-auth-lifecycle`; this story adds only result and error
-  scenario files.
 
 ## Domain relations
 
@@ -90,3 +86,38 @@ acceptance criterion 5; the inbound half is
 Which capabilities are selected at all — `story:mcp-profile-selection-matrix`.
 Composition, where an invocation is itself re-exposed inbound —
 `story:mcp-composition-provenance`. Nothing inbound. No server is contacted.
+
+## Scope — confirmed 2026-10-02
+
+- Cited: `adapters/mcp/contracts/client/v1alpha1/invocation.md`, new contract.
+- Inferred and selected by the coordinator: `adapters/mcp/contracts/client/v1alpha1/invocation-cases.json`, named document cases owned by this story.
+- Inferred: `crates/connectors-build/tests/mcp_outbound_invocation_results.rs`, Rust document checker and deciding negative controls.
+
+This replaces the earlier directory-wide scenario allocation. The read-only scope
+pass inspected released source tree c22b6765b147cc4b3e57373b9c6dd261ccfc29b5;
+its report SHA is c0bdde5634818709063d4d06511563864ea500e17e50c793f2b70339cd9def37.
+The JSON cases are deliberately outside the YAML scenario collector. Existing
+outbound YAML is a custom lifecycle format excluded from ESS synthesis; copying
+that format does not create invocation conformance. No existing scenario, shared
+model, gate, dependency manifest, archive or sibling contract is writable here.
+
+## Named cases and evidence boundary
+
+Cover tools, resources and prompts selected by the protocol matrix, provider
+business failure versus protocol failure, malformed input versus malformed peer
+output, complete versus partial output, exact byte-accounting and bound refusal,
+unknown effect with no automatic redispatch, and annotations granting no authority.
+Each obligation has stable named cases with source citations and literal observable
+outcomes. The checker derives applicable error variants from the actual shared
+model and protocol selections from their owner. It rejects contradictory or missing
+rows, duplicate identifiers and mismatched contract/case references. Demonstrate
+meaningful failures by mutating copies, not merely checking strings twice.
+
+These cases check the authored mapping contract, not network execution or runtime
+MCP conformance. Preserve that distinction in the document and report. Full runtime
+conformance remains future work; this story does not invent a projection command or
+weaken the existing ESS obligations to call document checks sufficient for delivery.
+If the mapping requires a new actual product type/entity/command, report its missing
+native ESS home before dependent implementation. All eight unresolved relation
+markers and the stdio ownership decision remain intact. No new durable invocation
+ledger or automatic credential/Connection selection follows from this story.
