@@ -8,7 +8,7 @@ relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:contract-driven-connectors-design
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 6
+revision: 7
 ---
 ## Operator request
 
@@ -184,3 +184,39 @@ Detailed source-cited mapping report in task scratch mcp-target-mapping/report.m
 SHA256d7bfe91a04cb1176a62627cd45026c87cd930b372036bf2267ac22ea8dc413ec.
 No sibling source/store/toolchain adoption or runtime/conformance execution occurred.
 This prepares the already-authorized MCP delivery after the provider release handoff.
+
+## Measured direct-return limits — 2026-10-02
+
+The successor ess/17 scratch draft validates three files and preserves all six
+nominal value declarations. Full selection of eight authored constructor scenarios
+fails synthesis with three constrained-response refusals. Partial selection emits
+nine scenarios (four generated and five authored), with four retained refusals;
+none were executed. This qualifies the preceding general mapping finding:
+direct-return support exists, but unchanged constrained ConnectionId/ToolSnapshot
+returns require invariant observation the pinned tool does not support. The count
+invariant projection is also refused. Neither constraints nor assertions were
+removed to make this appear complete.
+
+ESS0.50.0 reproduced ESS0.45.0's results on byte-identical inputs, including identical
+partial suite bytes. Read-only inspection of local ESS0.51.0 tag
+0347ffa222939e3791e574d2dbe42d4b4b02d979 found both refusal boundaries still present;
+0.51 was not executed or installed for this probe. An ambient tool upgrade is not
+a measured remedy. Existing implemented direct-library-return-observations and
+active input guard work do not claim constrained output invariant observation.
+No exact open owner was found in the searched local planning snapshots; this is
+not a claim about every remote issue or private plan.
+
+Retained task-owned reports and SHA256:
+- mcp-direct-return-draft/report.md:
+  f5cda4fbb3193ba460dd23140a74ee3a33f5463aaff17248fc67d468a5c9615e.
+- mcp-newer-ess-probe/report.md:
+  84b3980f5b7870e640c201d75a228645ac9e6602a35fd8c080bd092bc7904f16.
+- mcp-ess-blocker-owner/report.md:
+  4b96e6f2c5a83a2438e5ec864683cc507845617c2981b3f6bb92ff421a1b33a9.
+
+Full unchanged declaration conformance remains incomplete. Independent MCP source
+adoption, actual runtime target and contract work can proceed after the provider
+release. A separately scoped faithful observation projection would retain its
+uncovered native invariants explicitly; it is not selected by this scratch work.
+No new upstream implementation, sibling dependency pin, invented persistent entity,
+source release or claim of MCP delivery follows from these probes.
