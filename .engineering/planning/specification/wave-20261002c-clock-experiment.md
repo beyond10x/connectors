@@ -7,7 +7,7 @@ title: 'Wave 20261002c: one bounded registry-clock experiment'
 relations:
 - informed_by: specification:milestone-acceleration-20261002
 - informed_by: story:registry-clock-outside-shared-batches
-revision: 3
+revision: 5
 ---
 ## Selection and authority
 
@@ -1139,3 +1139,51 @@ or MCP runtime is declared complete by this experiment.
 }
 
 ```
+
+## Dispatch and retained recovery
+
+Dispatched the one authorized experiment to managed tree `cb26c-clock`, branch
+`experiment/cb26c-clock`, base `26929027f85b4653d81bd9cb290a7f472cfe84e8`.
+Worker lease `codex-cb26c-clock`; root planning lease `codex-cb26c-plan`.
+Worker brief and preflight are retained in that tree's `.local/clock-experiment/`;
+report destination is `.local/clock-experiment/report.md`. Root retains sole AEP
+ownership. Worker owns only the scoped `metadata/er.rs` candidate and scratch.
+No other Connectors builds run during this experiment. Disk reserve is checked
+before compilation and timing. Numeric and invariant acceptance is unchanged.
+
+The superseded `cb26b-publish` and `connectors-plan-20261002` trees were removed
+through exact reviewed `worktree gc --apply` ids, with verified archives retained.
+All evidence and task fixture configuration required for continuation was copied
+to `cb26c-plan` before retirement. Remaining Connectors managed trees are the
+planning/integration tree and this experiment tree; primary user state is untouched.
+
+Independent read-only preparation proceeds for MCP unresolved relations and catalog
+ER test-fixture feasibility. Neither is provider/MCP implementation or acceptance.
+
+## GitLab sandbox recovery — 2026-10-02
+
+The historical credential blocker is already cleared by recorded test evidence
+from 2026-09-13. Its original Missing prerequisite prose is history, not a current
+claim that no sandbox has ever been supplied. Existing dedicated container
+`connectors-gitlab-20260912` is healthy; runner container remains running.
+The retained source report identifies project `root/connectors-sandbox` (id1),
+non-admin `sandbox-dev` (id2), and the validated TLS CA. Owner-only protected
+credential files and CA still exist in the historical sandbox cache; no credential
+value was read or printed. Actual credential validity has not been rechecked.
+
+Retained catalog-child real-provider evidence from 2026-09-13/14 covers eleven
+reads, applied create/update/merge and exact-head guard refusals on the then-current
+engine. Those records remain valid historical evidence. They do not establish the
+new production CLI settlement/recovery ports against current ER metadata. The
+new catalog journey unit and current sandbox replay must record which source
+inputs changed; do not repeat all old setup simply because narrative prose says
+access was once missing. Reuse the dedicated provider only within its established
+disposable project authority, with fresh task-private host configuration/custody.
+Do not mutate or clean unrelated provider fixtures or old credential stores.
+
+The installed CLI reports0.20.0. Safe inventory lists `forge` as a separate
+`cb3-gitlab-3` catalog instance; its one connection is pending. This is not the
+historical sandbox identity and is not selected for destructive acceptance.
+No GitLab API request, revalidation, repair or mutation was performed in this
+recheck. Docker read-only inspection was used only for local fixture inventory,
+after the already recorded Connectors Docker capability gap.

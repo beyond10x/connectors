@@ -21,7 +21,7 @@ scope:
   path: crates/connectors-build/src/ignored.rs
 - confidence: cited
   path: docs/evidence/catalog-cli-20261002
-revision: 4
+revision: 5
 ---
 ## Outcome
 
@@ -100,3 +100,44 @@ Keep prepared_attempt_exit_fixture as an explicitly classified helper (expected 
 - Full wall-clock time and credential-evidence expiry under current ER cost are unmeasured for these ports.
 - No new product semantic decision or entity is necessary for the identified mechanical adaptations. Adding an inspection API, changing authority/replay/guard semantics, or changing persistent records would exceed this conclusion and must return for ESS/contract review before implementation.
 - GitLab sandbox acceptance is not established by deterministic fixtures and is deliberately outside this one unit.
+
+## Current ER fixture seam — 2026-10-02
+
+A read-only source audit of the pinned ER public APIs identified a bounded,
+test-owned observer. This is feasibility from source, not runtime proof. Add a
+narrow `adapters/catalog/tests/local_runtime/recorded_state.rs` helper only to this
+integration-test target. Use host Metadata::inspect for existing admission checks,
+read only the immutable authority marker from physical SQLite, then open that
+exact existing authority through RecordedProviderFacade. Load the exact production
+entity definition JSON; never provision/import/copy an authority or query legacy
+business tables. The facade performs observational reads but its existing-store
+attachment can use a write-intent validation transaction; do not claim it is an
+OS-read-only database handle or hold the host lifecycle lock across barriers.
+
+Capture complete_snapshot anew per observation, with finite explicit limits and
+waits, requiring completeness and exact identity. Join AuditRecord, AttemptRecord
+and KeyReservation terminal facts from the same capture. Preserve literal key
+states and absent settlement/expiry, exact before/held audit-set differences,
+request/attempt/reservation/connection/operation identities, and checked RFC3339
+millisecond conversion. Cross-check public Store observations at quiescent stages;
+those are separate reads, not an atomic combined snapshot. Keep the observer open
+before fault windows, expose no write method, and require joined shutdown before
+fixture cleanup. Retain exact seeded AttemptRef before helper exit73. Unknown
+fields/states, partial captures, missing/duplicate rows or capacity refusal fail.
+
+Dev-only dependencies may reuse the already pinned workspace entity-core,
+entity-eventlog, entity-store, eventlog-core and time, plus host-aligned rusqlite
+0.40.2/bundled, libc0.2 and ring0.17. Add uuid only if actually imported. Root
+serializes Cargo.lock and ignored-runner integration. No new upstream version,
+production export or new authority is selected.
+
+The historical chmod0400 fault is not established: host privacy checks permit it,
+SQLite READ_WRITE may fall back to read-only, and pooled Eventlog handles can keep
+write access. First prove a paired unchanged-permission control and one controlled
+fault case using identical production binaries and a fixed held response. Prove
+committed dispatch/spend and exact0or1provider effect before injection, then require
+the exact known-outcome/attempt_store/incomplete-audit response and fresh durable
+Dispatching/Pending state before restoration/recovery. The observer must not cause
+an earlier refusal or stand in for settlement failure. If chmod allows settlement,
+record that injection as rejected and return for a separately scoped fixture seam;
+do not broaden filesystem damage or drop the historical modes8–11 assertions.

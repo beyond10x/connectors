@@ -1,0 +1,1117 @@
+---
+format: aep.planning-md/3
+id: specification:wave-20261002d-provider-acceptance
+kind: specification
+status: draft
+title: 'Wave 20261002d: catalog journeys and real-provider acceptance'
+relations:
+- informed_by: specification:milestone-acceleration-20261002
+- informed_by: story:catalog-cli-journeys
+- informed_by: story:kubernetes-real-read-acceptance
+- informed_by: story:postgres-real-provider-acceptance
+revision: 2
+---
+## Selection and existing authorization
+
+AEP implementing skill0.19.1; preparation for the next wave under the operator's
+approval-record:milestones-delivery-20261002. Select only these three existing
+stories after the bounded clock experiment has an independently checked decision:
+
+- story:catalog-cli-journeys — ten production catalog-child lifecycle/mutation
+  obligations and fifteen variants, with exact current ER audit/key observation.
+- story:kubernetes-real-read-acceptance — four real-provider existing-read cases.
+- story:postgres-real-provider-acceptance — five real-provider query/lifecycle
+  cases, including direct adapter-future cancellation and its no-drop control.
+
+This is preparation, not dispatch. Kubernetes/PostgreSQL have completed their
+bounded critic panel. Catalog revision5 is undergoing its first critic round.
+Resolve any actionable findings before accepting its implementation. No further
+operator approval is inferred to be needed for the already-authorized scope.
+
+## Independence and ownership
+
+Three separate managed worktrees, one worker per story, Rust-only runnable code
+with clap derive for any new command. Each owns only its named adapter tests and
+guide/evidence, with production code read-only until a reproduced defect receives
+its own scope. Root is the sole AEP writer and serializes Cargo.lock and the exact
+new ignored-suite classifications. Catalog owns its Cargo.toml dependency proposal;
+worker lockfile changes are supplied as a patch for coordinator integration.
+No shared target directory and no writes to primary checkout or another worker.
+
+Catalog's shared fixture, signing clock, ER observer and recovery variants stay
+one serial unit. Use paired controls for settlement injection. A failed injection
+is a finding, not permission to drop its acceptance. Kubernetes and SQL use only
+the task-owned disposable providers and private credentials, never the default
+cluster or unrelated databases. Dedicated historical GitLab is a separately
+qualified sandbox, not the installed forge integration. No secret values enter
+public evidence or tool arguments.
+
+## Resource and verification policy
+
+Two Cargo jobs per worker, sccache, separate targets and short private TMPDIR.
+Root grants build windows according to observed free space and host load, retaining
+at least8GiB. Source authoring may run concurrently after dispatch; expensive
+builds/live fixture runs are serialized when necessary. Release-profile binaries
+are used for real CLI acceptance under unchanged production deadlines. Keep raw
+logs and command exit statuses, exact selected/executed/failed/missing/helper
+counts, source/binary/provider identities and verified owned-process cleanup.
+
+Each unit receives independent adversarial review. Root integrates only green
+units, verifies the merged repository and website inputs, and completes required
+bot-authored source release handoffs. A unit's passing tests do not complete the
+other provider's missing capabilities. Reuse prior verification only when its
+relevant inputs are unchanged. Retain red evidence and limits explicitly.
+
+## Remaining milestones after these slices
+
+The Kubernetes read slice does not implement SelfSubjectAccessReview, C12 finite
+and previous/multi-container logs, C15 conditional restart/rollout, C16 execution,
+Helm interoperability/actions or deterministic packaging. Those remain selected
+initiative work, with execution-family decisions still open. MCP follows provider
+acceptance; read-only contract/model planning can proceed independently. No
+caller assignment, outbound process ownership or execution-family answer is
+invented from silence. The clock experiment does not close upstream ER issue51
+or the sustained store-cost milestone.
+
+## Scheduling output
+
+The complete unfiltered `aep plan artifact waves --kind story --status draft
+--format json` output below places all three selected stories in wave1. Other
+candidates, collisions and unassessed items are retained as emitted; they are not
+implicitly selected by this proposal.
+
+```json
+{
+  "waves": [
+    {
+      "wave": 1,
+      "artifacts": [
+        {
+          "id": "story:catalog-cli-journeys",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "Cargo.lock"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/Cargo.toml"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/tests/local_runtime"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/tests/local_runtime.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-build/src/ignored.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/evidence/catalog-cli-20261002"
+            }
+          ]
+        },
+        {
+          "id": "story:catalog-google-live-deck-read",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "docs/catalog-google-drive.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/catalog-google-oauth.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/catalog-google-slides.md"
+            }
+          ]
+        },
+        {
+          "id": "story:catalog-honours-retry-after",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-confluence.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-hubspot.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-jira.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/local-catalog-provider.md"
+            }
+          ]
+        },
+        {
+          "id": "story:catalog-slack-reads",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/generated/bundles/index.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/generated/bundles/slack.bundle.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/providers/slack/operations.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/tests/slack.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/slack/upstream/slack-web-api.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-slack.md"
+            }
+          ]
+        },
+        {
+          "id": "story:gmail-attachment-read-flaky-under-load",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/tests/google_calendar_gmail_adversary_pass2.rs"
+            }
+          ]
+        },
+        {
+          "id": "story:kubernetes-real-read-acceptance",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "adapters/kubernetes/tests/local_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/kubernetes/tests/local_runtime/cli_journey.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/kubernetes/tests/provider.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/local-kubernetes-cli.md"
+            }
+          ]
+        },
+        {
+          "id": "story:mcp-inbound-capability-projection",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/server/v1alpha1/projection.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/server/v1alpha1/scenarios"
+            }
+          ]
+        },
+        {
+          "id": "story:mcp-inbound-cloud-profile",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/server/v1alpha1/cloud-profile.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/server/v1alpha1/fixtures"
+            }
+          ]
+        },
+        {
+          "id": "story:mcp-outbound-auth-lifecycle",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/client/v1alpha1/auth.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/client/v1alpha1/scenarios"
+            }
+          ]
+        },
+        {
+          "id": "story:oauth-browser-empty-connection-fixture",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/oauth_adversary_tests.rs"
+            }
+          ]
+        },
+        {
+          "id": "story:postgres-real-provider-acceptance",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "adapters/sql/tests/local_runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/sql/tests/local_runtime/cli_journey.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/sql/tests/protocol.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/local-postgres-cli.md"
+            }
+          ]
+        },
+        {
+          "id": "story:retire-unmerged-remote-branches",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "refs/heads/* on beyond10x/connectors"
+            }
+          ]
+        },
+        {
+          "id": "story:spec-models-operation-admission",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "apps/connectors-cli-contract"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-build/src/metadata_conformance.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-build/src/metadata_entities.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/metadata/entity-runtime-definitions.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-host/src/local/metadata/er.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "ess/domains/declarations.yaml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "artifacts": [
+        {
+          "id": "story:catalog-validates-enum-and-date-time",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "CHANGELOG.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/confluence.bundle.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/gitlab.bundle.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/google-calendar.bundle.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/google-drive.bundle.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/google-gmail.bundle.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/google-slides.bundle.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/hubspot.bundle.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/index.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/generated/bundles/jira.bundle.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/tests/gitlab_commit_reads_adversary.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/tests/parameter_types.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-catalog/src/authored.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-catalog/src/inventory.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-catalog/tests/template.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/local-catalog-provider.md"
+            }
+          ]
+        },
+        {
+          "id": "story:kubernetes-spec-service",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "Cargo.lock"
+            },
+            {
+              "confidence": "cited",
+              "path": "Cargo.toml"
+            },
+            {
+              "confidence": "cited",
+              "path": "README.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/gitlab"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/kubernetes"
+            },
+            {
+              "confidence": "cited",
+              "path": "contracts/service/v1alpha1"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-build"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-conformance"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-spec"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs"
+            },
+            {
+              "confidence": "cited",
+              "path": "ess"
+            },
+            {
+              "confidence": "cited",
+              "path": "examples"
+            },
+            {
+              "confidence": "cited",
+              "path": "spec-kinds"
+            }
+          ]
+        },
+        {
+          "id": "story:live-reads-jira-confluence-hubspot",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-confluence.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-hubspot.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-jira.md"
+            }
+          ]
+        },
+        {
+          "id": "story:mcp-inbound-mutation-replay",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/server/v1alpha1/mutations.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/server/v1alpha1/scenarios"
+            }
+          ]
+        },
+        {
+          "id": "story:mcp-outbound-invocation-results",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/client/v1alpha1/scenarios"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "artifacts": [
+        {
+          "id": "story:catalog-zendesk-reads",
+          "inferred": false,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/generated/bundles/index.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/generated/bundles/zendesk.bundle.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/providers/zendesk/operations.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/tests/zendesk.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/zendesk/upstream/zendesk-support.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/catalog-zendesk.md"
+            }
+          ]
+        },
+        {
+          "id": "story:configuration-change-error",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors-cli-contract/binding.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors/src/local.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors/src/local/connections.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "contracts/cli/v1alpha1/scenarios.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "contracts/cli/v1alpha1/semantics.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-host/src/local/owner.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-host/src/local/registry.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/registry/lifecycle.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-host/src/local/registry/tests.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/local-catalog-provider.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/domains/cli.yaml"
+            }
+          ]
+        },
+        {
+          "id": "story:mcp-composition-provenance",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/composition/v1alpha1/scenarios"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/composition/v1alpha1/semantics.md"
+            }
+          ]
+        },
+        {
+          "id": "story:toolchain-pins-newest-release-20261001",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "Cargo.lock"
+            },
+            {
+              "confidence": "cited",
+              "path": "Cargo.toml"
+            },
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors-cli-contract"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-build/aep-toolchain.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-spec/toolchain.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/development.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "artifacts": [
+        {
+          "id": "story:expired-evidence-invoke-advises-revalidate",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors-cli-contract/binding.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "apps/connectors/src/local.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "apps/connectors/src/local/connections.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "contracts/auth/evidence/v1alpha1/semantics.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "contracts/cli/v1alpha1/scenarios.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "contracts/cli/v1alpha1/semantics.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/owner.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/owner/mutation/recovery.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-host/src/local/registry/observation.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/registry/tests.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/registry/use_and_retirement.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "docs/local-catalog-provider.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "ess/domains/cli.yaml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "artifacts": [
+        {
+          "id": "story:service-failure-carries-upstream-reason",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "cited",
+              "path": "adapters/catalog/src/lib.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/catalog/tests/local_runtime/cli_journey.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "apps/connectors-cli-contract/binding.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "apps/connectors/src/local.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors/src/local/operations.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "contracts/cli/v1alpha1/private-adapter.md"
+            },
+            {
+              "confidence": "cited",
+              "path": "contracts/cli/v1alpha1/semantics.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-core/src/lib.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/owner.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-host/src/local/owner/mutation.rs"
+            },
+            {
+              "confidence": "inferred",
+              "path": "crates/connectors-host/src/local/runtime"
+            },
+            {
+              "confidence": "cited",
+              "path": "crates/connectors-host/src/local/runtime.rs"
+            },
+            {
+              "confidence": "cited",
+              "path": "ess/domains/cli.yaml"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "artifacts": [
+        {
+          "id": "story:mcp-cli-journey-discovery-contract",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors/spec/compatibility.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "contracts/cli/v1alpha1/semantics.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/local-mcp-cli.md"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "collisions": [
+    {
+      "a": "story:catalog-cli-journeys",
+      "b": "story:kubernetes-spec-service",
+      "path": "Cargo.lock",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:catalog-cli-journeys",
+      "b": "story:toolchain-pins-newest-release-20261001",
+      "path": "Cargo.lock",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:catalog-validates-enum-and-date-time",
+      "path": "adapters/catalog/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:catalog-validates-enum-and-date-time",
+      "path": "docs/local-catalog-provider.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:configuration-change-error",
+      "path": "docs/local-catalog-provider.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "docs/local-catalog-provider.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:live-reads-jira-confluence-hubspot",
+      "path": "docs/catalog-confluence.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:live-reads-jira-confluence-hubspot",
+      "path": "docs/catalog-hubspot.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:live-reads-jira-confluence-hubspot",
+      "path": "docs/catalog-jira.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-honours-retry-after",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "adapters/catalog/src/lib.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:catalog-slack-reads",
+      "b": "story:catalog-validates-enum-and-date-time",
+      "path": "adapters/catalog/generated/bundles/index.json",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:catalog-slack-reads",
+      "b": "story:catalog-zendesk-reads",
+      "path": "adapters/catalog/generated/bundles/index.json",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-validates-enum-and-date-time",
+      "b": "story:catalog-zendesk-reads",
+      "path": "adapters/catalog/generated/bundles/index.json",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:catalog-validates-enum-and-date-time",
+      "b": "story:configuration-change-error",
+      "path": "docs/local-catalog-provider.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-validates-enum-and-date-time",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "docs/local-catalog-provider.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:catalog-validates-enum-and-date-time",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "adapters/catalog/src/lib.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "apps/connectors-cli-contract/binding.json",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "apps/connectors/src/local.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "apps/connectors/src/local/connections.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "contracts/cli/v1alpha1/scenarios.md",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "contracts/cli/v1alpha1/semantics.md",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "crates/connectors-host/src/local/owner.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "crates/connectors-host/src/local/registry/tests.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "docs/local-catalog-provider.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:expired-evidence-invoke-advises-revalidate",
+      "path": "ess/domains/cli.yaml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:mcp-cli-journey-discovery-contract",
+      "path": "contracts/cli/v1alpha1/semantics.md",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "apps/connectors-cli-contract/binding.json",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "apps/connectors/src/local.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "contracts/cli/v1alpha1/semantics.md",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "crates/connectors-host/src/local/owner.rs",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:configuration-change-error",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "ess/domains/cli.yaml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:expired-evidence-invoke-advises-revalidate",
+      "b": "story:mcp-cli-journey-discovery-contract",
+      "path": "contracts/cli/v1alpha1/semantics.md",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:expired-evidence-invoke-advises-revalidate",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "apps/connectors-cli-contract/binding.json",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:expired-evidence-invoke-advises-revalidate",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "apps/connectors/src/local.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:expired-evidence-invoke-advises-revalidate",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "contracts/cli/v1alpha1/semantics.md",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:expired-evidence-invoke-advises-revalidate",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "crates/connectors-host/src/local/owner.rs",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:expired-evidence-invoke-advises-revalidate",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "ess/domains/cli.yaml",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:kubernetes-spec-service",
+      "b": "story:toolchain-pins-newest-release-20261001",
+      "path": "Cargo.lock",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:kubernetes-spec-service",
+      "b": "story:toolchain-pins-newest-release-20261001",
+      "path": "Cargo.toml",
+      "confidence": "cited"
+    },
+    {
+      "a": "story:kubernetes-spec-service",
+      "b": "story:toolchain-pins-newest-release-20261001",
+      "path": "ess",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:mcp-cli-journey-discovery-contract",
+      "b": "story:service-failure-carries-upstream-reason",
+      "path": "contracts/cli/v1alpha1/semantics.md",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:mcp-inbound-capability-projection",
+      "b": "story:mcp-inbound-mutation-replay",
+      "path": "adapters/mcp/contracts/server/v1alpha1/scenarios",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:mcp-outbound-auth-lifecycle",
+      "b": "story:mcp-outbound-invocation-results",
+      "path": "adapters/mcp/contracts/client/v1alpha1/scenarios",
+      "confidence": "inferred"
+    },
+    {
+      "a": "story:spec-models-operation-admission",
+      "b": "story:toolchain-pins-newest-release-20261001",
+      "path": "apps/connectors-cli-contract",
+      "confidence": "inferred"
+    }
+  ],
+  "unassessed": [
+    "story:archive-closed-review-results",
+    "story:audit-anchor-co-presence",
+    "story:catalog-grafana-reads",
+    "story:catalog-guard-optional-preflight-values",
+    "story:catalog-post-reads",
+    "story:ess-format-paging-views",
+    "story:ess3-format-adoption",
+    "story:guarded-write-credential-refusal-says-repair",
+    "story:host-gate-load-sensitivity-w3",
+    "story:http-empty-query-no-trailing-question-mark",
+    "story:identity-views-for-witnessing",
+    "story:multi-tenant-principal-assignment",
+    "story:owner-recovers-after-failed-acquisition",
+    "story:owner-refuses-buildless-callers",
+    "story:session-connection-binding"
+  ],
+  "cycles": []
+}
+
+```
+
+## Catalog planning panel outcome
+
+Catalog revision5 received approve from all four named perspectives in round1:
+aep:plan-critic-acceptance, aep:plan-critic-design, aep:plan-critic-scope and
+aep:plan-critic-parallel-safety. Four immutable review-results retain exact reports;
+four no-op outcomes record that there were no findings requiring revision. No
+second round is needed for an unchanged all-approve set. This is acceptance of the
+plan, not proof of the ten executed journeys.
+
+Host adaptation: three workers reviewed independently without seeing other
+findings; root supplied parallel-safety and is not independent of the plan author.
+The acceptance reviewer completed its already-running bounded preflight before
+reading the story, so starts were staggered. The clock worker used a read-only
+waiting interval for design critique without interrupting the cost process.
+Sonnet is unavailable; reviewers inherited the session model. No claim of four
+independent simultaneous Sonnet reviews is made.
+
+The clock experiment remains active. This proposal is ready for dispatch only
+after its checked decision; no provider story has yet been activated or assigned.
