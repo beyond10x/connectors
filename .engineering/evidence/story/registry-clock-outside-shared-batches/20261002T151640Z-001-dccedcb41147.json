@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T15:16:40Z",
+  "actor": "human:timo",
+  "artifact": "story:registry-clock-outside-shared-batches",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "Independent audit of hashes, outputs, fixture reuse and exact source restoration",
+    "reference": "review-result:registry-clock-experiment-20261002"
+  }
+}

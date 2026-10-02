@@ -1,0 +1,13 @@
+diff --git a/crates/connectors-host/src/local/metadata/er.rs b/crates/connectors-host/src/local/metadata/er.rs
+index 02fe013ef3..9b5523772d 100644
+--- a/crates/connectors-host/src/local/metadata/er.rs
++++ b/crates/connectors-host/src/local/metadata/er.rs
+@@ -3281,7 +3281,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
+     if actions.is_empty() && !prepared_observation {
+         return Ok(());
+     }
+-    if !concurrent_observation && !runtime_state_only {
++    if prepared_observation {
+         // An already-open registry observation may advance its clock after
+         // releasing the physical lifecycle lock. Fence that floor even
+         // when this batch sampled the same millisecond as its baseline,

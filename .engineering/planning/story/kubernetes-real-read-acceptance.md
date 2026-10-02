@@ -2,12 +2,13 @@
 format: aep.planning-md/3
 id: story:kubernetes-real-read-acceptance
 kind: story
-status: draft
+status: active
 title: Close real Kubernetes read and local lifecycle acceptance gaps
 relations:
 - decomposes: initiative:complete-local-connectors
 - informed_by: story:persistent-kubernetes-journey
 - depends_on: story:bridge-drop-waits-for-dispatched-batch
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/kubernetes/tests/local_runtime.rs
@@ -17,7 +18,10 @@ scope:
   path: adapters/kubernetes/tests/provider.rs
 - confidence: cited
   path: docs/local-kubernetes-cli.md
-revision: 5
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-02T15:18:27Z", actor: "human:timo", revision: 6, correlation: "wave-20261002d-provider-acceptance"}
+- {from: "proposed", to: "active", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 7, correlation: "wave-20261002d-provider-acceptance"}
 ---
 ## Problem and evidence
 

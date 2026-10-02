@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T15:16:40Z",
+  "actor": "human:timo",
+  "artifact": "story:registry-clock-outside-shared-batches",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "One baseline and one candidate: 9 invariants and both full cost probes; rejection rule satisfied",
+    "reference": "docs/evidence/clock-experiment-20261002/README.md"
+  }
+}

@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: story:postgres-real-provider-acceptance
 kind: story
-status: draft
+status: active
 title: Close PostgreSQL C06 and local lifecycle acceptance gaps
 relations:
 - decomposes: initiative:complete-local-connectors
 - informed_by: story:postgres-local-cli-journey
 - depends_on: story:sql-fixture-accepts-stray-connections
 - depends_on: story:bridge-drop-waits-for-dispatched-batch
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: adapters/sql/tests/local_runtime.rs
@@ -18,7 +19,10 @@ scope:
   path: adapters/sql/tests/protocol.rs
 - confidence: cited
   path: docs/local-postgres-cli.md
-revision: 6
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}, correlation: "wave-20261002d-provider-acceptance"}
+- {from: "proposed", to: "active", at: "2026-10-02T15:18:28Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}, correlation: "wave-20261002d-provider-acceptance"}
 ---
 ## Problem and evidence
 
