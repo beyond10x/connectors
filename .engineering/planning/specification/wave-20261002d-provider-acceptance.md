@@ -9,7 +9,7 @@ relations:
 - informed_by: story:catalog-cli-journeys
 - informed_by: story:kubernetes-real-read-acceptance
 - informed_by: story:postgres-real-provider-acceptance
-revision: 6
+revision: 7
 ---
 ## Selection and existing authorization
 
@@ -1186,3 +1186,29 @@ whitespace check passed. Logs were not silently edited to make that check green.
 Exact validation output with historical review warnings is retained privately in
 .local/provider-wave-briefs/preflight/aep-validation.txt. No runtime acceptance
 is inferred from these opening checks.
+
+## Discovered SQL classification defect — 2026-10-02
+
+The PostgreSQL acceptance unit reproduced a specific error classification defect:
+its wrapped data-modifying CTE receives PostgreSQL0A000, but the native mapper
+returns Unavailable. The child remains ready and a later read succeeds. Full-loop
+red2/2 and the independent first-CTE probe ruled out a preceding-request dependency.
+The worker's retained diagnosis records hypotheses and discriminating outputs.
+The earlier fixture expected invalid_input; the supported correction is exact
+Unsupported, never accepting generic unavailable as a read-only refusal.
+
+Root created/activated story:postgres-unsupported-feature-classification with
+exact source scope and red evidence before authorizing source edits. The same
+PostgreSQL worker/tree owns this sequential correction because its protocol and
+CLI tests overlap the acceptance unit. No concurrent author is introduced. Add
+only exact0A000 mapping, public wire regression first, native contract clarification
+and complete real-case verification. No other error mapping, deadline, grant or
+upstream version changes. Root remains the only AEP/classifier/Git writer.
+Independent review must judge both stories and the full unit before integration.
+
+The PostgreSQL worker retains the sole live window while other workers author
+source. K8S expanded compilation and baseline39passed/4ignored are complete;
+catalog baseline compilation is complete with its exact baseline executable
+retained. Catalog expanded compilation follows PostgreSQL's correction, then
+Kubernetes receives its live window. All provider units remain unaccepted until
+actual final suites and review complete.

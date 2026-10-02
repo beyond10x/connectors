@@ -10,6 +10,7 @@ relations:
 - depends_on: story:sql-fixture-accepts-stray-connections
 - depends_on: story:bridge-drop-waits-for-dispatched-batch
 - serves: vision:independent-contract-adapters
+- depends_on: story:postgres-unsupported-feature-classification
 scope:
 - confidence: cited
   path: adapters/sql/tests/local_runtime.rs
