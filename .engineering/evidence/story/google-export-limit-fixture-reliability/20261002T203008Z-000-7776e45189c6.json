@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T20:30:08Z",
+  "actor": "human:timo",
+  "artifact": "story:google-export-limit-fixture-reliability",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Flush-only loop100 passes; actual shared TLS writer regression UnexpectedEof red without flush then green; final boundary100 passes; full affected binary6 passes; scoped Clippy/fmt pass. Worker report SHA2569bb2030afa8daa0aedad20dee037bf33770f3dd1891fd8e65002c6f238dad87c. Broad generated-file fmt discrepancy separate; integrated gate pending.",
+    "reference": "docs/evidence/google-export-ci-20261002/README.md"
+  }
+}

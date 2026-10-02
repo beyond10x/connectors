@@ -7,7 +7,7 @@ title: 'Release 0.25.1: verified provider acceptance and precise SQL refusals'
 relations:
 - informed_by: specification:wave-20261002d-provider-acceptance
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 7
 transitions:
 - {from: "draft", to: "active", at: "2026-10-02T16:50:11Z", actor: "human:timo", revision: 2}
 ---
@@ -114,3 +114,48 @@ Remote publication is still pending. Next: bot commit/push, App PR, requiredchec
 App merge, verifyexactmain/tree, immutableannotatedv0.25.1tag, successfultagchecks,
 App-authoredLatestrelease and sourcearchives. Release plan staysactive until verified.
 MCP and the sustained-load/upstreamclock and decision-gated provider remainder stayopen.
+
+## CI refusal and scoped correction — 2026-10-02
+
+PR79 candidateb0b42f5a3a85dc3621a5a263b717c9d748bb2932 failed its repository gate
+(run37051606475) in existing files_export_at_and_over_the_response_limit,
+google_reads_adversary.rs405: exactly4MiB returned Unavailable. OtherPRchecks passed.
+The complete localgate had passed; neither that green nor a blind rerun discharges
+this observed CI failure. Merge/tag/release remain held.
+
+The unchanged test reproduced the same symptom locally on iteration27 of a
+100-iteration bounded loop after26passes, with a private gate-style TMPDIR.
+Loop logSHA7fce34011d0bf245ae7018067338a572c10b6e6ff0bd8b1c49750de78ba1c0ec;
+CIlogSHA894320c580b62b002e7295e984c9a479d4f03c01fada4c9bb5993d48d6cbcb66.
+An earlier no-private-TMPDIR single invocation failed fixture setup instead;
+it is retained separately, not counted as reproduction of this symptom.
+
+Active story:google-export-limit-fixture-reliability owns the bounded correction.
+Worker cb26e-export at exactpublishedcandidate may change only the existing Google
+adversary fixture/regression, starting with ranked one-variable probes. Production,
+size/deadline limits, guards/dependencies stay unchanged absent a separately proven
+and scoped defect. Root owns store/evidence/release notes and integration.
+Fullscope/rankedpredictions are recorded in that story. Independentreview and an
+updated requiredCI run must precede release. The existing four provider stories'
+reviewed unit evidence remains valid; the source release is not yet complete.
+
+## Corrected candidate integration — 2026-10-02
+
+The actual TLS fixture writer now flushes buffered ciphertext before dropping its
+stream. The new regression was red without flush and green with it; original
+boundary loops passed100/100 twice. Separate bounded adversary review found no
+concrete defect; its immutable record is review-result:google-export-fixture-20261002.
+No production, dependency, limit, deadline or existing assertion changed.
+
+The full local gate --msrv passed:1208ordinary tests,0failed,65ignored, Clippy,
+authored formatting, source/CLI/descriptor/model checks and Rust1.88library plus
+Rust1.91workspace/all-targets checks. Contract synthesis retains21refusals and
+498emittedscenarios; metadata execution289passed retains Inconclusive due to
+undeclaredcoverage. Website references and build/publicaudit passed (482files).
+Unchanged website presentation/examples/browser inputs retain prior passing checks.
+Source/evidence: docs/evidence/google-export-ci-20261002/README.md.
+
+This completes the scoped local fixture correction. Fresh required CI on the
+updated PR79 head, App merge, exact immutabletag and hostedrelease checks remain
+required. The earlier failed CI and initial candidate's checks remain historical;
+no version release is claimed by this observation.
