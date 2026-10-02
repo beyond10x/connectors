@@ -107,10 +107,13 @@ A rejected password comes back as the server's own `28P01`.
 
 **The identity is the role and the database**, recorded as `reader@incidents`.
 The role name is the principal PostgreSQL authorises against and the database
-scopes it. A `connections repair` for a different role is an identity mismatch
-and the existing valid credential is preserved. Changing `host`, `port` or
-`database` changes the configuration revision instead, and is refused at startup
-before any session opens — it is a different binding, not a renewed one.
+scopes it. The protected repair document accepts only a password; it cannot
+select another role. Changing `user`, `host`, `port` or `database` changes the
+configuration revision. A native file that no longer matches the configured
+revision is refused as `readiness_mismatch` at startup, before a session opens.
+Failed password repair on the original binding preserves its still-valid saved
+credential. These are the reachable SQL repair boundaries; a password alone
+cannot produce a different role identity.
 
 **A password grants no scopes and exposes no expiry.** The profile declares no
 required scopes and the saved connection records none, so a successful
@@ -135,9 +138,16 @@ interpolated into the text.
 | columns | 1 to 256 |
 | connect / query / request | 5 s, 10 s, 15 s, with 2 s reserved for cleanup |
 
-A request that exceeds a bound is refused before a session is opened. A caller
-cannot extend the deadline with `set_config()`, and a dropped invocation still
-sends the backend cancel key rather than leaving the server executing.
+A request that exceeds an input bound is refused before a session is opened.
+Oversized result values return `capacity`; empty rows retain column metadata,
+and row truncation is reported separately. A caller cannot extend the execution
+deadline with `set_config()`.
+
+Dropping the native `Sql::invoke` future triggers backend-keyed cancellation and
+bounded local cleanup. It does not guarantee remote termination after a network
+failure or process crash. CLI disconnect is a different boundary: an already
+dispatched read may finish. Killing the CLI does not test native future-drop
+cancellation.
 
 Writes are not refused by a keyword filter: the transaction is `READ ONLY`, so
 PostgreSQL itself rejects any statement that would write.
@@ -148,7 +158,51 @@ MySQL is not implemented and belongs to the remaining-provider phase. No write,
 DDL, transaction control, cursor, stored procedure or connection pooling is
 exposed. `schema.list` and `query.read` are the whole surface.
 
-No runtime evidence against a dedicated PostgreSQL sandbox has been recorded.
-The journeys above are verified against a PostgreSQL wire fixture on loopback
-with fictional credentials, in the same shape as the existing protocol tests. A
-real server is required before this binding is called proven.
+The [retained real-provider restart evidence](evidence/provider-restarts-20261002/README.md)
+covers a disposable PostgreSQL server and saved-credential reuse. Wire-protocol
+fixtures remain separate from that provider evidence. Neither establishes TLS
+for the plaintext loopback sandbox or MySQL support.
+
+## Running the bounded provider acceptance cases
+
+The SQL `local_runtime` suite contains five additional opt-in real-provider cases:
+join/group/UTC/quoted parameters; empty/truncated/capacity/timeout outcomes;
+read-only escape refusals; native invocation-drop cancellation; and repair,
+revoke and busy-stop authority. Four use the production CLI and qualified
+disposable Secret Service. The cancellation case invokes the production `Sql`
+library directly, observes the exact marked backend within two seconds, then
+checks termination within five seconds of dropping the invocation. A paired
+no-drop control must still run after five seconds. This is a controlled fixture
+observation, not a universal cancellation deadline.
+
+Use only an owned PostgreSQL 17.6 container whose published port is bound to
+`127.0.0.1`, with the disposable `incidents` database and the fixture `reader`
+credential used by the existing restart journey. The reader must have no
+superuser, role-creation or database-creation authority. The host needs Docker,
+and the container needs `psql` with local fixture-admin access. Admin access is
+used only for fixture setup, observation and cleanup; SUT queries use `reader`.
+Do not point this suite at a production database or a shared container.
+
+```sh
+CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-sql
+CONNECTORS_TEST_CLI="$PWD/target/release/connectors" \
+CONNECTORS_PG_SANDBOX=127.0.0.1:PORT \
+CONNECTORS_PG_CONTAINER=OWNED_CONTAINER \
+TMPDIR=/absolute/short/private/tmp \
+CARGO_BUILD_JOBS=2 cargo test --release --locked -p connectors-sql \
+  --test local_runtime cli_journey:: -- --ignored --nocapture --test-threads=1
+```
+
+The three environment selections contain paths or fixture coordinates, never
+passwords. The physical temporary directory must be owner-private and short
+enough for the private Unix sockets. Each case creates private custody and
+configuration, and its own database schema where needed. Cleanup drops only that
+schema and terminates only a correlated test backend. Explicit selection with
+missing prerequisites fails; an ignored case in the ordinary package run is
+unexecuted evidence, not a passing provider case.
+
+Write refusal checks distinguish columnless statements and unsupported PostgreSQL
+features (`unsupported`, including SQLSTATE `0A000`), rejected read-subquery syntax
+or multiple statements (`invalid_input`), and the mandatory
+read-only transaction. They also compare independently observed fixture contents;
+an arbitrary transport failure is not accepted as write protection.
