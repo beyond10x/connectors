@@ -8,6 +8,13 @@ use std::{
     time::Instant,
 };
 
+#[path = "guarded_merge.rs"]
+mod guarded_merge;
+#[path = "lifecycle.rs"]
+mod lifecycle;
+#[path = "settlement_fault.rs"]
+mod settlement_fault;
+
 struct OwnedProcess(Process);
 
 impl Drop for OwnedProcess {
@@ -122,6 +129,8 @@ impl Custody {
 pub(super) struct Cli {
     binary: PathBuf,
     pub(super) paths: Paths,
+    recorded: std::cell::RefCell<Option<recorded_state::Reader>>,
+    fault: Option<settlement_fault::Controller>,
 }
 
 impl Cli {
@@ -131,6 +140,8 @@ impl Cli {
             .into();
         Self {
             binary,
+            recorded: std::cell::RefCell::new(None),
+            fault: None,
             paths: Paths {
                 config: root.join("cli/config.toml"),
                 state: root.join("cli/state"),
@@ -150,11 +161,52 @@ impl Cli {
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if let Some(fault) = &self.fault {
+            fault.configure(&mut command);
+        }
         command
     }
 
     pub(super) fn run(&self, args: &[&str]) -> Output {
         self.command(args).output().unwrap()
+    }
+
+    fn status(&self) -> Value {
+        success(self.run(&["adapters", "status", "--adapter", "gitlab"]))["observation"].clone()
+    }
+
+    fn recorded(&self) -> recorded_state::Facts {
+        let mut reader = self.recorded.borrow_mut();
+        reader
+            .get_or_insert_with(|| recorded_state::Reader::open(&self.paths.state))
+            .snapshot()
+    }
+
+    fn operation_result(&self, connection: &str, operation: &str, input: Value) -> Value {
+        let description = success(self.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "gitlab",
+            "--operation",
+            operation,
+        ]));
+        success(self.run(&[
+            "operations",
+            "invoke",
+            "--adapter",
+            "gitlab",
+            "--connection",
+            connection,
+            "--operation",
+            operation,
+            "--schema",
+            description["schema"].as_str().unwrap(),
+            "--revision",
+            description["revision"].as_str().unwrap(),
+            "--input-json",
+            &input.to_string(),
+        ]))
     }
 
     /// `run`, with the consent hook of a debug-build CLI following the
@@ -174,9 +226,31 @@ impl Cli {
     }
 
     fn shutdown(&self) {
+        if let Some(fault) = &self.fault {
+            fault.disarm();
+        }
         if let Ok(client) = owner::Client::connect(&self.paths, false) {
             let host = client.host_incarnation.clone();
-            client.shutdown(&host).unwrap();
+            if self.fault.is_some() {
+                let handles = guarded_merge::owner_handles(self);
+                let answer = client.shutdown(&host);
+                if !guarded_merge::finish_filtered_owner(handles, answer.is_ok()) {
+                    return;
+                }
+                let directory = filesystem::directory(&self.paths.state, false, true).unwrap();
+                let lock =
+                    filesystem::private_file_at(&directory, std::ffi::OsStr::new("owner.lock"))
+                        .unwrap();
+                // SAFETY: verified exact owned lifetime file, after pidfd exit.
+                use std::os::fd::AsRawFd;
+                assert_eq!(
+                    unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) },
+                    0
+                );
+                eprintln!("filtered owner lifetime lock reacquired after exact process exits");
+            } else {
+                client.shutdown(&host).unwrap();
+            }
             let until = Instant::now() + Duration::from_secs(5);
             while self.paths.state.join("owner.sock").exists() {
                 assert!(Instant::now() < until, "owner did not finish cleanup");
@@ -189,6 +263,8 @@ impl Cli {
 impl Drop for Cli {
     fn drop(&mut self) {
         self.shutdown();
+        // Observational bridge retires while all fault listeners still exist.
+        drop(self.recorded.get_mut().take());
     }
 }
 
@@ -208,13 +284,14 @@ pub(super) fn success(output: Output) -> Value {
 }
 
 #[track_caller]
-fn refusal(output: Output, code: &str) {
+fn refusal(output: Output, code: &str) -> Value {
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
     assert!(!String::from_utf8_lossy(&output.stderr).contains("fixture-pat-one"));
     assert!(!carries_basic_material(&output.stderr));
     let value: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(value["error"]["data"]["code"], code, "{value}");
+    value["error"]["data"].clone()
 }
 
 fn configure(cli: &Cli, provider: &Provider, custody: &Custody) {
@@ -281,6 +358,7 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
         .unwrap()
         .to_owned();
     assert_eq!(connected["summary"]["state"], "ready");
+    assert_eq!(provider.count(), 2);
 
     let description = success(cli.run(&[
         "operations",
@@ -351,13 +429,22 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
     ]));
     assert_eq!(refreshed["connection"]["summary"]["state"], "ready");
     assert_eq!(refreshed["connection"]["summary"]["revision"], revision);
+    assert_eq!(provider.count(), calls_before_refusal + 2);
+    // Revalidation is explicit. Start the simultaneous invocations with no
+    // owner so they also exercise concurrent owner creation and saved custody.
+    cli.shutdown();
     let calls_before = provider.count();
-    let result = success(cli.run(&invoke));
-    assert_eq!(
-        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
-        7
-    );
-    assert!(provider.count() > calls_before);
+    let children: Vec<_> = (0..4)
+        .map(|_| cli.command(&invoke).spawn().unwrap())
+        .collect();
+    for child in children {
+        let result = success(child.wait_with_output().unwrap());
+        assert_eq!(
+            serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+            7
+        );
+    }
+    assert_eq!(provider.count(), calls_before + 4);
     let new_host = success(cli.run(&["adapters", "status", "--adapter", "gitlab"]))["observation"]
         ["host_incarnation"]
         .clone();
@@ -386,6 +473,36 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
     );
     assert_eq!(provider.count(), before_refusal);
 
+    let coordinates = cli.status();
+    let stop = |child: &str| {
+        cli.run(&[
+            "adapters",
+            "stop",
+            "--adapter",
+            "gitlab",
+            "--expected-revision",
+            coordinates["configuration_revision"].as_str().unwrap(),
+            "--host-incarnation",
+            coordinates["host_incarnation"].as_str().unwrap(),
+            "--child-incarnation",
+            child,
+        ])
+    };
+    refusal(stop("stale-child"), "incarnation_mismatch");
+    assert_eq!(
+        cli.status()["child_incarnation"],
+        coordinates["child_incarnation"]
+    );
+    success(stop(coordinates["child_incarnation"].as_str().unwrap()));
+    assert_eq!(cli.status()["state"], "suppressed");
+    cli.shutdown();
+    assert_eq!(cli.status()["state"], "owner_unavailable");
+    success(cli.run(&invoke));
+    assert_ne!(
+        cli.status()["child_incarnation"],
+        coordinates["child_incarnation"]
+    );
+
     success(
         cli.run(&[
             "connections",
@@ -410,6 +527,10 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
         &reference,
     ]));
     assert_eq!(revoked["connection"]["summary"]["state"], "revoked");
+    let before = provider.count();
+    refusal(cli.run(&invoke), "revoked");
+    assert_eq!(provider.count(), before);
+    assert!(!cli.paths.state.join("owner.sock").exists());
 }
 
 fn arguments(owned: &[String]) -> Vec<&str> {
