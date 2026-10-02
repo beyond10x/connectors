@@ -69,7 +69,16 @@ The host owns `metadata.sqlite3`, its SQLite sidecars and `metadata.lock` in the
 private state directory. The lock serializes the bounded setup/inspection handle's
 whole lifetime, including schema installation and SQLite's last-close sidecar
 retirement; OS process exit releases it. These handles must not be held across
-provider work. SQLite owns the durable authority.
+provider work. Entity Runtime over Eventlog SQLite owns the durable metadata
+authority; the compatibility connection projects its verified state.
+
+If a dispatched metadata batch or legacy import exceeds its deadline, the result
+remains uncertain. The refused handle transfers its lifecycle lock to an
+autonomous cleanup worker and returns without waiting indefinitely. The lock is
+released only after the underlying worker joins, so a second owner cannot race
+a late commit. If cleanup cannot start or panics, ownership is retained until
+process exit. The next open still verifies recorded state and corruption checks;
+a timeout is never treated as proof that nothing committed.
 Its first migration records the local authority identity, UID and migration
 digest. Migration two adds the [connection registry](local-connection-registry.md),
 acquisition/custody publication, retirement and bounded read-use guards. Migration
@@ -83,8 +92,9 @@ Only each admitted private owner installs its migration; ordinary setup retains
 version three. The policy port requires a trusted host caller to admit its write
 operation set. The [local approval commands](local-approvals.md) now perform that
 admission, prepare subjects without modifying metadata, and publish protected
-proofs under current policy/key leases. Complete business write dispatch remains
-unfinished; production GitLab continues to advertise reads.
+proofs under current policy/key leases. The catalog GitLab selection also
+advertises approved merge-request create, update and guarded merge through the
+private mutation protocol; the public/version-one service interface retains reads.
 
 The binding selects SQLite WAL, `synchronous=FULL`, foreign keys and in-memory
 temporary storage, with 30-second lock/busy bounds. Versioned migrations commit

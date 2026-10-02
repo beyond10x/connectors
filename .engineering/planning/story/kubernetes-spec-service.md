@@ -36,7 +36,7 @@ scope:
   path: examples
 - confidence: cited
   path: spec-kinds
-revision: 2
+revision: 3
 ---
 ## Context and current status
 
@@ -75,3 +75,7 @@ Use connectors for integrations and report gaps before an alternative client. Fo
 ## Scope
 
 Cited from the original draft and current owners: Cargo.toml, Cargo.lock, README.md, adapters/kubernetes, adapters/gitlab, crates/connectors-spec, crates/connectors-build, crates/connectors-conformance, contracts/service/v1alpha1, spec-kinds, ess, examples and docs. This retained scope belongs to future implementation; the present integration changes only planning prose and the draft task.
+
+## Current preflight, 2026-10-02
+
+The explicit configured protocol snapshot resolves with both AEP 0.65.0 and 0.68.0; tooling-blocker:kubernetes-driver-protocol-loading is cleared with retained output in docs/evidence/kubernetes-resolver-20261002/. Use that exact --root selection; implicit discovery remains broken. Runtime baseline is v0.24.0 at c7a9d5b1db1ff4e3b2af568db19c6eaa60d79d90; project tools are ESS 0.45.0 / AEP 0.65.0. The earlier source-pin, native-GitLab and local-only statements describe historical preparation, not the current implementation path. Native GitLab was retired; regressions now target the catalog provider. approval-record:milestones-delivery-20261002 authorizes the selected implementation and verified source release, not a paid drive or deployment. Re-scope actual generation ownership before scheduling this story alongside other source edits.

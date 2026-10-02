@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.24.0
+# Source release v0.25.0
 
-Version **0.24.0** specifies at ESS source format `ess/15` with the released
+Version **0.25.0** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -67,18 +67,23 @@ responses, host-child fixtures over disposable HTTPS, a drift check on the
 committed bundle, and the repository gate including Rust 1.88. Its GitLab
 sandbox acceptance is recorded in the source checkout's evidence directory.
 
-The development checkout extends this release with local approval policy,
-protected proof issuance and a guarded GitLab merge through private protocol two.
-Disposable CLI fixtures join the mutation ledger, audit, approval spend and one
-native PUT, including lost-response observation after owner shutdown without
-resending. Public/version-one interfaces retain reads. The wider crash/failure
-matrix and dedicated sandbox acceptance remain unfinished.
+Local approval policy, protected proof issuance and guarded GitLab writes run
+through private protocol two. The retired native GitLab adapter had production
+CLI fixtures joining the mutation ledger, audit, approval spend and provider
+effects, including lost-response observation without resending. Porting those
+journeys to the catalog child remains required; engine fixtures and earlier live
+sandbox runs do not replace that evidence. Public/version-one interfaces retain
+reads.
 
-Kubernetes and PostgreSQL still need the persistent local connection lifecycle.
-Their remaining selected workflows precede MCP and the remaining providers.
+Kubernetes and PostgreSQL implement persistent local connections, saved credential
+reuse and owner restarts. Their dedicated sandbox acceptance and remaining
+selected workflows precede MCP and the remaining providers. Metadata operation
+cost still grows with the event store; Entity Runtime issue 51 tracks the upstream
+fix, and the timeout cleanup change does not remove that performance limit.
 Other adapter pages distinguish designs and typed specifications from running
 implementations; a release does not imply completion of the full provider plan.
 
-This is a source release for Linux x86_64, built with Rust 1.88 or later. Existing
-installed configuration and credentials are not automatically migrated.
+This is a source release for Linux x86_64. The local runtime requires Rust 1.91;
+the independent libraries are checked on Rust 1.88. Existing installed
+configuration and credentials are not automatically migrated.
 Binary/package distribution and website/cloud deployment are separate.

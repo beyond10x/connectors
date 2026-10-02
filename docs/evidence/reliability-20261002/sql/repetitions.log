@@ -1,0 +1,899 @@
+
+Run 1
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.11s
+
+
+Run 2
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.16s
+
+
+Run 3
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.47s
+
+
+Run 4
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.27s
+
+
+Run 5
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.67s
+
+
+Run 6
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.08s
+
+
+Run 7
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.03s
+
+
+Run 8
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.18s
+
+
+Run 9
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+
+Run 10
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.99s
+
+
+Run 11
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.62s
+
+
+Run 12
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.44s
+
+
+Run 13
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.02s
+
+
+Run 14
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.19s
+
+
+Run 15
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.19s
+
+
+Run 16
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.99s
+
+
+Run 17
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.66s
+
+
+Run 18
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.08s
+
+
+Run 19
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.73s
+
+
+Run 20
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.54s
+
+
+Run 21
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+
+Run 22
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.41s
+
+
+Run 23
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.34s
+
+
+Run 24
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+
+Run 25
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.90s
+
+
+Run 26
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.45s
+
+
+Run 27
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.04s
+
+
+Run 28
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.22s
+
+
+Run 29
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.75s
+
+
+Run 30
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.41s
+
+
+Run 31
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.37s
+
+
+Run 32
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.97s
+
+
+Run 33
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.34s
+
+
+Run 34
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.31s
+
+
+Run 35
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.95s
+
+
+Run 36
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.51s
+
+
+Run 37
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.60s
+
+
+Run 38
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.58s
+
+
+Run 39
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.47s
+
+
+Run 40
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.32s
+
+
+Run 41
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.89s
+
+
+Run 42
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.56s
+
+
+Run 43
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.20s
+
+
+Run 44
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.15s
+
+
+Run 45
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.41s
+
+
+Run 46
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.57s
+
+
+Run 47
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.66s
+
+
+Run 48
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.22s
+
+
+Run 49
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.80s
+
+
+Run 50
+
+running 11 tests
+test cli_journey::a_real_postgres_session_persists_across_cli_and_owner_restart ... ignored, requires CONNECTORS_PG_SANDBOX, a built production CLI and qualified disposable Secret Service
+test a_rejected_password_and_a_malformed_entry_are_distinguishable ... ok
+test sql_fixture_rejects_a_malformed_cancellation - should panic ... ok
+test bootstrap_mismatches_and_changed_artifacts_refuse_before_any_session ... ok
+test sql_fixture_rejects_an_unexpected_startup - should panic ... ok
+test sql_fixture_rejects_cancellation_length_and_pid_boundaries ... ok
+test sql_fixture_counts_cancel_requests_separately ... ok
+test a_dispatched_read_reaches_the_database_and_returns_its_refusal ... ok
+test sql_fixture_repeated_control_packets_preserve_provider_refusal ... ok
+test the_session_is_the_credential_check_and_its_identity_is_the_role_and_database ... ok
+test sql_fixture_rejects_an_extra_sut_session - should panic ... ok
+
+test result: ok. 10 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.92s
