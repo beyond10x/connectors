@@ -401,10 +401,10 @@ diagnostic they can surface to users" (`mcp-2026-07-28-basic-versioning.mdx:154-
 An advertised or requested capability that matches no row of the selection matrix is not
 an error and not support: it is recorded as advertised and projected into nothing, which
 is the matrix's own rule under its `Limits`. **Which** Connectors capabilities this
-binding advertises at all is not this document's: that is
-`story:mcp-inbound-capability-projection`, and it rests on the model's `UNMAPPED: which
-Connectors operations are advertised, and under which admission`. Error mapping onto
-`connectors.service_wire.ErrorCode` belongs to that story too.
+binding advertises is specified by [the projection contract](projection.md), owned
+by `story:mcp-inbound-capability-projection`. That contract also maps
+`connectors.service_wire.ErrorCode`; its document checks do not establish runtime
+projection conformance or resolve the model's caller/Connection relation markers.
 
 ## 4. What inbound stdio does not offer
 

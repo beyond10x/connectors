@@ -1,0 +1,564 @@
+{
+  "format": "mcp-inbound-projection-document/1",
+  "evidence": "document-only",
+  "errors": [
+    {
+      "code": "invalid_input",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve invalid_input and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "unsupported",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve unsupported and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "unauthorized",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve unauthorized and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "forbidden",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve forbidden and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "not_found",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve not_found and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "stale_description",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve stale_description and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "stale_cursor",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve stale_cursor and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "rate_limited",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve rate_limited and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "unavailable",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve unavailable and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "capacity",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve capacity and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "timeout",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve timeout and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "upstream_protocol",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve upstream_protocol and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "internal",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve internal and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "approval_required",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve approval_required and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "approval_refused",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve approval_refused and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "approval_replayed",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve approval_replayed and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "idempotency_conflict",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve idempotency_conflict and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "outcome_unknown",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve outcome_unknown and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "not_granted",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve not_granted and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "stale_authority",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve stale_authority and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "connection_not_ready",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve connection_not_ready and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "route_unavailable",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve route_unavailable and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "route_refused",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve route_refused and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "insufficient_scope",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve insufficient_scope and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "session_not_ready",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve session_not_ready and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "session_lost",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve session_lost and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "offer_expired",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve offer_expired and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "offer_rejected",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve offer_rejected and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "lease_expired",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve lease_expired and the admitted envelope; no retry authority."
+    },
+    {
+      "code": "revoked",
+      "tool_execution": "tool-error",
+      "resource": "rpc-error",
+      "prompt": "rpc-error",
+      "observation": "Preserve revoked and the admitted envelope; no retry authority."
+    }
+  ],
+  "names": [
+    {
+      "id": "qualified-first",
+      "instance": "a",
+      "adapter": "bc",
+      "operation": "d",
+      "name": "c1_61_6263_64"
+    },
+    {
+      "id": "qualified-separator",
+      "instance": "ab",
+      "adapter": "c",
+      "operation": "d",
+      "name": "c1_6162_63_64"
+    },
+    {
+      "id": "qualified-other-instance",
+      "instance": "z",
+      "adapter": "bc",
+      "operation": "d",
+      "name": "c1_7a_6263_64"
+    },
+    {
+      "id": "qualified-unicode",
+      "instance": "é",
+      "adapter": "a_b",
+      "operation": "a.b",
+      "name": "c1_c3a9_615f62_612e62"
+    },
+    {
+      "id": "qualified-empty-refused",
+      "instance": "",
+      "adapter": "a",
+      "operation": "b",
+      "name": null
+    },
+    {
+      "id": "qualified-long-refused",
+      "instance": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "adapter": "a",
+      "operation": "b",
+      "name": null
+    }
+  ],
+  "visibility": [
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "ready",
+      "visible": true,
+      "outcome": "candidate_or_retained_key"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": true,
+      "dependency_ready": false,
+      "approval_ready": true,
+      "id": "dependency-unready",
+      "visible": true,
+      "outcome": "candidate_or_retained_key"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": false,
+      "id": "approval-missing",
+      "visible": true,
+      "outcome": "candidate_or_retained_key"
+    },
+    {
+      "implemented": false,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "unknown",
+      "visible": false,
+      "outcome": "not_found"
+    },
+    {
+      "implemented": true,
+      "bound": false,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "unbound",
+      "visible": false,
+      "outcome": "not_found"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": false,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "disabled",
+      "visible": false,
+      "outcome": "forbidden"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": false,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "metadata-hidden",
+      "visible": false,
+      "outcome": "candidate_or_retained_key"
+    },
+    {
+      "implemented": false,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": false,
+      "policy": "deny",
+      "observation_admitted": true,
+      "revision_current": false,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "policy-beats-stale",
+      "visible": false,
+      "outcome": "not_granted"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "unavailable",
+      "observation_admitted": true,
+      "revision_current": false,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "policy-unavailable",
+      "visible": false,
+      "outcome": "unavailable"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": false,
+      "revision_current": false,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "scope-beats-stale",
+      "visible": true,
+      "outcome": "forbidden"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": false,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": false,
+      "input_valid": false,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "revision-beats-hidden",
+      "visible": false,
+      "outcome": "stale_description"
+    },
+    {
+      "implemented": false,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": false,
+      "input_valid": true,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "revision-beats-absent",
+      "visible": false,
+      "outcome": "stale_description"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": false,
+      "input_valid": false,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "revision-beats-input",
+      "visible": true,
+      "outcome": "stale_description"
+    },
+    {
+      "implemented": true,
+      "bound": true,
+      "enabled": true,
+      "metadata_admitted": true,
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "input_valid": false,
+      "dependency_ready": true,
+      "approval_ready": true,
+      "id": "bad-input",
+      "visible": true,
+      "outcome": "invalid_input"
+    }
+  ],
+  "families": [
+    {
+      "id": "tool-complete",
+      "family": "tools",
+      "complete_binding": true,
+      "read_only": false,
+      "empty_input": false,
+      "string_arguments": false,
+      "prompt_messages": false,
+      "advertised": true
+    },
+    {
+      "id": "tool-weakened-refused",
+      "family": "tools",
+      "complete_binding": false,
+      "read_only": true,
+      "empty_input": true,
+      "string_arguments": true,
+      "prompt_messages": true,
+      "advertised": false
+    },
+    {
+      "id": "resource-read",
+      "family": "resources",
+      "complete_binding": true,
+      "read_only": true,
+      "empty_input": true,
+      "string_arguments": false,
+      "prompt_messages": false,
+      "advertised": true
+    },
+    {
+      "id": "resource-write-refused",
+      "family": "resources",
+      "complete_binding": true,
+      "read_only": false,
+      "empty_input": true,
+      "string_arguments": false,
+      "prompt_messages": false,
+      "advertised": false
+    },
+    {
+      "id": "resource-arguments-refused",
+      "family": "resources",
+      "complete_binding": true,
+      "read_only": true,
+      "empty_input": false,
+      "string_arguments": false,
+      "prompt_messages": false,
+      "advertised": false
+    },
+    {
+      "id": "prompt-messages",
+      "family": "prompts",
+      "complete_binding": true,
+      "read_only": true,
+      "empty_input": false,
+      "string_arguments": true,
+      "prompt_messages": true,
+      "advertised": true
+    },
+    {
+      "id": "prompt-coercion-refused",
+      "family": "prompts",
+      "complete_binding": true,
+      "read_only": true,
+      "empty_input": false,
+      "string_arguments": false,
+      "prompt_messages": true,
+      "advertised": false
+    },
+    {
+      "id": "prompt-data-refused",
+      "family": "prompts",
+      "complete_binding": true,
+      "read_only": true,
+      "empty_input": true,
+      "string_arguments": true,
+      "prompt_messages": false,
+      "advertised": false
+    },
+    {
+      "id": "prompt-write-refused",
+      "family": "prompts",
+      "complete_binding": true,
+      "read_only": false,
+      "empty_input": false,
+      "string_arguments": true,
+      "prompt_messages": true,
+      "advertised": false
+    }
+  ]
+}
