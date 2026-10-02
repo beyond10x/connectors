@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-02T13:02:41Z",
+  "actor": "human:timo",
+  "artifact": "story:ignored-suites-have-a-runner",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "Production CLI already refuses inherited autoreaping before fixture dispatch; diagnostic preserved, no production correction required.",
+    "review": "review-result:wave-20261002b-runner-adversary-2",
+    "outcome": "no-op"
+  }
+}

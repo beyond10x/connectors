@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:08:09Z",
+  "actor": "human:timo",
+  "artifact": "story:ignored-suites-have-a-runner",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "VERIFIED new command absent at base; eight authored cases 0 passed/8 failed before implementation to 8 passed, final package 151 passed. Real operator run reports 31 passed, 1 failed, 1 missing and exits 1 as required.",
+    "reference": "docs/evidence/reliability-20261002/runner/implementor.md"
+  }
+}

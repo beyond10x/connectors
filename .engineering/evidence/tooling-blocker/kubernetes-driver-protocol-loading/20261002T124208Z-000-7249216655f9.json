@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T12:42:08Z",
+  "actor": "human:timo",
+  "artifact": "tooling-blocker:kubernetes-driver-protocol-loading",
+  "kind": "tooling-blocker",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "AEP0.65.0 govern resolve with exact configured snapshot --root: exit0, adp/1 development.standard adp/default,11 obligations",
+    "reference": "docs/evidence/kubernetes-resolver-20261002/resolved.json"
+  }
+}
