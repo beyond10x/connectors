@@ -15,7 +15,7 @@ scope:
   path: crates/connectors-host/src/local/metadata/er.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/metadata/metamorphic_tests.rs
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
@@ -28,7 +28,7 @@ Preserve exclusive metadata ownership until dispatched work finishes or is prove
 
 ## Acceptance
 
-A metadata-timeout-safety conformance result passes all three Required conformance cases using the fault injection in Verification and model, demonstrating safe recovery across the timed-out handle's ownership boundary.
+A metadata-timeout-safety conformance result passes every Required conformance case using the fault injection in Verification and model, demonstrating safe recovery across the timed-out handle's ownership boundary, including legacy import before the authority is installed in the handle.
 
 ## Verification and model
 These are proposed runtime conformance case names, not existing-test claims. Bind them to contracts/cli/v1alpha1/semantics.md and existing ess/domains/mutations.yaml, idempotency.yaml and clock.yaml. Reproduce on base with synchronized fault injection: hold a worker past deadline, attempt a second owner, release the worker, inspect commits and provider request counts. Retain corruption detection and reopen checks.
@@ -40,4 +40,4 @@ Serialize with story:registry-clock-outside-shared-batches and story:metadata-in
 
 ## Required conformance cases
 
-The named conformance cases batch-timeout-retains-ownership, queued-batch-cancelled-before-release and next-invoke-after-unknown-outcome prove no dispatched batch commits after ownership release, a subsequent invoke recovers without a duplicate provider effect, and uncertainty remains until observed.
+The named conformance cases batch-timeout-retains-ownership, queued-batch-cancelled-before-release and next-invoke-after-unknown-outcome prove no dispatched batch commits after ownership release, a subsequent invoke recovers without a duplicate provider effect, and uncertainty remains until observed. The additional metadata_timeout_safety_legacy_import_retains_ownership case covers the same boundary while Metadata::adopt_er imports legacy state before installing its authority. The implementation's exact test names and outputs are retained in its report; all four must pass. This closes a reachable import path discovered during review rather than excluding it as migration-only.

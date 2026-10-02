@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T12:42:10Z",
+  "actor": "human:timo",
+  "artifact": "story:sql-fixture-accepts-stray-connections",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "SQL package19 passed after adversary; fmt/Clippy green;50 of50 fixture runs,10 passed each, under actual workspace test load",
+    "reference": "docs/evidence/reliability-20261002/sql/README.md"
+  }
+}

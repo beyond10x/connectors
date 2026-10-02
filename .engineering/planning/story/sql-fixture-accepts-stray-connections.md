@@ -10,7 +10,7 @@ relations:
 scope:
 - confidence: cited
   path: adapters/sql/tests/local_runtime.rs
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T11:48:33Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
@@ -30,4 +30,8 @@ Cited sole edit surface: adapters/sql/tests/local_runtime.rs. No shared gate or 
 
 ## Required conformance cases
 
-The named conformance cases sql-fixture-isolates-unrelated-connection and a_dispatched_read_reaches_the_database_and_returns_its_refusal preserve exact admitted-session counts and reject an extra SUT session, while 50 of 50 repetitions pass during a parallel workspace test run.
+The named conformance cases sql_fixture_counts_cancel_requests_separately and a_dispatched_read_reaches_the_database_and_returns_its_refusal preserve exact admitted-session counts while classifying the adapter's valid CancelRequest separately by backend key; foreign startup, malformed cancellation and a second ordinary SUT session remain failing negative controls, and 50 of 50 repetitions pass during a parallel workspace test run. This replaces the draft sql-fixture-isolates-unrelated-connection name because reproduction identified legitimate protocol cancellation rather than unrelated traffic.
+
+## Reproduced mechanism — 2026-10-02 wave 20261002b
+
+The implementor's deterministic injection reproduced the unexpected-startup/count failure and the extra-SUT control exposed a valid PostgreSQL CancelRequest emitted by the actual adapter. Bytes [4,210,22,46,0,0,0,42,0,0,4,210] identify protocol cancellation code 80877102 and the fixture backend key 42/1234. A cancellation connection is protocol control traffic, not an admitted database session. The fixture must validate the exact key and count it separately, while malformed cancellation and an extra ordinary SUT startup still fail. Endpoint isolation alone would not correct this reproduced class. The earlier unrelated-traffic explanation remains a historical hypothesis; it is not the chosen fix. Source scope remains the single SQL test fixture file; retain exact red and capture logs with final evidence.

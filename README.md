@@ -25,7 +25,7 @@ separate steps.
 
 ## Where the project stands
 
-Source release **v0.24.0** keeps connection metadata in Entity Runtime over an
+Source release **v0.25.0** keeps connection metadata in Entity Runtime over an
 Eventlog SQLite store, specified at ESS source format `ess/15`, with GitLab, Jira Cloud, Confluence Cloud and HubSpot CRM served from their pinned OpenAPI sources, and Google Drive, Slides, Calendar and Gmail from pinned Discovery documents projected to OpenAPI, through
 the catalog provider. The [changelog](CHANGELOG.md) records its scope and
 remaining work.
@@ -53,7 +53,7 @@ This catalog is a second implementation, not a migration of the first: the
 predecessor it re-implements ships at `crates/catalog` in the v1 component, and both
 exist today. The org-state review of 2026-09-15 decided which is which — Atlas ADR
 *Connectors lineage*, 2026-09-15: the name `beyond10x/connectors` denotes this
-lineage, which owns that repository's `next` default branch, its `v0.8.0`-and-later
+lineage, which owns that repository's `main` default branch, its `v0.8.0`-and-later
 tags and its Latest release; v1, whose releases end at `v0.7.2`, is the predecessor.
 Consumers are still on the predecessor and not on this code: six repositories in the
 organization depend on `beyond10x/connectors` at seven distinct revisions (devcenter
