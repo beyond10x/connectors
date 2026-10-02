@@ -25,3 +25,4 @@ ess-synth.workspace = true
 ess-conformance.workspace = true
 ess-primitives.workspace = true
 entity-core.workspace = true
+libc = "0.2"

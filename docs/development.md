@@ -123,6 +123,65 @@ client, or sibling adapter dependency. The generic client and federation host ha
 no adapter dependencies. A new provider supplies an `Adapter` implementation and
 configuration; it requires no provider switch in the shared client or host.
 
+## Ignored tests
+
+`connectors-build ignored` inventories every compiled default-feature workspace
+test executable with Rust's `--ignored --list`, then runs each selected test by
+its exact name. Unknown classifications refuse all execution. The existing
+`gate` command is unchanged; this lane is not automatically enrolled in CI.
+
+```sh
+cargo run --locked -p connectors-build -- ignored --inventory
+cargo run --locked -p connectors-build -- ignored
+cargo run --locked -p connectors-build -- ignored --required
+```
+
+The default `disposable` family runs private custody, CLI and loopback browser
+fixtures. Workspace compilation supplies the current production CLI and catalog
+provider paths. Custody requires `/usr/bin/dbus-daemon` and the exact qualified
+GNOME Keyring artifact described in [Secret Service custody](local-secret-service.md).
+Browser fixtures require `google-chrome-stable` on PATH. The compatibility fixture
+also requires `CONNECTORS_ADVERSARY_PRE_HANDSHAKE`, an executable from before the
+owner handshake change. Unavailable prerequisites are reported by test name.
+Use `--required` for a release family: missing prerequisites, empty selection,
+test failures and zero-test successes refuse acceptance. An ordinary exploratory
+run may finish with explicit prerequisite skips; it is not release acceptance.
+
+Live sandboxes and timing probes require explicit family selection, regardless
+of which credentials happen to be present:
+
+```sh
+cargo run --locked -p connectors-build -- ignored --family live --required
+cargo run --locked -p connectors-build -- ignored --family timing --required
+cargo run --locked -p connectors-build -- ignored --family disposable,live,timing,deferred --inventory
+```
+
+The `live` family includes the public Roughtime interoperability check and the
+prepared PostgreSQL and Kubernetes sandboxes. PostgreSQL requires
+`CONNECTORS_PG_SANDBOX=host:port`; Kubernetes requires `CONNECTORS_K8S_SANDBOX`,
+`CONNECTORS_K8S_CA` and `CONNECTORS_K8S_TOKEN`. Both provider journeys also need
+custody and the production CLI. Selecting `live` authorizes those existing tests;
+the runner does not provision sandboxes. The `deferred` family contains the known
+CLI contract invariant limitation and can be explicitly run to observe its
+current result. Subprocess helpers are always excluded from top-level execution;
+their owning parent tests invoke them.
+
+The JSON report defaults to `.local/ignored-suites.json`; `--report <path>` selects
+another destination. It records every fully qualified test name, family,
+selection, outcome and skip reason, plus exact inventory, selected, executed,
+skipped, failed, missing-prerequisite and unknown counts. Raw test output lives
+beside it in the corresponding `.logs` directory, keyed by the SHA-256 of the
+fully qualified name. Inventory mode executes no tests and cannot be combined
+with `--required`. Each executed fixture has a ten-minute deadline; its owned
+process group is stopped and reaped on success, failure, timeout or runner error,
+with a bounded cleanup wait. A subprocess that deliberately creates a separate
+session escapes that group and remains the fixture's shutdown responsibility.
+Temporary
+fixture files default to `.local/tmp`. For long managed checkouts, supply
+`--tmpdir <short-directory>`: an actual directory owned by your user with mode
+700, without symlinks. Custody checks refuse overly long temporary paths and
+report this option as the missing prerequisite. The runner creates and removes
+its own subdirectory there; the supplied directory, reports and logs remain.
 
 ## Documentation website
 

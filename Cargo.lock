@@ -578,6 +578,7 @@ dependencies = [
  "ess-service-contract",
  "ess-synth",
  "jsonschema",
+ "libc",
  "pulldown-cmark",
  "regex",
  "serde",

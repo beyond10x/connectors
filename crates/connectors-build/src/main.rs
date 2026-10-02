@@ -17,6 +17,7 @@ mod cli;
 mod docs;
 mod ess_boundary;
 mod gate;
+mod ignored;
 mod metadata_conformance;
 mod metadata_entities;
 mod source_hashes;
@@ -39,6 +40,8 @@ struct Args {
 #[derive(Subcommand)]
 enum Action {
     Check,
+    /// Account for every ignored workspace test and run explicitly selected families.
+    Ignored(ignored::Options),
     /// Generate or compare the selected local CLI contract fixture.
     Cli {
         #[arg(long)]
@@ -161,6 +164,9 @@ fn main() -> Result<()> {
 }
 fn execute(args: Args) -> Result<()> {
     let root = args.root.canonicalize()?;
+    if let Action::Ignored(options) = args.command {
+        return ignored::run(&root, options);
+    }
     if let Action::DocsAudit { directory } = args.command {
         return docs::audit(&directory.unwrap_or_else(|| root.join("website/build")));
     }
