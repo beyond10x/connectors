@@ -8,7 +8,7 @@ relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:contract-driven-connectors-design
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 2
+revision: 3
 ---
 ## Operator request
 
@@ -82,3 +82,43 @@ it here. No Harness repin or hosted deployment is included automatically.
 Preparation is retained privately in `.local/next-milestones/mcp-preflight.md` and
 `mcp-relations-preflight.md`. These source audits establish work scope, not passing
 wire interoperability or persistent-auth conformance.
+
+## Source inventory for the first sibling retrofit — 2026-10-02
+
+Read-only inventory verified clean sibling MCP primary at
+51b9c7969def3dc0fbee9026cd26f4ce5837d62c and already-fetched origin/main at
+0fdfbafa7c130caa76d74825680d72af3280e21b. The latter changes documentation authority
+only; runtime inputs are identical. No fetch, build, test or source/spec/store
+mutation was performed. No ESS root, governed plan or ESS opt-out exists there.
+MCP's current controlled transport testkit is Unreleased relative to local tag
+0.1.2; neither hosted release state nor complete compatibility is inferred.
+
+The smallest independent retrofit is the shipped tools value/operation boundary
+and frozen connected-handle snapshot, using the public HTTP client as the first
+real conformance target. It is not a durable server/session/request model. Sources:
+crates/b10x-mcp-client/src/lib.rs:21-96,101-150,196-228 and
+crates/b10x-mcp-types/src/lib.rs:80-105,162-319 in the sibling. Current configured
+protocol versions are not an executed legacy-fallback matrix. Existing HTTP/stdio
+transport tests are useful seeds; the sibling gate is cargo xtask gate and does
+not yet validate or execute ESS. A managed sibling checkout, governed adoption,
+minimal validated specification and an actual conformance target are required
+before claiming retrofit completion. No entities or relation semantics are
+introduced into this Connectors record by the inventory.
+
+Preserve these source disagreements explicitly in the future draft: sibling
+AGENTS says types carries no credential value, while types::SecretString exists;
+Limits.max_pages is declared but the client does not read it; max_frame_bytes is
+wired only to HTTP SSE. SDK behavior and executable cases must establish effective
+bounds. Session lifecycle, registry removal/custody cascade, snapshot persistence,
+OAuth one-use/refresh coordination, omitted-capability behavior and consumer
+ownership relations remain UNMAPPED rather than invented from field composition.
+Opaque wire values are not automatically persistent entities, and tools/call is
+not automatically a read merely because this library keeps no local ledger.
+
+This first HTTP/tools specification and conformance work can proceed after the
+provider handoff without the caller-assignment, outbound-process or execution-family
+decisions. Those blockers stay open for their dependent consumer work. New inbound
+server/resources/prompts capabilities remain new specification and implementation,
+not behavior that may be asserted by the retrofit. Detailed source citations are
+retained in the task-owned mcp-retrofit-inventory/report.md, SHA256
+cb744d5de42ca204e8c72095787c494383150b244c83b127486e9f359eaac242.

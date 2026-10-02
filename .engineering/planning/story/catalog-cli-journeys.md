@@ -21,7 +21,7 @@ scope:
   path: crates/connectors-build/src/ignored.rs
 - confidence: cited
   path: docs/evidence/catalog-cli-20261002
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T15:17:51Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":4}}, correlation: "wave-20261002d-provider-acceptance"}
 - {from: "proposed", to: "active", at: "2026-10-02T15:17:51Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":4}}, correlation: "wave-20261002d-provider-acceptance"}
@@ -144,3 +144,52 @@ Dispatching/Pending state before restoration/recovery. The observer must not cau
 an earlier refusal or stand in for settlement failure. If chmod allows settlement,
 record that injection as rejected and return for a separately scoped fixture seam;
 do not broaden filesystem damage or drop the historical modes8–11 assertions.
+
+## Current executable admission and replay fixture — 2026-10-02
+
+The first expanded repair case failed with OwnerBuildMismatch because the libtest
+Client::begin called a production-CLI owner. Current transport.rs:351-358,487-492,
+519-536 requires the caller and owner to have the same measured executable image.
+This is intentional, and apps/connectors/tests/owner_build_security.rs protects it.
+The retained failure is not a production defect.
+
+Capture invalidation remains production-CLI acceptance: hold protected stdin after
+connections connect has admitted Begin (apps/connectors/src/local/session.rs:177-201),
+observe the exact new Pending Acquisition through the existing ER observer, stop the
+busy child, then supply the fixture credential. Require lifecycle_conflict and no
+new provider send. No fabricated capture or build digest is allowed.
+
+Settled public CLI retries return locally before WriteClient
+(apps/connectors/src/local/operations.rs:123-151). Keep those passive controls and
+label them accurately. Preserve the separate successful owner/2 replay obligation
+using the existing catalog fixture and a same-image host-library helper. This is a
+sequential replacement of the invalid cross-image test seam within the same owned
+test files, not a new runtime feature or removal of an acceptance obligation.
+
+After original settlement through the production CLI/catalog child, stop and wait
+for that exact owner. Spawn the same libtest executable with one exact ignored
+helper that calls existing unmodified public owner::serve. Pass a real startup
+UnixStream on FD3 and the exact verified private owner.lock lifetime file on FD4,
+following production descriptor duplication, flock and isolated process rules.
+The libtest parent WriteClient and helper naturally share actual /proc/self/exe
+bytes; never forge a greeting/digest, change same_build, construct a fake Owner,
+add a production test hook, or run fixed-FD mutation in a shared test thread.
+Use start=false; no production-only hidden-command fallback through libtest.
+
+Label this segment same-build host-library transport acceptance, distinct from the
+production-CLI original effect. First measure successful handshake, exact owner
+incarnation and bounded shutdown/lock release. Then prove one applied settled
+replay before refusal/lost-response variants. Preserve all original request/attempt,
+exact delivery/refusal, key, spent proof, clock, provider PUT/effect and audit checks.
+A replay has its own correlated final audit; zero clock/provider calls does not
+mean zero metadata writes. Stop custody/delete proof before replay, pass no proof,
+and observe no new native child. Keep pending mode3 on its genuine public CLI owner
+path and preserve all fifteen variants, including independent settlement-fault
+feasibility controls. Helper source and deps remain in current test scope; no new
+Cargo dependency is justified. Root adds its exact name as an excluded helper and
+it never counts as a journey. The helper refuses absent private fixture selection.
+
+Source-grounded feasibility is recorded in the coordinator's assigned
+.local/provider-wave-briefs/owner-replay-feasibility/report.md. It is not executed
+proof. If actual inherited-FD startup, cleanup or replay assertions fail, retain the
+failure and return the unmet obligation without weakening deadlines or authority.

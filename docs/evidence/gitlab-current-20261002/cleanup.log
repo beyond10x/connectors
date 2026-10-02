@@ -1,0 +1,5 @@
+cleanup-stop exit=0
+Terminated verified final owner pid=1833858
+Final owner executable gone; no child exit status available for detached owner
+keyring wait exit=0
+bus wait exit=0

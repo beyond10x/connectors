@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T15:55:46Z",
+  "actor": "human:timo",
+  "artifact": "story:postgres-real-provider-acceptance",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Six selected PostgreSQL live cases; 19 ordinary package cases; Clippy and formatting",
+    "reference": "docs/evidence/postgres-acceptance-20261002/README.md"
+  }
+}

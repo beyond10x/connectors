@@ -1,0 +1,71 @@
+    Finished `release` profile [optimized] target(s) in 0.17s
+     Running tests/local_runtime.rs (target/release/deps/local_runtime-3575a67e13ecbb3d)
+
+running 1 test
+test cli_journey::kubernetes_cli_repair_revoke_and_stop_preserve_authority ... owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned CLI process 1539952 exit=exit status: 0
+owned CLI process 1539985 exit=exit status: 0
+real fixture cb26d-1539580-1790957284597 connection_revision=c71b1d1e-942b-4ded-a587-1f3456497d71 objects=[{"kind":"Service","name":"cb26d-1539580-1790957284597-a","resourceVersion":"4959","uid":"5b98b61a-2f34-4497-bd05-3c3a1887ed61"},{"kind":"Service","name":"cb26d-1539580-1790957284597-b","resourceVersion":"4961","uid":"7ebca2d6-f840-40b6-b57e-64101ec5a68c"},{"kind":"Service","name":"cb26d-1539580-1790957284597-c","resourceVersion":"4963","uid":"f0e36fae-b8a9-4a2e-8b09-1bacab495f37"},{"kind":"EndpointSlice","name":"cb26d-1539580-1790957284597","resourceVersion":"4964","uid":"4ef987df-8e7a-4b27-8b36-4e5eea73fca3"},{"kind":"Deployment","name":"cb26d-1539580-1790957284597","resourceVersion":"4965","uid":"c03fd4f0-3ffd-4dcb-b732-b5a88070fe75"},{"kind":"Pod","name":"cb26d-1539580-1790957284597","resourceVersion":"4970","uid":"531eedf7-8c73-47d8-8507-c1a7c5d8a988"}]
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned provisioning process exit=exit status: 0
+owned CLI process 1540215 exit=exit status: 1
+owned CLI process 1540309 exit=exit status: 0
+owned CLI process 1540318 exit=exit status: 0
+owned CLI process 1540339 exit=exit status: 0
+owned CLI process 1540370 exit=exit status: 0
+owned CLI process 1540382 exit=exit status: 0
+owned CLI process 1540443 exit=exit status: 0
+owned CLI process 1540392 exit=exit status: 1
+owned CLI process 1540623 exit=exit status: 0
+owned CLI process 1540672 exit=exit status: 0
+owned CLI process 1540680 exit=exit status: 0
+owned CLI process 1540844 exit=exit status: 0
+owned CLI process 1540878 exit=exit status: 0
+owned CLI process 1540888 exit=exit status: 0
+owned CLI process 1540928 exit=exit status: 0
+owned CLI process 1540931 exit=exit status: 0
+owned CLI process 1541033 exit=exit status: 0
+owned CLI process 1541049 exit=exit status: 1
+owner 2f8d3f30-0cb3-47bb-82a1-50eda5f9d06d acknowledged shutdown and removed its socket
+owned custody process 1539943 exit=Ok(ExitStatus(unix_wait_status(9)))
+owned CLI process 1541080 exit=exit status: 0
+owned CLI process 1541153 exit=exit status: 1
+owned CLI process 1541233 exit=exit status: 0
+owned CLI process 1541259 exit=exit status: 0
+owned CLI process 1541266 exit=exit status: 0
+owned CLI process 1541369 exit=exit status: 0
+owner c6e318e6-09a2-4be3-a07a-20afddf19bfc acknowledged shutdown and removed its socket
+owned CLI process 1541395 exit=exit status: 0
+owned CLI process 1541406 exit=exit status: 1
+owned CLI process 1541428 exit=exit status: 0
+owned custody process 1541252 exit=Ok(ExitStatus(unix_wait_status(9)))
+owned custody process 1539942 exit=Ok(ExitStatus(unix_wait_status(9)))
+observed upstream method/path/status=[("POST", "/apis/authentication.k8s.io/v1/selfsubjectreviews", 201), ("POST", "/apis/authentication.k8s.io/v1/selfsubjectreviews", 201), ("GET", "/api/v1/namespaces/fixture/services", 200), ("GET", "/api/v1/namespaces/fixture/services", 200), ("GET", "/api/v1/namespaces/fixture/services", 200), ("GET", "/api/v1/namespaces/fixture/services", 200), ("GET", "/api/v1/namespaces/fixture/services", 200), ("GET", "/api/v1/namespaces/fixture/services", 200)]
+owned fixture cleanup kind="RoleBinding" name="cb26d-1539580-1790957284597-denied" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1539580-1790957284597-denied" exit=exit status: 0
+owned fixture cleanup kind="ServiceAccount" name="cb26d-1539580-1790957284597-denied" exit=exit status: 0
+owned fixture cleanup kind="Pod" name="cb26d-1539580-1790957284597" exit=exit status: 0
+owned fixture cleanup kind="Deployment" name="cb26d-1539580-1790957284597" exit=exit status: 0
+owned fixture cleanup kind="EndpointSlice" name="cb26d-1539580-1790957284597" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1539580-1790957284597-c" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1539580-1790957284597-b" exit=exit status: 0
+owned fixture cleanup kind="Service" name="cb26d-1539580-1790957284597-a" exit=exit status: 0
+owned fixture cleanup kind="RoleBinding" name="cb26d-1539580-1790957284597" exit=exit status: 0
+owned fixture cleanup kind="RoleBinding" name="cb26d-1539580-1790957284597" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1539580-1790957284597" exit=exit status: 0
+owned fixture cleanup kind="Role" name="cb26d-1539580-1790957284597" exit=exit status: 0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 16.30s
+

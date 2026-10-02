@@ -1,0 +1,319 @@
+[
+  {
+    "operation": "project.get",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "object",
+    "items": null,
+    "text_bytes": null,
+    "object_id": 1,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958538872,
+      "resource": "/api/v4/projects/{id}",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "issues.list",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 1,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958540904,
+      "resource": "/api/v4/projects/{id}/issues",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "file.get",
+    "input": {
+      "id": "1",
+      "ref": "main",
+      "file_path": ".gitlab-ci.yml"
+    },
+    "status": 200,
+    "body_kind": "object",
+    "items": null,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958604217,
+      "resource": "/api/v4/projects/{id}/repository/files/{file_path}",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "branch.get",
+    "input": {
+      "id": "1",
+      "branch": "main"
+    },
+    "status": 200,
+    "body_kind": "object",
+    "items": null,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958602513,
+      "resource": "/api/v4/projects/{id}/repository/branches/{branch}",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "merge_requests.list",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 11,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958542230,
+      "resource": "/api/v4/projects/{id}/merge_requests",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "merge_request.get",
+    "input": {
+      "id": "1",
+      "merge_request_iid": "11"
+    },
+    "status": 200,
+    "body_kind": "object",
+    "items": null,
+    "text_bytes": null,
+    "object_id": 11,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958606378,
+      "resource": "/api/v4/projects/{id}/merge_requests/{merge_request_iid}",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "pipelines.list",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 20,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958543541,
+      "resource": "/api/v4/projects/{id}/pipelines",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "pipeline.get",
+    "input": {
+      "id": "1",
+      "pipeline_id": "23"
+    },
+    "status": 200,
+    "body_kind": "object",
+    "items": null,
+    "text_bytes": null,
+    "object_id": 23,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958608047,
+      "resource": "/api/v4/projects/{id}/pipelines/{pipeline_id}",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "pipeline.jobs",
+    "input": {
+      "id": "1",
+      "pipeline_id": "23"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 1,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958610086,
+      "resource": "/api/v4/projects/{id}/pipelines/{pipeline_id}/jobs",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "job.get",
+    "input": {
+      "id": "1",
+      "job_id": "27"
+    },
+    "status": 200,
+    "body_kind": "object",
+    "items": null,
+    "text_bytes": null,
+    "object_id": 27,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958614326,
+      "resource": "/api/v4/projects/{id}/jobs/{job_id}",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "job.trace",
+    "input": {
+      "id": "1",
+      "job_id": "27"
+    },
+    "status": 200,
+    "body_kind": "string",
+    "items": null,
+    "text_bytes": 2383,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958616819,
+      "resource": "/api/v4/projects/{id}/jobs/{job_id}/trace",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "projects.list",
+    "input": {
+      "membership": true,
+      "per_page": 10
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 1,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958551637,
+      "resource": "/api/v4/projects",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "tags.list",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 0,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958544746,
+      "resource": "/api/v4/projects/{id}/repository/tags",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "releases.list",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 0,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958545934,
+      "resource": "/api/v4/projects/{id}/releases",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "project.events",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 20,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958547300,
+      "resource": "/api/v4/projects/{id}/events",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "commits.list",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 11,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958548558,
+      "resource": "/api/v4/projects/{id}/repository/commits",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "repository.compare",
+    "input": {
+      "id": "1",
+      "from": "c64b58120d9ce0de849e215f32dad9f6095b5003",
+      "to": "45fbac1b0127059aac91c45ee6cf25b1903230fb"
+    },
+    "status": 200,
+    "body_kind": "object",
+    "items": null,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958611947,
+      "resource": "/api/v4/projects/{id}/repository/compare",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  },
+  {
+    "operation": "deployments.list",
+    "input": {
+      "id": "1"
+    },
+    "status": 200,
+    "body_kind": "array",
+    "items": 0,
+    "text_bytes": null,
+    "object_id": null,
+    "provenance": {
+      "instance": "gitlab-current-20261002",
+      "observed_at_unix_ms": 1790958549846,
+      "resource": "/api/v4/projects/{id}/deployments",
+      "source_revision": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530"
+    }
+  }
+]

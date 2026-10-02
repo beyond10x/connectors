@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T16:33:26Z",
+  "actor": "human:timo",
+  "artifact": "task:gitlab-catalog-current-sandbox-read-replay",
+  "kind": "task",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "18 distinct current production catalog reads HTTP200, explicit revalidation and new-owner saved-credential reuse; initial refusals retained",
+    "reference": "docs/evidence/gitlab-current-20261002/README.md"
+  }
+}
