@@ -1,0 +1,13 @@
+{
+  "checks": [
+    "kubernetes: authenticated discovery and token refusal",
+    "kubernetes: direct supported operation and refusal scenarios",
+    "kubernetes: federated supported operation and refusal scenarios",
+    "sql: authenticated discovery and token refusal",
+    "sql: direct supported operation and refusal scenarios",
+    "sql: federated supported operation and refusal scenarios"
+  ],
+  "evidence": "live configured upstreams; scoped Kubernetes service account, PostgreSQL reader role",
+  "status": "passed",
+  "wire": "v1alpha1"
+}

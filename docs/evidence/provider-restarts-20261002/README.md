@@ -30,3 +30,34 @@ This evidence therefore establishes API inventory and connection reuse, not a
 running workload, logs, exec, mutation, tunnel, or Helm acceptance. The test's
 invalid-token refusal does not establish the full per-operation authorization
 coverage contract. No provider milestone is closed by this receipt alone.
+
+## Direct and federated acceptance
+
+The existing `connectors-conformance` executable then passed all six named groups
+in [federated-result.json](federated-result.json), exit 0. It ran on the same
+isolated provider containers, with the exact three-row `connector_fixture` from
+`examples/live/postgres.sql`, its SELECT-only role, and a separate `engineering`
+namespace created from `examples/live/kubernetes.yaml`. The opted-in host discovery
+credential could get/list nodes. A ready external EndpointSlice explicitly named
+the owned PostgreSQL container and port 5432. This API fixture does not claim that
+the Pending pod became ready.
+
+The services listened only on loopback ports 33100, 33102 and 33103. The gateway
+selected downstream aliases `kubernetes` and `sql`. The conformance command used
+`--namespace engineering --allow-plaintext` and the explicit URLs and private
+service-token file, under a 120-second timeout with a five-second kill grace. The
+plaintext allowance applied to these loopback service links and the disposable
+PostgreSQL database; Kubernetes still verified its cluster TLS CA.
+
+The runner checks service authentication, Kubernetes services/endpoints/hosts,
+SQL exact numeric/null/array/JSON values, truncation and empty schemas, oversized-row
+refusal, single-statement/read-only refusals with unchanged row count, and query
+timeouts both directly and through federation. Source:
+`crates/connectors-conformance/src/main.rs`. Binary identities are in
+[federated-binaries.sha256](federated-binaries.sha256). All three service processes
+received SIGTERM and were observed exiting 0 after the successful check.
+
+C06's selected joins/grouping/UTC/quoted-value queries and dropped-invoke
+cancellation are not fully covered by this existing runner. Kubernetes richer
+diagnosis, permission checks, mutations, rollout, exec/copy/tunnels and Helm remain
+separate acceptance obligations. No blanket provider completion is inferred.
