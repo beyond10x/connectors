@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:registry-clock-outside-shared-batches
 kind: story
-status: draft
+status: active
 title: Investigate keeping the registry clock out of every registry batch
 relations:
 - serves: vision:independent-contract-adapters
@@ -20,7 +20,10 @@ scope:
   path: crates/connectors-host/src/local/registry/store_cost_tests.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 7
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-02T13:56:03Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-02T13:56:03Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 ---
 ## Hypothesis
 Entity Runtime 0.25.1 follows co-batched subjects through the registry clock, growing its closure across the store. Isolating that clock might bound the work, but must preserve the atomic revision guard in crates/connectors-host/src/local/metadata/er.rs:3215.

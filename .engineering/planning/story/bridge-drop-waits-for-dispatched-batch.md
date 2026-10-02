@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:bridge-drop-waits-for-dispatched-batch
 kind: story
-status: active
+status: implemented
 title: A refused metadata handle does not leave a batch running after its lock is released
 relations:
 - serves: vision:independent-contract-adapters
@@ -17,10 +17,11 @@ scope:
   path: crates/connectors-host/src/local/metadata/metamorphic_tests.rs
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 15
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-02T11:48:32Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-02T13:37:11Z", actor: "human:timo", revision: 16, decided_on: {"recorded":{"test_result":3,"review_outcome":1}}}
 ---
 ## Observed
 The 2026-10-02 investigation saw an OutcomeUnknown batch continue after its handle released the lifecycle lock. Skipping reopen verification then regressed recovery. See story:metadata-invoke-cost-flat-in-store-size and crates/connectors-host/src/local/metadata.rs:206.
