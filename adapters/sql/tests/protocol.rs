@@ -354,8 +354,35 @@ async fn rows_nulls_native_types_and_truncation_are_preserved() {
     assert_eq!(result["truncated"], false);
 }
 #[tokio::test]
+async fn adversary_only_exact_feature_not_supported_changes_classification() {
+    // The accepted correction names one SQLSTATE, not the whole 0A class.
+    // Custom neighboring codes exercise the actual provider-error wire path.
+    for (state, expected) in [
+        ("0A000", ErrorCode::Unsupported),
+        ("0A001", ErrorCode::Unavailable),
+        ("0A999", ErrorCode::Unavailable),
+    ] {
+        let error = invoke(
+            Scenario {
+                query_error: Some(state),
+                ..Scenario::default()
+            },
+            json!({"query":"SELECT 1","limit":1}),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, expected, "SQLSTATE {state}");
+        assert!(!error.upstream_answer, "SQLSTATE {state}");
+        let serialized = serde_json::to_string(&error).unwrap();
+        assert!(!serialized.contains("private-provider-detail"));
+        assert!(!serialized.contains("fixture-password"));
+    }
+}
+
+#[tokio::test]
 async fn authentication_database_errors_and_row_capacity_are_sanitized() {
     for (code, expected) in [
+        ("0A000", ErrorCode::Unsupported),
         ("28P01", ErrorCode::Unauthorized),
         ("42501", ErrorCode::Forbidden),
         ("25006", ErrorCode::Forbidden),
@@ -380,6 +407,7 @@ async fn authentication_database_errors_and_row_capacity_are_sanitized() {
             .await
             .unwrap_err();
         assert_eq!(error.code, expected);
+        assert_eq!(error.upstream_answer, matches!(code, "57014" | "53300"));
         let text = serde_json::to_string(&error).unwrap();
         assert!(!text.contains("private-provider-detail"));
         assert!(!text.contains("fixture-password"));
