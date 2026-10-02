@@ -1138,3 +1138,303 @@ fn mr13_refused_mutation_commands_leave_every_view_unchanged() {
     );
     assert_unchanged("MR13", &before, &views(&world.path), &[]);
 }
+
+// Metadata timeout safety binds the CLI's conservative storage acknowledgement
+// to the mutation, idempotency and clock domains. Holding SQLite's writer lock
+// keeps the real ER worker inside provider dispatch, without changing its code.
+const BATCH_DEADLINE: std::time::Duration = std::time::Duration::from_millis(250);
+
+fn hold_worker(path: &Path) -> rusqlite::Connection {
+    let blocker = rusqlite::Connection::open(path.join(super::NAME)).unwrap();
+    blocker.execute_batch("BEGIN IMMEDIATE").unwrap();
+    blocker
+}
+
+fn lifecycle_owned(path: &Path) -> bool {
+    use std::os::fd::AsRawFd;
+    let lock = std::fs::File::open(path.join(super::LOCK)).unwrap();
+    // SAFETY: this fresh descriptor is owned until the end of this function.
+    let result = unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+    if result == 0 {
+        false
+    } else {
+        assert_eq!(
+            std::io::Error::last_os_error().kind(),
+            std::io::ErrorKind::WouldBlock
+        );
+        true
+    }
+}
+
+fn wait_for_runtime_row(path: &Path, id: &str) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        if let Ok(metadata) = Metadata::inspect(path) {
+            let present: bool = metadata
+                .connection
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM local_runtime_instances WHERE instance_id=?1)",
+                    [id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            if present {
+                return;
+            }
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "worker never committed"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn metadata_timeout_safety_batch_timeout_retains_ownership() {
+    const CHILD_PATH: &str = "CONNECTORS_TIMEOUT_SAFETY_CHILD_PATH";
+    if let Some(path) = std::env::var_os(CHILD_PATH) {
+        // The original process performs no metadata calls while this process
+        // waits: recovery therefore requires autonomous retirement.
+        wait_for_runtime_row(Path::new(&path), "timed-out");
+        return;
+    }
+    let (_root, path) = root();
+    let mut metadata = Metadata::update(&path, true).unwrap();
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO local_runtime_instances(instance_id,suppressed) VALUES ('timed-out',1)",
+            [],
+        )
+        .unwrap();
+    let blocker = hold_worker(&path);
+    let result = er::with_batch_wait(BATCH_DEADLINE, || metadata.persist_runtime_state());
+    assert_eq!(
+        result,
+        Err(super::Failure::OutcomeUnknown),
+        "the real worker must have dispatched"
+    );
+    let started = std::time::Instant::now();
+    drop(metadata);
+    let elapsed = started.elapsed();
+    let retained = lifecycle_owned(&path);
+    blocker.execute_batch("ROLLBACK").unwrap();
+    let recovered = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "local::metadata::metamorphic_tests::metadata_timeout_safety_batch_timeout_retains_ownership", "--nocapture"])
+        .env(CHILD_PATH, &path)
+        .output()
+        .unwrap();
+    assert!(
+        recovered.status.success(),
+        "cross-process recovery failed: {}",
+        String::from_utf8_lossy(&recovered.stdout)
+    );
+    assert!(
+        elapsed < std::time::Duration::from_secs(1),
+        "Drop must return without waiting for a stuck worker"
+    );
+    assert!(
+        retained,
+        "a dispatched batch still able to commit released lifecycle ownership"
+    );
+}
+
+#[test]
+fn metadata_timeout_safety_queued_batch_cancelled_before_release() {
+    let (_root, path) = root();
+    let mut metadata = Metadata::update(&path, true).unwrap();
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO local_runtime_instances(instance_id,suppressed) VALUES ('dispatched',1)",
+            [],
+        )
+        .unwrap();
+    let blocker = hold_worker(&path);
+    assert_eq!(
+        er::with_batch_wait(BATCH_DEADLINE, || metadata.persist_runtime_state()),
+        Err(super::Failure::OutcomeUnknown)
+    );
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO local_runtime_instances(instance_id,suppressed) VALUES ('queued',1)",
+            [],
+        )
+        .unwrap();
+    assert_eq!(
+        er::with_batch_wait(BATCH_DEADLINE, || metadata.persist_runtime_state()),
+        Err(super::Failure::MetadataUnavailable)
+    );
+    drop(metadata);
+    let retained = lifecycle_owned(&path);
+    blocker.execute_batch("ROLLBACK").unwrap();
+    wait_for_runtime_row(&path, "dispatched");
+    let metadata = Metadata::inspect(&path).unwrap();
+    let count: i64 = metadata
+        .connection
+        .query_row(
+            "SELECT count(*) FROM local_runtime_instances WHERE instance_id='queued'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        count, 0,
+        "a queued deadline must never become a later commit"
+    );
+    assert!(
+        retained,
+        "cancelling queued work did not finish the dispatched batch"
+    );
+}
+
+#[test]
+fn metadata_timeout_safety_next_invoke_after_unknown_outcome() {
+    let mut world = World::new();
+    world.connect("timeout", NOW);
+    let candidate = world.candidate(0, "timeout-caller", Some("timeout-key"));
+    let prepared = world.prepare(&candidate);
+    let gate = world.mutations.open_dispatch(prepared).unwrap();
+    let reference = gate.reference();
+    // A counted provider effect is permitted only by the original gate. A
+    // subsequent keyed invoke must observe the recorded attempt, never send.
+    let mut provider_requests = 1;
+    let held = Arc::new(Mutex::new(None));
+    let worker_lock = held.clone();
+    let path = world.path.clone();
+    er::before_batch(move || *worker_lock.lock().unwrap() = Some(hold_worker(&path)));
+    let result = er::with_batch_wait(BATCH_DEADLINE, || {
+        world.mutations.settle(
+            reference,
+            &mutations::Outcome::Applied(json!({"effect": 1})),
+        )
+    });
+    assert_eq!(result.err(), Some(mutations::Failure::OutcomeUnknown));
+    let retained = lifecycle_owned(&world.path);
+    held.lock()
+        .unwrap()
+        .take()
+        .unwrap()
+        .execute_batch("ROLLBACK")
+        .unwrap();
+    match world.mutations.prepare(&candidate).unwrap() {
+        mutations::Preparation::Existing(observed) => {
+            assert_eq!(observed.reference, reference);
+            assert_eq!(observed.result, Some(json!({"effect": 1})));
+        }
+        mutations::Preparation::Prepared(_) => provider_requests += 1,
+    }
+    assert_eq!(
+        provider_requests, 1,
+        "recovery issued a duplicate provider effect"
+    );
+    assert!(
+        retained,
+        "unknown settlement released its ownership before observation was possible"
+    );
+}
+
+#[test]
+fn metadata_timeout_safety_legacy_import_retains_ownership() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("legacy");
+    let authority = super::legacy_fixture(&path, 3);
+    let held = Arc::new(Mutex::new(None));
+    let worker_lock = held.clone();
+    let blocked_path = path.clone();
+    er::before_batch(move || {
+        *worker_lock.lock().unwrap() = Some(hold_worker(&blocked_path));
+    });
+    let result = er::with_batch_wait(BATCH_DEADLINE, || Metadata::update(&path, true));
+    assert!(matches!(result, Err(super::Failure::MetadataUnavailable)));
+    let retained = lifecycle_owned(&path);
+    held.lock()
+        .unwrap()
+        .take()
+        .unwrap()
+        .execute_batch("ROLLBACK")
+        .unwrap();
+    // Recovery must resume equal imported anchors without inventing a fresh
+    // authority or treating the timed-out import as a successful cutover.
+    let reopened = Metadata::update(&path, true).unwrap();
+    assert_eq!(reopened.authority().unwrap(), authority);
+    assert!(
+        retained,
+        "a timed-out legacy import released a still-running worker"
+    );
+}
+
+#[test]
+fn adversary_timeout_unwind_keeps_ownership_until_dispatched_work_finishes() {
+    let (_root, path) = root();
+    let mut metadata = Metadata::update(&path, true).unwrap();
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO local_runtime_instances(instance_id,suppressed) VALUES ('unwind-dispatched',1)",
+            [],
+        )
+        .unwrap();
+    let blocker = hold_worker(&path);
+    let started = std::time::Instant::now();
+    let unwind = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+        assert_eq!(
+            er::with_batch_wait(BATCH_DEADLINE, || metadata.persist_runtime_state()),
+            Err(super::Failure::OutcomeUnknown)
+        );
+        panic!("caller unwinds after uncertain acknowledgement");
+    }));
+    let elapsed = started.elapsed();
+    let retained = lifecycle_owned(&path);
+    blocker.execute_batch("ROLLBACK").unwrap();
+    wait_for_runtime_row(&path, "unwind-dispatched");
+    assert_eq!(
+        unwind.unwrap_err().downcast_ref::<&str>(),
+        Some(&"caller unwinds after uncertain acknowledgement"),
+        "the injected panic must follow an actual OutcomeUnknown"
+    );
+    assert!(elapsed < std::time::Duration::from_secs(2));
+    assert!(retained, "unwinding released a still-dispatched writer");
+}
+
+#[test]
+fn adversary_timeout_before_dispatch_releases_ownership_without_a_commit() {
+    let (_root, path) = root();
+    let mut metadata = Metadata::update(&path, true).unwrap();
+    metadata
+        .connection
+        .execute(
+            "INSERT INTO local_runtime_instances(instance_id,suppressed) VALUES ('never-dispatched',1)",
+            [],
+        )
+        .unwrap();
+    assert_eq!(
+        er::with_batch_wait(std::time::Duration::ZERO, || metadata
+            .persist_runtime_state()),
+        Err(super::Failure::MetadataUnavailable)
+    );
+    drop(metadata);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while lifecycle_owned(&path) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "idle retirement leaked the lifecycle lock"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    let reopened = Metadata::inspect(&path).unwrap();
+    let count: i64 = reopened
+        .connection
+        .query_row(
+            "SELECT count(*) FROM local_runtime_instances WHERE instance_id='never-dispatched'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        count, 0,
+        "deadline-before-acceptance became a durable effect"
+    );
+}
