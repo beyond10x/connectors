@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-02T01:24:14Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-selection-excludes-parameters",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate at 67fb9da30 from managed worktree wave1002a-close: run 2 1169 passed, 1 failed (sql fixture flake outside the wave, 5/5 alone); run 3 passed every step through the descriptor checks, then cc link failed on a full disk; package suites for this unit green; the CI repository gate on the wave PR is the closing gate"
+  }
+}
