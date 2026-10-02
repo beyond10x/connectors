@@ -10,7 +10,7 @@ relations:
 - informed_by: epic:mcp-contracts
 - informed_by: story:kubernetes-spec-service
 - serves: vision:independent-contract-adapters
-revision: 35
+revision: 36
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-10T09:49:45Z", actor: "human:timo", revision: 2, imported: true}
 - {from: "proposed", to: "active", at: "2026-09-10T09:49:46Z", actor: "human:timo", revision: 3, imported: true}
@@ -298,3 +298,6 @@ PostgreSQL. The handoff specification's second provider, TOML-authored action,
 schemas and further auth profiles stay open. Kubernetes with Helm, PostgreSQL,
 MCP and the remaining providers keep their order.
 
+## Planning handoff — 2026-10-02
+
+specification:milestone-acceleration-20261002 records the verified v0.24.0 publication at c7a9d5b1db1ff4e3b2af568db19c6eaa60d79d90, the still-open Entity Runtime #51 throughput blocker, and the next batch proposal. Sustained reads are the immediate priority; provider acceptance preparation can proceed while upstream work is pending, followed by MCP under this initiative's existing order. It preserves every provider/sandbox obligation and the three open product decisions. No runtime completion or implementation-wave approval is inferred from this planning update.

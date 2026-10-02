@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:04:31Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-kubernetes-journey",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Exact ignored real K3s CLI/owner/keyring restart journey: 1 passed, 0 failed, 21.23s, exit 0; Pending fixture pod limits claims to API journey",
+    "reference": "docs/evidence/provider-restarts-20261002/README.md"
+  }
+}

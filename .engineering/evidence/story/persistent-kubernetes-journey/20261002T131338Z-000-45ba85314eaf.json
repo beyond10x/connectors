@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:13:38Z",
+  "actor": "human:timo",
+  "artifact": "story:persistent-kubernetes-journey",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Existing live direct/federated conformance exit 0; nonempty services, endpoints and opted-in nodes plus authentication/scope checks",
+    "reference": "docs/evidence/provider-restarts-20261002/federated-result.json"
+  }
+}

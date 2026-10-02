@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:13:37Z",
+  "actor": "human:timo",
+  "artifact": "story:postgres-local-cli-journey",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Existing live direct/federated conformance exit 0, all six provider/auth groups passed; exact SQL values, bounds, refusal and timeout checks",
+    "reference": "docs/evidence/provider-restarts-20261002/federated-result.json"
+  }
+}

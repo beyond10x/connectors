@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-02T13:04:31Z",
+  "actor": "human:timo",
+  "artifact": "story:postgres-local-cli-journey",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Exact ignored real PostgreSQL CLI/owner/keyring restart journey: 1 passed, 0 failed, 30.81s, exit 0",
+    "reference": "docs/evidence/provider-restarts-20261002/README.md"
+  }
+}
