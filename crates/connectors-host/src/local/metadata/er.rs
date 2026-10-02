@@ -8,7 +8,7 @@ use entity_eventlog::{
     Authority, EventlogOperationContext, RecordedProviderFacade,
     sync::{
         BridgeConfig, CallWait, EventlogRecordedStoreOwner, EventlogRecordedStoreProvisioner,
-        ProvisionAuthority,
+        ProvisionAuthority, ShutdownMode, ShutdownOutcome,
     },
 };
 use entity_executor::{BatchAction, CreateRequest, ExecuteRequest, ExecutionError};
@@ -507,7 +507,38 @@ impl ErAuthority {
     }
 }
 
-/// Keeps a handle for the next open of the same store in this process.
+/// A failed batch may still commit after its caller's deadline. Move ownership
+/// of both the bridge and its lifecycle lock to an autonomous retirement task.
+/// No shutdown runs in the caller's destructor: even a deadline-based shutdown
+/// can join once the worker has signalled completion, before its runtime drops.
+pub(super) fn release_handle(er: ErAuthority, lock: &mut Option<std::fs::File>) {
+    if er.reusable {
+        release(er);
+        return;
+    }
+    // The authority is destroyed before the lock. ManuallyDrop is deliberate:
+    // failure to start the reaper, or a panic inside it, must retain ownership
+    // until process exit rather than release a worker still able to commit.
+    let mut owned = std::mem::ManuallyDrop::new((er, lock.take()));
+    let _ = std::thread::Builder::new()
+        .name("connectors-metadata-retire".into())
+        .spawn(move || {
+            if matches!(
+                owned
+                    .0
+                    .facade
+                    .shutdown(ShutdownMode::CancelQueued, CallWait::Forever),
+                ShutdownOutcome::Joined { .. }
+            ) {
+                // Joined proves the worker and its runtime have terminated,
+                // even when provider retirement itself reported an error. It
+                // does not turn the caller's uncertain write into success.
+                drop(std::mem::ManuallyDrop::into_inner(owned));
+            }
+        });
+}
+
+/// Keeps a verified handle for the next open of the same store in this process.
 pub(super) fn release(er: ErAuthority) {
     if !er.reusable {
         return;
@@ -539,7 +570,8 @@ pub(super) fn release(er: ErAuthority) {
         }
         evicted
     };
-    // Stopping a provider worker waits for it; never while holding the pool.
+    // Dropping a verified idle bridge closes admission and detaches its worker;
+    // no unacknowledged write remains on this path. Keep it outside the pool.
     drop(evicted);
 }
 
@@ -1597,11 +1629,37 @@ fn evidence_value(mut value: Value) -> Result<Value> {
     Ok(value)
 }
 
-pub(super) fn provision(
+#[cfg(test)]
+fn provision(
     path: &Path,
     authority_id: uuid::Uuid,
     level: i64,
     rows: Vec<RowImage>,
+) -> Result<(ErAuthority, Authority, String)> {
+    provision_with_lock(path, authority_id, level, rows, None)
+}
+
+/// Import is already dispatched before Metadata can install its authority.
+/// On refusal or unwind, retain the duplicated lifecycle lock until retirement.
+struct Provisioning {
+    er: Option<ErAuthority>,
+    lock: Option<std::fs::File>,
+}
+
+impl Drop for Provisioning {
+    fn drop(&mut self) {
+        if let Some(er) = self.er.take() {
+            release_handle(er, &mut self.lock);
+        }
+    }
+}
+
+pub(super) fn provision_with_lock(
+    path: &Path,
+    authority_id: uuid::Uuid,
+    level: i64,
+    rows: Vec<RowImage>,
+    lock: Option<std::fs::File>,
 ) -> Result<(ErAuthority, Authority, String)> {
     let registry = registry()?;
     let source_digest = rows_digest(&rows)?;
@@ -1638,15 +1696,27 @@ pub(super) fn provision(
         let authority = facade.authority().clone();
         (facade, authority)
     };
-    facade
-        .import_legacy(snapshot, context("legacy-import"), call_wait())
-        .map_err(|_| Failure::MetadataUnavailable)?;
     let mut er = ErAuthority::new(facade, path, level, level);
-    resynchronize(&mut er)?;
+    er.reusable = false;
+    let mut pending = Provisioning { er: Some(er), lock };
+    let er = pending.er.as_mut().expect("provisioning authority");
+    #[cfg(test)]
+    if let Some(hook) = BEFORE_BATCH.with(|slot| slot.borrow_mut().take()) {
+        hook();
+    }
+    er.facade
+        .import_legacy(snapshot, context("legacy-import"), batch_wait())
+        .map_err(|_| Failure::MetadataUnavailable)?;
+    resynchronize(er)?;
     if visible_rows(&er.baseline) != expected {
         return Err(Failure::MetadataUnavailable);
     }
-    Ok((er, authority, source_digest))
+    er.reusable = true;
+    Ok((
+        pending.er.take().expect("verified provisioning authority"),
+        authority,
+        source_digest,
+    ))
 }
 
 impl ErAuthority {
@@ -3249,11 +3319,15 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         uuid::Uuid::new_v4()
     ));
     let outcome = timed("er.execute_batch", || {
+        #[cfg(test)]
+        if let Some(hook) = BEFORE_BATCH.with(|slot| slot.borrow_mut().take()) {
+            hook();
+        }
         er.facade.execute_batch(
             context("metadata-mutation"),
             batch.clone(),
             actions,
-            call_wait(),
+            batch_wait(),
         )
     })
     .map_err(map_execution_failure)?;
@@ -4011,6 +4085,38 @@ fn context(label: &str) -> EventlogOperationContext {
 
 fn call_wait() -> CallWait {
     CallWait::Until(Instant::now() + Duration::from_secs(30))
+}
+
+#[cfg(test)]
+thread_local! {
+    static BATCH_WAIT: std::cell::Cell<Option<Duration>> = const { std::cell::Cell::new(None) };
+    static BEFORE_BATCH: std::cell::RefCell<Option<Box<dyn FnOnce()>>> = const { std::cell::RefCell::new(None) };
+}
+
+#[cfg(test)]
+pub(super) fn with_batch_wait<T>(wait: Duration, call: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Duration>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            BATCH_WAIT.with(|slot| slot.set(self.0));
+            BEFORE_BATCH.with(|slot| slot.borrow_mut().take());
+        }
+    }
+    let _restore = Restore(BATCH_WAIT.with(|slot| slot.replace(Some(wait))));
+    call()
+}
+
+#[cfg(test)]
+pub(super) fn before_batch(hook: impl FnOnce() + 'static) {
+    BEFORE_BATCH.with(|slot| *slot.borrow_mut() = Some(Box::new(hook)));
+}
+
+fn batch_wait() -> CallWait {
+    #[cfg(test)]
+    if let Some(wait) = BATCH_WAIT.with(std::cell::Cell::get) {
+        return CallWait::Until(Instant::now() + wait);
+    }
+    call_wait()
 }
 
 pub(super) fn migrations() -> impl Iterator<Item = (i64, &'static str)> {
