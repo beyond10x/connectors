@@ -9,7 +9,7 @@ relations:
 - informed_by: story:catalog-cli-journeys
 - informed_by: story:kubernetes-real-read-acceptance
 - informed_by: story:postgres-real-provider-acceptance
-revision: 5
+revision: 6
 ---
 ## Selection and existing authorization
 
@@ -1152,3 +1152,37 @@ Source authoring starts only after creation, lease and cheap opening checks.
 Root owns Cargo.lock, ignored classification, AEP and bot publication. Workers
 return source/test changes without committing. Independent review rotates away
 from each implementor. No unit has passing runtime evidence yet.
+
+## Live unit state — 2026-10-02
+
+All three managed trees were created at exact opening commit
+71dec8e6db5ca4fb87e5244662443a0d45d2a756, whose author and committer are b10x-bot[bot].
+The catalog, Kubernetes and PostgreSQL branches/targets/scratch/leases are exactly
+the triples recorded above. Each authoritative brief and active full story was
+copied to its scratch directory before dispatch. Workers are authoring; no unit
+commit or passing expanded suite is yet claimed. Root remains at the opening
+commit plus this AEP update.
+
+Short physical temporary directories are explicitly assigned outside the trees:
+$HOME/.cache/c26d/cat, $HOME/.cache/c26d/k8s and $HOME/.cache/c26d/pg, mode700.
+They are recorded disposable output, not shared targets or unowned cleanup scope.
+The PostgreSQL worker has the first two-job release build window. Root is not
+building; further build/live windows are granted from measured disk/target state.
+
+Kubernetes receives only task-owned k3s at loopback33097 and namespace fixture.
+Root supplied a private kubeconfig, CA, fresh8hour reader token and the exact
+connectors-cb26d-k8s-hosts ClusterRole/Binding granting node get/list to
+fixture/connector-reader. Worker namespace changes remain fixture-only; any other
+cluster-scoped change returns to root. PostgreSQL uses task-owned loopback33096,
+incidents and disposable reader; exact local admin observation/provisioning is
+permitted while SUT business queries retain SELECT-only authority. Catalog uses
+local deterministic fixtures and no real GitLab sandbox mutation in this unit.
+
+Opening cheap checks: AEP validation exit0, cargo metadata --locked --offline
+--no-deps exit0, clean source status and bot commit hooks passed. The public raw
+log copies preserve libtest's blank/trailing whitespace, so whole-diff whitespace
+checking names those six log locations; the authored Markdown/AEP/rejected patch
+whitespace check passed. Logs were not silently edited to make that check green.
+Exact validation output with historical review warnings is retained privately in
+.local/provider-wave-briefs/preflight/aep-validation.txt. No runtime acceptance
+is inferred from these opening checks.
