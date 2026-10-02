@@ -25,6 +25,7 @@ are not a substitute for the configured role's schema and function grants.
 No connection pool is claimed in this local profile. A configured CA bundle
 replaces public trust roots for SQL; empty bundles are refused.
 Do not advertise writes, transactions across requests, or dialect portability.
+PostgreSQL SQLSTATE `0A000` (feature not supported) returns `unsupported`, not `unavailable`.
 Source facts: https://www.postgresql.org/docs/current/sql-set-transaction.html and
 https://www.postgresql.org/docs/current/runtime-config-client.html.
 Source access: 2026-09-08.
