@@ -65,7 +65,7 @@ result envelope does not make native query/continuation semantics shared.
 | [Catalog](catalog/design.md) | Optional catalog adapter design |
 | [SIP](sip/design.md) | [Dial/effect/media binding](sip/contracts/dial/v1alpha1/semantics.md), native configuration and protocol obligations |
 | [RTVBP](rtvbp/design.md) | [Session/authority transport](rtvbp/contracts/session/v1alpha1/semantics.md), native configuration and codec obligations |
-| [MCP](mcp/design.md) | [Pinned specification revisions](mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md), [ESS](mcp/spec/ess/system.yaml); protocol contracts and transport/capability profile selection remain unauthored |
+| [MCP](mcp/design.md) | [Pinned specification revisions](mcp/contracts/protocol/v1alpha1/evidence/20260912/specification-sources.md), [ESS](mcp/spec/ess/system.yaml), selected directional contracts and native naming/framing components; complete inbound/outbound runtime remains unfinished |
 
 Each authored native model lives in `spec/ess` with namespace
 `connectors_<owner>.<domain>`. Shared ESS includes none of these roots and imports

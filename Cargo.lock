@@ -759,6 +759,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-mcp"
+version = "0.27.0"
+dependencies = [
+ "clap",
+ "connectors-mcp-launch-cli-contract",
+ "connectors-mcp-launch-types",
+ "connectors-types",
+ "serde_json",
+ "time",
+]
+
+[[package]]
+name = "connectors-mcp-launch-cli-contract"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "clap_complete",
+ "rpassword",
+ "rustix",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "connectors-mcp-launch-types"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "connectors-sdk"
 version = "0.27.0"
 dependencies = [
@@ -833,6 +865,10 @@ dependencies = [
  "tokio",
  "zeroize",
 ]
+
+[[package]]
+name = "connectors-types"
+version = "1.0.0"
 
 [[package]]
 name = "const-oid"
