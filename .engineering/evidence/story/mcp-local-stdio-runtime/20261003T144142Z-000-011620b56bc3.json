@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T14:41:42Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 43,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build ignored --inventory: exit 0, 148 binaries, 66 ignored entries, unknown 0, executed 0; 39 prerequisites missing, including long fixture path",
+    "reference": "sha256:a9e131b3f56df824917afa291f0c0e91eff7163c4c9062844ccc3480439f4828"
+  }
+}

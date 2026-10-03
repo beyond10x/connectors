@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T15:25:14Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-outbound-stdio-runtime",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "39 dependent MCP contract/census checks pass after reconciling the resolved process decision; first combined gate failed on stale eight-unmapped assertion.",
+    "reference": "sha256:8dcc180167e41b883476ba1715fb00c005852fc0068f8c8f3eb4e89708563567"
+  }
+}

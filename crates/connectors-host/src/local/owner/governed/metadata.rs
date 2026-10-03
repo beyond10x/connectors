@@ -2,7 +2,11 @@
 //! provider, connection, credential, approval or execution grant.
 use super::*;
 
-fn snapshot(paths: &Paths, alias: &str) -> Result<(Adapter, runtime::Bootstrap, String)> {
+fn snapshot(
+    paths: &Paths,
+    alias: &str,
+    projection: Option<&dyn ReadPolicy>,
+) -> Result<(Adapter, Value, String)> {
     if !connectors_core::valid_id(alias) {
         return Err(Code::InvalidInput.into());
     }
@@ -19,7 +23,18 @@ fn snapshot(paths: &Paths, alias: &str) -> Result<(Adapter, runtime::Bootstrap, 
     {
         return Err(Code::ReadinessMismatch.into());
     }
-    let fingerprint = connectors_core::digest(&json!({"config":config,"bootstrap":bootstrap}));
+    let revision = projection
+        .map(|policy| policy.metadata_revision(paths, alias, adapter, &bootstrap))
+        .transpose()?;
+    if revision
+        .as_deref()
+        .is_some_and(|value| !connectors_core::valid_id(value))
+    {
+        return Err(Code::Unavailable.into());
+    }
+    let fingerprint = connectors_core::digest(
+        &json!({"config":config,"bootstrap":bootstrap,"projection_revision":revision}),
+    );
     let mut descriptor = bootstrap.descriptor()?;
     descriptor
         .operations
@@ -33,25 +48,31 @@ fn snapshot(paths: &Paths, alias: &str) -> Result<(Adapter, runtime::Bootstrap, 
     bootstrap.descriptor = serde_json::to_string(&descriptor).map_err(|_| Code::Unavailable)?;
     // This carrier stays on the authenticated private owner socket. Native
     // composition must explicitly project public fields rather than expose it.
-    Ok((adapter.clone(), bootstrap, fingerprint))
+    let value = match revision {
+        Some(revision) => json!({"bootstrap":bootstrap,"projection_revision":revision}),
+        None => serde_json::to_value(bootstrap).map_err(|_| Code::Unavailable)?,
+    };
+    Ok((adapter.clone(), value, fingerprint))
 }
 
 pub(in crate::local::owner) fn describe(
     (paths, host, until): Context<'_>,
     alias: &str,
+    projection: Option<&dyn ReadPolicy>,
 ) -> Result<Value> {
     let audits = audit::Store::new(&paths.state, 100_000).map_err(|_| Code::Unavailable)?;
-    describe_using((paths, host, until), alias, &audits, || {})
+    describe_using((paths, host, until), alias, &audits, projection, || {})
 }
 
 pub(super) fn describe_using(
     (paths, host, until): Context<'_>,
     alias: &str,
     audits: &audit::Store,
+    projection: Option<&dyn ReadPolicy>,
     after_admission: impl FnOnce(),
 ) -> Result<Value> {
     approval_issuance::check(until)?;
-    let selected = snapshot(paths, alias);
+    let selected = snapshot(paths, alias, projection);
     let instance = selected
         .as_ref()
         .ok()
@@ -102,11 +123,11 @@ pub(super) fn describe_using(
             let outcome = (|| {
                 after_admission();
                 approval_issuance::check(until)?;
-                let (_, bootstrap, current) = snapshot(paths, alias)?;
+                let (_, value, current) = snapshot(paths, alias, projection)?;
                 if current != fingerprint {
                     return Err(Code::StaleDescription.into());
                 }
-                serde_json::to_value(bootstrap).map_err(|_| Code::Unavailable.into())
+                Ok(value)
             })();
             (reference, outcome)
         }

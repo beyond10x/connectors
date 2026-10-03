@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T15:12:54Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-outbound-stdio-runtime",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Native ESS validation and 20 focused guard tests passed; ownership and open-decision mutants failed, sources restored.",
+    "reference": "sha256:82b9b3fa5ace511e43699df5d0e8b6a60bd4dd07451f6e3fa19271d29fb8fd9a"
+  }
+}

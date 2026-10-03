@@ -33,6 +33,8 @@ enum Verdict {
     Unmapped,
     /// Held by the named open `decision-blocker:`; a cardinality here would answer it.
     Filed(&'static str),
+    /// The operator supplied the ownership decision; retain its named source.
+    Resolved(&'static str),
 }
 
 /// The whole relation census `story:mcp-domain-model` carries, in the story's order.
@@ -74,7 +76,7 @@ const CENSUS: &[(&str, &str, Verdict)] = &[
     (
         "McpServerBinding",
         "supervised OS process",
-        Verdict::Filed("decision-blocker:mcp-outbound-stdio-process-ownership"),
+        Verdict::Resolved("decision-blocker:mcp-outbound-stdio-process-ownership"),
     ),
 ];
 
@@ -122,6 +124,61 @@ fn read(relative: &str) -> String {
 
 fn document(relative: &str) -> serde_yaml_ng::Value {
     serde_yaml_ng::from_str(&read(relative)).unwrap_or_else(|e| panic!("parse {relative}: {e}"))
+}
+
+#[test]
+fn the_selected_stdio_process_belongs_to_one_session_and_references_its_binding() {
+    let model = document("domains/state.yaml");
+    let entities = model["entities"].as_sequence().unwrap();
+    let entity = |name: &str| {
+        entities
+            .iter()
+            .find(|value| value["name"].as_str() == Some(name))
+            .unwrap()
+    };
+    let session = entity("connectors_mcp.state.McpOutboundSession");
+    let relation = &session["relations"][0];
+    assert_eq!(relation["kind"].as_str(), Some("owns"));
+    assert_eq!(
+        relation["target"].as_str(),
+        Some("connectors_mcp.state.McpStdioProcess")
+    );
+    assert_eq!(relation["cardinality"].as_str(), Some("one"));
+    assert_eq!(relation["via"].as_str(), Some("session_ref"));
+    let process = entity("connectors_mcp.state.McpStdioProcess");
+    let selected = &process["relations"][0];
+    assert_eq!(selected["kind"].as_str(), Some("references"));
+    assert_eq!(
+        selected["target"].as_str(),
+        Some("connectors_mcp.state.McpServerBinding")
+    );
+    assert_eq!(selected["cardinality"].as_str(), Some("one"));
+    assert_eq!(selected["via"].as_str(), Some("binding_ref"));
+    for required in [
+        "session_ref",
+        "binding_ref",
+        "executable_path",
+        "executable_sha256",
+    ] {
+        assert!(
+            process["fields"]
+                .as_sequence()
+                .unwrap()
+                .iter()
+                .any(|field| {
+                    field["name"].as_str() == Some(required)
+                        && field["type"].as_str() == Some("String")
+                }),
+            "missing process pin or association: {required}"
+        );
+    }
+    let record = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../.engineering/planning/decision-blocker/mcp-outbound-stdio-process-ownership.md",
+    );
+    let text = std::fs::read_to_string(record).unwrap();
+    let header: serde_yaml_ng::Value =
+        serde_yaml_ng::from_str(text.split("---").nth(1).unwrap()).unwrap();
+    assert_eq!(header["status"].as_str(), Some("cleared"));
 }
 
 /// A declaration name without its namespace: `connectors_mcp.state.McpCaller` → `McpCaller`.
@@ -307,6 +364,7 @@ fn markers(verdict: Verdict) -> Vec<&'static str> {
     match verdict {
         Verdict::Unmapped => vec!["UNMAPPED"],
         Verdict::Filed(blocker) => vec!["UNMAPPED", blocker],
+        Verdict::Resolved(decision) => vec!["RESOLVED", decision],
         Verdict::Absent => vec!["ess/domains/sessions.yaml:89-91"],
         Verdict::Stated => Vec::new(),
     }
@@ -376,7 +434,7 @@ fn every_census_edge_is_marked_and_no_unreadable_one_is_realised() {
             );
         }
 
-        if matches!(verdict, Verdict::Stated) {
+        if matches!(verdict, Verdict::Stated | Verdict::Resolved(_)) {
             continue;
         }
 

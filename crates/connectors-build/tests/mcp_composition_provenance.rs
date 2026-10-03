@@ -762,13 +762,20 @@ fn vocabulary_is_owned_by_selected_contracts_and_shared_ess() {
         ])
     );
     let state = read("adapters/mcp/spec/ess/domains/state.yaml");
+    let state = state.split_once("The relation census, closed").unwrap().1;
     assert_eq!(
         state
             .lines()
             .filter(|l| l.trim_start().starts_with("#") && l.contains(". UNMAPPED: "))
             .count(),
-        8
+        7
     );
+    let resolved: Vec<_> = state
+        .lines()
+        .filter(|l| l.trim_start().starts_with("#") && l.contains(". RESOLVED: "))
+        .collect();
+    assert_eq!(resolved.len(), 1);
+    assert!(resolved[0].contains("McpServerBinding → supervised OS process"));
 }
 #[test]
 fn revision_and_family_fixture_contradictions_are_rejected() {

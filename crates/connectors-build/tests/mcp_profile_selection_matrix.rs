@@ -899,13 +899,30 @@ fn every_revision_exclusion_is_stated_by_the_matrix_and_still_removes_a_token() 
 /// A row whose reason rests on an open decision-blocker is `deferred`.
 ///
 /// The brief for this unit states the rule and the failure it guards: such a row "is not
-/// `refused`, and it is certainly not `supported`". Both blockers are open, so a
-/// selection resting on either is a selection nobody has made.
+/// `refused`, and it is certainly not `supported`". Read current lifecycle state:
+/// the operator can resolve a decision without that historical id disappearing.
 #[test]
 fn no_row_resting_on_an_open_decision_blocker_claims_support_or_refusal() {
+    let blocker = regex::Regex::new(r"decision-blocker:([a-z0-9][a-z0-9-]*)").unwrap();
     let mispositioned: Vec<String> = rows()
         .into_iter()
-        .filter(|row| row.reason.contains("decision-blocker:"))
+        .filter(|row| {
+            blocker.captures_iter(&row.reason).any(|capture| {
+                let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../.engineering/planning/decision-blocker")
+                    .join(format!("{}.md", &capture[1]));
+                let text = std::fs::read_to_string(path).expect("decision record must exist");
+                let header: serde_yaml_ng::Value = serde_yaml_ng::from_str(
+                    text.split("---").nth(1).expect("decision frontmatter"),
+                )
+                .expect("valid decision frontmatter");
+                match header["status"].as_str() {
+                    Some("open") => true,
+                    Some("cleared") => false,
+                    _ => panic!("unknown decision lifecycle state"),
+                }
+            })
+        })
         .filter(|row| row.disposition != "deferred")
         .map(|row| {
             format!(
