@@ -18,19 +18,35 @@ mod tests;
 
 /// Application-owned projection checks. This can constrain an already admitted
 /// owner request; it never supplies generic operation or credential authority.
+pub struct ProjectionMetadata {
+    pub revision: String,
+    pub operations:
+        std::collections::BTreeMap<String, connectors_core::operation_metadata::Metadata>,
+}
+
 pub trait ReadPolicy: Send + Sync {
     /// Identify the application's current metadata projection over the original
     /// validated cache, before the owner removes operations denied by its policy.
     /// This is metadata-only: no provider, custody, approval or connection use.
     /// Every input affecting the projection must affect this revision.
-    fn metadata_revision(
+    fn metadata(
         &self,
         _paths: &Paths,
         _alias: &str,
         _adapter: &Adapter,
         _bootstrap: &runtime::Bootstrap,
-    ) -> Result<String> {
+    ) -> Result<ProjectionMetadata> {
         Err(Code::Unsupported.into())
+    }
+
+    fn metadata_revision(
+        &self,
+        paths: &Paths,
+        alias: &str,
+        adapter: &Adapter,
+        bootstrap: &runtime::Bootstrap,
+    ) -> Result<String> {
+        Ok(self.metadata(paths, alias, adapter, bootstrap)?.revision)
     }
 
     fn admit(

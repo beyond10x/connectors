@@ -1,5 +1,5 @@
 domain: connectors.service_wire
-summary: Proposed public service observation values; no codec, runtime or persisted entity.
+summary: Shared service observation and operation metadata values; executable binding obligations remain explicit.
 
 # Normative owner: contracts/service/compatibility.md §§4–5.
 # These are values, not audit/approval/connection storage or a second attempt ledger.
@@ -88,6 +88,32 @@ types:
     # session_establishment require external_write; unresolved realization never
     # callable. A decoder cannot establish effect completeness, native repeat
     # proof, receiver support, current approval/grants or actual budget enforcement.
+
+  # Protected receiver configuration, not a public descriptor or persisted entity.
+  # Normative owner: contracts/service/local-operation-curation.md. The exact
+  # executable selection and bootstrap digest bind reviewed declarations to the
+  # existing adapter configuration; no new operation identity or owner is created.
+  - name: connectors.service_wire.CuratedOperation
+    kind: struct
+    fields:
+      - {name: operation, type: String}
+      - {name: metadata, type: connectors.service_wire.OperationMetadata}
+  - name: connectors.service_wire.AdapterOperationCuration
+    kind: struct
+    fields:
+      - {name: adapter_alias, type: String}
+      - {name: executable_selection, type: String}
+      - {name: bootstrap_sha256, type: String}
+      - {name: operations, type: "List<connectors.service_wire.CuratedOperation>"}
+  - name: connectors.service_wire.OperationCuration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: adapters, type: "List<connectors.service_wire.AdapterOperationCuration>"}
+    # Closed decoding, exact format, bounded unique selectors, digest pin checks,
+    # per-operation metadata validation and current admission execute at the owner.
+    # Reading this document does not establish native effect/idempotency proof,
+    # actual budget enforcement, approval, custody or permission to call a provider.
 
 # ESS-LIMIT codec obligations (ESS 0.36 has no wire-codec construct: Optional
 # projects to omission, not a required-null rule; no byte-length or canonical

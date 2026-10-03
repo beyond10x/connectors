@@ -69,6 +69,36 @@
       "x-ess-kind": "enum",
       "x-ess-name": "connectors.mutations.SemanticEffect"
     },
+    "connectors.service_wire.AdapterOperationCuration": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_alias": {
+          "type": "string"
+        },
+        "bootstrap_sha256": {
+          "type": "string"
+        },
+        "executable_selection": {
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/connectors.service_wire.CuratedOperation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "adapter_alias",
+        "executable_selection",
+        "bootstrap_sha256",
+        "operations"
+      ],
+      "title": "AdapterOperationCuration",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.AdapterOperationCuration"
+    },
     "connectors.service_wire.AuthAlternative": {
       "additionalProperties": false,
       "properties": {
@@ -91,6 +121,25 @@
       "x-ess-kind": "struct",
       "x-ess-name": "connectors.service_wire.AuthAlternative"
     },
+    "connectors.service_wire.CuratedOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/connectors.service_wire.OperationMetadata"
+        },
+        "operation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation",
+        "metadata"
+      ],
+      "title": "CuratedOperation",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.CuratedOperation"
+    },
     "connectors.service_wire.IdempotencyKeySource": {
       "enum": [
         "caller_supplied"
@@ -99,6 +148,28 @@
       "type": "string",
       "x-ess-kind": "enum",
       "x-ess-name": "connectors.service_wire.IdempotencyKeySource"
+    },
+    "connectors.service_wire.OperationCuration": {
+      "additionalProperties": false,
+      "properties": {
+        "adapters": {
+          "items": {
+            "$ref": "#/$defs/connectors.service_wire.AdapterOperationCuration"
+          },
+          "type": "array"
+        },
+        "format": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "adapters"
+      ],
+      "title": "OperationCuration",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.OperationCuration"
     },
     "connectors.service_wire.OperationIdempotency": {
       "additionalProperties": false,
@@ -205,8 +276,8 @@
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-ess-provenance": {
-    "contract_digest": "slice-sha256/2:879ca29873f7cff279efb2684add8594d12e87efc11589ccb24c38e6dfac13d1",
-    "source_digest": "635a307c60869a1adf2b7217e12d6255a3f29cc1f7e9c7eeec09d970de33574c",
+    "contract_digest": "slice-sha256/2:22bef5955fecc78aa8fb98dbc2a6fc02ba2a3bcca9533dbf02d02cc78a5e537b",
+    "source_digest": "eefdf65b15a8e6103c91eab7d6628eb9c412608eec66d7d886b74c58ceb4ec6a",
     "specification_version": "v1",
     "system": "connectors"
   }
