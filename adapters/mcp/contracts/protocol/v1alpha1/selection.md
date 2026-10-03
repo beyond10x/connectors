@@ -42,7 +42,7 @@ therefore keeps two things in two columns and never lets the first imply the sec
 
   | Half | Held by | Rule |
   |---|---|---|
-  | a named `decision-blocker:` | `mcp_profile_selection_matrix_adversary.rs` | the blocker's own record in the planning store names the deferred feature |
+  | a named `decision-blocker:` | `mcp_profile_selection_matrix_adversary.rs` | the record names the feature, including after resolution; the companion selection check requires deferral while its status is open |
   | a quoted `UNMAPPED:` marker | `mcp_profile_selection_matrix.rs` | the marker appears verbatim in the authored model under `adapters/mcp/spec/ess/`, and its text names the deferred feature |
 
   A `deferred` row that names neither fails, which is what "half a definition enforced
@@ -199,7 +199,7 @@ next omission of this shape is a failing check rather than a reader's good luck.
 
 | Key | Direction | Defined by | Disposition | Reason, and what a caller observes |
 |---|---|---|---|---|
-| `transport:stdio` | outbound | `mcp-2026-07-28-basic-transports-index.mdx:18-19` `mcp-2026-07-28-basic-transports-stdio.mdx:87-107` | deferred | The binding is a client-launched subprocess, so selecting it decides whether Connectors spawns and supervises an unpinned third-party binary. `decision-blocker:mcp-outbound-stdio-process-ownership` is open, and the model carries the same edge unread as `UNMAPPED: McpServerBinding -> supervised OS process`. |
+| `transport:stdio` | outbound | `mcp-2026-07-28-basic-transports-index.mdx:18-19` `mcp-2026-07-28-basic-transports-stdio.mdx:87-107` | supported | The operator resolved `decision-blocker:mcp-outbound-stdio-process-ownership` on 2026-10-03: Connectors owns one explicitly configured pinned server process per session and supervises cleanup. Native ESS records the session-owned process and selected binding. This selects the binding for delivery; launch, pin verification, framing and cleanup still require runtime evidence. |
 | `transport:stdio` | inbound | `mcp-2026-07-28-basic-transports-stdio.mdx:33-63` `mcp-2025-11-25-basic-transports.mdx:22-52` | supported | Here the client launches `$BIN server` and Connectors is the child, so no process-ownership question arises on this side. This is the explicitly selected local-client binding `epic:mcp-contracts` requires. |
 | `transport:streamable-http` | outbound | `mcp-2026-07-28-basic-transports-streamable-http.mdx:70-105` `mcp-2026-07-28-basic-transports-streamable-http.mdx:107-165` | supported | Named as an implementation target by `initiative:complete-local-connectors` milestone 5 and required to be evaluated by the epic. Framing, streaming, cancellation and session loss are the outbound lifecycle story's, not settled here. |
 | `transport:streamable-http` | inbound | `mcp-2026-07-28-basic-transports-streamable-http.mdx:54-68` `mcp-2025-11-25-basic-transports.mdx:54-75` | supported | The cloud-capable server binding `epic:mcp-contracts` requires, and `story:mcp-inbound-cloud-profile` is chartered to specify it. Authenticated inbound access, transport and session lifetime, streaming and failure behaviour are that story's; selecting the binding is what this row does. |
@@ -217,11 +217,11 @@ pinned for the legacy seam — its own documented fallback ends in HTTP+SSE, so 
 client that simply follows the pinned text lands on a binding no target list mentions.
 The refusal above is the thing that stops that happening silently.
 
-**One transport row is deferred, and it is the only one a blocker reaches.**
-`decision-blocker:mcp-outbound-stdio-process-ownership` names stdio throughout its own
-record and exempts the inbound direction by name — there the client launches the binary
-and Connectors is the child — so outbound stdio defers and inbound stdio is dispositioned
-on its merits.
+**Both standard transports are selected in both directions.** The operator cleared
+`decision-blocker:mcp-outbound-stdio-process-ownership` on 2026-10-03 by selecting a
+pinned server process owned per outbound stdio session. This replaces the earlier
+outbound deferral. Inbound stdio still makes Connectors the client-launched child;
+the decision does not merge the two ownership roles or prove either runtime.
 
 `decision-blocker:mcp-caller-connection-assignment` reaches **no transport row**, and an
 earlier draft of this table deferred inbound Streamable HTTP against it anyway. That was

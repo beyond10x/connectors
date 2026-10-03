@@ -8,7 +8,7 @@ relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:contract-driven-connectors-design
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 8
+revision: 9
 ---
 ## Operator request
 
@@ -235,3 +235,37 @@ The shortest delivery sequence remains:
 5. Cut a verified usable MCP source release only after the chosen runtime acceptance passes. Keep multi-caller cloud assignment, outbound stdio child ownership and external execution decisions open until answered; none is chosen by the HTTP model or CLI selected-intent task.
 
 Parallelism follows independent source ownership, not direction labels alone. Fixture/runtime API work touching the same sibling files is serialized; composition and static CLI docs own disjoint paths. Run authors and fresh adversaries in isolated managed trees, keep a single planning writer, and overlap published-candidate CI with the next independent authoring wave. Root integration caches remain available; completed worker targets are disposable only after their evidence is retained and source is recoverable.
+
+## Resolved process decisions and remaining delivery — 2026-10-03
+
+The operator answered both previously pending process questions affirmatively:
+- decision-blocker:mcp-outbound-stdio-process-ownership is cleared: one explicitly
+  configured pinned MCP child per outbound session, with supervised cleanup.
+- decision-blocker:helm-execution-family is cleared: bounded pinned Helm execution
+  covers reads/local chart work and guarded rollback, retaining existing mutation
+  approval, audit, attempt, final-fence and unknown-outcome semantics.
+The recorded approval evidence contains the actual replies. Cloud caller-to-Connection
+assignment remains open; the two answers do not settle it.
+
+The native MCP model now declares McpStdioProcess and its one-session ownership and
+server-binding reference; ESS0.45 validates it. Selection includes outbound stdio for
+delivery. story:mcp-outbound-stdio-runtime records named actual-process acceptance,
+machine scope and the collision with active inbound integration. Its draft review
+has four separate coordinator passes under aep:plan-critic-acceptance, design, scope
+and parallel-safety procedures; records are review-result:mcp-stdio-plan-{acceptance,
+design,scope,parallel}-20261003. Zero findings; these passes are not independent
+because the existing workers remain quota-exhausted. No new approval bypass or
+runtime promotion is inferred.
+
+Continue the existing inbound runtime integration, then integrate outbound stdio
+against a reviewed shared execution port and its native protocol contract. The host
+already owns digest-captured adapter-child mechanics, but these are a private adapter
+protocol launcher, not an admitted provider execution capability. Model and validate
+the reusable bounded execution inputs/outcomes before implementing the Helm binding.
+Helm's argument/filesystem/registry authority and rollback contract remain required;
+the approved direction alone supplies none of that runtime evidence.
+
+Full MCP, first-three-provider acceptance and the next usable source release remain
+required. The previous ae895e5021c7dc856b58498e31af3375c945c053 checkpoint passed its
+exact repository CI37130050243. PR84 remains draft. Cleanup dry-run for cb26l-runtime
+found no eligible candidate; the active leased tree retains ongoing work.

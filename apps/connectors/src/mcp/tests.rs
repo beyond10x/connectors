@@ -210,3 +210,53 @@ fn unsafe_missing_or_malformed_companion_is_not_an_empty_projection() {
         Code::InvalidConfiguration
     );
 }
+
+#[test]
+fn discovery_revision_matches_execution_with_an_unadvertised_cached_operation() {
+    let fixture = Fixture::new();
+    let config = Config::load(&fixture.paths.config).unwrap();
+    let adapter = &config.adapters["selected"];
+    let mut original = owner::cached(&fixture.paths, "selected").unwrap();
+    let mut descriptor = original.descriptor().unwrap();
+    let mut hidden = descriptor.operations[0].clone();
+    hidden.id = "hidden".into();
+    descriptor.operations.push(hidden);
+    original.descriptor = serde_json::to_string(&descriptor).unwrap();
+    let mut requirement = original.requirements[0].clone();
+    requirement.operation = "hidden".into();
+    original.requirements.push(requirement);
+    original.validate_for(adapter.private_protocol()).unwrap();
+    runtime::state::State::new(&fixture.paths.state)
+        .remember(&adapter.selection(), &original)
+        .unwrap();
+    let revision = ProjectionPolicy
+        .metadata_revision(&fixture.paths, "selected", adapter, &original)
+        .unwrap();
+    fixture.check(&revision).unwrap();
+    descriptor.operations.retain(|entry| entry.id != "hidden");
+    let mut filtered = original.clone();
+    filtered.descriptor = serde_json::to_string(&descriptor).unwrap();
+    filtered
+        .requirements
+        .retain(|entry| entry.operation != "hidden");
+    let incorrect = ProjectionPolicy
+        .metadata_revision(&fixture.paths, "selected", adapter, &filtered)
+        .unwrap();
+    assert_ne!(revision, incorrect);
+    assert_eq!(
+        fixture.check(&incorrect).unwrap_err().code,
+        Code::StaleDescription
+    );
+    let mut companion = fixture.value();
+    companion["exposures"][0]["enabled"] = json!(false);
+    fixture.write(companion);
+    let current = ProjectionPolicy
+        .metadata_revision(&fixture.paths, "selected", adapter, &original)
+        .unwrap();
+    assert_ne!(current, revision);
+    assert_eq!(
+        fixture.check(&revision).unwrap_err().code,
+        Code::StaleDescription
+    );
+    assert_eq!(fixture.check(&current).unwrap_err().code, Code::Forbidden);
+}

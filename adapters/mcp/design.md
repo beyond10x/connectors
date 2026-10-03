@@ -28,6 +28,16 @@ withdrawal at final dispatch cancels the captured credential use without calling
 provider; removing that last check makes the test reach the provider and fail. This
 worker evidence remains separate from unfinished MCP process conformance.
 
+Protected `projected_describe` pairs filtered private metadata with the application
+revision computed over the original validated cache. Hashing the filtered result in
+the caller would disagree with execution when an operation is hidden. The owner
+checks both host policy and the projection revision again after audit acknowledgement;
+changed or unavailable projection policy releases no metadata. An unbound application
+refuses the projected query. Ordinary `governed_describe` and legacy adapter Bootstrap
+codecs retain their existing shapes. Neither private carrier is a public descriptor:
+complete operation curation, safe field selection and receiver limits remain required
+before any operation can be advertised through MCP.
+
 The runtime and generated projection packages are siblings: generated manifests retain
 their own workspace declarations, and the root workspace excludes those packages while
 consuming their unchanged libraries. The repository gate checks both native launch
@@ -79,7 +89,7 @@ drift beside the launch/session projections. The [native validator](runtime/src/
 rejects duplicate/unknown JSON members, invalid selectors, conflicting exposures,
 unsupported format and out-of-bound integer limits before any file or host access.
 It validates an approval source path without opening it. Application composition
-must still admit the private companion file on each request and fence its selection
+admits the private companion file on each projected query/read and fences its selection
 at dispatch. The [CLI intent guide](../../docs/local-mcp-cli.md#selected-local-projection-configuration)
 records its location and bounds; this parser does not make the server available.
 
@@ -124,16 +134,18 @@ needs an MCP noun reads this root rather than declaring one.**
 | Domain | Holds |
 |---|---|
 | [`connectors_mcp.protocol`](spec/ess/domains/protocol.yaml) | Protocol values read from the pinned archives: the two negotiable revision strings, the three eras, the four transport bindings, server and client capability kinds, the legacy session phases, three error codes, the two cache scopes, the acquisition modes and the authorization roles. |
-| [`connectors_mcp.state`](spec/ess/domains/state.yaml) | Four entities — `McpServerBinding`, `McpAdvertisedCapability`, `McpOutboundSession`, `McpInboundSession` — the `McpCapabilitySnapshot` value, and the three credential kinds `epic:mcp-contracts` keeps apart, as three distinct types. |
+| [`connectors_mcp.state`](spec/ess/domains/state.yaml) | Five entities — `McpServerBinding`, `McpAdvertisedCapability`, `McpOutboundSession`, `McpInboundSession`, `McpStdioProcess` — the `McpCapabilitySnapshot` value, and the three credential kinds `epic:mcp-contracts` keeps apart, as three distinct types. The selected outbound stdio session owns at most one process, which references its server binding and records its executable pin. |
 | [`connectors_mcp.launch`](spec/ess/domains/launch.yaml) | Immutable input, transport and final process outcomes for the selected local stdio launch. They introduce no caller, Connection or persistent session relation. |
 | [`connectors_mcp.local_server`](spec/ess/domains/local_server.yaml) | Immutable exposure, family, limits and configuration values for the local projection. Existing connection references are explicit deployment selections, not new caller ownership. |
 
 Four things about it are load-bearing and are stated in the files themselves:
 
-- **It declares no ESS relation.** The whole relation census of `epic:mcp-contracts`
-  lands at the foot of `domains/state.yaml`: one stated edge, one refusal repeated from
-  `ess/domains/sessions.yaml:89-91`, eight `UNMAPPED:` markers — two of which are also
-  filed as decision-blockers. A cardinality nobody could read was not chosen.
+- **Relations require a recorded decision.** The original foundation declared no ESS
+  relation. The operator's 2026-10-03 resolution of
+  `decision-blocker:mcp-outbound-stdio-process-ownership` now supplies the session-owned
+  process and its binding reference. The census at the foot of `domains/state.yaml`
+  has one stated edge, one cited refusal, seven `UNMAPPED:` markers and one `RESOLVED:`
+  marker. General HTTP binding lifetime and cloud caller assignment remain unresolved.
 - **Every lifecycle has one state.** ESS 0.22.2 refuses a transition no command outcome
   causes (`ESS-ENTITY-005`), and this story declares no behaviour, so each entity carries
   the single-state shape `connectors.auth_bindings.AuthProfile` uses.
@@ -152,7 +164,7 @@ one of them is not held at all:**
 
 | Property | Held by |
 |---|---|
-| No ESS relation; every unreadable edge marked at every site, at either end | `crates/connectors-build/tests/mcp_domain_model_census.rs`. `ess specify validate` cannot: a guessed cardinality on an `UNMAPPED:` row validates at exit 0, and so does a flat carrier that means the same thing. |
+| Resolved stdio ownership matches its recorded decision; every unreadable edge remains marked at every site, at either end | `crates/connectors-build/tests/mcp_domain_model_census.rs`. `ess specify validate` cannot: a guessed cardinality on an `UNMAPPED:` row validates at exit 0, and so does a flat carrier that means the same thing. The census also checks the selected process ownership, binding reference and executable pin fields. |
 | Single-state lifecycles | **ESS itself**, not that case — `ESS-ENTITY-005 missing_causation` and `ESS-ENTITY-011 dead_end_state`/`unreachable_state` refuse the alternatives. |
 | No carrier closes an open set | `mcp_domain_model_adversary_pass2.rs`, which reads the openness out of `domains/protocol.yaml` rather than hard-coding it. |
 | **It selects nothing** | **Partly.** A new `SelectedTransport` enum would still validate, compile and pass every case in this repository, and the census case only asserts that `domains/protocol.yaml` still carries its no-selection disclaimer. What changed with `story:mcp-profile-selection-matrix` is that the selection now exists elsewhere and is itself checked: `crates/connectors-build/tests/mcp_profile_selection_matrix.rs` derives every revision, transport and capability from the archived bytes and fails if `contracts/protocol/v1alpha1/selection.md` does not disposition each exactly once per direction. Nothing still stops a second, contradicting selection being added to this domain. |
@@ -181,12 +193,11 @@ one of them is not held at all:**
   streaming, cancellation, progress, session loss and version mismatch, is a separate
   authoring obligation that reads this pin. A selection matrix built from this bullet has
   a row for each of the four.
-- Every relation the model could not read. `story:mcp-domain-model` declared the nouns —
-  see [the authored native model](#the-authored-native-model) above — and declared **no
-  ESS relation at all**. Its `domains/state.yaml` closes the epic's relation census as
-  one stated edge, one cited refusal and eight `UNMAPPED:` markers, two of them also
-  filed against an open decision-blocker. None may be answered by inference from the pinned
-  documents; each needs its own modelled and reviewed record.
+- Every relation still marked `UNMAPPED:`. The original `story:mcp-domain-model`
+  foundation declared no ESS relations. The 2026-10-03 operator decision resolves
+  only the outbound stdio process subset, as described above. Seven census edges
+  remain unmapped, including general outbound HTTP binding lifetime and cloud caller
+  assignment; none may be answered by inference from the pinned documents.
 - Any mapping onto shared service, records, session, auth, discovery or mutation
   contracts.
 
