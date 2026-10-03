@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T02:33:07Z",
+  "actor": "human:timo",
+  "artifact": "task:mcp-cli-selected-intent-contract",
+  "kind": "task",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "Independent CLI reviewer found nothing after source/grammar/error/link comparisons. Author and reviewer exact3source hashes match integrated files. No parser/model/runtime support changes; parent story:mcp-cli-journey-discovery-contract remains draft/open.",
+    "reference": ".local/mcp-two-waves/evidence/retained-cli/cli-review/report.md"
+  }
+}
