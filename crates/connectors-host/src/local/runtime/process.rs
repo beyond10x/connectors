@@ -244,6 +244,9 @@ impl Child {
         input_and_deadline: (&[u8], u64),
         decode: fn(&[u8]) -> Result<serde_json::Value>,
     ) -> Result<Vec<u8>> {
+        if self.protocol == PrivateProtocol::V3 {
+            return Err(Failure::Unsupported);
+        }
         let (input, deadline_ms) = input_and_deadline;
         if input.len() > INPUT_LIMIT || !connectors_core::valid_id(partition) {
             return Err(Failure::InvalidInput);
@@ -300,6 +303,89 @@ impl Child {
                 Err(Failure::Protocol)
             }
         }
+    }
+    /// Explicit read transport only. Caller supplies current admission and the
+    /// original budget established before admission; no new interval starts here.
+    pub fn invoke_bounded(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        budget: ReadBudget,
+    ) -> Result<Vec<u8>> {
+        if self.protocol != PrivateProtocol::V3 {
+            return Err(Failure::Unsupported);
+        }
+        if !self.live {
+            return Err(Failure::Unavailable);
+        }
+        let until = budget.until()?;
+        if input.len() > budget.input_bytes() || !connectors_core::valid_id(partition) {
+            return Err(Failure::InvalidInput);
+        }
+        let descriptor = self.bootstrap.descriptor()?;
+        if descriptor.revision != revision {
+            return Err(Failure::StaleDescription);
+        }
+        let requirement = self
+            .bootstrap
+            .requirements
+            .iter()
+            .find(|r| r.operation == operation)
+            .ok_or(Failure::NotFound)?;
+        if requirement.effect != Effect::Read {
+            return Err(Failure::Unsupported);
+        }
+        let declaration = descriptor
+            .operation(operation)
+            .map_err(Failure::from_service)?;
+        let value = connectors_core::json::decode(input, 64).map_err(|_| Failure::InvalidInput)?;
+        connectors_sdk::validate(&declaration.input_schema, &value)
+            .map_err(Failure::from_service)?;
+        let id = uuid::Uuid::new_v4().to_string();
+        let result = channel::write(
+            &mut self.channel,
+            &bounded::ReadRequest::InvokeBounded {
+                request_id: id.clone(),
+                operation: operation.into(),
+                revision: revision.into(),
+                partition: partition.into(),
+                budget,
+            },
+            Some(secret),
+            input,
+            until,
+        )
+        .and_then(|_| {
+            channel::read::<Reply>(&mut self.channel, until, false, budget.result_bytes())
+        })
+        .and_then(|frame| match frame.control {
+            Reply::Success { request_id } if request_id == id => {
+                let value = connectors_core::json::decode(&frame.document, 64)
+                    .map_err(|_| Failure::Protocol)?;
+                connectors_sdk::validate(&declaration.output_schema, &value)
+                    .map_err(|_| Failure::Protocol)?;
+                budget.until()?;
+                Ok(frame.document)
+            }
+            Reply::Failed { request_id, code } if request_id == id && frame.document.is_empty() => {
+                Err(code)
+            }
+            _ => Err(Failure::Protocol),
+        });
+        if matches!(
+            result,
+            Err(Failure::Timeout
+                | Failure::ProviderTimeout
+                | Failure::Interrupted
+                | Failure::Protocol
+                | Failure::Unavailable)
+        ) {
+            self.terminate();
+        }
+        result
     }
     /// Prepare on this exact child without writing. The returned borrow occupies
     /// it through commit/cancel and keeps the original monotonic deadline. The

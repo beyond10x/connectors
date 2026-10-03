@@ -19,6 +19,12 @@ scope:
   path: Cargo.toml
 - confidence: cited
   path: adapters/README.md
+- confidence: cited
+  path: adapters/catalog/src/local.rs
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/bounded_reads.rs
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/oauth2_refresh.rs
 - confidence: inferred
   path: adapters/mcp/conformance
 - confidence: cited
@@ -42,6 +48,8 @@ scope:
 - confidence: inferred
   path: apps/connectors/tests/local_mcp_server.rs
 - confidence: cited
+  path: contracts/cli/v1alpha1/private-bounded-read.md
+- confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
 - confidence: cited
   path: contracts/service/local-operation-curation.md
@@ -64,12 +72,18 @@ scope:
 - confidence: cited
   path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
+  path: crates/connectors-host/tests/local_foundation.rs
+- confidence: cited
   path: docs/development.md
 - confidence: cited
   path: docs/local-mcp-cli.md
 - confidence: cited
+  path: docs/local-runtime-foundation.md
+- confidence: cited
   path: ess/domains/service_wire.yaml
-revision: 66
+- confidence: cited
+  path: ess/domains/transport.yaml
+revision: 72
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -1411,3 +1425,64 @@ b377ceaaca632372f7a4fc1aab09d8790c217fb82c8e239a1a1a62555bd274c2.
 All repository CI for the preceding published 8e02d6f checkpoint is green.
 This checkpoint remains a draft foundation; production serving, native budget
 binding, full MCP, provider acceptance and the new release remain incomplete.
+
+## Explicit private bounded reads — 2026-10-03
+
+Select connectors-private/3 explicitly for native bounded reads, as owned by
+contracts/cli/v1alpha1/private-bounded-read.md. The immutable PrivateReadBudget
+value in ess/domains/transport.yaml validates with ESS 0.45 (24 files). It carries
+the original same-boot monotonic deadline, declared execution/provider ceilings
+and remaining private payload byte allowances. No persisted entity changes.
+Legacy private/1 and private/2 remain closed; version 3 must opt in before
+credentials and refuses legacy invokes and mutations. No silent fallback.
+
+Implement the actual parent/child binding and catalog native composition so OAuth
+exchange and business HTTP share the same provider cutoff. Named checks:
+bounded-read-explicit-selection, bounded-read-original-deadline,
+bounded-read-byte-limits, bounded-read-native-context and
+bounded-read-shared-oauth-cutoff. Establish a failing stub and a planted cutoff
+reset before the restored suite and repository gate. The public envelope limits,
+owner admission binding and production MCP loop remain required integration;
+this phase does not satisfy full MCP acceptance. The existing quota-errored
+workers are unavailable; coordinator implementation and review only.
+
+The prior curation checkpoint 2eb6408e69d910fd28dda851d9168ae2240b4bd1 is published
+on draft PR84, with exact remote/PR head verified. Its full gate passed 1356 tests,
+0 failed,66 ignored. The managed tree remains active for this integration.
+
+Implemented the explicit V3 handshake, read-only closed request carrier,
+checked monotonic budget, parent/child payload checks and catalog native HTTP
+composition. Legacy invoke refuses on V3 before transferring credentials; V1/V2
+refuse the bounded read port. Catalog OAuth and business HTTP use the same cutoff.
+The new transport reaps an in-flight timed-out child, preserving ProviderTimeout
+classification. The existing configuration codec accepts only the now-selected
+three versions and still refuses future/unknown versions; each selection has a
+different executable digest. No production owner selection or MCP serving claim.
+
+Budget tests failed against the refusing stub (0 passed,3 failed). Removing only
+the business HTTP cutoff after OAuth made the actual pinned child return success
+past the shared deadline, failing the exact timeout assertion. The mutant was
+restored byte-for-byte. Restored runtime tests passed28/28 and the actual catalog
+process suite passed5/5, with no ignored tests in either run. They include expiry,
+consumed original execution time, input/result bounds, strict selection, OAuth
+and API execution, and exact child cleanup. The targeted run first exposed the
+ProviderTimeout cleanup case, which was corrected without remapping its origin.
+
+Retained logs/SHA256 under .local/mcp-runtime/:
+- bounded-read-red.log: 334841eb2bd5b990ebb51ef0c61218cc94def891333958ff9a0a1cf0696aedc9
+- bounded-read-cutoff-mutation.log: 69dcf61203f6feec1b395aa6a57049b3c81694f25d9c5d43fb4d842183e86a22
+- bounded-read-host-restored.log: 166c2d6c04045ae3f81bcf7dd0e1e83a1f2709111901a1d9f2dad52d4c52bc3c
+- bounded-read-native-final.log: 543ae1b2ac79b29fb6c2565cc6eacb9932bf25d7219aad7a5c9fcf8bdab1aa42
+
+Generation used the owning metadata-entities and service-metadata commands.
+Parsed Entity Runtime definitions/commands remain identical; only provenance
+changed. Docs generation and check passed43contract/97total reference pages
+without drift. The complete connectors-build gate --msrv passed: 1364 passed, 0 failed,
+66 ignored across 166 summaries; Clippy, projection drift, adapter isolation
+and Rust 1.88/1.91 checks passed. Log: .local/mcp-runtime/gate-bounded-read.log;
+SHA256 3abfc81be4308fcace5fc8d1a4f2ab609c1f5b55f02c4b49ac6ffbe8b4730111.
+The next integration must select these limits through current owner admission,
+preserve the original monotonic cutoff through queue/startup/custody/audit,
+and enforce whole public envelopes. Full MCP, provider acceptance and release
+remain incomplete. Cleanup dry-run returned no eligible assessment for active
+cb26l-runtime; preserve its lease and the retained evidence for continued work.

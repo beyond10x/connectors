@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T17:45:56Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 71,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Private bounded reads: refusing stub red; native OAuth cutoff bypass detected; restored runtime 28 passed and catalog process 5 passed, no ignored",
+    "reference": ".local/mcp-runtime/bounded-read-native-final.log"
+  }
+}
