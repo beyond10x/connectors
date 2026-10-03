@@ -8,20 +8,21 @@ summary: MCP-owned nouns, the three distinct credential kinds, and the relations
 # domains/protocol.yaml: the file under that record's `vendor/`, the line of its
 # uncompressed bytes.
 #
-# ── This model declares no relation, and that is the finding ───────────────────────
+# ── Relation census, updated by the operator's 2026-10-03 process decision ─────────
 #
-# `relations:` appears nowhere below. Every candidate edge in this epic is in exactly
-# one of four states, and all four are recorded here rather than resolved:
+# Every candidate edge retains its evidence. The stdio process decision now supplies
+# a session owner and an explicit server-binding reference; the other open edges
+# remain unresolved rather than inheriting that decision:
 #
 #   1. citable, but undeclarable in this root — McpAdvertisedCapability → the
 #      OperationDeclaration an AdapterSpecification already owns;
 #   2. deliberately absent, with the absence itself cited — McpSession → Connection;
-#   3. unreadable, so carried as an `UNMAPPED:` marker — EIGHT of them;
-#   4. of those eight, two are also filed against an open decision-blocker, which names
-#      who answers them. Filed is not a second vocabulary standing in for `UNMAPPED:`;
-#      a filed decision is a relation the model could not read, so it carries both.
+#   3. unreadable, so carried as an `UNMAPPED:` marker — SEVEN of them;
+#   4. one of those seven is also filed against the open caller/Connection blocker;
+#   5. RESOLVED: McpServerBinding → supervised OS process, per
+#      decision-blocker:mcp-outbound-stdio-process-ownership, operator 2026-10-03.
 #
-# One and two, plus eight, is the whole census: ten rows, listed at the foot of this file.
+# One stated, one absent, seven unresolved and one resolved: ten original rows.
 #
 # The ESS validator does NOT protect any of this. It accepts a guessed `cardinality:
 # one` exactly as readily as a correct one; only the markers below distinguish them.
@@ -250,13 +251,11 @@ entities:
   #     `via: connection_ref`) or a custody record with no connection owner. The shared
   #     model's shape is cited so a reader can see exactly which of the two is open — it
   #     is not adopted here.
-  #   · UNMAPPED: `McpServerBinding → supervised OS process`, and filed —
-  #     `decision-blocker:mcp-outbound-stdio-process-ownership`, open. The protocol says
-  #     who launches — mcp-2026-07-28-basic-transports-stdio.mdx:7, "the client launches
-  #     the MCP server as a subprocess", and mcp-2025-11-25-basic-transports.mdx:26 the
-  #     same. It does not say whether the Connectors owner is that client, supervises
-  #     the process, or must pin and digest-verify it. That is the blocker's question and
-  #     this model does not answer it by declaring a field.
+  #   · RESOLVED: `McpServerBinding → supervised OS process`, recorded in
+  #     `decision-blocker:mcp-outbound-stdio-process-ownership`, operator 2026-10-03.
+  #     Connectors launches one configured pinned process per stdio session and
+  #     supervises cleanup. The session owns McpStdioProcess; that process references
+  #     the selected binding. A binding is not one shared process across sessions.
   #
   # No removal, disable or re-selection transition is declared, for the ESS-ENTITY-005
   # reason at the head of this file and because none is stated anywhere. The shape
@@ -268,8 +267,8 @@ entities:
       # The remote server's canonical URI where one exists. Optional: a stdio server is a
       # launched subprocess (stdio.mdx:7) and has none, and authorization-index.mdx:224-244
       # defines the canonical URI only for the HTTP authorization flow's `resource`.
-      # UNMAPPED: what identifies a stdio server instead — a command, a path, a digest,
-      # an operator-supplied name. That is the process-ownership blocker's territory.
+      # Stdio keeps the explicit binding_ref; its session-owned McpStdioProcess
+      # records the executable path and digest selected by the operator.
       - {name: canonical_uri, type: "Optional<String>"}
       - {name: transport_binding, type: connectors_mcp.protocol.TransportBinding}
       # Optional because era is DETERMINED, not configured, and may be absent before the
@@ -366,7 +365,7 @@ entities:
   # Admission and advertised-name rules are specified in
   # adapters/mcp/contracts/server/v1alpha1/projection.md. Its document checks
   # do not execute runtime projection; this entity declares no new admission policy
-  # or caller/Connection relation. The eight unresolved relation markers remain.
+  # or caller/Connection relation. The seven unresolved relation markers remain.
   - name: connectors_mcp.state.McpAdvertisedCapability
     identity: {name: advertised_ref, type: String}
     fields:
@@ -417,10 +416,11 @@ entities:
 
   # An outbound session: this repository as the MCP client, against a remote server.
   #
-  # UNMAPPED: `McpOutboundSession → McpServerBinding` — whether a session may outlive a
-  # binding, and what a binding's removal does to a live session. No carrier for the
-  # binding appears below, deliberately: a `binding_ref: String` would read as a settled
-  # one-to-one. mcp-2025-11-25-basic-transports.mdx:196-197 does establish that a session
+  # UNMAPPED: `McpOutboundSession → McpServerBinding` — general HTTP/durable-session
+  # lifetime and binding-removal semantics. The 2026-10-03 decision settles the stdio
+  # subset through its owned McpStdioProcess, not every transport's durable session.
+  # No general binding_ref carrier is inferred. The pinned
+  # mcp-2025-11-25-basic-transports.mdx:196-197 does establish that a session
   # on the wire is between one client and one server, but that is a statement about a
   # live wire session, not about how many durable sessions a durable binding record may
   # carry or survive, which is what the census asks.
@@ -439,6 +439,40 @@ entities:
       # encode as a type.
       - {name: wire_session_id, type: "Optional<String>"}
       - {name: phase, type: connectors_mcp.protocol.LegacySessionPhase}
+    relations:
+      - name: stdio_process
+        kind: owns
+        target: connectors_mcp.state.McpStdioProcess
+        cardinality: one
+        via: session_ref
+    # At most one process record; successful stdio launch establishes one, HTTP
+    # has none. Session termination requires bounded child cleanup. ESS structural
+    # validation does not execute spawn, reap, pin verification or deadline rules.
+    lifecycle:
+      initial: Recorded
+      states: [Recorded]
+      terminal: [Recorded]
+
+  # Operator decision 2026-10-03, recorded by
+  # decision-blocker:mcp-outbound-stdio-process-ownership. This is the native
+  # process association, not a second credential store or a new binding owner.
+  # process_ref is an opaque host-owned identity, never an OS PID supplied by a
+  # caller. Pin verification must precede launch; path replacement cannot change
+  # the executable between verification and execution. These are runtime
+  # obligations, not properties established by the String carriers alone.
+  - name: connectors_mcp.state.McpStdioProcess
+    identity: {name: process_ref, type: String}
+    fields:
+      - {name: session_ref, type: String}
+      - {name: binding_ref, type: String}
+      - {name: executable_path, type: String}
+      - {name: executable_sha256, type: String}
+    relations:
+      - name: selected_server
+        kind: references
+        target: connectors_mcp.state.McpServerBinding
+        cardinality: one
+        via: binding_ref
     lifecycle:
       initial: Recorded
       states: [Recorded]
@@ -501,8 +535,8 @@ entities:
 #      — whether a discovered tool/resource/prompt set is durable state or a per-session
 #      value, and therefore whether a cardinality exists to declare.
 #   6. UNMAPPED: McpOutboundSession → McpServerBinding
-#      — whether a session may outlive a binding, and what a binding's removal does to a
-#      live session.
+#      — HTTP/durable lifetime and binding removal remain open; stdio is explicitly
+#      joined through the session-owned McpStdioProcess after the operator decision.
 #   7. UNMAPPED: McpServerBinding → credential custody
 #      — whether the outbound server credential is a
 #      `connectors.credentials.CredentialGeneration` under a `Connection`
@@ -513,10 +547,13 @@ entities:
 # Filed as decisions, not modelling gaps — a cardinality written here would answer them:
 #   9. UNMAPPED: McpCaller → connectors.auth_bindings.Connection — and FILED:
 #      decision-blocker:mcp-caller-connection-assignment (open).
-#  10. UNMAPPED: McpServerBinding → supervised OS process — and FILED:
-#      decision-blocker:mcp-outbound-stdio-process-ownership (open).
+#  10. RESOLVED: McpServerBinding → supervised OS process — source:
+#      decision-blocker:mcp-outbound-stdio-process-ownership (cleared 2026-10-03).
+#      One configured pinned process per stdio session, owned by that session and
+#      referencing its selected server binding. The binding does not own one
+#      shared process; Connectors supervises session-end cleanup.
 #
-# Nothing above is a cardinality this model chose. Ten stories read this file; a guessed
+# Every declared cardinality needs its cited source. Ten stories read this file; a guessed
 # one-to-many and a guessed one-to-one produce different schemas, different lifecycles
 # and different stories, so a guess here is not a smaller error than inventing the
 # relation outright.

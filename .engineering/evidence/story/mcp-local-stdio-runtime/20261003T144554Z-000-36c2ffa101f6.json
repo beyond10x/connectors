@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T14:45:54Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 44,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Private projected discovery: owner 19 passed/1 ignored, app 5 passed, socket 1 passed; dropping projection revision from snapshot killed race test; restored owner suite green",
+    "reference": "sha256:6049f4c597bab6d1fc4b99671c63706f00bf3cc8598d5cb728cefa0106aa8647"
+  }
+}
