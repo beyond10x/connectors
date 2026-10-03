@@ -48,7 +48,7 @@ enum Action {
         #[arg(long)]
         check: bool,
     },
-    /// Generate or compare the native MCP launch parser and value types.
+    /// Generate or compare MCP launch, configuration and shared session projections.
     McpBindings {
         #[arg(long)]
         check: bool,

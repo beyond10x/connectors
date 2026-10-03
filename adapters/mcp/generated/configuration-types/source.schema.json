@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "connectors_mcp.local_server.Configuration": {
+      "additionalProperties": false,
+      "properties": {
+        "exposures": {
+          "items": {
+            "$ref": "#/$defs/connectors_mcp.local_server.Exposure"
+          },
+          "type": "array"
+        },
+        "format": {
+          "type": "string"
+        },
+        "limits": {
+          "$ref": "#/$defs/connectors_mcp.local_server.Limits"
+        }
+      },
+      "required": [
+        "format",
+        "exposures",
+        "limits"
+      ],
+      "title": "Configuration",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors_mcp.local_server.Configuration"
+    },
+    "connectors_mcp.local_server.Exposure": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_alias": {
+          "type": "string"
+        },
+        "approval_file": {
+          "type": "string"
+        },
+        "connection_ref": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "families": {
+          "items": {
+            "$ref": "#/$defs/connectors_mcp.local_server.Family"
+          },
+          "type": "array"
+        },
+        "operation_ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "adapter_alias",
+        "operation_ref",
+        "connection_ref",
+        "families",
+        "enabled"
+      ],
+      "title": "Exposure",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors_mcp.local_server.Exposure"
+    },
+    "connectors_mcp.local_server.Family": {
+      "enum": [
+        "tools",
+        "resources",
+        "prompts"
+      ],
+      "title": "Family",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors_mcp.local_server.Family"
+    },
+    "connectors_mcp.local_server.Limits": {
+      "additionalProperties": false,
+      "properties": {
+        "concurrent_requests": {
+          "type": "integer"
+        },
+        "frame_octets": {
+          "type": "integer"
+        },
+        "request_milliseconds": {
+          "type": "integer"
+        },
+        "response_octets": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "frame_octets",
+        "response_octets",
+        "concurrent_requests",
+        "request_milliseconds"
+      ],
+      "title": "Limits",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors_mcp.local_server.Limits"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-ess-provenance": {
+    "contract_digest": "slice-sha256/2:162337936332d042655b22c8e8b438e3e41fb97f7990fa0d61e5c5990fce8b7e",
+    "source_digest": "e01cf3a0c69790239c9a6a719618d413f55d37830a1f1405e9a765e6719cf3c2",
+    "specification_version": "v1",
+    "system": "connectors_mcp"
+  }
+}

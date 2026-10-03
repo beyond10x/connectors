@@ -2,6 +2,20 @@ use super::*;
 use crate::local::{config, registry};
 use std::{cell::Cell, collections::BTreeSet, sync::atomic::Ordering, time::Duration};
 
+struct WithdrawAfter {
+    admitted: usize,
+    calls: std::sync::atomic::AtomicUsize,
+}
+impl ReadPolicy for WithdrawAfter {
+    fn admit(&self, _: &Paths, _: &str, _: &Request<'_>, _: &str) -> Result<()> {
+        if self.calls.fetch_add(1, Ordering::SeqCst) < self.admitted {
+            Ok(())
+        } else {
+            Err(Code::Forbidden.into())
+        }
+    }
+}
+
 struct Target {
     _root: tempfile::TempDir,
     paths: Paths,
@@ -137,6 +151,266 @@ impl Target {
             .unwrap()
             .unwrap()
     }
+}
+
+#[test]
+fn metadata_is_audited_without_provider_or_connection_and_withdraws_on_next_query() {
+    let target = Target::new();
+    let audits = target.audits();
+    let describe = || {
+        metadata::describe_using(
+            (
+                &target.paths,
+                "owner-authority",
+                Instant::now() + Duration::from_secs(20),
+            ),
+            "fixture",
+            &audits,
+            || {},
+        )
+        .unwrap()
+    };
+    let value = describe();
+    assert_eq!(value["status"], "success");
+    assert!(value["request_id"].is_null());
+    assert_eq!(value["audit_status"], "complete");
+    let bootstrap: runtime::Bootstrap = serde_json::from_value(value["result"].clone()).unwrap();
+    assert_eq!(bootstrap.descriptor().unwrap().operations.len(), 1);
+    let record = target.record(&audits, &value);
+    assert_eq!(record.anchor.activity, Some(audit::Activity::Describe));
+    assert!(record.anchor.request_id.is_none());
+    assert!(record.anchor.operation_id.is_none());
+    assert!(record.anchor.connection_ref.is_none());
+    assert_eq!(
+        record.final_observation.unwrap().outcome,
+        audit::Outcome::Success
+    );
+    let mut config = Config::load(&target.paths.config).unwrap();
+    let adapter = config.adapters.get_mut("fixture").unwrap();
+    assert!(!adapter.executable.path.exists());
+    adapter.permissions.operations.clear();
+    std::fs::write(&target.paths.config, toml::to_string(&config).unwrap()).unwrap();
+    let withdrawn = describe();
+    assert_eq!(withdrawn["status"], "success");
+    let bootstrap: runtime::Bootstrap =
+        serde_json::from_value(withdrawn["result"].clone()).unwrap();
+    assert!(bootstrap.descriptor().unwrap().operations.is_empty());
+    assert!(bootstrap.requirements.is_empty());
+    assert_ne!(value["audit_ref"], withdrawn["audit_ref"]);
+}
+
+#[test]
+fn metadata_policy_change_after_admission_does_not_release_old_descriptor() {
+    let target = Target::new();
+    let audits = target.audits();
+    let value = metadata::describe_using(
+        (
+            &target.paths,
+            "owner-authority",
+            Instant::now() + Duration::from_secs(20),
+        ),
+        "fixture",
+        &audits,
+        || {
+            let mut config = Config::load(&target.paths.config).unwrap();
+            config
+                .adapters
+                .get_mut("fixture")
+                .unwrap()
+                .permissions
+                .operations
+                .clear();
+            std::fs::write(&target.paths.config, toml::to_string(&config).unwrap()).unwrap();
+        },
+    )
+    .unwrap();
+    assert_eq!(value["error"]["code"], "stale_description");
+    assert_eq!(value["audit_status"], "complete");
+    assert!(value.get("result").is_none());
+    assert_eq!(
+        target
+            .record(&audits, &value)
+            .final_observation
+            .unwrap()
+            .outcome,
+        audit::Outcome::Error
+    );
+}
+
+#[test]
+fn metadata_without_audit_acknowledgement_does_not_release_cached_descriptor() {
+    let target = Target::new();
+    let audits = audit::Store::new(&target.paths.state, 1).unwrap();
+    let describe = || {
+        metadata::describe_using(
+            (
+                &target.paths,
+                "owner-authority",
+                Instant::now() + Duration::from_secs(20),
+            ),
+            "fixture",
+            &audits,
+            || {},
+        )
+        .unwrap()
+    };
+    assert_eq!(describe()["status"], "success");
+    let denied = describe();
+    assert_eq!(denied["error"]["code"], "unavailable");
+    assert_eq!(denied["audit_status"], "unavailable");
+    assert!(denied["audit_ref"].is_null());
+    assert!(denied.get("result").is_none());
+}
+
+#[test]
+fn metadata_final_audit_failure_preserves_known_metadata_and_real_reference() {
+    let target = Target::new();
+    let audits = target.audits();
+    let value = metadata::describe_using(
+        (
+            &target.paths,
+            "owner-authority",
+            Instant::now() + Duration::from_secs(20),
+        ),
+        "fixture",
+        &audits,
+        || audits.fault.store(10, Ordering::SeqCst),
+    )
+    .unwrap();
+    assert_eq!(value["status"], "success");
+    assert_eq!(value["audit_status"], "incomplete");
+    let record = target.record(&audits, &value);
+    assert_eq!(record.anchor.activity, Some(audit::Activity::Describe));
+    assert!(record.final_observation.is_none());
+}
+
+#[test]
+fn projection_policy_runs_after_host_grant_before_revision_or_input() {
+    let target = Target::new();
+    let policy = WithdrawAfter {
+        admitted: 0,
+        calls: Default::default(),
+    };
+    let request = Request {
+        revision: "stale",
+        input: "malformed",
+        ..target.request()
+    };
+    assert!(matches!(
+        resolve_selected(
+            &target.paths,
+            "fixture",
+            &request,
+            Some((&policy, "projection"))
+        ),
+        Err(Error {
+            code: Code::Forbidden,
+            ..
+        })
+    ));
+    assert_eq!(policy.calls.load(Ordering::SeqCst), 1);
+    let mut config = Config::load(&target.paths.config).unwrap();
+    config
+        .adapters
+        .get_mut("fixture")
+        .unwrap()
+        .permissions
+        .operations
+        .clear();
+    std::fs::write(&target.paths.config, toml::to_string(&config).unwrap()).unwrap();
+    assert!(matches!(
+        resolve_selected(
+            &target.paths,
+            "fixture",
+            &request,
+            Some((&policy, "projection"))
+        ),
+        Err(Error {
+            code: Code::NotGranted,
+            ..
+        })
+    ));
+    assert_eq!(
+        policy.calls.load(Ordering::SeqCst),
+        1,
+        "denied host lookup consulted native policy"
+    );
+}
+
+#[test]
+fn projection_withdrawal_after_audit_acknowledgement_prevents_dispatch() {
+    let target = Target::new();
+    let policy = WithdrawAfter {
+        admitted: 1,
+        calls: Default::default(),
+    };
+    let audits = target.audits();
+    let value = read_using(
+        (
+            &target.paths,
+            "owner-authority",
+            Instant::now() + Duration::from_secs(20),
+        ),
+        "fixture",
+        &target.request(),
+        &audits,
+        Some((&policy, "projection")),
+        |_| panic!("withdrawn projection dispatched"),
+    )
+    .unwrap();
+    assert_eq!(policy.calls.load(Ordering::SeqCst), 2);
+    assert_eq!(value["error"]["code"], "forbidden");
+    assert_eq!(value["audit_status"], "complete");
+    let record = target.record(&audits, &value);
+    assert_eq!(record.anchor.kind, audit::Kind::AdmittedExecution);
+    // Admission was already acknowledged; its later failure is the final
+    // error observation, not a replacement early-refusal anchor.
+    assert_eq!(
+        record.final_observation.unwrap().outcome,
+        audit::Outcome::Error
+    );
+}
+
+#[test]
+fn worker_rechecks_projection_before_attempting_provider_startup() {
+    use super::super::supervisor::{Pool, Task};
+    use std::sync::Arc;
+    let target = Target::new();
+    let adapter = Config::load(&target.paths.config).unwrap().adapters["fixture"].clone();
+    let policy = Arc::new(WithdrawAfter {
+        admitted: 0,
+        calls: Default::default(),
+    });
+    let paths = Arc::new(Paths {
+        config: target.paths.config.clone(),
+        state: target.paths.state.clone(),
+    });
+    let pool = Pool::with_read_policy(paths, "owner-authority".into(), policy.clone());
+    let request = target.request();
+    let result = pool.run(
+        "fixture",
+        &adapter,
+        Task::Invoke {
+            connection: request.connection.into(),
+            operation: request.operation.into(),
+            schema: request.schema.into(),
+            revision: request.revision.into(),
+            document: request.input.as_bytes().to_vec(),
+            governed: true,
+            projection_revision: Some("projection".into()),
+        },
+        connectors_sdk::now_ms() + 5000,
+    );
+    pool.shutdown().unwrap();
+    assert!(matches!(
+        result,
+        Err(Error {
+            code: Code::Forbidden,
+            ..
+        })
+    ));
+    assert_eq!(policy.calls.load(Ordering::SeqCst), 1);
+    assert!(!adapter.executable.path.exists());
 }
 
 #[test]
