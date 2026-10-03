@@ -1,0 +1,512 @@
+{
+  "format": "mcp-cli-selected-intent/1",
+  "artifact_kind": "authored-static-documentation",
+  "runtime_output": false,
+  "mcp_runtime": "runtime-unavailable",
+  "compatibility": "deferred",
+  "command_coverage": "selected-journey-only",
+  "commands": [
+    {
+      "id": "inbound-stdio-launch",
+      "path": [
+        "server"
+      ],
+      "grammar": "selected-intent",
+      "mcp": "runtime-unavailable",
+      "syntax": "connectors --config CONFIG --state-dir STATE_DIR server --transport stdio",
+      "global_flags": [
+        "config",
+        "state-dir"
+      ],
+      "flags": [
+        "transport"
+      ],
+      "required_flags": [
+        "config",
+        "state-dir",
+        "transport"
+      ],
+      "transport_values": [
+        "stdio"
+      ],
+      "transport_default": null,
+      "constraints": [
+        "config and state-dir are explicit absolute local paths",
+        "output and credential flags are not selected"
+      ],
+      "owner": "local MCP client launches Connectors as its child",
+      "placement": "local-single-owner",
+      "stdin": "mcp-frames-only",
+      "stdout": "mcp-frames-only",
+      "stderr": "safe-diagnostics",
+      "credential_input": "none",
+      "startup_result_error_contract": null,
+      "sources": [
+        "adapters/mcp/contracts/server/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md"
+      ]
+    },
+    {
+      "id": "outbound-connect",
+      "path": [
+        "connections",
+        "connect"
+      ],
+      "flags": [
+        "adapter",
+        "profile",
+        "credential-file",
+        "credential-stdin",
+        "credential-prompt"
+      ],
+      "constraints": [
+        "exactly one static protected source",
+        "MCP profile and OAuth completion codec unresolved"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    },
+    {
+      "id": "outbound-status",
+      "path": [
+        "connections",
+        "status"
+      ],
+      "flags": [
+        "adapter",
+        "connection",
+        "acquisition"
+      ],
+      "constraints": [
+        "exactly one of connection or acquisition"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    },
+    {
+      "id": "outbound-revalidate",
+      "path": [
+        "connections",
+        "revalidate"
+      ],
+      "flags": [
+        "adapter",
+        "connection",
+        "expected-revision"
+      ],
+      "constraints": [
+        "exact existing connection and expected revision",
+        "no credential re-entry"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    },
+    {
+      "id": "outbound-repair",
+      "path": [
+        "connections",
+        "repair"
+      ],
+      "flags": [
+        "adapter",
+        "connection",
+        "expected-revision",
+        "credential-file",
+        "credential-stdin",
+        "credential-prompt"
+      ],
+      "constraints": [
+        "exactly one static protected source",
+        "preserve connection identity"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    },
+    {
+      "id": "outbound-revoke",
+      "path": [
+        "connections",
+        "revoke"
+      ],
+      "flags": [
+        "adapter",
+        "connection",
+        "expected-revision"
+      ],
+      "constraints": [
+        "local durable cutoff is separate from provider revocation"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    },
+    {
+      "id": "outbound-operation-list",
+      "path": [
+        "operations",
+        "list"
+      ],
+      "flags": [
+        "adapter",
+        "limit",
+        "cursor"
+      ],
+      "constraints": [
+        "limit and cursor are optional",
+        "discovery is not execution authority"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    },
+    {
+      "id": "outbound-operation-describe",
+      "path": [
+        "operations",
+        "describe"
+      ],
+      "flags": [
+        "adapter",
+        "operation"
+      ],
+      "constraints": [
+        "operation is an admitted local identifier, not an inferred remote MCP method"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    },
+    {
+      "id": "outbound-operation-invoke",
+      "path": [
+        "operations",
+        "invoke"
+      ],
+      "flags": [
+        "adapter",
+        "connection",
+        "operation",
+        "schema",
+        "revision",
+        "input-json",
+        "input-file",
+        "input-stdin",
+        "approval-file",
+        "idempotency-key"
+      ],
+      "constraints": [
+        "exact operation, schema and revision",
+        "connection explicit where required",
+        "exactly one business input source",
+        "approval-file and idempotency-key follow the selected mutation profile",
+        "no automatic business retry"
+      ],
+      "grammar": "current-generic",
+      "mcp": "unresolved-binding",
+      "global_flags": [
+        "config",
+        "state-dir",
+        "output"
+      ],
+      "sources": [
+        "apps/connectors/spec/cli.yaml",
+        "contracts/cli/v1alpha1/semantics.md",
+        "adapters/mcp/contracts/client/v1alpha1/auth.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    }
+  ],
+  "generic_process": {
+    "scope": "current-generic-grouped-commands-only",
+    "global_flags": [
+      "config",
+      "state-dir",
+      "output"
+    ],
+    "json_success_stdout": "one newline-terminated success envelope",
+    "json_failure_stdout": "empty",
+    "json_failure_stderr": "one newline-terminated failure envelope",
+    "exit_meanings": {
+      "0": "successful observation",
+      "1": "operational refusal or failure",
+      "2": "usage or input refusal",
+      "130": "interruption"
+    },
+    "sources": [
+      "contracts/cli/v1alpha1/semantics.md",
+      "apps/connectors/spec/cli.yaml"
+    ]
+  },
+  "protected_channels": {
+    "existing_static_sources": [
+      "credential-prompt",
+      "credential-file",
+      "credential-stdin"
+    ],
+    "existing_static_admission": [
+      "hidden controlling terminal",
+      "admitted owner-only regular file",
+      "deliberately supplied same-session protected stdin"
+    ],
+    "business_sources": [
+      "input-json",
+      "input-file",
+      "input-stdin"
+    ],
+    "business_input_is_credential_input": false,
+    "inbound_protocol_stdin_is_credential_input": false,
+    "ordinary_disclosure_forbidden": [
+      "access token",
+      "refresh token",
+      "authorization code",
+      "state",
+      "PKCE verifier",
+      "client secret",
+      "actionable completion URL",
+      "custody reference",
+      "approval proof"
+    ],
+    "mcp_oauth_completion_codec": null,
+    "sources": [
+      "contracts/cli/v1alpha1/semantics.md",
+      "adapters/mcp/contracts/client/v1alpha1/auth.md",
+      "adapters/mcp/contracts/server/v1alpha1/mutations.md"
+    ]
+  },
+  "protocol_discovery": {
+    "mcp": "runtime-unavailable",
+    "revisions": {
+      "primary": "2026-07-28",
+      "interoperability": "2025-11-25"
+    },
+    "primary_protocol_discovery": "server/discover",
+    "legacy_initialization": "initialize",
+    "operation_discovery": [
+      "tools/list",
+      "resources/list",
+      "prompts/list"
+    ],
+    "invocation_methods": [
+      "tools/call",
+      "resources/read",
+      "prompts/get"
+    ],
+    "local_operation_ids": null,
+    "local_profile_ids": null,
+    "eligibility": [
+      "implemented",
+      "fully-bound",
+      "enabled",
+      "selected",
+      "metadata-admitted"
+    ],
+    "resources_and_prompts": "read-only",
+    "mutation_advertisement": "withheld-until-executable-binding-verified",
+    "sources": [
+      "adapters/mcp/contracts/protocol/v1alpha1/selection.md",
+      "adapters/mcp/contracts/server/v1alpha1/projection.md",
+      "adapters/mcp/contracts/server/v1alpha1/mutations.md",
+      "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+    ]
+  },
+  "error_layers": {
+    "cli_presentation": {
+      "carrier": "outer error.code with empty data",
+      "codes": [
+        "cli_parse",
+        "cli_input",
+        "cli_source",
+        "cli_dynamic_input",
+        "cli_dynamic_validator_unavailable",
+        "cli_result",
+        "cli_dynamic_result",
+        "cli_error",
+        "cli_dynamic_error",
+        "cli_handler_unavailable",
+        "cli_interrupted"
+      ],
+      "sources": [
+        "apps/connectors-cli-contract/src/runtime.rs"
+      ]
+    },
+    "cli_application": {
+      "carrier": "outer error.code=failure; typed Failure in error.data",
+      "type": "connectors.cli.FailureCode",
+      "codes": [
+        "invalid_input",
+        "invalid_configuration",
+        "configuration_exists",
+        "protected_entry_unavailable",
+        "custody_unavailable",
+        "metadata_unavailable",
+        "revision_conflict",
+        "outcome_unknown",
+        "identity_mismatch",
+        "lifecycle_conflict",
+        "incarnation_mismatch",
+        "readiness_mismatch",
+        "description_unavailable",
+        "stale_description",
+        "not_found",
+        "revoked",
+        "forbidden",
+        "not_granted",
+        "unavailable",
+        "timeout",
+        "capacity",
+        "stale_cursor",
+        "unsupported",
+        "interrupted",
+        "service_failure",
+        "approval_required",
+        "approval_refused",
+        "approval_replayed",
+        "idempotency_conflict",
+        "owner_build_mismatch"
+      ],
+      "sources": [
+        "ess/domains/cli.yaml",
+        "apps/connectors/spec/cli.yaml"
+      ]
+    },
+    "shared_service": {
+      "carrier": "optional Failure.service_code; service_failure is the CLI route",
+      "type": "connectors.service_wire.ErrorCode",
+      "codes": [
+        "invalid_input",
+        "unsupported",
+        "unauthorized",
+        "forbidden",
+        "not_found",
+        "stale_description",
+        "stale_cursor",
+        "rate_limited",
+        "unavailable",
+        "capacity",
+        "timeout",
+        "upstream_protocol",
+        "internal",
+        "approval_required",
+        "approval_refused",
+        "approval_replayed",
+        "idempotency_conflict",
+        "outcome_unknown",
+        "not_granted",
+        "stale_authority",
+        "connection_not_ready",
+        "route_unavailable",
+        "route_refused",
+        "insufficient_scope",
+        "session_not_ready",
+        "session_lost",
+        "offer_expired",
+        "offer_rejected",
+        "lease_expired",
+        "revoked"
+      ],
+      "sources": [
+        "ess/domains/service_wire.yaml",
+        "contracts/cli/v1alpha1/semantics.md"
+      ]
+    },
+    "mcp_protocol": {
+      "peer_code_domain": "open-integer-set",
+      "native_named_codes_are_exhaustive": false,
+      "inbound_service_rpc_carrier": -32000,
+      "inbound_tool_execution_error": "isError=true with complete safe service Response",
+      "inbound_service_mapping_source": "adapters/mcp/contracts/server/v1alpha1/projection-cases.json",
+      "outbound_unknown_effect_allows_retry": false,
+      "sources": [
+        "adapters/mcp/spec/ess/domains/protocol.yaml",
+        "adapters/mcp/contracts/server/v1alpha1/projection.md",
+        "adapters/mcp/contracts/client/v1alpha1/invocation.md"
+      ]
+    }
+  },
+  "remaining_obligations": [
+    "native ESS launch input/result/error ownership",
+    "explicit shared/native CLI composition design",
+    "pinned ESS 0.45.0 presentation expressibility",
+    "long-lived stdio stdout binding",
+    "MCP configuration and local identifier selection",
+    "protected OAuth ingress and Connection/custody binding",
+    "actual inbound and outbound runtime conformance",
+    "outbound stdio child ownership decision",
+    "multi-caller Connection assignment decision"
+  ],
+  "parent_working_journey": "open"
+}
