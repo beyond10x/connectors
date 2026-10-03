@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T14:08:48Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 39,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Real custody and owned child final fence: planted bypass fails; byte-identical restore passes; registry use cancellation verified",
+    "reference": ".local/mcp-runtime/native-tests/final-fence-released.log"
+  }
+}
