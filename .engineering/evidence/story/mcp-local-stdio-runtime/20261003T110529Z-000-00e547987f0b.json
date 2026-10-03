@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-03T11:05:29Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 15,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integrated native MCP package:20 passed on stable and Rust1.88,0failed0ignored; all-target Clippy -D warnings passed; 59049 bounded command sequences; native-tests/supervision-{workspace,msrv,clippy}.log; first-terminal mutation 7passed2failed in probe/supervision/mutation-sequences.log"
+  }
+}

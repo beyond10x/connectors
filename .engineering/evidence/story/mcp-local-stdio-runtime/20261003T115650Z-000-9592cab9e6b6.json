@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T11:56:50Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 22,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust1.88 isolated lossless JSON:stub0pass6fail; implementation6pass0fail; duplicate mutation5pass1fail; float mutation3pass3fail; restored6pass0fail; Clippy clean",
+    "reference": ".local/mcp-runtime/probe/json/restored.log"
+  }
+}

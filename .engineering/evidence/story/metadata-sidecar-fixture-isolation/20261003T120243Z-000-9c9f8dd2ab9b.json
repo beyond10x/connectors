@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T12:02:43Z",
+  "actor": "human:timo",
+  "artifact": "story:metadata-sidecar-fixture-isolation",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "PASS: complete connectors-build gate --msrv includes repaired local_foundation10pass0fail; no production metadata changes",
+    "reference": ".local/mcp-runtime/gate-lease-restored.log"
+  }
+}
