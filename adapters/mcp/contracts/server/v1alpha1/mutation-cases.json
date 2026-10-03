@@ -1,0 +1,744 @@
+{
+  "format": "mcp-inbound-replay-document/1",
+  "evidence": "document-only",
+  "mutation_advertised": false,
+  "attempts": [
+    {
+      "state": "Prepared",
+      "observation": "unknown_until_observed_or_fenced_abort",
+      "retention": "audit_independent",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Dispatching",
+      "observation": "unknown_without_definitive_evidence",
+      "retention": "audit_independent",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Aborted",
+      "observation": "not_attempted",
+      "retention": "audit_independent",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Completed",
+      "observation": "applied",
+      "retention": "audit_independent",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Failed",
+      "observation": "refused",
+      "retention": "audit_independent",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Indeterminate",
+      "observation": "unknown",
+      "retention": "audit_independent",
+      "dispatch_permission": false
+    }
+  ],
+  "reservations": [
+    {
+      "state": "Pending",
+      "observation": "wait_original",
+      "retention": "no_automatic_expiry",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Replayable",
+      "observation": "retained_result",
+      "retention": "settlement_plus_86400_seconds",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Quarantined",
+      "observation": "outcome_unknown",
+      "retention": "no_automatic_expiry",
+      "dispatch_permission": false
+    },
+    {
+      "state": "Expired",
+      "observation": "candidate_new",
+      "retention": "known_result_only",
+      "dispatch_permission": false
+    }
+  ],
+  "coordinates": [
+    {
+      "owner": "namespace",
+      "field": "receiver_instance",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "namespace",
+      "field": "authority",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "namespace",
+      "field": "origin",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "authority",
+      "field": "tenant",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "authority",
+      "field": "realm",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "authority",
+      "field": "caller",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "authority",
+      "field": "executor",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "origin",
+      "field": "kind",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "origin",
+      "field": "authority_ref",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "operation_ref",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "connection_ref",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "connection_revision",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "contract_ref",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "profile",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "descriptor_revision",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "configuration_revision",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "canonicalization_version",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "input_digest",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "fingerprint",
+      "field": "route",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "route",
+      "field": "gateway_instance",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "route",
+      "field": "route_id",
+      "source": "resolved_host"
+    },
+    {
+      "owner": "route",
+      "field": "route_revision",
+      "source": "resolved_host"
+    }
+  ],
+  "errors": [
+    {
+      "code": "approval_required",
+      "channel": "tool-error",
+      "meaning": "A new attempt lacks required approval; an admitted retained replay needs none."
+    },
+    {
+      "code": "approval_refused",
+      "channel": "tool-error",
+      "meaning": "New-attempt approval verification failed; disclose no failing axis."
+    },
+    {
+      "code": "approval_replayed",
+      "channel": "tool-error",
+      "meaning": "The approval was spent; a new attempt cannot spend it again."
+    },
+    {
+      "code": "idempotency_conflict",
+      "channel": "tool-error",
+      "meaning": "A live namespace/key has a different fingerprint; disclose neither result nor differing axis."
+    },
+    {
+      "code": "outcome_unknown",
+      "channel": "tool-error",
+      "meaning": "No definitive authorized observation establishes the original effect; never redispatch automatically."
+    }
+  ],
+  "decisions": [
+    {
+      "policy": "deny",
+      "observation_admitted": true,
+      "revision_current": false,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "policy-before-stale",
+      "expected": "not_granted"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": false,
+      "revision_current": false,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "scope-before-stale",
+      "expected": "forbidden"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": false,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Replayable",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "revision-before-key",
+      "expected": "stale_description"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "disabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Replayable",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "disabled-before-key",
+      "expected": "forbidden"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": false,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Replayable",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "input-before-key",
+      "expected": "invalid_input"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": null,
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "key-required",
+      "expected": "invalid_input"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "none",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "none-rejects-key",
+      "expected": "invalid_input"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "natural",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "natural-rejects-key",
+      "expected": "invalid_input"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Replayable",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "missing",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "exact-replay",
+      "expected": "retained_result"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Pending",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "spent",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "pending-waits",
+      "expected": "wait_original"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Quarantined",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "quarantine-never-resends",
+      "expected": "outcome_unknown"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Pending",
+      "fingerprint_matches": false,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "conflict",
+      "expected": "idempotency_conflict"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Replayable",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": false,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "revoked-before-delivery",
+      "expected": "forbidden"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "missing",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "missing-approval",
+      "expected": "approval_required"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "refused",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "refused-approval",
+      "expected": "approval_refused"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "spent",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "spent-approval",
+      "expected": "approval_replayed"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "spent",
+      "winner_recheck": "exact",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "winner-after-miss",
+      "expected": "observe_winner"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "refused",
+      "winner_recheck": "conflict",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "conflict-after-miss",
+      "expected": "idempotency_conflict"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "missing",
+      "winner_recheck": "unreadable",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "unreadable-after-miss",
+      "expected": "outcome_unknown"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "preflight_unavailable",
+      "winner_recheck": "exact",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "preflight-winner",
+      "expected": "observe_winner"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "Expired",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "spent",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "expired-new-approval",
+      "expected": "approval_replayed"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "absent",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "candidate-new",
+      "expected": "candidate_new"
+    },
+    {
+      "policy": "admit",
+      "observation_admitted": true,
+      "revision_current": true,
+      "lookup": "enabled",
+      "input_valid": true,
+      "kind": "keyed",
+      "key": "business-key",
+      "reservation": "unreadable",
+      "fingerprint_matches": true,
+      "final_disclosure_admitted": true,
+      "approval": "fresh",
+      "winner_recheck": "absent",
+      "extra_dispatches": 0,
+      "extra_spends": 0,
+      "id": "unreadable-ledger",
+      "expected": "outcome_unknown"
+    }
+  ],
+  "correlations": [
+    {
+      "id": "new-correlation-same-key",
+      "left_mcp_id": 1,
+      "right_mcp_id": "again",
+      "left_host_id": "request-a",
+      "right_host_id": "request-b",
+      "same_namespace": true,
+      "same_key": true,
+      "same_fingerprint": true,
+      "expected": "same_reservation"
+    },
+    {
+      "id": "same-correlation-new-key",
+      "left_mcp_id": 1,
+      "right_mcp_id": 1,
+      "left_host_id": "request-a",
+      "right_host_id": "request-b",
+      "same_namespace": true,
+      "same_key": false,
+      "same_fingerprint": true,
+      "expected": "distinct_intent"
+    },
+    {
+      "id": "same-key-changed-meaning",
+      "left_mcp_id": 1,
+      "right_mcp_id": 2,
+      "left_host_id": "request-a",
+      "right_host_id": "request-b",
+      "same_namespace": true,
+      "same_key": true,
+      "same_fingerprint": false,
+      "expected": "idempotency_conflict"
+    },
+    {
+      "id": "same-spelling-other-authority",
+      "left_mcp_id": 1,
+      "right_mcp_id": 1,
+      "left_host_id": "request-a",
+      "right_host_id": "request-b",
+      "same_namespace": false,
+      "same_key": true,
+      "same_fingerprint": true,
+      "expected": "distinct_intent"
+    }
+  ],
+  "observations": [
+    {
+      "id": "caller-lost-reply",
+      "observer": "caller",
+      "evidence": "applied",
+      "cause": "timeout",
+      "terminal_durable": true,
+      "reply_received": false,
+      "classification": "unknown",
+      "code": "outcome_unknown",
+      "known_result_replayable": false,
+      "stage": "observation"
+    },
+    {
+      "id": "live-applied-store-failure",
+      "observer": "live_host",
+      "evidence": "applied",
+      "cause": "unavailable",
+      "terminal_durable": false,
+      "reply_received": true,
+      "classification": "applied",
+      "code": "unavailable",
+      "known_result_replayable": false,
+      "stage": "attempt_store"
+    },
+    {
+      "id": "live-applied-audit-failure",
+      "observer": "live_host",
+      "evidence": "applied",
+      "cause": "unavailable",
+      "terminal_durable": true,
+      "reply_received": true,
+      "classification": "applied",
+      "code": "unavailable",
+      "known_result_replayable": true,
+      "stage": "audit"
+    },
+    {
+      "id": "recovery-after-dispatch",
+      "observer": "recovery",
+      "evidence": "none",
+      "cause": "timeout",
+      "terminal_durable": false,
+      "reply_received": true,
+      "classification": "unknown",
+      "code": "outcome_unknown",
+      "known_result_replayable": false,
+      "stage": "observation"
+    },
+    {
+      "id": "fenced-abort",
+      "observer": "recovery",
+      "evidence": "not_attempted",
+      "cause": "timeout",
+      "terminal_durable": true,
+      "reply_received": true,
+      "classification": "not_attempted",
+      "code": "timeout",
+      "known_result_replayable": true,
+      "stage": "dispatch"
+    },
+    {
+      "id": "definitive-refusal",
+      "observer": "live_host",
+      "evidence": "refused",
+      "cause": "forbidden",
+      "terminal_durable": true,
+      "reply_received": true,
+      "classification": "refused",
+      "code": "forbidden",
+      "known_result_replayable": true,
+      "stage": "response"
+    }
+  ]
+}
