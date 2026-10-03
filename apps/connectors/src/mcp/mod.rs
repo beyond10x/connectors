@@ -2,7 +2,7 @@
 //! selection constrains the generic owner's admitted operation.
 use connectors_host::local::{
     config::{Config, Paths},
-    filesystem,
+    filesystem, operation_curation,
     owner::{self, Code, ReadPolicy},
     runtime,
 };
@@ -25,20 +25,26 @@ fn revision(
     configuration: &Configuration,
     adapter: &connectors_host::local::config::Adapter,
     bootstrap: &runtime::Bootstrap,
+    curation_sha256: &str,
 ) -> String {
     connectors_core::digest(
-        &json!({"projection":configuration.document(),"adapter":adapter,"bootstrap":bootstrap}),
+        &json!({"projection":configuration.document(),"adapter":adapter,"bootstrap":bootstrap,"curation":curation_sha256}),
     )
 }
 impl ReadPolicy for ProjectionPolicy {
-    fn metadata_revision(
+    fn metadata(
         &self,
         paths: &Paths,
-        _alias: &str,
+        alias: &str,
         adapter: &connectors_host::local::config::Adapter,
         bootstrap: &runtime::Bootstrap,
-    ) -> owner::Result<String> {
-        Ok(revision(&load(paths)?, adapter, bootstrap))
+    ) -> owner::Result<owner::ProjectionMetadata> {
+        let configuration = load(paths)?;
+        let curation = operation_curation::load(paths, alias, adapter, bootstrap)?;
+        Ok(owner::ProjectionMetadata {
+            revision: revision(&configuration, adapter, bootstrap, &curation.source_sha256),
+            operations: curation.operations,
+        })
     }
 
     fn admit(
@@ -64,12 +70,16 @@ impl ReadPolicy for ProjectionPolicy {
             return Err(Code::Forbidden.into());
         }
         let bootstrap = owner::cached(paths, alias)?;
-        if revision(&configuration, adapter, &bootstrap) != expected {
+        let curation = operation_curation::load(paths, alias, adapter, &bootstrap)?;
+        if revision(&configuration, adapter, &bootstrap, &curation.source_sha256) != expected {
             return Err(Code::StaleDescription.into());
         }
         let exposure = exposure.ok_or(Code::NotFound)?;
         if !exposure.enabled {
             return Err(Code::Forbidden.into());
+        }
+        if !curation.operations.contains_key(request.operation) {
+            return Err(Code::NotFound.into());
         }
         // This does not consult the selected approval source or credential
         // readiness. The existing coordinator independently admits execution.
