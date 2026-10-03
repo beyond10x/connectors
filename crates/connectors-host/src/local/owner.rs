@@ -415,6 +415,15 @@ enum Request {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         projection_revision: Option<String>,
     },
+    BoundedRead {
+        adapter: String,
+        connection: String,
+        operation: String,
+        schema: String,
+        revision: String,
+        projection_revision: String,
+        budget: runtime::ReadBudget,
+    },
     GovernedDescribe {
         adapter: String,
         deadline_ms: u64,

@@ -2,6 +2,7 @@ use super::*;
 use crate::local::{config, registry};
 use std::{cell::Cell, collections::BTreeSet, sync::atomic::Ordering, time::Duration};
 
+mod bounded_reads;
 mod final_fence;
 mod metadata_projection;
 
@@ -362,6 +363,7 @@ fn projection_withdrawal_after_audit_acknowledgement_prevents_dispatch() {
         &target.request(),
         &audits,
         Some((&policy, "projection")),
+        None,
         |_| panic!("withdrawn projection dispatched"),
     )
     .unwrap();
@@ -405,6 +407,7 @@ fn worker_rechecks_projection_before_attempting_provider_startup() {
             document: request.input.as_bytes().to_vec(),
             governed: true,
             projection_revision: Some("projection".into()),
+            budget: None,
         },
         connectors_sdk::now_ms() + 5000,
     );

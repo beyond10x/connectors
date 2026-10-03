@@ -26,6 +26,20 @@ impl runtime::Adapter for Provider {
     fn bootstrap_v2(&self) -> runtime::Result<runtime::Bootstrap> {
         Ok(self.bootstrap.clone())
     }
+    fn bootstrap_v3(&self) -> runtime::Result<runtime::Bootstrap> {
+        Ok(self.bootstrap.clone())
+    }
+    async fn invoke_bounded(
+        &self,
+        operation: &str,
+        partition: &str,
+        material: Secret,
+        input: Value,
+        budget: runtime::ReadBudget,
+    ) -> runtime::Result<Value> {
+        budget.until()?;
+        self.invoke(operation, partition, material, input).await
+    }
     async fn validate(&self, _: &str, _: Secret) -> runtime::Result<runtime::Baseline> {
         Err(runtime::Failure::Unsupported)
     }
@@ -75,23 +89,52 @@ fn provider_fixture() {
 struct Policy {
     calls: AtomicUsize,
     allow: AtomicBool,
+    admitted: usize,
 }
 impl ReadPolicy for Policy {
     fn admit(&self, _: &Paths, _: &str, _: &Request<'_>, _: &str) -> Result<()> {
         let call = self.calls.fetch_add(1, Ordering::SeqCst);
-        if call == 0 || self.allow.load(Ordering::SeqCst) {
+        if call < self.admitted || self.allow.load(Ordering::SeqCst) {
             Ok(())
         } else {
             Err(Code::Forbidden.into())
         }
+    }
+    fn metadata(
+        &self,
+        _: &Paths,
+        _: &str,
+        _: &Adapter,
+        bootstrap: &runtime::Bootstrap,
+    ) -> Result<ProjectionMetadata> {
+        let descriptor = bootstrap.descriptor()?;
+        let metadata = connectors_core::operation_metadata::Metadata::parse(
+            &serde_json::to_vec(&super::bounded_reads::declaration(false)).unwrap(),
+            &descriptor.operation("item.read").unwrap().profile,
+            65536,
+        )
+        .unwrap();
+        Ok(ProjectionMetadata {
+            revision: "projection".into(),
+            operations: std::collections::BTreeMap::from([("item.read".into(), metadata)]),
+        })
     }
 }
 
 #[test]
 #[ignore = "requires qualified disposable GNOME Secret Service; run explicitly"]
 fn withdrawal_at_final_dispatch_prevents_real_child_invocation() {
+    for bounded in [false, true] {
+        exercise(bounded);
+    }
+}
+
+fn exercise(bounded: bool) {
     let custody_fixture = custody::tests::Fixture::new();
-    let target = Target::new();
+    let mut target = Target::new();
+    if bounded {
+        super::bounded_reads::prepare(&mut target, false);
+    }
     let bootstrap = crate::local::owner::cached(&target.paths, "fixture").unwrap();
     let mut config = Config::load(&target.paths.config).unwrap();
     config.secret_service_socket = Some(custody_fixture.socket.clone());
@@ -152,6 +195,7 @@ fn withdrawal_at_final_dispatch_prevents_real_child_invocation() {
     let policy = Arc::new(Policy {
         calls: AtomicUsize::new(0),
         allow: AtomicBool::new(false),
+        admitted: if bounded { 3 } else { 1 },
     });
     let pool = Pool::with_read_policy(
         Arc::new(Paths {
@@ -163,39 +207,69 @@ fn withdrawal_at_final_dispatch_prevents_real_child_invocation() {
     );
     let invoke = || {
         let request = target.request();
-        pool.run(
-            "fixture",
-            &adapter,
-            Task::Invoke {
-                connection: connection.clone(),
-                operation: request.operation.into(),
-                schema: request.schema.into(),
-                revision: request.revision.into(),
-                document: request.input.as_bytes().to_vec(),
-                governed: true,
-                projection_revision: Some("projection".into()),
-            },
-            connectors_sdk::now_ms() + 30_000,
-        )
+        let budget =
+            bounded.then(|| runtime::ReadBudget::start(20000, 15000, 65536, 4194304).unwrap());
+        let dispatch = || {
+            pool.run(
+                "fixture",
+                &adapter,
+                Task::Invoke {
+                    connection: connection.clone(),
+                    operation: request.operation.into(),
+                    schema: request.schema.into(),
+                    revision: request.revision.into(),
+                    document: request.input.as_bytes().to_vec(),
+                    governed: true,
+                    projection_revision: Some("projection".into()),
+                    budget,
+                },
+                connectors_sdk::now_ms() + 30_000,
+            )
+        };
+        if let Some(budget) = budget {
+            super::super::bounded::read(
+                &target.paths,
+                "owner-authority",
+                "fixture",
+                &request,
+                (policy.as_ref(), "projection"),
+                budget,
+                |_| match dispatch()? {
+                    Output::Document(bytes) => Ok(bytes),
+                    _ => Err(Code::Unavailable.into()),
+                },
+            )
+            .map(Output::Value)
+        } else {
+            dispatch()
+        }
     };
     let refused = invoke();
     assert!(
         !target._root.path().join("provider-invoked").exists(),
         "withdrawn projection reached the real provider"
     );
-    assert!(
-        matches!(
-            refused,
-            Err(Error {
-                code: Code::Forbidden,
-                ..
-            })
-        ),
-        "final projection refusal expected"
-    );
+    if bounded {
+        let Output::Value(value) = refused.unwrap() else {
+            panic!("bounded service envelope required");
+        };
+        assert_eq!(value["error"]["code"], "forbidden");
+        assert_eq!(value["audit_status"], "complete");
+    } else {
+        assert!(
+            matches!(
+                refused,
+                Err(Error {
+                    code: Code::Forbidden,
+                    ..
+                })
+            ),
+            "final projection refusal expected"
+        );
+    }
     assert_eq!(
         policy.calls.load(Ordering::SeqCst),
-        2,
+        if bounded { 4 } else { 2 },
         "must reach final admission after real custody read"
     );
     let uses = || {
@@ -224,15 +298,22 @@ fn withdrawal_at_final_dispatch_prevents_real_child_invocation() {
     policy.allow.store(true, Ordering::SeqCst);
     let accepted = invoke();
     pool.shutdown().unwrap();
-    let Output::Document(bytes) = accepted.unwrap() else {
-        panic!("governed read did not return document");
-    };
-    assert_eq!(
-        connectors_core::json::decode(&bytes, 64).unwrap(),
-        json!({"observed":true})
-    );
+    match accepted.unwrap() {
+        Output::Document(bytes) if !bounded => assert_eq!(
+            connectors_core::json::decode(&bytes, 64).unwrap(),
+            json!({"observed":true})
+        ),
+        Output::Value(value) if bounded => {
+            assert_eq!(value["result"], json!({"observed":true}));
+            assert_eq!(value["audit_status"], "complete");
+        }
+        _ => panic!("governed read did not return selected carrier"),
+    }
     assert!(target._root.path().join("provider-invoked").is_file());
-    assert_eq!(policy.calls.load(Ordering::SeqCst), 4);
+    assert_eq!(
+        policy.calls.load(Ordering::SeqCst),
+        if bounded { 8 } else { 4 }
+    );
     assert_eq!(
         uses(),
         (2, 1, 2),

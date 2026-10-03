@@ -470,6 +470,42 @@ impl Client {
     ) -> Result<Vec<u8>> {
         self.read_selected(adapter, request, Some(projection_revision), deadline_ms)
     }
+    /// Explicit bounded projected read; limits are independently selected again
+    /// by the owner. Start the original budget before admission, not here.
+    pub fn bounded_projected_read(
+        mut self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        projection_revision: &str,
+        budget: runtime::ReadBudget,
+    ) -> Result<Vec<u8>> {
+        self.same_build()?;
+        crate::local::protected::cancellation()?;
+        let until = budget.until()?;
+        if request.input.len() > budget.input_bytes() {
+            return Err(Code::InvalidInput.into());
+        }
+        channel::write(
+            &mut self.stream,
+            &Request::BoundedRead {
+                adapter: adapter.into(),
+                connection: request.connection.into(),
+                operation: request.operation.into(),
+                schema: request.schema.into(),
+                revision: request.revision.into(),
+                projection_revision: projection_revision.into(),
+                budget,
+            },
+            None,
+            request.input.as_bytes(),
+            until,
+        )?;
+        let bytes = self.governed_reply(until)?;
+        if bytes.len() > budget.result_bytes() {
+            return Err(Code::Capacity.into());
+        }
+        Ok(bytes)
+    }
     fn read_selected(
         mut self,
         adapter: &str,
@@ -1108,6 +1144,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
     {
         return Err(Code::ReadinessMismatch.into());
     }
+    let same_build = build.as_deref() == Some(owner.build);
     channel::write(
         stream,
         &Reply::Hello {
@@ -1133,6 +1170,14 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
         runtime::INPUT_LIMIT,
     )?;
     let shutdown = matches!(frame.control, Request::Shutdown { .. });
+    let write_until = if let Request::BoundedRead { budget, .. } = &frame.control {
+        if !same_build {
+            return Err(Code::ReadinessMismatch.into());
+        }
+        Some(budget.until()?)
+    } else {
+        None
+    };
     let result = action(owner, stream, frame.control, frame.document);
     let shutdown = shutdown && result.is_ok();
     let (reply, document) = match result {
@@ -1147,7 +1192,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
         &reply,
         None,
         &document,
-        Instant::now() + Duration::from_secs(5),
+        write_until.unwrap_or_else(|| Instant::now() + Duration::from_secs(5)),
     );
     if shutdown {
         owner.shutdown.store(true, Ordering::SeqCst);
@@ -1313,17 +1358,70 @@ fn action(
             projection.then_some(owner.read_policy.as_ref()),
         );
     }
-    if let Request::GovernedRead {
-        adapter: alias,
-        connection,
-        operation,
-        schema,
-        revision,
-        deadline_ms,
-        projection_revision,
-    } = request
-    {
-        if !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
+    if matches!(
+        &request,
+        Request::GovernedRead { .. } | Request::BoundedRead { .. }
+    ) {
+        let (
+            alias,
+            connection,
+            operation,
+            schema,
+            revision,
+            projection_revision,
+            budget,
+            deadline_ms,
+        ) = match request {
+            Request::GovernedRead {
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                deadline_ms,
+            } => (
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                None,
+                deadline_ms,
+            ),
+            Request::BoundedRead {
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                budget,
+            } => {
+                let left = budget
+                    .until()?
+                    .checked_duration_since(Instant::now())
+                    .ok_or(Code::Timeout)?;
+                let deadline = connectors_sdk::now_ms()
+                    .checked_add(left.as_millis() as u64)
+                    .ok_or(Code::Timeout)?;
+                (
+                    adapter,
+                    connection,
+                    operation,
+                    schema,
+                    revision,
+                    Some(projection_revision),
+                    Some(budget),
+                    deadline,
+                )
+            }
+            _ => unreachable!("read variant selected above"),
+        };
+        if budget.is_none()
+            && !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms()))
+        {
             return Err(Code::Timeout.into());
         }
         let input = std::str::from_utf8(&document).map_err(|_| Code::InvalidInput)?;
@@ -1334,31 +1432,45 @@ fn action(
             revision: &revision,
             input,
         };
-        return governed::read(
-            (&owner.paths, &owner.authority, super::until(deadline_ms)?),
+        let dispatch = |adapter: &Adapter| match owner.pool.run(
             &alias,
-            &call,
-            projection_revision
-                .as_deref()
-                .map(|r| (owner.read_policy.as_ref(), r)),
-            |adapter| match owner.pool.run(
-                &alias,
-                adapter,
-                Task::Invoke {
-                    connection: connection.clone(),
-                    operation: operation.clone(),
-                    schema: schema.clone(),
-                    revision: revision.clone(),
-                    document: document.clone(),
-                    governed: true,
-                    projection_revision: projection_revision.clone(),
-                },
-                deadline_ms,
-            )? {
-                Output::Document(bytes) => Ok(bytes),
-                _ => Err(Code::Unavailable.into()),
+            adapter,
+            Task::Invoke {
+                connection: connection.clone(),
+                operation: operation.clone(),
+                schema: schema.clone(),
+                revision: revision.clone(),
+                document: document.clone(),
+                governed: true,
+                projection_revision: projection_revision.clone(),
+                budget,
             },
-        );
+            deadline_ms,
+        )? {
+            Output::Document(bytes) => Ok(bytes),
+            _ => Err(Code::Unavailable.into()),
+        };
+        let selection = projection_revision
+            .as_deref()
+            .map(|r| (owner.read_policy.as_ref(), r));
+        return match budget {
+            Some(budget) => governed::bounded::read(
+                &owner.paths,
+                &owner.authority,
+                &alias,
+                &call,
+                selection.ok_or(Code::Unsupported)?,
+                budget,
+                dispatch,
+            ),
+            None => governed::read(
+                (&owner.paths, &owner.authority, super::until(deadline_ms)?),
+                &alias,
+                &call,
+                selection,
+                dispatch,
+            ),
+        };
     }
     let alias = match &request {
         Request::Begin { adapter, .. }
@@ -1589,6 +1701,7 @@ fn action(
                     document,
                     governed: false,
                     projection_revision: None,
+                    budget: None,
                 },
                 deadline_ms,
             )? {
@@ -1621,6 +1734,156 @@ fn action(
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    #[test]
+    fn bounded_socket_preserves_original_budget_and_lossless_response() {
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let budget = runtime::ReadBudget::start(20000, 15000, 65536, 4194304).unwrap();
+        let selected = serde_json::to_value(budget).unwrap();
+        let expected = br#"{"version":"v1alpha2","request_id":"request","status":"success","result":{"n":1844674407370955161701},"audit_ref":"real-ref","audit_status":"complete"}"#;
+        let serving = std::thread::spawn(move || {
+            let deadline = budget.until().unwrap();
+            let frame =
+                channel::read::<Request>(&mut peer, deadline, false, runtime::INPUT_LIMIT).unwrap();
+            let Request::BoundedRead {
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                budget,
+            } = frame.control
+            else {
+                panic!("explicit bounded request required");
+            };
+            assert_eq!(
+                (
+                    adapter.as_str(),
+                    connection.as_str(),
+                    operation.as_str(),
+                    schema.as_str(),
+                    revision.as_str(),
+                    projection_revision.as_str()
+                ),
+                (
+                    "fixture",
+                    "connection",
+                    "read",
+                    "schema",
+                    "revision",
+                    "projection"
+                )
+            );
+            assert_eq!(serde_json::to_value(budget).unwrap(), selected);
+            assert_eq!(frame.document, br#"{"n":1844674407370955161701}"#);
+            channel::write(&mut peer, &Reply::Success, None, expected, deadline).unwrap();
+        });
+        let request = approval_issuance::Request {
+            connection: "connection",
+            operation: "read",
+            schema: "schema",
+            revision: "revision",
+            input: r#"{"n":1844674407370955161701}"#,
+        };
+        let result = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some(own_build().unwrap().into()),
+        }
+        .bounded_projected_read("fixture", &request, "projection", budget)
+        .unwrap();
+        assert_eq!(result, expected);
+        serving.join().unwrap();
+    }
+
+    #[test]
+    fn bounded_socket_checks_build_and_expiry_before_any_request_bytes() {
+        use std::io::Read;
+        for mismatch in [true, false] {
+            let (client, mut peer) = UnixStream::pair().unwrap();
+            let mut value = serde_json::to_value(
+                runtime::ReadBudget::start(20000, 15000, 65536, 4194304).unwrap(),
+            )
+            .unwrap();
+            if !mismatch {
+                value["deadline_ticks"] = json!(1);
+            }
+            let budget = serde_json::from_value(value).unwrap();
+            let request = approval_issuance::Request {
+                connection: "connection",
+                operation: "read",
+                schema: "schema",
+                revision: "revision",
+                input: "{}",
+            };
+            let error = Client {
+                stream: client,
+                host_incarnation: "host".into(),
+                owner_build: Some(
+                    if mismatch {
+                        "another-build"
+                    } else {
+                        own_build().unwrap()
+                    }
+                    .into(),
+                ),
+            }
+            .bounded_projected_read("fixture", &request, "projection", budget)
+            .unwrap_err();
+            assert_eq!(
+                error.code,
+                if mismatch {
+                    Code::OwnerBuildMismatch
+                } else {
+                    Code::Timeout
+                }
+            );
+            let mut bytes = Vec::new();
+            peer.read_to_end(&mut bytes).unwrap();
+            assert!(bytes.is_empty());
+        }
+    }
+
+    #[test]
+    fn bounded_socket_reply_wait_keeps_the_original_cutoff() {
+        // The real connection handshake measures the build before this port.
+        let build = own_build().unwrap().to_owned();
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let budget = runtime::ReadBudget::start(20000, 15000, 65536, 4194304)
+            .unwrap()
+            .constrain(Instant::now() + Duration::from_millis(100))
+            .unwrap();
+        let serving = std::thread::spawn(move || {
+            channel::read::<Request>(
+                &mut peer,
+                Instant::now() + Duration::from_secs(2),
+                false,
+                runtime::INPUT_LIMIT,
+            )
+            .unwrap();
+            // Bounded hold means a broken receiver deadline still terminates this test.
+            std::thread::sleep(Duration::from_millis(600));
+        });
+        let request = approval_issuance::Request {
+            connection: "connection",
+            operation: "read",
+            schema: "schema",
+            revision: "revision",
+            input: "{}",
+        };
+        let started = Instant::now();
+        let error = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some(build),
+        }
+        .bounded_projected_read("fixture", &request, "projection", budget)
+        .unwrap_err();
+        assert_eq!(error.code, Code::Timeout);
+        assert!(started.elapsed() < Duration::from_millis(400));
+        serving.join().unwrap();
+    }
 
     #[test]
     fn governed_describe_socket_carries_no_document_and_requires_same_build() {
