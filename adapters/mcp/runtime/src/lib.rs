@@ -1,0 +1,8 @@
+//! Native MCP protocol mechanics. Host admission and credential custody are ports
+//! supplied by application composition, never authority inferred from wire input.
+
+pub mod framing;
+pub mod launch;
+pub mod lease;
+pub mod names;
+pub mod supervision;

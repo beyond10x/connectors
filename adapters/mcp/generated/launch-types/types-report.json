@@ -1,0 +1,91 @@
+{
+  "format": "ess-types-report/3",
+  "source_digest": "b01143a91b18e311da9c5f5d72957134dc5fcca636313abf9f75b22a928cb94f",
+  "input": {
+    "kind": "model",
+    "system": "connectors_mcp",
+    "specification_version": "v1",
+    "contract_digest": "slice-sha256/2:9697310eab6721915ab3f4225654b9123fb27cdac818e2cececd81257d5dce83",
+    "projection_digest": "3ee7a406cd598bc04f8984eb4fbb68da29b8ef6447a7d7a79ccdabbc293add1e"
+  },
+  "generator_version": "0.45.0",
+  "target": "rust",
+  "configuration": {
+    "language": "rust",
+    "package": "connectors-mcp-launch-types"
+  },
+  "roots": [
+    "connectors_mcp.launch.LocalLaunchCompletion",
+    "connectors_mcp.launch.LocalLaunchFailure",
+    "connectors_mcp.launch.LocalLaunchInput"
+  ],
+  "declarations": {
+    "connectors_mcp.launch.LocalLaunchCompletion": "ConnectorsMcpLaunchLocalLaunchCompletion",
+    "connectors_mcp.launch.LocalLaunchFailure": "ConnectorsMcpLaunchLocalLaunchFailure",
+    "connectors_mcp.launch.LocalLaunchInput": "ConnectorsMcpLaunchLocalLaunchInput",
+    "connectors_mcp.launch.LocalTransport": "ConnectorsMcpLaunchLocalTransport"
+  },
+  "annotations": [
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchCompletion/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchCompletion/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchCompletion/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchFailure/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchFailure/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchFailure/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchInput/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchInput/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalLaunchInput/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalTransport/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalTransport/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.launch.LocalTransport/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    }
+  ],
+  "obligations": []
+}

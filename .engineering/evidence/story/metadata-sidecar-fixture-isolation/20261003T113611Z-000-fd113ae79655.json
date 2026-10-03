@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T11:36:11Z",
+  "actor": "human:timo",
+  "artifact": "story:metadata-sidecar-fixture-isolation",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "GREEN: Rust1.98.1 cargo test --locked --offline -p connectors-host --test local_foundation:10 passed0 failed0 ignored; targeted symlink and valid-snapshot test1 pass0 fail",
+    "reference": ".local/mcp-runtime/fixture-suite.log"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T12:02:43Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 23,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "PASS: Rust1.98.1 connectors-build gate --msrv;1285pass0fail65ignored; Clippy, generation, adapter boundaries, Rust1.88 libraries and1.91 workspace pass; ESS synthesized498scenarios43authored21refusals, not full runtime conformance",
+    "reference": ".local/mcp-runtime/gate-lease-restored.log"
+  }
+}

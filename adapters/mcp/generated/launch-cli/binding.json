@@ -1,0 +1,78 @@
+{
+  "format": "ess-cli-plan/1",
+  "binary": "connectors-mcp-launch",
+  "about": "Local MCP stdio binding over admitted Connectors operations",
+  "globals": {
+    "config": "config",
+    "state": "state-dir",
+    "output": "output"
+  },
+  "callables": {
+    "local-server": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors_mcp.launch",
+        "action": "local-server"
+      },
+      "input": {
+        "type_ref": "connectors_mcp.launch.LocalLaunchInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "transport": {
+              "kind": "enum",
+              "variants": [
+                "stdio"
+              ]
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors_mcp.launch.LocalLaunchCompletion",
+        "shape": {
+          "kind": "enum",
+          "variants": [
+            "closed"
+          ]
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors_mcp.launch.LocalLaunchFailure",
+          "shape": {
+            "kind": "enum",
+            "variants": [
+              "invalid_input",
+              "configuration_unavailable",
+              "owner_refused",
+              "transport_failed"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "commands": [
+    {
+      "path": [
+        "server"
+      ],
+      "aliases": [],
+      "callable": "local-server",
+      "about": "Serve MCP on stdin and stdout as the admitted local owner",
+      "arguments": [
+        {
+          "field": "transport",
+          "source": {
+            "kind": "option",
+            "long": "transport"
+          }
+        }
+      ]
+    }
+  ],
+  "obligations": [
+    "handler:local-server: implement the owner-qualified callable and its declared result/error contract"
+  ]
+}

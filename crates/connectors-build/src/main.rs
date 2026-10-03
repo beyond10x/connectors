@@ -18,6 +18,7 @@ mod docs;
 mod ess_boundary;
 mod gate;
 mod ignored;
+mod mcp;
 mod metadata_conformance;
 mod metadata_entities;
 mod source_hashes;
@@ -45,6 +46,11 @@ enum Action {
     Ignored(ignored::Options),
     /// Generate or compare the selected local CLI contract fixture.
     Cli {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate or compare the native MCP launch parser and value types.
+    McpBindings {
         #[arg(long)]
         check: bool,
     },
@@ -234,6 +240,9 @@ fn execute(args: Args) -> Result<()> {
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
     if let Action::Cli { check } = args.command {
         return cli::run(&root, &ess, check);
+    }
+    if let Action::McpBindings { check } = args.command {
+        return mcp::run(&root, &ess, check);
     }
     if let Action::Examples = args.command {
         check_ess(&ess)?;

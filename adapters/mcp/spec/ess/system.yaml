@@ -4,3 +4,4 @@ version: v1
 domains:
   - connectors_mcp.protocol
   - connectors_mcp.state
+  - connectors_mcp.launch
