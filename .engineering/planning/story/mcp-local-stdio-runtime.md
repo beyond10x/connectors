@@ -54,14 +54,18 @@ scope:
 - confidence: cited
   path: crates/connectors-core/tests
 - confidence: cited
+  path: crates/connectors-host/src/http.rs
+- confidence: cited
   path: crates/connectors-host/src/local
+- confidence: cited
+  path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
   path: docs/development.md
 - confidence: cited
   path: docs/local-mcp-cli.md
 - confidence: cited
   path: ess/domains/service_wire.yaml
-revision: 54
+revision: 60
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -1270,3 +1274,66 @@ The published predecessor ad39b5754e04e3f4227e23b396a96db8c152f85c has now passe
 repository CI37133928989, verified against that exact head. Docs, planning and
 shared-source checks also passed. This remains draft PR84, with full MCP runtime
 and the provider/release objective incomplete.
+
+## Shared provider deadline phase — 2026-10-03
+
+Implement the HTTP portion of service/compatibility.md §7 before selecting an
+extended operation binding. ScopedHttp will offer an explicit trusted-composition
+budget constructor: a provider interval bounded by30seconds plus the existing
+absolute execution cutoff. It retains the earliest cutoff across credential,
+probe and write capability derivation and repeated requests. Credential resolution,
+request transmission and response body reading consume that one budget. Connect
+remains bounded by5seconds and the remaining overall provider interval. Explicit
+per-request remaining time must override the legacy15second client default so a
+selected30second generic budget is executable. Existing callers retain their
+legacy behavior until they explicitly select this capability.
+
+This is a transport enforcement step, not public metadata admission. The owning
+composition must still select exact declared budgets, carry the original total
+execution deadline across processes, enforce complete service envelope byte limits,
+and provide authoritative operation curation before MCP advertisement. No new
+private protocol is selected by this step and no native adapter is implicitly
+converted to the extended binding. The ephemeral cutoff is not a persisted entity.
+
+Named checks: provider-budget-credential-bound, provider-budget-shared-cutoff,
+provider-budget-capability-derivation and provider-budget-generic-not-clipped.
+Exercise the actual HTTP transport with controlled fixture clocks where possible;
+observe credential/provider call counts. First fail against a stub; plant a
+deadline-reset or clipping defect and verify the targeted refusal before restoring.
+Coordinator-only verification remains necessary: the three existing workers are
+still quota-errored and no independent review is claimed.
+
+Implementation verification: the initial five tests failed against the refusing
+stub (0passed,5failed). With the implementation restored, the new six cases plus
+existing HTTP, prefix, write and timeout-origin suites passed22tests,0failed,
+0ignored. The real fixture answered after16seconds under a30second selected
+provider budget. Stalled bodies hit the original cutoff for all five capabilities
+(GET, prefix, consuming write, probe and form); no truncated body became success.
+Deleting only the inherited-cutoff minimum caused the capability-derivation case
+to fail when its write reached the provider after the original cutoff. The source
+was restored byte-for-byte before the22-test run. Credential stalls terminated
+without HTTP dispatch, and the existing legacy TLS/body timeout distinctions pass.
+
+Logs/SHA256 under .local/mcp-runtime/:
+- http-budget-red.log: 2b2f1a8858d707c270bca22c235fae8f192ec83234163d0dbea09124340473ac
+- http-budget-mutation.log: a97c347a5fa4f3e7c23618f69d1cd366e72e9835714d5a4454343fe9acef324e
+- http-budget-restored.log: f3859420dd8e37cdedecfceef0ef4f5b536424cc9e4ada0aba387cb719b05e70
+
+The required full gate passed with exit0: 1350passed,0failed,66ignored across
+165test summaries, including workspace Clippy, projection drift, independent
+adapter builds and Rust1.88/1.91 checks. Command: cargo run --locked --offline
+-p connectors-build -- gate --msrv, with the same pinned ESS0.45/AEP0.65,
+RUSTUP_TOOLCHAIN=1.98.1 and bounded build settings recorded in the metadata phase.
+Log: .local/mcp-runtime/gate-http-budget.log; SHA256:
+5d63c13f237b13771f201f9a0ac2bfb5df706391a82e3b17a46f5729ba4d6132.
+AEP is valid; full historical warnings remain in the log. Scope is now cited for
+both crates/connectors-host/src/http.rs and tests/http_budget.rs.
+The preceding metadata checkpoint54e4bed6c0678f41fa722738f1db3bf022cc1574 is published
+on draftPR84; docs37135930021,planning37135929967 and shared-source37135928707 passed.
+Rust gate37135930002 also completed successfully at that exact head. The worktree
+cb26l-runtime remains active for unfinished story:mcp-local-stdio-runtime; root
+owns the next integration and the retained logs. Actual metadata curation and
+owner/native selection of these budgets remain required before advertisement.
+The closed legacy Bootstrap lacks the complete declarations and original
+execution context; do not manufacture them from its Read/Write flag or silently
+extend its wire carrier. Explicitly select and model that integration next.

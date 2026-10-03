@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T16:36:52Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 60,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "HTTP provider deadline full gate --msrv: exit 0; 1350 passed, 0 failed, 66 ignored across 165 summaries. Projection drift, Clippy, isolated adapters and Rust1.88/1.91 passed. AEP valid with historical warnings. Log SHA256 5d63c13f237b13771f201f9a0ac2bfb5df706391a82e3b17a46f5729ba4d6132. Coordinator verification only.",
+    "reference": ".local/mcp-runtime/gate-http-budget.log"
+  }
+}
