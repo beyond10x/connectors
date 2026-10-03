@@ -46,10 +46,16 @@ scope:
 - confidence: cited
   path: crates/connectors-build/src
 - confidence: cited
+  path: crates/connectors-core/Cargo.toml
+- confidence: cited
+  path: crates/connectors-core/src
+- confidence: cited
+  path: crates/connectors-core/tests
+- confidence: cited
   path: crates/connectors-host/src/local
 - confidence: cited
   path: docs/local-mcp-cli.md
-revision: 23
+revision: 31
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -569,3 +575,203 @@ outbound HTTP/custody and final release acceptance remain required.
 Pinned generated output includes whitespace in CLI help and an EOF blank line in
 types.rs reported by git diff --check. Preserve exact generator bytes; authored
 source whitespace is clean. No generated file is hand-repaired to hide those findings.
+
+## Published checkpoint and linked JSON decoder — 2026-10-03
+
+Native foundations are published on unit/mcp-local-runtime-20261003 at commit
+4dde21d3fac77b15bd122a1be6e287558d09762f (bot author and committer verified), draft
+https://github.com/beyond10x/connectors/pull/84 (bot author verified). Full local gate
+log SHA256:077d7917acec7a5addb7647e60c1efa6428e866bf848fac6dfc3c17d95708978.
+The first commit attempt was refused for a personal home path in the planning
+specification; replaced it through AEP with the worktree id and repository-relative
+locations, revalidated, then the same Gates commit/push route passed. No hook bypass.
+PR common security, docs and planning checks passed; repository gate is still running
+as of this observation. Nothing is merged or released by this checkpoint.
+
+Following publication, the tested lossless decoder is linked as runtime/src/json.rs,
+exported with explicit serde/arbitrary_precision/raw_value dependencies. Native tests
+now35pass0fail0ignored on Rust1.98.1 and1.88; Clippy1.98.1 and authored native formatting
+pass. Logs native-tests/json-{linked,msrv,clippy}.log. The complete workspace already
+selected both serde_json features before this change; core legacy behavior is untouched.
+
+The JSON addition remains uncommitted and is not part of PR84's published head or its
+preceding full-gate result. Cover the complete next implementation with the required
+gate before its next commit. Continue the protected host port and actual process
+journeys; component tests, draft PR and native generation do not complete this story.
+
+## Protected governed read phase — 2026-10-03
+
+Implement the first real protected host read interface behind the existing verified
+local-owner socket/build handshake. It returns complete service-response JSON bytes,
+not an unaudited business Value. The native MCP facade will decode those bytes with
+the lossless codec; existing CLI/private invoke remains unchanged.
+
+Move the provider-independent JSON decoder into connectors-core::json and re-export
+it from connectors-mcp::json. The host must not depend on a native adapter. Explicit
+serde_json precision/raw-value features remain declared by the owning generic crate;
+legacy read_json and canonicalization are unchanged. This is a generic wire-codec
+obligation already recorded by service_wire, not a new domain entity or authority.
+
+Current owner config and executable-bound cached descriptor are checked for each
+read. The operations allowlist supplies local lookup admission before descriptor
+revision and private existence. Local single-owner target/result scope remains the
+verified configured owner; an MCP request cannot choose another Connection. Profile
+permissions govern credential use at execution preflight, not a fabricated provider
+credential probe during discovery. Recheck operation admission in the serialized
+worker before startup/dispatch; preserve legacy error order on the legacy path.
+
+Use existing execution_audit Store/Anchor/FinalObservation: acknowledge an admission
+before provider work, confirm its live receipt, and append final observation separately.
+No acknowledged anchor means no dispatch and unavailable audit with null reference.
+A failed final append retains the known business outcome with incomplete audit and
+the real acknowledged ref. Early refusals retain only verified coordinates. No read
+retry or synthetic audit reference. Audit policy/metadata is local and actual; test
+these failure seams with the real store and controlled provider callback.
+
+Add a distinct private governed-read request and raw response reader. Refuse malformed
+or oversized private frames and mismatched build as existing protected calls do.
+Preserve exact provider JSON text through its child and owner transports until strict
+lossless decoding, and retain complete safe response/audit metadata. Existing generated
+shared public observation values and compatibility.md sections4-5 own the envelope;
+no second approval/attempt/audit ledger or caller relation is introduced.
+
+Coordinator acceptance/design/scope review: this generic seam is prerequisite to
+real MCP invocation, not a server-support claim. Scope now includes core's generic
+JSON codec and tests as well as the already selected host/native/runtime surfaces.
+No parallel writer; independent reviewers remain quota unavailable. Required tests:
+policy beats stale/existence, stale beats absence/input, no dispatch on audit failure,
+known outcome survives final-audit failure, raw numeric precision and legacy behavior.
+
+## Governed read implementation checkpoint — 2026-10-03
+
+Implemented the selected protected read seam in the existing host owner: a distinct
+GovernedRead request, same-build client check, raw complete response bytes, serialized
+worker policy recheck before child startup, lossless child output validation, and the
+existing registry capture/custody/final dispatch sequence. The legacy Invoke decoder,
+error precedence and result shape remain unchanged. Governed registry NotReady and
+InsufficientScope now retain connection_not_ready and insufficient_scope rather than
+using the legacy not_granted collapse.
+
+The real execution-audit Store acknowledges and confirms an anchor before invoking
+the provider callback. Current lookup policy precedes revision/existence/input errors.
+Only verified coordinates enter refusal records; no caller alias or guessed connection
+is turned into a registry namespace. If the required namespace or audit acknowledgement
+is unavailable, the response has unavailable audit and null ref, with no dispatch.
+Bounded recovery reuses the exact final observation under the original deadline;
+failed recovery preserves the known business result with incomplete audit and the
+acknowledged ref. Complete-envelope overflow returns capacity, never partial JSON.
+
+Rust1.98.1 targeted checks (bounded jobs, locked/offline, task TMPDIR):
+- cargo test -p connectors-core -p connectors-mcp: 49 passed, 0 failed, 0 ignored;
+  includes six lossless tests in each owner/re-export and eight legacy core tests.
+- cargo test -p connectors-host --lib governed: restored source 9 passed, 0 failed,
+  0 ignored. Seven real-store coordinator tests, one private socket/client test,
+  and one actual owned child-process transport test. This is not an end-to-end
+  production MCP server, OAuth connection or live-provider acceptance run.
+- cargo clippy -p connectors-core -p connectors-host -p connectors-mcp --all-targets
+  -- -D warnings: exit0.
+- Audit guard mutation allowed dispatch after an unacknowledged anchor: the exact
+  negative test failed with `unacknowledged read dispatched` (0 passed, 1 failed,
+  exit101). Original source restored byte-identically; the nine tests then passed.
+
+Task evidence under .local/mcp-runtime/native-tests: shared-json.log,
+governed-wire-tests.log, governed-recovery-tests.log, governed-clippy.log,
+governed-mutation-audit.log, governed-restored.log. Mutation log SHA256
+ e269cc84827d175d4ee3cf195dd788ccc8363e93a158bb676b344614860f2234.
+These logs are local supporting evidence; the named tests and this AEP record are
+retained source evidence. The complete repository gate is next, not yet claimed.
+
+PR84 foundation commit 4dde21d3fac77b15bd122a1be6e287558d09762f has all four checks
+passing, including repository gate run37121814005 (23m46s). Current JSON/governed
+changes are not on that published commit. No merge, new release, independent review
+or finished runtime is claimed. Independent workers remain unavailable on quota;
+this implementation and review were the coordinator's.
+
+The full local inbound and outbound HTTP goals remain active. Next: validate this
+batch with the full gate, then finish the generated projection configuration,
+audited discovery and actual server I/O/clock boundary; deliver outbound protected
+OAuth/persistent invocation and the final verified source release. Existing cloud
+assignment/outbound child ownership decisions remain explicit rather than implied.
+
+## Local projection configuration selection — implementation decision, 2026-10-03
+
+The local inbound binding selects an owner-only UTF-8 JSON companion named by
+appending `.mcp-stdio.json` to the exact configured owner config path. For example,
+`/private/config.toml` selects `/private/config.toml.mcp-stdio.json`. There is no
+implicit default exposure and no extra launch flag. The application composes this
+native configuration with the generic owner; generic Config remains closed and
+contains no native provider value bag. The file is limited to 1 MiB and opened
+through the existing descriptor-relative, no-symlink private-file admission.
+Missing, unreadable, ambiguous, oversized or malformed configuration refuses startup
+or the current request. It never means a successful empty projection.
+
+The already validated native local_server.Configuration/Exposure/Family/Limits
+values own the shape. Select format `connectors-mcp-local/1`. Limits must be positive
+unsigned integer JSON tokens (no fractional/exponent spelling), bounded for this binding: frame_octets 256..1048576, response_octets 1024..33554432,
+concurrent_requests 1..16, request_milliseconds 1..120000. These are deployment
+ceilings; they cannot relax the shared 2000ms data lease or 5000ms teardown bounds.
+Unlike the owner transport's 8 MiB service document ceiling, the native response
+ceiling allows 32 MiB so a tool can retain its complete structured Response and
+its escaped JSON text representation with framing overhead.
+Count the framing newline and all duplicated text/structured representations in
+the wire budgets. Complete-binding eligibility still checks every operation's
+own declared budgets before advertisement and dispatch.
+
+Allow at most 1000 exposures, each with valid existing owner selectors, a nonempty
+set of unique selected families, and no duplicate (adapter_alias,operation_ref)
+entry. Different configured connections may not alias one advertised operation.
+An optional approval_file is an absolute bounded local path; its mere selection
+never opens it, proves its existence, or authorizes a write. It remains private and
+is consulted only by the admitted new-mutation path. The replay path never reads it.
+JSON member duplicates, unknown members, explicit null for optional String,
+private-token-shaped objects pretending to be numbers, and invalid limits refuse.
+
+Read the admitted configuration anew for every discovery page and invocation.
+Changing selection, enablement or configured target invalidates the affected
+projection revision. Do not implement a startup-only snapshot: projection.md
+requires withdrawal at the next admitted list. The serialized owner must repeat
+or fence the same selection at dispatch. This is an application-composed metadata
+policy seam, not a new provider grant, caller identity or ledger. The exact generic
+callback/request shape remains to be implemented and held to TOCTOU tests before
+this configuration is advertised as usable. Local single-owner semantics do not
+answer the separate cloud caller-assignment question.
+
+Promotion order: add the validated native domain to its owning ESS header, generate
+the four types into a dedicated sibling package, extend the pinned drift gate,
+implement bounded validation, then compose protected file admission and the owner
+metadata/discovery/dispatch fence. Do not publish a server command while these
+admission and I/O obligations are incomplete.
+
+## Governed read full-gate checkpoint — 2026-10-03
+
+The required gate completed with exit0 in session98514:
+`RUSTUP_TOOLCHAIN=1.98.1 RUSTC_WRAPPER= CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0
+CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 TMPDIR=$PWD/.local/tmp
+CONNECTORS_ESS=<pinned0.45.0> CONNECTORS_AEP=<pinned0.65.0>
+cargo run --locked --offline -p connectors-build -- gate --msrv`.
+
+Observed 1306 passed, 0 failed, 65 ignored across161 test summaries. Native and
+shared projections match pinned ESS; formatting, workspace build/tests/Clippy,
+isolated adapter builds and Rust1.88 selected libraries/Rust1.91 all workspace
+all-target checks passed. Shared ESS synthesis retains498 scenarios (43 authored),
+21 named synthesis refusals and its existing unpublished-view-field notes; the local
+metadata authority conformance ran289 scenarios. This does not convert synthesis
+obligations into actual MCP runtime conformance or clear the65 ignored tests.
+
+Full log .local/mcp-runtime/gate-governed.log, SHA256
+4afa0df75d9fffd4a77d486431d8ad3c49f455a149364a1cdfaba5d6b03f148d.
+Publish the governed read/core JSON source on the existing draft PR84. Keep the
+runtime story active and the CLI compatibility deferred. No new release is claimed.
+
+The next configuration validator has an isolated Rust1.88 prototype with6 passed,
+0 failed, 0 ignored (probe/configuration/refined-tests.log). It uses the four
+already validated generated native values, protects Number deserialization from
+literal private-token objects, rejects duplicate/unknown input and conflicting
+exposures, and never opens the selected approval source. Its32MiB native ceiling
+allows room for both tool result representations around the8MiB owner envelope.
+This prototype is not linked source and is not included in the completed gate.
+Promotion and application/owner admission remain the next implementation batch.
+
+An asynchronous operator question about host-owned cloud connections with explicit
+caller grants is pending. No answer has been assumed and no blocker was cleared.
+Local inbound stdio and outbound HTTP continue independently.

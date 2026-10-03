@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T12:44:27Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 27,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust1.98.1 governed read restored: 9 passed; audit dispatch mutation: 1 expected failure; core/native JSON: 49 passed; Clippy all targets: exit0",
+    "reference": ".local/mcp-runtime/native-tests/governed-restored.log"
+  }
+}

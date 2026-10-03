@@ -24,6 +24,7 @@ pub(super) enum Task {
         schema: String,
         revision: String,
         document: Vec<u8>,
+        governed: bool,
     },
     Write {
         connection: String,
@@ -67,6 +68,7 @@ pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
     Baseline(runtime::Baseline),
     Value(Value),
+    Document(Vec<u8>),
     Write(mutation::Delivery),
 }
 struct Job {
@@ -518,6 +520,28 @@ fn worker(
                 guard.stopping = false;
             }
             guard.check(job.epoch)?;
+            if let Task::Invoke {
+                connection,
+                operation,
+                schema,
+                revision,
+                document,
+                governed: true,
+            } = &job.task
+            {
+                let input = std::str::from_utf8(document).map_err(|_| Code::InvalidInput)?;
+                governed::resolve(
+                    &paths,
+                    &job.alias,
+                    &approval_issuance::Request {
+                        connection,
+                        operation,
+                        schema,
+                        revision,
+                        input,
+                    },
+                )?;
+            }
             let (config, current) = selected(&paths, &job.alias)?;
             if current.instance_id != job.adapter.instance_id {
                 return Err(Code::LifecycleConflict.into());
@@ -797,6 +821,7 @@ fn worker(
                     schema: expected_schema,
                     revision,
                     document,
+                    governed,
                 } => {
                     let bootstrap = active.bootstrap().clone();
                     if bootstrap.descriptor()?.revision != revision
@@ -816,8 +841,12 @@ fn worker(
                         return Err(Code::Forbidden.into());
                     }
                     runtime::channel::depth(&document)?;
-                    let value: Value =
-                        connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?;
+                    let value: Value = if governed {
+                        connectors_core::json::decode(&document, 64)
+                            .map_err(|_| Code::InvalidInput)?
+                    } else {
+                        connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?
+                    };
                     connectors_sdk::validate(
                         &bootstrap
                             .descriptor()?
@@ -829,13 +858,21 @@ fn worker(
                     .map_err(|_| Code::InvalidInput)?;
                     let registry = registry::Registry::with_system_clock(&paths.state);
                     let binding = bootstrap.binding(&requirement.profile)?;
-                    let captured = registry.capture_read(
-                        &binding,
-                        &connection,
-                        &requirement.scopes,
-                        connectors_sdk::now_ms(),
-                        job.deadline,
-                    )?;
+                    let captured = registry
+                        .capture_read(
+                            &binding,
+                            &connection,
+                            &requirement.scopes,
+                            connectors_sdk::now_ms(),
+                            job.deadline,
+                        )
+                        .map_err(|error| {
+                            if governed {
+                                governed::registry_error(error)
+                            } else {
+                                error.into()
+                            }
+                        })?;
                     let version = captured.version();
                     let material = custody::Store::open_at(
                         version.scope(),
@@ -865,9 +902,15 @@ fn worker(
                         {
                             return Err(Code::LifecycleConflict.into());
                         }
-                        if !latest.permissions.operations.contains(&operation)
-                            || !latest.permissions.profiles.contains(&requirement.profile)
-                        {
+                        if !latest.permissions.operations.contains(&operation) {
+                            return Err(if governed {
+                                Code::NotGranted
+                            } else {
+                                Code::Forbidden
+                            }
+                            .into());
+                        }
+                        if !latest.permissions.profiles.contains(&requirement.profile) {
                             return Err(Code::Forbidden.into());
                         }
                         Ok(())
@@ -887,12 +930,29 @@ fn worker(
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
                     }
-                    let dispatched = registry.dispatch_read(captured, connectors_sdk::now_ms())?;
+                    let dispatched = registry
+                        .dispatch_read(captured, connectors_sdk::now_ms())
+                        .map_err(|error| {
+                            if governed {
+                                governed::registry_error(error)
+                            } else {
+                                error.into()
+                            }
+                        })?;
                     drop(guard);
-                    let result = active.invoke(
-                        &operation, &revision, &partition, &material, &document, deadline,
-                    );
+                    let result = if governed {
+                        active.invoke_lossless(
+                            &operation, &revision, &partition, &material, &document, deadline,
+                        )
+                    } else {
+                        active.invoke(
+                            &operation, &revision, &partition, &material, &document, deadline,
+                        )
+                    };
                     registry.release_read(dispatched, connectors_sdk::now_ms())?;
+                    if governed {
+                        return result.map(Output::Document).map_err(Error::from);
+                    }
                     let body = String::from_utf8(result?).map_err(|_| Code::Unavailable)?;
                     Ok(Output::Value(
                         json!({"adapter":job.alias,"operation":operation,"revision":revision,"result":body}),
@@ -998,6 +1058,7 @@ mod suppression_tests {
                 schema: text(),
                 revision: text(),
                 document: Vec::new(),
+                governed: false,
             },
             Task::Write {
                 connection: text(),

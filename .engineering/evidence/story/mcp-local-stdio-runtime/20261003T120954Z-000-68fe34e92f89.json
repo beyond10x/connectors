@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T12:09:54Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 24,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Linked lossless JSON decoder:35 native tests pass on Rust1.98.1 and1.88; Clippy and authored formatting pass; not included in published4dde21d or its full gate",
+    "reference": ".local/mcp-runtime/native-tests/json-msrv.log"
+  }
+}
