@@ -44,4 +44,35 @@ child; a deadline already expired before transfer refuses without provider work.
 The catalog executable opts into this read binding and shares one selected HTTP
 cutoff between its OAuth token client and business client. Other executables
 remain unsupported until they implement the same obligations. Production MCP
-serving and owner selection of this binding are separate integration work.
+serving remains separate integration work. The same-build owner can select this
+binding through its explicit bounded projected read port described below.
+
+## Owner selection
+
+The authenticated owner request `bounded_read` carries the adapter, connection,
+operation, schema, descriptor revision, required projection revision and original
+budget. The business input remains in the separate document section. The owner
+requires the current exact pinned curation, read permission and private/3 support;
+the caller's budget never grants or overrides a declaration. The owner supports
+`approval: not_required`, idempotency `none` or `natural`, and a five-second connect
+limit. An `implemented` realization selects 20 seconds execution, 15 seconds
+provider, 65,536 request bytes and 4,194,304 result bytes. A `generic` realization
+requires `generic-http` or `generic-http-page` and selects 40 seconds execution,
+30 seconds provider, 262,144 request bytes and 4,194,304 result bytes. Other
+combinations refuse without fallback.
+
+The request byte count includes the complete canonical v1alpha2 service envelope
+with its owner-assigned UUID; result limits include the complete service response
+and audit fields. Excess input refuses before dispatch; excess output becomes a
+capacity error without truncation. Existing audit acknowledgement and final
+credential/lifecycle fences remain required. Selection is checked again after
+audit acknowledgement and immediately before native dispatch.
+
+Owner queue and lifecycle-lock waits, launch capacity, child startup, custody,
+native invocation and response delivery retain the original monotonic deadline.
+An owned guard closes only the held custody socket when that deadline expires,
+including during D-Bus setup and close, and joins its thread. Credential evidence
+expiry may shorten execution; it cannot restart it. Expired queued work cannot
+capture a credential or invoke a provider. This is a local owner binding, not yet
+a production MCP ingress: a future ingress must also bound its own framing,
+connection establishment and admission within that same original deadline.
