@@ -1,0 +1,1997 @@
+{
+  "format": "mcp-auth-document-cases/1",
+  "cases": [
+    {
+      "id": "auth.2026-07-28.missing",
+      "revision": "2026-07-28",
+      "obligation": "missing",
+      "action": "inspect",
+      "facts": {
+        "credential": "missing",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "missing",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.expired",
+      "revision": "2026-07-28",
+      "obligation": "expired",
+      "action": "inspect",
+      "facts": {
+        "credential": "expired",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "expired",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.revoked",
+      "revision": "2026-07-28",
+      "obligation": "revoked",
+      "action": "restart",
+      "facts": {
+        "credential": "revoked",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "revoked",
+        "code": "revoked",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.unavailable",
+      "revision": "2026-07-28",
+      "obligation": "unavailable",
+      "action": "inspect",
+      "facts": {
+        "credential": "unavailable",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "custody-unavailable",
+        "code": "unavailable",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.restart",
+      "revision": "2026-07-28",
+      "obligation": "restart",
+      "action": "restart",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "credential-ready",
+        "code": null,
+        "reuse": true,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.unacknowledged",
+      "revision": "2026-07-28",
+      "obligation": "unacknowledged",
+      "action": "restart",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": false,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "persistence-unacknowledged",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.protected-entry",
+      "revision": "2026-07-28",
+      "obligation": "protected-entry",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "protected-action",
+        "code": null,
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [
+          "acquisition_ref",
+          "expires_at",
+          "action_kind"
+        ],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.no-protected-channel",
+      "revision": "2026-07-28",
+      "obligation": "no-protected-channel",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": false,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "protected-channel-unavailable",
+        "code": "unavailable",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.completion",
+      "revision": "2026-07-28",
+      "obligation": "completion",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "acquisition-published",
+        "code": null,
+        "reuse": false,
+        "publish": true,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [
+          "acquisition_ref",
+          "state",
+          "connection_ref"
+        ],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.issuer",
+      "revision": "2026-07-28",
+      "obligation": "issuer",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": false,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "authority-mismatch",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.audience",
+      "revision": "2026-07-28",
+      "obligation": "audience",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": false,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "authority-mismatch",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.consumption",
+      "revision": "2026-07-28",
+      "obligation": "consumption",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": false,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "completion-refused",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.refresh-once",
+      "revision": "2026-07-28",
+      "obligation": "refresh-once",
+      "action": "refresh",
+      "facts": {
+        "credential": "expired",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "refresh-send-once",
+        "code": null,
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 1,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Authorized"
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.refresh-uncertain",
+      "revision": "2026-07-28",
+      "obligation": "refresh-uncertain",
+      "action": "refresh",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Uncertain",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "refresh-uncertain",
+        "code": "outcome_unknown",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Uncertain"
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.refresh-authorized",
+      "revision": "2026-07-28",
+      "obligation": "refresh-authorized",
+      "action": "refresh",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Authorized",
+        "new_live_authorization": false,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "refresh-uncertain",
+        "code": "outcome_unknown",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Uncertain"
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.refresh-recovery",
+      "revision": "2026-07-28",
+      "obligation": "refresh-recovery",
+      "action": "recover",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "ResponseStored",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "publication-only-recovery",
+        "code": null,
+        "reuse": false,
+        "publish": true,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Published"
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.refresh-wrong-state",
+      "revision": "2026-07-28",
+      "obligation": "refresh-wrong-state",
+      "action": "recover",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Uncertain",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "recovery-refused",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.repair",
+      "revision": "2026-07-28",
+      "obligation": "repair",
+      "action": "repair",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "repair-published",
+        "code": null,
+        "reuse": false,
+        "publish": true,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [
+          "acquisition_ref",
+          "state",
+          "connection_ref"
+        ],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.repair-identity",
+      "revision": "2026-07-28",
+      "obligation": "repair-identity",
+      "action": "repair",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": false,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "identity-mismatch",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.revoke",
+      "revision": "2026-07-28",
+      "obligation": "revoke",
+      "action": "revoke",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "locally-revoked",
+        "code": null,
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "unsupported",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.revoke-unknown",
+      "revision": "2026-07-28",
+      "obligation": "revoke-unknown",
+      "action": "revoke",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": false,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "revocation-unacknowledged",
+        "code": "outcome_unknown",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.stdio",
+      "revision": "2026-07-28",
+      "obligation": "stdio",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "stdio",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "stdio-held",
+        "code": "unsupported",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.unselected-binding",
+      "revision": "2026-07-28",
+      "obligation": "unselected-binding",
+      "action": "restart",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": false,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "binding-unselected",
+        "code": "unsupported",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2026-07-28.management-admission",
+      "revision": "2026-07-28",
+      "obligation": "management-admission",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": false,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "management-refused",
+        "code": "not_granted",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2026-07-28-basic-authorization-index.mdx:136"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.missing",
+      "revision": "2025-11-25",
+      "obligation": "missing",
+      "action": "inspect",
+      "facts": {
+        "credential": "missing",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "missing",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.expired",
+      "revision": "2025-11-25",
+      "obligation": "expired",
+      "action": "inspect",
+      "facts": {
+        "credential": "expired",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "expired",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.revoked",
+      "revision": "2025-11-25",
+      "obligation": "revoked",
+      "action": "restart",
+      "facts": {
+        "credential": "revoked",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "revoked",
+        "code": "revoked",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.unavailable",
+      "revision": "2025-11-25",
+      "obligation": "unavailable",
+      "action": "inspect",
+      "facts": {
+        "credential": "unavailable",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "custody-unavailable",
+        "code": "unavailable",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.restart",
+      "revision": "2025-11-25",
+      "obligation": "restart",
+      "action": "restart",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "credential-ready",
+        "code": null,
+        "reuse": true,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.unacknowledged",
+      "revision": "2025-11-25",
+      "obligation": "unacknowledged",
+      "action": "restart",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": false,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "persistence-unacknowledged",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.protected-entry",
+      "revision": "2025-11-25",
+      "obligation": "protected-entry",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "protected-action",
+        "code": null,
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [
+          "acquisition_ref",
+          "expires_at",
+          "action_kind"
+        ],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.no-protected-channel",
+      "revision": "2025-11-25",
+      "obligation": "no-protected-channel",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": false,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "protected-channel-unavailable",
+        "code": "unavailable",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.completion",
+      "revision": "2025-11-25",
+      "obligation": "completion",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "acquisition-published",
+        "code": null,
+        "reuse": false,
+        "publish": true,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [
+          "acquisition_ref",
+          "state",
+          "connection_ref"
+        ],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.issuer",
+      "revision": "2025-11-25",
+      "obligation": "issuer",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": false,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "authority-mismatch",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.audience",
+      "revision": "2025-11-25",
+      "obligation": "audience",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": false,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "authority-mismatch",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.consumption",
+      "revision": "2025-11-25",
+      "obligation": "consumption",
+      "action": "complete",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": false,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "completion-refused",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.refresh-once",
+      "revision": "2025-11-25",
+      "obligation": "refresh-once",
+      "action": "refresh",
+      "facts": {
+        "credential": "expired",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "refresh-send-once",
+        "code": null,
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 1,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Authorized"
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.refresh-uncertain",
+      "revision": "2025-11-25",
+      "obligation": "refresh-uncertain",
+      "action": "refresh",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Uncertain",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "refresh-uncertain",
+        "code": "outcome_unknown",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Uncertain"
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.refresh-authorized",
+      "revision": "2025-11-25",
+      "obligation": "refresh-authorized",
+      "action": "refresh",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Authorized",
+        "new_live_authorization": false,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "refresh-uncertain",
+        "code": "outcome_unknown",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Uncertain"
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.refresh-recovery",
+      "revision": "2025-11-25",
+      "obligation": "refresh-recovery",
+      "action": "recover",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "ResponseStored",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "publication-only-recovery",
+        "code": null,
+        "reuse": false,
+        "publish": true,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": "Published"
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.refresh-wrong-state",
+      "revision": "2025-11-25",
+      "obligation": "refresh-wrong-state",
+      "action": "recover",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Uncertain",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "recovery-refused",
+        "code": "connection_not_ready",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.repair",
+      "revision": "2025-11-25",
+      "obligation": "repair",
+      "action": "repair",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "repair-published",
+        "code": null,
+        "reuse": false,
+        "publish": true,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [
+          "acquisition_ref",
+          "state",
+          "connection_ref"
+        ],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.repair-identity",
+      "revision": "2025-11-25",
+      "obligation": "repair-identity",
+      "action": "repair",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": false,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "identity-mismatch",
+        "code": "unauthorized",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.revoke",
+      "revision": "2025-11-25",
+      "obligation": "revoke",
+      "action": "revoke",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "locally-revoked",
+        "code": null,
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "unsupported",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.revoke-unknown",
+      "revision": "2025-11-25",
+      "obligation": "revoke-unknown",
+      "action": "revoke",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": false,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "revocation-unacknowledged",
+        "code": "outcome_unknown",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.stdio",
+      "revision": "2025-11-25",
+      "obligation": "stdio",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "stdio",
+        "binding_available": true,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "stdio-held",
+        "code": "unsupported",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.unselected-binding",
+      "revision": "2025-11-25",
+      "obligation": "unselected-binding",
+      "action": "restart",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": false,
+        "admitted": true,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "binding-unselected",
+        "code": "unsupported",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    },
+    {
+      "id": "auth.2025-11-25.management-admission",
+      "revision": "2025-11-25",
+      "obligation": "management-admission",
+      "action": "begin",
+      "facts": {
+        "credential": "ready",
+        "transport": "streamable-http",
+        "binding_available": true,
+        "admitted": false,
+        "protected_channel": true,
+        "custody_ack": true,
+        "publication_ack": true,
+        "correlation_live": true,
+        "consume_ack": true,
+        "issuer_matches": true,
+        "audience_matches": true,
+        "identity_matches": true,
+        "grants_valid": true,
+        "candidate_valid": true,
+        "refresh_state": "Reserved",
+        "new_live_authorization": true,
+        "current_fence": true,
+        "provider_revoke_supported": false
+      },
+      "expected": {
+        "outcome": "management-refused",
+        "code": "not_granted",
+        "reuse": false,
+        "publish": false,
+        "token_exchanges": 0,
+        "business_dispatches": 0,
+        "anonymous_fallback": false,
+        "ordinary_fields": [],
+        "provider_revocation": "not_attempted",
+        "refresh_next": null
+      },
+      "citations": [
+        "mcp-2025-11-25-basic-authorization.mdx:352"
+      ]
+    }
+  ]
+}
