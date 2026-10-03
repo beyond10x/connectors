@@ -6,7 +6,7 @@ and, since `story:mcp-domain-model`, an authored native ESS model at
 the protocol selection at
 [`contracts/protocol/v1alpha1/selection.md`](contracts/protocol/v1alpha1/selection.md).
 The initial [Rust library](runtime/Cargo.toml) implements canonical qualified names/resource
-URIs, bounded incremental stdio line framing, generated launch-input validation and
+URIs, bounded incremental stdio line framing, lossless JSON decoding, generated launch-input validation and
 serialized reduction of the shared session state and absolute lease decisions. Native
 tests exercise those components under Rust 1.88; EOF-retention, first-terminal and
 expiry-boundary mutations fail the intended checks.
@@ -39,6 +39,24 @@ future renewals. Timestamp comparisons preserve fractional precision. These deci
 tests do not qualify an operating-system clock or prove the final transport cutoff:
 the enclosing supervisor still needs serialized admission, fresh checks at each I/O
 boundary and verified resource cleanup.
+
+The [JSON decoder](runtime/src/json.rs) preserves large integers and decimal values,
+rejects duplicate decoded keys and enforces an explicit container-depth limit.
+Literal objects retain arbitrary member names, including names that resemble Serde
+implementation tokens. Equivalent numeric spellings may normalize; this is not a
+canonical byte encoder. The frame reader owns the byte ceiling. The existing core
+JSON reader retains its legacy numeric behavior.
+
+The decoder is owned by `connectors-core::json` and re-exported by the native
+library, so the generic host never depends on MCP. The protected owner has a
+distinct governed read request that acknowledges a real audit anchor before
+queueing provider work, rechecks policy in the serialized worker, and returns
+the complete service response without passing its numbers through the legacy
+reader. Final-observation recovery reuses the same observation and never retries
+business work; an unconfirmed final append preserves the known result and the
+acknowledged reference with `incomplete` audit. These host, socket and child-process
+tests establish the read seam. MCP discovery, projection configuration, real
+session clock/I/O supervision and the production launch remain to be connected.
 
 ## Scope and dependencies
 

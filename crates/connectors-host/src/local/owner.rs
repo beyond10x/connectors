@@ -1,6 +1,7 @@
 //! Owner-side composition for the production local CLI. Provider libraries never
 //! receive this authority, the metadata database, or a credential resolver.
 pub mod approval_issuance;
+mod governed;
 mod lifecycle;
 mod maintenance;
 pub mod mutation;
@@ -38,6 +39,8 @@ pub enum Code {
     LifecycleConflict,
     Revoked,
     NotGranted,
+    ConnectionNotReady,
+    InsufficientScope,
     IdentityMismatch,
     Unavailable,
     Timeout,
@@ -394,6 +397,14 @@ enum Request {
         deadline_ms: u64,
     },
     Invoke {
+        adapter: String,
+        connection: String,
+        operation: String,
+        schema: String,
+        revision: String,
+        deadline_ms: u64,
+    },
+    GovernedRead {
         adapter: String,
         connection: String,
         operation: String,
