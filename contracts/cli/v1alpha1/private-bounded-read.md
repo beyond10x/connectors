@@ -74,5 +74,5 @@ An owned guard closes only the held custody socket when that deadline expires,
 including during D-Bus setup and close, and joins its thread. Credential evidence
 expiry may shorten execution; it cannot restart it. Expired queued work cannot
 capture a credential or invoke a provider. This is a local owner binding, not yet
-a production MCP ingress: a future ingress must also bound its own framing,
-connection establishment and admission within that same original deadline.
+a production MCP ingress: a future ingress must also bound its own framing and
+pass that same original deadline into owner connection and admission.

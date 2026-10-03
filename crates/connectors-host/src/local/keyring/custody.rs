@@ -129,7 +129,7 @@ impl Store {
             return Err(Failure::Unavailable);
         }
         let path = super::local_path(socket).map_err(unavailable)?;
-        let stream = super::deadline::connect(&path, until).map_err(unavailable)?;
+        let stream = crate::local::unix::connect(&path, until).map_err(unavailable)?;
         let _guard = super::deadline::Guard::new(&stream, until).map_err(unavailable)?;
         let result = Self::connect(stream, version.scope()).and_then(|store| store.read(version));
         if std::time::Instant::now() >= until {
