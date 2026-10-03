@@ -54,8 +54,11 @@ Private version two supplies a bounded prepare/commit/cancel transport port with
 one-use pending writes, used by the [guarded GitLab journey](local-gitlab-merge.md).
 See the [private mutation binding](../contracts/cli/v1alpha1/private-mutations.md).
 Private version three supplies explicit [bounded native reads](../contracts/cli/v1alpha1/private-bounded-read.md)
-in the catalog executable. Its production owner/MCP composition remains unfinished;
-ordinary legacy invocation is refused on that selection, and it supplies no writes.
+in the catalog executable. The same-build owner has a bounded projected read port
+that checks exact curated limits, complete service envelopes and the original
+deadline through queueing, custody and dispatch. Production MCP composition remains
+unfinished; ordinary legacy invocation is refused on that selection, and it
+supplies no writes.
 
 `adapters describe --adapter ALIAS` reports the configured entry and its cached
 descriptor when available; cache facts are always stale. `adapters status --adapter

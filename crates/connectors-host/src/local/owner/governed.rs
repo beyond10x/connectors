@@ -11,6 +11,7 @@ use std::time::Instant;
 use uuid::Uuid;
 
 type Request<'a> = approval_issuance::Request<'a>;
+pub(super) mod bounded;
 mod metadata;
 pub(super) use metadata::describe;
 #[cfg(test)]
@@ -76,6 +77,7 @@ pub(super) fn registry_error(error: crate::local::registry::Failure) -> Error {
 
 pub(super) struct ReadPlan {
     pub adapter: Adapter,
+    bootstrap: runtime::Bootstrap,
     fingerprint: String,
 }
 
@@ -147,6 +149,7 @@ pub(super) fn resolve_selected(
     Ok(ReadPlan {
         adapter: adapter.clone(),
         fingerprint: connectors_core::digest(&json!({"config":config,"bootstrap":bootstrap})),
+        bootstrap,
     })
 }
 
@@ -160,7 +163,7 @@ pub(super) fn read(
     dispatch: impl FnOnce(&Adapter) -> Result<Vec<u8>>,
 ) -> Result<Value> {
     let audits = audit::Store::new(&context.0.state, 100_000).map_err(|_| Code::Unavailable)?;
-    read_using(context, alias, request, &audits, selection, dispatch)
+    read_using(context, alias, request, &audits, selection, None, dispatch)
 }
 
 #[cfg(test)]
@@ -173,7 +176,15 @@ fn read_with_audit(
     audits: &audit::Store,
     dispatch: impl FnOnce(&Adapter) -> Result<Vec<u8>>,
 ) -> Result<Value> {
-    read_using((paths, host, until), alias, request, audits, None, dispatch)
+    read_using(
+        (paths, host, until),
+        alias,
+        request,
+        audits,
+        None,
+        None,
+        dispatch,
+    )
 }
 
 fn read_using(
@@ -182,11 +193,24 @@ fn read_using(
     request: &Request<'_>,
     audits: &audit::Store,
     selection: Selection<'_>,
+    budget: Option<runtime::ReadBudget>,
     dispatch: impl FnOnce(&Adapter) -> Result<Vec<u8>>,
 ) -> Result<Value> {
     approval_issuance::check(until)?;
     let request_id = Uuid::new_v4().to_string();
-    let plan = resolve_selected(paths, alias, request, selection);
+    let plan = bounded::resolve(paths, alias, request, selection, budget);
+    let response = |id: &str, outcome, reference, status: &str| {
+        let value = self::response(id, outcome, reference, status)?;
+        if let Some(budget) = budget
+            && serde_json::to_vec(&value)
+                .map_err(|_| Code::Unavailable)?
+                .len()
+                > budget.result_bytes()
+        {
+            return Err(Code::Capacity.into());
+        }
+        Ok(value)
+    };
     // A denied operation may still have a verified configured instance. Never
     // use a submitted alias as an audit namespace or manufacture a registry row.
     let instance = plan
@@ -245,7 +269,7 @@ fn read_using(
             }
             let outcome = (|| {
                 approval_issuance::check(until)?;
-                let current = resolve_selected(paths, alias, request, selection)?;
+                let current = bounded::resolve(paths, alias, request, selection, budget)?;
                 if current.fingerprint != plan.fingerprint {
                     return Err(Code::StaleDescription.into());
                 }
