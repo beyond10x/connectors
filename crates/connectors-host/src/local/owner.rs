@@ -12,7 +12,7 @@ use super::{
     keyring::custody,
     registry, runtime,
 };
-pub use governed::ReadPolicy;
+pub use governed::{ProjectionMetadata, ReadPolicy};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{

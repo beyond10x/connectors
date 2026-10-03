@@ -36,7 +36,7 @@ fn generate(root: &Path, ess: &Path, output: &Path) -> Result<()> {
                 "--path",
                 "ess",
                 "--root",
-                "connectors.service_wire.OperationMetadata",
+                "connectors.service_wire.OperationCuration",
                 "--target",
                 "rust",
                 "--package",
