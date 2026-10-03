@@ -21,6 +21,7 @@ mod ignored;
 mod mcp;
 mod metadata_conformance;
 mod metadata_entities;
+mod service_metadata;
 mod source_hashes;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -50,6 +51,11 @@ enum Action {
     },
     /// Generate or compare MCP launch, configuration and shared session projections.
     McpBindings {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate or compare shared public operation metadata types.
+    ServiceMetadata {
         #[arg(long)]
         check: bool,
     },
@@ -229,6 +235,9 @@ fn execute(args: Args) -> Result<()> {
     }
     if let Action::McpBindings { check } = args.command {
         return mcp::run(&root, &ess, check);
+    }
+    if let Action::ServiceMetadata { check } = args.command {
+        return service_metadata::run(&root, &ess, check);
     }
     if let Action::Examples = args.command {
         check_ess(&ess)?;
