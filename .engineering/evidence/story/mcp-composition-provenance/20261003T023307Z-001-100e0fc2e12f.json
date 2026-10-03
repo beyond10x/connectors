@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T02:33:07Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-composition-provenance",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "All40literal composition cases and12revision-family pairs retained; encoded wrapper, remaining budget, provenance and correlation guards checked. Coordinator adversarial correlation finding fixed with retained regression; review outcome recorded. Authored contract consistency only, no MCP runtime claim.",
+    "reference": ".local/mcp-two-waves/evidence/retained-composition/composition-correction/report.md"
+  }
+}

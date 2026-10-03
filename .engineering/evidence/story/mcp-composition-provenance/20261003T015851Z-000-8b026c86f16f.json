@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T01:58:51Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-composition-provenance",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integration build environment probe: identical tiny Rust input direct compiler 21/19/15ms exit0; sccache proxy twice and actual compiler once each timeout at 10s exit124. Operational mitigation is invocation-local RUSTC_WRAPPER empty; this is not a product test pass or cache root-cause claim.",
+    "reference": ".local/mcp-two-waves/second-integration/compiler-probe"
+  }
+}

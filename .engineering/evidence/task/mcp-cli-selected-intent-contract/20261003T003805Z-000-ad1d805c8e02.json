@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-03T00:38:05Z",
+  "actor": "human:timo",
+  "artifact": "task:mcp-cli-selected-intent-contract",
+  "kind": "task",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:mcp-cli-intent-20261003",
+    "review": "review-result:mcp-cli-intent-20261003",
+    "outcome": "no-op"
+  }
+}
