@@ -57,6 +57,7 @@ pub struct ScopedHttp {
     /// The exact paths `post_json` may reach, fixed by trusted composition.
     read_posts: Arc<std::collections::BTreeSet<Vec<String>>>,
     read_post_timeout: Duration,
+    provider_until: Option<tokio::time::Instant>,
 }
 
 /// The largest JSON body a read sent as a POST may carry.
@@ -66,6 +67,43 @@ pub const READ_POST_MAX_TIMEOUT: Duration = Duration::from_secs(180);
 const READ_POST_DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
 
 impl ScopedHttp {
+    /// Trusted composition selects one provider interval inside the original
+    /// execution deadline. Credential resolution and all requests made through
+    /// this capability share the cutoff; deriving capabilities cannot extend it.
+    ///
+    /// This enforces HTTP time only. The selected binding must separately admit
+    /// metadata and enforce whole-envelope byte and total execution ceilings.
+    /// Existing constructors retain the legacy per-request timeout.
+    pub fn with_provider_budget(
+        &self,
+        budget: Duration,
+        execution_until: std::time::Instant,
+    ) -> Result<Self> {
+        if budget.is_zero() || budget > Duration::from_secs(30) {
+            return Err(Error::invalid(
+                "provider budget is outside supported bounds",
+            ));
+        }
+        let now = tokio::time::Instant::now();
+        let mut until = (now + budget).min(tokio::time::Instant::from_std(execution_until));
+        if let Some(previous) = self.provider_until {
+            until = until.min(previous);
+        }
+        if until <= now {
+            return Err(budget_expired());
+        }
+        Ok(Self {
+            client: self.client.clone(),
+            base: self.base.clone(),
+            credential: self.credential.clone(),
+            header: self.header.clone(),
+            bearer: self.bearer,
+            provider_until: Some(until),
+            read_posts: self.read_posts.clone(),
+            read_post_timeout: self.read_post_timeout,
+        })
+    }
+
     pub fn from_config(config: &HttpConfig) -> Result<Self> {
         Self::new(
             config,
@@ -150,6 +188,7 @@ impl ScopedHttp {
             bearer: config.bearer,
             read_posts: Arc::default(),
             read_post_timeout: READ_POST_DEFAULT_TIMEOUT,
+            provider_until: None,
         })
     }
     /// Immutable per-command credential capability over the captured target/TLS
@@ -163,6 +202,7 @@ impl ScopedHttp {
             bearer: self.bearer,
             read_posts: self.read_posts.clone(),
             read_post_timeout: self.read_post_timeout,
+            provider_until: self.provider_until,
         }
     }
 }
@@ -215,6 +255,7 @@ impl ScopedHttp {
                 bearer: self.bearer,
                 read_posts: self.read_posts.clone(),
                 read_post_timeout: self.read_post_timeout,
+                provider_until: self.provider_until,
             },
             segments: fixed,
         }))
@@ -264,6 +305,7 @@ impl ScopedHttp {
             credential: self.credential.clone(),
             header: self.header.clone(),
             bearer: self.bearer,
+            provider_until: self.provider_until,
             read_posts: Arc::new(fixed),
             read_post_timeout: timeout,
         })
@@ -274,11 +316,8 @@ impl ScopedHttp {
         segments: &[&str],
         query: &[(&str, String)],
     ) -> Result<reqwest::Response> {
-        self.request(reqwest::Method::GET, segments, query)
-            .await?
-            .send()
-            .await
-            .map_err(provider_error)
+        let request = self.request(reqwest::Method::GET, segments, query).await?;
+        self.send(request).await
     }
 
     /// Trusted composition only. One `application/x-www-form-urlencoded` POST
@@ -297,7 +336,7 @@ impl ScopedHttp {
             return Err(Error::invalid("a form endpoint is one fixed path"));
         }
         let url = self.url(segments)?;
-        let response = self
+        let request = self
             .client
             .post(url)
             .header(
@@ -306,11 +345,31 @@ impl ScopedHttp {
             )
             .header(reqwest::header::ACCEPT, "application/json")
             // The transport holds the owner, and drops it when the body is sent.
-            .body(reqwest::Body::from(axum::body::Bytes::from_owner(body)))
-            .send()
-            .await
-            .map_err(provider_error)?;
+            .body(reqwest::Body::from(axum::body::Bytes::from_owner(body)));
+        let response = self.send(request).await?;
         bounded_response(response).await
+    }
+
+    fn remaining(&self) -> Result<Option<Duration>> {
+        self.provider_until
+            .map(|until| {
+                until
+                    .checked_duration_since(tokio::time::Instant::now())
+                    .filter(|remaining| !remaining.is_zero())
+                    .ok_or_else(budget_expired)
+            })
+            .transpose()
+    }
+
+    async fn send(&self, request: reqwest::RequestBuilder) -> Result<reqwest::Response> {
+        // Compute at the send boundary, after credential and body construction.
+        // Reqwest retains this timeout through response-body consumption. This
+        // explicit timeout overrides the legacy client's 15-second default.
+        let request = match self.remaining()? {
+            Some(remaining) => request.timeout(remaining),
+            None => request,
+        };
+        request.send().await.map_err(provider_error)
     }
 
     fn url(&self, segments: &[&str]) -> Result<Url> {
@@ -336,12 +395,19 @@ impl ScopedHttp {
         segments: &[&str],
         query: &[(&str, String)],
     ) -> Result<reqwest::RequestBuilder> {
+        self.remaining()?;
         let mut url = self.url(segments)?;
         url.query_pairs_mut()
             .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
         let mut request = self.client.request(method, url);
         if let Some(credential) = &self.credential {
-            let secret = credential.resolve().await?;
+            let secret = match self.provider_until {
+                Some(until) => tokio::time::timeout_at(until, credential.resolve())
+                    .await
+                    .map_err(|_| budget_expired())??,
+                None => credential.resolve().await?,
+            };
+            self.remaining()?;
             let value = zeroize::Zeroizing::new(if self.bearer {
                 let mut value = b"Bearer ".to_vec();
                 value.extend_from_slice(&secret.0);
@@ -356,6 +422,13 @@ impl ScopedHttp {
         }
         Ok(request)
     }
+}
+
+fn budget_expired() -> Error {
+    Error::new(
+        ErrorCode::Timeout,
+        "provider budget expired before dispatch",
+    )
 }
 
 // Deliberately private, non-Clone, and separate from the GET capability. Native
@@ -385,7 +458,7 @@ impl AuthenticatedWrite for ScopedWrite {
         } else {
             request.json(body)
         };
-        let response = request.send().await.map_err(provider_error)?;
+        let response = self.0.send(request).await?;
         let status = response.status().as_u16();
         let mut headers = std::collections::BTreeMap::new();
         let mut bytes = 0_usize;
@@ -431,15 +504,13 @@ impl AuthProbe for ScopedProbe {
             ));
         }
         let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
-        let response = self
+        let request = self
             .http
             .request(reqwest::Method::POST, &segments, &[])
             .await?
             .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(document)
-            .send()
-            .await
-            .map_err(provider_error)?;
+            .body(document);
+        let response = self.http.send(request).await?;
         let status = response.status().as_u16();
         let mut headers = std::collections::BTreeMap::new();
         let mut bytes = 0_usize;
@@ -660,13 +731,19 @@ impl AuthenticatedHttp for ScopedHttp {
         if bytes.len() > READ_POST_BODY_LIMIT {
             return Err(Error::invalid("read POST body exceeds limit"));
         }
-        let response = self
+        let request = self
             .request(reqwest::Method::POST, segments, query)
             .await?
-            .timeout(self.read_post_timeout)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .header(reqwest::header::ACCEPT, "application/json")
-            .body(bytes)
+            .body(bytes);
+        // The read-POST timeout never outlasts the shared provider budget.
+        let timeout = match self.remaining()? {
+            Some(remaining) => remaining.min(self.read_post_timeout),
+            None => self.read_post_timeout,
+        };
+        let response = request
+            .timeout(timeout)
             .send()
             .await
             .map_err(provider_error)?;
