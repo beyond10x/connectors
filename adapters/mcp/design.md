@@ -14,6 +14,20 @@ This does not implement a running
 MCP server, an outbound authenticated connection or a CLI command. There is no admitted
 runtime declaration, and CLI compatibility remains deferred.
 
+The native [result codecs](runtime/src/results.rs) project an already admitted owner
+reply into tools, resources or a declared prompt-message result, retaining service
+correlation and complete audit/source/mutation observations. Tool text and structured
+content carry the same lossless JSON value. Primary-only completion/cache fields are
+separate from legacy replies, and whole-frame encoding budgets the JSON-RPC wrapper,
+correlation, duplicated representations and final newline. These helpers do not
+establish family eligibility, provider declaration support or request admission.
+
+The protected owner also checks the application-provided projection constraint at
+dequeue and final dispatch. A disposable real-custody/owned-child test confirms that
+withdrawal at final dispatch cancels the captured credential use without calling the
+provider; removing that last check makes the test reach the provider and fail. This
+worker evidence remains separate from unfinished MCP process conformance.
+
 The runtime and generated projection packages are siblings: generated manifests retain
 their own workspace declarations, and the root workspace excludes those packages while
 consuming their unchanged libraries. The repository gate checks both native launch
