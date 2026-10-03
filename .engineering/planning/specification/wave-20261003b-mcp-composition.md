@@ -1,79 +1,79 @@
 ---
 format: aep.planning-md/3
-id: specification:wave-20261003a-mcp-auth-replay
+id: specification:wave-20261003b-mcp-composition
 kind: specification
 status: draft
-title: 'First authorized MCP wave: outbound auth and inbound replay contracts'
+title: 'Second authorized MCP wave: composition and CLI selected intent'
 relations:
-- informed_by: specification:wave-20261002g-mcp-contracts
+- informed_by: specification:wave-20261003a-mcp-auth-replay
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 1
 ---
-## Authorization and selected units
+## Second authorized wave: selection pending predecessor completion
 
-AEP skill version0.19.1, wave mode. approval-record:mcp-next-two-waves-20261003
-contains the operator's explicit instruction to dispatch two waves using multiple
-agents and clean up. This is the first of those two, after completion of the current
-invocation/projection wave. Root is sole AEP writer. Codex collaboration agents run
-the aep:story-scoper, aep:implementor and aep:adversary reference procedures; this
-host has no plugin-specific subagent_type selector. Model overrides are not selected.
+AEP skill version0.19.1. The operator authorized two waves in
+approval-record:mcp-next-two-waves-20261003; no second approval question is needed.
+This page preserves preparation, not a claim that prerequisites already finished.
 
-- story:mcp-outbound-auth-lifecycle: authored HTTP credential lifecycle, serving
-  vision:independent-contract-adapters. One cited contract plus two inferred new
-  JSON/guard paths; existing unresolved native ownership remains explicit.
-- story:mcp-inbound-mutation-replay: authored local single-owner mutation/replay
-  mapping, serving the same vision. One cited contract plus two inferred new
-  JSON/guard paths. Requires the integrated projection story implemented first.
+The selected story candidate is story:mcp-composition-provenance. Its exact three
+contract/case/guard paths are recorded in the story, with cited primary and inferred
+new case/test paths. It now depends on reviewed auth and mutation contracts as well
+as invocation/projection. Re-read their final bodies and recompute draft waves after
+the first wave closes; include the complete returned lists here before dispatch.
 
-Both units are authored specification checks, not runtime MCP interoperability,
-Secret Service persistence, no-duplicate-effect execution or end-to-end delivery.
-The separate sibling HTTP native-model review prepares actual runtime work.
+A separate parallel companion is task:mcp-cli-selected-intent-contract, under the
+still-open story:mcp-cli-journey-discovery-contract. AEP refused task-level scope
+because a task inherits its parent's surfaces. The static inventory path is recorded
+on that parent; the task owns only its exact three authored documents. It is not
+an implemented working CLI journey and is not counted as a second terminal story.
+The composition wave may have N=1; the companion task and independent reviewer use
+separate agents and checkouts under the same operator authorization.
 
-Each unit gets one managed tree and one independent review, with at most two full
-attacks. Author base remains pending until the current integration gate passes and
-the opening commit exists. No candidate receives a dirty partial source snapshot.
-Authorization covers two unit commits, integration commits, closing store commit,
-merge to base and existing bot publication authorization. No additional product
-relations or deployment are selected.
+## Boundaries and checks
 
-## Preflight and ownership
+Composition covers both inbound and outbound hops for the configured single local
+owner. It reuses actual auth/projection/replay owners, preserves safe provenance,
+remaining deadlines and wrapper overhead, and rejects credential forwarding,
+account fallback, metadata authority and invented remote audit references. The old
+mediated-HTTP analogy was corrected: it supplies boundary principles, not MCP's
+runtime relation/transport semantics. No unresolved native relation is silently
+chosen. Meaningful document guard negative controls plus independent review and
+one full integration gate remain required; no runtime conformance follows.
 
-Primary checkouts remain untouched. The coordinator reuses its owned managed
-cb26c-plan tree and existing build cache; current uncommitted changes belong to
-this authorized integration and planning work, retained in private preflight status.
-Prior worker cb26g-in/out are frozen, all leases released, reports read/copied and
-recovery archives verified. Their exact Cargo targets were cleaned:1.7GiB each.
-Finish/GC follows publication of wanted source. Integration root is retained because
-it owns the next work. No unrelated tree or process is a cleanup candidate.
+The CLI companion selects intent, JSON inventory and human/static agreement. It
+leaves mcp=deferred, parser, generated binding and runtime untouched. No new mirrored
+prose test is required. Validate JSON, links, syntax correspondence, source checks
+and explicit unavailable steps. Parent acceptance waits for actual runtime.
 
-Measured worker build cost about1.6GiB, root fullgate already has its own target.
-Available disk14GiB at this preflight; floor8GiB, recheck before every new build.
-Two implementors maximum, each2Cargo jobs with /usr/bin/sccache and isolated target.
-Host concurrency4 including coordinator; no separate token budget stated. Builds
-may be serialized to preserve reserve. Sourcepins ESS0.45/AEP0.65 remain fixed.
+Root alone owns planning/integration/publication. Existing bot commit/push/PR/merge
+authorization remains. No source release, deployment, consumer pin or product
+ownership choice is implied by these contract-only units.
 
-Managed records planned:
-- cb26i-auth, branch unit/mcp-auth-20261003, target within that tree, scratch
-  .local/mcp-two-waves/auth; unit story:mcp-outbound-auth-lifecycle.
-- cb26i-replay, branch unit/mcp-replay-20261003, target within that tree, scratch
-  .local/mcp-two-waves/replay; unit story:mcp-inbound-mutation-replay.
-The private wave directory holds exact resolved paths, leases and immutable briefs.
-Their source base and stage are updated after creation, never inferred from age.
+## Planned ownership; fill exact base before dispatch
 
-## Scope and deferrals
+- Composition: managed cb26j-compose, branch unit/mcp-composition-20261003,
+  its own target, scratch.local/mcp-two-waves/composition.
+- CLI companion: managed cb26j-cli, branch unit/mcp-cli-intent-20261003,
+  no Cargo target needed, scratch.local/mcp-two-waves/cli-intent.
+Durable briefs and source base will be written before authors start. Existingroot
+integration cache may be reused only byroot; worker targets nevershared.
 
-Read-only scopers confirmed exact new files; each story now records typed scopes.
-The replay story corrected a false request-id-to-business-key inference; terminal
-Indeterminate alone never supplied the entire dispatch fence. Auth remains an
-obligation until its separate native custody/Connection mapping is designed.
+## Preflight to refresh
 
-Second wave candidates are composition plus CLI/discovery, separately re-read and
-recomputed after these two units close. Cloud caller isolation, outbound stdio child
-ownership, external execution and unrelated unassessed backlog remain excluded.
-The computed broad-store lists below are retained verbatim; they are candidates,
-not authorization for every returned artifact. No unassessed item is selected here.
+Confirm first-wave source integrated, review findings recorded, exact gates passed,
+wanted source published and completedworker cleanup. Refresh free disk against8GiB
+floor; measured Rust contractworker targetabout1.6GiB. Twojobs/sccache/defaulttarget.
+Do not clean unrelated trees/processes. Model/toolpins unchanged.
 
-## Computed scope lists before dispatch
+## Selected second wave after predecessor verification
+
+AEP skill version0.19.1. Existing approval-record:mcp-next-two-waves-20261003 authorizes dispatch; no new approval required. Full predecessor gate passed with1245 tests, zero failures,65 ignored; auth/replay stories implemented. Computed draft wave1 includes both composition and the CLI parent; only story:mcp-composition-provenance is selected as a terminal story (N=1). Separate task:mcp-cli-selected-intent-contract runs in parallel under the still-open CLI parent. Its static documents do not satisfy the working CLI journey. Unrelated unassessed backlog is not selected and is not claimed parallel-safe. Exact typed scopes do not overlap.
+
+One implementor per selected unit and one fresh adversary per result, at most two attacks. Codex collaboration agents execute the installed AEP role procedures; no plugin-specific subagent_type selector is exposed. Root alone writes AEP and integrates. Authorization covers the two bounded units' source, integration/store commits and bot publication under existing authority, not runtime completion, deployment or consumer pins.
+
+Managed cb26j-compose / unit/mcp-composition-20261003 owns three composition paths, scratch.local/mcp-two-waves/composition, isolated defaulttarget. Managed cb26j-cli / unit/mcp-cli-intent-20261003 owns three static CLI documents, scratch.local/mcp-two-waves/cli-intent, no Cargo build. Both start at the verified published first-wave candidate; its exact SHA and resolved paths enter durable briefs before dispatch. Current available storage11GiB,8GiB reserve; only composition needs an estimated1.6GiB worker target,2jobs/sccache. Root retains its cache; no live providers. Final first-wave archives and signed publication precede old-worker retirement.
+
+## Complete computed draft lists
 
 
 ```json
@@ -221,16 +221,46 @@ not authorization for every returned artifact. No unassessed item is selected he
           ]
         },
         {
+          "id": "story:mcp-cli-journey-discovery-contract",
+          "inferred": true,
+          "scope": [
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "apps/connectors/spec/compatibility.json"
+            },
+            {
+              "confidence": "inferred",
+              "path": "contracts/cli/v1alpha1/semantics.md"
+            },
+            {
+              "confidence": "inferred",
+              "path": "docs/local-mcp-cli.md"
+            }
+          ]
+        },
+        {
           "id": "story:mcp-composition-provenance",
           "inferred": true,
           "scope": [
             {
               "confidence": "inferred",
-              "path": "adapters/mcp/contracts/composition/v1alpha1/scenarios"
+              "path": "adapters/mcp/contracts/composition/v1alpha1/composition-cases.json"
+            },
+            {
+              "confidence": "cited",
+              "path": "adapters/mcp/contracts/composition/v1alpha1/semantics.md"
             },
             {
               "confidence": "inferred",
-              "path": "adapters/mcp/contracts/composition/v1alpha1/semantics.md"
+              "path": "crates/connectors-build/tests/mcp_composition_provenance.rs"
             }
           ]
         },
@@ -245,42 +275,6 @@ not authorization for every returned artifact. No unassessed item is selected he
             {
               "confidence": "inferred",
               "path": "adapters/mcp/contracts/server/v1alpha1/fixtures"
-            }
-          ]
-        },
-        {
-          "id": "story:mcp-inbound-mutation-replay",
-          "inferred": true,
-          "scope": [
-            {
-              "confidence": "inferred",
-              "path": "adapters/mcp/contracts/server/v1alpha1/mutation-cases.json"
-            },
-            {
-              "confidence": "cited",
-              "path": "adapters/mcp/contracts/server/v1alpha1/mutations.md"
-            },
-            {
-              "confidence": "inferred",
-              "path": "crates/connectors-build/tests/mcp_inbound_mutation_replay.rs"
-            }
-          ]
-        },
-        {
-          "id": "story:mcp-outbound-auth-lifecycle",
-          "inferred": true,
-          "scope": [
-            {
-              "confidence": "inferred",
-              "path": "adapters/mcp/contracts/client/v1alpha1/auth-cases.json"
-            },
-            {
-              "confidence": "cited",
-              "path": "adapters/mcp/contracts/client/v1alpha1/auth.md"
-            },
-            {
-              "confidence": "inferred",
-              "path": "crates/connectors-build/tests/mcp_outbound_auth_lifecycle.rs"
             }
           ]
         },
@@ -398,28 +392,6 @@ not authorization for every returned artifact. No unassessed item is selected he
             {
               "confidence": "cited",
               "path": "docs/catalog-jira.md"
-            }
-          ]
-        },
-        {
-          "id": "story:mcp-cli-journey-discovery-contract",
-          "inferred": true,
-          "scope": [
-            {
-              "confidence": "inferred",
-              "path": "adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.md"
-            },
-            {
-              "confidence": "inferred",
-              "path": "apps/connectors/spec/compatibility.json"
-            },
-            {
-              "confidence": "inferred",
-              "path": "contracts/cli/v1alpha1/semantics.md"
-            },
-            {
-              "confidence": "inferred",
-              "path": "docs/local-mcp-cli.md"
             }
           ]
         },
@@ -970,53 +942,3 @@ not authorization for every returned artifact. No unassessed item is selected he
 }
 
 ```
-
-## Dispatch — 2026-10-03
-
-Opening source/plan commit b360aaaa771ad9a31cab46ff4249015b74a4d50f passed coordinated
-hooks and common security (166commits scanned); bot author and committer verified.
-Published as plan/mcp-contracts-20261002, PR80. The prerequisite contract fullgate
-passed1227 tests; its independent review history is retained. Both selected stories
-are now active and their actual dependencies implemented. No source is borrowed
-from a dirty/uncommitted candidate.
-
-- cb26i-auth / unit/mcp-auth-20261003 / baseb360aaaa / implementor mcp_invocation;
-  leasecodex-cb26i-auth; scratch.local/mcp-two-waves/auth; isolatedtarget.
-- cb26i-replay / unit/mcp-replay-20261003 / baseb360aaaa / implementor mcp_projection;
-  leasecodex-cb26i-replay; scratch.local/mcp-two-waves/replay; isolatedtarget.
-
-Durable per-unit briefs existed before implementation dispatch. Both own exactly
-three files recorded on their stories. Initially auth compiled alone; after exact
-cleanup of completed root MSRV/default targets, available disk17GiB permitted both
-scoped builds, each2jobs withsccache. Floor8GiB remains checked. Rootgate output
-and source hashes were retained before deleting any build output. Root retained its
-active source tree; no shared builddirectory or unrelated process was touched.
-
-Previous workers cb26g-in and cb26g-out: reports copied, wantedsourcepublished,
-archivesverified, finished, exactGCdryruneligible and applyremoved both. Archives
-remain. Managed repolist verifies neither oldpath remains. This cleanup began
-before newtree creation and finished while newauthors prepared their scoped work.
-
-## Prerequisites published; first independent attacks — 2026-10-03
-
-Connectors PR80 merged through b10x-bot[bot] at fcef8b18a58c16e8af07c0a04aece5e8415164d2 after required repository, planning and shared security checks passed. Its tree 71d8d7d8ce348a6a098128662d555940c194d245 equals reviewed candidate b360aaaa771ad9a31cab46ff4249015b74a4d50f. The App-only branch authority and exact App merge action were verified. The coordinator fast-forwarded, preserving owned uncommitted next-wave planning, and selected plan/mcp-auth-replay-20261003.
-
-Both authors froze source with targeted tests/fmt/Clippy passing. Auth ran25 checks and fixed a stale restart fence after an observed RED. Replay ran37 checks. Independent adversary review-results mcp-auth-20261003 and mcp-replay-20261003 preserve first attacks verbatim before author corrections. Auth accepted contradictory duplicate Markdown rows (25passed/1failed after attack); replay allowed required semantic cases to be replaced by early-denial premises and a recovery observer to become live-host (38passed/2failed). These document-guard findings returned to authors with regressions retained; no runtime defect or runtime conformance inferred.
-
-Old workers cb26g-in/cb26g-out were archived, finished and removed through exact reviewed managed GC after wanted source publication. Archives retained under worktree/archives/connectors. The current auth/replay workers remain active for correction/review. Available space24GiB at 23:10UTC, with8GiB reserve. Second-wave selected scope remains prepared, not yet dispatched.
-
-## Verified integration — 2026-10-03
-
-Final integrated fullgate --msrv exited0: 1245 tests passed, zero failed,65 ignored across152 runner summaries. Formatting, Clippy, provider/generic CLI boundaries, Rust1.88 pure libraries and Rust1.91 whole workspace, ESS/native models and conformance, and AEP validation passed. Log SHA256ddb71066b5ffe80d22aea3e8ff7e962314e50eb3c0181a8c21d85cdf849938ce. Existing planning historical review warnings remain; no new validation error. Both selected stories moved active→implemented with recorded test_result and verification. Actual MCP runtime and mutation advertisement remain unavailable.
-
-Auth first/second attacks found1/1 defects, AEP carried0/new1/resolved1; both were corrected, regressions retained and coordinator verified the final diff. Replay first/second attacks found2/0, carried0/new0/resolved2; all corrected,41 targeted checks passed. Auth28 targeted passed. No third campaign. All source reports and122 ignored evidence files were copied and byte-verified before worker targets were cleaned (3.135GiB). Both exact worker archives are verified; finish/GC waits for wanted source publication.
-
-The next wave is preauthorized. Independent author preparation is complete and scopes were recomputed after these two stories closed. Its authors may begin at the verified published candidate while CI runs; actual PR merges still require all exact-head checks. The root integration cache is retained. The completed sibling MCP model target was separately cleaned (1.5GiB) after no users were found, keeping the storage reserve; its logs and published source remain.
-
-## Publication privacy correction
-
-The common commit gate refused two personal-paths findings in raw compiler-output lines of the unpublished auth review records. Nothing was committed or published. Because review records are immutable, the original unpublished store and raw reports remain in private recovery; no immutable record was rewritten. A fresh managed publication candidate, cb26k-publish, was created from the same published base fcef8b18a58c16e8af07c0a04aece5e8415164d2. The single coordinator replayed every required planning mutation through AEP, with existing evidence observation times preserved.
-
-The two public report copies explicitly normalize only the private compiler checkout root to <worktree>. Findings, test names, assertions, counts and exit statuses are unchanged. Original report digests remain the raw evidence identities cited earlier. Public copy digests: first768985a02ca8451a844c2f2141f53a4fa67c4189037fd18491fe44615e927241; followupa075b57736f7193b4fdb818d8127da5ef7af5bccbbed13d733e16935f8963189. Replay reports already used portable paths and are unchanged.
-
-All six implementation source files were copied and byte-compared equal to the final integrated gate inputs; every other executable/specification source remains at the same base. Fullgate evidence is reused at those identical source bytes, while AEP validation and the same common gate run on the rebuilt publication candidate. No policy or hook changed and no refusal was bypassed. The new integration owner is cb26k-publish; the old cb26c-plan becomes private archive recovery after wanted source is published. Subsequent author briefs name the new owner and exact published base.

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T00:02:45Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-inbound-mutation-replay",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "CARGO_BUILD_JOBS=2 RUSTC_WRAPPER=/usr/bin/sccache CONNECTORS_ESS=0.45.0 CONNECTORS_AEP=0.65.0 cargo run --locked -p connectors-build -- gate --msrv; exit 0; 1245 passed, 0 failed, 65 ignored across 152 summaries; SHA256 ddb71066b5ffe80d22aea3e8ff7e962314e50eb3c0181a8c21d85cdf849938ce",
+    "reference": ".local/mcp-two-waves/integration/gate.log"
+  }
+}

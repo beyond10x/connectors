@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-outbound-auth-lifecycle
 kind: story
-status: active
+status: implemented
 title: Specify outbound MCP credential entry, persistence, refresh, repair and revocation
 relations:
 - decomposes: epic:mcp-contracts
@@ -16,10 +16,11 @@ scope:
   path: adapters/mcp/contracts/client/v1alpha1/auth.md
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_outbound_auth_lifecycle.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T22:44:32Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-02T22:44:32Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-10-03T00:10:02Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
 ---
 ## Acceptance
 
@@ -121,3 +122,15 @@ uncertain rotating-token refresh with no second exchange, publication-only recov
 identity-preserving repair, local versus provider revocation, and maintenance never
 replaying a business call. Use mutated-copy controls for the same failure classes.
 No actual credentials, restart acceptance, stdio ownership or provider forwarding.
+
+## Implementation and first review correction — 2026-10-03
+
+Authored contract and48 literal document cases cover both pinned revisions. The five initial checks first failed on the absent contract; author mutation testing subsequently caught stale restart reuse and required the current publication fence. Initial targeted25checks, formatting and scopedClippy passed. No native custody/Connection relation, OAuth flow or persistent implementation was introduced.
+
+Independent review-result:mcp-auth-20261003 added a failing test: all48 contradictory duplicate Markdown rows were accepted by the document guard. The correction parses full structural Markdown table rows with unique identifiers and rejects misplaced rows, fenced/quoted substitutions and duplicated tables; it retains the reviewer regression and supports valid row reordering. The corrected affected suite executed27checks, zero failures/ignored; formatting and scopedClippy exited0. Contract/JSON unchanged; guard SHA25613319d3bf3dd607eaee0ad00e6b68e20920248be2562f69ffce1344fffafba2b. Correction report SHA2565c3e190c6218749bf006b45cd4b35587a4cabcec7984e202e2c7dc5536cfc7f2. Final bounded independent pass and integration gate remain pending; this is document conformance only.
+
+## Final bounded review and correction — 2026-10-03
+
+The second attack found one adjacent unsupported-HTML bypass. AEP findings comparison: carried0, new1 (whole HTML blocks bypass correspondence), resolved1 (contradictory Markdown duplicates). The final correction unconditionally rejects InlineHtml/Html events and documents that authored subset. Coordinator compared the guard against the frozen second-pass baseline: only the rejection condition/message and the preserved appended reviewer test differ; no assertion was removed or relaxed. Both reviewer regressions remain unchanged. No third attack ran.
+
+Final28affected checks passed, zero failed/ignored, with formatting and scopedClippy exit0. Final source hashes: auth.md5beefe75580f987957e96c4553257e19a9fb6df6a0b3e159e9b74808c2b13209; auth-cases.json65d655e428eeaa03afc57af1182246131e94359b874e97ec4086a10d94830b48; guard8cbdb0638b95a4e1ad8a0e96a4c2c4b5b627cd8202a1c3e1372187ea91b8a8ea. Final correction report SHA25643b72c76f836ecf85c83a10285e0a31a5fb8c78827175bb1991f7be3ab5fed7e. Exact three source files integrated; full repository gate pending.

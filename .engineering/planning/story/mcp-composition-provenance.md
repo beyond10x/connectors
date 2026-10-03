@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-composition-provenance
 kind: story
-status: draft
+status: active
 title: Specify composition when an inbound MCP capability is backed by an outbound MCP server
 relations:
 - decomposes: epic:mcp-contracts
@@ -18,7 +18,10 @@ scope:
   path: adapters/mcp/contracts/composition/v1alpha1/semantics.md
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_composition_provenance.rs
-revision: 5
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-03T00:10:02Z", actor: "human:timo", revision: 7}
+- {from: "proposed", to: "active", at: "2026-10-03T00:10:03Z", actor: "human:timo", revision: 8}
 ---
 ## Acceptance
 
@@ -130,3 +133,9 @@ safeprovenance, wrapperbyteoverhead, remainingdeadline, partial/unknown results,
 metadata-no-authority, missingmutationbinding and unresolved durable ownership.
 Document guards derive applicable vocabulary from authoritative owners, reject
 missing/duplicate/contradictory copied cases, and claim no network/runtime conformance.
+
+## Read-only preparation against final predecessor contracts — 2026-10-03
+
+Independent preparation found no confirmed owning-contract contradiction before dispatch. Composition-specific cases must cover all four inbound/outbound revision pairs across tools/resources/prompts; legacy wrapping of modern structured arrays/null; fixed target/account on auth failure; no caller retargeting or credential forwarding; independent admission/revision/disclosure; metadata-no-authority; trustworthy acknowledged instance-qualified SourceAudit versus peer self-report; actual encoded wrapper size including escaping/duplicate representations; exact bounds/multibyte content; remaining budget after auth/processing; partial/lost downstream observations and caller-versus-host knowledge; and withheld mutations without an executable binding.
+
+Three representation constraints prevent invented semantics: encoded envelope sizes differ by hop, so minimum raw byte ceilings alone is insufficient; SourceAudit is not a provenance-chain payload, so any further public shape needs native ESS first; the capability snapshot has no declared persistent revision identity, which cannot be invented to mirror the inbound descriptor revision. All cases are document requirements, not runtime conformance.

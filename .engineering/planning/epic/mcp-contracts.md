@@ -8,7 +8,7 @@ relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:contract-driven-connectors-design
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 7
+revision: 8
 ---
 ## Operator request
 
@@ -220,3 +220,18 @@ release. A separately scoped faithful observation projection would retain its
 uncovered native invariants explicitly; it is not selected by this scratch work.
 No new upstream implementation, sibling dependency pin, invented persistent entity,
 source release or claim of MCP delivery follows from these probes.
+
+## Delivery route after specification refinement — 2026-10-03
+
+Operator clarified that ESS refinement means the MCP specifications, not skill instructions. The next two waves are explicitly authorized by approval-record:mcp-next-two-waves-20261003. Invocation/projection/framing prerequisites merged in Connectors PR80 at fcef8b18a58c16e8af07c0a04aece5e8415164d2 after required checks; exact candidate/merge tree matched. Auth/replay final reviewed sources are integrated and their fullgate is running. Composition plus the separate CLI selected-intent task follow from that verified published base while CI runs; merging still waits for required checks. The parent working CLI journey stays open.
+
+Sibling beyond10x/mcp PR5 refined eleven immutable HTTP observation values after the earlier constructor/gate foundation. Candidate110fc10edcfcc90bb9b56d4f1fcf2c7e5c22cda7 merged atc45e1a74125ac1c4cbba79fa90fe1cb098cb18c8, identical treec831e8e4b24ae24e8f5c812396707781028b0642. PR and merged-main checks passed; Rust1.88 taskcheck26passed. Constructor suite still has nine same scenario bodies, six explicit partial refusals, three authored refusals and inconclusive coverage. New HTTP execution coverage is zero. Model H1–H4 preserve byte/length/fidelity/instrumentation obligations; generated codecs expose nine duties rather than claiming structural decoding enforces them. Design-review planted missing peer data was detected, not a runtime mutation score. Frozen modelworker was archived and exact-GC removed.
+
+The shortest delivery sequence remains:
+1. Close the two authorized contract waves with retained negative controls, one integration gate each and source publication; no runtime completion inferred.
+2. Use sibling specification:strict-http-exchange-scope and its validated immutable domain for the first actual bounded HTTP tool-exchange slice: raw observations, selected negotiation, no automatic redispatch, actual owned wire fixture and independent counters. Preserve the existing API/digest path through explicit opt-in. Model any further input/output types before runtime stories. Resources and prompts follow that boundary rather than duplicating transports.
+3. Resolve the existing native binding/Connection/custody/snapshot ownership markers by reviewed ESS design and actual source owners before Connectors runtime decomposition. These design questions do not create extra operator approval gates. Persistent authenticated outbound acceptance needs real restart/custody evidence, not another document checker.
+4. Implement single-owner local inbound stdio against existing admitted read operations, then the explicit mutation binding against existing approval/attempt/replay owners. Model the selected CLI launch inputs/results/errors and prove pinned ESS0.45 expressibility before parser changes; stdout must be reserved for protocol frames.
+5. Cut a verified usable MCP source release only after the chosen runtime acceptance passes. Keep multi-caller cloud assignment, outbound stdio child ownership and external execution decisions open until answered; none is chosen by the HTTP model or CLI selected-intent task.
+
+Parallelism follows independent source ownership, not direction labels alone. Fixture/runtime API work touching the same sibling files is serialized; composition and static CLI docs own disjoint paths. Run authors and fresh adversaries in isolated managed trees, keep a single planning writer, and overlap published-candidate CI with the next independent authoring wave. Root integration caches remain available; completed worker targets are disposable only after their evidence is retained and source is recoverable.

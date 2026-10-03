@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T00:02:45Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-inbound-mutation-replay",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "Authored contract claim verified against missing-contract RED, literal source-bound cases and retained independent regressions. Final integrated fullgate passed; all independent findings corrected, no assertion relaxed. This verifies document consistency, not MCP runtime conformance.",
+    "reference": "specification:wave-20261003a-mcp-auth-replay"
+  }
+}
