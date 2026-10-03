@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T16:24:25Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 58,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "HTTP provider budget: 0/5 red stub; inherited-cutoff bypass caused derived write test failure; restored HTTP/budget/prefix/write/timeout-origin suites 22 passed, 0 failed, 0 ignored. Real generic response after 16 seconds; five stalled-body capability checks. Coordinator verification only.",
+    "reference": ".local/mcp-runtime/http-budget-restored.log"
+  }
+}
