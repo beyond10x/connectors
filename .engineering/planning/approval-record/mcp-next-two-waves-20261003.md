@@ -9,6 +9,7 @@ relations:
 - decides: story:mcp-inbound-mutation-replay
 - decides: story:mcp-composition-provenance
 - decides: story:mcp-cli-journey-discovery-contract
+- decides: task:mcp-cli-selected-intent-contract
 revision: 1
 ---
 ## Operator instruction

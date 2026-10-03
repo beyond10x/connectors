@@ -7,7 +7,7 @@ title: 'First authorized MCP wave: outbound auth and inbound replay contracts'
 relations:
 - informed_by: specification:wave-20261002g-mcp-contracts
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
 ---
 ## Authorization and selected units
 
@@ -970,3 +970,53 @@ not authorization for every returned artifact. No unassessed item is selected he
 }
 
 ```
+
+## Dispatch — 2026-10-03
+
+Opening source/plan commit b360aaaa771ad9a31cab46ff4249015b74a4d50f passed coordinated
+hooks and common security (166commits scanned); bot author and committer verified.
+Published as plan/mcp-contracts-20261002, PR80. The prerequisite contract fullgate
+passed1227 tests; its independent review history is retained. Both selected stories
+are now active and their actual dependencies implemented. No source is borrowed
+from a dirty/uncommitted candidate.
+
+- cb26i-auth / unit/mcp-auth-20261003 / baseb360aaaa / implementor mcp_invocation;
+  leasecodex-cb26i-auth; scratch.local/mcp-two-waves/auth; isolatedtarget.
+- cb26i-replay / unit/mcp-replay-20261003 / baseb360aaaa / implementor mcp_projection;
+  leasecodex-cb26i-replay; scratch.local/mcp-two-waves/replay; isolatedtarget.
+
+Durable per-unit briefs existed before implementation dispatch. Both own exactly
+three files recorded on their stories. Initially auth compiled alone; after exact
+cleanup of completed root MSRV/default targets, available disk17GiB permitted both
+scoped builds, each2jobs withsccache. Floor8GiB remains checked. Rootgate output
+and source hashes were retained before deleting any build output. Root retained its
+active source tree; no shared builddirectory or unrelated process was touched.
+
+Previous workers cb26g-in and cb26g-out: reports copied, wantedsourcepublished,
+archivesverified, finished, exactGCdryruneligible and applyremoved both. Archives
+remain. Managed repolist verifies neither oldpath remains. This cleanup began
+before newtree creation and finished while newauthors prepared their scoped work.
+
+## Prerequisites published; first independent attacks — 2026-10-03
+
+Connectors PR80 merged through b10x-bot[bot] at fcef8b18a58c16e8af07c0a04aece5e8415164d2 after required repository, planning and shared security checks passed. Its tree 71d8d7d8ce348a6a098128662d555940c194d245 equals reviewed candidate b360aaaa771ad9a31cab46ff4249015b74a4d50f. The App-only branch authority and exact App merge action were verified. The coordinator fast-forwarded, preserving owned uncommitted next-wave planning, and selected plan/mcp-auth-replay-20261003.
+
+Both authors froze source with targeted tests/fmt/Clippy passing. Auth ran25 checks and fixed a stale restart fence after an observed RED. Replay ran37 checks. Independent adversary review-results mcp-auth-20261003 and mcp-replay-20261003 preserve first attacks verbatim before author corrections. Auth accepted contradictory duplicate Markdown rows (25passed/1failed after attack); replay allowed required semantic cases to be replaced by early-denial premises and a recovery observer to become live-host (38passed/2failed). These document-guard findings returned to authors with regressions retained; no runtime defect or runtime conformance inferred.
+
+Old workers cb26g-in/cb26g-out were archived, finished and removed through exact reviewed managed GC after wanted source publication. Archives retained under worktree/archives/connectors. The current auth/replay workers remain active for correction/review. Available space24GiB at 23:10UTC, with8GiB reserve. Second-wave selected scope remains prepared, not yet dispatched.
+
+## Verified integration — 2026-10-03
+
+Final integrated fullgate --msrv exited0: 1245 tests passed, zero failed,65 ignored across152 runner summaries. Formatting, Clippy, provider/generic CLI boundaries, Rust1.88 pure libraries and Rust1.91 whole workspace, ESS/native models and conformance, and AEP validation passed. Log SHA256ddb71066b5ffe80d22aea3e8ff7e962314e50eb3c0181a8c21d85cdf849938ce. Existing planning historical review warnings remain; no new validation error. Both selected stories moved active→implemented with recorded test_result and verification. Actual MCP runtime and mutation advertisement remain unavailable.
+
+Auth first/second attacks found1/1 defects, AEP carried0/new1/resolved1; both were corrected, regressions retained and coordinator verified the final diff. Replay first/second attacks found2/0, carried0/new0/resolved2; all corrected,41 targeted checks passed. Auth28 targeted passed. No third campaign. All source reports and122 ignored evidence files were copied and byte-verified before worker targets were cleaned (3.135GiB). Both exact worker archives are verified; finish/GC waits for wanted source publication.
+
+The next wave is preauthorized. Independent author preparation is complete and scopes were recomputed after these two stories closed. Its authors may begin at the verified published candidate while CI runs; actual PR merges still require all exact-head checks. The root integration cache is retained. The completed sibling MCP model target was separately cleaned (1.5GiB) after no users were found, keeping the storage reserve; its logs and published source remain.
+
+## Publication privacy correction
+
+The common commit gate refused two personal-paths findings in raw compiler-output lines of the unpublished auth review records. Nothing was committed or published. Because review records are immutable, the original unpublished store and raw reports remain in private recovery; no immutable record was rewritten. A fresh managed publication candidate, cb26k-publish, was created from the same published base fcef8b18a58c16e8af07c0a04aece5e8415164d2. The single coordinator replayed every required planning mutation through AEP, with existing evidence observation times preserved.
+
+The two public report copies explicitly normalize only the private compiler checkout root to <worktree>. Findings, test names, assertions, counts and exit statuses are unchanged. Original report digests remain the raw evidence identities cited earlier. Public copy digests: first768985a02ca8451a844c2f2141f53a4fa67c4189037fd18491fe44615e927241; followupa075b57736f7193b4fdb818d8127da5ef7af5bccbbed13d733e16935f8963189. Replay reports already used portable paths and are unchanged.
+
+All six implementation source files were copied and byte-compared equal to the final integrated gate inputs; every other executable/specification source remains at the same base. Fullgate evidence is reused at those identical source bytes, while AEP validation and the same common gate run on the rebuilt publication candidate. No policy or hook changed and no refusal was bypassed. The new integration owner is cb26k-publish; the old cb26c-plan becomes private archive recovery after wanted source is published. Subsequent author briefs name the new owner and exact published base.
