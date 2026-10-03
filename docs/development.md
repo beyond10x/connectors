@@ -110,6 +110,15 @@ adapter document) keeps its tests against the frozen fixture
 today. Generation and its tests need the pinned ESS release and the recorded rustfmt
 version, resolved as described under [Pinned tools](#pinned-tools).
 
+Shared public operation metadata types come from
+`ess/domains/service_wire.yaml`. Regenerate them with
+`cargo run --locked --offline -p connectors-build -- service-metadata`; add
+`--check` to compare without replacing output. The repository gate performs this
+comparison. The generated package under `crates/connectors-core/generated/operation-types`
+owns structural serialization; the core metadata codec checks cross-field rules.
+Neither check proves a receiver enforces the declared execution limits or admits
+an operation, and neither changes the closed legacy operation codec.
+
 Each adapter's default `service` feature adds its standalone executable and host
 wiring. To embed only its contract implementation, disable default features:
 

@@ -1,0 +1,232 @@
+{
+  "format": "ess-types-report/3",
+  "source_digest": "635a307c60869a1adf2b7217e12d6255a3f29cc1f7e9c7eeec09d970de33574c",
+  "input": {
+    "kind": "model",
+    "system": "connectors",
+    "specification_version": "v1",
+    "contract_digest": "slice-sha256/2:879ca29873f7cff279efb2684add8594d12e87efc11589ccb24c38e6dfac13d1",
+    "projection_digest": "07eae7838fb8cb8cc79441adc96c81cef7cb5f857028f6fcf945a4d034d013d9"
+  },
+  "generator_version": "0.45.0",
+  "target": "rust",
+  "configuration": {
+    "language": "rust",
+    "package": "connectors-operation-types"
+  },
+  "roots": [
+    "connectors.service_wire.OperationMetadata"
+  ],
+  "declarations": {
+    "connectors.artifact_provenance.Realization": "ConnectorsArtifactProvenanceRealization",
+    "connectors.artifact_provenance.Risk": "ConnectorsArtifactProvenanceRisk",
+    "connectors.mutations.ApprovalMode": "ConnectorsMutationsApprovalMode",
+    "connectors.mutations.ExecutableEffect": "ConnectorsMutationsExecutableEffect",
+    "connectors.mutations.IdempotencyKind": "ConnectorsMutationsIdempotencyKind",
+    "connectors.mutations.SemanticEffect": "ConnectorsMutationsSemanticEffect",
+    "connectors.service_wire.AuthAlternative": "ConnectorsServiceWireAuthAlternative",
+    "connectors.service_wire.IdempotencyKeySource": "ConnectorsServiceWireIdempotencyKeySource",
+    "connectors.service_wire.OperationIdempotency": "ConnectorsServiceWireOperationIdempotency",
+    "connectors.service_wire.OperationLimits": "ConnectorsServiceWireOperationLimits",
+    "connectors.service_wire.OperationMetadata": "ConnectorsServiceWireOperationMetadata"
+  },
+  "annotations": [
+    {
+      "pointer": "/$defs/connectors.artifact_provenance.Realization/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.artifact_provenance.Realization/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.artifact_provenance.Realization/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.artifact_provenance.Risk/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.artifact_provenance.Risk/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.artifact_provenance.Risk/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.ApprovalMode/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.ApprovalMode/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.ApprovalMode/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.ExecutableEffect/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.ExecutableEffect/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.ExecutableEffect/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.IdempotencyKind/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.IdempotencyKind/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.IdempotencyKind/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.SemanticEffect/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.SemanticEffect/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.mutations.SemanticEffect/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.AuthAlternative/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.AuthAlternative/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.AuthAlternative/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.IdempotencyKeySource/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.IdempotencyKeySource/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.IdempotencyKeySource/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationIdempotency/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationIdempotency/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationIdempotency/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationMetadata/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationMetadata/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationMetadata/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    }
+  ],
+  "obligations": [
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationIdempotency/properties/retention_seconds",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/properties/connect_ms",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/properties/execution_ms",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/properties/provider_ms",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/properties/request_bytes",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors.service_wire.OperationLimits/properties/result_bytes",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    }
+  ]
+}
