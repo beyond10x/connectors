@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T19:00:10Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 76,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv; 1376 passed, 0 failed, 66 ignored; explicit real custody final fence passed; selection and socket-cutoff mutations detected",
+    "reference": ".local/mcp-runtime/gate-owner-budget-restored.log"
+  }
+}
