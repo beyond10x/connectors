@@ -116,6 +116,15 @@ impl Capture {
     }
 }
 impl Client {
+    /// Connect and admit this exact build within the caller's original deadline.
+    /// No request or connection retry starts a new interval.
+    pub fn connect_until(paths: &Paths, start: bool, deadline: Instant) -> Result<Self> {
+        let client = Self::connect_version(paths, start, VERSION, deadline)?;
+        approval_issuance::check(deadline)?;
+        client.same_build()?;
+        Ok(client)
+    }
+
     pub fn connect(paths: &Paths, start: bool) -> Result<Self> {
         Self::connect_version(
             paths,
@@ -130,12 +139,21 @@ impl Client {
         version: &str,
         deadline: Instant,
     ) -> Result<Self> {
-        let authority = Metadata::inspect(&paths.state)?.authority()?.to_string();
+        approval_issuance::check(deadline)?;
+        let authority = Metadata::inspect_authority_until(&paths.state, deadline)
+            .map_err(|error| -> Error {
+                if Instant::now() >= deadline {
+                    Code::Timeout.into()
+                } else {
+                    error.into()
+                }
+            })?
+            .to_string();
         let directory = fs::directory(&paths.state, false, true)?;
         let socket = socket_path(&directory);
         loop {
-            crate::local::protected::cancellation()?;
-            match connect_identified(&socket) {
+            approval_issuance::check(deadline)?;
+            match connect_identified(&socket, deadline) {
                 Ok((stream, identity)) => {
                     match Self::greet_running(&socket, stream, paths, &authority, version, deadline)
                     {
@@ -160,10 +178,14 @@ impl Client {
             let lock = lock(&directory)?;
             // SAFETY: the held owner-only file is the one admitted lifetime lock.
             if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-                if let Ok(stream) = connect_socket(&socket) {
-                    return Self::greet_running(
-                        &socket, stream, paths, &authority, version, deadline,
-                    );
+                match connect_socket(&socket, deadline) {
+                    Ok(stream) => {
+                        return Self::greet_running(
+                            &socket, stream, paths, &authority, version, deadline,
+                        );
+                    }
+                    Err(error) if error.code == Code::Unavailable => {}
+                    Err(error) => return Err(error),
                 }
                 let (stream, mut process) = spawn(paths, &lock, deadline)?;
                 let result = Self::greet(
@@ -187,7 +209,9 @@ impl Client {
             if Instant::now() >= deadline {
                 return Err(Code::Timeout.into());
             }
-            std::thread::sleep(Duration::from_millis(20));
+            std::thread::sleep(
+                Duration::from_millis(20).min(deadline.saturating_duration_since(Instant::now())),
+            );
         }
     }
     /// Greets an owner that was already running. An owner built before the
@@ -219,7 +243,7 @@ impl Client {
                 Err(silent) => silent,
             };
             let probe = Self::greet(
-                connect_socket(socket)?,
+                connect_socket(socket, deadline)?,
                 paths,
                 authority,
                 VERSION,
@@ -230,7 +254,7 @@ impl Client {
                 Ok(()) => {}
                 Err(None) => {
                     return Self::greet(
-                        connect_socket(socket)?,
+                        connect_socket(socket, deadline)?,
                         paths,
                         authority,
                         VERSION,
@@ -245,7 +269,7 @@ impl Client {
             }
             std::thread::sleep(pause.min(deadline.saturating_duration_since(Instant::now())));
             pause = (pause * 2).min(Duration::from_secs(1));
-            stream = connect_socket(socket)?;
+            stream = connect_socket(socket, deadline)?;
         }
     }
     /// `Ok(())` when the owner answers with its build; `Err(None)` when it
@@ -730,18 +754,30 @@ fn socket_path(directory: &File) -> PathBuf {
         directory.as_raw_fd()
     ))
 }
-fn connect_socket(path: &std::path::Path) -> Result<UnixStream> {
-    connect_identified(path).map(|(stream, _)| stream)
+fn connect_socket(path: &std::path::Path, deadline: Instant) -> Result<UnixStream> {
+    connect_identified(path, deadline).map(|(stream, _)| stream)
 }
 /// Also returns the identity of the socket file connected to, so that a caller
 /// can tell whether the owner behind it has since removed it.
-fn connect_identified(path: &std::path::Path) -> Result<(UnixStream, (u64, u64))> {
+fn connect_identified(
+    path: &std::path::Path,
+    deadline: Instant,
+) -> Result<(UnixStream, (u64, u64))> {
+    approval_issuance::check(deadline)?;
     let info = std::fs::symlink_metadata(path).map_err(|_| Code::Unavailable)?;
     if !info.file_type().is_socket() || info.uid() != fs::uid() || info.mode() & 0o077 != 0 {
         return Err(Code::InvalidConfiguration.into());
     }
-    let stream = UnixStream::connect(path).map_err(|_| Code::Unavailable)?;
+    let stream =
+        crate::local::unix::connect(path, deadline).map_err(|error| match error.kind() {
+            std::io::ErrorKind::TimedOut => Code::Timeout,
+            // Linux AF_UNIX EAGAIN means the accept queue is full. It is neither a
+            // connected stream nor absence that authorizes a replacement owner.
+            std::io::ErrorKind::WouldBlock => Code::Capacity,
+            _ => Code::Unavailable,
+        })?;
     channel::peer(&stream)?;
+    approval_issuance::check(deadline)?;
     Ok((stream, (info.dev(), info.ino())))
 }
 fn socket_identity(path: &std::path::Path) -> Option<(u64, u64)> {
@@ -764,6 +800,7 @@ fn spawn(
     lock: &File,
     deadline: Instant,
 ) -> Result<(UnixStream, std::process::Child)> {
+    approval_issuance::check(deadline)?;
     let binary = std::env::current_exe().map_err(|_| Code::Unavailable)?;
     let hash = hex::encode(Sha256::digest(
         std::fs::read(&binary).map_err(|_| Code::Unavailable)?,
@@ -814,6 +851,7 @@ fn spawn(
             Ok(())
         });
     }
+    approval_issuance::check(deadline)?;
     let process = command.spawn().map_err(|_| Code::Unavailable)?;
     Ok((parent, process))
 }
@@ -1729,6 +1767,10 @@ fn action(
         _ => Err(Code::InvalidInput.into()),
     }
 }
+
+#[cfg(test)]
+#[path = "admission_tests.rs"]
+mod admission_tests;
 
 #[cfg(test)]
 mod tests {
