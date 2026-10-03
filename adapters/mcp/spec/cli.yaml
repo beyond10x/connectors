@@ -1,0 +1,24 @@
+format: ess-cli/1
+# Fixture-only identity keeps this generated package distinct from the generic
+# CLI contract. Application composition still exposes `connectors server`.
+binary: connectors-mcp-launch
+about: Local MCP stdio binding over admitted Connectors operations
+# ESS 0.45 requires a finite-fixture output global. The production composition
+# takes only this generated server subcommand before Clap propagates globals,
+# and supplies config/state-dir through its own process entry. It neither uses
+# the generated ProcessOutput adapter nor exposes this fixture's output flag.
+globals: {config: config, state: state-dir, output: output}
+callables:
+  local-server:
+    target: {kind: local, owner: connectors_mcp.launch, action: local-server}
+    input: connectors_mcp.launch.LocalLaunchInput
+    result: connectors_mcp.launch.LocalLaunchCompletion
+    errors: {failure: connectors_mcp.launch.LocalLaunchFailure}
+commands:
+  - path: [server]
+    aliases: []
+    callable: local-server
+    about: Serve MCP on stdin and stdout as the admitted local owner
+    arguments:
+      - field: transport
+        source: {kind: option, long: transport}

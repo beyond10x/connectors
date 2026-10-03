@@ -9,5 +9,8 @@
 /website/.cache/
 /website/static/examples/
 /apps/connectors-cli-contract/.ess-output/
+/adapters/mcp/generated/launch-cli/.ess-output/
+/adapters/mcp/generated/launch-types/.ess-output/
+/adapters/mcp/generated/supervision/.ess-output/
 .engineering/.aep-planning-writer*.lock
 .engineering/migrations/

@@ -1,0 +1,31 @@
+domain: connectors_mcp.launch
+
+# Native presentation values for the already selected local launch in
+# docs/local-mcp-cli.md and contracts/server/v1alpha1/semantics.md sections 1–3.
+# These are immutable process inputs/outcomes, not a persistent session, caller,
+# Connection or credential binding. No UNMAPPED state relation is resolved here.
+# Configuration and state-directory paths remain process globals owned by the
+# existing local CLI. Only the transport is an MCP-native command argument.
+types:
+  - name: connectors_mcp.launch.LocalTransport
+    kind: enum
+    variants: [stdio]
+
+  - name: connectors_mcp.launch.LocalLaunchInput
+    kind: struct
+    fields:
+      - {name: transport, type: connectors_mcp.launch.LocalTransport}
+
+  # Returned only after the stream has closed and local teardown has completed.
+  # It is never a startup acknowledgement or a frame on MCP stdout. Generated
+  # finite ProcessOutput is a parser fixture, not the production stream adapter.
+  - name: connectors_mcp.launch.LocalLaunchCompletion
+    kind: enum
+    variants: [closed]
+
+  # Safe process-level failures. They are not peer JSON-RPC error codes, provider
+  # outcomes or a replacement for the shared CLI Failure/service_code owners.
+  # No free-form OS/parser/provider text or credential location is projected.
+  - name: connectors_mcp.launch.LocalLaunchFailure
+    kind: enum
+    variants: [invalid_input, configuration_unavailable, owner_refused, transport_failed]
