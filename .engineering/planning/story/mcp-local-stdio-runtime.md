@@ -47,6 +47,8 @@ scope:
   path: crates/connectors-build/src
 - confidence: cited
   path: crates/connectors-core/Cargo.toml
+- confidence: inferred
+  path: crates/connectors-core/generated/operation-types
 - confidence: cited
   path: crates/connectors-core/src
 - confidence: cited
@@ -54,8 +56,12 @@ scope:
 - confidence: cited
   path: crates/connectors-host/src/local
 - confidence: cited
+  path: docs/development.md
+- confidence: cited
   path: docs/local-mcp-cli.md
-revision: 48
+- confidence: cited
+  path: ess/domains/service_wire.yaml
+revision: 54
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -1187,3 +1193,80 @@ provider milestones. No merge or new source release follows from this checkpoint
 Cloud caller assignment stays open. Keep cb26l-runtime active and leased: exact-id
 cleanup finds no candidate; the broader workspace dry-run found12 refused candidates
 and none eligible, all preserved. No local verification process remains running.
+
+## Shared operation metadata phase — 2026-10-03
+
+The next required runtime phase is complete safe operation metadata and enforcement
+of its declared limits before MCP discovery is advertised. Current core::Operation
+has only the six legacy fields, while private Bootstrap/Requirement adds only auth
+requirements and Read/Write/Unknown. It cannot supply the extended service metadata
+required by contracts/service/compatibility.md §4 and the native projection contract.
+Do not infer risk, approval, idempotency or budgets from descriptive text or effect alone.
+
+First implement the shared strict metadata value codec from its owning ESS types.
+The added connectors.service_wire.OperationMetadata and OperationIdempotency values
+reuse shared effect, risk, approval, realization and limit types; they introduce no
+entity or ownership relation. ESS0.45 validation: connectors v1 —24 file(s),valid.
+Generated Rust types live under crates/connectors-core/generated/operation-types;
+connectors-build service-metadata owns generation and the full gate checks drift.
+The core codec must reject missing/unknown fields, forged numeric objects, duplicate
+members/effects, incompatible read/mutation effects, unresolved realizations and
+invalid keyed-only metadata. Optional absence is distinct from null. Parsing does
+not prove current grants, native natural-idempotency assumptions, effect completeness
+or actual budget enforcement; the receiver's selected binding must establish those.
+
+Named checks for this phase: operation-metadata-required-fields,
+operation-metadata-lossless-numbers, operation-metadata-effect-discriminator,
+operation-metadata-keyed-shape, operation-metadata-optional-presence and
+operation-metadata-canonical-roundtrip. A planted read/external-write discriminator
+bypass must fail before restored tests and the required gate. Existing legacy
+Operation/Descriptor/Bootstrap codecs remain closed and unchanged by this phase.
+A complete admitted metadata source and provider/request/result/time enforcement
+remain subsequent integration work within this same runtime story, not optional
+follow-ups or reasons to accept an empty catalog.
+
+Implementation evidence: the new six-case suite first failed0passed/6failed against
+an always-refusing stub, then passed with the generated-type-backed codec. The
+complete restored core suite passes21 tests,0failed,0ignored, including the added
+closed legacy-codec compatibility case. Omitting only the external_write/mutation
+iff check caused operation_metadata_effect_discriminator_cannot_be_replaced_by_a_hint
+to fail on a read carrying external_write; the source was restored byte-for-byte.
+
+Retained logs/SHA256 under .local/mcp-runtime/:
+- operation-metadata-red.log:
+  d177b1eeaab7fc53a29cd32c160579547ce60e855d4bfa855899b4972ccdfdd6
+- operation-metadata-mutation.log:
+  64ff3ae6742caaeea6b4ac940fb40d44d63fc64a60ad96ea8577b463f5d80e2c
+- operation-metadata-core-restored.log:
+  c030bbb05acfb6260a0144dd02e79aa9079f112872a34d88b994d4b83ef45ab7
+- operation-metadata-drift.log:
+  60372ebb7b387b466210f9341f2016d765f220f1072a90755df1d28094e5c033
+The existing CLI/MCP projections still match. Metadata Entity Runtime definitions
+were regenerated through their owner: only source_digest and synthesis_digest
+changed; definitions and command bindings are byte-value identical under parsed
+JSON comparison. No persisted entity schema or command was added or changed.
+The full required repository gate completed with exit0: 1344passed,0failed,
+66ignored across164test summaries. Command: cargo run --locked --offline
+-p connectors-build -- gate --msrv with RUSTUP_TOOLCHAIN=1.98.1,
+CONNECTORS_ESS pinned0.45.0, CONNECTORS_AEP pinned0.65.0, RUSTC_WRAPPER empty,
+CARGO_BUILD_JOBS=2, CARGO_INCREMENTAL=0 and task-owned TMPDIR=.local/tmp.
+The gate also checks its declared MSRV lanes and projection drift.
+Log: .local/mcp-runtime/gate-operation-metadata.log; SHA256:
+8d6f05e3f98055b2a1595952cd66816af142ece1552001eda39e63c77e44243e.
+AEP validation is valid with historical review-outcome warnings retained in the
+full log. This is coordinator verification, not an independent adversary verdict.
+
+Next integration constraint, verified in source: crates/connectors-host/src/http.rs
+currently builds HTTP clients with fixed5-second connect and15-second request
+limits, while service/compatibility.md §7 gives generic operations a30-second
+provider budget inside40-second execution. The private runtime permits1MiB input
+and8MiB result, unlike either public profile. A metadata parser cannot fix that
+mismatch. Carry and enforce the selected receiver budgets through owner dispatch,
+native child and provider I/O; do not merely label existing fixed limits as generic
+support. Explicitly select any private-protocol evolution and preserve old-reader
+refusal instead of silently adding fields to the closed Bootstrap carrier.
+
+The published predecessor ad39b5754e04e3f4227e23b396a96db8c152f85c has now passed
+repository CI37133928989, verified against that exact head. Docs, planning and
+shared-source checks also passed. This remains draft PR84, with full MCP runtime
+and the provider/release objective incomplete.

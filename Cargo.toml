@@ -2,7 +2,7 @@
 resolver = "2"
 # Specification-only adapters have no Cargo package until implemented.
 members = ["crates/*", "adapters/catalog", "adapters/kubernetes", "adapters/sql", "adapters/mcp/runtime", "apps/connectors"]
-exclude = ["apps/connectors-cli-contract", "adapters/mcp/generated/launch-cli", "adapters/mcp/generated/launch-types", "adapters/mcp/generated/configuration-types", "adapters/mcp/generated/supervision"]
+exclude = ["apps/connectors-cli-contract", "adapters/mcp/generated/launch-cli", "adapters/mcp/generated/launch-types", "adapters/mcp/generated/configuration-types", "adapters/mcp/generated/supervision", "crates/connectors-core/generated/operation-types"]
 
 [workspace.package]
 version = "0.25.1"

@@ -13,5 +13,6 @@
 /adapters/mcp/generated/launch-types/.ess-output/
 /adapters/mcp/generated/configuration-types/.ess-output/
 /adapters/mcp/generated/supervision/.ess-output/
+/crates/connectors-core/generated/operation-types/.ess-output/
 .engineering/.aep-planning-writer*.lock
 .engineering/migrations/

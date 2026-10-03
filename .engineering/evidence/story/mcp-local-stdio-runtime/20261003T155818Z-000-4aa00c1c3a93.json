@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T15:58:18Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 52,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Shared operation metadata codec: six cases failed against stub; restored core suite 21 passed, 0 failed; effect-discriminator mutant failed; generated projection matches.",
+    "reference": "sha256:c030bbb05acfb6260a0144dd02e79aa9079f112872a34d88b994d4b83ef45ab7"
+  }
+}

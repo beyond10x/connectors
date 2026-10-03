@@ -686,6 +686,7 @@ dependencies = [
 name = "connectors-core"
 version = "0.25.1"
 dependencies = [
+ "connectors-operation-types",
  "hex",
  "serde",
  "serde_json",
@@ -796,6 +797,14 @@ dependencies = [
 
 [[package]]
 name = "connectors-mcp-local-server-types"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "connectors-operation-types"
 version = "0.0.0"
 dependencies = [
  "serde",
