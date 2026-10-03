@@ -6,6 +6,7 @@ use super::Result;
 const SPEC: &str = "adapters/mcp/spec/ess";
 const CLI: &str = "adapters/mcp/generated/launch-cli";
 const TYPES: &str = "adapters/mcp/generated/launch-types";
+const CONFIGURATION: &str = "adapters/mcp/generated/configuration-types";
 const SUPERVISION: &str = "adapters/mcp/generated/supervision";
 
 pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
@@ -38,6 +39,14 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
                 "MCP launch types differ from pinned ESS projection; run mcp-bindings".into(),
             );
         }
+        let configuration = temp.path().join("configuration");
+        generate_configuration(root, ess, &configuration)?;
+        if artifacts(&configuration)? != artifacts(&root.join(CONFIGURATION))? {
+            return Err(
+                "MCP configuration types differ from pinned ESS projection; run mcp-bindings"
+                    .into(),
+            );
+        }
         let supervision = temp.path().join("supervision");
         generate_supervision(root, ess, temp.path(), &supervision)?;
         if artifacts(&supervision)? != artifacts(&root.join(SUPERVISION))? {
@@ -48,6 +57,7 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
         }
     } else {
         generate_types(root, ess, &root.join(TYPES))?;
+        generate_configuration(root, ess, &root.join(CONFIGURATION))?;
         let base = root.join(".local/tmp");
         std::fs::create_dir_all(&base)?;
         let temp = tempfile::Builder::new()
@@ -56,7 +66,7 @@ pub fn run(root: &Path, ess: &Path, check: bool) -> Result<()> {
         generate_supervision(root, ess, temp.path(), &root.join(SUPERVISION))?;
     }
     println!(
-        "MCP launch parser, types and shared session projection {}; runtime admission remains separate",
+        "MCP launch, configuration and shared session projections {}; runtime admission remains separate",
         if check { "match" } else { "generated" }
     );
     Ok(())
@@ -119,6 +129,27 @@ fn generate_types(root: &Path, ess: &Path, out: &Path) -> Result<()> {
             "rust",
             "--package",
             "connectors-mcp-launch-types",
+            "--out",
+        ])
+        .arg(out);
+    execute(&mut command)
+}
+
+fn generate_configuration(root: &Path, ess: &Path, out: &Path) -> Result<()> {
+    let mut command = Command::new(ess);
+    command
+        .current_dir(root)
+        .args([
+            "generate",
+            "types",
+            "--path",
+            SPEC,
+            "--root",
+            "connectors_mcp.local_server.Configuration",
+            "--target",
+            "rust",
+            "--package",
+            "connectors-mcp-local-server-types",
             "--out",
         ])
         .arg(out);

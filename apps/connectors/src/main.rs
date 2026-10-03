@@ -1,5 +1,6 @@
 mod legacy;
 mod local;
+mod mcp;
 
 /// Answers the root `--version` and `-V`, and nothing else.
 ///
@@ -19,7 +20,12 @@ fn main() {
                 Some(std::path::Path::new(&args[3])),
             )
             .map_err(connectors_host::local::owner::Error::from)
-            .and_then(connectors_host::local::owner::serve)
+            .and_then(|paths| {
+                connectors_host::local::owner::serve_with_read_policy(
+                    paths,
+                    std::sync::Arc::new(mcp::ProjectionPolicy),
+                )
+            })
         } else {
             Err(connectors_host::local::owner::Code::InvalidInput.into())
         };

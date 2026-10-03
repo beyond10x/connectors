@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T13:41:40Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 35,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust 1.98.1 locked offline: application policy 4 passed; host governed filter 16 passed; full gate pending",
+    "reference": ".local/mcp-runtime/policy-metadata-checkpoint.md"
+  }
+}
