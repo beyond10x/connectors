@@ -66,6 +66,17 @@ validates the separately transferred document through the exact adapter, and the
 uses the existing guarded custody/publication coordinator. Lost acknowledgement
 is unknown and can be resolved only through status, without replay.
 
+An explicit same-build connection may carry the caller's original monotonic
+deadline through metadata inspection, owner startup and every identification
+retry. Expiry before admission opens no state. Metadata lifecycle-lock, cached
+authority mutex, SQLite busy and bridge waits use that cutoff; nested inspection
+can shorten it but cannot extend it, and leaving the inspection scope restores
+ordinary waits. This does not change uncertain-write retirement or its retained
+lifecycle-lock proof. Nonblocking Unix connection refuses a full accept queue as
+`capacity`: it is neither a connected stream nor permission to start another
+owner. Socket ownership, peer credentials, challenge and exact-build checks remain
+required before this connection port returns an admitted client.
+
 The generated parser's protected Sources hook retains one clearing buffer and
 one admitted live owner channel, and supplies only a nonsecret marker to the
 generated String/JSON carrier. The paired handler checks the original selectors

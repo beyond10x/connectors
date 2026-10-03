@@ -1,7 +1,7 @@
 use super::{
     APPROVAL_KEYS_MIGRATION, APPROVAL_MIGRATION, APPROVAL_POLICY_MIGRATION, AUDIT_MIGRATION,
     Failure, MIGRATION as BASE_MIGRATION, MUTATION_MIGRATION, REGISTRY_MIGRATION,
-    RUNTIME_MIGRATION, Result, WAIT_BOUND, migration_digest as base_migration_digest, unavailable,
+    RUNTIME_MIGRATION, Result, migration_digest as base_migration_digest, unavailable,
 };
 use entity_core::{EntityDefinition, EntityInstance, OperationFieldAction, Registry};
 use entity_eventlog::{
@@ -24,12 +24,9 @@ use eventlog_core::CaptureLimits;
 use rusqlite::{Connection, OptionalExtension, params_from_iter, types::Value as SqlValue};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
-use std::{
-    collections::BTreeMap,
-    num::NonZeroU16,
-    path::Path,
-    time::{Duration, Instant},
-};
+#[cfg(test)]
+use std::time::Instant;
+use std::{collections::BTreeMap, num::NonZeroU16, path::Path, time::Duration};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
 /// Visible projection rows keyed by entity and identity: lifecycle state and fields.
@@ -544,7 +541,7 @@ pub(super) fn release(er: ErAuthority) {
         return;
     }
     let evicted = {
-        let Ok(mut idle) = IDLE.lock() else {
+        let Ok(mut idle) = super::deadline::lock(&IDLE) else {
             return;
         };
         let mut evicted = Vec::new();
@@ -585,7 +582,7 @@ fn file_identity(path: &Path) -> Option<(u64, u64)> {
 fn take(path: &Path, authority: &Authority, source_level: i64) -> Option<ErAuthority> {
     let file = file_identity(path);
     let (taken, replaced) = {
-        let mut idle = IDLE.lock().ok()?;
+        let mut idle = super::deadline::lock(&IDLE).ok()?;
         // A held authority whose file is no longer the one at its path would
         // read and write the file that was moved away: drop it.
         let (replaced, kept) = std::mem::take(&mut *idle)
@@ -1748,6 +1745,7 @@ pub(super) fn open(
     source_level: i64,
     projection_level: i64,
 ) -> Result<(ErAuthority, String)> {
+    super::deadline::check()?;
     if let Some(mut held) = take(path, &authority, source_level) {
         held.projection_level = projection_level;
         // A held handle whose read refuses is not evidence either way; the
@@ -1757,6 +1755,7 @@ pub(super) fn open(
             return Ok((held, source_digest));
         }
     }
+    super::deadline::check()?;
     let definitions = registry()?;
     let path_text = utf8_path(path)?;
     let facade = timed("er.start", || {
@@ -2041,7 +2040,7 @@ fn feed_connection(path: &Path) -> Result<Connection> {
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(unavailable)?;
-    connection.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
+    super::deadline::configure(&connection)?;
     Ok(connection)
 }
 
@@ -2125,7 +2124,7 @@ pub(super) fn advance_projection_level(er: &mut ErAuthority, level: i64) -> Resu
             | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(unavailable)?;
-    connection.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
+    super::deadline::configure(&connection)?;
     let changed = connection
         .execute(
             "UPDATE connectors_er_authority SET projection_level=?1 \
@@ -2402,9 +2401,7 @@ fn build_projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connec
     connection
         .pragma_update(None, "user_version", level)
         .map_err(unavailable)?;
-    connection
-        .busy_timeout(std::time::Duration::from_secs(30))
-        .map_err(unavailable)?;
+    super::deadline::configure(&connection)?;
     connection
         .pragma_update(None, "trusted_schema", false)
         .map_err(unavailable)?;
@@ -4084,7 +4081,7 @@ fn context(label: &str) -> EventlogOperationContext {
 }
 
 fn call_wait() -> CallWait {
-    CallWait::Until(Instant::now() + Duration::from_secs(30))
+    CallWait::Until(super::deadline::cutoff(Duration::from_secs(30)))
 }
 
 #[cfg(test)]
