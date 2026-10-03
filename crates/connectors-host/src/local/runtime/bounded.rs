@@ -69,6 +69,28 @@ impl ReadBudget {
     pub fn result_bytes(self) -> usize {
         self.result_bytes
     }
+    pub(crate) fn limits(self) -> (u64, u64, usize, usize) {
+        (
+            self.execution_ms,
+            self.provider_ms,
+            self.input_bytes,
+            self.result_bytes,
+        )
+    }
+    /// Credential validity may shorten, never restart or extend, execution.
+    pub(crate) fn constrain(mut self, until: Instant) -> Result<Self> {
+        self.until()?;
+        let sampled = ticks()?;
+        let remaining = until
+            .checked_duration_since(Instant::now())
+            .ok_or(Failure::Timeout)?;
+        let nanos = u64::try_from(remaining.as_nanos()).map_err(|_| Failure::Timeout)?;
+        self.deadline_ticks = self
+            .deadline_ticks
+            .min(sampled.checked_add(nanos).ok_or(Failure::Timeout)?);
+        self.until()?;
+        Ok(self)
+    }
 }
 
 fn ticks() -> Result<u64> {

@@ -1,6 +1,7 @@
 //! Owner-checked Secret Service transport. Inspection never activates a service,
 //! unlocks a collection, or reads credentials.
 pub mod custody;
+mod deadline;
 
 /// The persistent collection custody uses, addressed by object path.
 pub(crate) const LOGIN_COLLECTION: &str = "/org/freedesktop/secrets/collection/login";
@@ -34,6 +35,10 @@ pub fn inspect_at(socket: Option<&Path>) -> State {
 }
 
 fn local_stream_at(socket: Option<&Path>) -> zbus::Result<UnixStream> {
+    UnixStream::connect(local_path(socket)?).map_err(Into::into)
+}
+
+fn local_path(socket: Option<&Path>) -> zbus::Result<PathBuf> {
     // The initial Linux profile binds the owner's runtime bus. Do not accept a
     // caller-controlled TCP DBUS_SESSION_BUS_ADDRESS as local owner authority.
     let default = PathBuf::from(format!("/run/user/{}/bus", super::filesystem::uid()));
@@ -50,8 +55,7 @@ fn local_stream_at(socket: Option<&Path>) -> zbus::Result<UnixStream> {
     if !metadata.file_type().is_socket() || metadata.uid() != super::filesystem::uid() {
         return Err(zbus::Error::Failure("local transport unavailable".into()));
     }
-    let stream = UnixStream::connect(path)?;
-    Ok(stream)
+    Ok(path.to_owned())
 }
 
 fn check_peer(stream: &UnixStream) -> zbus::Result<()> {

@@ -48,6 +48,8 @@ scope:
 - confidence: inferred
   path: apps/connectors/tests/local_mcp_server.rs
 - confidence: cited
+  path: contracts/cli/v1alpha1/owner.md
+- confidence: cited
   path: contracts/cli/v1alpha1/private-bounded-read.md
 - confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
@@ -68,7 +70,17 @@ scope:
 - confidence: cited
   path: crates/connectors-host/src/local
 - confidence: cited
+  path: crates/connectors-host/src/local/keyring.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/keyring/custody.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/keyring/deadline.rs
+- confidence: cited
   path: crates/connectors-host/src/local/operation_curation.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/governed/bounded.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/governed/tests/bounded_reads.rs
 - confidence: cited
   path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
@@ -83,7 +95,7 @@ scope:
   path: ess/domains/service_wire.yaml
 - confidence: cited
   path: ess/domains/transport.yaml
-revision: 72
+revision: 76
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -1486,3 +1498,70 @@ preserve the original monotonic cutoff through queue/startup/custody/audit,
 and enforce whole public envelopes. Full MCP, provider acceptance and release
 remain incomplete. Cleanup dry-run returned no eligible assessment for active
 cb26l-runtime; preserve its lease and the retained evidence for continued work.
+
+## Owner-selected bounded reads — 2026-10-03
+
+The explicit authenticated same-build bounded_read port now carries the original
+PrivateReadBudget and required projection revision through owner admission and the
+serialized worker. Exact current curation selects implemented (20s/15s/64KiB/4MiB)
+or supported generic (40s/30s/256KiB/4MiB) limits with 5s connect, no required
+approval and none/natural idempotency. Caller overrides, absent realization and
+private/1 or private/2 bindings refuse. Complete canonical service request and
+response envelopes are measured; oversized results become audited capacity errors.
+
+Queue/lifecycle mutex and launch waits, child startup, custody, native work and
+reply writes retain the original cutoff. The Secret Service read owns one socket
+guard covering setup, qualification, read and Close; expiry shuts down that socket
+and joins the guard thread. Credential validity can only shorten native execution.
+Both worker admission and the final dispatch fence recheck the selected declaration.
+
+Initial bounded owner selection and queue suite:12 passed,0 failed. Planted selection
+bypass:2 passed,2 failed (caller limits admitted and oversized envelope dispatched).
+Restored before further work. Custody stub red:1 passed,2 failed; restored custody
+suite:4 passed. Removing only the socket shutdown made the exact cutoff regression
+fail with WouldBlock after its one-second safety timeout; the source was restored
+byte-for-byte. These are coordinator-run checks, not independent review.
+
+The real disposable qualified GNOME custody/native-child final-fence test passes
+for both legacy and bounded paths:withdrawal yields no provider invocation and
+registry use counts (1 captured,0 dispatched,1 released); allowing the next request
+yields audited success and counts (2,1,2). Its first invocation failed before any
+owner behavior because the long checkout's fixture socket exceeded the Unix path
+limit; a short physical owner-private fixture directory resolved that invocation
+failure, and was removed after all owned processes stopped. No desktop bus was used.
+
+Socket checks cover exact original budget serialization, lossless result bytes,
+build/expiry refusal before request bytes, and the original reply cutoff. The first
+timed fixture consumed its budget measuring the test executable; it now performs
+the same pre-budget build measurement as the actual connection handshake.
+
+Owning contract:contracts/cli/v1alpha1/private-bounded-read.md#owner-selection;
+owner.md and docs/local-runtime-foundation.md link the implemented scope. Documentation
+reference generation/check reports43 contract and97 total pages,no drift.
+
+The complete connectors-build gate --msrv passed:1376 passed,0 failed,66 ignored
+across166 libtest summaries; Clippy with warnings denied, ESS/projection drift,
+adapter boundaries and Rust1.88/1.91 checks passed. The initial gate stopped on
+test-module ordering; formatting that authored file resolved it. The restored
+gate includes all12 new owner/socket/custody tests passing. The explicit qualified
+final-fence test above is additional to the gate's ignored inventory. This
+checkpoint does not claim production MCP serving, extended mutation budgets,
+outbound MCP, Helm, complete provider acceptance or a new release. All remain open.
+Future MCP ingress must bound its own framing/owner connection before admission.
+All three existing agents remain quota-errored; root is the sole implementation and
+store writer. No independent-review result is asserted.
+
+Next integration boundary: start one selected deadline before MCP frame/admission
+and owner connection; expose only declarations whose native binding and complete
+service budgets the owner can actually honor; compose the admitted discovery/read
+ports with native request/result codecs and session cleanup. Do not advertise an
+operation merely because its curation is well-formed. The existing full production
+entry scenarios remain the acceptance target, including mutation replay and exact
+process evidence. Cloud caller assignment is still a separate open decision.
+Evidence is retained in .local/mcp-runtime (SHA256):
+- gate-owner-budget-restored.log:2d2005873a308886cb0350b96d63d11a2cfe375de75a414893b20bfe4a922bee
+- owner-budget-selection-mutation.log:6847aa2f21dac8e40472dd0ae1c1d9f7ec5ef03ab69904b4755bf22a1e6a844e
+- custody-cutoff-restored.log:dafb55a09d67e85141ea0086eea1adbe689305dc33b928a27813c4c5d9c71425
+- custody-deadline-mutation.log:76c0d0e7cd5a0b6eca9b2ddc4b97b7f62895bdf98f7dc317128f803c68bb894c
+- owner-budget-final-fence-short.log:f41efdedbfa4afc98909d8cbe389c99525941caa8b2ab3d3e893127bff373dfa
+- owner-budget-docs.log:9c84eaa2f40eca5f3ea1f20f0309ef4692ce198188c29da8bb00f95725d0698c

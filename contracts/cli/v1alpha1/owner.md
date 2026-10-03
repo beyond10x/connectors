@@ -89,6 +89,12 @@ startup is coalesced per instance and at most four launches run concurrently.
 Per-owner connections and work queues are bounded, and original request deadlines
 are never reset by queueing, startup, capture or provider work.
 
+The explicit same-build `bounded_read` request additionally carries a required
+projection revision and the original monotonic budget. Its declaration selection,
+whole-envelope limits and custody cutoff are specified in the
+[bounded read binding](private-bounded-read.md#owner-selection). Existing request
+shapes keep their meaning; a private/3 child refuses ordinary legacy invocation.
+
 CLI reply reads check cancellation while waiting, including an incomplete frame;
 the bounded polling interval never resets the original deadline or replays a
 request. A received terminal success wins a concurrent interruption. Disconnecting
