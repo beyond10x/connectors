@@ -7,7 +7,8 @@ license.workspace = true
 
 [dependencies]
 clap.workspace = true
-serde_json.workspace = true
+connectors-core.workspace = true
+serde_json = { workspace = true, features = ["arbitrary_precision", "raw_value"] }
 time.workspace = true
 launch-contract = { package = "connectors-mcp-launch-cli-contract", path = "../generated/launch-cli" }
 launch-types = { package = "connectors-mcp-launch-types", path = "../generated/launch-types" }

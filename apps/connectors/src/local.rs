@@ -147,7 +147,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         NotFound => ("admission", "check_configuration", false),
         LifecycleConflict => ("admission", "retry_status", false),
         Revoked => ("admission", "create_connection", false),
-        NotGranted | IdentityMismatch => ("admission", "repair_connection", false),
+        NotGranted | IdentityMismatch | ConnectionNotReady | InsufficientScope => {
+            ("admission", "repair_connection", false)
+        }
         Unavailable => ("readiness", "retry_status", false),
         Timeout | Capacity => ("admission", "retry_explicitly", false),
         StaleCursor => ("observation", "retry_explicitly", false),

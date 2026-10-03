@@ -416,6 +416,45 @@ impl Client {
         )?;
         self.value(until(deadline_ms)?)
     }
+    /// A complete governed service response, including the real host audit
+    /// reference. Keep its JSON bytes lossless across the private socket.
+    pub fn governed_read(
+        mut self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        deadline_ms: u64,
+    ) -> Result<Vec<u8>> {
+        self.same_build()?;
+        crate::local::protected::cancellation()?;
+        if request.input.len() > runtime::INPUT_LIMIT {
+            return Err(Code::InvalidInput.into());
+        }
+        let deadline = until(deadline_ms)?;
+        channel::write(
+            &mut self.stream,
+            &Request::GovernedRead {
+                adapter: adapter.into(),
+                connection: request.connection.into(),
+                operation: request.operation.into(),
+                schema: request.schema.into(),
+                revision: request.revision.into(),
+                deadline_ms,
+            },
+            None,
+            request.input.as_bytes(),
+            deadline,
+        )?;
+        let frame = read_reply(&mut self.stream, deadline, runtime::RESULT_LIMIT)?;
+        match frame.control {
+            Reply::Success => {
+                connectors_core::json::decode(&frame.document, 68)
+                    .map_err(|_| Code::Unavailable)?;
+                Ok(frame.document)
+            }
+            Reply::Failed { error } if frame.document.is_empty() => Err(error),
+            _ => Err(Code::Unavailable.into()),
+        }
+    }
     pub fn revalidate(
         mut self,
         adapter: &str,
@@ -1186,6 +1225,50 @@ fn action(
         }
         return Ok(json!({ "build": owner.build }));
     }
+    if let Request::GovernedRead {
+        adapter: alias,
+        connection,
+        operation,
+        schema,
+        revision,
+        deadline_ms,
+    } = request
+    {
+        if !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
+            return Err(Code::Timeout.into());
+        }
+        let input = std::str::from_utf8(&document).map_err(|_| Code::InvalidInput)?;
+        let call = approval_issuance::Request {
+            connection: &connection,
+            operation: &operation,
+            schema: &schema,
+            revision: &revision,
+            input,
+        };
+        return governed::read(
+            &owner.paths,
+            &owner.authority,
+            &alias,
+            &call,
+            super::until(deadline_ms)?,
+            |adapter| match owner.pool.run(
+                &alias,
+                adapter,
+                Task::Invoke {
+                    connection: connection.clone(),
+                    operation: operation.clone(),
+                    schema: schema.clone(),
+                    revision: revision.clone(),
+                    document: document.clone(),
+                    governed: true,
+                },
+                deadline_ms,
+            )? {
+                Output::Document(bytes) => Ok(bytes),
+                _ => Err(Code::Unavailable.into()),
+            },
+        );
+    }
     let alias = match &request {
         Request::Begin { adapter, .. }
         | Request::Revalidate { adapter, .. }
@@ -1413,6 +1496,7 @@ fn action(
                     schema,
                     revision,
                     document,
+                    governed: false,
                 },
                 deadline_ms,
             )? {
@@ -1445,6 +1529,51 @@ fn action(
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    #[test]
+    fn governed_socket_keeps_complete_response_bytes_and_checks_build_before_sending() {
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let expected = br#"{"version":"v1alpha2","request_id":"request","status":"success","result":{"n":1844674407370955161701,"huge":1e400},"audit_ref":"real-ref","audit_status":"complete"}"#;
+        let serving = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let frame =
+                channel::read::<Request>(&mut peer, deadline, false, runtime::INPUT_LIMIT).unwrap();
+            assert!(
+                matches!(frame.control, Request::GovernedRead { ref adapter, ref connection, .. } if adapter=="fixture" && connection=="connection")
+            );
+            assert_eq!(frame.document, br#"{"n":1844674407370955161701}"#);
+            channel::write(&mut peer, &Reply::Success, None, expected, deadline).unwrap();
+        });
+        let request = approval_issuance::Request {
+            connection: "connection",
+            operation: "read",
+            schema: "schema",
+            revision: "revision",
+            input: r#"{"n":1844674407370955161701}"#,
+        };
+        let result = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some(own_build().unwrap().into()),
+        }
+        .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000)
+        .unwrap();
+        assert_eq!(result, expected);
+        serving.join().unwrap();
+
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let result = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some("another-build".into()),
+        }
+        .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000);
+        assert_eq!(result.unwrap_err().code, Code::OwnerBuildMismatch);
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        peer.read_to_end(&mut bytes).unwrap();
+        assert!(bytes.is_empty());
+    }
 
     /// The greeting an owner built before the build handshake understands.
     #[derive(Deserialize)]
