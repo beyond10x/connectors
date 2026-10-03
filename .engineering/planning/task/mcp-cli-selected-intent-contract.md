@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: task:mcp-cli-selected-intent-contract
 kind: task
-status: draft
+status: active
 title: Select MCP CLI intent and static discovery contract without claiming runtime support
 relations:
 - decomposes: story:mcp-cli-journey-discovery-contract
@@ -11,7 +11,10 @@ relations:
 - depends_on: story:mcp-inbound-mutation-replay
 - depends_on: story:mcp-inbound-capability-projection
 - depends_on: story:mcp-outbound-invocation-results
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-03T00:10:03Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-03T00:10:03Z", actor: "human:timo", revision: 4}
 ---
 ## Acceptance
 
@@ -59,3 +62,11 @@ Check static JSON parses, each document link/citation resolves, human syntax and
 inventory match, and all unavailable steps are labelled. Reuse existing documentation
 source checks. No new mirrored prose test or invented executable MCP fixture. No
 runtime support, parser compatibility, wire behavior or conformance claim follows.
+
+## Read-only preparation against final predecessor contracts — 2026-10-03
+
+Proposed selected intent, runtime unavailable: `connectors --config CONFIG --state-dir STATE_DIR server --transport stdio`, with absolute local paths. The local MCP client owns the launched Connectors child. The proposed launch has no cloud/caller-assignment/outbound-child/credential flags and no generic `--output` surface; stdout exclusively carries MCP frames and stderr safe diagnostics. This task selects spelling; existing parser support is not claimed.
+
+Outbound HTTP retains generic connections connect/status/revalidate and operations list/describe/invoke grammar from apps/connectors/spec/cli.yaml. Its MCP native profile, local operation identifiers, configuration and protected OAuth completion codec remain undeclared. Do not invent mcp.oauth or a local tools.call operation ID from remote tools/call. Existing static credential-prompt/file/stdin channels do not establish managed MCP OAuth. Protected continuations, state, codes, tokens and custody references never become ordinary outputs. Separate business input from credentials.
+
+The static inventory distinguishes current-generic, selected-intent/runtime-unavailable and unresolved-binding. Keep parser errors, connectors.cli.FailureCode, optional shared service_code and open-ended peer JSON-RPC integer errors separate; the native three-code enum is not exhaustive. Native launch types, shared/native CLI composition, pinned ESS0.45 expressibility and actual stdout framing remain implementation prerequisites. Mutation advertisement stays withheld and the parent working CLI journey remains open.
