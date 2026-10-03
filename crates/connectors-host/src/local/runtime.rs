@@ -1,11 +1,13 @@
 //! Private configured adapter composition. No database or credential resolver is
 //! exported to business adapters. See contracts/cli/v1alpha1/private-adapter.md.
 pub(crate) mod artifact;
+mod bounded;
 pub(crate) mod channel;
 mod process;
 mod server;
 pub mod state;
 mod writes;
+pub use bounded::ReadBudget;
 pub use process::{Child, PreparedInvocation};
 pub use server::{Adapter, serve};
 pub use writes::{PreparedWrite, WriteEffect, WriteResult};
@@ -17,18 +19,22 @@ use std::collections::BTreeSet;
 
 pub const VERSION: &str = "connectors-private/1";
 pub const WRITE_VERSION: &str = "connectors-private/2";
+pub const BOUNDED_READ_VERSION: &str = "connectors-private/3";
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PrivateProtocol {
     #[serde(rename = "connectors-private/1")]
     V1,
     #[serde(rename = "connectors-private/2")]
     V2,
+    #[serde(rename = "connectors-private/3")]
+    V3,
 }
 impl PrivateProtocol {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::V1 => VERSION,
             Self::V2 => WRITE_VERSION,
+            Self::V3 => BOUNDED_READ_VERSION,
         }
     }
 }
@@ -320,7 +326,7 @@ impl Bootstrap {
         self.validate()?;
         if self.requirements.iter().any(|requirement| {
             requirement.effect == Effect::Unknown
-                || (protocol == PrivateProtocol::V1 && requirement.effect != Effect::Read)
+                || (protocol != PrivateProtocol::V2 && requirement.effect != Effect::Read)
         }) {
             return Err(Failure::Unsupported);
         }

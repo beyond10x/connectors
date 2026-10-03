@@ -114,6 +114,14 @@ refuses; missing operation curation supplies no defaults. This internal metadata
 path does not establish native profile support, enforce every declared execution
 limit or enable MCP serving.
 
+The catalog executable now implements the explicit
+[private bounded-read binding](../contracts/cli/v1alpha1/private-bounded-read.md).
+It carries the original monotonic execution deadline and shares one provider
+cutoff across OAuth exchange and business HTTP. Existing private selections do
+not upgrade automatically. The owner still needs to select and enforce this
+binding from admitted operation metadata, including complete public-envelope byte
+limits, before these reads can be advertised through MCP.
+
 ## Outbound HTTP: current generic grammar, MCP binding unresolved
 
 The grouped CLI grammar below already exists in the
