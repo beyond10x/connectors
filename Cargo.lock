@@ -553,11 +553,13 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-host",
+ "connectors-mcp",
  "connectors-sdk",
  "ring",
  "serde_json",
  "tempfile",
  "tokio",
+ "toml",
  "uuid",
 ]
 
@@ -766,6 +768,7 @@ dependencies = [
  "connectors-core",
  "connectors-mcp-launch-cli-contract",
  "connectors-mcp-launch-types",
+ "connectors-mcp-local-server-types",
  "connectors-types",
  "serde_json",
  "time",
@@ -785,6 +788,14 @@ dependencies = [
 
 [[package]]
 name = "connectors-mcp-launch-types"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "connectors-mcp-local-server-types"
 version = "0.0.0"
 dependencies = [
  "serde",

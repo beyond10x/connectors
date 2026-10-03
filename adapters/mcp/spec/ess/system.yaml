@@ -5,3 +5,4 @@ domains:
   - connectors_mcp.protocol
   - connectors_mcp.state
   - connectors_mcp.launch
+  - connectors_mcp.local_server

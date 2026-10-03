@@ -11,8 +11,30 @@ use std::time::Instant;
 use uuid::Uuid;
 
 type Request<'a> = approval_issuance::Request<'a>;
+mod metadata;
+pub(super) use metadata::describe;
 #[cfg(test)]
 mod tests;
+
+/// Application-owned projection checks. This can constrain an already admitted
+/// owner request; it never supplies generic operation or credential authority.
+pub trait ReadPolicy: Send + Sync {
+    fn admit(
+        &self,
+        paths: &Paths,
+        alias: &str,
+        request: &approval_issuance::Request<'_>,
+        projection_revision: &str,
+    ) -> Result<()>;
+}
+pub(super) struct UnboundReadPolicy;
+impl ReadPolicy for UnboundReadPolicy {
+    fn admit(&self, _: &Paths, _: &str, _: &Request<'_>, _: &str) -> Result<()> {
+        Err(Code::Unsupported.into())
+    }
+}
+type Selection<'a> = Option<(&'a dyn ReadPolicy, &'a str)>;
+type Context<'a> = (&'a Paths, &'a str, Instant);
 
 pub(super) fn registry_error(error: crate::local::registry::Failure) -> Error {
     match error {
@@ -29,7 +51,15 @@ pub(super) struct ReadPlan {
 
 /// Metadata admission only: no custody, provider probe or child startup. Profile
 /// permission is a credential-use preflight; it cannot hide a stale revision.
-pub(super) fn resolve(paths: &Paths, alias: &str, request: &Request<'_>) -> Result<ReadPlan> {
+pub(super) fn resolve_selected(
+    paths: &Paths,
+    alias: &str,
+    request: &Request<'_>,
+    selection: Selection<'_>,
+) -> Result<ReadPlan> {
+    if selection.is_some_and(|(_, revision)| !connectors_core::valid_id(revision)) {
+        return Err(Code::InvalidInput.into());
+    }
     for id in [
         alias,
         request.connection,
@@ -56,6 +86,9 @@ pub(super) fn resolve(paths: &Paths, alias: &str, request: &Request<'_>) -> Resu
         || bootstrap.protocol != adapter.protocol
     {
         return Err(Code::ReadinessMismatch.into());
+    }
+    if let Some((policy, revision)) = selection {
+        policy.admit(paths, alias, request, revision)?;
     }
     let descriptor = bootstrap.descriptor()?;
     if descriptor.revision != request.revision {
@@ -90,17 +123,17 @@ pub(super) fn resolve(paths: &Paths, alias: &str, request: &Request<'_>) -> Resu
 /// The provider closure is the existing serialized owner worker. A read has no
 /// business retry here, and a final-audit failure cannot erase a known result.
 pub(super) fn read(
-    paths: &Paths,
-    host: &str,
+    context: Context<'_>,
     alias: &str,
     request: &Request<'_>,
-    until: Instant,
+    selection: Selection<'_>,
     dispatch: impl FnOnce(&Adapter) -> Result<Vec<u8>>,
 ) -> Result<Value> {
-    let audits = audit::Store::new(&paths.state, 100_000).map_err(|_| Code::Unavailable)?;
-    read_with_audit(paths, host, alias, request, until, &audits, dispatch)
+    let audits = audit::Store::new(&context.0.state, 100_000).map_err(|_| Code::Unavailable)?;
+    read_using(context, alias, request, &audits, selection, dispatch)
 }
 
+#[cfg(test)]
 fn read_with_audit(
     paths: &Paths,
     host: &str,
@@ -110,9 +143,20 @@ fn read_with_audit(
     audits: &audit::Store,
     dispatch: impl FnOnce(&Adapter) -> Result<Vec<u8>>,
 ) -> Result<Value> {
+    read_using((paths, host, until), alias, request, audits, None, dispatch)
+}
+
+fn read_using(
+    (paths, host, until): Context<'_>,
+    alias: &str,
+    request: &Request<'_>,
+    audits: &audit::Store,
+    selection: Selection<'_>,
+    dispatch: impl FnOnce(&Adapter) -> Result<Vec<u8>>,
+) -> Result<Value> {
     approval_issuance::check(until)?;
     let request_id = Uuid::new_v4().to_string();
-    let plan = resolve(paths, alias, request);
+    let plan = resolve_selected(paths, alias, request, selection);
     // A denied operation may still have a verified configured instance. Never
     // use a submitted alias as an audit namespace or manufacture a registry row.
     let instance = plan
@@ -171,7 +215,7 @@ fn read_with_audit(
             }
             let outcome = (|| {
                 approval_issuance::check(until)?;
-                let current = resolve(paths, alias, request)?;
+                let current = resolve_selected(paths, alias, request, selection)?;
                 if current.fingerprint != plan.fingerprint {
                     return Err(Code::StaleDescription.into());
                 }
@@ -230,6 +274,15 @@ fn now() -> Result<i64> {
 
 fn response(
     request_id: &str,
+    outcome: Result<Value>,
+    reference: Option<&audit::Reference>,
+    status: &str,
+) -> Result<Value> {
+    response_optional(Some(request_id), outcome, reference, status)
+}
+
+fn response_optional(
+    request_id: Option<&str>,
     outcome: Result<Value>,
     reference: Option<&audit::Reference>,
     status: &str,

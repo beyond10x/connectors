@@ -58,6 +58,17 @@ acknowledged reference with `incomplete` audit. These host, socket and child-pro
 tests establish the read seam. MCP discovery, projection configuration, real
 session clock/I/O supervision and the production launch remain to be connected.
 
+The [local configuration domain](spec/ess/domains/local_server.yaml) now owns four
+immutable deployment values. The pinned build projects them into
+[`generated/configuration-types`](generated/configuration-types/types.rs) and checks
+drift beside the launch/session projections. The [native validator](runtime/src/configuration.rs)
+rejects duplicate/unknown JSON members, invalid selectors, conflicting exposures,
+unsupported format and out-of-bound integer limits before any file or host access.
+It validates an approval source path without opening it. Application composition
+must still admit the private companion file on each request and fence its selection
+at dispatch. The [CLI intent guide](../../docs/local-mcp-cli.md#selected-local-projection-configuration)
+records its location and bounds; this parser does not make the server available.
+
 ## Scope and dependencies
 
 `adapters/mcp/` owns this repository's native Model Context Protocol material: the pinned
@@ -101,6 +112,7 @@ needs an MCP noun reads this root rather than declaring one.**
 | [`connectors_mcp.protocol`](spec/ess/domains/protocol.yaml) | Protocol values read from the pinned archives: the two negotiable revision strings, the three eras, the four transport bindings, server and client capability kinds, the legacy session phases, three error codes, the two cache scopes, the acquisition modes and the authorization roles. |
 | [`connectors_mcp.state`](spec/ess/domains/state.yaml) | Four entities — `McpServerBinding`, `McpAdvertisedCapability`, `McpOutboundSession`, `McpInboundSession` — the `McpCapabilitySnapshot` value, and the three credential kinds `epic:mcp-contracts` keeps apart, as three distinct types. |
 | [`connectors_mcp.launch`](spec/ess/domains/launch.yaml) | Immutable input, transport and final process outcomes for the selected local stdio launch. They introduce no caller, Connection or persistent session relation. |
+| [`connectors_mcp.local_server`](spec/ess/domains/local_server.yaml) | Immutable exposure, family, limits and configuration values for the local projection. Existing connection references are explicit deployment selections, not new caller ownership. |
 
 Four things about it are load-bearing and are stated in the files themselves:
 
@@ -205,6 +217,10 @@ forbidden native term or an adapter-path dependency, and no per-file suppression
 Native MCP vocabulary stays in this directory and needs no exception at all.
 
 ## Sources and remaining obligations
+
+The original foundation note below is retained as history. It predates the
+contracts, generated packages and native runtime library now described at the top
+of this document; it is not the current implementation inventory.
 
 The only retained source is the specification pin above; it is research provenance, not
 adopted upstream source/license packaging, a build dependency or a vendored library.
