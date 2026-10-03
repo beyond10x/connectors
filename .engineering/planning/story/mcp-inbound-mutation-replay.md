@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-inbound-mutation-replay
 kind: story
-status: active
+status: implemented
 title: Bind inbound MCP mutating invocations to the existing attempt and idempotency owners
 relations:
 - decomposes: epic:mcp-contracts
@@ -15,10 +15,11 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1/mutations.md
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_inbound_mutation_replay.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-02T22:44:32Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-02T22:44:32Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-10-03T00:10:02Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1,"review_outcome":2,"verification":1}}}
 ---
 ## Acceptance
 
@@ -141,3 +142,17 @@ The prior blanket statement that provider write dispatch is unfinished is histor
 local-mutations now describes guarded GitLab private-protocol-two dispatch. This is
 not an MCP binding. The current story remains authored mapping with separate document
 checks, never actual mutation or no-duplicate-effect conformance evidence.
+
+## Implementation and first review correction — 2026-10-03
+
+Six initial document guards failed against the absent contract then passed; the original affected suite executed37checks. Authored mutation mapping and JSON observations preserve existing namespace/fingerprint/approval/attempt/recovery owners without implementing MCP dispatch. Independent review-result:mcp-replay-20261003 added3checks: one precedence cross-product passed, two demonstrated missing named-case premise obligations. The affected suite then had38passes/2failures. These were reachable document-edit coverage defects, not runtime replay defects.
+
+The correction validates distinguishing premises for all23decisions,4correlations and6observations rather than only IDs and self-consistent outputs. Existing CauseStage is read from service_wire and six stage values added to the observation metadata so audit/storage failure cannot collapse. All three reviewer tests are byte-for-byte preserved; added class-wide negative controls and positive irrelevant variations keep legitimate variation allowed. Final40affected checks passed, zero failures/ignored, formatting and scopedClippy exit0.
+
+Contract SHA2561f7884ccc7ededac8cef0173e18b04b0182fead6bb8b912caa59bdd348175fd3 unchanged; JSON6ce39a6e9eef009ad91b9918e236838f70d381d0852a6fa95208c286f59c7e95; guard1382c020e8422f98be0ce92f1e3f2db43a2bba446880568d2295297d22036a26. Correction report SHA256ea1a5a63e2228d9288c9ff1be7750a6df49649f494b81720f1c25e99d643ec86. Second bounded review and full integration gate pending. Mutation advertisement remains withheld until an executable binding is verified.
+
+## Final bounded independent pass — 2026-10-03
+
+Review-result:mcp-replay-followup-20261003 found no new mismatch. Its added observer-knowledge attack changes evidence/durability and consistently rewrites expected output and Markdown; semantic premise checks reject every such erosion. Existing reviewer regressions remain unchanged and pass. AEP comparison carried0/new0/resolved2. Final affected suite41passed, zero failed/ignored; fmt and scopedClippy exited0. One63line reviewer test added; no third attack.
+
+Final guard SHA256a85785382d0fbd83dfc65bd9e621c5d047d0386d12e8224062ac4c545af75a9b; contract/JSON remain at first-correction hashes. Final report SHA256e00a3154585c2dbaa666cbd4ecad9951057bacd25d3870dbd183c2be143ef82b. Exact three source files integrated; fullgate --msrv running with final auth/replay sources. No mutation runtime advertisement or no-duplicate-effect execution inferred.
