@@ -45,14 +45,17 @@ executable arguments.
 
 Setup writes `connectors-local/2`, and the parser still accepts an existing
 `connectors-local/1` configuration. Every adapter in version two requires
-`private_protocol`, exactly `connectors-private/1` or `connectors-private/2`.
+`private_protocol`, exactly `connectors-private/1`, `connectors-private/2` or
+`connectors-private/3`.
 Version one refuses that field and keeps its implicit private version one;
 loading never rewrites a file. An explicit
 selection changes the executable selection digest and requires fresh admission.
 Private version two supplies a bounded prepare/commit/cancel transport port with
-one-use pending writes. Production GitLab does not select it yet: approval issuance
-and the host write coordinator must be integrated first. See the
-[private mutation binding](../contracts/cli/v1alpha1/private-mutations.md).
+one-use pending writes, used by the [guarded GitLab journey](local-gitlab-merge.md).
+See the [private mutation binding](../contracts/cli/v1alpha1/private-mutations.md).
+Private version three supplies explicit [bounded native reads](../contracts/cli/v1alpha1/private-bounded-read.md)
+in the catalog executable. Its production owner/MCP composition remains unfinished;
+ordinary legacy invocation is refused on that selection, and it supplies no writes.
 
 `adapters describe --adapter ALIAS` reports the configured entry and its cached
 descriptor when available; cache facts are always stale. `adapters status --adapter
