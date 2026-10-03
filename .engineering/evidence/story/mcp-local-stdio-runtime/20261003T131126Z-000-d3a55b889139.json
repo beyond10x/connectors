@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T13:11:26Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 33,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Correction to evidence20261003T131003Z-000-e41ccd04991d: initial Clippy exit101 (collapsible_if), fixed and observed same native all-targets Clippy exit0",
+    "reference": ".local/mcp-runtime/native-tests/configuration-clippy-fixed.log"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T13:52:32Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 36,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Repository gate --msrv exit 0: 1324 passed, 0 failed, 65 ignored; drift, Clippy, Rust 1.88 and 1.91 passed",
+    "reference": ".local/mcp-runtime/gate-policy-metadata.log"
+  }
+}

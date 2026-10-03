@@ -41,8 +41,9 @@ local binding. Process startup alone is neither protocol initialization nor a
 grant to execute an operation.
 
 **Unavailable step:** configure the MCP projection and launch that command from
-your client. No complete MCP configuration schema or launch handler is selected
-by this guide. Do not paste an invented adapter stanza into a working installation.
+your client. The native configuration shape below is selected and validated by a
+library; its protected file loader and launch handler are not yet connected.
+Do not paste an invented adapter stanza into a working installation.
 Multi-caller/tenant-to-Connection assignment and cloud placement remain unresolved.
 The local single-owner intent does not close either decision.
 
@@ -55,6 +56,51 @@ policy gives a refusal. Discovery neither probes credentials nor grants executio
 Resources and prompts remain read-only. Mutation advertisement remains withheld
 until the complete [mutation/replay binding](../adapters/mcp/contracts/server/v1alpha1/mutations.md)
 exists, including its protected approval source and explicit business key.
+
+## Selected local projection configuration
+
+This configuration is **not yet consumed by the production CLI**. The selected
+location appends `.mcp-stdio.json` to `CONFIG`: `/private/config.toml` would use
+`/private/config.toml.mcp-stdio.json`. The application must admit an owner-only
+regular file without following symlinks, bounded to 1 MiB. Missing or invalid input
+is a refusal, never an implicit empty catalog. Generic owner configuration stays
+unchanged; there is no extra server flag or default exposure.
+
+The [generated native types](../adapters/mcp/generated/configuration-types/types.rs)
+define the closed JSON shape. `format` is `connectors-mcp-local/1`; `exposures` is
+an explicit array, possibly empty. Every exposure requires `adapter_alias`,
+`operation_ref`, `connection_ref`, a nonempty unique `families` array drawn from
+`tools`, `resources`, `prompts`, and boolean `enabled`. At most 1,000 exposures are
+accepted. An adapter/operation pair occurs only once, so two connection selections
+cannot compete for one advertised identity. These selectors refer to existing
+host configuration and metadata; parsing creates no connection or authority.
+
+`limits` requires unsigned integer JSON tokens in these ranges:
+
+| Member | Range |
+|---|---|
+| `frame_octets` | 256–1,048,576, including newline |
+| `response_octets` | 1,024–33,554,432, including all representations and framing |
+| `concurrent_requests` | 1–16 |
+| `request_milliseconds` | 1–120,000 |
+
+The native response ceiling allows space for an 8 MiB owner service envelope in
+both structured content and escaped JSON text. Each operation must still fit its
+complete selected binding before advertisement and dispatch. These limits cannot
+extend the shared two-second lease or five-second teardown bounds.
+
+An exposure may select `approval_file`, an absolute bounded private path. It is
+never advertised or accepted from MCP input. Discovery does not open it or infer
+that it contains valid proof. Only an admitted new mutation may read it through
+the existing protected-source path; an admitted replay does not read or spend it.
+Duplicate or unknown JSON members, explicit null instead of a path, invalid
+selectors and conflicting families refuse configuration.
+
+Configuration must be read anew for every admitted list page and invocation.
+Selection, enablement or target changes invalidate affected projection revisions;
+the serialized owner must repeat or fence selection at dispatch. A startup-only
+snapshot does not satisfy this contract. These application/owner checks and the
+runtime families remain unfinished despite the structural parser being available.
 
 ## Outbound HTTP: current generic grammar, MCP binding unresolved
 

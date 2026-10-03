@@ -11,6 +11,7 @@ connectors-core.workspace = true
 connectors-sdk.workspace = true
 connectors-client.workspace = true
 connectors-host.workspace = true
+connectors-mcp = { path = "../../adapters/mcp/runtime" }
 connectors_cli_contract.workspace = true
 clap.workspace = true
 serde_json.workspace = true
@@ -20,3 +21,4 @@ uuid.workspace = true
 [dev-dependencies]
 ring = "=0.17.14"
 tempfile.workspace = true
+toml = "1.1"
