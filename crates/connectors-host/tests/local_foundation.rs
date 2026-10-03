@@ -88,8 +88,19 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
         toml::from_str(&explicit.replace("connectors-private/2", "connectors-private/1")).unwrap();
     assert_ne!(v1_explicit.adapters["fixture"].selection(), old_digest);
     assert_ne!(v1_explicit.adapters["fixture"].selection(), digest);
+    let v3_explicit: Config =
+        toml::from_str(&explicit.replace("connectors-private/2", "connectors-private/3")).unwrap();
+    assert_eq!(
+        v3_explicit.adapters["fixture"].private_protocol(),
+        PrivateProtocol::V3
+    );
+    assert_ne!(v3_explicit.adapters["fixture"].selection(), digest);
+    assert_ne!(
+        v3_explicit.adapters["fixture"].selection(),
+        v1_explicit.adapters["fixture"].selection()
+    );
     for invalid in [
-        explicit.replace("connectors-private/2", "connectors-private/3"),
+        explicit.replace("connectors-private/2", "connectors-private/4"),
         explicit.replace("connectors-local/2", "connectors-local/3"),
         explicit.replace("private_protocol=", "unreviewed="),
     ] {

@@ -30,6 +30,17 @@ pub const FORMAT: &str = "connectors-catalog-local/2";
 pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
 const DOCUMENT_LIMIT: usize = 64 * 1024;
 
+fn bounded_http(http: ScopedHttp, until: Option<Instant>) -> Result<ScopedHttp> {
+    match until {
+        // `until` was selected once for the whole native sequence. The maximum
+        // duration here cannot extend that original, possibly shorter cutoff.
+        Some(until) => http
+            .with_provider_budget(Duration::from_secs(30), until)
+            .map_err(Failure::from_service),
+        None => Ok(http),
+    }
+}
+
 /// Where the subject of a credential comes from.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -350,10 +361,24 @@ impl OAuth {
     /// One refresh-token grant. Every refusal is a code; no answer text,
     /// status line or credential reaches it.
     async fn exchange(&self, entry: &OAuthEntry) -> Result<Exchanged> {
+        self.exchange_until(entry, None).await
+    }
+    async fn exchange_until(
+        &self,
+        entry: &OAuthEntry,
+        until: Option<Instant>,
+    ) -> Result<Exchanged> {
+        let bounded = until
+            .map(|until| {
+                self.http
+                    .with_provider_budget(Duration::from_secs(30), until)
+            })
+            .transpose()
+            .map_err(Failure::from_service)?;
+        let http = bounded.as_ref().unwrap_or(&self.http);
         let sent = Instant::now();
         let segments: Vec<&str> = self.path.iter().map(String::as_str).collect();
-        let response = self
-            .http
+        let response = http
             .post_form(
                 &segments,
                 &[
@@ -884,6 +909,13 @@ impl Local {
     /// The API port for one request and, for an OAuth profile, the cache key of
     /// the access token it carries, so a refusal of that token can evict it.
     async fn authenticated(&self, document: Secret) -> Result<(ScopedHttp, Option<[u8; 32]>)> {
+        self.authenticated_until(document, None).await
+    }
+    async fn authenticated_until(
+        &self,
+        document: Secret,
+        until: Option<Instant>,
+    ) -> Result<(ScopedHttp, Option<[u8; 32]>)> {
         let credential = match self.auth.scheme {
             Scheme::Token => {
                 let document = Self::document(document)?;
@@ -902,15 +934,18 @@ impl Local {
                 let access = match oauth.cached(&key) {
                     Some(access) => access,
                     None => {
-                        let exchanged = oauth.exchange(&entry).await?;
+                        let exchanged = oauth.exchange_until(&entry, until).await?;
                         oauth.store(key, &exchanged);
                         exchanged.access
                     }
                 };
-                return Ok((self.with(Secret(access.as_bytes().to_vec())), Some(key)));
+                return Ok((
+                    bounded_http(self.with(Secret(access.as_bytes().to_vec())), until)?,
+                    Some(key),
+                ));
             }
         };
-        Ok((self.with(credential), None))
+        Ok((bounded_http(self.with(credential), until)?, None))
     }
     fn baseline(
         &self,
@@ -1067,6 +1102,27 @@ impl runtime::Adapter for Local {
     }
     fn bootstrap_v2(&self) -> Result<Bootstrap> {
         Ok(self.bootstrap_v2.clone())
+    }
+    fn bootstrap_v3(&self) -> Result<Bootstrap> {
+        Ok(self.bootstrap.clone())
+    }
+    async fn invoke_bounded(
+        &self,
+        operation: &str,
+        _partition: &str,
+        document: Secret,
+        input: Value,
+        budget: runtime::ReadBudget,
+    ) -> Result<Value> {
+        let until = budget.provider_until()?;
+        let (http, key) = self.authenticated_until(document, Some(until)).await?;
+        let result = self
+            .engine
+            .read(&http, &self.instance, operation, input)
+            .await
+            .map_err(Failure::from_provider);
+        self.evict_refused(key, &result);
+        result
     }
     async fn prepare_write(
         &self,
