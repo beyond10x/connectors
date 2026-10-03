@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T13:10:03Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 32,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Native configuration integration: 41 native tests passed on Rust1.98.1 and Rust1.88.0; ESS0.45 validates 5 files; pinned projection drift and native Clippy passed",
+    "reference": ".local/mcp-runtime/native-tests/configuration-msrv.log"
+  }
+}

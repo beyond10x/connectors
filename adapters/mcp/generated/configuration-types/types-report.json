@@ -1,0 +1,110 @@
+{
+  "format": "ess-types-report/3",
+  "source_digest": "e01cf3a0c69790239c9a6a719618d413f55d37830a1f1405e9a765e6719cf3c2",
+  "input": {
+    "kind": "model",
+    "system": "connectors_mcp",
+    "specification_version": "v1",
+    "contract_digest": "slice-sha256/2:162337936332d042655b22c8e8b438e3e41fb97f7990fa0d61e5c5990fce8b7e",
+    "projection_digest": "37fe50f33f03056f95eba0bcafd9137913ffbe5988d8b5b2a3f1fc4c8624acc0"
+  },
+  "generator_version": "0.45.0",
+  "target": "rust",
+  "configuration": {
+    "language": "rust",
+    "package": "connectors-mcp-local-server-types"
+  },
+  "roots": [
+    "connectors_mcp.local_server.Configuration"
+  ],
+  "declarations": {
+    "connectors_mcp.local_server.Configuration": "ConnectorsMcpLocalServerConfiguration",
+    "connectors_mcp.local_server.Exposure": "ConnectorsMcpLocalServerExposure",
+    "connectors_mcp.local_server.Family": "ConnectorsMcpLocalServerFamily",
+    "connectors_mcp.local_server.Limits": "ConnectorsMcpLocalServerLimits"
+  },
+  "annotations": [
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Configuration/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Configuration/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Configuration/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Exposure/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Exposure/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Exposure/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Family/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Family/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Family/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Limits/title",
+      "rule": "title",
+      "detail": "retained in source.schema.json; no decoder behavior inferred"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Limits/x-ess-kind",
+      "rule": "x-ess-kind",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Limits/x-ess-name",
+      "rule": "x-ess-name",
+      "detail": "model identity and wire mapping retained in source.schema.json"
+    }
+  ],
+  "obligations": [
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Limits/properties/concurrent_requests",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Limits/properties/frame_octets",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Limits/properties/request_milliseconds",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    },
+    {
+      "pointer": "/$defs/connectors_mcp.local_server.Limits/properties/response_octets",
+      "rule": "integer",
+      "detail": "serde_json::Number retains exact JSON numbers but does not enforce integrality; validate the source constraint"
+    }
+  ]
+}

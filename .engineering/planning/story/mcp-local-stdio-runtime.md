@@ -55,7 +55,7 @@ scope:
   path: crates/connectors-host/src/local
 - confidence: cited
   path: docs/local-mcp-cli.md
-revision: 31
+revision: 37
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -775,3 +775,159 @@ Promotion and application/owner admission remain the next implementation batch.
 An asynchronous operator question about host-owned cloud connections with explicit
 caller grants is pending. No answer has been assumed and no blocker was cleared.
 Local inbound stdio and outbound HTTP continue independently.
+
+## Native configuration integration checkpoint — 2026-10-03
+
+The governed-read checkpoint was bot-committed and pushed on the existing branch:
+f77dcd61224b31474dc102c2dbe847333c8fb4fa. Both author and committer were verified as
+b10x-bot[bot], the advertised branch matches, and draft PR84 names that exact head.
+The bot API updated its title/description to the combined final scope. Current CI:
+common source, documentation and planning checks succeeded; repository gate
+run37124861921/job111207994769 is still in progress. No merge or release was made.
+
+Continued the already selected native configuration phase after that publication:
+- Added local_server to the native ESS header: 5 files validate under ESS0.45.0.
+- Generated four configuration values into the dedicated configuration-types sibling
+  package; root workspace exclusion and native dependency keep generated manifests
+  intact. The build now regenerates and compares this projection with the existing
+  launch/session projections. Local output ledgers remain ignored.
+- Added native Configuration validation and six tests for bounded input, closed JSON,
+  literal private-number objects, numeric limits, duplicate/conflicting exposures,
+  exact selectors and local approval source shape. Parsing never opens a proof file.
+- The CLI intent guide now documents the selected companion filename and bounds,
+  while explicitly retaining production runtime unavailability. Application protected
+  file loading, per-request metadata admission and final dispatch fencing are next.
+
+Linked native tests: 41 passed, 0 failed, 0 ignored under Rust1.98.1 and Rust1.88.0.
+Pinned `mcp-bindings --check` passed. Native Clippy all-targets with -D warnings
+passed. Logs: native-tests/configuration-{linked,msrv,drift,clippy}.log under the
+existing task evidence directory. A first generator invocation used an unsupported
+--ess flag and exited2; its help named only --check, and rerunning the same command
+with the documented CONNECTORS_ESS environment pin succeeded. No generated file
+was repaired by hand. The full gate on f77dcd612 predates this configuration batch;
+these new changes are local and await the next complete integration gate.
+
+The story remains active. Neither typed configuration parsing nor the earlier
+protected read API is the actual-process MCP acceptance promised by this story.
+The pending cloud caller-assignment question has no answer yet and remains open.
+
+## Configuration Clippy evidence correction — 2026-10-03
+
+Evidence20261003T131003Z-000-e41ccd04991d prematurely said native Clippy passed.
+The completed initial command actually exited101 on clippy::collapsible_if in
+configuration.rs. The coordinator wrote that claim before checking the returned
+exit status; it was not valid evidence of Clippy success. The 41-test and ESS/drift
+results in that record were observed and remain accurate. Keep the earlier record
+as history rather than editing an immutable evidence record.
+
+Collapsed the named conditional without suppressing the lint. The same native
+all-targets Clippy command now completed with exit0, observed directly. The failed
+log remains native-tests/configuration-clippy.log; the successful retry is
+native-tests/configuration-clippy-fixed.log. This correction supersedes only the
+premature Clippy claim. Full integration/release acceptance remains unfinished.
+
+## Protected metadata and native selection seam — 2026-10-03
+
+Continue the active local runtime story with a generic owner ReadPolicy callback
+installed by application composition. The host must not depend on a native adapter.
+A projected private read supplies an additional expected projection revision; the
+callback rereads the admitted native companion file and checks the exact configured
+operation/connection and enablement after generic current lookup policy and before
+private operation lookup/input. The original generic governed-read call retains its
+behavior, and the default owner refuses a projected call when no policy is installed.
+This extra constraint grants nothing and cannot bypass generic host policy, registry
+admission, audit acknowledgement, credential custody or the final dispatch gate.
+
+Pass the same application-owned policy to the serialized worker. Recheck at dequeue
+before startup, and again at final dispatch while holding the existing lifecycle
+control guard. A changed projection revision refuses stale input; a mismatched
+configured connection refuses scope before revealing revision/operation information.
+Policy file failure is unavailable rather than empty metadata. Only composition knows
+the native filename and typed configuration; no native value bag enters generic Config.
+
+Add a protected metadata query over the existing runtime Bootstrap carrier. It reads
+current generic config and exact executable-bound cached metadata, filters operations
+by current metadata policy, and returns only admitted metadata, without a provider
+probe, credential access, child startup or approval source read. Discovery audit uses
+the existing audit store and no synthetic reference. Application projection owns the
+safe MCP presentation; private metadata is not blindly copied into protocol output.
+
+Required checks cover actual protected file admission, unknown/duplicate/excess input,
+revocation/change between discovery and worker dispatch, policy-before-stale refusal,
+no child startup on policy refusal, metadata queries with absent credentials/provider,
+and unchanged legacy invocation behavior. New runtime helper ports are implementation
+composition of existing typed declarations; they introduce no caller, grant or ledger.
+No production server availability or completed process conformance is claimed yet.
+
+## Protected policy and metadata implementation checkpoint — 2026-10-03
+
+Implemented the application-owned ReadPolicy port through the protected owner
+socket, read coordinator and serialized worker. The application reloads the
+private native configuration for each check. Host operation policy precedes native
+policy; selected connection scope precedes projection revision; current revision
+precedes enablement and operation input. The worker checks before provider startup
+and again at final dispatch. No native adapter dependency enters the host library.
+
+Added protected GovernedDescribe and Client::governed_describe. It validates the
+exact executable-bound cached Bootstrap, filters operations and requirements by
+current metadata policy, acknowledges a real Describe audit anchor, rereads policy
+and metadata, and appends the final observation. Public correlation is null for
+describe. Audit admission failure withholds metadata and returns unavailable with
+no invented reference. Final audit failure retains the known result and real
+reference as incomplete. This private carrier is not an MCP list or public codec;
+application-owned field projection remains to be implemented.
+
+Observed focused checks, Rust 1.98.1, locked/offline and bounded build settings:
+
+- Application mcp::tests: 4 passed. Initial 4 failures were invalid test setup:
+  Config::initialize writes connectors-local/2, requiring explicit private_protocol.
+  The fixture now selects V2. Production validation was not relaxed.
+  Log .local/mcp-runtime/native-tests/policy-app-tests-fixed.log,
+  SHA256 608dbbc60c32656a9e7711d4b209d512ea3497965e6e44011862695df3515b45.
+- Host governed filter: 16 passed, including socket framing/build admission,
+  real child JSON transport, 3 new policy checks and 3 metadata checks.
+  Log .local/mcp-runtime/native-tests/metadata-tests-fixed.log,
+  SHA256 d476a76ee1a499eec430222eb9cf793a074174d777c1d50f17e8cd91d6e3cc66.
+  A test initially expected EarlyRefusal's Refused outcome after an already
+  acknowledged admission; corrected to the existing Error final observation,
+  retaining its no-dispatch and real-record assertions. Metadata final-write
+  fault injection initially also hit admission; moved injection after confirmed
+  admission so it exercises the intended final-write seam. Failures remain in logs.
+
+The extra metadata-policy-change-after-admission test was added after that focused
+run and is not covered by those 16 passes. The full gate including MSRV is now
+running in .local/mcp-runtime/gate-policy-metadata.log; no passing claim yet.
+PR84 remote repository gate 37124861921 completed success on published f77dcd6;
+it does not cover these uncommitted changes.
+
+Remaining: a real final-dispatch withdrawal fixture with custody/child, native
+list/result projection, production stdio launch and process conformance, outbound
+HTTP/OAuth composition, mutation binding, cloud assignment decision and release.
+No server runtime or completed provider batch is claimed. Independent workers
+remain unavailable under the previously observed quota; these checks are the
+coordinator's work, not independent review. Story remains active.
+
+## Policy and metadata full gate — 2026-10-03
+
+The full repository gate finished with exit 0 on the native configuration,
+application policy port and audited metadata implementation. Command:
+`RUSTUP_TOOLCHAIN=1.98.1 RUSTC_WRAPPER= CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 TMPDIR="$PWD/.local/tmp" CONNECTORS_ESS="$HOME/.cache/ess/toolchains/0.45.0/ess" CONNECTORS_AEP="$HOME/.cache/aep/toolchains/0.65.0/aep-0.65.0-x86_64-unknown-linux-gnu/aep" cargo run --locked --offline -p connectors-build -- gate --msrv`.
+
+Observed 162 test summaries: 1324 passed, 0 failed, 65 ignored. Includes the
+metadata-policy-change-after-admission test added after the focused run. Pinned
+ESS validation and generation/drift, authored formatting, workspace build/tests,
+adapter isolation, Clippy all-targets with warnings denied, Rust 1.88 selected
+libraries and Rust 1.91 workspace all-target checks all passed. AEP validation is
+valid with existing historical review warnings. Full unedited output is retained
+at .local/mcp-runtime/gate-policy-metadata.log, SHA256
+8efade3cc9917a8859c338e9d47c78620ce4cd4a189765e393cc1b44924ec94f.
+
+This checkpoint is to be published on the existing draft PR84 branch. No merge,
+tag, release or MCP process conformance is claimed by a green repository gate.
+The story remains active and retains all runtime, provider and cloud decision gaps
+listed in the preceding checkpoint.
+
+The first commit attempt was refused by Gates for a personal absolute toolchain
+path in this command transcript. The transcript now uses HOME-relative paths;
+code, generated output and validation inputs are unchanged. The same bot/Gates
+route is retried without changing policy or suppressing its check.

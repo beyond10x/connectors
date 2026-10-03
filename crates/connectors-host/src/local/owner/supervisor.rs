@@ -25,6 +25,7 @@ pub(super) enum Task {
         revision: String,
         document: Vec<u8>,
         governed: bool,
+        projection_revision: Option<String>,
     },
     Write {
         connection: String,
@@ -169,9 +170,18 @@ pub(super) struct Pool {
     shutdown_lock: Mutex<()>,
     /// Attempts recovery has settled; the owner's idle clock counts only these.
     settled: Arc<AtomicU64>,
+    read_policy: Arc<dyn ReadPolicy>,
 }
 impl Pool {
+    #[cfg(test)]
     pub fn new(paths: Arc<Paths>, incarnation: String) -> Self {
+        Self::with_read_policy(paths, incarnation, Arc::new(governed::UnboundReadPolicy))
+    }
+    pub fn with_read_policy(
+        paths: Arc<Paths>,
+        incarnation: String,
+        read_policy: Arc<dyn ReadPolicy>,
+    ) -> Self {
         Self {
             workers: Mutex::new(BTreeMap::new()),
             paths,
@@ -180,6 +190,7 @@ impl Pool {
             stopped: Arc::new(AtomicBool::new(false)),
             shutdown_lock: Mutex::new(()),
             settled: Arc::new(AtomicU64::new(0)),
+            read_policy,
         }
     }
     fn send(
@@ -200,6 +211,7 @@ impl Pool {
             }
             let (sender, receiver) = mpsc::sync_channel(16);
             let (paths, launches) = (self.paths.clone(), self.launches.clone());
+            let read_policy = self.read_policy.clone();
             let control = Arc::new(Mutex::new(lifecycle::Control::default()));
             let shared = control.clone();
             let stopped = self.stopped.clone();
@@ -216,7 +228,13 @@ impl Pool {
                 .name("connectors-adapter-owner".into())
                 .spawn(move || {
                     worker(
-                        paths, launches, shared, stopped, activity, instance, receiver,
+                        (paths, read_policy),
+                        launches,
+                        shared,
+                        stopped,
+                        activity,
+                        instance,
+                        receiver,
                     )
                 })
                 .map_err(|_| Code::Unavailable)?;
@@ -463,7 +481,7 @@ impl Pool {
     }
 }
 fn worker(
-    paths: Arc<Paths>,
+    binding: (Arc<Paths>, Arc<dyn ReadPolicy>),
     launches: Arc<Launches>,
     control: Arc<Mutex<lifecycle::Control>>,
     stopped: Arc<AtomicBool>,
@@ -471,6 +489,7 @@ fn worker(
     instance: String,
     receiver: mpsc::Receiver<Work>,
 ) {
+    let (paths, read_policy) = binding;
     let Activity {
         busy,
         recovering,
@@ -527,10 +546,11 @@ fn worker(
                 revision,
                 document,
                 governed: true,
+                projection_revision,
             } = &job.task
             {
                 let input = std::str::from_utf8(document).map_err(|_| Code::InvalidInput)?;
-                governed::resolve(
+                governed::resolve_selected(
                     &paths,
                     &job.alias,
                     &approval_issuance::Request {
@@ -540,6 +560,9 @@ fn worker(
                         revision,
                         input,
                     },
+                    projection_revision
+                        .as_deref()
+                        .map(|r| (read_policy.as_ref(), r)),
                 )?;
             }
             let (config, current) = selected(&paths, &job.alias)?;
@@ -822,6 +845,7 @@ fn worker(
                     revision,
                     document,
                     governed,
+                    projection_revision,
                 } => {
                     let bootstrap = active.bootstrap().clone();
                     if bootstrap.descriptor()?.revision != revision
@@ -924,6 +948,24 @@ fn worker(
                         if stopped.load(Ordering::SeqCst) {
                             Err(Code::Unavailable.into())
                         } else {
+                            if governed {
+                                let input = std::str::from_utf8(&document)
+                                    .map_err(|_| Code::InvalidInput)?;
+                                governed::resolve_selected(
+                                    &paths,
+                                    &job.alias,
+                                    &approval_issuance::Request {
+                                        connection: &connection,
+                                        operation: &operation,
+                                        schema: &expected_schema,
+                                        revision: &revision,
+                                        input,
+                                    },
+                                    projection_revision
+                                        .as_deref()
+                                        .map(|r| (read_policy.as_ref(), r)),
+                                )?;
+                            }
                             Ok(())
                         }
                     }) {
@@ -1059,6 +1101,7 @@ mod suppression_tests {
                 revision: text(),
                 document: Vec::new(),
                 governed: false,
+                projection_revision: None,
             },
             Task::Write {
                 connection: text(),
