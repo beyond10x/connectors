@@ -44,6 +44,8 @@ scope:
 - confidence: cited
   path: contracts/cli/v1alpha1/semantics.md
 - confidence: cited
+  path: contracts/service/local-operation-curation.md
+- confidence: cited
   path: crates/connectors-build/src
 - confidence: cited
   path: crates/connectors-core/Cargo.toml
@@ -58,6 +60,8 @@ scope:
 - confidence: cited
   path: crates/connectors-host/src/local
 - confidence: cited
+  path: crates/connectors-host/src/local/operation_curation.rs
+- confidence: cited
   path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
   path: docs/development.md
@@ -65,7 +69,7 @@ scope:
   path: docs/local-mcp-cli.md
 - confidence: cited
   path: ess/domains/service_wire.yaml
-revision: 60
+revision: 66
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -1337,3 +1341,73 @@ owner/native selection of these budgets remain required before advertisement.
 The closed legacy Bootstrap lacks the complete declarations and original
 execution context; do not manufacture them from its Read/Write flag or silently
 extend its wire carrier. Explicitly select and model that integration next.
+
+## Protected curation and coherent projection — 2026-10-03
+
+Selected integration: protected CONFIG.operation-curation.json supplies complete
+reviewed operation declarations, pinned to both Adapter::selection() and the
+canonical digest of the original validated Bootstrap. The normative source is
+contracts/service/local-operation-curation.md, modeled as immutable values in
+ess/domains/service_wire.yaml. ESS0.45 validates24files. No operation or persistent
+entity is introduced. Native ESS remains independent from shared declarations.
+
+This selection avoids altering the existing persisted LocalRuntimeRecord.bootstrap
+schema and closed legacy Bootstrap codec; it does not waive private execution
+support. No metadata is guessed from Read/Write. An operation missing explicit
+curation is unbound. A protected policy read failure is not an empty catalog.
+The application policy returns one coherent revision plus metadata snapshot, and
+the owner filters both metadata and descriptor entries by current permissions.
+The authenticated same-build ProjectedDescribe carrier gains a distinct metadata
+map; ordinary GovernedDescribe and legacy codecs stay closed and unchanged.
+
+Named checks: curation-exact-pins, curation-closed-document, curation-profile-and-auth,
+curation-private-file, curation-coherent-revision, curation-hidden-omission and
+curation-audit-race. Check a failing stub before implementation. Plant a changed-pin
+or hidden-metadata bypass and prove it fails before restored tests and full gate.
+Explicit private execution/budget binding remains the next required step before
+advertisement; the curation parser alone is not a native conformance claim.
+
+The prior HTTP budget checkpoint8e02d6f2573f4c5c75049989d0239374d2c73175 is published
+on draftPR84. Its local full gate passed1350tests with66ignored; CI was still
+running when this phase began. The three existing workers remain quota-errored,
+so root remains implementation/store writer and claims no independent review.
+
+Implemented: generated curation types, strict core document parsing, protected
+owner loading and pin/profile/effect/auth checks, coherent application snapshots,
+and permission filtering of both the descriptor and the metadata map. The owner
+fingerprint includes metadata values independently of the policy's declared
+revision, so changing metadata behind an incorrectly constant revision after the
+real audit acknowledgement still refuses. Legacy cached Bootstrap fields and
+ordinary GovernedDescribe remain unchanged. The public guide now distinguishes
+this internal implemented policy from the still-unavailable MCP serving loop.
+
+The core positive case failed against a refusing stub (1passed,1failed), and the
+application suite failed against the loader stub (1passed,7failed). Bypassing the
+pin guard failed with `mismatched pin released metadata`; bypassing only metadata
+permission filtering leaked item.read in the targeted hidden-operation test and
+failed its exact empty-map assertion. Both sources were restored. The restored
+core/application/owner suites passed51tests,0failed,1existingignored fixture.
+Pin testing calls metadata selection directly, so a stale-revision refusal cannot
+conceal a missing pin comparison. The loader also checks cached identity against
+the selected adapter before using curation.
+
+Retained logs/SHA256 under .local/mcp-runtime/:
+- curation-red.log: a08f62bf0c7ae4e0d17055aa5257fcf589dc8e98415234aedc15bf05478c13e7
+- curation-pin-mutation.log: 769395e47a1a82c8006b649dc07394e7b2beebaef81b4d2a0f8bd1f9552caa34
+- curation-filter-mutation.log: f288e5c9c411b55eaad76b66845c462601c3e139e2825789b3cb016f93383c15
+- curation-owner-restored.log: a596215e89cf75c55294086c2649b5f6a7c6028a3a58c7acef496ddc4ab30b45
+- curation-application-restored.log: d69e29e175e8062d4888bdfb720ec264d450f908d09a21c0710cfc472dd1ca31
+- curation-core-restored.log: fe1a0ece4e2943e4f572e8f04435b7fbe69124dd029f2f24fbce46512397bd54
+- curation-docs-restored.log: 70a6cfdd181136c6bfb74c64de8aa4123aabd28e3388e2f2da459b0b2bbda3c3
+
+Entity Runtime definitions were regenerated through their owning command; parsed
+definitions and commands equal HEAD exactly, with only provenance digests changed.
+The website reference check initially had no local cache; generating it through
+connectors-build docs and then checking produced43contract/97total pages,no drift.
+The complete connectors-build gate --msrv passed: 1356 passed, 0 failed,
+66 ignored across 166 summaries, including Clippy, drift, adapter isolation
+and Rust 1.88/1.91 checks. Log: .local/mcp-runtime/gate-curation.log; SHA256
+b377ceaaca632372f7a4fc1aab09d8790c217fb82c8e239a1a1a62555bd274c2.
+All repository CI for the preceding published 8e02d6f checkpoint is green.
+This checkpoint remains a draft foundation; production serving, native budget
+binding, full MCP, provider acceptance and the new release remain incomplete.

@@ -91,6 +91,7 @@ impl Fixture {
             .unwrap();
         let fixture = Self { _root: root, paths };
         fixture.write(fixture.value());
+        fixture.write_curation(fixture.curation());
         fixture
     }
     fn value(&self) -> serde_json::Value {
@@ -103,11 +104,34 @@ impl Fixture {
     }
     fn revision(&self) -> String {
         let config = Config::load(&self.paths.config).unwrap();
-        revision(
-            &load(&self.paths).unwrap(),
-            &config.adapters["selected"],
-            &owner::cached(&self.paths, "selected").unwrap(),
-        )
+        ProjectionPolicy
+            .metadata_revision(
+                &self.paths,
+                "selected",
+                &config.adapters["selected"],
+                &owner::cached(&self.paths, "selected").unwrap(),
+            )
+            .unwrap()
+    }
+    fn curation(&self) -> serde_json::Value {
+        let config = Config::load(&self.paths.config).unwrap();
+        let bootstrap = owner::cached(&self.paths, "selected").unwrap();
+        json!({"format":"connectors-operation-curation/1","adapters":[{
+            "adapter_alias":"selected", "executable_selection":config.adapters["selected"].selection(),
+            "bootstrap_sha256":connectors_core::digest(&serde_json::to_value(bootstrap).unwrap()),
+            "operations":[{"operation":"read","metadata":{
+                "effects":["network"],"semantic_effects":[],"risk":"low",
+                "idempotency":{"kind":"none"},"approval":"not_required",
+                "requires_auth":[{"profile":"token","scopes":[]}],
+                "limits":{"request_bytes":65536,"result_bytes":4194304,
+                    "execution_ms":20000,"provider_ms":15000,"connect_ms":5000}
+            }}]
+        }]})
+    }
+    fn write_curation(&self, value: serde_json::Value) {
+        let path = operation_curation::path(&self.paths);
+        std::fs::write(&path, serde_json::to_vec(&value).unwrap()).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).unwrap();
     }
     fn request(&self) -> owner::approval_issuance::Request<'static> {
         owner::approval_issuance::Request {
@@ -229,6 +253,7 @@ fn discovery_revision_matches_execution_with_an_unadvertised_cached_operation() 
     runtime::state::State::new(&fixture.paths.state)
         .remember(&adapter.selection(), &original)
         .unwrap();
+    fixture.write_curation(fixture.curation());
     let revision = ProjectionPolicy
         .metadata_revision(&fixture.paths, "selected", adapter, &original)
         .unwrap();
@@ -241,12 +266,8 @@ fn discovery_revision_matches_execution_with_an_unadvertised_cached_operation() 
         .retain(|entry| entry.operation != "hidden");
     let incorrect = ProjectionPolicy
         .metadata_revision(&fixture.paths, "selected", adapter, &filtered)
-        .unwrap();
-    assert_ne!(revision, incorrect);
-    assert_eq!(
-        fixture.check(&incorrect).unwrap_err().code,
-        Code::StaleDescription
-    );
+        .unwrap_err();
+    assert_eq!(incorrect.code, Code::StaleDescription);
     let mut companion = fixture.value();
     companion["exposures"][0]["enabled"] = json!(false);
     fixture.write(companion);
@@ -259,4 +280,102 @@ fn discovery_revision_matches_execution_with_an_unadvertised_cached_operation() 
         Code::StaleDescription
     );
     assert_eq!(fixture.check(&current).unwrap_err().code, Code::Forbidden);
+}
+
+#[test]
+fn curation_pins_and_native_profile_auth_requirements_are_checked_before_use() {
+    let fixture = Fixture::new();
+    let old = fixture.revision();
+    for key in ["executable_selection", "bootstrap_sha256"] {
+        let mut value = fixture.curation();
+        value["adapters"][0][key] = json!("0".repeat(64));
+        fixture.write_curation(value);
+        let config = Config::load(&fixture.paths.config).unwrap();
+        let observed = ProjectionPolicy.metadata(
+            &fixture.paths,
+            "selected",
+            &config.adapters["selected"],
+            &owner::cached(&fixture.paths, "selected").unwrap(),
+        );
+        assert_eq!(
+            observed
+                .err()
+                .expect("mismatched pin released metadata")
+                .code,
+            Code::StaleDescription
+        );
+        assert_eq!(
+            fixture.check(&old).unwrap_err().code,
+            Code::StaleDescription
+        );
+    }
+    for (field, bad) in [
+        ("effects", json!(["external_write"])),
+        ("requires_auth", json!([{"profile":"unbound","scopes":[]}])),
+        (
+            "requires_auth",
+            json!([{"profile":"token","scopes":["extra"]}]),
+        ),
+    ] {
+        let mut value = fixture.curation();
+        value["adapters"][0]["operations"][0]["metadata"][field] = bad;
+        fixture.write_curation(value);
+        assert_eq!(
+            fixture.check(&old).unwrap_err().code,
+            Code::InvalidConfiguration
+        );
+    }
+    fixture.write_curation(fixture.curation());
+    fixture.check(&old).unwrap();
+}
+
+#[test]
+fn changed_curation_revises_the_snapshot_and_omitted_operations_gain_no_defaults() {
+    let fixture = Fixture::new();
+    let old = fixture.revision();
+    let mut value = fixture.curation();
+    value["adapters"][0]["operations"][0]["metadata"]["risk"] = json!("high");
+    fixture.write_curation(value);
+    assert_eq!(
+        fixture.check(&old).unwrap_err().code,
+        Code::StaleDescription
+    );
+    let config = Config::load(&fixture.paths.config).unwrap();
+    let snapshot = ProjectionPolicy
+        .metadata(
+            &fixture.paths,
+            "selected",
+            &config.adapters["selected"],
+            &owner::cached(&fixture.paths, "selected").unwrap(),
+        )
+        .unwrap();
+    assert_eq!(snapshot.revision, fixture.revision());
+    assert_eq!(
+        snapshot.operations["read"].to_value().unwrap()["risk"],
+        "high"
+    );
+    let mut value = fixture.curation();
+    value["adapters"][0]["operations"] = json!([]);
+    fixture.write_curation(value);
+    assert_eq!(
+        fixture.check(&fixture.revision()).unwrap_err().code,
+        Code::NotFound
+    );
+    assert!(!fixture._root.path().join("absent-provider").exists());
+}
+
+#[test]
+fn curation_policy_is_a_required_private_file_not_an_empty_catalog_fallback() {
+    let fixture = Fixture::new();
+    let old = fixture.revision();
+    let path = operation_curation::path(&fixture.paths);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(fixture.check(&old).is_err());
+    std::fs::remove_file(&path).unwrap();
+    assert!(fixture.check(&old).is_err());
+    let target = fixture._root.path().join("other-curation.json");
+    std::fs::write(&target, serde_json::to_vec(&fixture.curation()).unwrap()).unwrap();
+    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+    symlink(&target, &path).unwrap();
+    assert!(fixture.check(&old).is_err());
 }
