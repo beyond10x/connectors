@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T14:31:22Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 42,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust 1.98.1 connectors-build gate --msrv: exit 0; 1331 passed, 0 failed, 66 ignored; drift, boundaries, Clippy, Rust 1.88 selected and 1.91 workspace checks passed",
+    "reference": "sha256:53a7626686e5bf4de7910dc73692414871b2bf0edd5a1643b7a3dfa21f21ab97"
+  }
+}

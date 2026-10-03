@@ -2,6 +2,8 @@ use super::*;
 use crate::local::{config, registry};
 use std::{cell::Cell, collections::BTreeSet, sync::atomic::Ordering, time::Duration};
 
+mod final_fence;
+
 struct WithdrawAfter {
     admitted: usize,
     calls: std::sync::atomic::AtomicUsize,

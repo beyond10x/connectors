@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T14:19:03Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 40,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Native results 47 passed; whole-frame newline budget mutation fails; restored source passes",
+    "reference": ".local/mcp-runtime/native-tests/results-restored.log"
+  }
+}

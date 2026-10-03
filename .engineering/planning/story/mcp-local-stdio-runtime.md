@@ -55,7 +55,7 @@ scope:
   path: crates/connectors-host/src/local
 - confidence: cited
   path: docs/local-mcp-cli.md
-revision: 37
+revision: 42
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -931,3 +931,141 @@ The first commit attempt was refused by Gates for a personal absolute toolchain
 path in this command transcript. The transcript now uses HOME-relative paths;
 code, generated output and validation inputs are unchanged. The same bot/Gates
 route is retried without changing policy or suppressing its check.
+
+## Final dispatch fence proof — 2026-10-03
+
+Prove the selected worker final-dispatch policy check with the existing disposable
+GNOME Secret Service fixture, real registry publication and an owned Rust adapter
+child. Admit at dequeue, withdraw before final dispatch, assert no provider marker,
+then allow the same connection and assert one provider invocation. Keep this
+environment-dependent scenario explicitly classified in the ignored-suite runner.
+Plant the defect by omitting the final policy recheck only, require this exact
+test to fail, restore byte-identical source and observe green. This proves the
+worker constraint, not the unfinished MCP wire runtime or full conformance suite.
+
+Continue native MCP discovery/result projection after this check. Public fields
+must be explicitly projected from admitted metadata; private Bootstrap, approval
+paths and credential locators are never copied wholesale to MCP output. Preserve
+the full server, outbound, mutation and release scope and the pending cloud choice.
+
+## Verified final fence and result projection phase — 2026-10-03
+
+The real final-dispatch fixture now passes with a qualified disposable Secret
+Service, actual registry/custody acknowledgements and a real owned Rust adapter.
+It denies the second (final) admission, sees no provider invocation and verifies
+the captured use is released without dispatch. Allowing the next call proves the
+same connection executes exactly once and releases its use. Removing only the
+worker final policy callback makes this test fail with "withdrawn projection
+reached the real provider". Restored supervisor SHA256 is
+f855aef1ec5fed762f5beab83b46f5b70250f2b9560a995160ed8dc8e0c9c969.
+Logs: native-tests/final-fence-mutation.log and final-fence-released.log under
+.local/mcp-runtime. The initial long-checkout TMPDIR failed before testing admission
+because the fixture bus could not open; a task-owned short private cache directory
+ran the qualified fixture. No production timeout or custody admission was relaxed.
+The ignored runner classifies this exact test as disposable with CUSTODY required.
+
+Next implement pure native tools/resources result projection and whole JSON-RPC
+response encoding from an already admitted safe v1alpha2 service envelope. Preserve
+all applicable service/audit/source/mutation fields without regenerating correlation;
+tool text and structured content must decode identically, including arbitrary JSON
+number tokens. Primary cacheable resource replies get ttlMs:0/cacheScope:private;
+legacy omits primary-only members. Budget the complete frame including id, wrappers,
+duplicate representations and newline; refuse capacity rather than truncate.
+Protocol request admission, public list eligibility and launch remain separate.
+
+Source constraint found during discovery wiring: core::Operation's current legacy
+carrier has no extended effects/risk/idempotency/approval/limits declarations, while
+contracts/service/compatibility.md section4 and MCP projection require those facts.
+The runtime must obtain complete reviewed curation before advertising a selected
+operation; do not infer missing declarations from a package name or fill guessed
+defaults. The protected metadata query is a private Bootstrap, not a complete
+extended public descriptor. This remains part of full delivery, not a scope deferral.
+
+## Result codecs and final fence checkpoint — 2026-10-03
+
+Added native results.rs for admitted protected-owner replies. The envelope shell
+rejects duplicate keys, legacy versions, inconsistent audit status/reference pairs,
+invalid correlation and dual result/error objects. Business payload and admitted
+source/mutation observations are preserved rather than reduced. The owner remains
+responsible for admitting those observations; the helper is not a public authority
+or a substitute for their complete schema validation.
+
+Resolved tools retain identical structuredContent and JSON text, with original
+host/attempt correlation intact. Resources carry the canonical URI and full successful
+response as JSON text. Declared prompts preserve ordered messages/description and the
+complete response in the selected metadata coordinate; their exact message/content
+schema and family eligibility must already be admitted. No prompt is synthesized
+from an arbitrary dataset. Resource/prompt failures use the safe JSON-RPC error data
+carrier; pre-resolution tool failures use that same channel. Primary-only complete
+and private/zero-TTL cache fields are omitted for interoperability replies.
+
+Whole response encoding reserves the newline and accounts for all JSON-RPC overhead,
+IDs, escape expansion and duplicate representations. A bounded writer refuses rather
+than truncates. Numeric request IDs and business JSON remain lossless.
+
+Rust 1.98.1 locked/offline native tests:47 passed,0 failed. Six result tests cover
+representational equality including 1e400/large integers/literal private-number objects,
+scalar resources, declared prompts, error channels, malformed envelopes and exact byte
+boundaries. Temporarily omitting only the newline reservation made the exact boundary
+test fail by returning an oversized frame. Restored result source SHA256:
+421781ec53d6200803a898c521cd1efdc3bb81583eae990b1ee81fdd6db8dd37.
+
+Evidence logs under .local/mcp-runtime/native-tests:
+- results-budget-mutation.log SHA256 7132a8bb8e01a81e8f8da7f3f47fea5dacedb21810a96a41dc9cb3cb0ffeddb6
+- results-restored.log SHA256 7a83097eeec6aa97e4f24efa4907462fc17a7144934fb798588b845e1b33e7f0
+- final-fence-mutation.log SHA256 7730f3716c0350e18019d454ca1e847184e600deb342ecadbe294fc81a994232
+- final-fence-released.log SHA256 b1418a4024d31f4216e096ab2e97dddb6d226b44d3766abede61602c9fdf4dd8
+
+The final-dispatch fixture passes with real disposable custody/child and verifies
+registry uses (1 captured,0 dispatched,1 released) after refusal and (2,1,2) after
+the subsequent allowed request. Its short fixture directory was removed after
+processes stopped. The exact ignored test is classified with the CUSTODY prerequisite.
+
+Full repository gate including MSRV is running in gate-results-fence.log; no passing
+claim for that run yet. Remote PR84 repository run37127847891 succeeded on13d9184e4,
+which predates this batch. Public request admission, declaration/limits curation,
+native discovery, actual process supervision, outbound auth/runtime and release remain
+unfinished. No lifecycle move, process-conformance claim or scope reduction.
+
+## Exact private discovery revision — 2026-10-03
+
+The next private discovery step must preserve the projection revision over the exact
+unfiltered cached Bootstrap used by execution. Current governed_describe filters
+operations and requirements before returning Bootstrap; recomputing its digest in
+an MCP caller would therefore disagree whenever host policy hides an operation.
+The app already owns the revision function and the generic owner must not acquire
+native adapter dependencies.
+
+Add an explicitly selected protected projected_describe query. Its application
+ReadPolicy computes a bounded revision from the original validated adapter/Bootstrap
+snapshot. Generic metadata filtering still precedes release. Return the private
+filtered Bootstrap and projection revision together only after acknowledged audit,
+then repeat both host and projection snapshots and refuse if either changed. The
+ordinary governed_describe carrier and legacy adapter Bootstrap codecs stay intact;
+the existing same-executable owner handshake gates the new private request member.
+An unbound projection policy must refuse, not return an empty successful revision.
+
+Tests must cover a hidden operation (returned revision equals execution's original
+snapshot), companion change after audit acknowledgement, host permission withdrawal,
+unavailable projection policy, malformed revision, same-build socket selection and
+no provider/credential/approval access. This is necessary discovery plumbing, not
+complete public extended declarations. Operation curation and exact receiver limits
+remain mandatory before any MCP operation is advertised; missing risk/idempotency
+facts must not be manufactured from a legacy package or profile name.
+
+## Verified result and final-fence gate — 2026-10-03
+
+The complete repository gate finished successfully (exit 0) after the result codecs
+and real final-dispatch fixture were added. Command: Rust 1.98.1, bounded Cargo jobs,
+locked/offline connectors-build gate --msrv, with the repository-pinned ESS 0.45.0
+and AEP 0.65.0 and task-owned TMPDIR. It includes generated-output drift, native/shared
+ESS checks, workspace tests/build/Clippy, adapter boundaries, Rust 1.88 selected
+packages and Rust 1.91 workspace all-target checks. Aggregate libtest output:
+1331 passed, 0 failed, 66 ignored across 163 summaries. Ignored tests are not counted
+as passing; the new real final-fence fixture was explicitly run and mutation-checked
+as recorded separately. No MCP process conformance or independent review is claimed.
+
+Gate log: .local/mcp-runtime/gate-results-fence.log
+SHA256: 53a7626686e5bf4de7910dc73692414871b2bf0edd5a1643b7a3dfa21f21ab97.
+AEP validation ends valid, with existing historical review-outcome warnings retained.
+The next protected metadata revision change is planned but not included in this run.
