@@ -16,6 +16,20 @@ pub trait Adapter: Send + Sync {
     fn bootstrap_v2(&self) -> Result<Bootstrap> {
         Err(Failure::Unsupported)
     }
+    /// Explicit bounded-read opt-in; no legacy invoke or write capability.
+    fn bootstrap_v3(&self) -> Result<Bootstrap> {
+        Err(Failure::Unsupported)
+    }
+    async fn invoke_bounded(
+        &self,
+        _operation: &str,
+        _partition: &str,
+        _document: Secret,
+        _input: Value,
+        _budget: ReadBudget,
+    ) -> Result<Value> {
+        Err(Failure::Unsupported)
+    }
     async fn prepare_write(
         &self,
         _operation: &str,
@@ -71,11 +85,12 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
     let protocol = match version.as_str() {
         VERSION => PrivateProtocol::V1,
         WRITE_VERSION => PrivateProtocol::V2,
+        BOUNDED_READ_VERSION => PrivateProtocol::V3,
         _ => return Err(Failure::Protocol),
     };
     if uuid::Uuid::parse_str(&nonce).is_err()
         || uuid::Uuid::parse_str(&child_incarnation).is_err()
-        || (protocol == PrivateProtocol::V2
+        || (protocol != PrivateProtocol::V1
             && (!writes::canonical_id(&nonce) || !writes::canonical_id(&child_incarnation)))
     {
         return Err(Failure::Protocol);
@@ -83,6 +98,7 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
     let bootstrap = match protocol {
         PrivateProtocol::V1 => adapter.bootstrap(),
         PrivateProtocol::V2 => adapter.bootstrap_v2()?,
+        PrivateProtocol::V3 => adapter.bootstrap_v3()?,
     };
     bootstrap.validate_for(protocol)?;
     channel::write(
@@ -107,6 +123,36 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
         channel::wait_readable(&channel)?;
         let until = Instant::now() + Duration::from_secs(10);
         let frame = match protocol {
+            PrivateProtocol::V3 => {
+                let frame =
+                    channel::read::<bounded::RequestV3>(&mut channel, until, true, 262_144)?;
+                match frame.control {
+                    bounded::RequestV3::Bounded(control) => {
+                        bounded::serve_read(
+                            &mut channel,
+                            &executor,
+                            &adapter,
+                            &bootstrap,
+                            channel::Frame {
+                                control,
+                                secret: frame.secret,
+                                document: frame.document,
+                            },
+                        )?;
+                        continue;
+                    }
+                    bounded::RequestV3::Legacy(control) => {
+                        if matches!(control, Request::Invoke { .. }) {
+                            return Err(Failure::Unsupported);
+                        }
+                        channel::Frame {
+                            control,
+                            secret: frame.secret,
+                            document: frame.document,
+                        }
+                    }
+                }
+            }
             PrivateProtocol::V1 => {
                 channel::read::<Request>(&mut channel, until, true, INPUT_LIMIT)?
             }
