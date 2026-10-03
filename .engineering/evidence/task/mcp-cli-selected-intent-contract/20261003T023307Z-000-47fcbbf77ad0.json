@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T02:33:07Z",
+  "actor": "human:timo",
+  "artifact": "task:mcp-cli-selected-intent-contract",
+  "kind": "task",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integrated repository/MSRV gate exited0 with1256passed/0failed/65ignored. CLI generation and contract checks passed. New CLI documents retain independently checked8command paths,35flags,34links,13references and distinct error inventories. Selected MCP server syntax remains unavailable.",
+    "reference": ".local/mcp-two-waves/second-integration/direct/gate.log"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T02:33:07Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-composition-provenance",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Integrated repository gate with MSRV exited0: 1256passed/0failed/65ignored in153summaries; composition11 plus five affected lanes48 passed. Rust wrapper disabled only for this invocation after measured cache delay. Gate log SHA2566fe8a160506669da234272ec6447e683f45a4868366ce41f6ed6337a6ecdb793.",
+    "reference": ".local/mcp-two-waves/second-integration/direct/gate.log"
+  }
+}

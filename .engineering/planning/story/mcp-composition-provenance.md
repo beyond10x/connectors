@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mcp-composition-provenance
 kind: story
-status: active
+status: implemented
 title: Specify composition when an inbound MCP capability is backed by an outbound MCP server
 relations:
 - decomposes: epic:mcp-contracts
@@ -18,10 +18,11 @@ scope:
   path: adapters/mcp/contracts/composition/v1alpha1/semantics.md
 - confidence: inferred
   path: crates/connectors-build/tests/mcp_composition_provenance.rs
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T00:10:02Z", actor: "human:timo", revision: 7}
 - {from: "proposed", to: "active", at: "2026-10-03T00:10:03Z", actor: "human:timo", revision: 8}
+- {from: "active", to: "implemented", at: "2026-10-03T02:33:07Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":2,"review_outcome":1,"verification":1}}}
 ---
 ## Acceptance
 

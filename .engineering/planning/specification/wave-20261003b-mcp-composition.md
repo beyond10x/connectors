@@ -7,7 +7,7 @@ title: 'Second authorized MCP wave: composition and CLI selected intent'
 relations:
 - informed_by: specification:wave-20261003a-mcp-auth-replay
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
 ---
 ## Second authorized wave: selection pending predecessor completion
 
@@ -942,3 +942,21 @@ Managed cb26j-compose / unit/mcp-composition-20261003 owns three composition pat
 }
 
 ```
+
+## Second-wave integration and review — 2026-10-03
+
+First-wave PR82 merged by the bot App at aff84c56c06d7277685f80d7453c67b0e36c7fe6 with the exact candidate tree, after all required checks passed. Composition and selected CLI intent were authored in separate managed trees from published0f648160. CLI independent review found nothing; static inventories match8genericpaths and preserve unavailable MCP runtime and the open parent journey.
+
+Composition author recorded missing-contract RED, then58affectedtests and formatting/Clippy green. Account quota stopped its final agent turn and prevented the fresh independent composition reviewer. Coordinator therefore performed a disclosed separate adversary pass, not an independent-agent claim. New regression found missing request/response IDs silently accepted by nullable indexing. The recorded first review is immutable; correction now validates typed present correlation and exclusive successful envelopes. Retained regression across2revisions/3families passes; affected suite59passed0failed; formatting/Clippy0. No contract/JSONsource changes or weakened assertion. This is document-fixture validation, not MCP wire/runtime conformance.
+
+Integration uses the six exact authored source paths plus CLI review and composition review/outcomes. Full pinned repository/MSRV gate runs on the integrated tree before lifecycle closure. No release/runtime/parent-CLI completion is asserted. Existing native unresolved relations and operator blockers remain. Worker usage limits affect further delegated work; primary coordinator continues useful local work. All author/review/correction logs and source hashes retained privately.
+
+## Integrated second-wave result — 2026-10-03
+
+Composition and the CLI selected-intent child are implemented as authored contracts/documents. The parent working CLI journey remains draft/open. The full integrated repository gate with --msrv exited0:1256passed,0failed,65ignored,153runner summaries; formatting,Clippy,library boundaries,MSRV,ESS/generation and AEP checks passed. Gate log SHA2566fe8a160506669da234272ec6447e683f45a4868366ce41f6ed6337a6ecdb793. Existing synthesis remains498scenarios(43authored),21refusals; local metadata suite289, conformanceinconclusive. No new MCP runtime coverage is inferred from these counts.
+
+Composition contains40literal cases and11Rust guard tests; the affected six lanes total59passing tests. The missing-correlation finding has its retained regression and fixed review outcome. CLI independent review found no issue in its source/grammar/link/error comparison. Delegated composition review was unavailable at account usage limit; coordinator adversary and correction passes were separately recorded and are not an independent-agent claim.
+
+The first integration attempt stopped for disk exhaustion. The resumed cache-wrapped attempt stayed live but showed measured wrapper delay; a tiny direct compiler probe took15-21ms while the wrapper timed out at10s. That owned attempt was explicitly terminated, then the same gate ran successfully with only the invocation-local wrapper disabled. Neither shared compiler configuration nor another process was changed. All source/review evidence remains retained.
+
+The two worker trees are archived and finished, but exact-ID GC awaits the operator approval requested by the explicitly invoked cleanup skill. cb26k-publish remains the active integration/publication tree. This wave does not deliver the working MCP runtime or cut a release.
