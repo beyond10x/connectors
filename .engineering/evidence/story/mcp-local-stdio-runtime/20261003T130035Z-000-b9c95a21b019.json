@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T13:00:35Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 31,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "gate --msrv exit0; 1306 passed, 0 failed, 65 ignored; Rust1.98.1 plus 1.88/1.91; log SHA256 4afa0df75d9fffd4a77d486431d8ad3c49f455a149364a1cdfaba5d6b03f148d",
+    "reference": ".local/mcp-runtime/gate-governed.log"
+  }
+}
