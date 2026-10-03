@@ -55,7 +55,7 @@ scope:
   path: crates/connectors-host/src/local
 - confidence: cited
   path: docs/local-mcp-cli.md
-revision: 42
+revision: 48
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -102,16 +102,23 @@ still includes persistent outbound HTTP and cannot close from this story alone.
 ## Native/shared architecture
 
 Native launch inputs/outcomes are immutable in adapters/mcp/spec/ess/domains/launch.yaml;
-source semantics are docs/local-mcp-cli.md and server/v1alpha1. ESS0.45 validates four
-files and projects four selected values. The native parser fixture's package identity
-must be distinct from the generic CLI contract; production takes only its server
-subtree and validates through the generated shape. Shared ESS imports no native type.
+source semantics are docs/local-mcp-cli.md and server/v1alpha1. The native parser
+fixture's package identity is distinct from the generic CLI contract; production
+takes only its server subtree and validates through the generated shape. Shared ESS
+imports no native type.
 
 Native protocol mechanics belong to adapters/mcp; application composition supplies
 host admission and operation ports. Reuse shared sessions state/lease behavior,
 existing local owner transport and mutation controls through explicit ports. Do not
 invent a caller entity, persistent MCP session association or a provider secret route.
-All UNMAPPED state relations and the two existing operator decisions remain open.
+
+On 2026-10-03 the operator resolved outbound stdio ownership: each outbound session
+owns one explicitly configured pinned server process. The native state model now
+represents that subset and validates as five files under ESS0.45.0; launch/configuration
+projections were regenerated. story:mcp-outbound-stdio-runtime owns its separate
+runtime acceptance and overlaps this story's integration scope. The cloud caller
+assignment decision remains open. All remaining UNMAPPED relations stay unresolved.
+Helm bounded execution was separately approved; no Helm runtime is delivered here.
 
 ## Scope
 
@@ -1069,3 +1076,114 @@ Gate log: .local/mcp-runtime/gate-results-fence.log
 SHA256: 53a7626686e5bf4de7910dc73692414871b2bf0edd5a1643b7a3dfa21f21ab97.
 AEP validation ends valid, with existing historical review-outcome warnings retained.
 The next protected metadata revision change is planned but not included in this run.
+
+## Published checkpoint and compiled ignored inventory — 2026-10-03
+
+Published checkpoint ae895e5021c7dc856b58498e31af3375c945c053 on
+unit/mcp-local-runtime-20261003; author and committer are b10x-bot[bot], and
+origin's exact advertised branch SHA was verified after the Gates bot push.
+PR84 was updated through the App API. The repository gate is running remotely;
+security/privacy, planning and documentation checks have passed for this checkpoint.
+
+The compiled ignored-suite inventory completed with exit 0: 148 test binaries,
+66 ignored entries, 42 selected disposable entries, 0 unclassified, 0 executed.
+This was inventory-only, not a live-suite result. It reported 39 missing prerequisites,
+including the long checkout TMPDIR for private Unix sockets. The exact new final-fence
+scenario is classified disposable and requires qualified custody; its actual execution
+and restored green result used the separately recorded short private fixture directory.
+Report .local/mcp-runtime/ignored-results-fence.json SHA256
+ a9e131b3f56df824917afa291f0c0e91eff7163c4c9062844ccc3480439f4828.
+No missing prerequisite was relabeled as a passing test.
+
+## Protected discovery revision verification — 2026-10-03
+
+Implemented an explicitly selected ProjectedDescribe private request and
+Client::projected_describe. Existing GovernedDescribe and legacy Bootstrap shapes
+remain unchanged. Both queries require the exact owner executable build before any
+request bytes are sent. The application ReadPolicy now supplies metadata_revision
+from the original validated adapter/Bootstrap and freshly admitted native companion.
+An unbound implementation returns Unsupported; malformed/empty revisions fail closed.
+
+The generic owner computes the private projection before filtering operations, pairs
+its revision with the filtered Bootstrap, and binds both host and projection snapshots
+in its admission fingerprint. After the real audit acknowledgement it reloads both;
+any changed fingerprint returns stale_description, and unavailable policy returns
+unavailable without metadata. Public discovery still must explicitly project safe
+complete declarations; neither private carrier may be copied into MCP output.
+
+Focused Rust 1.98.1 locked/offline verification:
+- owner governed tests: 19 passed,0 failed,1 explicitly ignored real-custody fixture;
+- application MCP tests: 5 passed,0 failed, including an extra hidden cached operation
+  with a revision accepted by execution and rejection of the filtered-cache digest;
+- protected discovery socket/build test: 1 passed, exercises both query variants.
+These are implementation tests, not completed MCP process conformance.
+
+Planted defect: omit only projection_revision from the metadata admission fingerprint.
+The exact projection_change_after_real_audit_acknowledgement_releases_no_metadata test
+failed: it expected stale_description, but the response had no error. Restored the
+source byte-for-byte and observed the 19-test governed suite green. Restored metadata.rs
+SHA256 d5595daab70246625a0b5cbbaedad616fd40cbcc5af3f9984d808222bbdbb5bb.
+Evidence under .local/mcp-runtime/native-tests:
+- metadata-revision-mutation.log SHA256 59b56ae8f63084d371abb7fcf75c87a4085c27b1c374fab90dce7a9c6206c690
+- metadata-projection-restored.log SHA256 6049f4c597bab6d1fc4b99671c63706f00bf3cc8598d5cb728cefa0106aa8647
+- metadata-projection-app.log SHA256 d076d0ad021ffa9195b6da2f464d7d79d660d3bb556ff15bb3695eeb5cf48f83
+- metadata-projection-socket.log SHA256 7a15d77dbfc86e74641ca23e873918f5d07a1a9f4cf3ab4f8987375c33ffc364
+
+The full gate including MSRV is running in gate-metadata-revision.log. No passing
+claim for that run yet. Full operation curation/limits, public wire/lifecycle and
+outbound delivery remain open. The operator was asked to resolve the existing
+outbound stdio and Helm execution-family choices; no answer is assumed and no blocker
+is cleared. Local inbound and outbound HTTP work remain independent of those choices.
+
+## Private metadata revision full gate — 2026-10-03
+
+The private metadata revision change completed its full required gate at exit0.
+Command: RUSTUP_TOOLCHAIN=1.98.1 with bounded Cargo jobs and task-owned TMPDIR,
+CONNECTORS_ESS=$HOME/.cache/ess/toolchains/0.45.0/ess and
+CONNECTORS_AEP=$HOME/.cache/aep/toolchains/0.65.0/aep-0.65.0-x86_64-unknown-linux-gnu/aep,
+cargo run --locked --offline -p connectors-build -- gate --msrv.
+The workspace commands inherit the selected Rust1.98.1 toolchain; the runner selects
+its explicit Rust1.88 and Rust1.91 MSRV checks internally.
+Result: 1336passed,0failed,66ignored across163 summaries, plus specification,
+generation drift, isolation, Clippy and required MSRV checks. Log retained locally as
+.local/mcp-runtime/gate-metadata-revision.log; SHA256
+ dda0789227b7ca166fe6d876286ef374e4d5fcded594f79e8458e7dbeaaca719.
+
+This gate precedes the subsequent outbound process model/selection reconciliation;
+it is not evidence for those later edits. Those require another combined gate.
+The projection revision mutation failed at the intended post-acknowledgment race
+assertion and the restored suite passed, as recorded in the preceding checkpoint.
+
+Published predecessor ae895e5021c7dc856b58498e31af3375c945c053 has now completed
+repository CI37130050243 successfully, verified against that exact head. Docs,
+planning and security checks were also successful. PR84 remains draft, full inbound
+and outbound MCP runtime remains incomplete, and no new release has been cut.
+
+## Combined metadata and process-model gate — 2026-10-03
+
+The corrected combined gate completed at exit0:1337passed,0failed,66ignored across
+163 test summaries. It includes pinned ESS/model/generation checks, formatting,
+workspace build/tests/Clippy, native/generic isolation, Rust1.88 selected targets
+and Rust1.91 workspace/all-target checks. Command: bounded two-job
+RUSTUP_TOOLCHAIN=1.98.1 cargo run --locked --offline -p connectors-build -- gate --msrv,
+with RUSTC_WRAPPER empty, incremental/debug outputs disabled, task-owned TMPDIR,
+CONNECTORS_ESS=$HOME/.cache/ess/toolchains/0.45.0/ess and
+CONNECTORS_AEP=$HOME/.cache/aep/toolchains/0.65.0/aep-0.65.0-x86_64-unknown-linux-gnu/aep.
+Retained log .local/mcp-runtime/gate-process-model-restored.log, SHA256
+32e7e85418dfcd65d372bcbc12207dfa5000272af113d19d6e9cb0a6ed1fb34a.
+AEP validation is valid and retains101 historical missing review-outcome warnings
+in .local/mcp-runtime/aep-validation-process-model.log; no warning cleanup is claimed.
+
+This covers the metadata revision fix, native process association, regenerated
+projections and reconciled transport/HTTP-only contract guards. The66 ignored tests
+were not executed by this gate. The previously recorded real final-fence fixture
+remains separate evidence. Both ownership and open-decision mutations failed at
+the intended assertions and restored focused tests passed; no mutants remain.
+
+Publish this verified checkpoint to the existing draft PR84. It does not complete
+inbound or outbound stdio runtime, public operation curation, real I/O deadlines,
+inbound mutation binding, authenticated outbound HTTP, Helm execution or the full
+provider milestones. No merge or new source release follows from this checkpoint.
+Cloud caller assignment stays open. Keep cb26l-runtime active and leased: exact-id
+cleanup finds no candidate; the broader workspace dry-run found12 refused candidates
+and none eligible, all preserved. No local verification process remains running.

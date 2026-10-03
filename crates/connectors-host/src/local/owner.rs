@@ -419,6 +419,10 @@ enum Request {
         adapter: String,
         deadline_ms: u64,
     },
+    ProjectedDescribe {
+        adapter: String,
+        deadline_ms: u64,
+    },
     Status {
         adapter: String,
     },

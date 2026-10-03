@@ -3,6 +3,7 @@ use crate::local::{config, registry};
 use std::{cell::Cell, collections::BTreeSet, sync::atomic::Ordering, time::Duration};
 
 mod final_fence;
+mod metadata_projection;
 
 struct WithdrawAfter {
     admitted: usize,
@@ -168,6 +169,7 @@ fn metadata_is_audited_without_provider_or_connection_and_withdraws_on_next_quer
             ),
             "fixture",
             &audits,
+            None,
             || {},
         )
         .unwrap()
@@ -213,6 +215,7 @@ fn metadata_policy_change_after_admission_does_not_release_old_descriptor() {
         ),
         "fixture",
         &audits,
+        None,
         || {
             let mut config = Config::load(&target.paths.config).unwrap();
             config
@@ -252,6 +255,7 @@ fn metadata_without_audit_acknowledgement_does_not_release_cached_descriptor() {
             ),
             "fixture",
             &audits,
+            None,
             || {},
         )
         .unwrap()
@@ -276,6 +280,7 @@ fn metadata_final_audit_failure_preserves_known_metadata_and_real_reference() {
         ),
         "fixture",
         &audits,
+        None,
         || audits.fault.store(10, Ordering::SeqCst),
     )
     .unwrap();

@@ -19,6 +19,20 @@ mod tests;
 /// Application-owned projection checks. This can constrain an already admitted
 /// owner request; it never supplies generic operation or credential authority.
 pub trait ReadPolicy: Send + Sync {
+    /// Identify the application's current metadata projection over the original
+    /// validated cache, before the owner removes operations denied by its policy.
+    /// This is metadata-only: no provider, custody, approval or connection use.
+    /// Every input affecting the projection must affect this revision.
+    fn metadata_revision(
+        &self,
+        _paths: &Paths,
+        _alias: &str,
+        _adapter: &Adapter,
+        _bootstrap: &runtime::Bootstrap,
+    ) -> Result<String> {
+        Err(Code::Unsupported.into())
+    }
+
     fn admit(
         &self,
         paths: &Paths,

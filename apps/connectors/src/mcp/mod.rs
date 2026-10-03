@@ -31,6 +31,16 @@ fn revision(
     )
 }
 impl ReadPolicy for ProjectionPolicy {
+    fn metadata_revision(
+        &self,
+        paths: &Paths,
+        _alias: &str,
+        adapter: &connectors_host::local::config::Adapter,
+        bootstrap: &runtime::Bootstrap,
+    ) -> owner::Result<String> {
+        Ok(revision(&load(paths)?, adapter, bootstrap))
+    }
+
     fn admit(
         &self,
         paths: &Paths,

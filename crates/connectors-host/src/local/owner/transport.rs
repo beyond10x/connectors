@@ -428,20 +428,35 @@ impl Client {
     }
     /// Audited, currently admitted metadata over the protected owner socket.
     /// The result is a private Bootstrap carrier, not public MCP presentation.
-    pub fn governed_describe(mut self, adapter: &str, deadline_ms: u64) -> Result<Vec<u8>> {
+    pub fn governed_describe(self, adapter: &str, deadline_ms: u64) -> Result<Vec<u8>> {
+        self.describe_selected(adapter, deadline_ms, false)
+    }
+    /// Audited private metadata paired with the composition's revision over the
+    /// original cache. The Bootstrap remains filtered by current owner policy.
+    pub fn projected_describe(self, adapter: &str, deadline_ms: u64) -> Result<Vec<u8>> {
+        self.describe_selected(adapter, deadline_ms, true)
+    }
+    fn describe_selected(
+        mut self,
+        adapter: &str,
+        deadline_ms: u64,
+        projection: bool,
+    ) -> Result<Vec<u8>> {
         self.same_build()?;
         crate::local::protected::cancellation()?;
         let deadline = until(deadline_ms)?;
-        channel::write(
-            &mut self.stream,
-            &Request::GovernedDescribe {
+        let request = if projection {
+            Request::ProjectedDescribe {
                 adapter: adapter.into(),
                 deadline_ms,
-            },
-            None,
-            &[],
-            deadline,
-        )?;
+            }
+        } else {
+            Request::GovernedDescribe {
+                adapter: adapter.into(),
+                deadline_ms,
+            }
+        };
+        channel::write(&mut self.stream, &request, None, &[], deadline)?;
         self.governed_reply(deadline)
     }
     /// Apply the composition's additional current projection constraint at the
@@ -1276,7 +1291,12 @@ fn action(
         }
         return Ok(json!({ "build": owner.build }));
     }
+    let projection = matches!(request, Request::ProjectedDescribe { .. });
     if let Request::GovernedDescribe {
+        adapter,
+        deadline_ms,
+    }
+    | Request::ProjectedDescribe {
         adapter,
         deadline_ms,
     } = request
@@ -1290,6 +1310,7 @@ fn action(
         return governed::describe(
             (&owner.paths, &owner.authority, super::until(deadline_ms)?),
             &adapter,
+            projection.then_some(owner.read_policy.as_ref()),
         );
     }
     if let Request::GovernedRead {
@@ -1603,39 +1624,61 @@ mod tests {
 
     #[test]
     fn governed_describe_socket_carries_no_document_and_requires_same_build() {
-        let (client, mut peer) = UnixStream::pair().unwrap();
-        let expected = br#"{"version":"v1alpha2","request_id":null,"status":"success","result":{},"audit_ref":"real-ref","audit_status":"complete"}"#;
-        let serving = std::thread::spawn(move || {
-            let deadline = Instant::now() + Duration::from_secs(5);
-            let frame =
-                channel::read::<Request>(&mut peer, deadline, false, runtime::INPUT_LIMIT).unwrap();
-            assert!(
-                matches!(frame.control, Request::GovernedDescribe { ref adapter, .. } if adapter == "fixture")
+        for projection in [false, true] {
+            let describe = if projection {
+                Client::projected_describe
+            } else {
+                Client::governed_describe
+            };
+            let (client, mut peer) = UnixStream::pair().unwrap();
+            let expected = br#"{"version":"v1alpha2","request_id":null,"status":"success","result":{},"audit_ref":"real-ref","audit_status":"complete"}"#;
+            let serving = std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                let frame =
+                    channel::read::<Request>(&mut peer, deadline, false, runtime::INPUT_LIMIT)
+                        .unwrap();
+                match frame.control {
+                    Request::GovernedDescribe { adapter, .. } => {
+                        assert!(!projection);
+                        assert_eq!(adapter, "fixture");
+                    }
+                    Request::ProjectedDescribe { adapter, .. } => {
+                        assert!(projection);
+                        assert_eq!(adapter, "fixture");
+                    }
+                    _ => panic!("wrong private discovery request"),
+                }
+                assert!(frame.document.is_empty());
+                channel::write(&mut peer, &Reply::Success, None, expected, deadline).unwrap();
+            });
+            let value = describe(
+                Client {
+                    stream: client,
+                    host_incarnation: "host".into(),
+                    owner_build: Some(own_build().unwrap().into()),
+                },
+                "fixture",
+                connectors_sdk::now_ms() + 5000,
+            )
+            .unwrap();
+            assert_eq!(value, expected);
+            serving.join().unwrap();
+            let (client, mut peer) = UnixStream::pair().unwrap();
+            let result = describe(
+                Client {
+                    stream: client,
+                    host_incarnation: "host".into(),
+                    owner_build: Some("another-build".into()),
+                },
+                "fixture",
+                connectors_sdk::now_ms() + 5000,
             );
-            assert!(frame.document.is_empty());
-            channel::write(&mut peer, &Reply::Success, None, expected, deadline).unwrap();
-        });
-        let value = Client {
-            stream: client,
-            host_incarnation: "host".into(),
-            owner_build: Some(own_build().unwrap().into()),
+            assert_eq!(result.unwrap_err().code, Code::OwnerBuildMismatch);
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            peer.read_to_end(&mut bytes).unwrap();
+            assert!(bytes.is_empty());
         }
-        .governed_describe("fixture", connectors_sdk::now_ms() + 5000)
-        .unwrap();
-        assert_eq!(value, expected);
-        serving.join().unwrap();
-        let (client, mut peer) = UnixStream::pair().unwrap();
-        let result = Client {
-            stream: client,
-            host_incarnation: "host".into(),
-            owner_build: Some("another-build".into()),
-        }
-        .governed_describe("fixture", connectors_sdk::now_ms() + 5000);
-        assert_eq!(result.unwrap_err().code, Code::OwnerBuildMismatch);
-        use std::io::Read;
-        let mut bytes = Vec::new();
-        peer.read_to_end(&mut bytes).unwrap();
-        assert!(bytes.is_empty());
     }
 
     #[test]

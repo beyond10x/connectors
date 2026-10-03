@@ -13,7 +13,7 @@ scope:
   path: adapters/mcp/contracts/client/v1alpha1/scenarios
 - confidence: inferred
   path: adapters/mcp/contracts/client/v1alpha1/semantics.md
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-09-12T10:23:49Z", actor: "human:timo", revision: 3, imported: true}
 - {from: "proposed", to: "active", at: "2026-09-12T10:23:51Z", actor: "human:timo", revision: 4, imported: true}
@@ -86,3 +86,13 @@ neither, or onto both, is a defect this document must resolve.
 - Authentication of the connection — `story:mcp-outbound-auth-lifecycle`.
 - What an invocation returns — `story:mcp-outbound-invocation-results`.
 - Anything inbound. This document states no `$BIN server` behaviour.
+
+## Subsequent stdio decision — 2026-10-03
+
+The earlier outbound stdio exclusion records the decision as it stood when this
+HTTP specification story was implemented. On 2026-10-03 the operator approved one
+explicitly configured pinned server process per outbound session; the named blocker
+is now cleared and the native model records that association. The separate draft
+story:mcp-outbound-stdio-runtime owns delivery and actual-process acceptance.
+This implemented story still specifies HTTP only; it is not retroactively evidence
+of stdio behavior. General durable/HTTP binding lifetime remains UNMAPPED.

@@ -2,13 +2,15 @@
 format: aep.planning-md/3
 id: decision-blocker:helm-execution-family
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided whether Connectors runs external provider binaries
 relations:
 - blocks: initiative:complete-local-connectors
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
 withholds: test_result
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-03T14:52:29Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"approval":1}}}
 ---
 ## The question nobody has answered
 
@@ -85,3 +87,27 @@ on silence.
 
 Recording this does not schedule any of the three. `story:kubernetes-helm-release-reads`
 covers the 25 release-read sites and is not blocked by this question.
+
+## Operator decision — 2026-10-03
+
+The operator answered on 2026-10-03: "Yes: include Helm reads/local work and guarded
+rollback (recommended)" to whether Connectors should gain a bounded, pinned-binary
+execution capability for Helm, including approved rollback.
+
+Decision: retain the full Helm milestone and implement the shared bounded process
+execution family. Include selected release reads, local chart work and guarded
+rollback through an explicitly configured pinned Helm binary. Rollback must use
+the existing approval, audit, attempt, dispatch-fence and unknown-outcome rules;
+it is not reimplemented as guessed Kubernetes API/storage behavior. Registry
+access still requires its declared authority and credential binding. The decision
+does not select arbitrary commands, unpinned executables, filesystem access or
+credential inheritance by default.
+
+This clears the platform direction choice, not the implementation or acceptance
+obligations. Model executable identity, argument construction, filesystem scope,
+output/deadline bounds, cleanup and mutation outcome evidence before scheduling
+implementation. Helm-specific semantics remain native. C16 exec/copy/tunnels and
+Docker remain separately selected consumers with their own required bindings and
+acceptance; no workflow is declared delivered merely because the capability is
+now authorized. The outbound MCP per-session process decision was separately
+answered by the operator in the same session.
