@@ -42,7 +42,8 @@ grant to execute an operation.
 
 **Unavailable step:** configure the MCP projection and launch that command from
 your client. The native configuration shape below is selected and validated by a
-library; its protected file loader and launch handler are not yet connected.
+library and the protected owner's internal projection policy. The stdio launch
+handler is not yet connected to that policy and a serving loop.
 Do not paste an invented adapter stanza into a working installation.
 Multi-caller/tenant-to-Connection assignment and cloud placement remain unresolved.
 The local single-owner intent does not close either decision.
@@ -59,7 +60,8 @@ exists, including its protected approval source and explicit business key.
 
 ## Selected local projection configuration
 
-This configuration is **not yet consumed by the production CLI**. The selected
+The protected owner can validate this configuration for internal projection;
+**the production MCP stdio entry remains unavailable**. The selected
 location appends `.mcp-stdio.json` to `CONFIG`: `/private/config.toml` would use
 `/private/config.toml.mcp-stdio.json`. The application must admit an owner-only
 regular file without following symlinks, bounded to 1 MiB. Missing or invalid input
@@ -99,8 +101,18 @@ selectors and conflicting families refuse configuration.
 Configuration must be read anew for every admitted list page and invocation.
 Selection, enablement or target changes invalidate affected projection revisions;
 the serialized owner must repeat or fence selection at dispatch. A startup-only
-snapshot does not satisfy this contract. These application/owner checks and the
-runtime families remain unfinished despite the structural parser being available.
+snapshot does not satisfy this contract. The protected owner implements loading,
+revision checks and audit admission; the serving loop and runtime families remain
+unfinished.
+
+The owner also reads `CONFIG.operation-curation.json`, the separate
+[protected operation curation](../contracts/service/local-operation-curation.md).
+Its complete metadata is pinned to the executable selection and the exact original
+cached bootstrap. Curation changes invalidate the projection revision, and current
+metadata permissions filter both operations and their metadata. Missing policy
+refuses; missing operation curation supplies no defaults. This internal metadata
+path does not establish native profile support, enforce every declared execution
+limit or enable MCP serving.
 
 ## Outbound HTTP: current generic grammar, MCP binding unresolved
 

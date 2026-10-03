@@ -1,6 +1,10 @@
 //! Explicit public metadata values. Decoding grants no execution authority.
 pub use operation_types::ConnectorsServiceWireOperationMetadata as Document;
 use operation_types::EssPresence;
+pub use operation_types::{
+    ConnectorsServiceWireAdapterOperationCuration as AdapterCuration,
+    ConnectorsServiceWireOperationCuration as CurationDocument,
+};
 use serde_json::Value;
 use std::collections::BTreeSet;
 
@@ -24,6 +28,58 @@ pub struct Metadata {
     document: Document,
 }
 
+pub const CURATION_LIMIT: usize = 1024 * 1024;
+pub const CURATION_FORMAT: &str = "connectors-operation-curation/1";
+
+/// Protected declaration input. Selection against the exact native descriptor,
+/// executable, auth requirement and supported execution binding is still required.
+pub struct Curation {
+    document: CurationDocument,
+}
+impl Curation {
+    pub fn parse(bytes: &[u8]) -> Result<Self, Error> {
+        if bytes.len() > CURATION_LIMIT {
+            return Err(Error::Size);
+        }
+        let value = crate::json::decode(bytes, 16).map_err(|_| Error::Json)?;
+        let document: CurationDocument =
+            serde_json::from_value(value.clone()).map_err(|_| Error::Shape)?;
+        if document.format != CURATION_FORMAT || document.adapters.len() > 1000 {
+            return Err(Error::Shape);
+        }
+        let mut aliases = BTreeSet::new();
+        for (index, adapter) in document.adapters.iter().enumerate() {
+            if !crate::valid_id(&adapter.adapter_alias)
+                || !aliases.insert(&adapter.adapter_alias)
+                || !sha256(&adapter.executable_selection)
+                || !sha256(&adapter.bootstrap_sha256)
+                || adapter.operations.len() > 256
+            {
+                return Err(Error::Shape);
+            }
+            let mut operations = BTreeSet::new();
+            for (position, operation) in adapter.operations.iter().enumerate() {
+                if !crate::valid_id(&operation.operation)
+                    || !operations.insert(&operation.operation)
+                {
+                    return Err(Error::Shape);
+                }
+                // Validate original JSON nodes before any generated numeric
+                // representation can erase their identity. Profile binding is
+                // deliberately deferred until the exact descriptor is selected.
+                Metadata::from_value(
+                    value["adapters"][index]["operations"][position]["metadata"].clone(),
+                    None,
+                )?;
+            }
+        }
+        Ok(Self { document })
+    }
+    pub fn document(&self) -> &CurationDocument {
+        &self.document
+    }
+}
+
 impl Metadata {
     /// `profile` comes from the selected operation; it is not overwritten by
     /// metadata. The enclosing descriptor/configuration supplies the byte budget.
@@ -35,6 +91,12 @@ impl Metadata {
             return Err(Error::Shape);
         }
         let value = crate::json::decode(bytes, 16).map_err(|_| Error::Json)?;
+        Self::from_value(value, Some(profile))
+    }
+
+    // None validates declaration shape only, and is used exclusively inside
+    // protected curation decoding. No unbound Metadata escapes that path.
+    fn from_value(value: Value, profile: Option<&str>) -> Result<Self, Error> {
         // Check JSON node identity before generated Number deserialization, which
         // otherwise accepts Serde's private object carrier as if it were a number.
         let limits = value.get("limits").ok_or(Error::Limits)?;
@@ -68,14 +130,15 @@ impl Metadata {
         // unrelated model variant must not change what this discriminator means.
         let effects = value["effects"].as_array().ok_or(Error::Shape)?;
         let has = |effect: &str| effects.iter().any(|v| v.as_str() == Some(effect));
-        if has("external_write") != (profile == "mutation")
+        if profile.is_some_and(|profile| has("external_write") != (profile == "mutation"))
             || ((has("send_external") || has("session_establishment")) && !has("external_write"))
         {
             return Err(Error::Effects);
         }
         let idempotency = &value["idempotency"];
         if idempotency["kind"] == "keyed" {
-            if profile != "mutation"
+            if !has("external_write")
+                || profile.is_some_and(|profile| profile != "mutation")
                 || idempotency["key"] != "caller_supplied"
                 || idempotency["retention_seconds"].as_u64() != Some(86_400)
             {
@@ -117,6 +180,13 @@ impl Metadata {
     pub fn to_value(&self) -> Result<Value, Error> {
         serde_json::to_value(&self.document).map_err(|_| Error::Shape)
     }
+}
+
+fn sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn distinct<T: serde::Serialize>(values: &[T]) -> bool {

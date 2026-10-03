@@ -23,17 +23,27 @@ fn snapshot(
     {
         return Err(Code::ReadinessMismatch.into());
     }
-    let revision = projection
-        .map(|policy| policy.metadata_revision(paths, alias, adapter, &bootstrap))
+    let projected = projection
+        .map(|policy| policy.metadata(paths, alias, adapter, &bootstrap))
         .transpose()?;
-    if revision
-        .as_deref()
-        .is_some_and(|value| !connectors_core::valid_id(value))
+    if projected
+        .as_ref()
+        .is_some_and(|value| !connectors_core::valid_id(&value.revision))
     {
         return Err(Code::Unavailable.into());
     }
+    let mut operation_metadata = std::collections::BTreeMap::new();
+    if let Some(projected) = &projected {
+        for (operation, metadata) in &projected.operations {
+            let value = metadata.to_value().map_err(|_| Code::Unavailable)?;
+            crate::local::operation_curation::bind(&bootstrap, operation, &value)?;
+            operation_metadata.insert(operation.clone(), value);
+        }
+    }
+    let revision = projected.map(|value| value.revision);
     let fingerprint = connectors_core::digest(
-        &json!({"config":config,"bootstrap":bootstrap,"projection_revision":revision}),
+        &json!({"config":config,"bootstrap":bootstrap,"projection_revision":revision,
+            "operation_metadata":operation_metadata}),
     );
     let mut descriptor = bootstrap.descriptor()?;
     descriptor
@@ -45,11 +55,13 @@ fn snapshot(
             .operations
             .contains(&requirement.operation)
     });
+    operation_metadata.retain(|operation, _| adapter.permissions.operations.contains(operation));
     bootstrap.descriptor = serde_json::to_string(&descriptor).map_err(|_| Code::Unavailable)?;
     // This carrier stays on the authenticated private owner socket. Native
     // composition must explicitly project public fields rather than expose it.
     let value = match revision {
-        Some(revision) => json!({"bootstrap":bootstrap,"projection_revision":revision}),
+        Some(revision) => json!({"bootstrap":bootstrap,"projection_revision":revision,
+            "operation_metadata":operation_metadata}),
         None => serde_json::to_value(bootstrap).map_err(|_| Code::Unavailable)?,
     };
     Ok((adapter.clone(), value, fingerprint))
