@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T11:33:15Z",
+  "actor": "human:timo",
+  "artifact": "story:metadata-sidecar-fixture-isolation",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "RED: Rust1.98.1 cargo test --locked --offline -p connectors-host --test local_foundation sidecar_symlink_is_refused_without_touching_its_target -- --exact --nocapture; 0 passed, 1 failed at WAL absence assertion, 5.40s after build",
+    "reference": ".local/mcp-runtime/fixture-repro.log"
+  }
+}

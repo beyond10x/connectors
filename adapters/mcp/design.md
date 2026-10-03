@@ -1,12 +1,44 @@
 # mcp adapter design
 
-**Status:** specification-only owner directory. It holds a pinned upstream specification
+**Status:** native implementation in progress. It holds a pinned upstream specification
 and, since `story:mcp-domain-model`, an authored native ESS model at
 [`spec/ess/`](spec/ess/system.yaml), and, since `story:mcp-profile-selection-matrix`,
 the protocol selection at
 [`contracts/protocol/v1alpha1/selection.md`](contracts/protocol/v1alpha1/selection.md).
-There is no adapter service, package, generated projection or runtime declaration, and
-no behaviour here is implemented.
+The initial [Rust library](runtime/Cargo.toml) implements canonical qualified names/resource
+URIs, bounded incremental stdio line framing, generated launch-input validation and
+serialized reduction of the shared session state and absolute lease decisions. Native
+tests exercise those components under Rust 1.88; EOF-retention, first-terminal and
+expiry-boundary mutations fail the intended checks.
+This does not implement a running
+MCP server, an outbound authenticated connection or a CLI command. There is no admitted
+runtime declaration, and CLI compatibility remains deferred.
+
+The runtime and generated projection packages are siblings: generated manifests retain
+their own workspace declarations, and the root workspace excludes those packages while
+consuming their unchanged libraries. The repository gate checks both native launch
+projections with its exact ESS pin (`connectors-build mcp-bindings --check`) and includes
+the runtime in workspace tests and the Rust 1.88 selection. Application composition must
+still supply config/state selectors, protected owner admission and protocol I/O; the
+native parser does not call the generated finite-output renderer.
+
+The [session reducer](runtime/src/supervision.rs) implements the eight behavior traits
+and state query generated from the unchanged [shared session domain](../../ess/domains/sessions.yaml).
+It uses generated transitions, retains the first terminal fact, removes lease authority
+on closure/loss and distinguishes local resource release from peer acknowledgement.
+The generation check selects that domain from the shared header and compares its whole
+projection. The enclosing supervisor must still derive admission decisions, verify clocks
+and enforce cutoff/accounting at the actual I/O boundary. The reducer's injected local
+clock and decision interfaces are trusted ports, never peer-controlled MCP fields.
+
+The [lease gate](runtime/src/lease.rs) consumes generated DataLease values and a trusted
+qualified UTC interval. It accounts for delay and uncertainty against the original
+expiry, rejects lifetimes over two seconds, checks existing authority before renewal,
+and retains the first denial. Activity never extends authority; a planned drain caps
+future renewals. Timestamp comparisons preserve fractional precision. These decision
+tests do not qualify an operating-system clock or prove the final transport cutoff:
+the enclosing supervisor still needs serialized admission, fresh checks at each I/O
+boundary and verified resource cleanup.
 
 ## Scope and dependencies
 
@@ -16,7 +48,9 @@ the authored protocol contracts that cite both. `epic:mcp-contracts` owns the co
 programme; this directory is where its authored output lands. Both directions the epic
 names — outbound use of a remote MCP server, and inbound MCP exposed by this product —
 are authored against the same pinned revisions. The model names the nouns of both;
-neither direction's behaviour is specified yet.
+both directions' selected contracts now live under `contracts/client` and
+`contracts/server`. Runtime work must satisfy their complete admission and lifecycle
+requirements before it advertises a supported binding.
 
 The owner directory is a sibling of every other adapter and depends on none of them. It
 carries no shared-contract selection yet, because no operation, profile or binding has
@@ -48,6 +82,7 @@ needs an MCP noun reads this root rather than declaring one.**
 |---|---|
 | [`connectors_mcp.protocol`](spec/ess/domains/protocol.yaml) | Protocol values read from the pinned archives: the two negotiable revision strings, the three eras, the four transport bindings, server and client capability kinds, the legacy session phases, three error codes, the two cache scopes, the acquisition modes and the authorization roles. |
 | [`connectors_mcp.state`](spec/ess/domains/state.yaml) | Four entities — `McpServerBinding`, `McpAdvertisedCapability`, `McpOutboundSession`, `McpInboundSession` — the `McpCapabilitySnapshot` value, and the three credential kinds `epic:mcp-contracts` keeps apart, as three distinct types. |
+| [`connectors_mcp.launch`](spec/ess/domains/launch.yaml) | Immutable input, transport and final process outcomes for the selected local stdio launch. They introduce no caller, Connection or persistent session relation. |
 
 Four things about it are load-bearing and are stated in the files themselves:
 

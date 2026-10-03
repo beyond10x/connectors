@@ -1,0 +1,56 @@
+{
+  "$defs": {
+    "connectors_mcp.launch.LocalLaunchCompletion": {
+      "enum": [
+        "closed"
+      ],
+      "title": "LocalLaunchCompletion",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors_mcp.launch.LocalLaunchCompletion"
+    },
+    "connectors_mcp.launch.LocalLaunchFailure": {
+      "enum": [
+        "invalid_input",
+        "configuration_unavailable",
+        "owner_refused",
+        "transport_failed"
+      ],
+      "title": "LocalLaunchFailure",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors_mcp.launch.LocalLaunchFailure"
+    },
+    "connectors_mcp.launch.LocalLaunchInput": {
+      "additionalProperties": false,
+      "properties": {
+        "transport": {
+          "$ref": "#/$defs/connectors_mcp.launch.LocalTransport"
+        }
+      },
+      "required": [
+        "transport"
+      ],
+      "title": "LocalLaunchInput",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors_mcp.launch.LocalLaunchInput"
+    },
+    "connectors_mcp.launch.LocalTransport": {
+      "enum": [
+        "stdio"
+      ],
+      "title": "LocalTransport",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors_mcp.launch.LocalTransport"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-ess-provenance": {
+    "contract_digest": "slice-sha256/2:9697310eab6721915ab3f4225654b9123fb27cdac818e2cececd81257d5dce83",
+    "source_digest": "b01143a91b18e311da9c5f5d72957134dc5fcca636313abf9f75b22a928cb94f",
+    "specification_version": "v1",
+    "system": "connectors_mcp"
+  }
+}
