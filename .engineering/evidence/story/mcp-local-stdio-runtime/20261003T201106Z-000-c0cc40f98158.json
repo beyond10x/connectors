@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T20:11:06Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 83,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked --offline -p connectors-build -- gate --msrv; original-deadline owner admission: 1385 passed, 0 failed, 66 ignored; exact focused red/green and mutation logs in results section",
+    "reference": ".local/mcp-runtime/gate-owner-admission-final.log"
+  }
+}

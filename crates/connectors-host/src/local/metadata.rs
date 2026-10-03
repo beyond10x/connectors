@@ -1,6 +1,7 @@
 //! A single local SQLite authority. Schema installation grants no connection,
 //! credential custody, approval or business dispatch authority.
 use super::{Failure, Result, filesystem as fs};
+pub(super) mod deadline;
 mod er;
 #[cfg(test)]
 mod metamorphic_tests;
@@ -325,6 +326,11 @@ impl Metadata {
         metadata.adopt_er()?;
         metadata.migrate(3)?;
         Ok(metadata)
+    }
+
+    /// Keep both the authority read and handle release inside the original cutoff.
+    pub(super) fn inspect_authority_until(path: &Path, until: Instant) -> Result<uuid::Uuid> {
+        deadline::within(until, || Self::inspect(path)?.authority())
     }
 
     /// Inspection never creates a database, migrates it, or interprets absence
@@ -735,7 +741,7 @@ impl Metadata {
         .map_err(unavailable)?;
         // SQLite's own write lock is waited on for the same bound as the lifecycle
         // lock; see `WAIT_BOUND` for why neither is two seconds.
-        connection.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
+        deadline::configure(&connection)?;
         connection
             .pragma_update(None, "trusted_schema", false)
             .map_err(unavailable)?;
@@ -972,8 +978,9 @@ fn lifecycle_lock(directory: &std::fs::File) -> Result<std::fs::File> {
 }
 
 fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
-    let deadline = Instant::now() + lifecycle_lock_wait();
+    let deadline = deadline::cutoff(lifecycle_lock_wait());
     loop {
+        self::deadline::check()?;
         // SAFETY: file owns the live descriptor. Dropping it releases the lock.
         let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_NB | libc::LOCK_EX) };
         if result == 0 {
@@ -983,7 +990,9 @@ fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
         if kind != std::io::ErrorKind::WouldBlock || Instant::now() >= deadline {
             return Err(Failure::MetadataUnavailable);
         }
-        std::thread::sleep(Duration::from_millis(5));
+        std::thread::sleep(
+            Duration::from_millis(5).min(deadline.saturating_duration_since(Instant::now())),
+        );
     }
 }
 

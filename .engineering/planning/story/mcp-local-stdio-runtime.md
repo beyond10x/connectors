@@ -76,11 +76,21 @@ scope:
 - confidence: cited
   path: crates/connectors-host/src/local/keyring/deadline.rs
 - confidence: cited
+  path: crates/connectors-host/src/local/metadata.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/metadata/deadline.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/metadata/er.rs
+- confidence: cited
   path: crates/connectors-host/src/local/operation_curation.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/admission_tests.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/governed/bounded.rs
 - confidence: cited
   path: crates/connectors-host/src/local/owner/governed/tests/bounded_reads.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/unix.rs
 - confidence: cited
   path: crates/connectors-host/tests/http_budget.rs
 - confidence: cited
@@ -92,10 +102,12 @@ scope:
 - confidence: cited
   path: docs/local-runtime-foundation.md
 - confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: cited
   path: ess/domains/service_wire.yaml
 - confidence: cited
   path: ess/domains/transport.yaml
-revision: 76
+revision: 83
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -1565,3 +1577,125 @@ Evidence is retained in .local/mcp-runtime (SHA256):
 - custody-deadline-mutation.log:76c0d0e7cd5a0b6eca9b2ddc4b97b7f62895bdf98f7dc317128f803c68bb894c
 - owner-budget-final-fence-short.log:f41efdedbfa4afc98909d8cbe389c99525941caa8b2ab3d3e893127bff373dfa
 - owner-budget-docs.log:9c84eaa2f40eca5f3ea1f20f0309ef4692ce198188c29da8bb00f95725d0698c
+
+## Original-deadline owner admission — 2026-10-03
+
+Continue production MCP ingress integration under this story. Current published
+49cd76a09 binds admitted reads, but Client::connect creates its own ten-second
+deadline, uses blocking AF_UNIX connect (including identification retries), and
+Metadata::inspect can wait a fresh thirty seconds for the metadata lock/bridge.
+The next caller must not restart the execution budget before admission.
+
+Add an explicit original-deadline owner connection port. Preserve current UID,
+socket identity, challenge, build and lifetime-lock authority; no owner replacement
+or protocol fallback may be inferred from a full accept queue or deadline expiry.
+Reuse the owned nonblocking Unix connector behind a neutral local module. Bound
+metadata inspection's lifecycle-lock, SQLite contention and bridge waits by a
+scoped same-thread original cutoff, with nesting only shortening and scope exit
+restoring ordinary behavior. Preserve uncertain-write retirement and its lock proof.
+No new persistent noun or relation is introduced; the existing PrivateReadBudget
+remains the call carrier and monotonic authority.
+
+Named checks: owner-admission-expired-no-state, owner-admission-stalled-greeting,
+owner-admission-full-accept-queue, owner-admission-lifetime-lock-cutoff,
+metadata-admission-original-cutoff, nested-cutoff-never-extends, and
+cutoff-scope-restores-on-unwind. Establish real socket/lock red controls, restore,
+run affected owner/custody regressions and the complete repository gate.
+
+Keep session lease enforcement, capability eligibility and actual production MCP
+dispatch as remaining integration obligations. A connection deadline alone does
+not prove all metadata/audit/credential cleanup obeys a session teardown budget;
+those worker paths still need explicit integration with cleanup accounting.
+Existing agents remain quota-errored; root is the sole implementation/store writer.
+Full provider acceptance, inbound/outbound MCP, Helm and new release remain open.
+
+## Delivery focus after scope correction — 2026-10-03
+
+The operator questioned scope expansion and then instructed continuation. Complete
+verification of the owner-admission changes already in flight; do not use that
+checkpoint to expand generic infrastructure work. The implementation target stays
+this story's actual-process acceptance, not another component-only milestone.
+
+Next observable boundary: invoke the selected production stdio command, admit the
+configured owner, list one eligible configured operation, and invoke it through the
+bounded owner port with the complete response. The process scenarios already named
+in Acceptance remain authoritative, including lease expiry, cancellation, output
+loss and hidden-operation refusal. This is sequencing within the accepted story,
+not a reduction of its acceptance or a claim that reads complete full MCP.
+
+Any additional host change must name the failing production-entry scenario and
+its caller path before being promoted to prerequisite work. Keep outbound stdio
+ownership as the operator selected it. Helm approval remains recorded but does not
+add Helm implementation to this inbound checkpoint. Cloud caller assignment stays
+unresolved; local single-owner work does not decide it.
+
+Code evidence for the remaining entry gap: apps/connectors/src/main.rs routes the
+private owner, version, legacy service commands and generated local commands;
+apps/connectors/src/mcp/mod.rs currently implements only ProjectionPolicy.
+The three existing worker sessions remain quota-limited. Root work is not an
+independent agent review or completion of the requested parallel waves.
+
+## Original-deadline owner admission results — 2026-10-03
+
+The owner now offers connect_until with an original monotonic deadline and exact
+build admission before returning a client. Owner connection, identification retries,
+lifetime-lock contention and startup checks preserve that cutoff. Every Unix connect
+uses the neutral owned nonblocking connector shared with custody. Linux AF_UNIX EAGAIN
+is capacity, never a usable stream or authority to start a replacement owner.
+
+Metadata inspection scopes its lifecycle-lock, cached-authority mutex, SQLite busy
+and synchronous bridge waits to the same deadline. Nested scopes only shorten, and
+ordinary behavior is restored after return or unwind. An already-open SQLite
+connection observes a shorter nested cutoff. Expired inspection refuses before
+work and after any synchronous work that crossed the deadline. Bridge retirement
+of uncertain writes and its retained lifecycle-lock proof are unchanged. This
+scope bounds waits; it does not promise preemption of arbitrary filesystem calls.
+
+Real lock red: before lifecycle-wait integration, the metadata admission assertion
+failed because it waited for the fixture's 600ms release instead of the 100ms
+original cutoff (2 passed,1 failed). Restored admission suite:12 passed,0 failed.
+Restored custody/metadata deadline suite:8 passed,0 failed, including nested SQLite
+contention, the cached mutex and scope restoration on unwind. The connector mutation
+removed only SOCK_NONBLOCK; the saturated-queue test failed with Timeout instead of
+immediate Capacity. Its finite fixture hold prevented a hanging probe. The exact
+nonblocking source was restored before the full gate.
+
+Real owner-socket tests cover an expired request opening no state, a stalled greeting
+ending at the original cutoff and closing the connection, a saturated accept queue
+never starting an owner, owner/metadata lock contention, and exact-build success and
+mismatch. The tests assert actual bytes, socket closure and absent owner state.
+Documentation references generated and checked:43 contract pages,97 total,no drift.
+
+The full repository gate --msrv passed: 1385 passed,0 failed,66 ignored across166 libtest summaries; Clippy, generation/drift, adapter boundaries and Rust1.88/1.91 checks passed. This
+is progress toward the production MCP entry, not completion of the local runtime
+story. Session lease authority/renewal, operation eligibility, production protocol
+dispatch and session cleanup accounting remain to integrate. Deadline-scoped
+inspection is not yet applied across every worker/audit/credential cleanup path.
+Full provider acceptance, inbound/outbound MCP, Helm and the requested release remain
+open. Existing agents remain quota-errored; root performed these checks without
+claiming independent review.
+
+Gate/review corrections: the first whole gate refused a stale ESS source-line
+citation in ess/domains/cli.yaml; correcting the citation restored all five
+cli_spec_mapping_adversary tests. The next whole gate was deliberately terminated
+(exit143, its entire owned process group verified absent) after coordinator review
+found that returning a Metadata handle out of the deadline scope left authority
+read and cache release outside it. inspect_authority_until now returns only the
+UUID, so read and handle drop both execute inside the original deadline scope.
+This was a source-review correction, not an independently reviewed result.
+The final whole gate is gate-owner-admission-final.log; earlier partial runs must
+not be reported as passing gates.
+
+The final gate exited0 and printed "gate: all checks passed". All nine new admission
+and metadata tests pass in that final workspace run. Gate logs preserve every step
+and all historical AEP warnings. No new ESS semantics or generated bytes changed;
+ess/domains/cli.yaml only updates its source-line citation.
+
+Evidence retained under .local/mcp-runtime (SHA256):
+31b27768c2da8a0fa6874608df70878de70a0aef9dfc7a29a529a904050463ea  .local/mcp-runtime/gate-owner-admission-final.log
+8411daab35f3e25f49a43ee8921eda2e06c469317953a0df994b902a731842ef  .local/mcp-runtime/metadata-admission-red.log
+e9cc0385a766ab0c6f0397f4f2b1bdc09c6d1535c8c06cdc7622970670b66ef1  .local/mcp-runtime/owner-admission-green.log
+2bf0bc94c3fafb2996ba5e40a7dc73690393f53d66a02971a0095fe0716bfc57  .local/mcp-runtime/metadata-admission-restored.log
+fa355a2aa2559d4ce7ced34a657623d30c2acada1a8a57708bd34eb74ebcab32  .local/mcp-runtime/owner-admission-connect-mutation.log
+9c84eaa2f40eca5f3ea1f20f0309ef4692ce198188c29da8bb00f95725d0698c  .local/mcp-runtime/owner-admission-docs.log
+f8aa48731d0aaf510eedc61a696ce35baeee505f5abcdf7b80527d319d58a977  .local/mcp-runtime/owner-admission-citations.log
