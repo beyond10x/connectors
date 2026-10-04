@@ -1,5 +1,6 @@
 //! Validated native deployment input. Opening files and admitting the configured
 //! owner belong to application composition, never to this protocol library.
+pub use configuration_types::ConnectorsMcpLocalServerExposure as Exposure;
 use configuration_types::{ConnectorsMcpLocalServerConfiguration as Document, EssPresence};
 use std::{
     collections::BTreeSet,

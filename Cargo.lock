@@ -547,6 +547,7 @@ dependencies = [
 name = "connectors"
 version = "0.25.1"
 dependencies = [
+ "async-trait",
  "base64 0.23.1",
  "clap",
  "connectors-cli-contract",
@@ -555,9 +556,11 @@ dependencies = [
  "connectors-host",
  "connectors-mcp",
  "connectors-sdk",
+ "libc",
  "ring",
  "serde_json",
  "tempfile",
+ "time",
  "tokio",
  "toml",
  "uuid",

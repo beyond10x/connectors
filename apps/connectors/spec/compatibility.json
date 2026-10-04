@@ -9,5 +9,5 @@
     {"path": ["serve"], "flags": ["config"], "wire": "operations/v1alpha1", "success": "existing federation host lifetime", "alias_of_grouped_command": false}
   ],
   "regression_test": "apps/connectors/tests/compatibility.rs",
-  "mcp": "deferred"
+  "mcp": "inbound stdio read-only tools slice; resources, prompts, mutations and outbound runtime deferred"
 }

@@ -31,6 +31,7 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     );
     session.borrow_mut().finish(&mut output);
     if root_help && output.exit_code == 0 {
+        output.stdout.push_str("\nNative integration commands (use COMMAND --help for options):\n  server    Serve admitted read-only MCP tools over stdio\n");
         output.stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n  describe  Read a complete service descriptor\n  invoke    Invoke an explicit service operation\n  serve     Run the configured federation service\n");
     }
     output
