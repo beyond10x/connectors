@@ -246,6 +246,13 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",
+            "local_mcp_server",
+            "production_stdio_lists_and_invokes_an_admitted_operation"
+            | "production_stdio_withdrawal_framing_and_cancellation"
+            | "production_stdio_stopped_session_cannot_renew_after_expiry",
+        ) => Some((Disposable, vec![CUSTODY])),
+        (
+            "connectors",
             "local_cli",
             "adversary2_a_real_pre_handshake_owner_is_refused_by_name_and_the_reverse_is_observed",
         ) => Some((Disposable, vec![OLD_CLI])),
