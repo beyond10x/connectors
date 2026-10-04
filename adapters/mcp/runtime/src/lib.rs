@@ -7,5 +7,6 @@ pub mod json;
 pub mod launch;
 pub mod lease;
 pub mod names;
+pub mod protocol;
 pub mod results;
 pub mod supervision;

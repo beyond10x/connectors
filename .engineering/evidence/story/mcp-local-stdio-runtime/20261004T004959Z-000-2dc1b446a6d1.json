@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-04T00:49:59Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 87,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv: all checks passed; 1391 passed, 0 failed, 69 ignored across 168 summaries; workspace Clippy, ESS validation/projection drift, adapter isolation, Rust 1.88/1.91 checks. Three new custody-dependent MCP scenarios separately executed in 6/6 process lane.",
+    "reference": ".local/mcp-runtime/stdio/gate-final.log"
+  }
+}

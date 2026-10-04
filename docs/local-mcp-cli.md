@@ -1,19 +1,18 @@
 # MCP through the local CLI: selected intent
 
-**MCP runtime unavailable.** This guide selects a future local command spelling;
-it is not an executable MCP walkthrough. The current CLI has no `server` command,
-MCP adapter configuration, MCP connection profile or MCP operation binding.
-[Compatibility metadata](../apps/connectors/spec/compatibility.json) remains
-`mcp: deferred`. The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
+**Inbound read-only tools now run.** Use the [production stdio guide](local-mcp-stdio.md)
+for supported declarations, configuration, calls and limitations. This document
+retains the broader selected intent; full inbound projection and outbound MCP
+remain unfinished. The [authored inventory](../adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.json)
 is static documentation, not CLI output or a runtime discovery endpoint.
 
 For working provider journeys today, use the [catalog provider](local-catalog-provider.md),
 [Kubernetes](local-kubernetes-cli.md) or [guarded GitLab merge](local-gitlab-merge.md)
-guide. Those paths do not provide MCP support.
+guide. MCP exposes only operations meeting the runtime guide's complete binding.
 
-## Inbound stdio: selected intent, runtime unavailable
+## Inbound stdio: launch
 
-The exact intended launch is:
+The production launch is:
 
 ```text
 connectors --config CONFIG --state-dir STATE_DIR server --transport stdio
@@ -40,16 +39,14 @@ Their per-request metadata versus initialization obligations remain those of the
 local binding. Process startup alone is neither protocol initialization nor a
 grant to execute an operation.
 
-**Unavailable step:** configure the MCP projection and launch that command from
-your client. The native configuration shape below is selected and validated by a
-library and the protected owner's internal projection policy. The stdio launch
-handler is not yet connected to that policy and a serving loop.
-Do not paste an invented adapter stanza into a working installation.
+Configure the MCP projection and launch that command from your client using the
+[runtime guide](local-mcp-stdio.md). The native configuration shape below is
+validated by the library and protected owner's internal projection policy.
 Multi-caller/tenant-to-Connection assignment and cloud placement remain unresolved.
 The local single-owner intent does not close either decision.
 
-**Unavailable step:** discover and invoke through the running server. Once an
-executable binding exists, [projection](../adapters/mcp/contracts/server/v1alpha1/projection.md)
+The tools subset can discover and invoke through the running server.
+The full [projection](../adapters/mcp/contracts/server/v1alpha1/projection.md)
 requires implemented, fully bound, enabled, selected and metadata-admitted
 operations. `tools/list`, `resources/list` and `prompts/list` expose only those
 operations; empty eligibility gives an empty list, while unavailable admission

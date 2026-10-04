@@ -10,6 +10,11 @@ use connectors_mcp::configuration::{Configuration, FILE_LIMIT};
 use serde_json::json;
 use std::path::PathBuf;
 
+mod entry;
+mod projection;
+mod session;
+pub(super) use entry::{run, selected};
+
 pub(super) struct ProjectionPolicy;
 
 fn companion(paths: &Paths) -> PathBuf {

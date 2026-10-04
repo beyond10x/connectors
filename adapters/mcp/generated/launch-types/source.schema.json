@@ -44,11 +44,22 @@
       "type": "string",
       "x-ess-kind": "enum",
       "x-ess-name": "connectors_mcp.launch.LocalTransport"
+    },
+    "connectors_mcp.protocol.LegacySessionPhase": {
+      "enum": [
+        "initialization",
+        "operation",
+        "shutdown"
+      ],
+      "title": "LegacySessionPhase",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors_mcp.protocol.LegacySessionPhase"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "x-ess-provenance": {
-    "contract_digest": "slice-sha256/2:9697310eab6721915ab3f4225654b9123fb27cdac818e2cececd81257d5dce83",
+    "contract_digest": "slice-sha256/2:b8200ca6210cca5738a5dbb37d6e26caa4ff52896b6e4ea191562d080eda0e3d",
     "source_digest": "d95f87dec8c10f78ad3e922155f13014753a3f6363b186614a4360c03028b20d",
     "specification_version": "v1",
     "system": "connectors_mcp"

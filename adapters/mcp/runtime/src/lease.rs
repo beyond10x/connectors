@@ -1,7 +1,11 @@
 //! Absolute lease decisions for the trusted local supervisor.
 //!
-//! The clock port must supply qualified UTC bounds, including its uncertainty
-//! and freshness, in milliseconds. Neither that port nor the generated lease is
+//! The clock port must supply qualified bounds on the issuing authority's
+//! timeline, including uncertainty and freshness, in milliseconds. A binding
+//! issuing and checking leases in one process may use correlated local elapsed
+//! time, provided it proves the real-time cutoff including rate error and suspend;
+//! its timestamp labels are not independent UTC evidence. Cross-clock bindings
+//! require their own qualified translation. Neither the clock nor the lease is
 //! accepted from MCP input. Every I/O boundary must check a fresh decision; a
 //! returned `Allow` is not a reusable grant. The enclosing supervisor applies
 //! denied decisions to the generated Session reducer in the same serialized step.
