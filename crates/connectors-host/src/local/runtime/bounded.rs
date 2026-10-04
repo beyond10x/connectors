@@ -77,8 +77,9 @@ impl ReadBudget {
             self.result_bytes,
         )
     }
-    /// Credential validity may shorten, never restart or extend, execution.
-    pub(crate) fn constrain(mut self, until: Instant) -> Result<Self> {
+    /// Earlier local authority or credential validity may shorten execution.
+    /// This never restarts the budget or changes its declared ceilings.
+    pub fn constrain(mut self, until: Instant) -> Result<Self> {
         self.until()?;
         let sampled = ticks()?;
         let remaining = until

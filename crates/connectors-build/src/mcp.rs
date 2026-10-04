@@ -125,6 +125,8 @@ fn generate_types(root: &Path, ess: &Path, out: &Path) -> Result<()> {
             "connectors_mcp.launch.LocalLaunchCompletion",
             "--root",
             "connectors_mcp.launch.LocalLaunchFailure",
+            "--root",
+            "connectors_mcp.protocol.LegacySessionPhase",
             "--target",
             "rust",
             "--package",
