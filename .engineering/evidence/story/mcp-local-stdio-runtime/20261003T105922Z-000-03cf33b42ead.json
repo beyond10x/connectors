@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-03T10:59:22Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 14,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust1.88 generated session reducer: initial stub 0 passed/6 failed; final 8 passed/0 failed; first-terminal overwrite mutation 7 passed/1 targeted failure; .local/mcp-runtime/probe/supervision/{red,green,mutation-terminal}.log; native state reduction only"
+  }
+}

@@ -1,5 +1,5 @@
 domain: connectors.service_wire
-summary: Proposed public service observation values; no codec, runtime or persisted entity.
+summary: Shared service observation and operation metadata values; executable binding obligations remain explicit.
 
 # Normative owner: contracts/service/compatibility.md §§4–5.
 # These are values, not audit/approval/connection storage or a second attempt ledger.
@@ -57,6 +57,63 @@ types:
       - {name: execution_ms, type: Integer}
       - {name: provider_ms, type: Integer}
       - {name: connect_ms, type: Integer}
+  # Required public operation declaration, sourced from operations/v1alpha1 §3
+  # and service/compatibility §§4,7. These immutable values supply no authority
+  # and select no provider implementation, transport or persistence relationship.
+  - name: connectors.service_wire.IdempotencyKeySource
+    kind: enum
+    variants: [caller_supplied]
+  - name: connectors.service_wire.OperationIdempotency
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.mutations.IdempotencyKind}
+      - {name: key, type: "Optional<connectors.service_wire.IdempotencyKeySource>"}
+      - {name: retention_seconds, type: "Optional<Integer>"}
+    # The first keyed profile requires caller_supplied and exactly86400 seconds;
+    # none/natural forbid those keyed-only members. Natural semantics require
+    # the native contract's repeat proof, never an inference from this value.
+  - name: connectors.service_wire.OperationMetadata
+    kind: struct
+    fields:
+      - {name: effects, type: "List<connectors.mutations.ExecutableEffect>"}
+      - {name: semantic_effects, type: "List<connectors.mutations.SemanticEffect>"}
+      - {name: risk, type: connectors.artifact_provenance.Risk}
+      - {name: idempotency, type: connectors.service_wire.OperationIdempotency}
+      - {name: approval, type: connectors.mutations.ApprovalMode}
+      - {name: requires_auth, type: "Optional<List<connectors.service_wire.AuthAlternative>>"}
+      - {name: realization, type: "Optional<connectors.artifact_provenance.Realization>"}
+      - {name: limits, type: connectors.service_wire.OperationLimits}
+    # Binding obligations: strict closed decoding; positive exact integer limits;
+    # distinct effect members; external_write iff mutation; send_external and
+    # session_establishment require external_write; unresolved realization never
+    # callable. A decoder cannot establish effect completeness, native repeat
+    # proof, receiver support, current approval/grants or actual budget enforcement.
+
+  # Protected receiver configuration, not a public descriptor or persisted entity.
+  # Normative owner: contracts/service/local-operation-curation.md. The exact
+  # executable selection and bootstrap digest bind reviewed declarations to the
+  # existing adapter configuration; no new operation identity or owner is created.
+  - name: connectors.service_wire.CuratedOperation
+    kind: struct
+    fields:
+      - {name: operation, type: String}
+      - {name: metadata, type: connectors.service_wire.OperationMetadata}
+  - name: connectors.service_wire.AdapterOperationCuration
+    kind: struct
+    fields:
+      - {name: adapter_alias, type: String}
+      - {name: executable_selection, type: String}
+      - {name: bootstrap_sha256, type: String}
+      - {name: operations, type: "List<connectors.service_wire.CuratedOperation>"}
+  - name: connectors.service_wire.OperationCuration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: adapters, type: "List<connectors.service_wire.AdapterOperationCuration>"}
+    # Closed decoding, exact format, bounded unique selectors, digest pin checks,
+    # per-operation metadata validation and current admission execute at the owner.
+    # Reading this document does not establish native effect/idempotency proof,
+    # actual budget enforcement, approval, custody or permission to call a provider.
 
 # ESS-LIMIT codec obligations (ESS 0.36 has no wire-codec construct: Optional
 # projects to omission, not a required-null rule; no byte-length or canonical

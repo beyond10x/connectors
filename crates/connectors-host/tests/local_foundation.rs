@@ -88,8 +88,19 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
         toml::from_str(&explicit.replace("connectors-private/2", "connectors-private/1")).unwrap();
     assert_ne!(v1_explicit.adapters["fixture"].selection(), old_digest);
     assert_ne!(v1_explicit.adapters["fixture"].selection(), digest);
+    let v3_explicit: Config =
+        toml::from_str(&explicit.replace("connectors-private/2", "connectors-private/3")).unwrap();
+    assert_eq!(
+        v3_explicit.adapters["fixture"].private_protocol(),
+        PrivateProtocol::V3
+    );
+    assert_ne!(v3_explicit.adapters["fixture"].selection(), digest);
+    assert_ne!(
+        v3_explicit.adapters["fixture"].selection(),
+        v1_explicit.adapters["fixture"].selection()
+    );
     for invalid in [
-        explicit.replace("connectors-private/2", "connectors-private/3"),
+        explicit.replace("connectors-private/2", "connectors-private/4"),
         explicit.replace("connectors-local/2", "connectors-local/3"),
         explicit.replace("private_protocol=", "unreviewed="),
     ] {
@@ -366,21 +377,49 @@ fn sidecar_symlink_is_refused_without_touching_its_target() {
     let root = root();
     let paths = paths(&root);
     Config::initialize(&paths).unwrap();
+    // The process pool retains the initialized authority, including its WAL.
+    // Snapshot its committed state into a directory no pooled handle owns.
+    // VACUUM INTO includes committed WAL content; copying the main file alone
+    // could silently discard it. No live sidecar is removed or replaced.
+    let state = root.path().join("sidecar-fixture");
+    fs::create_dir(&state).unwrap();
+    fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
+    let database = state.join("metadata.sqlite3");
+    rusqlite::Connection::open_with_flags(
+        paths.state.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap()
+    .execute("VACUUM INTO ?1", [database.to_str().unwrap()])
+    .unwrap();
+    rusqlite::Connection::open(&database)
+        .unwrap()
+        .pragma_update(None, "journal_mode", "WAL")
+        .unwrap();
+    fs::write(state.join("metadata.lock"), b"").unwrap();
+    for name in ["metadata.sqlite3", "metadata.lock"] {
+        fs::set_permissions(state.join(name), fs::Permissions::from_mode(0o600)).unwrap();
+    }
     let target = root.path().join("untouched");
     fs::write(&target, b"sentinel").unwrap();
-    let sidecar = paths.state.join("metadata.sqlite3-wal");
-    // Entity Runtime retires its SQLite bridge after the setup handle drops.
-    // Wait for that legitimate WAL to close before installing the hostile link.
-    let until = std::time::Instant::now() + Duration::from_secs(5);
-    while sidecar.exists() && std::time::Instant::now() < until {
-        std::thread::sleep(Duration::from_millis(10));
-    }
+    let sidecar = state.join("metadata.sqlite3-wal");
     assert!(!sidecar.exists());
     symlink(&target, &sidecar).unwrap();
     assert!(matches!(
-        Metadata::inspect(&paths.state),
+        Metadata::inspect(&state),
         Err(Failure::MetadataUnavailable)
     ));
+    assert_eq!(fs::read(&target).unwrap(), b"sentinel");
+    // Prove refusal was the hostile link, not an invalid snapshot. Remove only
+    // the link installed above and admit this same database normally.
+    assert!(
+        fs::symlink_metadata(&sidecar)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+    fs::remove_file(&sidecar).unwrap();
+    Metadata::inspect(&state).unwrap();
     assert_eq!(fs::read(&target).unwrap(), b"sentinel");
 }
 

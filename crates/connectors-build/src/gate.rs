@@ -54,6 +54,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     super::ess_boundary::run(root, ess, temp.path())?;
     super::source_hashes::run(root)?;
     super::cli::run(root, ess, true)?;
+    super::mcp::run(root, ess, true)?;
+    super::service_metadata::run(root, ess, true)?;
     // The website build's examples step, without its WASM build: a target refusing the
     // example model fails here rather than only in `npm run build`.
     super::docs::synthesize_examples(root, ess, &temp.path().join("examples"))?;
@@ -129,7 +131,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "-D",
         "warnings",
     ]))?;
-    for adapter in ["kubernetes", "sql", "catalog-provider"] {
+    for adapter in ["kubernetes", "sql", "catalog-provider", "mcp"] {
         let package = format!("connectors-{adapter}");
         execute(command(None)?.args([
             "build",
@@ -157,6 +159,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-host",
             "connectors-client",
             "connectors-kubernetes",
+            "connectors-mcp",
             "connectors-sql",
         ] {
             if name != package
@@ -201,6 +204,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-client",
             "connectors-contracts",
             "connectors-core",
+            "connectors-mcp",
             "connectors-sdk",
         ] {
             execute(

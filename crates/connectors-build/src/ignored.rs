@@ -138,6 +138,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
                 Some((Disposable, vec![CHROME]))
             }
             "local::keyring::custody::tests::disposable_secret_service_restart_and_failures"
+            | "local::owner::governed::tests::final_fence::withdrawal_at_final_dispatch_prevents_real_child_invocation"
             | "local::keyring::custody::tests::custody_neither_reads_nor_changes_the_default_alias"
             | "local::keyring::custody::tests::disposable_changed_keyring_format_is_refused_before_transfer"
             | "local::approval_keys::tests::durable_key_management_with_qualified_custody"
@@ -242,6 +243,13 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors",
             "failed_connect",
             "a_revalidation_the_owner_definitely_fails_reports_dispatch_at_the_cli",
+        ) => Some((Disposable, vec![CUSTODY])),
+        (
+            "connectors",
+            "local_mcp_server",
+            "production_stdio_lists_and_invokes_an_admitted_operation"
+            | "production_stdio_withdrawal_framing_and_cancellation"
+            | "production_stdio_stopped_session_cannot_renew_after_expiry",
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",

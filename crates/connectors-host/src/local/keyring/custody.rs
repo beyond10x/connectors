@@ -117,6 +117,26 @@ pub struct Store {
 }
 
 impl Store {
+    /// Read one admitted version within the original execution cutoff. The
+    /// owned socket guard covers connect/setup, qualification, read and Close.
+    /// Expiry closes this connection only; there is no detached custody worker.
+    pub fn read_at_until(
+        version: Version,
+        socket: Option<&std::path::Path>,
+        until: std::time::Instant,
+    ) -> Result<Secret> {
+        if std::time::Instant::now() >= until {
+            return Err(Failure::Unavailable);
+        }
+        let path = super::local_path(socket).map_err(unavailable)?;
+        let stream = crate::local::unix::connect(&path, until).map_err(unavailable)?;
+        let _guard = super::deadline::Guard::new(&stream, until).map_err(unavailable)?;
+        let result = Self::connect(stream, version.scope()).and_then(|store| store.read(version));
+        if std::time::Instant::now() >= until {
+            return Err(Failure::Unavailable);
+        }
+        result
+    }
     pub fn open(scope: Scope) -> Result<Self> {
         Self::open_at(scope, None)
     }

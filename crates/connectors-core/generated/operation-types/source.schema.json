@@ -1,0 +1,284 @@
+{
+  "$defs": {
+    "connectors.artifact_provenance.Realization": {
+      "enum": [
+        "generic",
+        "implemented",
+        "unresolved"
+      ],
+      "title": "Realization",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors.artifact_provenance.Realization"
+    },
+    "connectors.artifact_provenance.Risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Risk",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors.artifact_provenance.Risk"
+    },
+    "connectors.mutations.ApprovalMode": {
+      "enum": [
+        "not_required",
+        "required",
+        "event_claim"
+      ],
+      "title": "ApprovalMode",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors.mutations.ApprovalMode"
+    },
+    "connectors.mutations.ExecutableEffect": {
+      "enum": [
+        "external_write",
+        "network",
+        "process",
+        "local_system",
+        "send_external",
+        "session_establishment"
+      ],
+      "title": "ExecutableEffect",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors.mutations.ExecutableEffect"
+    },
+    "connectors.mutations.IdempotencyKind": {
+      "enum": [
+        "none",
+        "natural",
+        "keyed"
+      ],
+      "title": "IdempotencyKind",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors.mutations.IdempotencyKind"
+    },
+    "connectors.mutations.SemanticEffect": {
+      "enum": [
+        "human_visible",
+        "billable",
+        "irreversible"
+      ],
+      "title": "SemanticEffect",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors.mutations.SemanticEffect"
+    },
+    "connectors.service_wire.AdapterOperationCuration": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_alias": {
+          "type": "string"
+        },
+        "bootstrap_sha256": {
+          "type": "string"
+        },
+        "executable_selection": {
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "$ref": "#/$defs/connectors.service_wire.CuratedOperation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "adapter_alias",
+        "executable_selection",
+        "bootstrap_sha256",
+        "operations"
+      ],
+      "title": "AdapterOperationCuration",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.AdapterOperationCuration"
+    },
+    "connectors.service_wire.AuthAlternative": {
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "scopes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "profile",
+        "scopes"
+      ],
+      "title": "AuthAlternative",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.AuthAlternative"
+    },
+    "connectors.service_wire.CuratedOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "$ref": "#/$defs/connectors.service_wire.OperationMetadata"
+        },
+        "operation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation",
+        "metadata"
+      ],
+      "title": "CuratedOperation",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.CuratedOperation"
+    },
+    "connectors.service_wire.IdempotencyKeySource": {
+      "enum": [
+        "caller_supplied"
+      ],
+      "title": "IdempotencyKeySource",
+      "type": "string",
+      "x-ess-kind": "enum",
+      "x-ess-name": "connectors.service_wire.IdempotencyKeySource"
+    },
+    "connectors.service_wire.OperationCuration": {
+      "additionalProperties": false,
+      "properties": {
+        "adapters": {
+          "items": {
+            "$ref": "#/$defs/connectors.service_wire.AdapterOperationCuration"
+          },
+          "type": "array"
+        },
+        "format": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "adapters"
+      ],
+      "title": "OperationCuration",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.OperationCuration"
+    },
+    "connectors.service_wire.OperationIdempotency": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/connectors.service_wire.IdempotencyKeySource"
+        },
+        "kind": {
+          "$ref": "#/$defs/connectors.mutations.IdempotencyKind"
+        },
+        "retention_seconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "OperationIdempotency",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.OperationIdempotency"
+    },
+    "connectors.service_wire.OperationLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "connect_ms": {
+          "type": "integer"
+        },
+        "execution_ms": {
+          "type": "integer"
+        },
+        "provider_ms": {
+          "type": "integer"
+        },
+        "request_bytes": {
+          "type": "integer"
+        },
+        "result_bytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "request_bytes",
+        "result_bytes",
+        "execution_ms",
+        "provider_ms",
+        "connect_ms"
+      ],
+      "title": "OperationLimits",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.OperationLimits"
+    },
+    "connectors.service_wire.OperationMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "$ref": "#/$defs/connectors.mutations.ApprovalMode"
+        },
+        "effects": {
+          "items": {
+            "$ref": "#/$defs/connectors.mutations.ExecutableEffect"
+          },
+          "type": "array"
+        },
+        "idempotency": {
+          "$ref": "#/$defs/connectors.service_wire.OperationIdempotency"
+        },
+        "limits": {
+          "$ref": "#/$defs/connectors.service_wire.OperationLimits"
+        },
+        "realization": {
+          "$ref": "#/$defs/connectors.artifact_provenance.Realization"
+        },
+        "requires_auth": {
+          "items": {
+            "$ref": "#/$defs/connectors.service_wire.AuthAlternative"
+          },
+          "type": "array"
+        },
+        "risk": {
+          "$ref": "#/$defs/connectors.artifact_provenance.Risk"
+        },
+        "semantic_effects": {
+          "items": {
+            "$ref": "#/$defs/connectors.mutations.SemanticEffect"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "effects",
+        "semantic_effects",
+        "risk",
+        "idempotency",
+        "approval",
+        "limits"
+      ],
+      "title": "OperationMetadata",
+      "type": "object",
+      "x-ess-kind": "struct",
+      "x-ess-name": "connectors.service_wire.OperationMetadata"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-ess-provenance": {
+    "contract_digest": "slice-sha256/2:22bef5955fecc78aa8fb98dbc2a6fc02ba2a3bcca9533dbf02d02cc78a5e537b",
+    "source_digest": "f406bfeb2c2e88f2ad2b20a744492cec9a2a47ba678f216495532682675bc195",
+    "specification_version": "v1",
+    "system": "connectors"
+  }
+}

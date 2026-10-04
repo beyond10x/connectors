@@ -211,8 +211,9 @@ integrity has existing owning checks. A resolvable citation is not semantic proo
 
 ## Preserved open work
 
-All eight unresolved relation markers in the native state model remain
-`UNMAPPED:`, including binding/snapshot ownership and lifetime. Outbound stdio
-remains `decision-blocker:mcp-outbound-stdio-process-ownership`. Caller assignment,
+Seven relation markers in the native state model remain `UNMAPPED:`, including
+binding/snapshot ownership and lifetime. The operator resolved
+`decision-blocker:mcp-outbound-stdio-process-ownership` on 2026-10-03;
+`story:mcp-outbound-stdio-runtime` owns its separate delivery. Caller assignment,
 auth lifecycle, composition/provenance, mutation replay and runtime/typed result
 binding keep their respective owners. Document checks close none of them.

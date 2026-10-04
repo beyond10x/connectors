@@ -116,6 +116,15 @@ impl Capture {
     }
 }
 impl Client {
+    /// Connect and admit this exact build within the caller's original deadline.
+    /// No request or connection retry starts a new interval.
+    pub fn connect_until(paths: &Paths, start: bool, deadline: Instant) -> Result<Self> {
+        let client = Self::connect_version(paths, start, VERSION, deadline)?;
+        approval_issuance::check(deadline)?;
+        client.same_build()?;
+        Ok(client)
+    }
+
     pub fn connect(paths: &Paths, start: bool) -> Result<Self> {
         Self::connect_version(
             paths,
@@ -130,12 +139,21 @@ impl Client {
         version: &str,
         deadline: Instant,
     ) -> Result<Self> {
-        let authority = Metadata::inspect(&paths.state)?.authority()?.to_string();
+        approval_issuance::check(deadline)?;
+        let authority = Metadata::inspect_authority_until(&paths.state, deadline)
+            .map_err(|error| -> Error {
+                if Instant::now() >= deadline {
+                    Code::Timeout.into()
+                } else {
+                    error.into()
+                }
+            })?
+            .to_string();
         let directory = fs::directory(&paths.state, false, true)?;
         let socket = socket_path(&directory);
         loop {
-            crate::local::protected::cancellation()?;
-            match connect_identified(&socket) {
+            approval_issuance::check(deadline)?;
+            match connect_identified(&socket, deadline) {
                 Ok((stream, identity)) => {
                     match Self::greet_running(&socket, stream, paths, &authority, version, deadline)
                     {
@@ -160,10 +178,14 @@ impl Client {
             let lock = lock(&directory)?;
             // SAFETY: the held owner-only file is the one admitted lifetime lock.
             if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-                if let Ok(stream) = connect_socket(&socket) {
-                    return Self::greet_running(
-                        &socket, stream, paths, &authority, version, deadline,
-                    );
+                match connect_socket(&socket, deadline) {
+                    Ok(stream) => {
+                        return Self::greet_running(
+                            &socket, stream, paths, &authority, version, deadline,
+                        );
+                    }
+                    Err(error) if error.code == Code::Unavailable => {}
+                    Err(error) => return Err(error),
                 }
                 let (stream, mut process) = spawn(paths, &lock, deadline)?;
                 let result = Self::greet(
@@ -187,7 +209,9 @@ impl Client {
             if Instant::now() >= deadline {
                 return Err(Code::Timeout.into());
             }
-            std::thread::sleep(Duration::from_millis(20));
+            std::thread::sleep(
+                Duration::from_millis(20).min(deadline.saturating_duration_since(Instant::now())),
+            );
         }
     }
     /// Greets an owner that was already running. An owner built before the
@@ -219,7 +243,7 @@ impl Client {
                 Err(silent) => silent,
             };
             let probe = Self::greet(
-                connect_socket(socket)?,
+                connect_socket(socket, deadline)?,
                 paths,
                 authority,
                 VERSION,
@@ -230,7 +254,7 @@ impl Client {
                 Ok(()) => {}
                 Err(None) => {
                     return Self::greet(
-                        connect_socket(socket)?,
+                        connect_socket(socket, deadline)?,
                         paths,
                         authority,
                         VERSION,
@@ -245,7 +269,7 @@ impl Client {
             }
             std::thread::sleep(pause.min(deadline.saturating_duration_since(Instant::now())));
             pause = (pause * 2).min(Duration::from_secs(1));
-            stream = connect_socket(socket)?;
+            stream = connect_socket(socket, deadline)?;
         }
     }
     /// `Ok(())` when the owner answers with its build; `Err(None)` when it
@@ -415,6 +439,138 @@ impl Client {
             until(deadline_ms)?,
         )?;
         self.value(until(deadline_ms)?)
+    }
+    /// A complete governed service response, including the real host audit
+    /// reference. Keep its JSON bytes lossless across the private socket.
+    pub fn governed_read(
+        self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        deadline_ms: u64,
+    ) -> Result<Vec<u8>> {
+        self.read_selected(adapter, request, None, deadline_ms)
+    }
+    /// Audited, currently admitted metadata over the protected owner socket.
+    /// The result is a private Bootstrap carrier, not public MCP presentation.
+    pub fn governed_describe(self, adapter: &str, deadline_ms: u64) -> Result<Vec<u8>> {
+        self.describe_selected(adapter, deadline_ms, false)
+    }
+    /// Audited private metadata paired with the composition's revision over the
+    /// original cache. The Bootstrap remains filtered by current owner policy.
+    pub fn projected_describe(self, adapter: &str, deadline_ms: u64) -> Result<Vec<u8>> {
+        self.describe_selected(adapter, deadline_ms, true)
+    }
+    fn describe_selected(
+        mut self,
+        adapter: &str,
+        deadline_ms: u64,
+        projection: bool,
+    ) -> Result<Vec<u8>> {
+        self.same_build()?;
+        crate::local::protected::cancellation()?;
+        let deadline = until(deadline_ms)?;
+        let request = if projection {
+            Request::ProjectedDescribe {
+                adapter: adapter.into(),
+                deadline_ms,
+            }
+        } else {
+            Request::GovernedDescribe {
+                adapter: adapter.into(),
+                deadline_ms,
+            }
+        };
+        channel::write(&mut self.stream, &request, None, &[], deadline)?;
+        self.governed_reply(deadline)
+    }
+    /// Apply the composition's additional current projection constraint at the
+    /// owner and serialized worker; this revision supplies no execution grant.
+    pub fn projected_read(
+        self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        projection_revision: &str,
+        deadline_ms: u64,
+    ) -> Result<Vec<u8>> {
+        self.read_selected(adapter, request, Some(projection_revision), deadline_ms)
+    }
+    /// Explicit bounded projected read; limits are independently selected again
+    /// by the owner. Start the original budget before admission, not here.
+    pub fn bounded_projected_read(
+        mut self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        projection_revision: &str,
+        budget: runtime::ReadBudget,
+    ) -> Result<Vec<u8>> {
+        self.same_build()?;
+        crate::local::protected::cancellation()?;
+        let until = budget.until()?;
+        if request.input.len() > budget.input_bytes() {
+            return Err(Code::InvalidInput.into());
+        }
+        channel::write(
+            &mut self.stream,
+            &Request::BoundedRead {
+                adapter: adapter.into(),
+                connection: request.connection.into(),
+                operation: request.operation.into(),
+                schema: request.schema.into(),
+                revision: request.revision.into(),
+                projection_revision: projection_revision.into(),
+                budget,
+            },
+            None,
+            request.input.as_bytes(),
+            until,
+        )?;
+        let bytes = self.governed_reply(until)?;
+        if bytes.len() > budget.result_bytes() {
+            return Err(Code::Capacity.into());
+        }
+        Ok(bytes)
+    }
+    fn read_selected(
+        mut self,
+        adapter: &str,
+        request: &approval_issuance::Request<'_>,
+        projection_revision: Option<&str>,
+        deadline_ms: u64,
+    ) -> Result<Vec<u8>> {
+        self.same_build()?;
+        crate::local::protected::cancellation()?;
+        if request.input.len() > runtime::INPUT_LIMIT {
+            return Err(Code::InvalidInput.into());
+        }
+        let deadline = until(deadline_ms)?;
+        channel::write(
+            &mut self.stream,
+            &Request::GovernedRead {
+                adapter: adapter.into(),
+                connection: request.connection.into(),
+                operation: request.operation.into(),
+                schema: request.schema.into(),
+                revision: request.revision.into(),
+                deadline_ms,
+                projection_revision: projection_revision.map(str::to_owned),
+            },
+            None,
+            request.input.as_bytes(),
+            deadline,
+        )?;
+        self.governed_reply(deadline)
+    }
+    fn governed_reply(&mut self, deadline: Instant) -> Result<Vec<u8>> {
+        let frame = read_reply(&mut self.stream, deadline, runtime::RESULT_LIMIT)?;
+        match frame.control {
+            Reply::Success => {
+                connectors_core::json::decode(&frame.document, 68)
+                    .map_err(|_| Code::Unavailable)?;
+                Ok(frame.document)
+            }
+            Reply::Failed { error } if frame.document.is_empty() => Err(error),
+            _ => Err(Code::Unavailable.into()),
+        }
     }
     pub fn revalidate(
         mut self,
@@ -598,18 +754,30 @@ fn socket_path(directory: &File) -> PathBuf {
         directory.as_raw_fd()
     ))
 }
-fn connect_socket(path: &std::path::Path) -> Result<UnixStream> {
-    connect_identified(path).map(|(stream, _)| stream)
+fn connect_socket(path: &std::path::Path, deadline: Instant) -> Result<UnixStream> {
+    connect_identified(path, deadline).map(|(stream, _)| stream)
 }
 /// Also returns the identity of the socket file connected to, so that a caller
 /// can tell whether the owner behind it has since removed it.
-fn connect_identified(path: &std::path::Path) -> Result<(UnixStream, (u64, u64))> {
+fn connect_identified(
+    path: &std::path::Path,
+    deadline: Instant,
+) -> Result<(UnixStream, (u64, u64))> {
+    approval_issuance::check(deadline)?;
     let info = std::fs::symlink_metadata(path).map_err(|_| Code::Unavailable)?;
     if !info.file_type().is_socket() || info.uid() != fs::uid() || info.mode() & 0o077 != 0 {
         return Err(Code::InvalidConfiguration.into());
     }
-    let stream = UnixStream::connect(path).map_err(|_| Code::Unavailable)?;
+    let stream =
+        crate::local::unix::connect(path, deadline).map_err(|error| match error.kind() {
+            std::io::ErrorKind::TimedOut => Code::Timeout,
+            // Linux AF_UNIX EAGAIN means the accept queue is full. It is neither a
+            // connected stream nor absence that authorizes a replacement owner.
+            std::io::ErrorKind::WouldBlock => Code::Capacity,
+            _ => Code::Unavailable,
+        })?;
     channel::peer(&stream)?;
+    approval_issuance::check(deadline)?;
     Ok((stream, (info.dev(), info.ino())))
 }
 fn socket_identity(path: &std::path::Path) -> Option<(u64, u64)> {
@@ -632,6 +800,7 @@ fn spawn(
     lock: &File,
     deadline: Instant,
 ) -> Result<(UnixStream, std::process::Child)> {
+    approval_issuance::check(deadline)?;
     let binary = std::env::current_exe().map_err(|_| Code::Unavailable)?;
     let hash = hex::encode(Sha256::digest(
         std::fs::read(&binary).map_err(|_| Code::Unavailable)?,
@@ -682,6 +851,7 @@ fn spawn(
             Ok(())
         });
     }
+    approval_issuance::check(deadline)?;
     let process = command.spawn().map_err(|_| Code::Unavailable)?;
     Ok((parent, process))
 }
@@ -694,8 +864,12 @@ struct Owner {
     pool: Arc<supervisor::Pool>,
     shutdown: AtomicBool,
     clients: AtomicUsize,
+    read_policy: Arc<dyn ReadPolicy>,
 }
 pub fn serve(paths: Paths) -> Result<()> {
+    serve_with_read_policy(paths, Arc::new(governed::UnboundReadPolicy))
+}
+pub fn serve_with_read_policy(paths: Paths, read_policy: Arc<dyn ReadPolicy>) -> Result<()> {
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
     let (startup, lifetime) = inherited()?;
@@ -736,9 +910,14 @@ pub fn serve(paths: Paths) -> Result<()> {
         authority,
         incarnation: incarnation.clone(),
         build,
-        pool: Arc::new(supervisor::Pool::new(paths, incarnation)),
+        pool: Arc::new(supervisor::Pool::with_read_policy(
+            paths,
+            incarnation,
+            read_policy.clone(),
+        )),
         shutdown: AtomicBool::new(false),
         clients: AtomicUsize::new(0),
+        read_policy,
     });
     // From the first request onward, keep lifetime authority through kernel
     // process exit, including unwinding or any early return with live threads.
@@ -1003,6 +1182,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
     {
         return Err(Code::ReadinessMismatch.into());
     }
+    let same_build = build.as_deref() == Some(owner.build);
     channel::write(
         stream,
         &Reply::Hello {
@@ -1028,6 +1208,14 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
         runtime::INPUT_LIMIT,
     )?;
     let shutdown = matches!(frame.control, Request::Shutdown { .. });
+    let write_until = if let Request::BoundedRead { budget, .. } = &frame.control {
+        if !same_build {
+            return Err(Code::ReadinessMismatch.into());
+        }
+        Some(budget.until()?)
+    } else {
+        None
+    };
     let result = action(owner, stream, frame.control, frame.document);
     let shutdown = shutdown && result.is_ok();
     let (reply, document) = match result {
@@ -1042,7 +1230,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
         &reply,
         None,
         &document,
-        Instant::now() + Duration::from_secs(5),
+        write_until.unwrap_or_else(|| Instant::now() + Duration::from_secs(5)),
     );
     if shutdown {
         owner.shutdown.store(true, Ordering::SeqCst);
@@ -1185,6 +1373,142 @@ fn action(
             return Err(Code::InvalidInput.into());
         }
         return Ok(json!({ "build": owner.build }));
+    }
+    let projection = matches!(request, Request::ProjectedDescribe { .. });
+    if let Request::GovernedDescribe {
+        adapter,
+        deadline_ms,
+    }
+    | Request::ProjectedDescribe {
+        adapter,
+        deadline_ms,
+    } = request
+    {
+        if !document.is_empty() {
+            return Err(Code::InvalidInput.into());
+        }
+        if !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
+            return Err(Code::Timeout.into());
+        }
+        return governed::describe(
+            (&owner.paths, &owner.authority, super::until(deadline_ms)?),
+            &adapter,
+            projection.then_some(owner.read_policy.as_ref()),
+        );
+    }
+    if matches!(
+        &request,
+        Request::GovernedRead { .. } | Request::BoundedRead { .. }
+    ) {
+        let (
+            alias,
+            connection,
+            operation,
+            schema,
+            revision,
+            projection_revision,
+            budget,
+            deadline_ms,
+        ) = match request {
+            Request::GovernedRead {
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                deadline_ms,
+            } => (
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                None,
+                deadline_ms,
+            ),
+            Request::BoundedRead {
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                budget,
+            } => {
+                let left = budget
+                    .until()?
+                    .checked_duration_since(Instant::now())
+                    .ok_or(Code::Timeout)?;
+                let deadline = connectors_sdk::now_ms()
+                    .checked_add(left.as_millis() as u64)
+                    .ok_or(Code::Timeout)?;
+                (
+                    adapter,
+                    connection,
+                    operation,
+                    schema,
+                    revision,
+                    Some(projection_revision),
+                    Some(budget),
+                    deadline,
+                )
+            }
+            _ => unreachable!("read variant selected above"),
+        };
+        if budget.is_none()
+            && !(1..=120_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms()))
+        {
+            return Err(Code::Timeout.into());
+        }
+        let input = std::str::from_utf8(&document).map_err(|_| Code::InvalidInput)?;
+        let call = approval_issuance::Request {
+            connection: &connection,
+            operation: &operation,
+            schema: &schema,
+            revision: &revision,
+            input,
+        };
+        let dispatch = |adapter: &Adapter| match owner.pool.run(
+            &alias,
+            adapter,
+            Task::Invoke {
+                connection: connection.clone(),
+                operation: operation.clone(),
+                schema: schema.clone(),
+                revision: revision.clone(),
+                document: document.clone(),
+                governed: true,
+                projection_revision: projection_revision.clone(),
+                budget,
+            },
+            deadline_ms,
+        )? {
+            Output::Document(bytes) => Ok(bytes),
+            _ => Err(Code::Unavailable.into()),
+        };
+        let selection = projection_revision
+            .as_deref()
+            .map(|r| (owner.read_policy.as_ref(), r));
+        return match budget {
+            Some(budget) => governed::bounded::read(
+                &owner.paths,
+                &owner.authority,
+                &alias,
+                &call,
+                selection.ok_or(Code::Unsupported)?,
+                budget,
+                dispatch,
+            ),
+            None => governed::read(
+                (&owner.paths, &owner.authority, super::until(deadline_ms)?),
+                &alias,
+                &call,
+                selection,
+                dispatch,
+            ),
+        };
     }
     let alias = match &request {
         Request::Begin { adapter, .. }
@@ -1413,6 +1737,9 @@ fn action(
                     schema,
                     revision,
                     document,
+                    governed: false,
+                    projection_revision: None,
+                    budget: None,
                 },
                 deadline_ms,
             )? {
@@ -1442,9 +1769,267 @@ fn action(
 }
 
 #[cfg(test)]
+#[path = "admission_tests.rs"]
+mod admission_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    #[test]
+    fn bounded_socket_preserves_original_budget_and_lossless_response() {
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let budget = runtime::ReadBudget::start(20000, 15000, 65536, 4194304).unwrap();
+        let selected = serde_json::to_value(budget).unwrap();
+        let expected = br#"{"version":"v1alpha2","request_id":"request","status":"success","result":{"n":1844674407370955161701},"audit_ref":"real-ref","audit_status":"complete"}"#;
+        let serving = std::thread::spawn(move || {
+            let deadline = budget.until().unwrap();
+            let frame =
+                channel::read::<Request>(&mut peer, deadline, false, runtime::INPUT_LIMIT).unwrap();
+            let Request::BoundedRead {
+                adapter,
+                connection,
+                operation,
+                schema,
+                revision,
+                projection_revision,
+                budget,
+            } = frame.control
+            else {
+                panic!("explicit bounded request required");
+            };
+            assert_eq!(
+                (
+                    adapter.as_str(),
+                    connection.as_str(),
+                    operation.as_str(),
+                    schema.as_str(),
+                    revision.as_str(),
+                    projection_revision.as_str()
+                ),
+                (
+                    "fixture",
+                    "connection",
+                    "read",
+                    "schema",
+                    "revision",
+                    "projection"
+                )
+            );
+            assert_eq!(serde_json::to_value(budget).unwrap(), selected);
+            assert_eq!(frame.document, br#"{"n":1844674407370955161701}"#);
+            channel::write(&mut peer, &Reply::Success, None, expected, deadline).unwrap();
+        });
+        let request = approval_issuance::Request {
+            connection: "connection",
+            operation: "read",
+            schema: "schema",
+            revision: "revision",
+            input: r#"{"n":1844674407370955161701}"#,
+        };
+        let result = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some(own_build().unwrap().into()),
+        }
+        .bounded_projected_read("fixture", &request, "projection", budget)
+        .unwrap();
+        assert_eq!(result, expected);
+        serving.join().unwrap();
+    }
+
+    #[test]
+    fn bounded_socket_checks_build_and_expiry_before_any_request_bytes() {
+        use std::io::Read;
+        for mismatch in [true, false] {
+            let (client, mut peer) = UnixStream::pair().unwrap();
+            let mut value = serde_json::to_value(
+                runtime::ReadBudget::start(20000, 15000, 65536, 4194304).unwrap(),
+            )
+            .unwrap();
+            if !mismatch {
+                value["deadline_ticks"] = json!(1);
+            }
+            let budget = serde_json::from_value(value).unwrap();
+            let request = approval_issuance::Request {
+                connection: "connection",
+                operation: "read",
+                schema: "schema",
+                revision: "revision",
+                input: "{}",
+            };
+            let error = Client {
+                stream: client,
+                host_incarnation: "host".into(),
+                owner_build: Some(
+                    if mismatch {
+                        "another-build"
+                    } else {
+                        own_build().unwrap()
+                    }
+                    .into(),
+                ),
+            }
+            .bounded_projected_read("fixture", &request, "projection", budget)
+            .unwrap_err();
+            assert_eq!(
+                error.code,
+                if mismatch {
+                    Code::OwnerBuildMismatch
+                } else {
+                    Code::Timeout
+                }
+            );
+            let mut bytes = Vec::new();
+            peer.read_to_end(&mut bytes).unwrap();
+            assert!(bytes.is_empty());
+        }
+    }
+
+    #[test]
+    fn bounded_socket_reply_wait_keeps_the_original_cutoff() {
+        // The real connection handshake measures the build before this port.
+        let build = own_build().unwrap().to_owned();
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let budget = runtime::ReadBudget::start(20000, 15000, 65536, 4194304)
+            .unwrap()
+            .constrain(Instant::now() + Duration::from_millis(100))
+            .unwrap();
+        let serving = std::thread::spawn(move || {
+            channel::read::<Request>(
+                &mut peer,
+                Instant::now() + Duration::from_secs(2),
+                false,
+                runtime::INPUT_LIMIT,
+            )
+            .unwrap();
+            // Bounded hold means a broken receiver deadline still terminates this test.
+            std::thread::sleep(Duration::from_millis(600));
+        });
+        let request = approval_issuance::Request {
+            connection: "connection",
+            operation: "read",
+            schema: "schema",
+            revision: "revision",
+            input: "{}",
+        };
+        let started = Instant::now();
+        let error = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some(build),
+        }
+        .bounded_projected_read("fixture", &request, "projection", budget)
+        .unwrap_err();
+        assert_eq!(error.code, Code::Timeout);
+        assert!(started.elapsed() < Duration::from_millis(400));
+        serving.join().unwrap();
+    }
+
+    #[test]
+    fn governed_describe_socket_carries_no_document_and_requires_same_build() {
+        for projection in [false, true] {
+            let describe = if projection {
+                Client::projected_describe
+            } else {
+                Client::governed_describe
+            };
+            let (client, mut peer) = UnixStream::pair().unwrap();
+            let expected = br#"{"version":"v1alpha2","request_id":null,"status":"success","result":{},"audit_ref":"real-ref","audit_status":"complete"}"#;
+            let serving = std::thread::spawn(move || {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                let frame =
+                    channel::read::<Request>(&mut peer, deadline, false, runtime::INPUT_LIMIT)
+                        .unwrap();
+                match frame.control {
+                    Request::GovernedDescribe { adapter, .. } => {
+                        assert!(!projection);
+                        assert_eq!(adapter, "fixture");
+                    }
+                    Request::ProjectedDescribe { adapter, .. } => {
+                        assert!(projection);
+                        assert_eq!(adapter, "fixture");
+                    }
+                    _ => panic!("wrong private discovery request"),
+                }
+                assert!(frame.document.is_empty());
+                channel::write(&mut peer, &Reply::Success, None, expected, deadline).unwrap();
+            });
+            let value = describe(
+                Client {
+                    stream: client,
+                    host_incarnation: "host".into(),
+                    owner_build: Some(own_build().unwrap().into()),
+                },
+                "fixture",
+                connectors_sdk::now_ms() + 5000,
+            )
+            .unwrap();
+            assert_eq!(value, expected);
+            serving.join().unwrap();
+            let (client, mut peer) = UnixStream::pair().unwrap();
+            let result = describe(
+                Client {
+                    stream: client,
+                    host_incarnation: "host".into(),
+                    owner_build: Some("another-build".into()),
+                },
+                "fixture",
+                connectors_sdk::now_ms() + 5000,
+            );
+            assert_eq!(result.unwrap_err().code, Code::OwnerBuildMismatch);
+            use std::io::Read;
+            let mut bytes = Vec::new();
+            peer.read_to_end(&mut bytes).unwrap();
+            assert!(bytes.is_empty());
+        }
+    }
+
+    #[test]
+    fn governed_socket_keeps_complete_response_bytes_and_checks_build_before_sending() {
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let expected = br#"{"version":"v1alpha2","request_id":"request","status":"success","result":{"n":1844674407370955161701,"huge":1e400},"audit_ref":"real-ref","audit_status":"complete"}"#;
+        let serving = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let frame =
+                channel::read::<Request>(&mut peer, deadline, false, runtime::INPUT_LIMIT).unwrap();
+            assert!(
+                matches!(frame.control, Request::GovernedRead { ref adapter, ref connection, .. } if adapter=="fixture" && connection=="connection")
+            );
+            assert_eq!(frame.document, br#"{"n":1844674407370955161701}"#);
+            channel::write(&mut peer, &Reply::Success, None, expected, deadline).unwrap();
+        });
+        let request = approval_issuance::Request {
+            connection: "connection",
+            operation: "read",
+            schema: "schema",
+            revision: "revision",
+            input: r#"{"n":1844674407370955161701}"#,
+        };
+        let result = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some(own_build().unwrap().into()),
+        }
+        .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000)
+        .unwrap();
+        assert_eq!(result, expected);
+        serving.join().unwrap();
+
+        let (client, mut peer) = UnixStream::pair().unwrap();
+        let result = Client {
+            stream: client,
+            host_incarnation: "host".into(),
+            owner_build: Some("another-build".into()),
+        }
+        .governed_read("fixture", &request, connectors_sdk::now_ms() + 5000);
+        assert_eq!(result.unwrap_err().code, Code::OwnerBuildMismatch);
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        peer.read_to_end(&mut bytes).unwrap();
+        assert!(bytes.is_empty());
+    }
 
     /// The greeting an owner built before the build handshake understands.
     #[derive(Deserialize)]
@@ -1786,6 +2371,7 @@ mod idle_sweep_tests {
             pool: Arc::new(supervisor::Pool::new(paths.clone(), incarnation)),
             shutdown: AtomicBool::new(false),
             clients: AtomicUsize::new(0),
+            read_policy: Arc::new(governed::UnboundReadPolicy),
         });
         let recovery = maintenance::Background::start(paths, owner.pool.clone()).unwrap();
         let directory = fs::directory(state, false, true).unwrap();

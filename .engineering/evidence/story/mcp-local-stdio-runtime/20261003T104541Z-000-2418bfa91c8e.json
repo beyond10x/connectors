@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-03T10:45:41Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --offline -p connectors-mcp and cargo +1.88.0 test --locked --offline -p connectors-mcp: 11 passed, 0 failed, 0 ignored on each; native components only; logs .local/mcp-runtime/native-tests/workspace.log and msrv.log"
+  }
+}

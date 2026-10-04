@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T16:09:25Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 54,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Shared operation metadata full gate --msrv: exit 0; 1344 passed, 0 failed, 66 ignored across 164 summaries. ESS0.45/AEP0.65 projection checks passed; AEP valid with historical warnings. Log SHA256 8d6f05e3f98055b2a1595952cd66816af142ece1552001eda39e63c77e44243e. Coordinator verification only.",
+    "reference": ".local/mcp-runtime/gate-operation-metadata.log"
+  }
+}

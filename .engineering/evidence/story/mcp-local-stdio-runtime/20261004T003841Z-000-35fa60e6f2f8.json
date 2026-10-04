@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-04T00:38:41Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 87,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Production stdio process lane: cargo test --locked --offline -p connectors --test local_mcp_server -- --include-ignored --test-threads=1; 6 passed, 0 failed, 0 ignored; production owner/custody/pinned provider under both revisions; disabled-exposure mutation fails at 2 tools vs 1, restored source passes",
+    "reference": ".local/mcp-runtime/stdio/process-final.log"
+  }
+}

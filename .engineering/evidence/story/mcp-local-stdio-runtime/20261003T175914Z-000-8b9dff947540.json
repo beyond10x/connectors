@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T17:59:14Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 72,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "connectors-build gate --msrv: 1364 passed, 0 failed, 66 ignored; SHA256 3abfc81be4308fcace5fc8d1a4f2ab609c1f5b55f02c4b49ac6ffbe8b4730111",
+    "reference": ".local/mcp-runtime/gate-bounded-read.log"
+  }
+}

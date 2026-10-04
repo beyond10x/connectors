@@ -547,17 +547,22 @@ dependencies = [
 name = "connectors"
 version = "0.25.1"
 dependencies = [
+ "async-trait",
  "base64 0.23.1",
  "clap",
  "connectors-cli-contract",
  "connectors-client",
  "connectors-core",
  "connectors-host",
+ "connectors-mcp",
  "connectors-sdk",
+ "libc",
  "ring",
  "serde_json",
  "tempfile",
+ "time",
  "tokio",
+ "toml",
  "uuid",
 ]
 
@@ -684,6 +689,7 @@ dependencies = [
 name = "connectors-core"
 version = "0.25.1"
 dependencies = [
+ "connectors-operation-types",
  "hex",
  "serde",
  "serde_json",
@@ -759,6 +765,56 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-mcp"
+version = "0.25.1"
+dependencies = [
+ "clap",
+ "connectors-core",
+ "connectors-mcp-launch-cli-contract",
+ "connectors-mcp-launch-types",
+ "connectors-mcp-local-server-types",
+ "connectors-types",
+ "serde_json",
+ "time",
+]
+
+[[package]]
+name = "connectors-mcp-launch-cli-contract"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "clap_complete",
+ "rpassword",
+ "rustix",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "connectors-mcp-launch-types"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "connectors-mcp-local-server-types"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "connectors-operation-types"
+version = "0.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "connectors-sdk"
 version = "0.25.1"
 dependencies = [
@@ -817,6 +873,10 @@ dependencies = [
  "webpki-roots",
  "zeroize",
 ]
+
+[[package]]
+name = "connectors-types"
+version = "1.0.0"
 
 [[package]]
 name = "const-oid"

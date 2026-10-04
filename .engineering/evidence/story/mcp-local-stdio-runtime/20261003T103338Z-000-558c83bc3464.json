@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T10:33:38Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Rust1.88 native naming/framing: 7 passed; original stub run 7 failed; no full runtime claim",
+    "reference": ".local/mcp-runtime/native-tests/green.log"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T17:10:39Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 65,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Protected operation curation: core/app stubs failed positive cases; bypassed pin guard and hidden-metadata filter both failed targeted tests; restored core/app/owner suites 51 passed, 0 failed, 1 existing ignored. Docs reference generated and checked, 43/97 pages no drift. Entity definitions/commands unchanged under parsed comparison. Coordinator verification only.",
+    "reference": ".local/mcp-runtime/curation-owner-restored.log"
+  }
+}

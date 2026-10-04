@@ -18,8 +18,10 @@ mod docs;
 mod ess_boundary;
 mod gate;
 mod ignored;
+mod mcp;
 mod metadata_conformance;
 mod metadata_entities;
+mod service_metadata;
 mod source_hashes;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -44,6 +46,16 @@ enum Action {
     Ignored(ignored::Options),
     /// Generate or compare the selected local CLI contract fixture.
     Cli {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate or compare MCP launch, configuration and shared session projections.
+    McpBindings {
+        #[arg(long)]
+        check: bool,
+    },
+    /// Generate or compare shared public operation metadata types.
+    ServiceMetadata {
         #[arg(long)]
         check: bool,
     },
@@ -220,6 +232,12 @@ fn execute(args: Args) -> Result<()> {
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
     if let Action::Cli { check } = args.command {
         return cli::run(&root, &ess, check);
+    }
+    if let Action::McpBindings { check } = args.command {
+        return mcp::run(&root, &ess, check);
+    }
+    if let Action::ServiceMetadata { check } = args.command {
+        return service_metadata::run(&root, &ess, check);
     }
     if let Action::Examples = args.command {
         check_ess(&ess)?;

@@ -1,0 +1,16 @@
+[package]
+name = "connectors-mcp"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+clap.workspace = true
+connectors-core.workspace = true
+serde_json = { workspace = true, features = ["arbitrary_precision", "raw_value"] }
+time.workspace = true
+launch-contract = { package = "connectors-mcp-launch-cli-contract", path = "../generated/launch-cli" }
+launch-types = { package = "connectors-mcp-launch-types", path = "../generated/launch-types" }
+configuration-types = { package = "connectors-mcp-local-server-types", path = "../generated/configuration-types" }
+session-model = { package = "connectors-types", path = "../generated/supervision/crates/connectors-types" }

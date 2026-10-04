@@ -24,6 +24,9 @@ pub(super) enum Task {
         schema: String,
         revision: String,
         document: Vec<u8>,
+        governed: bool,
+        projection_revision: Option<String>,
+        budget: Option<runtime::ReadBudget>,
     },
     Write {
         connection: String,
@@ -50,6 +53,53 @@ pub(super) enum Task {
         profile: String,
     },
 }
+impl Task {
+    fn bounded_until(&self) -> Result<Option<Instant>> {
+        match self {
+            Self::Invoke {
+                budget: Some(budget),
+                governed: true,
+                ..
+            } => Ok(Some(budget.until()?)),
+            Self::Invoke {
+                budget: Some(_), ..
+            } => Err(Code::Unsupported.into()),
+            _ => Ok(None),
+        }
+    }
+    fn until(&self, wall_deadline: u64) -> Result<Instant> {
+        match self {
+            Self::Invoke {
+                budget: Some(budget),
+                governed: true,
+                ..
+            } => budget.until().map_err(Error::from),
+            Self::Invoke {
+                budget: Some(_), ..
+            } => Err(Code::Unsupported.into()),
+            _ => until(wall_deadline),
+        }
+    }
+}
+
+fn lock_before<T>(
+    mutex: &Mutex<T>,
+    deadline: Option<Instant>,
+) -> Result<std::sync::MutexGuard<'_, T>> {
+    let Some(until) = deadline else {
+        return mutex.lock().map_err(|_| Code::Unavailable.into());
+    };
+    loop {
+        approval_issuance::check(until)?;
+        match mutex.try_lock() {
+            Ok(guard) => return Ok(guard),
+            Err(std::sync::TryLockError::Poisoned(_)) => return Err(Code::Unavailable.into()),
+            Err(std::sync::TryLockError::WouldBlock) => std::thread::sleep(
+                Duration::from_millis(5).min(until.saturating_duration_since(Instant::now())),
+            ),
+        }
+    }
+}
 /// The explicit resume actions of contracts/cli/v1alpha1/semantics.md:282-285:
 /// connect/repair (an explicit `Ensure`), revalidate and invoke clear a stop's
 /// durable suppression. The automatic sweep, credential validation and a write
@@ -67,6 +117,7 @@ pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
     Baseline(runtime::Baseline),
     Value(Value),
+    Document(Vec<u8>),
     Write(mutation::Delivery),
 }
 struct Job {
@@ -133,10 +184,12 @@ struct Launches {
 }
 struct Permit<'a>(&'a Launches);
 impl Launches {
-    fn acquire(&self, deadline: u64) -> Result<Permit<'_>> {
-        let mut active = self.active.lock().map_err(|_| Code::Unavailable)?;
+    fn acquire(&self, deadline: Instant) -> Result<Permit<'_>> {
+        let mut active = lock_before(&self.active, Some(deadline))?;
+        approval_issuance::check(deadline)?;
         while *active >= 4 {
-            let duration = until(deadline)?.saturating_duration_since(Instant::now());
+            approval_issuance::check(deadline)?;
+            let duration = deadline.saturating_duration_since(Instant::now());
             let (guard, timeout) = self
                 .wake
                 .wait_timeout(active, duration)
@@ -167,9 +220,18 @@ pub(super) struct Pool {
     shutdown_lock: Mutex<()>,
     /// Attempts recovery has settled; the owner's idle clock counts only these.
     settled: Arc<AtomicU64>,
+    read_policy: Arc<dyn ReadPolicy>,
 }
 impl Pool {
+    #[cfg(test)]
     pub fn new(paths: Arc<Paths>, incarnation: String) -> Self {
+        Self::with_read_policy(paths, incarnation, Arc::new(governed::UnboundReadPolicy))
+    }
+    pub fn with_read_policy(
+        paths: Arc<Paths>,
+        incarnation: String,
+        read_policy: Arc<dyn ReadPolicy>,
+    ) -> Self {
         Self {
             workers: Mutex::new(BTreeMap::new()),
             paths,
@@ -178,6 +240,7 @@ impl Pool {
             stopped: Arc::new(AtomicBool::new(false)),
             shutdown_lock: Mutex::new(()),
             settled: Arc::new(AtomicU64::new(0)),
+            read_policy,
         }
     }
     fn send(
@@ -187,8 +250,9 @@ impl Pool {
         task: Task,
         deadline: u64,
     ) -> Result<mpsc::Receiver<Result<Output>>> {
-        until(deadline)?;
-        let mut workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
+        task.until(deadline)?;
+        let bounded_until = task.bounded_until()?;
+        let mut workers = lock_before(&self.workers, bounded_until)?;
         if self.stopped.load(Ordering::SeqCst) {
             return Err(Code::Unavailable.into());
         }
@@ -198,6 +262,7 @@ impl Pool {
             }
             let (sender, receiver) = mpsc::sync_channel(16);
             let (paths, launches) = (self.paths.clone(), self.launches.clone());
+            let read_policy = self.read_policy.clone();
             let control = Arc::new(Mutex::new(lifecycle::Control::default()));
             let shared = control.clone();
             let stopped = self.stopped.clone();
@@ -214,7 +279,13 @@ impl Pool {
                 .name("connectors-adapter-owner".into())
                 .spawn(move || {
                     worker(
-                        paths, launches, shared, stopped, activity, instance, receiver,
+                        (paths, read_policy),
+                        launches,
+                        shared,
+                        stopped,
+                        activity,
+                        instance,
+                        receiver,
                     )
                 })
                 .map_err(|_| Code::Unavailable)?;
@@ -232,7 +303,7 @@ impl Pool {
             );
         }
         let worker = &workers[&adapter.instance_id];
-        let mut control = worker.control.lock().map_err(|_| Code::Unavailable)?;
+        let mut control = lock_before(&worker.control, bounded_until)?;
         if control.stopping
             && control
                 .child
@@ -265,8 +336,9 @@ impl Pool {
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
         // The worker may still commit a revalidation after this wait ends.
         let committing = matches!(task, Task::Revalidate { .. });
+        let cutoff = task.until(deadline)?;
         self.send(alias, adapter, task, deadline)?
-            .recv_timeout(until(deadline)?.saturating_duration_since(Instant::now()))
+            .recv_timeout(cutoff.saturating_duration_since(Instant::now()))
             .map_err(|e| match e {
                 _ if committing => Code::OutcomeUnknown,
                 mpsc::RecvTimeoutError::Timeout => Code::Timeout,
@@ -461,7 +533,7 @@ impl Pool {
     }
 }
 fn worker(
-    paths: Arc<Paths>,
+    binding: (Arc<Paths>, Arc<dyn ReadPolicy>),
     launches: Arc<Launches>,
     control: Arc<Mutex<lifecycle::Control>>,
     stopped: Arc<AtomicBool>,
@@ -469,6 +541,7 @@ fn worker(
     instance: String,
     receiver: mpsc::Receiver<Work>,
 ) {
+    let (paths, read_policy) = binding;
     let Activity {
         busy,
         recovering,
@@ -504,11 +577,12 @@ fn worker(
         // `busy` now covers this job; it is no longer queued.
         drop(job.queued.take());
         let result = (|| {
-            until(job.deadline)?;
+            job.task.until(job.deadline)?;
+            let bounded_until = job.task.bounded_until()?;
             if stopped.load(Ordering::SeqCst) {
                 return Err(Code::Unavailable.into());
             }
-            let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
+            let mut guard = lock_before(&control, bounded_until)?;
             if let Some(active) = child.as_mut()
                 && !active.running()?
             {
@@ -518,6 +592,34 @@ fn worker(
                 guard.stopping = false;
             }
             guard.check(job.epoch)?;
+            if let Task::Invoke {
+                connection,
+                operation,
+                schema,
+                revision,
+                document,
+                governed: true,
+                projection_revision,
+                budget,
+            } = &job.task
+            {
+                let input = std::str::from_utf8(document).map_err(|_| Code::InvalidInput)?;
+                governed::bounded::resolve(
+                    &paths,
+                    &job.alias,
+                    &approval_issuance::Request {
+                        connection,
+                        operation,
+                        schema,
+                        revision,
+                        input,
+                    },
+                    projection_revision
+                        .as_deref()
+                        .map(|r| (read_policy.as_ref(), r)),
+                    *budget,
+                )?;
+            }
             let (config, current) = selected(&paths, &job.alias)?;
             if current.instance_id != job.adapter.instance_id {
                 return Err(Code::LifecycleConflict.into());
@@ -619,13 +721,13 @@ fn worker(
             drop(guard);
             if child.is_none() {
                 {
-                    let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
+                    let mut guard = lock_before(&control, bounded_until)?;
                     guard.check(job.epoch)?;
                     guard.starting = true;
                 }
-                let _permit = launches.acquire(job.deadline)?;
-                let new = runtime::Child::spawn_until(&current, until(job.deadline)?)?;
-                let mut guard = control.lock().map_err(|_| Code::Unavailable)?;
+                let _permit = launches.acquire(job.task.until(job.deadline)?)?;
+                let new = runtime::Child::spawn_until(&current, job.task.until(job.deadline)?)?;
+                let mut guard = lock_before(&control, bounded_until)?;
                 guard.check(job.epoch)?;
                 if stopped.load(Ordering::SeqCst) {
                     return Err(Code::Unavailable.into());
@@ -641,7 +743,7 @@ fn worker(
                 guard.starting = false;
                 child = Some(new);
             }
-            until(job.deadline)?;
+            let execution_until = job.task.until(job.deadline)?;
             let active = child.as_mut().ok_or(Code::Unavailable)?;
             match job.task {
                 Task::ObserveWrite { .. } => Err(Code::OutcomeUnknown.into()),
@@ -797,6 +899,9 @@ fn worker(
                     schema: expected_schema,
                     revision,
                     document,
+                    governed,
+                    projection_revision,
+                    budget,
                 } => {
                     let bootstrap = active.bootstrap().clone();
                     if bootstrap.descriptor()?.revision != revision
@@ -816,8 +921,12 @@ fn worker(
                         return Err(Code::Forbidden.into());
                     }
                     runtime::channel::depth(&document)?;
-                    let value: Value =
-                        connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?;
+                    let value: Value = if governed {
+                        connectors_core::json::decode(&document, 64)
+                            .map_err(|_| Code::InvalidInput)?
+                    } else {
+                        connectors_core::read_json(&document).map_err(|_| Code::InvalidInput)?
+                    };
                     connectors_sdk::validate(
                         &bootstrap
                             .descriptor()?
@@ -829,19 +938,38 @@ fn worker(
                     .map_err(|_| Code::InvalidInput)?;
                     let registry = registry::Registry::with_system_clock(&paths.state);
                     let binding = bootstrap.binding(&requirement.profile)?;
-                    let captured = registry.capture_read(
-                        &binding,
-                        &connection,
-                        &requirement.scopes,
-                        connectors_sdk::now_ms(),
-                        job.deadline,
-                    )?;
+                    if budget.is_some() {
+                        approval_issuance::check(execution_until)?;
+                    }
+                    let captured = registry
+                        .capture_read(
+                            &binding,
+                            &connection,
+                            &requirement.scopes,
+                            connectors_sdk::now_ms(),
+                            job.deadline,
+                        )
+                        .map_err(|error| {
+                            if governed {
+                                governed::registry_error(error)
+                            } else {
+                                error.into()
+                            }
+                        })?;
                     let version = captured.version();
-                    let material = custody::Store::open_at(
-                        version.scope(),
-                        config.secret_service_socket.as_deref(),
-                    )
-                    .and_then(|store| store.read(version));
+                    let material = if budget.is_some() {
+                        custody::Store::read_at_until(
+                            version,
+                            config.secret_service_socket.as_deref(),
+                            execution_until,
+                        )
+                    } else {
+                        custody::Store::open_at(
+                            version.scope(),
+                            config.secret_service_socket.as_deref(),
+                        )
+                        .and_then(|store| store.read(version))
+                    };
                     let material = match material {
                         Ok(value) => value,
                         Err(e) => {
@@ -853,6 +981,9 @@ fn worker(
                                 )?;
                             }
                             registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            if budget.is_some() {
+                                approval_issuance::check(execution_until)?;
+                            }
                             return Err(Code::CustodyUnavailable.into());
                         }
                     };
@@ -865,9 +996,15 @@ fn worker(
                         {
                             return Err(Code::LifecycleConflict.into());
                         }
-                        if !latest.permissions.operations.contains(&operation)
-                            || !latest.permissions.profiles.contains(&requirement.profile)
-                        {
+                        if !latest.permissions.operations.contains(&operation) {
+                            return Err(if governed {
+                                Code::NotGranted
+                            } else {
+                                Code::Forbidden
+                            }
+                            .into());
+                        }
+                        if !latest.permissions.profiles.contains(&requirement.profile) {
                             return Err(Code::Forbidden.into());
                         }
                         Ok(())
@@ -876,23 +1013,77 @@ fn worker(
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
                     }
-                    let guard = control.lock().map_err(|_| Code::Unavailable)?;
+                    let guard = match lock_before(&control, bounded_until) {
+                        Ok(guard) => guard,
+                        Err(error) => {
+                            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                            return Err(error);
+                        }
+                    };
                     if let Err(error) = guard.check(job.epoch).and_then(|_| {
+                        if budget.is_some() {
+                            approval_issuance::check(execution_until)?;
+                        }
                         if stopped.load(Ordering::SeqCst) {
                             Err(Code::Unavailable.into())
                         } else {
+                            if governed {
+                                let input = std::str::from_utf8(&document)
+                                    .map_err(|_| Code::InvalidInput)?;
+                                governed::bounded::resolve(
+                                    &paths,
+                                    &job.alias,
+                                    &approval_issuance::Request {
+                                        connection: &connection,
+                                        operation: &operation,
+                                        schema: &expected_schema,
+                                        revision: &revision,
+                                        input,
+                                    },
+                                    projection_revision
+                                        .as_deref()
+                                        .map(|r| (read_policy.as_ref(), r)),
+                                    budget,
+                                )?;
+                            }
                             Ok(())
                         }
                     }) {
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
                     }
-                    let dispatched = registry.dispatch_read(captured, connectors_sdk::now_ms())?;
+                    let dispatched = registry
+                        .dispatch_read(captured, connectors_sdk::now_ms())
+                        .map_err(|error| {
+                            if governed {
+                                governed::registry_error(error)
+                            } else {
+                                error.into()
+                            }
+                        })?;
                     drop(guard);
-                    let result = active.invoke(
-                        &operation, &revision, &partition, &material, &document, deadline,
-                    );
+                    let result = if let Some(budget) = budget {
+                        until(deadline)
+                            .map_err(|_| runtime::Failure::Timeout)
+                            .and_then(|until| budget.constrain(until))
+                            .and_then(|budget| {
+                                active.invoke_bounded(
+                                    &operation, &revision, &partition, &material, &document, budget,
+                                )
+                            })
+                    } else if governed {
+                        active.invoke_lossless(
+                            &operation, &revision, &partition, &material, &document, deadline,
+                        )
+                    } else {
+                        active.invoke(
+                            &operation, &revision, &partition, &material, &document, deadline,
+                        )
+                    };
                     registry.release_read(dispatched, connectors_sdk::now_ms())?;
+                    if governed {
+                        return result.map(Output::Document).map_err(Error::from);
+                    }
                     let body = String::from_utf8(result?).map_err(|_| Code::Unavailable)?;
                     Ok(Output::Value(
                         json!({"adapter":job.alias,"operation":operation,"revision":revision,"result":body}),
@@ -998,6 +1189,9 @@ mod suppression_tests {
                 schema: text(),
                 revision: text(),
                 document: Vec::new(),
+                governed: false,
+                projection_revision: None,
+                budget: None,
             },
             Task::Write {
                 connection: text(),
@@ -1038,6 +1232,81 @@ mod suppression_tests {
         for task in &passive {
             assert!(!resumes_suppression(task));
         }
+    }
+}
+
+#[cfg(test)]
+mod bounded_queue_tests {
+    use super::*;
+    #[test]
+    fn bounded_queue_wait_uses_original_cutoff_and_opens_no_state() {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Arc::new(Paths {
+            config: root.path().join("absent-config"),
+            state: root.path().join("unopened-state"),
+        });
+        let pool = Pool::new(paths.clone(), "owner".into());
+        let adapter = Adapter {
+            instance_id: "fixture".into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: Some(runtime::PrivateProtocol::V3),
+            permissions: Default::default(),
+            startup: Default::default(),
+            restart: Default::default(),
+            executable: crate::local::config::Executable {
+                path: root.path().join("unopened-executable"),
+                sha256: "0".repeat(64),
+                args: vec![],
+            },
+        };
+        let held = pool.workers.lock().unwrap();
+        let (ready, started) = mpsc::channel();
+        std::thread::scope(|scope| {
+            let work = scope.spawn(|| {
+                let budget = runtime::ReadBudget::start(20000, 15000, 65536, 4194304)
+                    .unwrap()
+                    .constrain(Instant::now() + Duration::from_millis(100))
+                    .unwrap();
+                let before = Instant::now();
+                ready.send(()).unwrap();
+                let result = pool.run(
+                    "fixture",
+                    &adapter,
+                    Task::Invoke {
+                        connection: "connection".into(),
+                        operation: "item.read".into(),
+                        schema: "schema".into(),
+                        revision: "revision".into(),
+                        document: b"{}".to_vec(),
+                        governed: true,
+                        projection_revision: Some("projection".into()),
+                        budget: Some(budget),
+                    },
+                    connectors_sdk::now_ms() + 30_000,
+                );
+                (result, before.elapsed())
+            });
+            started.recv().unwrap();
+            std::thread::sleep(Duration::from_millis(600));
+            drop(held);
+            let (result, elapsed) = work.join().unwrap();
+            assert!(matches!(
+                result,
+                Err(Error {
+                    code: Code::Timeout,
+                    ..
+                })
+            ));
+            assert!(
+                elapsed < Duration::from_millis(400),
+                "queue restarted or ignored its budget: {elapsed:?}"
+            );
+        });
+        assert!(!paths.state.exists());
+        assert!(pool.workers.lock().unwrap().is_empty());
+        pool.shutdown().unwrap();
     }
 }
 

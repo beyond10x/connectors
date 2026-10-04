@@ -25,7 +25,7 @@ scope:
   path: contracts/cli/v1alpha1/semantics.md
 - confidence: inferred
   path: docs/local-mcp-cli.md
-revision: 4
+revision: 5
 ---
 ## Acceptance
 
@@ -118,3 +118,51 @@ the parent surface. The static discovery-contract.json path is therefore recorde
 here as inferred. The child is restricted to its exact three authored documents;
 parser, generated output, compatibility metadata and runtime remain read-only.
 Source/model expressibility and stdout binding must be resolved before runtime work.
+
+## Native launch composition selected, 2026-10-03
+
+The selected local command remains connectors --config CONFIG --state-dir STATE_DIR
+server --transport stdio. The native launch model is connectors_mcp.launch under
+adapters/mcp/spec/ess/domains/launch.yaml. It introduces four immutable values:
+LocalTransport, LocalLaunchInput, LocalLaunchCompletion and LocalLaunchFailure.
+They are process input/final outcome values, not a new caller, persistent session,
+Connection or credential relation. All existing UNMAPPED relations remain open.
+The native model validates independently under the exact repository ESS 0.45.0 pin.
+
+The finite CLI generator requires all three process globals. Omitting output
+produced the exact refusal `error: globals: missing field `output` at line 4 column 10`.
+It also supplies a finite ProcessOutput adapter that must not own MCP stdout.
+The selected composition therefore generates a native parser fixture, extracts only
+its public server command subtree before Clap propagates root globals, and composes
+that subtree into a clap-derive root containing config/state-dir. The native fixture
+is not a separately installed binary and its finite output adapter is never the
+production protocol loop. Its fixture-only binary/package identity must be distinct
+from the existing connectors-cli-contract package when both become dependencies.
+
+The app must validate the resulting input through the generated native shape and
+projected type before protected entry. Parsing alone is insufficient: the pinned
+frontend accepts ordinary string arguments and performs enum/required-field
+validation in its process adapter. The prototype initially omitted that second
+step, failed on missing/invalid transport, then passed with generated shape validation.
+No generated file was edited and no hand-written enum replaced the model.
+
+Rust 1.88 probe .local/mcp-runtime/probe/composition invokes the actual generated
+command and shape. Three valid argument lists pass, six forbidden forms refuse
+(missing/unknown transport, output before/after server, credential stdin and serve
+alias), and server help contains transport but no output. The first probe also
+used the wrong Clap argument id; the correct generated id is field:transport.
+Native types project all four selected values. These are executable parser and
+projection observations, not MCP protocol or authority conformance.
+
+Production integration must preserve generic grouped/legacy CLI behavior, reject
+all unselected server flags, reserve protocol stdout, use current local owner entry
+before exposing capabilities, and implement actual bounded framing, session leases,
+revision/capability handling, cancellation and target-preserving projection. A parser
+alone cannot advertise runtime support or move the working CLI journey to implemented.
+Compatibility remains mcp=deferred until an actual peer journey passes. Config and
+custody interfaces are still separate from the native model; no cross-root ESS import.
+
+The coordinator reviewed this composition and the generated command/shape sources.
+Existing workers remain quota-exhausted; this is not independent review. Remaining
+native-to-shared runtime port design, full repository gate and actual peer tests must
+land before publication of a working command.

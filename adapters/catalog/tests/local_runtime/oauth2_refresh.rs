@@ -9,6 +9,8 @@
 //! redirects to the loopback `redirect_uri` with a code bound to the PKCE
 //! challenge, and `/token` exchanges that code for a new refresh token.
 use super::*;
+#[path = "bounded_reads.rs"]
+mod bounded_reads;
 
 pub(super) const CLIENT_ID: &str = "fixture-client-id.apps.example.test";
 pub(super) const CLIENT_SECRET: &str = "fixture-client-secret-one";
@@ -232,6 +234,8 @@ struct FixtureState {
     acquired: u32,
     /// Refresh tokens the token route answers `invalid_grant` for.
     revoked: Vec<String>,
+    token_delay_ms: u64,
+    api_delay_ms: u64,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -282,6 +286,8 @@ impl OAuthProvider {
             consents: Vec::new(),
             acquired: 0,
             revoked: Vec::new(),
+            token_delay_ms: 0,
+            api_delay_ms: 0,
         }));
         let served = state.clone();
         let (address_tx, address_rx) = std::sync::mpsc::channel();
@@ -405,6 +411,14 @@ impl OAuthProvider {
                             (404, json!({"error": "fixture route"}))
                         }
                     };
+                    let delay = {
+                        let state = served.lock().unwrap();
+                        if route == "/token" { state.token_delay_ms } else { state.api_delay_ms }
+                    };
+                    tokio::select! {
+                        _ = &mut stopped => break,
+                        _ = tokio::time::sleep(Duration::from_millis(delay)) => {}
+                    }
                     let answer = serde_json::to_vec(&answer).unwrap();
                     let location = location
                         .map(|target| format!("Location: {target}\r\n"))

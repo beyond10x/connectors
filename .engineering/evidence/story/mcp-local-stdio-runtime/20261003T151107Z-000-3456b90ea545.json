@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-03T15:11:07Z",
+  "actor": "human:timo",
+  "artifact": "story:mcp-local-stdio-runtime",
+  "kind": "story",
+  "revision": 46,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "Full repository gate with MSRVs: 1336 passed, 0 failed, 66 ignored; metadata revision source before subsequent process-model edits.",
+    "reference": "sha256:dda0789227b7ca166fe6d876286ef374e4d5fcded594f79e8458e7dbeaaca719"
+  }
+}

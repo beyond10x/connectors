@@ -72,7 +72,7 @@ const FAILURE_ROW: (&str, &str) = ("state:transport-unreachable", "unavailable")
 const SENDING_IT_AGAIN: &str = r"(?i)\b(retry|retries|retried|retrying|re-?sends?|re-?sent)\b";
 
 const QUARANTINE_HEADING: &str = "## Why no outcome above sends the request a second time";
-const HELD_HEADING: &str = "## Outbound stdio is held, not specified here";
+const HELD_HEADING: &str = "## Outbound stdio is selected, not specified here";
 
 fn repository_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -679,8 +679,8 @@ fn the_document_does_not_close_the_revision_set_the_model_leaves_open() {
     );
 }
 
-/// Outbound stdio is held by an open decision-blocker, so this document specifies none of
-/// it — and nothing else is held by that blocker either.
+/// Outbound stdio has a resolved ownership decision and a separate delivery owner;
+/// this HTTP document specifies none of it or the other transport families.
 ///
 /// The first pass of this case exempted every line that named the blocker, which let a
 /// line naming it say anything about any transport: the document called the remainder of
@@ -690,7 +690,7 @@ fn the_document_does_not_close_the_revision_set_the_model_leaves_open() {
 /// blocker's id, and a collective reference to "the other" transport is refused outright,
 /// because the family a disposition is stated for has to be the one that was named.
 #[test]
-fn outbound_stdio_is_held_by_its_blocker_and_nothing_else_is() {
+fn outbound_stdio_names_its_resolved_decision_and_separate_delivery_owner() {
     let document = semantics();
     let blocker = "decision-blocker:mcp-outbound-stdio-process-ownership";
     assert!(
@@ -752,9 +752,12 @@ fn outbound_stdio_is_held_by_its_blocker_and_nothing_else_is() {
         broken.join("\n  ")
     );
     assert!(
-        held.contains("`transport:stdio`") && held.contains("deferred"),
-        "the held section does not name the selection matrix's own disposition of \
-         outbound stdio"
+        held.contains("`transport:stdio`")
+            && held.contains("`supported`")
+            && held.contains("cleared")
+            && held.contains("`story:mcp-outbound-stdio-runtime`"),
+        "the stdio section does not name its resolved decision, selected disposition \
+         and separate delivery owner"
     );
 }
 
