@@ -18,6 +18,8 @@ scope:
 - confidence: cited
   path: Cargo.toml
 - confidence: cited
+  path: README.md
+- confidence: cited
   path: adapters/README.md
 - confidence: cited
   path: adapters/catalog/src/local.rs
@@ -31,7 +33,7 @@ scope:
   path: adapters/mcp/contracts/server/v1alpha1
 - confidence: cited
   path: adapters/mcp/design.md
-- confidence: inferred
+- confidence: cited
   path: adapters/mcp/generated
 - confidence: cited
   path: adapters/mcp/runtime
@@ -45,8 +47,12 @@ scope:
   path: apps/connectors/spec/compatibility.json
 - confidence: cited
   path: apps/connectors/src
-- confidence: inferred
+- confidence: cited
+  path: apps/connectors/tests/legacy_commands.rs
+- confidence: cited
   path: apps/connectors/tests/local_mcp_server.rs
+- confidence: cited
+  path: apps/connectors/tests/support/mcp
 - confidence: cited
   path: contracts/cli/v1alpha1/owner.md
 - confidence: cited
@@ -100,6 +106,8 @@ scope:
 - confidence: cited
   path: docs/local-mcp-cli.md
 - confidence: cited
+  path: docs/local-mcp-stdio.md
+- confidence: cited
   path: docs/local-runtime-foundation.md
 - confidence: cited
   path: ess/domains/cli.yaml
@@ -107,7 +115,7 @@ scope:
   path: ess/domains/service_wire.yaml
 - confidence: cited
   path: ess/domains/transport.yaml
-revision: 83
+revision: 88
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-03T10:29:40Z", actor: "human:timo", revision: 5}
 - {from: "proposed", to: "active", at: "2026-10-03T10:29:41Z", actor: "human:timo", revision: 6}
@@ -1699,3 +1707,103 @@ e9cc0385a766ab0c6f0397f4f2b1bdc09c6d1535c8c06cdc7622970670b66ef1  .local/mcp-run
 fa355a2aa2559d4ce7ced34a657623d30c2acada1a8a57708bd34eb74ebcab32  .local/mcp-runtime/owner-admission-connect-mutation.log
 9c84eaa2f40eca5f3ea1f20f0309ef4692ce198188c29da8bb00f95725d0698c  .local/mcp-runtime/owner-admission-docs.log
 f8aa48731d0aaf510eedc61a696ce35baeee505f5abcdf7b80527d319d58a977  .local/mcp-runtime/owner-admission-citations.log
+
+## Production stdio read slice — 2026-10-04
+
+The operator explicitly selected production stdio listing and invocation of an
+admitted operation. Implement the existing generated launch subtree in the real
+connectors binary and a bounded read-only tools path through ProjectedDescribe
+and BoundedRead. Native framing, names and result codecs remain their existing
+owners. Use the shared generated session reducer and lease gate; no new persistent
+entity, cloud caller mapping, outbound transport or Helm execution is introduced.
+
+Acceptance is actual-process evidence: selected launch/refusal with protocol-only
+stdout, current admitted tools/list, tools/call through the real owner and native
+provider with exact input/result/audit preservation, hidden/disabled/unbound reads
+omitted, stale projection and unsupported writes refused, malformed/truncated
+frames not dispatched, cancellation answered with no result, and bounded shutdown.
+Both selected wire revisions are exercised. The first usable subset exposes tools
+for one configured local adapter/Connection coordinate. Other families and the
+full parent story remain open and must not be advertised as complete.
+
+Implementation surfaces already cited: apps/connectors/src/main.rs,
+apps/connectors/src/mcp, adapters/mcp/runtime and crates/connectors-host/src/local/runtime/bounded.rs.
+New process checks: apps/connectors/tests/local_mcp_server.rs and its support
+fixtures. Only expose the existing ReadBudget shortening operation if needed to
+carry the live session cutoff into native dispatch; do not expand host facilities.
+Keep execution ceilings and authority lifetime distinct: a 20-second declaration
+never permits dispatch or output beyond the session's current lease.
+
+Existing worker sessions remain quota-blocked. Root implementation and review are
+not independent reviews. Full local-runtime story acceptance remains unchanged;
+this explicitly requested production read slice is evidence toward it.
+
+## Production stdio read slice result — 2026-10-04
+
+The production binary now routes the native generated `server --transport stdio`
+launch before finite CLI codecs. A single configured adapter/Connection exposes
+eligible read-only tools through fresh, audited ProjectedDescribe and protected
+BoundedRead; v3, complete receiver curation and inline schemas are required.
+Disabled, unbound, approval-required and metadata-denied operations remain absent.
+Provider credentials never enter MCP input/output. Both selected revisions preserve
+the complete service response and exact numbers; discovery has no provider dispatch.
+
+The local same-process lease is issued and checked on correlated CLOCK_BOOTTIME,
+with bracketed MONOTONIC discontinuity checks, <=2ms resolution allowance and the
+existing explicit <=1% rate assumption. A 1900ms lease remains below 2000 real ms;
+its wall epoch is a label, not independent UTC evidence. Renewals admit the same
+owner incarnation and current local selection before issuing another lease.
+Dispatched reads retain the earlier lease cutoff, so slow requests may terminate
+this initial slice before their declared profile ceiling. No shared clock redesign.
+ReadBudget::constrain is the sole new host API exposure and only shortens an
+existing absolute deadline. Cleanup records its terminal before joining workers.
+
+Actual-process fixture: real production binary and owner, private disposable GNOME
+Secret Service, protected registry publication, pinned Rust native provider and an
+independent newline JSON peer. Named acceptance bindings: local-server-launch-selected
+and owner-refused (ordinary lane); admitted-discovery and tools-only typed-results
+(both revisions); withdrawal/revision, malformed/oversized/truncated input,
+explicit cancellation and stopped-process non-renewal (disposable lane). Listing
+and refusals have zero business dispatch; each positive call invokes once and
+returns complete audit/request references with lossless structured and text forms.
+The initial red launch test failed on the missing server route. The first real
+fixture correctly failed unsupported because its v3 bootstrap contained a write;
+the fixture was corrected to an approval-required read, not the production boundary.
+
+The disabled-exposure mutation removed the advertisement enabled guard and the
+real process test failed at the intended list count (2 rather than 1). Restoring
+that exact source returned all six process tests to green. The three environment-
+dependent scenarios are explicitly classified as disposable. The six include the
+provider child fixture and two ordinary process tests; they are not six fully
+implemented parent acceptance families. Native protocol tests additionally cover
+per-request version checks, legacy readiness and unsupported families. Inline-only
+schema eligibility prevents root references from silently changing meaning when
+nested in tool input/output envelopes.
+
+Cited scope: apps/connectors/src/mcp entry/projection/session plus native protocol;
+apps/connectors/tests/local_mcp_server.rs and support/mcp; generated legacy phase
+root and generation owner; runtime lease/configuration facade; public shortening
+port; ignored inventory; compatibility/help and docs/local-mcp-stdio.md.
+
+The full parent story stays active. Resources, prompts, mutation replay, renewable
+long reads, complete process-bound ESS conformance, outbound runtime and Helm are
+unchanged outstanding work. Existing worker quota failures remain; coordinator
+checks and a mutation control are not an independent adversary approval. No release,
+tag, merge or full MCP support claim is authorized by these partial results.
+
+## Production stdio verification and handoff — 2026-10-04
+
+Final source verification on 2026-10-04:
+
+- `cargo test --locked --offline -p connectors --test local_mcp_server -- --include-ignored --test-threads=1`: 6 passed, 0 failed, 0 ignored (18.03s). Log `.local/mcp-runtime/stdio/process-final.log`, SHA256 `0abad446f9f44e1a8e5a7dd9927dd73d60d4a1f2cbba94120ea0d5edda6a1280`.
+- Disabled-exposure mutation: expected failure at list count 2 vs 1. Log `.local/mcp-runtime/stdio/mutation-disabled-exposure.log`, SHA256 `fb49a2e8aa8a26403499dc6d5e120a88d786b9c448de3264adcc81828d7e0b3e`. Sources restored before the final process lane and gate.
+- `cargo run --locked --offline -p connectors-build -- gate --msrv`: all checks passed, 1391 passed / 0 failed / 69 ignored across 168 summaries, including Clippy and required Rust1.88/1.91 checks. Log `.local/mcp-runtime/stdio/gate-final.log`, SHA256 `43bc71ec4f3e24b046e083e7351e68a25e63c4c33b994a14e2572d2f429480d6`.
+- The initial gate correctly failed the exact root-help regression after adding the native server block. Its expectation now preserves generated/grouped and explicit-service text and includes the native block; the final complete gate is green.
+- AEP validation: 597 artifacts, valid; historical review warnings retained verbatim in `.local/mcp-runtime/stdio/aep-validation.log`, SHA256 `2ceed3486a19985e785f07ea9cd9d6d44958fa935dd7b19318f8e68bffef24e5`.
+- Core process source hashes and actual-process log hashes are retained in `.local/mcp-runtime/stdio/evidence-sha256.txt` and checked unchanged after the final process run.
+- Cleanup: `worktree gc --dry-run` followed by exact-id apply removed only the finished, clean, published Connectors tree `wt-0fbcf5bbdfe5`. Other repositories were not selected. The active `cb26l-runtime` tree and its evidence remain for draft PR84 and independent review; no other lease was cleared.
+
+Publication continues on the already-authorized `unit/mcp-local-runtime-20261003`
+draft branch/PR84, not a merge or release. Coordinator retains ownership of this
+handoff. Next review concerns this concrete read-tools implementation and the
+explicit outstanding full-runtime acceptance; it is not a new provider wave.

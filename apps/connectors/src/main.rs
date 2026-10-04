@@ -37,6 +37,9 @@ fn main() {
         print!("{error}");
         return;
     }
+    if mcp::selected(&args) {
+        std::process::exit(mcp::run(args));
+    }
     if legacy_route(&args) {
         let runtime = tokio::runtime::Runtime::new().expect("create compatibility runtime");
         runtime.block_on(legacy::main(args));

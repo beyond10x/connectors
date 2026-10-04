@@ -126,7 +126,7 @@ fn output_before_the_legacy_command_word_is_accepted() {
 }
 
 #[test]
-fn root_help_is_the_generated_help_plus_the_contract_service_block() {
+fn root_help_keeps_generated_and_service_help_and_names_the_native_server() {
     let semantics = include_str!("../../../contracts/cli/v1alpha1/semantics.md");
     let block = semantics
         .split("```text\n")
@@ -141,9 +141,14 @@ fn root_help_is_the_generated_help_plus_the_contract_service_block() {
         include_str!("../../connectors-cli-contract/help.txt")
     );
     let short = generated.render_help().to_string();
+    let native = "Native integration commands (use COMMAND --help for options):\n  server    Serve admitted read-only MCP tools over stdio\n";
     assert_eq!(
         parts(&cli(&["--help"])),
-        (Some(0), format!("{short}\n{block}"), String::new())
+        (
+            Some(0),
+            format!("{short}\n{native}\n{block}"),
+            String::new()
+        )
     );
     assert!(!short.contains("Explicit service commands"));
 }

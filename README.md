@@ -80,22 +80,24 @@ transaction with fixed statement and lock timeouts.
 [Six real PostgreSQL cases](docs/evidence/postgres-acceptance-20261002/README.md)
 cover restart, incident reads, read-only refusals, native drop cancellation and
 local lifecycle controls. The plaintext fixture does not establish TLS. See the
-[PostgreSQL CLI guide](docs/local-postgres-cli.md). MCP and the remaining
-providers follow. The explicit network commands below remain compatible.
+[PostgreSQL CLI guide](docs/local-postgres-cli.md).
 
-Three decisions are open and are what MCP and the recorded Helm workflows wait on.
+The production [MCP stdio entry](docs/local-mcp-stdio.md) now lists and invokes
+admitted read-only tools through the local owner, with complete audit responses
+under both selected protocol revisions. Resources, prompts, mutations and outbound
+MCP remain unfinished. The explicit network commands below remain compatible.
+
+The cloud MCP caller-to-Connection assignment decision remains open.
 `aep plan artifact list --kind decision-blocker --store .engineering/planning`
 prints their current status:
 
-- `decision-blocker:helm-execution-family` — nobody has decided whether Connectors
-  runs external provider binaries; it withholds the test result of
-  `initiative:complete-local-connectors`, the only active initiative.
 - `decision-blocker:mcp-caller-connection-assignment` — nobody has decided which
-  provider connection an inbound MCP caller may use; it withholds review of
-  `epic:mcp-contracts`.
-- `decision-blocker:mcp-outbound-stdio-process-ownership` — nobody has decided
-  whether Connectors spawns an MCP server as a child process; it withholds review
-  of `epic:mcp-contracts`.
+  provider connection a cloud inbound MCP caller may use. The single configured
+  local owner uses its explicit exposure's Connection.
+
+The operator has selected pinned outbound stdio children and bounded Helm
+execution including guarded rollback. Those decisions are cleared; their
+implementation and acceptance remain separate work.
 
 This repository contains a working local data/discovery slice and a broader,
 reviewed specification baseline. The local **v0.1.0 milestone is a specification

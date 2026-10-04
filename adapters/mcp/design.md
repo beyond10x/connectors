@@ -10,9 +10,10 @@ URIs, bounded incremental stdio line framing, lossless JSON decoding, generated 
 serialized reduction of the shared session state and absolute lease decisions. Native
 tests exercise those components under Rust 1.88; EOF-retention, first-terminal and
 expiry-boundary mutations fail the intended checks.
-This does not implement a running
-MCP server, an outbound authenticated connection or a CLI command. There is no admitted
-runtime declaration, and CLI compatibility remains deferred.
+The production application now composes these pieces into the
+[local stdio read-tools slice](../../docs/local-mcp-stdio.md). Its real-process
+tests cover both selected revisions through the protected owner and a pinned
+provider. Complete inbound projection and authenticated outbound MCP remain open.
 
 The native [result codecs](runtime/src/results.rs) project an already admitted owner
 reply into tools, resources or a declared prompt-message result, retaining service
