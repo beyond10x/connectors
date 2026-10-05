@@ -22,6 +22,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for the baseline's implementation boundary.
 | `datasource.relational/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | bounded relational result binding; native semantics belong to the SQL adapter |
 | `datasource.logs/v1alpha1` | [datasources/logs/v1alpha1](datasources/logs/v1alpha1/semantics.md) | proposed | log lines with stream identity, native query, window and byte bounds |
 | `datasource.series/v1alpha1` | [datasources/series/v1alpha1](datasources/series/v1alpha1/semantics.md) | proposed | labeled time series with native query, step and explicit partial results; native profiles live with their adapters |
+| `datasource.websearch/v1alpha1` | [datasources/websearch/v1alpha1](datasources/websearch/v1alpha1/semantics.md) | proposed; Tavily binding implemented | websites from a query, a set of URLs or a bounded crawl, with title, description and bounded content; every operation a read, sent as a POST where the provider requires; native profiles live with their adapters |
 | `endpoint_discovery/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | address/port observations and candidates, no dial |
 | `host_discovery/v1alpha1` | [service/v1alpha1](service/v1alpha1/semantics.md) | implemented | node/host observations |
 | `resource_discovery/v1alpha1` | [discovery/resources/v1alpha1](discovery/resources/v1alpha1/semantics.md) | proposed | opaque-locator observations with target-adapter candidates, generations, withdrawal |
