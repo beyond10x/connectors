@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-05T23:39:47Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0290-oauth-client-er026",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.52.0, AEP 0.65.0, Rust 1.99.0 default, +1.88.0 and +1.91.0 MSRV) on 9806140 plus uncommitted release preparation; exit 0; 1296 passed, 0 failed, 65 ignored",
+    "reference": "gate log sha256 47d614acd679eb88e2d67371be7ba3b5f543ad261ef9f2f057784ebd9c1ab307"
+  }
+}
