@@ -106,6 +106,58 @@ is refused before any request.
 
 ## Authentication
 
+Use an OAuth client with the client-credentials grant. Zendesk is retiring API
+tokens: accounts created on or after 2026-07-28 cannot create or use them,
+existing accounts cannot create new ones after 2026-10-27, and every remaining
+API token stops working on 2027-04-30 (Zendesk, "Migrating from API tokens to
+OAuth access tokens", read 2026-10-05). A refresh-token grant does not fit
+either: Zendesk refresh tokens are single-use and rotate on every exchange,
+which `oauth2_refresh` refuses.
+
+### OAuth client credentials (`zendesk.oauth`)
+
+Create a confidential OAuth client in Admin Center (**Apps and integrations >
+APIs > OAuth clients**), as the admin, or a dedicated service user, whose
+actions the reads should be attributed to: Zendesk attributes a
+client-credentials token to the user who created the client. Then declare:
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "zendesk-support",
+  "provider": "zendesk",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://your-subdomain.zendesk.com",
+  "auth": {
+    "profile": "zendesk.oauth",
+    "scheme": "oauth2_client_credentials",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "OAuth client secret",
+    "identity": {"path": "api/v2/users/me", "kind": "zendesk.user", "subject_pointer": "/user/id"},
+    "token_url": "https://your-subdomain.zendesk.com/oauth/tokens",
+    "requested_scopes": ["read"]
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/zendesk/operations.json"
+}
+```
+
+`connections connect` takes `{"client_id": "<unique identifier>", "client_secret":
+"<secret>"}` once. Every access token is requested with
+`grant_type=client_credentials` and `scope=read`. Zendesk gives clients created
+on or after 2026-04-30 a 30-minute default lifetime; an older client's answer
+carries no `expires_in`, and the provider then uses the token for at most 24
+hours or until a request refuses it. Either way the provider requests a new one
+when it expires, so there is nothing to refresh and the stored entry never
+changes. The request is form-encoded, as RFC 6749 requires; Zendesk's pages
+show both form-encoded and JSON examples, and which it accepts has not been
+checked against a live account. Zendesk also documents
+per-resource scopes such as `tickets:read` and `users:read`; whether those
+alone admit the incremental exports and `users/me` has not been checked against
+a live account. Nothing here has run against a live account yet.
+
+### API token (`zendesk.basic`)
+
 The pinned document declares one security scheme, HTTP basic (`basicAuth`). With
 a Zendesk API token, the user name is the account email followed by `/token`
 and the password is the token (Zendesk's API authentication guide; not checked

@@ -337,22 +337,40 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
     }
 }
 
-/// The `auth` profile of the configuration example in the Zendesk guide, so the
-/// fixture runs the profile the guide tells a reader to write.
-fn documented_auth() -> Value {
+/// The `auth` profile `profile` of a configuration example in the Zendesk guide,
+/// so the fixture runs the profile the guide tells a reader to write.
+fn documented_auth(profile: &str) -> Value {
     let guide = fs::read_to_string(root().join("../../docs/catalog-zendesk.md")).unwrap();
     let example = guide
         .split("```json\n")
         .skip(1)
         .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains("\"provider\": \"zendesk\""))
+        .find(|body| {
+            body.contains("\"provider\": \"zendesk\"")
+                && body.contains(&format!("\"profile\": \"{profile}\""))
+        })
         .expect("the documented Zendesk configuration");
     serde_json::from_str::<Value>(example).unwrap()["auth"].clone()
 }
 
 #[test]
+fn the_documented_oauth_profile_uses_client_credentials_and_reads_only() {
+    let auth = documented_auth("zendesk.oauth");
+    assert_eq!(auth["scheme"], "oauth2_client_credentials");
+    assert_eq!(auth["header"], "Authorization");
+    assert_eq!(auth["bearer"], true);
+    assert_eq!(
+        auth["token_url"],
+        "https://your-subdomain.zendesk.com/oauth/tokens"
+    );
+    assert_eq!(auth["requested_scopes"], json!(["read"]));
+    assert_eq!(auth["authorize_url"], Value::Null);
+    assert_eq!(auth["identity"], documented_auth(PROFILE)["identity"]);
+}
+
+#[test]
 fn the_documented_profile_is_basic_with_the_current_user_as_identity() {
-    let auth = documented_auth();
+    let auth = documented_auth(PROFILE);
     assert_eq!(auth["profile"], PROFILE);
     assert_eq!(auth["scheme"], "basic");
     assert_eq!(auth["header"], "Authorization");
@@ -543,7 +561,7 @@ impl Provider {
                 "bundle_directory": root_path("generated/bundles"),
                 "api_base": format!("https://localhost:{}", address.port()),
                 "ca_file": ca,
-                "auth": documented_auth(),
+                "auth": documented_auth(PROFILE),
                 "operations_file": root_path("providers/zendesk/operations.json"),
             }))
             .unwrap(),

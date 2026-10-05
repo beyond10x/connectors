@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Catalog provider authentication scheme `oauth2_client_credentials`: the stored
+  `{client_id, client_secret}` is exchanged with the client-credentials grant and the
+  configured `requested_scopes` at `token_url`, and the access token is sent as
+  `Authorization: Bearer`. There is no refresh token, so nothing is refreshed or rotated;
+  an expired access token is requested again. `docs/catalog-zendesk.md` declares
+  `zendesk.oauth` with it, because Zendesk retires API tokens on 2027-04-30.
+
 ## 0.28.0 — 2026-10-05
 
 ### Changed
