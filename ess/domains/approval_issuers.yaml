@@ -185,7 +185,7 @@ errors:
 # durable-acknowledgement, trusted-time or process-lease construct. A guard that
 # reads another entity's field is `when_related:`, added in ESS 0.41 at source
 # format ess/18; this specification is ess/15, which refuses it
-# (unsupported_format_version), and the ESS 0.45 Entity Runtime lowering refuses
+# (unsupported_format_version), and the ESS 0.52 Entity Runtime lowering refuses
 # it at any format (RelatedGuardUnsupported). The issuer's own revision CAS is declared above.
 # No entity here stores a seed or grants approval use.
 

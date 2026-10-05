@@ -535,6 +535,73 @@ fn json_argument(text: &str) -> Result<Value, serde_json::Error> {
     serde_json::from_slice(normalized.as_deref().unwrap_or(bytes))
 }
 
+/// Parse dynamic payload text, refusing a duplicate object key at any depth. `serde_json` keeps
+/// the last of two equal keys, so the validator would otherwise check a value other than the
+/// text the handler receives.
+fn native_json(text: &str) -> Option<Value> {
+    serde_json::from_str::<UniqueKeys>(text).ok()?;
+    serde_json::from_str(text).ok()
+}
+
+/// A JSON document read only to prove that no object repeats a key.
+struct UniqueKeys;
+
+impl<'de> serde::Deserialize<'de> for UniqueKeys {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(UniqueKeys)
+    }
+}
+
+impl<'de> serde::de::Visitor<'de> for UniqueKeys {
+    type Value = Self;
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("a JSON value")
+    }
+    fn visit_bool<E>(self, _: bool) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_i64<E>(self, _: i64) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_u64<E>(self, _: u64) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_f64<E>(self, _: f64) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_str<E>(self, _: &str) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_unit<E>(self) -> Result<Self, E> {
+        Ok(self)
+    }
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut items: A) -> Result<Self, A::Error> {
+        while items.next_element::<Self>()?.is_some() {}
+        Ok(self)
+    }
+    fn visit_map<A: serde::de::MapAccess<'de>>(self, mut entries: A) -> Result<Self, A::Error> {
+        let mut keys = std::collections::BTreeSet::new();
+        while let Some(key) = entries.next_key::<String>()? {
+            if !keys.insert(key) {
+                // The message names no key: nothing of the input reaches an error.
+                return Err(serde::de::Error::custom("duplicate object key"));
+            }
+            entries.next_value::<Self>()?;
+        }
+        Ok(self)
+    }
+}
+
+/// Every invalid input answers the callable's declared `invalid_input` error with `{}` data, or
+/// the adapter's closed code when the binding declares none. Neither carries the input text.
+fn invalid(callable: &Callable, output: OutputMode, adapter_code: &str) -> ProcessOutput {
+    internal(
+        output,
+        2,
+        callable.invalid_input.as_deref().unwrap_or(adapter_code),
+    )
+}
+
 fn payload(
     declaration: &Command,
     callable: &Callable,
@@ -557,10 +624,10 @@ fn payload(
         let value = if matches!(shape.required(), Shape::String | Shape::Enum { .. }) {
             Value::String(text)
         } else {
-            json_argument(&text).map_err(|_| internal(output, 2, "cli_input"))?
+            json_argument(&text).map_err(|_| invalid(callable, output, "cli_input"))?
         };
         if !shape.accepts(&value) {
-            return Err(internal(output, 2, "cli_input"));
+            return Err(invalid(callable, output, "cli_input"));
         }
         object.insert(argument.field.clone(), value);
     }
@@ -570,7 +637,7 @@ fn payload(
         .as_ref()
         .is_some_and(|input| !input.shape.accepts(&value))
     {
-        return Err(internal(output, 2, "cli_input"));
+        return Err(invalid(callable, output, "cli_input"));
     }
     Ok(value)
 }
@@ -658,15 +725,19 @@ pub fn run(
         let Some(validator) = dynamic.as_mut() else {
             return internal(output, 1, "cli_dynamic_validator_unavailable");
         };
-        let Ok(native) = serde_json::from_str(
+        let Some(native) = native_json(
             invocation.input[payload_field]
                 .as_str()
                 .expect("typed dynamic field"),
         ) else {
-            return internal(output, 2, "cli_dynamic_input");
+            return invalid(callable, output, "cli_dynamic_input");
         };
-        if let Err(error) = validator.validate(&invocation, DynamicPhase::Input, &native) {
-            return dynamic_failure(output, error, 2, "cli_dynamic_input");
+        match validator.validate(&invocation, DynamicPhase::Input, &native) {
+            Ok(()) => {}
+            Err(DynamicError::InvalidValue) => {
+                return invalid(callable, output, "cli_dynamic_input")
+            }
+            Err(error) => return dynamic_failure(output, error, 2, "cli_dynamic_input"),
         }
         true
     } else {

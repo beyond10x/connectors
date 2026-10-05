@@ -173,10 +173,11 @@ fn c05_wrong_input_is_classified_the_same_from_inline_and_stdin() {
             "2/true/cli_dynamic_input",
         ),
         ("trailing", "{} {}".to_owned(), "2/true/cli_dynamic_input"),
+        // Since ESS 0.52 the generated decoder refuses a duplicate object key itself.
         (
             "duplicate",
             r#"{"name":"a","name":"b"}"#.to_owned(),
-            "2/true/failure/invalid_input",
+            "2/true/cli_dynamic_input",
         ),
         (
             "wrong field",

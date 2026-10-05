@@ -99,9 +99,9 @@ commands:
         error: connectors.local_approval_policy.RevisionConflict
       # local-mutations.md:23-24: exhaustion refuses without changing the policy
       # (approval_policy.rs publish, Capacity).
-      # ESS-LIMIT: ESS 0.43 through 0.45 synthesize no scenario for this branch
-      # (ESS-SYNTH-003, "stored revision selecting this branch", beyond10x/ess#251);
-      # a host test in connectors-host drives it at the maximum stored revision.
+      # ESS 0.43 through 0.50 synthesized no scenario for this branch (ESS-SYNTH-003,
+      # beyond10x/ess#251); ESS 0.51 does. A host test in connectors-host also
+      # drives it at the maximum stored revision.
       - name: exhausted
         when_subject:
           predicate: revision >= 9007199254740991
