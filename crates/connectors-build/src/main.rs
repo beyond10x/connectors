@@ -21,6 +21,7 @@ mod ignored;
 mod metadata_conformance;
 mod metadata_entities;
 mod source_hashes;
+mod upstream_redaction;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 #[derive(Parser)]
@@ -63,8 +64,17 @@ enum Action {
     },
     /// Check shared ESS ownership and compile shared and adapter semantic models.
     EssBoundary,
-    /// Re-derive every recorded upstream source digest from its archived bytes.
+    /// Re-derive every recorded upstream source digest from its archived bytes, and
+    /// check every redacted upstream source against its record and its rule.
     SourceHashes,
+    /// Write the `upstream-redaction/2` copy of a vendor document: example credentials,
+    /// real-looking email addresses and phone numbers replaced. Never touches the network.
+    Redact {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
     /// Generate or compare the local metadata Entity Runtime definitions.
     MetadataEntities {
         #[arg(long)]
@@ -170,8 +180,12 @@ fn execute(args: Args) -> Result<()> {
     if let Action::DocsAudit { directory } = args.command {
         return docs::audit(&directory.unwrap_or_else(|| root.join("website/build")));
     }
+    if let Action::Redact { input, output } = &args.command {
+        return upstream_redaction::write(input, output);
+    }
     if let Action::SourceHashes = args.command {
         source_hashes::run(&root)?;
+        upstream_redaction::run(&root)?;
         return Ok(());
     }
     if let Action::MetadataConformance { action } = args.command {
