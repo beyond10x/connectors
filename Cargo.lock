@@ -819,6 +819,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-tavily"
+version = "0.25.1"
+dependencies = [
+ "async-trait",
+ "clap",
+ "connectors-contracts",
+ "connectors-core",
+ "connectors-host",
+ "connectors-sdk",
+ "serde",
+ "serde_json",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
