@@ -7,6 +7,10 @@ title: Per-invoke metadata cost does not grow with the store
 relations:
 - serves: vision:independent-contract-adapters
 scope:
+- confidence: cited
+  path: Cargo.lock
+- confidence: cited
+  path: Cargo.toml
 - confidence: inferred
   path: crates/connectors-host/src/local/metadata.rs
 - confidence: inferred
@@ -15,7 +19,7 @@ scope:
   path: crates/connectors-host/src/local/registry.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 7
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
@@ -80,3 +84,33 @@ rest, host-only work 0.4%. The cause is inside Entity Runtime 0.25.1: upstream-b
 (beyond10x/entity-runtime#51). Host follow-ups: story:registry-clock-outside-shared-batches (a mitigation to test),
 story:bridge-drop-waits-for-dispatched-batch. A host change that skipped the reopen verification saved 1.3% and
 regressed recovery; it was reverted.
+
+## Adopted Entity Runtime 0.26.0 (2026-10-05)
+
+beyond10x/entity-runtime#51 closed with Entity Runtime 0.26.0 (2026-10-03): opt-in
+`CapturePolicy::ProviderTracked` reuses a fully verified observation while SQLite attests it
+unchanged, or verifies only an appended suffix; every open still verifies the whole store. The host
+now pins 0.26.0 (eventlog `6983cc2`, the revision 0.26.0 builds on) and opens the recorded store
+with `RecordedProviderFacade::start_with_read_policy(.., CapturePolicy::ProviderTracked)`.
+
+`read_invoke_cost_by_store_size`, release build, same command as the 2026-10-02 diagnosis, 5
+measured invokes per store:
+
+| events | 0.25.1 (2026-10-02) | 0.26.0 + ProviderTracked |
+|---|---|---|
+| 55 | 578 ms | 302 ms |
+| 601 | 12.4 s | 1,255 ms |
+| 1,203 | 40.2 s | 2,332 ms |
+
+`er.execute_batch` is flat (77 ms at 55 events, 112 ms at 601, 114 ms at 1,203). What still grows is
+`er.start` (75, 492, 963 ms), the complete verification every open performs, and `er.read_history`
+(80, 504, 976 ms for 6 calls). Switching `read_history` to the scoped facade read was measured
+slower (2,003 ms median at 601 events, 1 of 5 invokes failed at 1,203) and was not kept.
+
+Integrity: with `ProviderTracked`, a raw edit of `metadata.sqlite3` that bypasses SQLite while an
+owner holds the store is not seen until the next open; an open, and any SQL write from another
+connection, still verifies.
+
+Operator observation the same day: on the default store (1,022 events, 29 MB) and on a fresh
+Zendesk store grown to 489 events, `connections revalidate` answered `outcome_unknown` at
+`publication` after 30 s with the 0.27.0 and 0.28.0 CLIs.
