@@ -569,7 +569,7 @@ dependencies = [
  "connectors-catalog",
  "connectors-catalog-provider",
  "connectors-spec",
- "entity-core 0.25.1",
+ "entity-core 0.26.0",
  "ess-compiler",
  "ess-conformance",
  "ess-domain",
@@ -613,7 +613,7 @@ dependencies = [
  "connectors-core",
  "connectors-host",
  "connectors-sdk",
- "entity-core 0.25.1",
+ "entity-core 0.26.0",
  "entity-eventlog",
  "entity-store",
  "eventlog-core",
@@ -701,7 +701,7 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-sdk",
- "entity-core 0.25.1",
+ "entity-core 0.26.0",
  "entity-eventlog",
  "entity-executor",
  "entity-store",
@@ -1040,8 +1040,8 @@ dependencies = [
 
 [[package]]
 name = "entity-core"
-version = "0.25.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.25.1#72455539c0756290d03fd5ef28b30512a729c457"
+version = "0.26.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.26.0#7fe81cacf05de37684807aa54246b7e1fb17121a"
 dependencies = [
  "serde",
  "serde_json",
@@ -1049,10 +1049,10 @@ dependencies = [
 
 [[package]]
 name = "entity-eventlog"
-version = "0.25.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.25.1#72455539c0756290d03fd5ef28b30512a729c457"
+version = "0.26.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.26.0#7fe81cacf05de37684807aa54246b7e1fb17121a"
 dependencies = [
- "entity-core 0.25.1",
+ "entity-core 0.26.0",
  "entity-executor",
  "entity-query",
  "entity-store",
@@ -1067,20 +1067,20 @@ dependencies = [
 
 [[package]]
 name = "entity-executor"
-version = "0.25.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.25.1#72455539c0756290d03fd5ef28b30512a729c457"
+version = "0.26.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.26.0#7fe81cacf05de37684807aa54246b7e1fb17121a"
 dependencies = [
- "entity-core 0.25.1",
+ "entity-core 0.26.0",
  "entity-store",
  "serde_json",
 ]
 
 [[package]]
 name = "entity-query"
-version = "0.25.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.25.1#72455539c0756290d03fd5ef28b30512a729c457"
+version = "0.26.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.26.0#7fe81cacf05de37684807aa54246b7e1fb17121a"
 dependencies = [
- "entity-core 0.25.1",
+ "entity-core 0.26.0",
  "entity-store",
  "serde",
  "serde_json",
@@ -1088,10 +1088,10 @@ dependencies = [
 
 [[package]]
 name = "entity-store"
-version = "0.25.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.25.1#72455539c0756290d03fd5ef28b30512a729c457"
+version = "0.26.0"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.26.0#7fe81cacf05de37684807aa54246b7e1fb17121a"
 dependencies = [
- "entity-core 0.25.1",
+ "entity-core 0.26.0",
  "fs2",
  "serde",
  "serde_json",
@@ -1275,7 +1275,7 @@ dependencies = [
 [[package]]
 name = "eventlog-core"
 version = "0.6.0"
-source = "git+https://github.com/beyond10x/eventlog?rev=0a0484634e8c640be29d6b6541d6cc1c1aaef7d3#0a0484634e8c640be29d6b6541d6cc1c1aaef7d3"
+source = "git+https://github.com/beyond10x/eventlog?rev=6983cc25eb92e07844b3a6fa3e0decbdb300f43c#6983cc25eb92e07844b3a6fa3e0decbdb300f43c"
 dependencies = [
  "serde",
  "serde_json",
@@ -1288,7 +1288,7 @@ dependencies = [
 [[package]]
 name = "eventlog-sqlite"
 version = "0.6.0"
-source = "git+https://github.com/beyond10x/eventlog?rev=0a0484634e8c640be29d6b6541d6cc1c1aaef7d3#0a0484634e8c640be29d6b6541d6cc1c1aaef7d3"
+source = "git+https://github.com/beyond10x/eventlog?rev=6983cc25eb92e07844b3a6fa3e0decbdb300f43c#6983cc25eb92e07844b3a6fa3e0decbdb300f43c"
 dependencies = [
  "eventlog-core",
  "nix",

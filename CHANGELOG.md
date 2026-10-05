@@ -11,6 +11,15 @@
   an expired access token is requested again. `docs/catalog-zendesk.md` declares
   `zendesk.oauth` with it, because Zendesk retires API tokens on 2027-04-30.
 
+### Fixed
+
+- Local metadata cost no longer grows with every recorded event: Entity Runtime 0.26.0 (from
+  0.25.1) and the store opened with `CapturePolicy::ProviderTracked`, so reads and batches reuse
+  the verified store while SQLite attests it unchanged. Per read invoke, release build: 302 ms at
+  55 events, 1.3 s at 601 and 2.3 s at 1,203 (was 578 ms, 12.4 s and 40.2 s), so
+  `connections revalidate` and invokes on a grown store no longer pass the 30 s deadline as
+  `outcome_unknown`. Every open still verifies the whole store.
+
 ## 0.28.0 — 2026-10-05
 
 ### Changed
