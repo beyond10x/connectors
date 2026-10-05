@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.0 — 2026-10-05
+## 0.27.0 — 2026-10-05
 
 ### Added
 
@@ -19,10 +19,11 @@
   timeout ceiling, under the same authority, no-redirect and response bounds as
   `get`. The rule is part of `auth.capability/v1alpha1`. The catalog engine's
   GET-only read rule is unchanged.
-- MCP contracts: outbound invocation results, inbound capability projection,
-  outbound auth lifecycle, inbound keyed mutation replay and composition
-  provenance, each with literal document cases and Rust drift guards. The
-  selected stdio launch syntax is documented in `docs/local-mcp-cli.md`.
+
+### Compatibility
+
+- `post_json` has a default that answers unavailable, so existing adapters
+  build unchanged. No configuration changes for existing adapters.
 
 ### Verified
 
@@ -31,17 +32,61 @@
   key appears in no error.
 - A live run through the local CLI stored a Tavily key over stdin and answered
   `websearch.search` and `websearch.crawl`, including revalidation after the
-  connection's 60 s evidence lifetime.
+  connection's 60 s evidence lifetime. `websearch.fetch` ran against the fake
+  server only.
 
 ### Limits
 
 - Tavily exposes no account identifier: two keys are not told apart, and a
   repair cannot detect a key from another account. Every read spends credits.
 - Tavily gives no page title for `fetch` and `crawl`; `title` is null there.
-- The MCP additions are contracts and document checks. No MCP runtime,
-  parser command or CLI journey ships in this release.
 - Adapter-owned models are still named `connectors_<owner>.<domain>`; the
   rename to `connectors.<owner>.<domain>` is planned, not done.
+
+## 0.26.0 — 2026-10-05
+
+### Added
+
+- The catalog provider reads Zendesk Support: `tickets.incremental`, `users.incremental`
+  (cursor-based incremental exports by `start_time`), `organizations.incremental` (the
+  time-based export; the pinned document has no cursor export for organizations),
+  `ticket.show`, `user.show`, `organization.show` and `ticket.comments` (paged by
+  `page[after]`), from the pinned Zendesk Support API document, with an API token as HTTP
+  basic `<email>/token:<token>` (profile `zendesk.basic`, identity `zendesk.user` from
+  `GET /api/v2/users/me`). See `docs/catalog-zendesk.md`.
+- The catalog inventory follows a parameter's local `$ref` to
+  `#/components/parameters/<name>`, and reads an exploded `deepObject` query parameter over
+  scalar properties as one `name[property]` parameter per property. No other committed
+  bundle changes.
+- `connectors-build redact` writes a vendor document with example credentials, real-looking
+  email addresses and phone numbers replaced (rule `upstream-redaction/2`); the gate refuses
+  a redacted pinned source whose digest drifted or that the rule would still change. The
+  Zendesk document is pinned redacted.
+
+### Specification
+
+- MCP contracts with document cases, checked by the repository gate: outbound invocation
+  results, inbound capability projection, outbound credential lifecycle, inbound mutation
+  replay, local composition provenance, and the selected local CLI spelling with its
+  static discovery inventory (`docs/local-mcp-cli.md`). None of them is a runtime: the
+  CLI has no MCP server, adapter configuration or connection, and compatibility metadata
+  stays `mcp: deferred`.
+
+### Compatibility
+
+- No configuration or bundle changes for existing providers. The other committed bundles
+  are byte-identical under the new parameter `$ref` and `deepObject` handling.
+
+### Limits
+
+- Zendesk has not been run against a live account. Every read was verified against a local
+  HTTPS fixture with synthetic records only; the API-token basic header follows Zendesk's
+  guide and is unconfirmed live. Whether organization export pages overlap at their
+  `end_time` boundary, and which ticket changes move a ticket into the export, are unchecked.
+- The provider does not walk pages, bound `per_page` or `page[size]`, or retry on `429`.
+  35 Zendesk operations with `deepObject` parameters stay unsupported; none is shipped.
+- MCP delivery, Entity Runtime issue 51, sustained-read acceptance and the remaining
+  provider plan stay open.
 
 ## 0.25.1 — 2026-10-02
 
