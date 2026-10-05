@@ -2,11 +2,15 @@
 format: aep.planning-md/3
 id: story:websearch-contract
 kind: story
-status: draft
+status: active
 title: The datasource.websearch/v1alpha1 family is stated and modelled
 relations:
 - decomposes: epic:generic-websearch
-revision: 1
+- serves: vision:independent-contract-adapters
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-05T02:15:48Z", actor: "agent:claude", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-05T02:15:48Z", actor: "agent:claude", revision: 3}
 ---
 ## Outcome
 

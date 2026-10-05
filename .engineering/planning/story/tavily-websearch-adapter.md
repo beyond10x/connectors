@@ -2,13 +2,17 @@
 format: aep.planning-md/3
 id: story:tavily-websearch-adapter
 kind: story
-status: draft
+status: active
 title: Tavily answers the websearch family
 relations:
 - decomposes: epic:generic-websearch
 - depends_on: story:websearch-contract
 - depends_on: story:read-post-capability
-revision: 1
+- serves: vision:independent-contract-adapters
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-05T02:15:49Z", actor: "agent:claude", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-05T02:15:49Z", actor: "agent:claude", revision: 3}
 ---
 ## Outcome
 
