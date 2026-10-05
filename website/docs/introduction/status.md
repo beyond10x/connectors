@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.25.1
+# Source release v0.26.0
 
-Version **0.25.1** specifies at ESS source format `ess/15` with the released
+Version **0.26.0** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -55,6 +55,13 @@ lists and events, and Gmail messages, threads, history and labels. Guarded write
 cover Drive metadata, Slides `batchUpdate`, Calendar events and Gmail drafts, with
 no direct `messages.send`. All four have been exercised against local fixtures only,
 not live Google.
+
+[Tavily](/adapters/tavily) runs as a native adapter since 0.26.0, binding the shared
+[websearch family](/contracts/data/websearch): `websearch.search`, `websearch.fetch`
+and `websearch.crawl`. Each is a read Tavily serves as a POST, which the host admits
+for the adapter's three fixed paths through `post_json`, with no write approval.
+Search and crawl have answered live through the local CLI; fetch has been exercised
+against a local fake server only.
 
 Local setup, adapter supervision and connection management use SQLite metadata
 and qualified Secret Service custody. Saved PATs can be reused after restarts,

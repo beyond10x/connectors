@@ -141,6 +141,13 @@
       "status": "Specified; runtime pending"
     },
     {
+      "route": "/contracts/data/websearch",
+      "title": "Web search",
+      "source": "contracts/datasources/websearch/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Implemented by the tavily adapter"
+    },
+    {
       "route": "/contracts/discovery/resources",
       "title": "Resource discovery",
       "source": "contracts/discovery/resources/v1alpha1/semantics.md",
@@ -188,6 +195,13 @@
       "source": "adapters/sql/contracts/reads/v1alpha1/semantics.md",
       "owner": "sql",
       "status": "First-slice reads implemented; extensions specified"
+    },
+    {
+      "route": "/adapters/tavily/contracts/websearch",
+      "title": "Tavily websearch profile",
+      "source": "adapters/tavily/contracts/websearch/v1alpha1/semantics.md",
+      "owner": "tavily",
+      "status": "Implemented: search, fetch and crawl"
     },
     {
       "route": "/adapters/kubernetes/contracts/reads",
