@@ -82,3 +82,24 @@ detect that a key belongs to another account.
 
 **A read spends credits.** Every invocation is a provider call; nothing is cached, and two
 invocations are two charges.
+
+## Replacing the executable
+
+The entry pins the executable's SHA-256, and the host serves the bootstrap it cached at the last
+admitted launch. After rebuilding `connectors-tavily`, update `sha256`, stop the running
+incarnation exactly, then repair the connection, which performs the admitted launch under the same
+connection id. Until then `operations describe` and `connections revalidate` answer
+`description_unavailable`:
+
+```sh
+target/release/connectors --output json adapters status --adapter tavily
+target/release/connectors --output json adapters stop --adapter tavily --expected-revision CONFIGURATION_REVISION --host-incarnation HOST --child-incarnation CHILD
+target/release/connectors --output json connections repair --adapter tavily --connection CONNECTION --expected-revision REVISION --credential-stdin
+```
+
+## Evidence lifetime
+
+Validation evidence lasts 60 seconds. After it the connection lists as `pending` and a read is
+refused with `not_granted` at admission until `connections revalidate` renews it; renewing calls
+`GET /usage` and spends no credit. A scheduled caller revalidates before reading, and once more
+when a read is refused because the evidence lapsed between the two.
