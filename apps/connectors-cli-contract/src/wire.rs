@@ -207,6 +207,9 @@ pub struct Callable {
     pub result: ValueContract,
     /// Declared failure-code payloads.
     pub errors: BTreeMap<String, ValueContract>,
+    /// The declared error code that answers every invalid input, with `{}` data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invalid_input: Option<String>,
 }
 
 /// Deterministic projection input. Created by the binding compiler.

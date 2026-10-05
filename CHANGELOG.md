@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- ESS 0.52.0 (from 0.45.0): the seven ESS crates, the pinned ESS toolchain and the CLI
+  contract generated from it. The local metadata authority's synthesized conformance suite
+  has 290 scenarios instead of 289: ESS now synthesizes
+  `ReviseLocalApprovalPolicy/outcome/exhausted` (beyond10x/ess#251), which the host
+  already answers with `RevisionExhausted`.
+- Business input with a duplicate object key (`--input-json`, `--input-stdin`,
+  `--input-file`) is now refused by the generated CLI decoder as `cli_dynamic_input`
+  instead of the owner's `invalid_input` Failure. Exit code 2, empty stdout and no dispatch
+  are unchanged.
+
 ## 0.27.0 — 2026-10-05
 
 ### Added

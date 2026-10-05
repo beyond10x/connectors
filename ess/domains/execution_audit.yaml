@@ -250,7 +250,7 @@ views:
 #   the attempt's connection (audit.md:52-53): the guard over another record's
 #   field is `when_related:`, added in ESS 0.41 at source format ess/18. This
 #   specification is ess/15, which refuses it (unsupported_format_version), and
-#   the ESS 0.45 Entity Runtime lowering refuses it at any format
+#   the ESS 0.52 Entity Runtime lowering refuses it at any format
 #   (RelatedGuardUnsupported).
 # - The byte-identical repeat returning the original acknowledgement (audit.md:91-92;
 #   crates/connectors-host/src/local/audit.rs `append`): a `when_subject` over
@@ -260,7 +260,7 @@ views:
 #   lowering additionally needs a command `response:` for that preserve.
 #   `when_subject_state` cannot be combined with a subject-fact guard either.
 # - `observation_id` equal to `final_observation.observation_id` is not declared.
-#   ESS 0.45 synthesizes `recorded` under that `when:` guard and the Entity Runtime
+#   ESS 0.52 synthesizes `recorded` under that `when:` guard and the Entity Runtime
 #   lowering carries it. The host fills `observation_id` from the appended
 #   observation itself (metadata/er.rs `command_arguments`), so no request reaching
 #   the runtime can disagree. The field exists only because a payload cannot read

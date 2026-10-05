@@ -4882,8 +4882,8 @@ mod tests {
         }
     }
 
-    // The ESS suite has no scenario for `exhausted` (ESS-SYNTH-003 since ESS 0.43,
-    // beyond10x/ess#251), so the host drives it: at the maximum stored revision a
+    // ESS 0.43 through 0.50 synthesized no scenario for `exhausted` (ESS-SYNTH-003,
+    // beyond10x/ess#251); ESS 0.51 does. The host also drives it: at the maximum stored revision a
     // revise answers `exhausted` with RevisionExhausted, also for an input revision
     // that `stale-revision` would claim, while a non-advancing revise below the
     // maximum answers `stale-revision` with RevisionNotAdvanced
