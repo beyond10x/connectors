@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.27.0 — 2026-10-05
+
+### Added
+
+- `datasource.websearch/v1alpha1`, a provider-independent websearch family:
+  `websearch.search`, `websearch.fetch` and `websearch.crawl`, all reads. Every
+  result states `complete`, `truncation` and `provenance` (instance, profile,
+  `received_at`) and bounds each `content`. Modelled as ESS domain
+  `connectors.websearch`.
+- The `tavily` adapter binds the family as profile `tavily/2026-10` against
+  Tavily's pinned OpenAPI document. Credential profile `tavily.api-key` is
+  checked with `GET /usage`, which spends no search credit. Setup is in
+  `docs/local-tavily.md`.
+- `AuthenticatedHttp::post_json` sends a read the provider serves as a POST
+  without a write approval. `ScopedHttp` admits it only for the paths an
+  adapter's composition fixes, with a 64 KiB request body limit and a 180 s
+  timeout ceiling, under the same authority, no-redirect and response bounds as
+  `get`. The rule is part of `auth.capability/v1alpha1`. The catalog engine's
+  GET-only read rule is unchanged.
+
+### Compatibility
+
+- `post_json` has a default that answers unavailable, so existing adapters
+  build unchanged. No configuration changes for existing adapters.
+
+### Verified
+
+- Eight Tavily protocol tests run against a local fake server, covering the
+  mapping, refused parameters, byte bounds, error classification and that the
+  key appears in no error.
+- A live run through the local CLI stored a Tavily key over stdin and answered
+  `websearch.search` and `websearch.crawl`, including revalidation after the
+  connection's 60 s evidence lifetime. `websearch.fetch` ran against the fake
+  server only.
+
+### Limits
+
+- Tavily exposes no account identifier: two keys are not told apart, and a
+  repair cannot detect a key from another account. Every read spends credits.
+- Tavily gives no page title for `fetch` and `crawl`; `title` is null there.
+- Adapter-owned models are still named `connectors_<owner>.<domain>`; the
+  rename to `connectors.<owner>.<domain>` is planned, not done.
+
 ## 0.26.0 — 2026-10-05
 
 ### Added

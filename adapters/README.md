@@ -61,6 +61,7 @@ result envelope does not make native query/continuation semantics shared.
 | Zendesk | Served by the catalog provider: pinned Support API document in zendesk/upstream/, bundle and shipped read-only selection set under catalog/; see [the Zendesk guide](../docs/catalog-zendesk.md) |
 | GitLab | Served by the catalog provider: pinned upstream in gitlab/upstream/, bundle and shipped selection set under catalog/; the native adapter was retired in 0.11.0 |
 | SQL | Existing declaration, native runtime and tests live in sql/ |
+| Tavily | [Websearch profile `tavily/2026-10`](tavily/contracts/websearch/v1alpha1/semantics.md), pinned OpenAPI in tavily/upstream/, [ESS](tavily/spec/ess/system.yaml); native runtime and tests in tavily/; see [the Tavily guide](../docs/local-tavily.md) |
 | [Catalog](catalog/design.md) | Optional catalog adapter design |
 | [SIP](sip/design.md) | [Dial/effect/media binding](sip/contracts/dial/v1alpha1/semantics.md), native configuration and protocol obligations |
 | [RTVBP](rtvbp/design.md) | [Session/authority transport](rtvbp/contracts/session/v1alpha1/semantics.md), native configuration and codec obligations |
