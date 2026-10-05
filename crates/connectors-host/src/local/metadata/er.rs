@@ -5,7 +5,7 @@ use super::{
 };
 use entity_core::{EntityDefinition, EntityInstance, OperationFieldAction, Registry};
 use entity_eventlog::{
-    Authority, EventlogOperationContext, RecordedProviderFacade,
+    Authority, CapturePolicy, EventlogOperationContext, RecordedProviderFacade,
     sync::{
         BridgeConfig, CallWait, EventlogRecordedStoreOwner, EventlogRecordedStoreProvisioner,
         ProvisionAuthority, ShutdownMode, ShutdownOutcome,
@@ -1759,8 +1759,11 @@ pub(super) fn open(
     }
     let definitions = registry()?;
     let path_text = utf8_path(path)?;
+    // The open verifies the whole store; later reads and batches reuse that verified
+    // observation while SQLite attests it unchanged, or verify only the appended suffix
+    // (Entity Runtime 0.26.0, beyond10x/entity-runtime#51).
     let facade = timed("er.start", || {
-        RecordedProviderFacade::start(
+        RecordedProviderFacade::start_with_read_policy(
             definitions,
             EventlogRecordedStoreOwner::Sqlite {
                 path: path_text,
@@ -1769,6 +1772,7 @@ pub(super) fn open(
                 limits: LIMITS,
             },
             bridge_config(),
+            CapturePolicy::ProviderTracked,
         )
     })
     .map_err(|_| Failure::MetadataUnavailable)?;

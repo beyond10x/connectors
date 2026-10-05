@@ -326,7 +326,7 @@ commands:
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
     # DECIDED 2026-09-27: PublishBinding with decision allow on a Revoked Connection refuses
     # with ConnectionStateConflict, as RevokeConnection does; input guards decide first (refuse → Refused, unknown → Unavailable).
-    # The host (crates/connectors-host/src/local/metadata/er.rs:2985-2990) maps no
+    # The host (crates/connectors-host/src/local/metadata/er.rs:2989-2994) maps no
     # Revoked row change to this command, so no code states another answer.
   - name: connectors.auth_bindings.BeginAcquisition
     # Owner refuses static_config, expired/unsupported flows and capacity before
