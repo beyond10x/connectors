@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-05T03:54:44Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0260-zendesk-reads",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "website: npm ci 0, typecheck 0, build 0 (482 public files audited, no private paths), reference:check 0 (43 contract / 97 reference pages, no drift), test:examples 0 (15 passed); a first reference:check before build exited 1 because website/.cache/reference.json did not yet exist in the fresh tree",
+    "reference": "website log sha256 168972d335b644b570443bf86e26abce342f44cdfba6e412493cd25989f76910; first run sha256 e94937243b95208fb6402cfeb47d01344594f79e17261160d67eacea5570c4cf"
+  }
+}

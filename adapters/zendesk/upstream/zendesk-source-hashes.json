@@ -1,0 +1,11 @@
+[
+  {
+    "file": "zendesk-support.yaml",
+    "url": "https://developer.zendesk.com/zendesk/oas.yaml",
+    "upstream_sha256": "3a477ea89b274f4d3731f1c7ff93dc93d4520de871ac759b06d3297798fd685d",
+    "upstream_bytes": 1932113,
+    "redaction": "upstream-redaction/2",
+    "sha256": "5dd6cf1eda8febf02f8fb2f2cfa72d7cb6bc7d5bab188ba97b49ab55fc51dbf2",
+    "bytes": 1931767
+  }
+]

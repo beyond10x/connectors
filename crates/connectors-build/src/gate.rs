@@ -53,6 +53,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     let temp = tempfile::Builder::new().prefix("gate-").tempdir_in(base)?;
     super::ess_boundary::run(root, ess, temp.path())?;
     super::source_hashes::run(root)?;
+    super::upstream_redaction::run(root)?;
     super::cli::run(root, ess, true)?;
     // The website build's examples step, without its WASM build: a target refusing the
     // example model fails here rather than only in `npm run build`.
