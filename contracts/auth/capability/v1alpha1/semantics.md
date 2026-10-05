@@ -81,6 +81,14 @@ Every capability carries the binding it was created for. Credential-bearing bind
 - Non-material dispatch still requires a current host admission and immutable configuration/route aperture ordered against revocation and binding changes. `socket-peer` validates and pins the admitted local path/peer/transport identity for use; it does not turn socket metadata into CredentialGeneration or anonymous HTTP. Its concrete peer/path race checks and typed transport admission remain UNMAPPED advertisement gates. Anonymous and mediated binding predicates likewise cannot be represented as a fake material-bearing DispatchAdmission.
 - Destination: `http-*` capabilities refuse a request whose resolved URL leaves the admitted origin and base path; redirects are not followed (`docs/design.md:590`; current host behavior).
 - Business methods: `GET`, `POST`, `PUT`, `PATCH`, `DELETE` with a bounded body; a mutation method is refused when the operation's profile is not `mutation` (`operations` document). Separately admitted auth checks use private purpose-specific capabilities: for example the bounded SSAR POST in [evidence §4.4](../../evidence/v1alpha1/semantics.md#44-exact-authorization-targets-and-fan-out-budget-f08) grants no business POST authority.
+- Read sent as a POST (`post_json`): some providers serve a read only as a POST with a JSON body, as
+  the [websearch family](../../../datasources/websearch/v1alpha1/semantics.md) does. Trusted
+  composition fixes, once, the exact paths an adapter may POST to as reads and their deadline
+  (`ScopedHttp::with_read_posts`), from the operations the adapter's descriptor declares reads sent
+  as a POST. Any other path is refused before dispatch, as is a body over the request limit. The
+  port carries no write approval, records no attempt and grants no mutation authority; an adapter
+  that declares a POST read takes responsibility that the provider changes nothing a caller can
+  observe. Its response is bounded as a GET's is, and redirects are not followed.
 - Provider 401 and refresh: a capability name grants neither an exchange nor redispatch. Only the explicitly selected supported [read-refresh-once/v1alpha1 binding](read-refresh-once.md) permits its one complete business-response 401 to trigger one coordinated refresh participation and at most one new-generation redispatch. It retains the original deadline, exact request/authority and consumed permission-call ledger; failed authorization checks do not become refresh triggers. Legacy and unselected reads retain their own terminal no-retry behavior. Separately admitted auth maintenance remains governed by acquisition, with its own effects and no implicit repeat of the business operation. Mutations never redispatch after refresh. Anonymous/static_config modes never acquire/refresh implicitly, and mediated/federated traffic cannot select this first retry binding; parent maintenance never grants a child a silent repeat.
 - Leases (`sip-credential-lease`, `exec-credential-plugin`): material is released for one establishment or one helper run, within a deadline, and is not retained by provider code beyond the protocol object that consumes it. The lease records purpose and time, never the value.
 - `exec-credential-plugin` runs only when configuration enables it and only inside an admitted operation or explicitly admitted activation/revalidation step, never during listing or description (old rule preserved). One helper output is one captured generation: identity validation and dispatch must consume the same output. Running the helper a second time needs a new generation and admission. Client-certificate capabilities similarly pin one coherent certificate/key pair through transport use. An identity probe needed for replacement belongs to the declared validation step; it is not an implicit expansion of a business operation.
@@ -93,7 +101,7 @@ Every capability carries the binding it was created for. Credential-bearing bind
 
 | Concern | Rule |
 |---|---|
-| Deadlines | inherited from the operation profile (today 15 s provider, 5 s connect) |
+| Deadlines | inherited from the operation profile (today 15 s provider, 5 s connect); a read sent as a POST takes the deadline its composition fixes, at most 180 s |
 | Body | inherited (64 KiB request, 4 MiB response today); mutation bodies bounded by the operation's declared limit |
 | Lease lifetime | one establishment; default ceiling 30 s for SIP, plugin deadline 10 s (first-profile defaults) |
 | Authority lifetime | 60 s from the old profile as the starting value |
@@ -104,6 +112,7 @@ Every capability carries the binding it was created for. Credential-bearing bind
 - Request built with an absolute URL or a `..` segment → refused before dispatch.
 - Redirect from the fake provider → not followed; `UpstreamProtocol`.
 - Legacy or unchanged read profile 401 → one business call and its documented error, with no refresh/redispatch caused by this invocation. Explicitly selected read-refresh-once/v1alpha1 → follow its [complete bounded sequence and refusal matrix](read-refresh-once.md); second 401 is terminal, and new-generation permission checks cannot reuse consumed per-invocation slots. Mutation redispatch remains zero. Anonymous/static_config read 401 never upgrades auth; mediated child never refreshes the parent or silently repeats a forward.
+- `post_json` to a path the composition did not fix, or with a body over the request limit → refused with no request sent; a port built without `with_read_posts` answers `unavailable`.
 - Lease released twice → second release is a no-op; lease used after deadline → refused.
 - Authority redeemed twice → `AlreadyRedeemed`; media bytes before redemption → refused.
 - Swap the custody implementation while preserving the exact immutable snapshot semantics → authentication behavior remains compatible. Swapping material is a new generation, never permission to retain old evidence.
@@ -124,6 +133,7 @@ Every capability carries the binding it was created for. Credential-bearing bind
 |---|---|
 | `AuthenticatedHttp` → `HttpCapability` with methods and body; basic scheme with user half | `crates/connectors-sdk/src/lib.rs:53-56`; `crates/connectors-host/src/http.rs:11-35` |
 | TLS client identity and unix-socket transport in the host HTTP client | `crates/connectors-host/src/http.rs` |
+| Read sent as a POST: `AuthenticatedHttp::post_json`, fixed paths and deadline from `ScopedHttp::with_read_posts` | `crates/connectors-sdk/src/lib.rs`; `crates/connectors-host/src/http.rs` (implemented) |
 | Generation pin and dispatch/publication/revocation ordering | host admission/capability boundary with the shared auth coordinator |
 | Lease, plugin, authority, verifier ports | `crates/connectors-sdk` (traits), `crates/connectors-host` (bindings) |
 | Mediated-http implementation | host, per [mediated_route](../../../discovery/mediated_route/v1alpha1/semantics.md) |
