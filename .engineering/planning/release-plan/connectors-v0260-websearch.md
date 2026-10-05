@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0260-websearch
 kind: release-plan
-status: active
+status: superseded
 title: 'Release 0.26.0: generic websearch family with Tavily as its first binding'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: epic:generic-websearch
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-05T02:15:38Z", actor: "agent:claude", revision: 2}
+- {from: "active", to: "superseded", at: "2026-10-05T06:23:29Z", actor: "agent:claude", revision: 3}
 ---
 ## Outcome
 
