@@ -370,8 +370,8 @@ views:
 # across records. `when_related:` (ESS 0.41, source format ess/18) guards on
 # another row only by that row's identity, and an ApprovalRedemption is keyed by
 # its receipt_id, not by attempt_id; this specification is ess/15, which refuses
-# it (unsupported_format_version), and the ESS 0.45 Entity Runtime lowering
-# refuses it at any format (RelatedGuardUnsupported). ESS 0.45 has no count
+# it (unsupported_format_version), and the ESS 0.52 Entity Runtime lowering
+# refuses it at any format (RelatedGuardUnsupported). ESS 0.52 has no count
 # across records (`affects:` sets fields on other rows but does not select or
 # refuse by them). Result byte bounds are host configuration.
 # ESS-LIMIT: Observation's classification mapping is the normative table in the

@@ -77,7 +77,7 @@ types:
       - {name: adapter, type: String}
       - {name: observation, type: connectors.clock.Observation}
     # ESS-LIMIT: clock.md:84 orders an observation (upper >= lower). The comparison
-    # is writable here, but ESS 0.45 `specify cli` refuses any invariant on a CLI
+    # is writable here, but ESS 0.52 `specify cli` refuses any invariant on a CLI
     # type ("unsupported invariants or union semantics"), so it is not declared.
   - name: connectors.cli.ApprovalKeyState
     kind: enum
@@ -333,7 +333,7 @@ types:
       - {name: configuration_format, type: "Optional<connectors.cli.ConfigurationFormat>"}
       # ESS-LIMIT: instance_id is an admitted selector (connectors_core::valid_id, at most
       # 128 bytes) and appears only with configuration_format on invalid_configuration.
-      # ESS 0.45 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
+      # ESS 0.52 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
       # so both rules are enforced by the host and pinned by tests, not declared here.
       - {name: instance_id, type: "Optional<String>"}
   - name: connectors.cli.Prerequisite
@@ -761,8 +761,8 @@ entities:
     # live-cursor cap (:104) are host rules. The guard over the related
     # configuration's field is `when_related:`, added in ESS 0.41 at source format
     # ess/18; this specification is ess/15, which refuses it
-    # (unsupported_format_version), and the ESS 0.45 Entity Runtime lowering
-    # refuses it at any format (RelatedGuardUnsupported). ESS 0.45 has no count
+    # (unsupported_format_version), and the ESS 0.52 Entity Runtime lowering
+    # refuses it at any format (RelatedGuardUnsupported). ESS 0.52 has no count
     # over an entity's records and no trusted time.
 
 errors:

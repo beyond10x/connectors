@@ -7,7 +7,7 @@
 //! for a host reason, not an ESS one.
 use std::{path::Path, process::Command};
 
-const NOTE: &str = "#   ESS 0.45 synthesizes `recorded` under that `when:` guard and the Entity Runtime\n#   lowering carries it.";
+const NOTE: &str = "#   ESS 0.52 synthesizes `recorded` under that `when:` guard and the Entity Runtime\n#   lowering carries it.";
 const RECORDED: &str = "      - name: recorded\n        when: decision == allow\n";
 const GUARDED: &str = "      - name: recorded\n        when:\n          all:\n            - decision == allow\n            - observation_id == final_observation.observation_id\n";
 const SCENARIO: &str = "connectors.execution_audit.AppendFinalObservation/outcome/recorded";
@@ -70,7 +70,7 @@ fn the_observation_id_equality_note_holds_for_the_pinned_ess() {
         !said.contains(&format!("has no scenario `{SCENARIO}`")),
         "ESS {pinned} refuses `AppendFinalObservation/recorded` under the guard \
          `observation_id == final_observation.observation_id`, so the ESS-LIMIT note in \
-         ess/domains/execution_audit.yaml (\"ESS 0.45 synthesizes `recorded` under that `when:` \
+         ess/domains/execution_audit.yaml (\"ESS 0.52 synthesizes `recorded` under that `when:` \
          guard\") is false for the pinned release:\n{said}"
     );
     let suite: serde_json::Value = serde_json::from_slice(&std::fs::read(&suite).unwrap()).unwrap();
