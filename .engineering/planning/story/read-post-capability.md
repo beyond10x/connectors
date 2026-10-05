@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:read-post-capability
 kind: story
-status: active
+status: implemented
 title: An adapter sends a read as a POST without a write approval
 relations:
 - decomposes: epic:generic-websearch
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-05T02:15:49Z", actor: "agent:claude", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-05T02:15:49Z", actor: "agent:claude", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-05T06:50:11Z", actor: "agent:claude", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
