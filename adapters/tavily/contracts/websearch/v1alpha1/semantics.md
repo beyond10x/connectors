@@ -28,7 +28,7 @@ told apart by identity, and a repair cannot detect that a key belongs to another
 | `search.content: full` | `include_raw_content: "markdown"`; `content` is `raw_content`, else the snippet |
 | `search.time_range`, `topic`, `include_domains`, `exclude_domains`, `country`, `language` | the parameters of the same names |
 | always sent | `search_depth: "basic"`, `include_published_date: true` |
-| result `url`, `title`, `published`, `score` | `url`, `title`, `published_date`, `score` (rendered as a decimal string) |
+| result `url`, `title`, `published`, `score` | `url`, `title`, `published_date` (an ISO date kept as is, an RFC 2822 GMT instant converted to RFC 3339, anything else null), `score` (rendered as a decimal string) |
 | result `description` | the result's `content`, Tavily's snippet of the page |
 | `fetch.urls` (1–20) | `POST /extract` `urls`, with `format: "markdown"`, `extract_depth: "basic"` |
 | page `url`, `content` | `results[].url`, `results[].raw_content`; `title` is null, Tavily gives none |

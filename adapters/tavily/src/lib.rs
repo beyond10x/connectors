@@ -274,7 +274,7 @@ impl Tavily {
                     "description": snippet,
                     "content": content,
                     "content_truncated": content_truncated,
-                    "published": text(r, "published_date"),
+                    "published": text(r, "published_date").and_then(|p| published(&p)),
                     "score": r.get("score").and_then(Value::as_f64).map(|s| s.to_string()),
                 }))
             })
@@ -394,6 +394,45 @@ impl Adapter for Tavily {
     }
 }
 
+/// Tavily's `published_date` as the family's RFC 3339 `published`, or `None`. Tavily answers
+/// either an ISO date (`2026-10-01`) or an RFC 2822 instant in GMT (`Tue, 22 Sep 2026 03:00:00
+/// GMT`, observed 2026-10-05); anything else is not reported rather than guessed.
+pub fn published(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    let digits = |s: &str, n: usize| s.len() == n && s.bytes().all(|b| b.is_ascii_digit());
+    if raw.len() == 10
+        && digits(&raw[0..4], 4)
+        && &raw[4..5] == "-"
+        && digits(&raw[5..7], 2)
+        && &raw[7..8] == "-"
+        && digits(&raw[8..10], 2)
+    {
+        return Some(raw.to_owned());
+    }
+    // `Ddd, DD Mon YYYY HH:MM:SS GMT` (or `+0000`).
+    let parts: Vec<&str> = raw.split_whitespace().collect();
+    let [_, day, month, year, time, zone] = parts[..] else {
+        return None;
+    };
+    if !matches!(zone, "GMT" | "UTC" | "+0000" | "Z") {
+        return None;
+    }
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let month = MONTHS.iter().position(|m| *m == month)? + 1;
+    let day: u32 = day.parse().ok().filter(|d| (1..=31).contains(d))?;
+    if !digits(year, 4) {
+        return None;
+    }
+    let hms: Vec<&str> = time.split(':').collect();
+    let [h, m, s] = hms[..] else { return None };
+    if !(digits(h, 2) && digits(m, 2) && digits(s, 2)) {
+        return None;
+    }
+    Some(format!("{year}-{month:02}-{day:02}T{h}:{m}:{s}Z"))
+}
+
 /// `ms` since the Unix epoch as an RFC 3339 instant in UTC, millisecond precision.
 pub fn rfc3339(ms: u64) -> String {
     let secs = ms / 1000;
@@ -428,5 +467,28 @@ mod tests {
             "2026-10-05T08:46:40.123Z"
         );
         assert_eq!(super::rfc3339(951_782_400_000), "2000-02-29T00:00:00.000Z");
+    }
+
+    #[test]
+    fn published_dates_become_rfc3339_or_nothing() {
+        use super::published;
+        assert_eq!(
+            published("Tue, 22 Sep 2026 03:00:00 GMT").as_deref(),
+            Some("2026-09-22T03:00:00Z")
+        );
+        assert_eq!(
+            published("Sat, 18 Jul 2026 19:18:21 GMT").as_deref(),
+            Some("2026-07-18T19:18:21Z")
+        );
+        assert_eq!(published("2026-10-01").as_deref(), Some("2026-10-01"));
+        for bad in [
+            "",
+            "yesterday",
+            "Tue, 22 Sep 2026 03:00:00 PDT",
+            "22/09/2026",
+            "Tue, 22 Foo 2026 03:00:00 GMT",
+        ] {
+            assert_eq!(published(bad), None, "{bad}");
+        }
     }
 }
