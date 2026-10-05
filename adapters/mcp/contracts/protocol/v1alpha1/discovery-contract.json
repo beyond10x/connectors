@@ -500,7 +500,7 @@
   "remaining_obligations": [
     "native ESS launch input/result/error ownership",
     "explicit shared/native CLI composition design",
-    "pinned ESS 0.45.0 presentation expressibility",
+    "pinned ESS 0.52.0 presentation expressibility",
     "long-lived stdio stdout binding",
     "MCP configuration and local identifier selection",
     "protected OAuth ingress and Connection/custody binding",

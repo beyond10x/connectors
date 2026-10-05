@@ -45,7 +45,7 @@ outbound child owner or multi-caller Connection assignment.
 The existing compatibility `serve` path is not this command and is not an alias.
 No parser, generated source, `ess-cli/1` declaration or compatibility flag is changed
 by this inventory. The launch's typed native ESS values, shared/native composition,
-pinned ESS 0.45.0 expressibility and streaming process binding remain prerequisites.
+pinned ESS 0.52.0 expressibility and streaming process binding remain prerequisites.
 There is no selected server startup success/error payload or exit-code mapping;
 it must be specified with that binding, not copied from generic `ProcessOutput`.
 

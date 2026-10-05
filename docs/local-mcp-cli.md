@@ -131,7 +131,7 @@ cancellation and lost replies grant no automatic retry or rollback claim.
 Native launch input/result/error values need an ESS owner before a parser or
 runtime story introduces them. Shared/native CLI composition needs an explicit
 design: importing native values into the shared model is not implied. The pinned
-[ESS toolchain](../crates/connectors-spec/toolchain.json), currently 0.45.0, must
+[ESS toolchain](../crates/connectors-spec/toolchain.json), currently 0.52.0, must
 prove the selected presentation is expressible. Generated `ProcessOutput` is a
 finite command result and does not establish long-lived MCP stdout framing.
 Actual configuration, protected OAuth binding, launch lifecycle, inbound/outbound
