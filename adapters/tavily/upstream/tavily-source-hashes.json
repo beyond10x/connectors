@@ -1,0 +1,9 @@
+[
+  {
+    "file": "tavily-openapi.json",
+    "url": "https://docs.tavily.com/documentation/api-reference/openapi.json",
+    "sha256": "b84132a5df9fa476cc38aac79083a28085ea2356e379af34f323975d640b91db",
+    "bytes": 156727,
+    "archive": "vendor/tavily-openapi.json.gz"
+  }
+]

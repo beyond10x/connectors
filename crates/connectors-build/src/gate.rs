@@ -106,7 +106,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         return Err("incomplete Cargo formatting selection".into());
     }
     execute(format.args(["--", "--check"]))?;
-    for adapter in ["kubernetes", "sql"] {
+    for adapter in ["kubernetes", "sql", "tavily"] {
         let source = root.join(format!("adapters/{adapter}/spec/adapter.json"));
         let descriptor = connectors_spec::compile(&std::fs::read(source)?)?;
         if connectors_spec::descriptor_bytes(&descriptor)?
@@ -129,7 +129,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "-D",
         "warnings",
     ]))?;
-    for adapter in ["kubernetes", "sql", "catalog-provider"] {
+    for adapter in ["kubernetes", "sql", "tavily", "catalog-provider"] {
         let package = format!("connectors-{adapter}");
         execute(command(None)?.args([
             "build",
@@ -158,6 +158,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-client",
             "connectors-kubernetes",
             "connectors-sql",
+            "connectors-tavily",
         ] {
             if name != package
                 && tree
@@ -184,7 +185,9 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     if tree.lines().any(|line| {
         matches!(
             line.split_whitespace().next(),
-            Some("connectors-kubernetes" | "connectors-sql" | "tokio-postgres")
+            Some(
+                "connectors-kubernetes" | "connectors-sql" | "connectors-tavily" | "tokio-postgres"
+            )
         )
     }) {
         return Err("generic CLI depends on a provider".into());
@@ -220,6 +223,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-catalog-provider",
             "connectors-kubernetes",
             "connectors-sql",
+            "connectors-tavily",
         ] {
             execute(
                 command(Some("1.88.0"))?
