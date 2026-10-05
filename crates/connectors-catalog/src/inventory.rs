@@ -215,13 +215,105 @@ fn media_types(container: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// One declared parameter, with the gap its shape leaves when it has one. The
+/// One declared parameter, with the gap its shape leaves when it has one, and
+/// the parameters it is sent as when that is not itself (a `deepObject`). The
 /// gap is held beside the parameter rather than recorded at once, because an
 /// operation's own declaration may replace the path item's, and a replaced
-/// declaration leaves no gap in the operation.
-type Declared = (Parameter, Option<String>);
+/// declaration leaves no gap in the operation. The expansion is held for the
+/// same reason: an override replaces the declared parameter by its declared
+/// name, not the pairs it would have been sent as.
+type Declared = (Parameter, Option<String>, Option<Vec<Parameter>>);
+
+/// The longest chain of parameter references followed. A longer chain, like a
+/// cycle, is named rather than followed further.
+const PARAMETER_REF_HOPS: usize = 8;
+
+/// The parameter object a local reference names. Only references to
+/// `#/components/parameters/<name>` in the same document are followed, through
+/// further such references; a reference into another document or another
+/// component kind keeps the reason it had before references were read, and a
+/// reference that names nothing, or loops, is named as such.
+fn resolve_parameter<'a>(document: &'a Value, parameter: &'a Value) -> Result<&'a Value, String> {
+    let mut current = parameter;
+    for _ in 0..=PARAMETER_REF_HOPS {
+        let Some(reference) = current.get("$ref") else {
+            return Ok(current);
+        };
+        let target = reference
+            .as_str()
+            .and_then(|r| r.strip_prefix("#/components/parameters/"))
+            .filter(|name| !name.is_empty() && !name.contains('/'))
+            .ok_or_else(|| "parameter is a $ref this pass does not resolve".to_owned())?;
+        // RFC 6901: `~1` is `/` and `~0` is `~`, unescaped in that order.
+        let name = target.replace("~1", "/").replace("~0", "~");
+        current = document
+            .get("components")
+            .and_then(|c| c.get("parameters"))
+            .and_then(|p| p.get(&name))
+            .ok_or_else(|| {
+                format!("parameter $ref `#/components/parameters/{target}` names no parameter")
+            })?;
+    }
+    Err(format!(
+        "parameter $ref chain is longer than {PARAMETER_REF_HOPS} references or loops"
+    ))
+}
+
+/// A query parameter declared `style: deepObject` (exploded, the only form
+/// OpenAPI defines) over an inline object schema whose every property is a
+/// scalar this model carries, sent as one `name[property]=value` pair per
+/// property given: the parameters it expands to, in property order. `None`
+/// when it is not a `deepObject`; an error when it is one this pass does not
+/// expand, which is then named and sent as one value as given.
+fn deep_object(parameter: &Value, name: &str) -> Option<Result<Vec<Parameter>, String>> {
+    if parameter.get("style").and_then(Value::as_str) != Some("deepObject") {
+        return None;
+    }
+    let refused = || {
+        Err(format!(
+            "query parameter `{name}` is serialised with style `deepObject` over a schema this \
+             pass does not expand into `{name}[property]` pairs; it is sent as one value as given"
+        ))
+    };
+    let schema = parameter.get("schema");
+    let exploded = parameter.get("explode").and_then(Value::as_bool) != Some(false);
+    let Some(properties) = schema
+        .filter(|s| single_type(s) == Some("object"))
+        .and_then(|s| s.get("properties"))
+        .and_then(Value::as_object)
+        .filter(|p| exploded && !p.is_empty())
+    else {
+        return Some(refused());
+    };
+    let required: Vec<&str> = schema
+        .and_then(|s| s.get("required"))
+        .and_then(Value::as_array)
+        .map(|r| r.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    let whole = parameter
+        .get("required")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let mut names: Vec<&String> = properties.keys().collect();
+    names.sort();
+    let mut out = Vec::new();
+    for property in names {
+        let Some(value_type) = ValueType::of_schema(&properties[property]) else {
+            return Some(refused());
+        };
+        out.push(Parameter {
+            name: format!("{name}[{property}]"),
+            location: Location::Query,
+            required: whole && required.contains(&property.as_str()),
+            value_type: Some(value_type),
+            repeated: false,
+        });
+    }
+    Some(Ok(out))
+}
 
 fn parameters(
+    document: &Value,
     raw: Option<&Value>,
     designation: &str,
     gaps: &mut Vec<Unsupported>,
@@ -231,13 +323,16 @@ fn parameters(
         return out;
     };
     for parameter in list {
-        if parameter.get("$ref").is_some() {
-            gaps.push(Unsupported {
-                designation: designation.to_owned(),
-                reason: "parameter is a $ref this pass does not resolve".into(),
-            });
-            continue;
-        }
+        let parameter = match resolve_parameter(document, parameter) {
+            Ok(parameter) => parameter,
+            Err(reason) => {
+                gaps.push(Unsupported {
+                    designation: designation.to_owned(),
+                    reason,
+                });
+                continue;
+            }
+        };
         let name = parameter.get("name").and_then(Value::as_str);
         let location = parameter.get("in").and_then(Value::as_str);
         match (name, location) {
@@ -248,6 +343,16 @@ fn parameters(
                         && schema.and_then(single_type) == Some("array");
                     let shape = array.then(|| array_shape(parameter, name));
                     let repeated = matches!(shape, Some(Ok(())));
+                    let deep = if location == Location::Query {
+                        deep_object(parameter, name)
+                    } else {
+                        None
+                    };
+                    let (expansion, deep_gap) = match deep {
+                        Some(Ok(expansion)) => (Some(expansion), None),
+                        Some(Err(reason)) => (None, Some(reason)),
+                        None => (None, None),
+                    };
                     let value_type = if repeated {
                         schema
                             .and_then(|s| s.get("items"))
@@ -266,7 +371,8 @@ fn parameters(
                             value_type,
                             repeated,
                         },
-                        shape.and_then(Result::err),
+                        shape.and_then(Result::err).or(deep_gap),
+                        expansion,
                     ))
                 }
                 None => gaps.push(Unsupported {
@@ -430,30 +536,53 @@ pub fn extract(document: &Value) -> Inventory {
                 Some(id) => id.clone(),
                 None => format!("{} {}", method.to_uppercase(), path),
             };
-            let mut declared = parameters(shared, &designation, &mut unsupported);
-            for parameter in parameters(body.get("parameters"), &designation, &mut unsupported) {
+            let mut declared = parameters(document, shared, &designation, &mut unsupported);
+            for parameter in parameters(
+                document,
+                body.get("parameters"),
+                &designation,
+                &mut unsupported,
+            ) {
                 // OpenAPI 3.1 section 4.8.9.1: the operation's own parameter
                 // overrides the path item's of the same name and location, and a
                 // parameter's identity is that pair. Keeping both would inventory
                 // one parameter twice and lose the override's `required`.
-                match declared
-                    .iter_mut()
-                    .find(|(d, _)| d.name == parameter.0.name && d.location == parameter.0.location)
-                {
+                match declared.iter_mut().find(|(d, _, _)| {
+                    d.name == parameter.0.name && d.location == parameter.0.location
+                }) {
                     Some(overridden) => *overridden = parameter,
                     None => declared.push(parameter),
                 }
             }
+            // A `deepObject` pair named like another declared query parameter
+            // would give one key two parameters; that expansion is not made.
+            let literal: Vec<String> = declared
+                .iter()
+                .filter(|(d, _, e)| e.is_none() && d.location == Location::Query)
+                .map(|(d, _, _)| d.name.clone())
+                .collect();
             let declared: Vec<Parameter> = declared
                 .into_iter()
-                .map(|(parameter, gap)| {
+                .flat_map(|(parameter, gap, expansion)| {
+                    let mut gap = gap;
+                    let expansion = expansion.filter(|pairs| {
+                        let clash = pairs.iter().any(|p| literal.contains(&p.name));
+                        if clash {
+                            gap = Some(format!(
+                                "query parameter `{}` is a `deepObject` whose pairs are named \
+                                 like another declared parameter; it is sent as one value as given",
+                                parameter.name
+                            ));
+                        }
+                        !clash
+                    });
                     if let Some(reason) = gap {
                         unsupported.push(Unsupported {
                             designation: designation.clone(),
                             reason,
                         });
                     }
-                    parameter
+                    expansion.unwrap_or_else(|| vec![parameter])
                 })
                 .collect();
             let request = body.get("requestBody");
