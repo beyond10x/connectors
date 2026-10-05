@@ -81,10 +81,19 @@ enum Scheme {
     /// `token_url` for an access token sent as `Authorization: Bearer`.
     #[serde(rename = "oauth2_refresh")]
     OAuth2Refresh,
+    /// `{"client_id","client_secret"}` is exchanged at `token_url` with the
+    /// client-credentials grant for an access token sent as
+    /// `Authorization: Bearer`; no refresh token exists.
+    #[serde(rename = "oauth2_client_credentials")]
+    OAuth2ClientCredentials,
 }
 impl Scheme {
     fn is_token(&self) -> bool {
         *self == Self::Token
+    }
+    /// A profile whose stored entry is exchanged at `token_url`.
+    fn is_oauth(&self) -> bool {
+        matches!(self, Self::OAuth2Refresh | Self::OAuth2ClientCredentials)
     }
 }
 
@@ -110,8 +119,10 @@ struct AuthConfig {
     minimum_scopes: BTreeSet<String>,
     #[serde(default = "default_evidence_lifetime")]
     evidence_lifetime_ms: u64,
-    // The four OAuth fields below belong to `oauth2_refresh` only and are
+    // The four OAuth fields below belong to the OAuth schemes only and are
     // omitted otherwise, so existing configuration revisions hold.
+    // `oauth2_client_credentials` takes `token_url`, `token_ca_file` and
+    // `requested_scopes`, sent as the grant's `scope`, and no `authorize_url`.
     /// The token endpoint; https only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     token_url: Option<String>,
@@ -243,6 +254,21 @@ struct OAuthEntry {
     #[serde(deserialize_with = "token")]
     refresh_token: Zeroizing<String>,
 }
+/// The `oauth2_client_credentials` profile's protected entry: the confidential
+/// client alone, under the token rules.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ClientEntry {
+    #[serde(deserialize_with = "token")]
+    client_id: Zeroizing<String>,
+    #[serde(deserialize_with = "token")]
+    client_secret: Zeroizing<String>,
+}
+/// The stored entry of either OAuth scheme, as the grant it makes.
+enum Grant {
+    Refresh(OAuthEntry),
+    ClientCredentials(ClientEntry),
+}
 
 /// A token endpoint's successful answer. Fields it adds are ignored.
 #[derive(Deserialize)]
@@ -250,7 +276,9 @@ struct TokenAnswer {
     #[serde(deserialize_with = "token")]
     access_token: Zeroizing<String>,
     token_type: String,
-    expires_in: u64,
+    /// RFC 6749 5.1 only recommends it; `oauth2_refresh` requires it.
+    #[serde(default)]
+    expires_in: Option<u64>,
     #[serde(default, deserialize_with = "optional_token")]
     refresh_token: Option<Zeroizing<String>>,
     #[serde(default)]
@@ -306,11 +334,14 @@ struct Cached {
     access: Zeroizing<String>,
     until: Instant,
 }
-/// The token endpoint of an `oauth2_refresh` profile and the access tokens it
-/// issued, keyed by a digest of the protected entry that obtained each.
+/// The token endpoint of an OAuth profile and the access tokens it issued,
+/// keyed by a digest of the protected entry that obtained each.
 struct OAuth {
     http: ScopedHttp,
     path: Vec<String>,
+    /// The client-credentials grant's `scope`: the requested scopes joined by
+    /// one space. `None` for `oauth2_refresh`, whose grant sends none.
+    scope: Option<String>,
     cache: Mutex<BTreeMap<[u8; 32], Cached>>,
 }
 impl OAuth {
@@ -347,22 +378,34 @@ impl OAuth {
     fn evict(&self, key: &[u8; 32]) {
         self.cache().remove(key);
     }
-    /// One refresh-token grant. Every refusal is a code; no answer text,
-    /// status line or credential reaches it.
-    async fn exchange(&self, entry: &OAuthEntry) -> Result<Exchanged> {
+    /// One refresh-token or client-credentials grant. Every refusal is a code;
+    /// no answer text, status line or credential reaches it.
+    async fn exchange(&self, grant: &Grant) -> Result<Exchanged> {
         let sent = Instant::now();
         let segments: Vec<&str> = self.path.iter().map(String::as_str).collect();
+        let form: Vec<(&str, &[u8])> = match grant {
+            Grant::Refresh(entry) => vec![
+                ("grant_type", b"refresh_token".as_slice()),
+                ("client_id", entry.client_id.as_bytes()),
+                ("client_secret", entry.client_secret.as_bytes()),
+                ("refresh_token", entry.refresh_token.as_bytes()),
+            ],
+            Grant::ClientCredentials(entry) => vec![
+                ("grant_type", b"client_credentials".as_slice()),
+                ("client_id", entry.client_id.as_bytes()),
+                ("client_secret", entry.client_secret.as_bytes()),
+                (
+                    "scope",
+                    self.scope
+                        .as_deref()
+                        .ok_or(Failure::InvalidConfiguration)?
+                        .as_bytes(),
+                ),
+            ],
+        };
         let response = self
             .http
-            .post_form(
-                &segments,
-                &[
-                    ("grant_type", b"refresh_token".as_slice()),
-                    ("client_id", entry.client_id.as_bytes()),
-                    ("client_secret", entry.client_secret.as_bytes()),
-                    ("refresh_token", entry.refresh_token.as_bytes()),
-                ],
-            )
+            .post_form(&segments, &form)
             .await
             .map_err(Failure::from_provider)?;
         let status = response.status;
@@ -375,6 +418,10 @@ impl OAuth {
                     .flatten();
                 return Err(match refusal.as_ref().map(|r| r.error.as_str()) {
                     Some("invalid_grant" | "invalid_client") => Failure::InvalidCredential,
+                    // A client not allowed this grant, such as a public one.
+                    Some("unauthorized_client") if matches!(grant, Grant::ClientCredentials(_)) => {
+                        Failure::InvalidCredential
+                    }
                     _ if status == 401 => Failure::InvalidCredential,
                     _ => Failure::Protocol,
                 });
@@ -387,20 +434,38 @@ impl OAuth {
             return Err(Failure::Protocol);
         }
         let answer: TokenAnswer = serde_json::from_slice(&body).map_err(|_| Failure::Protocol)?;
-        if !answer.token_type.eq_ignore_ascii_case("bearer") || answer.expires_in == 0 {
+        // A client-credentials answer without `expires_in` (Zendesk clients created
+        // before 2026-04-30) is cached for at most `CACHE_LIFETIME_S`; a refused
+        // request evicts it sooner.
+        let expires_in = match (answer.expires_in, grant) {
+            (Some(0), _) | (None, Grant::Refresh(_)) => return Err(Failure::Protocol),
+            (Some(seconds), _) => seconds,
+            (None, Grant::ClientCredentials(_)) => CACHE_LIFETIME_S,
+        };
+        if !answer.token_type.eq_ignore_ascii_case("bearer") {
             return Err(Failure::Protocol);
         }
-        // The profile is declared non-rotating, and there is no path to publish
-        // rotated material: a different refresh token is refused, not stored.
-        if answer
-            .refresh_token
-            .as_ref()
-            .is_some_and(|rotated| rotated.as_bytes() != entry.refresh_token.as_bytes())
-        {
-            return Err(Failure::InvalidCredential);
+        match grant {
+            // The profile is declared non-rotating, and there is no path to publish
+            // rotated material: a different refresh token is refused, not stored.
+            Grant::Refresh(entry) => {
+                if answer
+                    .refresh_token
+                    .as_ref()
+                    .is_some_and(|rotated| rotated.as_bytes() != entry.refresh_token.as_bytes())
+                {
+                    return Err(Failure::InvalidCredential);
+                }
+            }
+            // RFC 6749 4.4.3: this grant issues no refresh token, and the
+            // profile has nowhere to keep one.
+            Grant::ClientCredentials(_) => {
+                if answer.refresh_token.is_some() {
+                    return Err(Failure::Protocol);
+                }
+            }
         }
-        let usable = answer
-            .expires_in
+        let usable = expires_in
             .min(CACHE_LIFETIME_S)
             .saturating_sub(EXPIRY_SKEW_S);
         Ok(Exchanged {
@@ -552,7 +617,7 @@ impl Local {
         .map_err(|_| Failure::InvalidConfiguration)?;
         let config: Configuration =
             connectors_core::read_json(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
-        let oauth = config.auth.scheme == Scheme::OAuth2Refresh;
+        let oauth = config.auth.scheme.is_oauth();
         let identity = &config.auth.identity;
         if config.format != FORMAT
             || !connectors_core::valid_id(&config.instance)
@@ -577,7 +642,7 @@ impl Local {
                 // The token response names the subject and its scopes; an API
                 // probe beside it would be read by nobody.
                 IdentitySource::IdToken => {
-                    !oauth
+                    config.auth.scheme != Scheme::OAuth2Refresh
                         || identity.path.is_some()
                         || identity.subject_pointer.is_some()
                         || config.auth.scopes.is_some()
@@ -608,6 +673,16 @@ impl Local {
                         || config.auth.account_label.is_some()
                         || config.auth.token_url.is_none()
                         || config.auth.authorize_url.is_none()
+                        || !valid_scopes(&config.auth.requested_scopes)
+                }
+                // No consent: nothing calls an `authorize_url`, so the file
+                // carries none.
+                Scheme::OAuth2ClientCredentials => {
+                    !config.auth.header.eq_ignore_ascii_case("authorization")
+                        || !config.auth.bearer
+                        || config.auth.account_label.is_some()
+                        || config.auth.token_url.is_none()
+                        || config.auth.authorize_url.is_some()
                         || !valid_scopes(&config.auth.requested_scopes)
                 }
             }
@@ -670,7 +745,7 @@ impl Local {
             .map(read_ca)
             .transpose()
             .map_err(|_| Failure::InvalidConfiguration)?;
-        let acquisition = if oauth {
+        let acquisition = if config.auth.scheme == Scheme::OAuth2Refresh {
             let (Some(token_url), Some(authorize_url)) =
                 (&config.auth.token_url, &config.auth.authorize_url)
             else {
@@ -709,9 +784,19 @@ impl Local {
                     token_ca.as_deref(),
                 )
                 .map_err(Failure::from_service)?;
+                let scope = (config.auth.scheme == Scheme::OAuth2ClientCredentials).then(|| {
+                    let scopes: Vec<&str> = config
+                        .auth
+                        .requested_scopes
+                        .iter()
+                        .map(String::as_str)
+                        .collect();
+                    scopes.join(" ")
+                });
                 Some(Arc::new(OAuth {
                     http,
                     path,
+                    scope,
                     cache: Mutex::new(BTreeMap::new()),
                 }))
             }
@@ -784,6 +869,14 @@ impl Local {
                     field("client_id", "OAuth client ID", 8192),
                     field("client_secret", "OAuth client secret", 8192),
                     field("refresh_token", &config.auth.label, 8192),
+                ],
+            ),
+            (Scheme::OAuth2ClientCredentials, _) => (
+                "http_bearer",
+                "http-bearer",
+                vec![
+                    field("client_id", "OAuth client ID", 8192),
+                    field("client_secret", &config.auth.label, 8192),
                 ],
             ),
             _ => (
@@ -873,13 +966,20 @@ impl Local {
         }
         Ok(document)
     }
-    /// An `oauth2_refresh` entry and its cache key, the digest of its bytes.
-    fn oauth_entry(&self, document: Secret) -> Result<(&OAuth, OAuthEntry, [u8; 32])> {
+    /// An OAuth profile's entry and its cache key, the digest of its bytes.
+    fn oauth_entry(&self, document: Secret) -> Result<(&OAuth, Grant, [u8; 32])> {
         let oauth = self.oauth.as_deref().ok_or(Failure::InvalidConfiguration)?;
         let document = Self::document(document)?;
-        let entry: OAuthEntry =
-            serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
-        Ok((oauth, entry, Sha256::digest(document.as_slice()).into()))
+        let grant = match self.auth.scheme {
+            Scheme::OAuth2Refresh => Grant::Refresh(
+                serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?,
+            ),
+            Scheme::OAuth2ClientCredentials => Grant::ClientCredentials(
+                serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?,
+            ),
+            Scheme::Token | Scheme::Basic => return Err(Failure::InvalidConfiguration),
+        };
+        Ok((oauth, grant, Sha256::digest(document.as_slice()).into()))
     }
     /// The API port for one request and, for an OAuth profile, the cache key of
     /// the access token it carries, so a refusal of that token can evict it.
@@ -897,12 +997,12 @@ impl Local {
                     serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
                 basic_header(&entry)?
             }
-            Scheme::OAuth2Refresh => {
-                let (oauth, entry, key) = self.oauth_entry(document)?;
+            Scheme::OAuth2Refresh | Scheme::OAuth2ClientCredentials => {
+                let (oauth, grant, key) = self.oauth_entry(document)?;
                 let access = match oauth.cached(&key) {
                     Some(access) => access,
                     None => {
-                        let exchanged = oauth.exchange(&entry).await?;
+                        let exchanged = oauth.exchange(&grant).await?;
                         oauth.store(key, &exchanged);
                         exchanged.access
                     }
@@ -1093,18 +1193,18 @@ impl runtime::Adapter for Local {
             return Err(Failure::Unsupported);
         }
         let collected_at_ms = connectors_sdk::now_ms();
-        if self.auth.scheme != Scheme::OAuth2Refresh {
+        if !self.auth.scheme.is_oauth() {
             let (http, _) = self.authenticated(document).await?;
             return self.probe_identity(&http, collected_at_ms).await;
         }
-        // Validation always proves the refresh token itself, never a cache, and
+        // Validation always proves the stored entry itself, never a cache, and
         // caches the fresh access token only once the credential validated.
-        let (oauth, entry, key) = self.oauth_entry(document)?;
+        let (oauth, grant, key) = self.oauth_entry(document)?;
         let result = async {
-            let exchanged = oauth.exchange(&entry).await?;
-            let baseline = match self.auth.identity.source {
-                IdentitySource::IdToken => {
-                    let (subject, scope) = oauth.identity(&entry, &exchanged).await?;
+            let exchanged = oauth.exchange(&grant).await?;
+            let baseline = match (self.auth.identity.source, &grant) {
+                (IdentitySource::IdToken, Grant::Refresh(entry)) => {
+                    let (subject, scope) = oauth.identity(entry, &exchanged).await?;
                     if subject.is_empty() || subject.len() > 256 {
                         return Err(Failure::Protocol);
                     }
@@ -1114,7 +1214,10 @@ impl runtime::Adapter for Local {
                     }
                     self.baseline(subject, Some(granted), collected_at_ms)?
                 }
-                IdentitySource::Api => {
+                (IdentitySource::IdToken, Grant::ClientCredentials(_)) => {
+                    return Err(Failure::InvalidConfiguration);
+                }
+                (IdentitySource::Api, _) => {
                     let http = self.with(Secret(exchanged.access.as_bytes().to_vec()));
                     self.probe_identity(&http, collected_at_ms).await?
                 }

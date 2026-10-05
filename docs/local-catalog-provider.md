@@ -184,6 +184,24 @@ The complete configuration used against the sandbox is
   whitespace is refused at load. The profile is offered to the host as
   `http_bearer` with the fields `client_id`, `client_secret` and
   `refresh_token`.
+- `oauth2_client_credentials` is for providers that issue an access token to a
+  confidential client with no user present and no refresh token, such as
+  Zendesk ([Zendesk guide](catalog-zendesk.md#authentication)). The protected
+  entry is `{"client_id":"...","client_secret":"..."}` and nothing else. The
+  provider posts it form-encoded (`grant_type=client_credentials`) to
+  `token_url`, with `requested_scopes` joined by one space as `scope` and no
+  credential header, and sends the access token as
+  `Authorization: Bearer <access token>`. Caching, eviction, `token_ca_file`
+  and the refusal codes are those of `oauth2_refresh`; when the cached token
+  expires the provider makes the same request again, so nothing is ever
+  refreshed or stored. A token answer carrying a `refresh_token` is refused as
+  a protocol failure (RFC 6749 4.4.3). An answer without `expires_in`, which
+  RFC 6749 5.1 only recommends, is cached for at most 24 hours; an
+  `unauthorized_client` refusal is an invalid credential. The profile requires `token_url` and
+  `requested_scopes`, refuses `authorize_url` and an `id_token` identity, and is
+  offered to the host as `http_bearer` with the fields `client_id` and
+  `client_secret`, with no acquisition: connect it with the hidden prompt or a
+  protected credential file.
 - `identity.source` is `api` when omitted, the read shown above. `id_token`,
   for `oauth2_refresh` only, takes the subject from the `sub` of the token
   answer's `id_token`, after checking that its `iss` is
@@ -457,9 +475,10 @@ appeared, which opened merge request 11 at the moved head and was classified
   requires one is refused at load.
 - One authentication profile per configuration: a token in one header, a
   basic profile (`"scheme": "basic"`) sending an account and API token as HTTP
-  basic, or an OAuth refresh profile (`"scheme": "oauth2_refresh"`). Signing
+  basic, an OAuth refresh profile (`"scheme": "oauth2_refresh"`), or an OAuth
+  client-credentials profile (`"scheme": "oauth2_client_credentials"`). Signing
   profiles and rotating refresh tokens are not offered by this provider. The
-  basic and OAuth refresh profiles have run only against the local fixture, not
+  basic and both OAuth profiles have run only against the local fixture, not
   a live provider, and the provider does not acquire the OAuth entry itself.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
