@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.26.0 — 2026-10-05
 
 ### Added
 
@@ -19,6 +19,31 @@
   email addresses and phone numbers replaced (rule `upstream-redaction/2`); the gate refuses
   a redacted pinned source whose digest drifted or that the rule would still change. The
   Zendesk document is pinned redacted.
+
+### Specification
+
+- MCP contracts with document cases, checked by the repository gate: outbound invocation
+  results, inbound capability projection, outbound credential lifecycle, inbound mutation
+  replay, local composition provenance, and the selected local CLI spelling with its
+  static discovery inventory (`docs/local-mcp-cli.md`). None of them is a runtime: the
+  CLI has no MCP server, adapter configuration or connection, and compatibility metadata
+  stays `mcp: deferred`.
+
+### Compatibility
+
+- No configuration or bundle changes for existing providers. The other committed bundles
+  are byte-identical under the new parameter `$ref` and `deepObject` handling.
+
+### Limits
+
+- Zendesk has not been run against a live account. Every read was verified against a local
+  HTTPS fixture with synthetic records only; the API-token basic header follows Zendesk's
+  guide and is unconfirmed live. Whether organization export pages overlap at their
+  `end_time` boundary, and which ticket changes move a ticket into the export, are unchecked.
+- The provider does not walk pages, bound `per_page` or `page[size]`, or retry on `429`.
+  35 Zendesk operations with `deepObject` parameters stay unsupported; none is shipped.
+- MCP delivery, Entity Runtime issue 51, sustained-read acceptance and the remaining
+  provider plan stay open.
 
 ## 0.25.1 — 2026-10-02
 
