@@ -10,6 +10,9 @@
 //! challenge, and `/token` exchanges that code for a new refresh token.
 use super::*;
 
+#[path = "oauth2_client_credentials.rs"]
+mod oauth2_client_credentials;
+
 pub(super) const CLIENT_ID: &str = "fixture-client-id.apps.example.test";
 pub(super) const CLIENT_SECRET: &str = "fixture-client-secret-one";
 const REFRESH_TOKEN: &str = "fixture-refresh-token-one";
