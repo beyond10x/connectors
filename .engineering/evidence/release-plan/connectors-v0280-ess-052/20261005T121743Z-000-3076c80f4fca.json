@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-05T12:17:43Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0280-ess-052",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "website: npm ci 0, typecheck 0, build 0 (494 public files audited, no private paths), reference:check 0 (45 contract / 100 reference pages, no drift), test:examples 0 (15 passed)",
+    "reference": "website log sha256 43a1391af9d4efb6140bffa762ffb546193b01e8693cef172112d7f8bd786703"
+  }
+}

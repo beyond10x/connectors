@@ -189,7 +189,7 @@ stdout, never an application `Failure`:
 | unknown command or flag, missing or malformed argument, two sources for one field | `cli_parse` |
 | an argument value that does not decode to its field type or the command's input shape | `cli_input` |
 | a selected source the presentation cannot read, when the owner recorded no refusal of its own | `cli_source` |
-| an `operations invoke` business JSON document that does not decode as exactly one JSON value (malformed, trailing document, 128 or more nesting levels counting the outermost value: the decoder's recursion limit, reached before the owner's depth bound) | `cli_dynamic_input` |
+| an `operations invoke` business JSON document that does not decode as exactly one JSON value (malformed, a duplicate object key, trailing document, 128 or more nesting levels counting the outermost value: the decoder's recursion limit, reached before the owner's depth bound) | `cli_dynamic_input` |
 
 When the owner's reader refused the selected source, the owner's `Failure`
 takes the place of `cli_source` (an unreadable business document file is

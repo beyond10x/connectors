@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.28.0 — 2026-10-05
 
 ### Changed
 
@@ -12,7 +12,27 @@
 - Business input with a duplicate object key (`--input-json`, `--input-stdin`,
   `--input-file`) is now refused by the generated CLI decoder as `cli_dynamic_input`
   instead of the owner's `invalid_input` Failure. Exit code 2, empty stdout and no dispatch
-  are unchanged.
+  are unchanged. CLI scenario C05 says so.
+
+### Compatibility
+
+- A caller that matches the error code of a duplicate-key refusal must accept
+  `cli_dynamic_input` with empty data where it read `failure` with `data.code =
+  invalid_input`. No configuration, stored metadata or adapter changes.
+- Install ESS 0.52.0 (`b10x upgrade`) or select it with `--ess`/`CONNECTORS_ESS`; the gate
+  refuses another version. AEP stays at 0.65.0.
+
+### Verified
+
+- The repository gate with `--msrv` (Rust 1.99.0, 1.88.0 and 1.91.0; ESS 0.52.0, AEP 0.65.0)
+  passed: 1289 tests passed, 0 failed, 65 ignored.
+- Website typecheck, build (494 public files audited), reference check (45 contract and 100
+  reference pages, no drift) and the 15 example tests passed.
+
+### Limits
+
+- No provider, operation or runtime surface is added. MCP delivery, Entity Runtime issue
+  51, live Zendesk evidence and the remaining provider plan stay open, as in 0.27.0.
 
 ## 0.27.0 — 2026-10-05
 
