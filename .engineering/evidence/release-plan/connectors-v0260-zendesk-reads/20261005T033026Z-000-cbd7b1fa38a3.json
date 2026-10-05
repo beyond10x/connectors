@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-05T03:30:26Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0260-zendesk-reads",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.45.0, AEP 0.65.0, Rust 1.98.1 default, +1.88.0 and +1.91.0 MSRV) on da3a04726 plus uncommitted release preparation; exit 0; 1275 passed, 0 failed, 65 ignored",
+    "reference": "gate log sha256 3cb5996e10ce655ac08bef910ea3bef895ebac6b6f053fdce8a1719ffbfbb459"
+  }
+}
