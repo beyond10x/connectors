@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The catalog provider reads Zendesk Support: `tickets.incremental`, `users.incremental`
+  (cursor-based incremental exports by `start_time`), `organizations.incremental` (the
+  time-based export; the pinned document has no cursor export for organizations),
+  `ticket.show`, `user.show`, `organization.show` and `ticket.comments` (paged by
+  `page[after]`), from the pinned Zendesk Support API document, with an API token as HTTP
+  basic `<email>/token:<token>` (profile `zendesk.basic`, identity `zendesk.user` from
+  `GET /api/v2/users/me`). See `docs/catalog-zendesk.md`.
+- The catalog inventory follows a parameter's local `$ref` to
+  `#/components/parameters/<name>`, and reads an exploded `deepObject` query parameter over
+  scalar properties as one `name[property]` parameter per property. No other committed
+  bundle changes.
+- `connectors-build redact` writes a vendor document with example credentials, real-looking
+  email addresses and phone numbers replaced (rule `upstream-redaction/2`); the gate refuses
+  a redacted pinned source whose digest drifted or that the rule would still change. The
+  Zendesk document is pinned redacted.
+
 ## 0.25.1 — 2026-10-02
 
 ### Fixed

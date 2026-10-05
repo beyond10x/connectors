@@ -39,8 +39,9 @@ here reaches the network.
 The repository reviews and ships one selection set per provider under
 `adapters/catalog/providers/<provider>/operations.json`; Jira Cloud is described
 in [the Jira guide](catalog-jira.md), Confluence Cloud in
-[the Confluence guide](catalog-confluence.md) and HubSpot CRM in
-[the HubSpot guide](catalog-hubspot.md). The GitLab set,
+[the Confluence guide](catalog-confluence.md), HubSpot CRM in
+[the HubSpot guide](catalog-hubspot.md) and Zendesk Support in
+[the Zendesk guide](catalog-zendesk.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
 serves the provider from the pinned source alone, plus seven repository reads:
