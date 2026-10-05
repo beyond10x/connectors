@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-05T12:12:31Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0280-ess-052",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.52.0, AEP 0.65.0, Rust 1.99.0 default, +1.88.0 and +1.91.0 MSRV) on 12fceb8 plus uncommitted release preparation; exit 0; 1289 passed, 0 failed, 65 ignored",
+    "reference": "gate log sha256 50164f345d900f25266eb58ff3e2f866500182ba8be3da089e2ae45b62a17918"
+  }
+}
