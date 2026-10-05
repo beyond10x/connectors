@@ -4,15 +4,19 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.27.0
+# Source release v0.28.0
 
-Version **0.27.0** specifies at ESS source format `ess/15` with the released
-ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
+Version **0.28.0** specifies at ESS source format `ess/15` with the released
+ESS 0.52.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
 provider, as in 0.11.0, which retired the native GitLab adapter. The earlier **v0.1.0
 milestone** remains a reviewed specification baseline for Kubernetes including
 discovery, GitLab and SQL.
+
+Since 0.28.0 the CLI's generated decoder refuses `operations invoke` business input
+with a duplicate object key itself, as `cli_dynamic_input`, before the owner sees it;
+exit code 2, empty stdout and no dispatch are as before.
 
 ## Available runtime
 
