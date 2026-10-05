@@ -16,8 +16,11 @@ use std::path::Path;
 /// array query parameters declared `explode: false`, each sent as the one value
 /// a caller gives, as before arrays were read; shipped reads are among them
 /// (`labels` and `iids` on issues and merge requests, `topic` on projects), and
-/// none of them changes what is sent.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 8] = [
+/// none of them changes what is sent. Zendesk's 35 are `deepObject` query
+/// parameters this pass does not expand, each sent as one value as given: 34
+/// `page` parameters that also accept an offset page number, and one nested
+/// `filter`; no shipped read is among them.
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 9] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -73,6 +76,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 8] = [
         None,
         "atlassian.basic",
         0,
+    ),
+    (
+        "zendesk",
+        "../zendesk/upstream/zendesk-support.yaml",
+        None,
+        "zendesk.basic",
+        35,
     ),
 ];
 
