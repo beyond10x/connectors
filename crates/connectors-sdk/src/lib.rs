@@ -83,6 +83,20 @@ pub trait AuthenticatedHttp: Send + Sync {
     ) -> Result<HttpResponsePrefix> {
         Err(Error::unavailable())
     }
+
+    /// One read sent as a POST with a JSON body, for a provider that serves a
+    /// read only that way. Reaches only the paths trusted composition fixed for
+    /// this port; any other path, and an oversized body, is refused with no I/O.
+    /// It carries no write approval and records no attempt. Ports composed
+    /// without read POSTs refuse without I/O.
+    async fn post_json(
+        &self,
+        _segments: &[&str],
+        _query: &[(&str, String)],
+        _body: &Value,
+    ) -> Result<HttpResponse> {
+        Err(Error::unavailable())
+    }
 }
 
 /// The HTTP method of one admitted native write. A generated write mapping
