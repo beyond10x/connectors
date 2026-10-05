@@ -63,6 +63,14 @@
       "source_sha256": "655b4790a5c8543c81755c8250c6a8b8f58ee62712168a39d628d6d927549709",
       "operations": 620,
       "unsupported": 0
+    },
+    {
+      "provider": "zendesk",
+      "file_name": "zendesk.bundle.json",
+      "bundle_sha256": "799e268a8f57dece50fc2a54d3799f6c2635515b73f3d16799878192ac21015b",
+      "source_sha256": "5dd6cf1eda8febf02f8fb2f2cfa72d7cb6bc7d5bab188ba97b49ab55fc51dbf2",
+      "operations": 652,
+      "unsupported": 35
     }
   ]
 }

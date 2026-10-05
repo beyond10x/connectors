@@ -61,7 +61,7 @@ fn decompress(archive: &Path) -> Result<Vec<u8>> {
     Ok(output.stdout)
 }
 
-fn digest(bytes: &[u8]) -> Result<String> {
+pub(crate) fn digest(bytes: &[u8]) -> Result<String> {
     let mut child = Command::new("sha256sum")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

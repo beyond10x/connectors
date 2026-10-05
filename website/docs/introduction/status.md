@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.26.0
+# Source release v0.27.0
 
-Version **0.26.0** specifies at ESS source format `ess/15` with the released
+Version **0.27.0** specifies at ESS source format `ess/15` with the released
 ESS 0.45.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -44,6 +44,13 @@ runs from its pinned CRM Objects `2026-09` document with a private-app access to
 one object type's records, paged, and one record by id, for contacts, companies,
 deals and every other object type. It has no updated-since filter yet and has been
 exercised against local fixtures only.
+[Zendesk Support](https://github.com/beyond10x/connectors/blob/main/docs/catalog-zendesk.md)
+runs since 0.26.0 from its pinned Support API document, redacted of example
+credentials and contact data, with an API token as HTTP basic (`zendesk.basic`):
+tickets, users and organizations changed since a `start_time`, one of each by id,
+and a ticket's comments, seven reads and no writes. Lists return one page per call;
+the caller walks pages. It has been exercised against a local HTTPS fixture with
+synthetic records only, not a live Zendesk account.
 
 [Google](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-oauth.md)
 Drive, Slides, Calendar and Gmail run through the same catalog provider since 0.21.0,
@@ -56,7 +63,7 @@ cover Drive metadata, Slides `batchUpdate`, Calendar events and Gmail drafts, wi
 no direct `messages.send`. All four have been exercised against local fixtures only,
 not live Google.
 
-[Tavily](/adapters/tavily) runs as a native adapter since 0.26.0, binding the shared
+[Tavily](/adapters/tavily) runs as a native adapter since 0.27.0, binding the shared
 [websearch family](/contracts/data/websearch): `websearch.search`, `websearch.fetch`
 and `websearch.crawl`. Each is a read Tavily serves as a POST, which the host admits
 for the adapter's three fixed paths through `post_json`, with no write approval.
@@ -99,8 +106,9 @@ four existing CLI journeys also passed. Six PostgreSQL 17.6 cases passed: five
 production CLI cases and one direct adapter invocation-drop cancellation case.
 The PostgreSQL fixture used plaintext loopback, and its cancellation timing is
 an observation rather than a universal deadline. SSAR and remaining Kubernetes/
-Helm workflows are still open. MCP delivery remains pending. Metadata operation
-cost still grows with the event store; Entity Runtime issue 51 tracks the upstream
+Helm workflows are still open. MCP delivery remains pending: 0.26.0 adds MCP
+invocation, projection, auth lifecycle, mutation replay and composition
+contracts, with no MCP runtime. Metadata operation cost still grows with the event store; Entity Runtime issue 51 tracks the upstream
 fix, and the timeout cleanup change does not remove that performance limit.
 Other adapter pages distinguish designs and typed specifications from running
 implementations; a release does not imply completion of the full provider plan.

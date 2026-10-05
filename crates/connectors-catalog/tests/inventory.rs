@@ -405,3 +405,214 @@ fn an_overridden_array_parameter_records_no_gap_for_the_declaration_it_replaced(
     );
     assert!(inventory.operations[0].parameters[0].repeated);
 }
+
+/// Parameters declared once under `components.parameters` and referenced by
+/// operations and path items, as vendor documents commonly write them.
+fn referenced_document() -> serde_json::Value {
+    json!({
+        "openapi": "3.0.3",
+        "components": {"parameters": {
+            "ThingId": {"name": "thing_id", "in": "path", "required": true,
+                        "schema": {"type": "integer", "format": "int64"}},
+            "Since": {"name": "start_time", "in": "query", "required": true,
+                      "schema": {"type": "integer"}},
+            "Alias": {"$ref": "#/components/parameters/Since"},
+            "a/b": {"name": "escaped", "in": "query", "schema": {"type": "string"}},
+            "LoopA": {"$ref": "#/components/parameters/LoopB"},
+            "LoopB": {"$ref": "#/components/parameters/LoopA"},
+            "Page": {"name": "page", "in": "query", "style": "deepObject", "explode": true,
+                     "schema": {"type": "object", "properties": {
+                         "size": {"type": "integer", "minimum": 1},
+                         "after": {"type": "string"}}}}
+        }},
+        "paths": {
+            "/things/{thing_id}": {
+                "parameters": [{"$ref": "#/components/parameters/ThingId"}],
+                "get": {
+                    "operationId": "showThing",
+                    "parameters": [{"$ref": "#/components/parameters/a~1b"}],
+                    "responses": {}
+                }
+            },
+            "/things": {"get": {
+                "operationId": "listThings",
+                "parameters": [
+                    {"$ref": "#/components/parameters/Alias"},
+                    {"$ref": "#/components/parameters/Page"}
+                ],
+                "responses": {}
+            }},
+            "/broken": {"get": {
+                "operationId": "brokenRefs",
+                "parameters": [
+                    {"$ref": "#/components/parameters/Missing"},
+                    {"$ref": "#/components/parameters/LoopA"},
+                    {"$ref": "./other.yaml#/components/parameters/ThingId"},
+                    {"$ref": "#/components/schemas/ThingId"}
+                ],
+                "responses": {}
+            }}
+        }
+    })
+}
+
+#[test]
+fn a_local_parameter_reference_is_read_as_the_parameter_it_names() {
+    use connectors_catalog::inventory::{Parameter, ValueType};
+    let inventory = extract(&referenced_document());
+    let operation = |id: &str| {
+        inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == Some(id))
+            .unwrap()
+    };
+    assert_eq!(
+        operation("showThing").parameters,
+        vec![
+            Parameter {
+                name: "thing_id".into(),
+                location: Location::Path,
+                required: true,
+                value_type: Some(ValueType::Integer),
+                repeated: false,
+            },
+            // `a~1b` is the JSON pointer spelling of the component `a/b`.
+            Parameter {
+                name: "escaped".into(),
+                location: Location::Query,
+                required: false,
+                value_type: Some(ValueType::String),
+                repeated: false,
+            },
+        ]
+    );
+    // Followed through a reference to a reference.
+    let since = &operation("listThings").parameters[0];
+    assert_eq!((since.name.as_str(), since.required), ("start_time", true));
+    assert!(
+        inventory
+            .unsupported
+            .iter()
+            .all(|u| u.designation == "brokenRefs"),
+        "{:?}",
+        inventory.unsupported
+    );
+}
+
+#[test]
+fn a_reference_that_names_nothing_loops_or_leaves_the_document_is_named() {
+    let inventory = extract(&referenced_document());
+    let broken = inventory
+        .operations
+        .iter()
+        .find(|o| o.operation_id.as_deref() == Some("brokenRefs"))
+        .unwrap();
+    assert!(broken.parameters.is_empty());
+    let reasons: Vec<&str> = inventory
+        .unsupported
+        .iter()
+        .filter(|u| u.designation == "brokenRefs")
+        .map(|u| u.reason.as_str())
+        .collect();
+    assert_eq!(
+        reasons,
+        vec![
+            "parameter $ref `#/components/parameters/Missing` names no parameter",
+            "parameter $ref chain is longer than 8 references or loops",
+            "parameter is a $ref this pass does not resolve",
+            "parameter is a $ref this pass does not resolve",
+        ]
+    );
+}
+
+#[test]
+fn a_deep_object_query_parameter_is_one_parameter_per_property() {
+    use connectors_catalog::inventory::ValueType;
+    let inventory = extract(&referenced_document());
+    let list = inventory
+        .operations
+        .iter()
+        .find(|o| o.operation_id.as_deref() == Some("listThings"))
+        .unwrap();
+    let shapes: Vec<(&str, Option<ValueType>, bool)> = list
+        .parameters
+        .iter()
+        .map(|p| (p.name.as_str(), p.value_type, p.required))
+        .collect();
+    // In property-name order, each its own scalar, none required.
+    assert_eq!(
+        shapes,
+        vec![
+            ("start_time", Some(ValueType::Integer), true),
+            ("page[after]", Some(ValueType::String), false),
+            ("page[size]", Some(ValueType::Integer), false),
+        ]
+    );
+    assert!(
+        list.parameters
+            .iter()
+            .all(|p| p.location == Location::Query && !p.repeated)
+    );
+}
+
+#[test]
+fn a_deep_object_this_pass_cannot_expand_is_named_and_kept_as_one_value() {
+    let document = json!({
+        "openapi": "3.0.3",
+        "paths": {"/things": {
+            "parameters": [{"name": "filter", "in": "query", "style": "deepObject",
+                            "schema": {"type": "object", "properties": {"x": {"type": "integer"}}}}],
+            "get": {
+                "operationId": "listThings",
+                "parameters": [
+                    {"name": "nested", "in": "query", "style": "deepObject",
+                     "schema": {"type": "object", "properties": {"inner": {"type": "object"}}}},
+                    {"name": "page", "in": "query", "style": "deepObject",
+                     "schema": {"type": "object", "properties": {"size": {"type": "integer"}}}},
+                    {"name": "page[size]", "in": "query", "schema": {"type": "integer"}}
+                ],
+                "responses": {}
+            },
+            "post": {
+                "operationId": "createThing",
+                "parameters": [{"name": "filter", "in": "query", "schema": {"type": "string"}}],
+                "responses": {}
+            }
+        }}
+    });
+    let inventory = extract(&document);
+    let operation = |id: &str| {
+        inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == Some(id))
+            .unwrap()
+    };
+    let names: Vec<&str> = operation("listThings")
+        .parameters
+        .iter()
+        .map(|p| p.name.as_str())
+        .collect();
+    assert_eq!(names, vec!["filter[x]", "nested", "page", "page[size]"]);
+    // The operation's own scalar `filter` replaces the path item's deepObject,
+    // so it is neither expanded nor named.
+    let names: Vec<&str> = operation("createThing")
+        .parameters
+        .iter()
+        .map(|p| p.name.as_str())
+        .collect();
+    assert_eq!(names, vec!["filter"]);
+    let reasons: Vec<(&str, &str)> = inventory
+        .unsupported
+        .iter()
+        .map(|u| (u.designation.as_str(), u.reason.as_str()))
+        .collect();
+    assert_eq!(reasons.len(), 2, "{reasons:?}");
+    assert!(reasons.iter().any(|(d, r)| *d == "listThings"
+        && r.contains("`nested`")
+        && r.contains("does not expand")));
+    assert!(reasons.iter().any(|(d, r)| *d == "listThings"
+        && r.contains("`page`")
+        && r.contains("named like another declared parameter")));
+}
