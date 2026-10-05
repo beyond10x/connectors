@@ -1,0 +1,530 @@
+{
+  "kind": "connectors.adapter/v1",
+  "id": "tavily",
+  "version": "0.1.0",
+  "sources": [
+    "https://docs.tavily.com/documentation/api-reference/openapi.json",
+    "https://docs.tavily.com/documentation/api-reference/endpoint/search",
+    "https://docs.tavily.com/documentation/api-reference/endpoint/extract",
+    "https://docs.tavily.com/documentation/api-reference/endpoint/crawl"
+  ],
+  "configuration_schema": {
+    "title": "effective local configuration",
+    "description": "The document the adapter composition builds and validates at bootstrap. See docs/local-tavily.md for the on-disk format.",
+    "type": "object",
+    "properties": {
+      "format": {
+        "const": "connectors-tavily-local/1"
+      },
+      "instance": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9_.-]+$"
+      },
+      "api_base": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 512
+      }
+    },
+    "required": [
+      "format",
+      "instance",
+      "api_base"
+    ],
+    "additionalProperties": false
+  },
+  "operations": [
+    {
+      "id": "websearch.search",
+      "description": "Search the web for one query; each result is a website with title, description and, on request, its content. A read sent as POST /search; it spends Tavily search credits.",
+      "contract": "datasource.websearch/v1alpha1",
+      "profile": "tavily/2026-10",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "max_results": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "content": {
+            "enum": [
+              "none",
+              "snippet",
+              "full"
+            ]
+          },
+          "time_range": {
+            "enum": [
+              "day",
+              "week",
+              "month",
+              "year"
+            ]
+          },
+          "topic": {
+            "enum": [
+              "general",
+              "news"
+            ]
+          },
+          "include_domains": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            }
+          },
+          "exclude_domains": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            }
+          },
+          "country": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "language": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "query",
+          "max_results"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "content": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "content_truncated": {
+                  "type": "boolean"
+                },
+                "published": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "score": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "url",
+                "title",
+                "description",
+                "content",
+                "content_truncated",
+                "published",
+                "score"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "provider_limit",
+                "provider_partial",
+                "result_limit",
+                "response_bytes",
+                "content_bytes"
+              ]
+            }
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "results",
+          "complete",
+          "truncation",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "profile": {
+                "type": "string"
+              },
+              "received_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "instance",
+              "profile",
+              "received_at"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "websearch.fetch",
+      "description": "Read the named pages; each is a website with its content, or a failure. A read sent as POST /extract; it spends Tavily extract credits.",
+      "contract": "datasource.websearch/v1alpha1",
+      "profile": "tavily/2026-10",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "urls": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        },
+        "required": [
+          "urls"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "content": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "content_truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "url",
+                "title",
+                "content",
+                "content_truncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "reason": {
+                  "enum": [
+                    "unreachable",
+                    "blocked",
+                    "not_text",
+                    "too_large",
+                    "provider_refused"
+                  ]
+                }
+              },
+              "required": [
+                "url",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "provider_limit",
+                "provider_partial",
+                "result_limit",
+                "response_bytes",
+                "content_bytes"
+              ]
+            }
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "pages",
+          "failed",
+          "complete",
+          "truncation",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "profile": {
+                "type": "string"
+              },
+              "received_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "instance",
+              "profile",
+              "received_at"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "websearch.crawl",
+      "description": "Crawl from one URL within bounds; each page reached is a website with its content. A read sent as POST /crawl; it spends Tavily crawl credits.",
+      "contract": "datasource.websearch/v1alpha1",
+      "profile": "tavily/2026-10",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "max_depth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "max_breadth": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "select_paths": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "exclude_paths": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          },
+          "allow_external": {
+            "type": "boolean"
+          },
+          "instructions": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "url",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "content": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "content_truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "url",
+                "title",
+                "content",
+                "content_truncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string"
+                },
+                "reason": {
+                  "enum": [
+                    "unreachable",
+                    "blocked",
+                    "not_text",
+                    "too_large",
+                    "provider_refused"
+                  ]
+                }
+              },
+              "required": [
+                "url",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "provider_limit",
+                "provider_partial",
+                "result_limit",
+                "response_bytes",
+                "content_bytes"
+              ]
+            }
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "pages",
+          "failed",
+          "complete",
+          "truncation",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "profile": {
+                "type": "string"
+              },
+              "received_at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "instance",
+              "profile",
+              "received_at"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ]
+}
