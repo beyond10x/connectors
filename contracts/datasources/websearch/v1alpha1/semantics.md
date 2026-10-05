@@ -1,0 +1,91 @@
+# datasource.websearch/v1alpha1
+
+**Status:** proposed; one binding is implemented, [Tavily](../../../../adapters/tavily/contracts/websearch/v1alpha1/semantics.md).
+
+## Shared contract and adapter ownership
+
+A websearch read answers websites: the results of one query, a named set of pages, or the pages a
+bounded crawl from one URL reaches. Each website comes with its URL, a title and a description where
+the provider gives them, and its content as text. The family proves neither that a result set is the
+web's complete answer to a query, nor that a page's content is current beyond the instant the
+provider fetched it, nor that two reads of one URL see the same bytes.
+
+The adapter owns the versioned native profile identifier, the provider protocol, the mapping of each
+family field to a provider parameter and result field, its ranking, its fetching and rendering of
+pages, and every bound it enforces. Profile identifiers are open. The shared family imposes no query
+language, ranking, freshness or crawling policy beyond the bounds below.
+
+Every operation is a read: it changes nothing at the provider that a caller can observe. A read is
+not free. Providers meter searches, fetches and crawls, and a binding's profile states what one
+invocation can cost. An adapter sends these reads as the provider requires, including as a POST with a
+body, through the read capability of
+[auth.capability/v1alpha1](../../../auth/capability/v1alpha1/semantics.md); a read never carries a
+write approval and never reaches a write port.
+
+## Operations
+
+| operation | input | result |
+|---|---|---|
+| `websearch.search` | `query`; `max_results`; optional `content` (`none`, `snippet` or `full`), `time_range` (`day`, `week`, `month`, `year`), `topic` (`general` or `news`), `include_domains`, `exclude_domains`, `country`, `language` | `results` |
+| `websearch.fetch` | `urls` (one or more, bounded by the profile) | `pages`, `failed` |
+| `websearch.crawl` | `url`; `limit`; optional `max_depth`, `max_breadth`, `select_paths`, `exclude_paths`, `allow_external`, `instructions` | `pages`, `failed` |
+
+An input the selected profile cannot honour is refused by name before any request. It is never
+dropped, narrowed or approximated: a caller that asked for `time_range: week` must not receive results
+the provider ranked without it. `select_paths` and `exclude_paths` are regular expressions over the URL
+path; a profile states the dialect it accepts and refuses others.
+
+## Result obligations
+
+A `search` result contains `results`, `complete`, `truncation` and `provenance`. Each result has
+`url`, `title`, `description`, `content`, `content_truncated`, `published` and `score`. A `fetch` or
+`crawl` result contains `pages`, `failed`, `complete`, `truncation` and `provenance`. Each page has
+`url`, `title`, `content` and `content_truncated`; each failure has `url` and `reason`.
+
+- `url` is the absolute URL the provider read, as it reports it. It is not normalised further, and two
+  results with one URL are not merged.
+- `title`, `description` and `published` are null where the provider gives none. A description is the
+  provider's summary or snippet of the page, not text the adapter composes. `published` is an RFC 3339
+  date or instant only when the provider states one; it is never inferred from content.
+- `content` is the page's text in the representation the profile names (markdown or plain text), null
+  when the caller asked for `content: none` or the provider gave none. It is bounded by the profile's
+  per-item byte ceiling and clipped on a UTF-8 boundary; `content_truncated` reports the clipping.
+- `score` is the provider's relevance value as a decimal string, or null. Scores are comparable only
+  within one result.
+- `reason` names why one page could not be read, from the profile's closed list. It carries no raw
+  provider error text.
+
+Provenance identifies the adapter instance, the native profile and the instant the
+adapter received the answer; the host's invocation record names the connection. It records
+nothing about the instant the provider fetched each page.
+
+Fetched content is untrusted input. The family states no redaction; a consumer that forwards content
+to a model or a person treats it as data and never as instructions.
+
+## Completeness and truncation
+
+`complete` is true only when every requested item is present: for `search`, the provider returned as
+many results as `max_results` or stated it had no more; for `fetch`, every URL is in `pages` or
+`failed`; for `crawl`, the crawl ended before `limit` and the provider reported no partial answer.
+
+Truncation causes are distinct: `provider_limit` (the provider capped the answer below the request),
+`provider_partial` (the provider reported a partial answer), `result_limit` (the profile's item
+ceiling omitted items), `response_bytes` (the serialized-result bound omitted items) and
+`content_bytes` (one or more contents were clipped). Record every applicable cause. Clipping alone
+omits no item and may coexist with `complete: true`.
+
+## Admission, limits and errors
+
+The host admits the principal, the visible operation, the connection and its credential evidence
+before dispatch. The family selects no cache: two invocations are two provider reads, and no retained
+answer is presented as fresh. There is no continuation token; a caller that wants more results asks
+again with a larger bound.
+
+Each profile declares finite ceilings for the input (query length, URL count, path pattern count),
+the per-item content bytes, the item count, the serialized result and the provider deadline.
+Deadline exhaustion is Timeout. A malformed or oversized provider answer is Unavailable; it never
+becomes an empty complete result. No raw provider error, request body, origin or credential enters
+an ordinary diagnostic.
+
+[Shared ESS](../../../../ess/domains/websearch.yaml) models the family's values. Native parameters,
+the profile's ceilings and its fixtures belong to the adapter's own model and tests.

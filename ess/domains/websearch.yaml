@@ -1,0 +1,91 @@
+domain: connectors.websearch
+summary: Proposed provider-independent web search, fetch and crawl values; no runtime or persistent provider owner.
+
+# Shared owner: contracts/datasources/websearch/v1alpha1/semantics.md. Native parameters, ceilings
+# and the mapping onto a provider belong to each adapter's own model.
+types:
+  - name: connectors.websearch.ContentForm
+    kind: enum
+    variants: [none, snippet, full]
+  - name: connectors.websearch.TimeRange
+    kind: enum
+    variants: [day, week, month, year]
+  - name: connectors.websearch.Topic
+    kind: enum
+    variants: [general, news]
+  - name: connectors.websearch.SearchInput
+    kind: struct
+    fields:
+      - {name: query, type: String}
+      - {name: max_results, type: Integer}
+      - {name: content, type: "Optional<connectors.websearch.ContentForm>"}
+      - {name: time_range, type: "Optional<connectors.websearch.TimeRange>"}
+      - {name: topic, type: "Optional<connectors.websearch.Topic>"}
+      - {name: include_domains, type: "Optional<List<String>>"}
+      - {name: exclude_domains, type: "Optional<List<String>>"}
+      - {name: country, type: "Optional<String>"}
+      - {name: language, type: "Optional<String>"}
+  - name: connectors.websearch.FetchInput
+    kind: struct
+    fields:
+      - {name: urls, type: "List<String>"}
+  - name: connectors.websearch.CrawlInput
+    kind: struct
+    fields:
+      - {name: url, type: String}
+      - {name: limit, type: Integer}
+      - {name: max_depth, type: "Optional<Integer>"}
+      - {name: max_breadth, type: "Optional<Integer>"}
+      - {name: select_paths, type: "Optional<List<String>>"}
+      - {name: exclude_paths, type: "Optional<List<String>>"}
+      - {name: allow_external, type: "Optional<Boolean>"}
+      - {name: instructions, type: "Optional<String>"}
+  - name: connectors.websearch.SearchResult
+    kind: struct
+    fields:
+      - {name: url, type: String}
+      - {name: title, type: "Optional<String>"}
+      - {name: description, type: "Optional<String>"}
+      - {name: content, type: "Optional<String>"}
+      - {name: content_truncated, type: Boolean}
+      - {name: published, type: "Optional<String>"}
+      - {name: score, type: "Optional<Decimal>"}
+  - name: connectors.websearch.Page
+    kind: struct
+    fields:
+      - {name: url, type: String}
+      - {name: title, type: "Optional<String>"}
+      - {name: content, type: "Optional<String>"}
+      - {name: content_truncated, type: Boolean}
+  - name: connectors.websearch.FailureReason
+    kind: enum
+    variants: [unreachable, blocked, not_text, too_large, provider_refused]
+  - name: connectors.websearch.Failure
+    kind: struct
+    fields:
+      - {name: url, type: String}
+      - {name: reason, type: connectors.websearch.FailureReason}
+  - name: connectors.websearch.TruncationCause
+    kind: enum
+    variants: [provider_limit, provider_partial, result_limit, response_bytes, content_bytes]
+  - name: connectors.websearch.Provenance
+    kind: struct
+    fields:
+      - {name: instance, type: String}
+      - {name: profile, type: String}
+      - {name: received_at, type: Timestamp}
+  - name: connectors.websearch.SearchAnswer
+    kind: struct
+    fields:
+      - {name: results, type: "List<connectors.websearch.SearchResult>"}
+      - {name: complete, type: Boolean}
+      - {name: truncation, type: "List<connectors.websearch.TruncationCause>"}
+      - {name: provenance, type: connectors.websearch.Provenance}
+  - name: connectors.websearch.PagesAnswer
+    kind: struct
+    fields:
+      - {name: pages, type: "List<connectors.websearch.Page>"}
+      - {name: failed, type: "List<connectors.websearch.Failure>"}
+      - {name: complete, type: Boolean}
+      - {name: truncation, type: "List<connectors.websearch.TruncationCause>"}
+      - {name: provenance, type: connectors.websearch.Provenance}

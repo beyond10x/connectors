@@ -1,0 +1,28 @@
+---
+title: Tavily
+slug: /adapters/tavily
+---
+
+import ReferenceCards from '@site/src/components/ReferenceCards';
+
+# Tavily
+
+Search the web, fetch pages and crawl a site through the shared [websearch family](/contracts/data/websearch).
+
+## Current capabilities
+
+The `tavily` adapter implements `websearch.search`, `websearch.fetch` and `websearch.crawl` as profile `tavily/2026-10`, mapped from Tavily's pinned OpenAPI document. Every operation is a read that Tavily serves as a POST; the host admits it through `post_json` for the three fixed paths only, with no write approval.
+
+Results carry each website's URL, title where Tavily gives one, description, content and published date, with `complete`, `truncation` and `provenance`. A content longer than 128 KiB is clipped, and items past a 3 MiB result are omitted.
+
+## Access and limits
+
+The credential profile `tavily.api-key` holds the API key in Secret Service custody; it is checked with `GET /usage`, which spends no search credit. Tavily exposes no account identifier, so two keys are not told apart. Every read spends Tavily credits, and nothing is cached.
+
+## Run it locally
+
+The [local Tavily guide](https://github.com/beyond10x/connectors/blob/main/docs/local-tavily.md) covers the native configuration, connecting with the key on stdin, invoking each operation and replacing the executable.
+
+## Native contract reference
+
+<ReferenceCards owner="tavily" />

@@ -18,6 +18,12 @@ export const adapters = [{
   status: 'Working first slice',
   runtime: true
 }, {
+  id: 'tavily',
+  title: 'Tavily',
+  summary: 'Web search, page fetch and site crawl through the websearch family.',
+  status: 'Local CLI and three reads',
+  runtime: true
+}, {
   id: 'atlassian',
   title: 'Atlassian',
   summary: 'Native Jira and Confluence document profiles.',

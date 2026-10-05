@@ -1,0 +1,49 @@
+domain: connectors_tavily.requests
+summary: Tavily-owned request bodies the websearch profile sends, and the bounds it enforces.
+
+# Normative owner: adapters/tavily/contracts/websearch/v1alpha1/semantics.md, Mapping.
+types:
+  - name: connectors_tavily.requests.RawContent
+    kind: enum
+    variants: [none, markdown]
+  - name: connectors_tavily.requests.SearchRequest
+    kind: struct
+    fields:
+      - {name: query, type: String}
+      - {name: max_results, type: Integer}
+      - {name: search_depth, type: String}
+      - {name: include_published_date, type: Boolean}
+      - {name: include_raw_content, type: connectors_tavily.requests.RawContent}
+      - {name: time_range, type: "Optional<String>"}
+      - {name: topic, type: "Optional<String>"}
+      - {name: include_domains, type: "Optional<List<String>>"}
+      - {name: exclude_domains, type: "Optional<List<String>>"}
+      - {name: country, type: "Optional<String>"}
+      - {name: language, type: "Optional<String>"}
+    invariants:
+      - max_results >= 1
+      - max_results <= 20
+  - name: connectors_tavily.requests.ExtractRequest
+    kind: struct
+    fields:
+      - {name: urls, type: "List<String>"}
+      - {name: format, type: String}
+      - {name: extract_depth, type: String}
+  - name: connectors_tavily.requests.CrawlRequest
+    kind: struct
+    fields:
+      - {name: url, type: String}
+      - {name: limit, type: Integer}
+      - {name: format, type: String}
+      - {name: extract_depth, type: String}
+      - {name: timeout, type: Integer}
+      - {name: max_depth, type: "Optional<Integer>"}
+      - {name: max_breadth, type: "Optional<Integer>"}
+      - {name: select_paths, type: "Optional<List<String>>"}
+      - {name: exclude_paths, type: "Optional<List<String>>"}
+      - {name: allow_external, type: "Optional<Boolean>"}
+      - {name: instructions, type: "Optional<String>"}
+    invariants:
+      - limit >= 1
+      - limit <= 100
+      - timeout == 150

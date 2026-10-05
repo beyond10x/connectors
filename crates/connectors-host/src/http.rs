@@ -54,7 +54,16 @@ pub struct ScopedHttp {
     credential: Option<Arc<dyn Credential>>,
     header: reqwest::header::HeaderName,
     bearer: bool,
+    /// The exact paths `post_json` may reach, fixed by trusted composition.
+    read_posts: Arc<std::collections::BTreeSet<Vec<String>>>,
+    read_post_timeout: Duration,
 }
+
+/// The largest JSON body a read sent as a POST may carry.
+pub const READ_POST_BODY_LIMIT: usize = 64 * 1024;
+/// The longest deadline composition may give a read sent as a POST.
+pub const READ_POST_MAX_TIMEOUT: Duration = Duration::from_secs(180);
+const READ_POST_DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
 
 impl ScopedHttp {
     pub fn from_config(config: &HttpConfig) -> Result<Self> {
@@ -139,6 +148,8 @@ impl ScopedHttp {
             credential,
             header,
             bearer: config.bearer,
+            read_posts: Arc::default(),
+            read_post_timeout: READ_POST_DEFAULT_TIMEOUT,
         })
     }
     /// Immutable per-command credential capability over the captured target/TLS
@@ -150,6 +161,8 @@ impl ScopedHttp {
             credential: Some(credential),
             header: self.header.clone(),
             bearer: self.bearer,
+            read_posts: self.read_posts.clone(),
+            read_post_timeout: self.read_post_timeout,
         }
     }
 }
@@ -200,9 +213,60 @@ impl ScopedHttp {
                 credential: self.credential.clone(),
                 header: self.header.clone(),
                 bearer: self.bearer,
+                read_posts: self.read_posts.clone(),
+                read_post_timeout: self.read_post_timeout,
             },
             segments: fixed,
         }))
+    }
+
+    /// Trusted composition only. Fixes, once, the exact paths this port may
+    /// POST to as reads (`AuthenticatedHttp::post_json`) and their deadline,
+    /// from the operations the adapter's descriptor declares reads sent as a
+    /// POST. A business adapter holding only `AuthenticatedHttp` cannot widen
+    /// them.
+    ///
+    /// ```compile_fail
+    /// use connectors_sdk::AuthenticatedHttp;
+    /// fn widen(http: &dyn AuthenticatedHttp) {
+    ///     http.with_read_posts(&[&["search"]], std::time::Duration::from_secs(1));
+    /// }
+    /// ```
+    pub fn with_read_posts(&self, paths: &[&[&str]], timeout: Duration) -> Result<Self> {
+        if paths.is_empty() || paths.len() > 16 {
+            return Err(Error::invalid(
+                "read POSTs are between one and 16 fixed paths",
+            ));
+        }
+        if timeout.is_zero() || timeout > READ_POST_MAX_TIMEOUT {
+            return Err(Error::invalid(
+                "read POST deadline is outside supported bounds",
+            ));
+        }
+        let mut fixed = std::collections::BTreeSet::new();
+        for segments in paths {
+            if segments.is_empty() || segments.len() > 16 {
+                return Err(Error::invalid(
+                    "a read POST endpoint is one bounded fixed path",
+                ));
+            }
+            if segments
+                .iter()
+                .any(|s| s.is_empty() || *s == "." || *s == "..")
+            {
+                return Err(Error::invalid("invalid provider path segment"));
+            }
+            fixed.insert(segments.iter().map(|s| (*s).to_owned()).collect());
+        }
+        Ok(Self {
+            client: self.client.clone(),
+            base: self.base.clone(),
+            credential: self.credential.clone(),
+            header: self.header.clone(),
+            bearer: self.bearer,
+            read_posts: Arc::new(fixed),
+            read_post_timeout: timeout,
+        })
     }
 
     async fn send_get(
@@ -575,6 +639,52 @@ impl AuthenticatedHttp for ScopedHttp {
             complete,
         })
     }
+
+    async fn post_json(
+        &self,
+        segments: &[&str],
+        query: &[(&str, String)],
+        body: &serde_json::Value,
+    ) -> Result<HttpResponse> {
+        if self.read_posts.is_empty() {
+            return Err(Error::unavailable());
+        }
+        let path: Vec<String> = segments.iter().map(|s| (*s).to_owned()).collect();
+        if !self.read_posts.contains(&path) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "path is not a read this port may send as a POST",
+            ));
+        }
+        let bytes = serde_json::to_vec(body).map_err(|_| Error::internal())?;
+        if bytes.len() > READ_POST_BODY_LIMIT {
+            return Err(Error::invalid("read POST body exceeds limit"));
+        }
+        let response = self
+            .request(reqwest::Method::POST, segments, query)
+            .await?
+            .timeout(self.read_post_timeout)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::ACCEPT, "application/json")
+            .body(bytes)
+            .send()
+            .await
+            .map_err(provider_error)?;
+        let status = response.status().as_u16();
+        let headers = response
+            .headers()
+            .iter()
+            .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), v.to_owned())))
+            .collect();
+        let body = connectors_client::bounded(response)
+            .await
+            .map_err(body_error)?;
+        Ok(HttpResponse {
+            status,
+            headers,
+            body,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -789,5 +899,131 @@ mod tests {
             ErrorCode::Unavailable,
             "a document at the limit must be sent, not refused"
         );
+    }
+
+    fn refused(result: Result<HttpResponse>) -> Error {
+        match result {
+            Ok(_) => panic!("the read POST was answered"),
+            Err(error) => error,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_read_post_reaches_only_the_paths_composition_fixed() {
+        let body = serde_json::json!({"query": "q"});
+        // Composed without read POSTs: unavailable, no I/O.
+        let none = refused(scoped().post_json(&["search"], &[], &body).await);
+        assert_eq!(none.code, ErrorCode::Unavailable);
+        assert!(!none.upstream_answer);
+
+        let http = scoped()
+            .with_read_posts(&[&["search"], &["v1", "crawl"]], Duration::from_secs(60))
+            .unwrap();
+        for path in [&["extract"][..], &["search", "x"], &["v1"], &["crawl"]] {
+            let error = refused(http.post_json(path, &[], &body).await);
+            assert_eq!(error.code, ErrorCode::Forbidden, "{path:?}");
+        }
+        let big = serde_json::json!({"query": "q".repeat(READ_POST_BODY_LIMIT)});
+        let error = refused(http.post_json(&["search"], &[], &big).await);
+        assert_eq!(error.code, ErrorCode::InvalidInput);
+        // A fixed path within the limit is sent; the base resolves nowhere.
+        let error = refused(http.post_json(&["search"], &[], &body).await);
+        assert_eq!(error.code, ErrorCode::Unavailable);
+    }
+
+    #[test]
+    fn read_post_composition_is_bounded() {
+        let http = scoped();
+        let minute = Duration::from_secs(60);
+        for (what, paths, timeout) in [
+            ("no path", &[][..], minute),
+            ("empty path", &[&[][..]][..], minute),
+            ("dot segment", &[&[".."][..]][..], minute),
+            ("zero deadline", &[&["search"][..]][..], Duration::ZERO),
+            (
+                "long deadline",
+                &[&["search"][..]][..],
+                READ_POST_MAX_TIMEOUT + Duration::from_secs(1),
+            ),
+        ] {
+            match http.with_read_posts(paths, timeout) {
+                Ok(_) => panic!("{what} was accepted"),
+                Err(error) => assert_eq!(error.code, ErrorCode::InvalidInput, "{what}"),
+            }
+        }
+        assert!(
+            http.with_read_posts(&[&["search"]], READ_POST_MAX_TIMEOUT)
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_read_post_sends_json_with_the_credential_and_bounds_the_answer() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                head.push(socket.read_u8().await.unwrap());
+            }
+            let head = String::from_utf8(head).unwrap();
+            let length: usize = head
+                .lines()
+                .find_map(|line| {
+                    line.split_once(':')
+                        .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                        .map(|(_, value)| value.trim().parse().unwrap())
+                })
+                .unwrap();
+            let mut body = vec![0; length];
+            socket.read_exact(&mut body).await.unwrap();
+            let answer = br#"{"results":[]}"#;
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        answer.len()
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+            socket.write_all(answer).await.unwrap();
+            (head, body)
+        });
+        let http = ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: format!("http://{address}/"),
+                credential: None,
+                credential_header: "authorization".into(),
+                bearer: true,
+                allow_plaintext: true,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap()
+        .with_credential(Arc::new(FixtureCredential))
+        .with_read_posts(&[&["search"]], Duration::from_secs(30))
+        .unwrap();
+        let response = http
+            .post_json(&["search"], &[], &serde_json::json!({"query": "rust"}))
+            .await
+            .unwrap();
+        assert_eq!(response.status, 200);
+        assert_eq!(response.body, br#"{"results":[]}"#);
+        let (head, body) = server.await.unwrap();
+        // The empty query keeps its `?`, as every request through `request` does.
+        assert!(head.starts_with("POST /search? HTTP/1.1\r\n"), "{head}");
+        let lower = head.to_ascii_lowercase();
+        assert!(
+            lower.contains("authorization: bearer "),
+            "credential header missing"
+        );
+        assert!(lower.contains("content-type: application/json\r\n"));
+        assert_eq!(body, br#"{"query":"rust"}"#);
     }
 }

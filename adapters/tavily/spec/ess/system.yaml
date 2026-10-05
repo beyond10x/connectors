@@ -1,0 +1,5 @@
+format: ess/18
+system: connectors_tavily
+version: v1
+domains:
+  - connectors_tavily.requests
