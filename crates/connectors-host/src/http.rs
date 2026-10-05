@@ -1103,4 +1103,49 @@ mod tests {
         assert!(lower.contains("content-type: application/json\r\n"));
         assert_eq!(body, br#"{"query":"rust"}"#);
     }
+
+    #[tokio::test]
+    async fn a_read_post_ends_at_the_shared_provider_budget_not_its_own_timeout() {
+        // A provider that accepts the request and never answers.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            tokio::time::sleep(Duration::from_secs(10)).await;
+            drop(socket);
+        });
+        let http = ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: format!("http://{address}/"),
+                credential: None,
+                credential_header: "authorization".into(),
+                bearer: true,
+                allow_plaintext: true,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap()
+        .with_read_posts(&[&["search"]], Duration::from_secs(30))
+        .unwrap()
+        .with_provider_budget(
+            Duration::from_millis(300),
+            std::time::Instant::now() + Duration::from_secs(60),
+        )
+        .unwrap();
+        let started = std::time::Instant::now();
+        let Err(error) = http
+            .post_json(&["search"], &[], &serde_json::json!({"query": "rust"}))
+            .await
+        else {
+            panic!("a provider that never answers produced a response");
+        };
+        assert_eq!(error.code, ErrorCode::Timeout);
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the 30 s read-POST timeout outlasted the 300 ms provider budget"
+        );
+        server.abort();
+    }
 }
