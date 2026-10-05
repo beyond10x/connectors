@@ -340,7 +340,8 @@ fn configured() -> (tempfile::TempDir, String) {
 /// C05 wrong input: every business-JSON defect is refused with exit 2, empty
 /// stdout and no dispatch. The ones the CLI's own decoder refuses carry the
 /// `ess-cli/1` code `cli_dynamic_input` with empty data; a decoded document the
-/// owner's schema check refuses is the application Failure `invalid_input`.
+/// owner's schema check refuses is the application Failure `invalid_input`. Since
+/// ESS 0.52 the generated decoder itself refuses a duplicate object key.
 #[test]
 fn c05_wrong_business_input_codes() {
     let (root, schema) = configured();
@@ -398,8 +399,8 @@ fn c05_wrong_business_input_codes() {
         seen,
         [
             ("malformed", decoder.clone()),
-            ("trailing", decoder),
-            ("duplicate", owner.clone()),
+            ("trailing", decoder.clone()),
+            ("duplicate", decoder),
             ("wrong field", owner.clone()),
             ("wrong type", owner.clone()),
             ("depth", owner.clone()),
