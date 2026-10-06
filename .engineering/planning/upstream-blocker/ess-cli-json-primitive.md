@@ -2,14 +2,16 @@
 format: aep.planning-md/3
 id: upstream-blocker:ess-cli-json-primitive
 kind: upstream-blocker
-status: open
+status: cleared
 title: ESS CLI generator refuses the Json primitive for result fields
 refs:
 - provider: github
   reference: beyond10x/ess#468
 relations:
 - blocks: story:cli-json-answers-as-json
-revision: 1
+revision: 2
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-06T23:25:52Z", actor: "human:timo", revision: 2}
 ---
 Filed upstream: https://github.com/beyond10x/ess/issues/468 (2026-10-06, by the bot); the ess-ship
 session was told the same day.

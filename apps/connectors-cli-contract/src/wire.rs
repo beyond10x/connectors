@@ -13,6 +13,8 @@ pub enum Shape {
     Boolean,
     /// An exact JSON integer token in the model's signed 64-bit range.
     Integer,
+    /// Any JSON value, written as JSON. Only a result carries it.
+    Json,
     /// One declared string variant.
     Enum {
         /// Permitted values.
@@ -59,6 +61,8 @@ impl Shape {
             Self::String => value.is_string(),
             Self::Boolean => value.is_boolean(),
             Self::Integer => value.is_i64(),
+            // A parsed value is well-formed JSON; what surrounds it is checked by its container.
+            Self::Json => true,
             Self::Enum { variants } => value
                 .as_str()
                 .is_some_and(|s| variants.iter().any(|v| v == s)),
@@ -156,6 +160,8 @@ pub enum ArgumentSource {
         /// Boolean flag selecting a hidden TTY prompt.
         hidden_tty: String,
     },
+    /// Every argv word after the first `--`, verbatim, into one required `List<String>`.
+    Trailing {},
 }
 
 /// One input field's source.
