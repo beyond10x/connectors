@@ -34,6 +34,17 @@ parameters](#array-and-required-query-parameters)). `adapters/catalog/tests/bund
 committed bundle that a fresh run would not reproduce byte for byte. Nothing
 here reaches the network.
 
+`--amendments <file>` applies a `connectors-source-amendments/1` file to the
+extracted inventory: each entry names an `operation_id`, one optional query
+parameter to add (`name`, `location: query`, `required: false`, `type`), the
+https page that documents it and why the pinned document lacks it. The file
+must carry the source's SHA-256, and an operation that is missing or declared
+twice, a parameter it already declares, or anything other than an optional,
+unrepeated query parameter is refused before any bundle is written. The
+bundle's source record then names the file and its SHA-256
+(`crates/connectors-catalog/src/amendment.rs`). Zendesk uses it for the ticket
+export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)).
+
 ## The shipped selection set
 
 The repository reviews and ships one selection set per provider under
@@ -202,6 +213,16 @@ The complete configuration used against the sandbox is
   offered to the host as `http_bearer` with the fields `client_id` and
   `client_secret`, with no acquisition: connect it with the hidden prompt or a
   protected credential file.
+- `access`, optional: one read validation makes after the identity read and the
+  scope read, as `{"path": "...", "query": {"name": "value"}}` relative to the
+  provider authority, with no `?` in the path and at most 16 query pairs. A `401`
+  or `403` refuses the connection as `insufficient_scope`: the credential
+  identified its holder but may not read what the selection needs, which a repair
+  with the same credential cannot change. Any other non-2xx answer is refused as
+  the identity read refuses it. The body is not read. Omitted, nothing changes and
+  existing configuration revisions hold. Confluence declares a v2 page read here
+  ([Confluence guide](catalog-confluence.md)), because its v1 identity read passes
+  for a token whose scopes do not cover the v2 page reads (#102).
 - `identity.source` is `api` when omitted, the read shown above. `id_token`,
   for `oauth2_refresh` only, takes the subject from the `sub` of the token
   answer's `id_token`, after checking that its `iss` is

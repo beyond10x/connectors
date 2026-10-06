@@ -86,6 +86,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 9] = [
     ),
 ];
 
+/// The cited amendments applied to a provider's pinned source, relative to this
+/// crate. A provider absent here is built from its source as written.
+const AMENDMENTS: [(&str, &str); 1] = [(
+    "zendesk",
+    "../zendesk/upstream/zendesk-support.amendments.json",
+)];
+
 /// The committed projection at `source` and its record beside it are exactly
 /// what projecting the pinned Discovery document at `from` produces now.
 fn assert_projection_is_fresh(provider: &str, source: &Path, from: &Path) {
@@ -129,12 +136,17 @@ fn every_committed_bundle_matches_a_fresh_pipeline_run() {
     let temp = tempfile::tempdir().unwrap();
     for (provider, source, derived_from, auth_profile, unsupported) in SOURCES {
         let source = root.join(source);
+        let amendments = AMENDMENTS
+            .iter()
+            .find(|(name, _)| *name == provider)
+            .map(|(_, path)| root.join(path));
         let request = pipeline::Request {
             provider,
             source: &source,
             directory: temp.path(),
             auth_profile,
             replace: false,
+            amendments: amendments.as_deref(),
         };
         let run = match derived_from {
             Some(from) => {

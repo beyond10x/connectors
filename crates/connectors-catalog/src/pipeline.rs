@@ -69,6 +69,9 @@ pub struct Request<'a> {
     pub directory: &'a Path,
     pub auth_profile: &'a str,
     pub replace: bool,
+    /// A `connectors-source-amendments/1` file applied to the extracted
+    /// inventory ([`crate::amendment`]).
+    pub amendments: Option<&'a Path>,
 }
 
 /// What a completed run did.
@@ -238,10 +241,19 @@ fn run_from(
     // to its step like every other, so no refusal can reach a caller without one.
     let document = crate::parse_document(&bytes)
         .map_err(|refusal| refused(Step::Extract, refusal.into(), Some(source.clone()), None))?;
+    let mut inventory = inventory::extract(&document);
+    if let Some(path) = request.amendments {
+        let bytes = std::fs::read(path).map_err(|_| unreadable())?;
+        let file_name = own_name(path).ok_or_else(unreadable)?;
+        source.amendments = Some(
+            crate::amendment::apply(file_name, &bytes, &source, &mut inventory)
+                .map_err(|error| refused(Step::Extract, error, Some(source.clone()), None))?,
+        );
+    }
     let bundle = Bundle {
         provider: request.provider.to_owned(),
         source: source.clone(),
-        inventory: inventory::extract(&document),
+        inventory,
         auth_profile: request.auth_profile.to_owned(),
     };
 
