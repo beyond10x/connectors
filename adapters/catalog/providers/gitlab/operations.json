@@ -50,6 +50,8 @@
     {"id": "deployments.list", "operation_id": "getApiV4ProjectsIdDeployments", "effect": "read",
      "description": "List a project's deployments with their environment and job, one page per call; updated_after, updated_before, finished_after and finished_before filter by time",
      "bounds": {"per_page": {"minimum": 1, "maximum": 100}}},
+    {"id": "issue.create", "operation_id": "postApiV4ProjectsIdIssues", "effect": "write",
+     "description": "Open one issue in project id from body; GitLab requires body.title. Unguarded: nothing exists to compare before a create, so the same input approved and sent again opens a second issue. Among other effects, body.assignee_ids assigns users, body.confidential makes it confidential, body.discussion_locked locks its discussion, body.merge_request_to_resolve_discussions_of resolves a merge request's discussions and body.iid and body.created_at, available only to administrators and project owners, set its internal id and creation time; this list is not exhaustive: the approval binds the whole input by digest, so read the whole input before approving"},
     {"id": "merge_request.create", "operation_id": "postApiV4ProjectsIdMergeRequests", "effect": "write",
      "description": "Open a merge request whose source branch head is the pinned sha",
      "guard": {
