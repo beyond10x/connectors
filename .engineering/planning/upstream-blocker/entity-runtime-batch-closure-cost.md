@@ -2,14 +2,16 @@
 format: aep.planning-md/3
 id: upstream-blocker:entity-runtime-batch-closure-cost
 kind: upstream-blocker
-status: open
+status: cleared
 title: Entity Runtime 0.25.1 batch execution and facade reads cost the whole store
 refs:
 - provider: github
   reference: beyond10x/entity-runtime#51
 relations:
 - blocks: story:metadata-invoke-cost-flat-in-store-size
-revision: 1
+revision: 2
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-06T09:05:50Z", actor: "human:timo", revision: 2}
 ---
 Filed upstream: https://github.com/beyond10x/entity-runtime/issues/51 (2026-10-02, by the bot).
 

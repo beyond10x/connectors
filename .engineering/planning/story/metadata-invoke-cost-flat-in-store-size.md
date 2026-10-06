@@ -6,6 +6,7 @@ status: active
 title: Per-invoke metadata cost does not grow with the store
 relations:
 - serves: vision:independent-contract-adapters
+- decomposes: epic:connector-probe-20261006
 scope:
 - confidence: cited
   path: Cargo.lock
@@ -19,7 +20,7 @@ scope:
   path: crates/connectors-host/src/local/registry.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 9
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
@@ -42,10 +43,16 @@ So the consumer's ~700-invoke workload will still reach the admission bound, lat
 
 ## Acceptance
 
-- Entity Runtime exposes subject-scoped reads and batch execution whose cost does not depend on the number of
-  unrelated recorded events (an upstream change; the host adopts the release that carries it).
-- Per-invoke metadata time is measured at 600 and 6,000 events with the same command and stays within a stated
-  bound; the ~700-invoke workload completes with no admission `timeout`.
+Revised 2026-10-06. Entity Runtime 0.26.0 is adopted (#96) and batch execution is flat; what grows
+is the complete verification every open performs (`er.start`), blocked on
+upstream-blocker:entity-runtime-open-verifies-whole-store (beyond10x/entity-runtime#55).
+
+- The host adopts the Entity Runtime release that closes beyond10x/entity-runtime#55.
+- `read_invoke_cost_by_store_size`, release build, same command at 600 and 6,000 events: the median
+  per-invoke time at 6,000 events is at most twice the median at 600.
+- Separately: a workload of 700 consecutive read invokes against one store completes with no
+  admission `timeout` and no `outcome_unknown`, run by a 700-invoke mode this story adds to
+  `read_invoke_cost_by_store_size` (`CONNECTORS_STORE_COST_INVOKES=700`).
 
 ## Not taken
 

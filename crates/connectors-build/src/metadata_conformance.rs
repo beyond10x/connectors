@@ -892,6 +892,8 @@ fn emit_suite(ir: &ess_compiler::ir::EssIr, dir: &str, out: &Path) -> Result<Emi
         refused: Some(refused),
         scenarios: synthesis.suite.len(),
         spec_digest: synthesis.suite.provenance.spec_digest.to_string(),
+        // Only in `ess-mutation-manifest/4`; this emitter writes `/2`.
+        suite_digest: None,
     })
 }
 
@@ -909,9 +911,12 @@ fn manifest(
     let manifest = Manifest {
         spec_digest: baseline.spec_digest.clone(),
         baseline,
+        component: None,
+        known_failures: None,
         format: mutate::MANIFEST_FORMAT_2.to_owned(),
         mutants,
         specification: format!("{} {}", ir.system(), ir.version()),
+        unavailable_sites: None,
     };
     let text = manifest.to_canonical_json();
     Manifest::from_json(&text)?;
@@ -946,8 +951,10 @@ pub fn emit(root: &Path, out: &Path) -> Result<()> {
             scenarios: None,
             site: mutant.mutation.site(),
             spec_digest: None,
+            out_of_scope: false,
             stillborn: None,
             unsatisfiable_guard: None,
+            suite_digest: None,
         };
         match mutate::compile(mutated, &loaded.sources) {
             Ok(ir) => {
