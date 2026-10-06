@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-06T06:32:32Z",
+  "actor": "agent:claude",
+  "artifact": "story:launch-consumer-with-connection-credential",
+  "kind": "story",
+  "revision": 24,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate in CI on wave/20261006a (pass)",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/37422093575"
+  }
+}
