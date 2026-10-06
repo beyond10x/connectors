@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T15:30:00Z",
+  "actor": "human:timo",
+  "artifact": "story:service-failure-carries-upstream-reason",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate (cargo test --workspace, fmt, clippy): 1347 passed, 0 failed, 72 ignored, exit 0, on 9f3d44400e's tree"
+  }
+}
