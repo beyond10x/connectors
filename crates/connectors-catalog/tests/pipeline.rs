@@ -45,6 +45,7 @@ fn request<'a>(source: &'a Path, directory: &'a Path, replace: bool) -> Request<
         directory,
         auth_profile: "fixture.token",
         replace,
+        amendments: None,
     }
 }
 
@@ -203,6 +204,7 @@ fn a_refusal_leaves_an_existing_index_byte_identical() {
         directory: &directory,
         auth_profile: "fixture.token",
         replace: false,
+        amendments: None,
     })
     .expect_err("swagger 2.0 is refused");
 
@@ -314,6 +316,7 @@ fn a_bundle_write_refusal_leaves_the_index_exactly_as_it_was() {
         directory: &directory,
         auth_profile: "fixture.token",
         replace: false,
+        amendments: None,
     })
     .expect_err("a directory that takes no new file must refuse");
 

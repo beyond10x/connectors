@@ -25,7 +25,8 @@ cargo run --locked -p connectors-build -- catalog \
   --provider zendesk \
   --source adapters/zendesk/upstream/zendesk-support.yaml \
   --directory adapters/catalog/generated/bundles \
-  --auth-profile zendesk.basic
+  --auth-profile zendesk.basic \
+  --amendments adapters/zendesk/upstream/zendesk-support.amendments.json
 ```
 
 It carries all 652 operations of the pinned document. 35 are reported
@@ -34,6 +35,15 @@ as one value as given (34 `page` parameters that also take an offset page
 number, and one nested `filter`); no shipped read is among them.
 `adapters/catalog/tests/bundle_drift.rs` refuses a committed bundle or index a
 fresh run would not reproduce byte for byte.
+
+One parameter is added to the extracted inventory by a cited amendment, not by
+the pinned bytes: `per_page` on `IncrementalTicketExportCursor`, from
+[`zendesk-support.amendments.json`](../adapters/zendesk/upstream/zendesk-support.amendments.json)
+(format `connectors-source-amendments/1`). The file is bound to the pinned
+document's SHA-256, cites Zendesk's incremental exports reference, and may only
+add an optional query parameter the operation does not declare; the bundle's
+source record names it with its SHA-256. The pinned document and its digest
+stay as retrieved and redacted.
 
 The pinned document declares most parameters once under
 `components.parameters` and references them; the bundle reads those references
@@ -56,7 +66,7 @@ end of a walk are in it.
 
 | id | pinned `operationId` | request | paging parameters | end condition | time filter or deltas |
 |---|---|---|---|---|---|
-| `tickets.incremental` | `IncrementalTicketExportCursor` | `GET /api/v2/incremental/tickets/cursor` | `start_time` on the first call, then `cursor` | `end_of_stream: true` | `start_time`, Unix seconds: tickets changed since |
+| `tickets.incremental` | `IncrementalTicketExportCursor` | `GET /api/v2/incremental/tickets/cursor` | `start_time` on the first call, then `cursor`; `per_page` (amended) | `end_of_stream: true` | `start_time`, Unix seconds: tickets changed since |
 | `ticket.show` | `ShowTicket` | `GET /api/v2/tickets/{ticket_id}` | single item | n/a | none |
 | `ticket.comments` | `ListTicketComments` | `GET /api/v2/tickets/{ticket_id}/comments` | `page[size]`, `page[after]` | `meta.has_more: false` | none; deltas come from `tickets.incremental` |
 | `users.incremental` | `IncrementalUserExportCursor` | `GET /api/v2/incremental/users/cursor` | `start_time` on the first call, then `cursor`; `per_page` | `end_of_stream: true` | `start_time`, Unix seconds: users changed since |
@@ -71,9 +81,13 @@ end of a walk are in it.
   minute in the past. Each following call sends the previous page's
   `after_cursor` as `cursor`. The walk ends on the page whose `end_of_stream`
   is `true`; that page's `after_cursor` is the cursor to resume from on the
-  next run. The pinned document declares `per_page` for the user export and
-  not for the ticket export, so `per_page` on `tickets.incremental` is
-  refused before any request. `support_type_scope` (`all`, `agent`,
+  next run. `per_page` (1 to 1,000; Zendesk's default 1,000) sets the page
+  size. The pinned document declares it for the user export only; for the
+  ticket export it is the one cited amendment
+  ([`zendesk-support.amendments.json`](../adapters/zendesk/upstream/zendesk-support.amendments.json)),
+  because a full page of 1,000 tickets can pass the provider's 4 MiB response
+  bound (`connectors-core` `RESPONSE_LIMIT`) and is then refused as
+  `capacity`. `support_type_scope` (`all`, `agent`,
   `ai_agent`; Zendesk's default `agent`) selects the tickets exported.
 - **`organizations.incremental`** is time-based: the pinned document has no
   cursor export for organizations. `start_time` is required on every call.
