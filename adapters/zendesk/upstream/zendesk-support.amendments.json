@@ -1,0 +1,17 @@
+{
+  "format": "connectors-source-amendments/1",
+  "source_sha256": "5dd6cf1eda8febf02f8fb2f2cfa72d7cb6bc7d5bab188ba97b49ab55fc51dbf2",
+  "amendments": [
+    {
+      "operation_id": "IncrementalTicketExportCursor",
+      "add_parameter": {
+        "name": "per_page",
+        "location": "query",
+        "required": false,
+        "type": "integer"
+      },
+      "cite": "https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/",
+      "reason": "The incremental exports reference documents per_page for the exports (up to 1,000, default 1,000); the pinned document declares it on the user export and leaves it out of the ticket export, whose full 1,000-ticket page exceeds the 4 MiB provider response bound."
+    }
+  ]
+}

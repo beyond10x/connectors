@@ -41,6 +41,13 @@ and that the rule would replace nothing more in it. `adapters/catalog/tests/zend
 asserts that this file, the manifest record, this README and the committed bundle
 index name one digest.
 
+`zendesk-support.amendments.json` adds one parameter the document leaves out:
+`per_page` on `IncrementalTicketExportCursor`, which Zendesk's
+[incremental exports reference](https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/)
+documents (up to 1,000, default 1,000). It is bound to the redacted SHA-256 above
+and applied to the inventory when the bundle is built (`--amendments`); this
+file's bytes are unchanged by it.
+
 The catalog provider compiles this document into
 `../../catalog/generated/bundles/zendesk.bundle.json`; the reviewed read-only
 selection set is `../../catalog/providers/zendesk/operations.json`, described in

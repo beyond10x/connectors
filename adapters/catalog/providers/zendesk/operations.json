@@ -3,7 +3,8 @@
   "provider": "zendesk",
   "operations": [
     {"id": "tickets.incremental", "operation_id": "IncrementalTicketExportCursor", "effect": "read",
-     "description": "Export the tickets changed since start_time, one page per call; the first call sends start_time, each later call sends the previous page's after_cursor as cursor, and the walk ends on a page with end_of_stream true"},
+     "description": "Export the tickets changed since start_time, one page per call of at most per_page tickets; the first call sends start_time, each later call sends the previous page's after_cursor as cursor, and the walk ends on a page with end_of_stream true",
+     "bounds": {"per_page": {"minimum": 1, "maximum": 1000}}},
     {"id": "ticket.show", "operation_id": "ShowTicket", "effect": "read",
      "description": "Read one ticket by ticket_id, without its comment thread"},
     {"id": "ticket.comments", "operation_id": "ListTicketComments", "effect": "read",

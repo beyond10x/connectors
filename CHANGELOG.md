@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Zendesk `tickets.incremental` accepts `per_page` (1 to 1,000). A full page of 1,000
+  tickets can pass the 4 MiB provider response bound and was refused as `capacity`; a
+  smaller page keeps a long export walkable. The pinned Zendesk document leaves the
+  parameter out of the ticket export, so it is added by a cited amendment,
+  `adapters/zendesk/upstream/zendesk-support.amendments.json`; the pinned bytes and their
+  digest are unchanged.
+- `connectors-build catalog --amendments <file>` applies a `connectors-source-amendments/1`
+  file: optional query parameters a vendor documents but its pinned document leaves out,
+  bound to the source's SHA-256 and recorded in the bundle's source record.
+
 ## 0.29.0 — 2026-10-06
 
 ### Added
