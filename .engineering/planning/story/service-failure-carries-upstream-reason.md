@@ -6,6 +6,8 @@ status: draft
 title: A dispatch service failure carries the upstream reason, not only its code
 relations:
 - serves: vision:independent-contract-adapters
+- decomposes: epic:connector-probe-20261006
+- depends_on: story:dependency-refresh-20261006
 scope:
 - confidence: cited
   path: adapters/catalog/src/lib.rs
@@ -33,7 +35,7 @@ scope:
   path: crates/connectors-host/src/local/runtime.rs
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 3
+revision: 4
 ---
 ## Observed
 
@@ -51,3 +53,12 @@ with the same token. The cause was the token's scopes.
 - A fixture test shows a 401 whose body names a scope reaching the caller, and a body with a secret-shaped value
   being withheld.
 - `contracts/cli/v1alpha1/semantics.md` states what the field may contain.
+
+## Ordering
+
+Added 2026-10-06. Edits `apps/connectors-cli-contract/binding.json` and `ess/domains/cli.yaml`,
+which `story:dependency-refresh-20261006` regenerates, so it lands after it (`depends_on`). Shares
+`adapters/catalog/src/lib.rs` (`read_body`) with `story:catalog-honours-retry-after`, and
+`apps/connectors/src/local.rs`, `crates/connectors-host/src/local/owner.rs` and the CLI contract with
+`story:expired-evidence-invoke-advises-revalidate` and `story:cli-json-answers-as-json`; all three
+land after it.
