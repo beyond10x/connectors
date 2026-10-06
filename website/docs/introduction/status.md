@@ -4,10 +4,10 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.30.0
+# Source release v0.31.0
 
-Version **0.30.0** specifies at ESS source format `ess/15` with the released
-ESS 0.52.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
+Version **0.31.0** specifies at ESS source format `ess/15` with the released
+ESS 0.53.0 and plans with the released AEP 0.68.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
 provider, as in 0.11.0, which retired the native GitLab adapter. The earlier **v0.1.0
@@ -31,6 +31,25 @@ when its provider authority, profile and identity are unchanged. Catalog profile
 declare an `access` read that validation makes, so a credential that identifies but
 cannot read is refused as `insufficient_scope`; the Confluence guide declares one.
 Zendesk's ticket export accepts `per_page`.
+
+Since 0.31.0 the registry clock floor is recorded in Entity Runtime at most once a minute
+instead of on every command: in the store-cost test a read invoke appended 4.0 clock
+records among its 7 events, and now appends none. Every command still opens and
+verifies the whole store, which Entity Runtime has to change
+([entity-runtime#55](https://github.com/beyond10x/entity-runtime/issues/55)). The owner
+uses one malloc arena and no longer copies every history on open: peak RSS of one
+measured process at 601 events fell from 696 MB to 557–588 MB; the rest is Entity
+Runtime's verified model
+([#103](https://github.com/beyond10x/connectors/issues/103),
+[entity-runtime#59](https://github.com/beyond10x/entity-runtime/issues/59)). A provider
+refusal names the upstream reason (`service_reason`) when it carries no credential,
+address or invisible text; a read answered `429` is retried once when its `Retry-After`
+fits the deadline and otherwise names `retry_after_seconds`; an invoke on lapsed
+validation evidence advises `revalidate_connection`. GitLab `issue.create` is an
+approved write, `connections launch` hands one connection's protected document to a
+pinned consumer, and the `datasource.feed/v1alpha1` contract family is specified with a
+catalog feed engine that `operations list --family` discovers; no real provider binds a
+feed yet, and a feed is not yet read through a saved connection.
 
 ## Available runtime
 
