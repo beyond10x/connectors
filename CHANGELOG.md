@@ -24,8 +24,9 @@
 ### Changed
 
 - ESS 0.53.0 (from 0.52.0) and AEP 0.68.0 (from 0.65.0): the seven ESS crates, the pinned
-  toolchains and the planning store's `protocols` pin; 24 compatible crates.io updates
-  (among them tokio 1.53.2, uuid 1.27.0, jsonschema 0.58.5). The generated CLI contract is
+  toolchains and the planning store's `protocols` pin; 23 compatible crates.io updates
+  (among them tokio 1.53.2, jsonschema 0.58.5). uuid stays at 1.26.1: 1.27.0 requires
+  rustc 1.89 and the MSRV is 1.88.0. The generated CLI contract is
   byte-identical under 0.53.0. `ess generate cli` now writes only into output it owns:
   a fresh checkout enrolls `apps/connectors-cli-contract` once with
   `ess generate output adopt` before regenerating (`docs/development.md`); the gate's
