@@ -214,6 +214,8 @@ commands:
       # The host only ever writes `epoch=epoch+1` (registry/lifecycle.rs `bump`),
       # so a lower epoch is refused. An equal one is accepted: a row whose other
       # columns change keeps its epoch and is recorded through this command.
+      # A connection's configuration upgrade (registry/revalidation.rs) moves
+      # `revision` to the configured one with its epoch advance.
       - name: regressed
         when_subject:
           predicate: registry_epoch > input.registry_epoch

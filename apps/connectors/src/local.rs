@@ -159,6 +159,13 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         ServiceFailure => ("dispatch", "retry_explicitly", false),
         OwnerBuildMismatch => ("readiness", "stop_owner", false),
     };
+    // A refusal during a configuration upgrade, or of a changed binding: repair
+    // refuses a changed binding, so only a new connection helps.
+    let action = if error.reconnect {
+        "create_connection"
+    } else {
+        action
+    };
     let mut data = json!({"kind":if error.code == Interrupted {"interrupted"} else if usage {"usage"} else {"operational"},"code":error.code,"stage":stage,"next_action":action});
     if let Some(acquisition) = error.acquisition {
         data["acquisition"] = json!(acquisition);
@@ -532,5 +539,92 @@ mod tests {
             reply(owner_failure(registry::Failure::MetadataUnavailable.into())),
             unavailable
         );
+    }
+
+    /// story:connection-follows-configuration-upgrade, beyond10x/connectors#102:
+    /// a connection whose authentication changed under the configuration keeps
+    /// `lifecycle_conflict` and names a new connection, never a repair that
+    /// cannot help; a stale expected revision keeps `retry_status`.
+    #[test]
+    fn a_changed_authentication_names_a_new_connection_not_a_repair() {
+        use connectors_host::local::registry;
+        let changed = owner::Error::from(registry::Failure::BindingChanged);
+        assert_eq!(changed.code, owner::Code::LifecycleConflict);
+        // Across the owner transport, as the CLI receives it.
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&changed).unwrap()).unwrap();
+        for error in [changed, received] {
+            assert_eq!(
+                stage(error),
+                (json!("admission"), json!("create_connection"))
+            );
+        }
+        assert_eq!(
+            stage(owner::Error::from(registry::Failure::Conflict)),
+            (json!("admission"), json!("retry_status"))
+        );
+        let HandlerReply::Error { data, .. } =
+            connections::registry_failure(registry::Failure::BindingChanged)
+        else {
+            panic!("not a failure");
+        };
+        assert_eq!(
+            (&data["code"], &data["next_action"]),
+            (&json!("lifecycle_conflict"), &json!("create_connection"))
+        );
+    }
+
+    /// A different identity answered during a configuration upgrade keeps
+    /// `identity_mismatch` but names a new connection: repair refuses the
+    /// changed binding. Outside an upgrade it still names repair.
+    #[test]
+    fn a_different_identity_during_an_upgrade_names_a_new_connection() {
+        use connectors_host::local::registry;
+        let changed = owner::Error::from(registry::Failure::UpgradeIdentityMismatch);
+        assert_eq!(changed.code, owner::Code::IdentityMismatch);
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&changed).unwrap()).unwrap();
+        for error in [changed, received] {
+            assert_eq!(
+                stage(error),
+                (json!("admission"), json!("create_connection"))
+            );
+        }
+        assert_eq!(
+            stage(owner::Error::from(registry::Failure::IdentityMismatch)),
+            (json!("admission"), json!("repair_connection"))
+        );
+        let HandlerReply::Error { data, .. } =
+            connections::registry_failure(registry::Failure::UpgradeIdentityMismatch)
+        else {
+            panic!("not a failure");
+        };
+        assert_eq!(
+            (&data["code"], &data["next_action"]),
+            (&json!("identity_mismatch"), &json!("create_connection"))
+        );
+    }
+
+    /// A credential the new provider refuses during a configuration upgrade
+    /// names a new connection: repair refuses the changed binding. The same
+    /// refusal outside an upgrade keeps its own next action.
+    #[test]
+    fn a_credential_refused_during_an_upgrade_names_a_new_connection() {
+        use connectors_host::local::runtime;
+        for failure in [
+            runtime::Failure::InvalidCredential,
+            runtime::Failure::IdentityMismatch,
+            runtime::Failure::InsufficientScope,
+        ] {
+            let outside = owner::Error::from(failure);
+            assert_ne!(stage(outside.clone()).1, json!("create_connection"));
+            let mut upgrade = outside;
+            upgrade.reconnect = true;
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&upgrade).unwrap()).unwrap();
+            for error in [upgrade, received] {
+                assert_eq!(stage(error).1, json!("create_connection"), "{failure:?}");
+            }
+        }
     }
 }

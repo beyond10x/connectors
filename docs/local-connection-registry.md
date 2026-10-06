@@ -81,6 +81,54 @@ retirement. It needs neither provider access nor keyring availability. Repeated
 revocation returns the same terminal result. A previously dispatched read can
 already be in flight; revocation cannot undo it or allow another dispatch.
 
+## Configuration upgrades
+
+A connection is bound to the configuration revision of its instance that it was
+admitted under. When the configuration moves to a new revision (a rebuilt bundle,
+a changed selection, a new provider executable or CA file), the connection reports
+`pending` with `stale` set, and reads, repair and approvals refuse it.
+
+Explicit revalidation upgrades it in place. It captures the connection's current
+custody version, never a credential entry, runs the new provider's declared
+validation against it, and publishes the connection under the configured binding
+only when:
+
+- the instance id, adapter id and provider authority are unchanged;
+- the profile declaration is unchanged: the same id and declaration revision, so
+  the same scheme, capability, purpose, subject, entry fields, minimum scopes and
+  evidence lifetime. The registry keeps only the declaration's revision, which
+  digests all of these, so any revision change refuses, a minimum-scope change
+  included; and
+- the validated external identity equals the connection's recorded identity.
+
+Publication advances the public revision, because the binding changed
+([CLI semantics](../contracts/cli/v1alpha1/semantics.md)), and revalidate answers
+with the new one. It keeps the external identity, generation and custody
+version, records new baseline evidence and a new private fence, and moves the
+instance to the configured revision in the same metadata commit. Reads are then
+admitted under the new binding and refused under the old one.
+
+Any other binding difference refuses before provider work as `lifecycle_conflict`
+with `next_action = create_connection`: neither revalidation nor repair can move
+the connection, a new connection under a new instance id can. A different
+validated identity refuses as `identity_mismatch`, also with `next_action =
+create_connection`, because repair refuses the changed binding; outside an
+upgrade it keeps `repair_connection`. A credential the new provider refuses
+answers its usual code, again with `next_action = create_connection`. None of
+these changes anything: the credential is not proved invalid under the
+configuration it was admitted under, so it is not invalidated. A revoked connection is never upgraded,
+including one revoked while the new provider validates.
+
+Every other connection of the instance keeps its own revision until it is
+revalidated itself. The metadata record holds a connection's revision only while
+it differs from its instance's (`configuration_revision` on
+`connectors.auth_bindings.Connection`); an upgrade records each such connection
+with the revision it keeps. A revoked connection is terminal: it records no
+revision of its own and follows its instance, so an upgrade never re-records it.
+A new connection of the instance is admitted under
+the instance's current revision. Changing the provider authority or the profile
+declaration still needs a new instance id.
+
 ## Read use and retirement
 
 Capture pins one exact generation/material/fence and original deadline, at most
@@ -112,7 +160,8 @@ continuations. These are implementation bounds, not additional provider semantic
 Tests cover migration admission, private allocation and separate publication,
 reopening, lost publication acknowledgement, identity/scope/expiry refusal,
 competing repair publication, terminal revoke, three-way revoke/repair/dispatch
-races, bounded cursors, known missing material and full retirement retention.
+races, bounded cursors, known missing material, full retirement retention and
+configuration upgrades (`registry/upgrade_tests.rs`).
 The disposable native fixture additionally covers real custody/registry/CLI
 composition, locked and unlocked restart, unknown write/delete acknowledgement,
 delayed-writer refusal and exact deletion after restart. See the
@@ -123,5 +172,6 @@ obtains `{client_id, client_secret, refresh_token}` by browser consent inside th
 capture window and submits it as an ordinary entry, which the registry stores
 like any other and never refreshes ([Google OAuth guide](catalog-google-oauth.md)).
 Business approval, audit, idempotency, coordinator OAuth flows, host-owned
-refresh, configuration upgrades and the supervised provider journeys need their
-own implementation and evidence.
+refresh, configuration upgrades across a changed provider authority or profile
+declaration, and the supervised provider journeys need their own implementation
+and evidence.

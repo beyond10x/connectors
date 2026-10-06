@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A connection follows a configuration upgrade of its instance without credential
+  re-entry. `connections revalidate` on a connection whose binding names an older
+  configuration revision validates the credential already in custody with the new
+  provider and publishes the connection under the configured revision when the
+  provider authority and profile declaration are unchanged and the provider answers
+  the recorded identity. Its instance moves to that revision; every other connection
+  of the instance keeps its own until it is revalidated. A rebuilt bundle no longer
+  needs a new instance id and a fresh credential.
+- `connectors.auth_bindings.Connection` gains the optional `configuration_revision`,
+  recorded while a connection's revision differs from its instance's.
+
+### Changed
+
+- `connections revalidate` on a connection whose provider authority or profile
+  declaration changed still answers `lifecycle_conflict`, now with `next_action`
+  `create_connection` instead of `retry_status`: only a new connection helps
+  (beyond10x/connectors#102). Any profile revision change refuses, a
+  minimum-scope change included. A different identity answered during an upgrade
+  answers `identity_mismatch` with `next_action` `create_connection`, because repair
+  refuses the changed binding; outside an upgrade it keeps `repair_connection`.
+  A credential the new provider refuses during an upgrade also names
+  `create_connection`. None of these invalidates anything. An upgrade advances the
+  connection's public revision, because its binding changed.
+- `connections revalidate` no longer answers `description_unavailable` before the
+  adapter's first launch under a changed configuration. Admission checks the
+  connection against the binding it was admitted under, and the request launches an
+  on-demand adapter as it did before.
+
 ## 0.29.0 — 2026-10-06
 
 ### Added

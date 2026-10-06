@@ -8,10 +8,18 @@ pub struct Revalidation {
     id: String,
     version: custody::Version,
     captured: u64,
+    /// The configured binding a configuration upgrade publishes the
+    /// connection under; None when the connection already has it.
+    upgrade: Option<Binding>,
 }
 impl Revalidation {
     pub fn version(&self) -> custody::Version {
         self.version
+    }
+    /// Whether this revalidation publishes the connection under a newer
+    /// configuration revision of its instance.
+    pub fn upgrades(&self) -> bool {
+        self.upgrade.is_some()
     }
 }
 #[cfg_attr(test, derive(Clone))]
@@ -20,13 +28,17 @@ pub struct RevalidationDispatch {
     consumed: u64,
 }
 
+/// Also answers whether revalidation upgrades the connection: its binding
+/// names another configuration revision of its instance, under the same
+/// provider authority and profile declaration as the configured binding. Any
+/// other difference refuses as BindingChanged: only a new connection helps.
 fn admitted(
     tx: &Transaction<'_>,
     binding: &Binding,
     reference: &str,
     revision: &str,
     now: u64,
-) -> Result<ConnectionRow> {
+) -> Result<(ConnectionRow, bool)> {
     let row = Registry::connection(tx, reference)?;
     if !row.public
         || row.binding.instance_id != binding.instance_id
@@ -37,16 +49,31 @@ fn admitted(
     if row.state == "revoked" {
         return Err(Failure::Revoked);
     }
-    if row.binding != *binding || row.revision != revision {
+    if row.revision != revision {
         return Err(Failure::Conflict);
+    }
+    let upgrade = row.binding != *binding;
+    if upgrade && !upgradable(&row.binding, binding) {
+        return Err(Failure::BindingChanged);
     }
     if row.material.is_none() {
         return Err(Failure::NotReady);
     }
     match observation::readiness(tx, &row, now, true)? {
-        State::Ready | State::Pending => Ok(row),
+        State::Ready | State::Pending => Ok((row, upgrade)),
         _ => Err(Failure::NotReady),
     }
+}
+
+/// The profile declaration's revision digests its scheme, capability, entry
+/// fields, scopes and evidence lifetime, so an equal declaration is unchanged
+/// authentication. Only the configuration revision may differ.
+fn upgradable(admitted: &Binding, configured: &Binding) -> bool {
+    admitted.instance_id == configured.instance_id
+        && admitted.adapter_id == configured.adapter_id
+        && admitted.provider_authority == configured.provider_authority
+        && admitted.profile == configured.profile
+        && admitted.configuration_revision != configured.configuration_revision
 }
 
 fn current(
@@ -77,7 +104,32 @@ fn current(
     {
         return Err(Failure::Conflict);
     }
-    admitted(tx, &row.binding, &reference, &row.revision, now)
+    let binding = captured.upgrade.as_ref().unwrap_or(&row.binding);
+    admitted(tx, binding, &reference, &row.revision, now).map(|(row, _)| row)
+}
+
+/// A revoked connection is a terminal record: it records no configuration
+/// revision of its own and follows its instance's (metadata/er.rs).
+pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &str) -> Result<()> {
+    let revoked = tx
+        .prepare("SELECT connection_ref,binding FROM registry_connections WHERE instance_id=?1 AND state='revoked'")
+        .map_err(db)?
+        .query_map([instance], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(db)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(db)?;
+    for (reference, binding) in revoked {
+        let mut binding: Binding = decode(&binding)?;
+        if binding.configuration_revision != revision {
+            binding.configuration_revision = revision.to_owned();
+            tx.execute(
+                "UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
+                params![reference, encode(&binding)?],
+            )
+            .map_err(db)?;
+        }
+    }
+    Ok(())
 }
 
 fn release(tx: &Transaction<'_>, id: &str) -> Result<()> {
@@ -108,6 +160,19 @@ impl Registry {
         reference: &str,
         revision: &str,
     ) -> Result<String> {
+        self.revalidation_binding(instance, adapter, reference, revision)
+            .map(|binding| binding.profile.id)
+    }
+
+    /// The binding the connection was admitted or last upgraded under, on the
+    /// same terms as revalidation_profile.
+    pub fn revalidation_binding(
+        &self,
+        instance: &str,
+        adapter: &str,
+        reference: &str,
+        revision: &str,
+    ) -> Result<Binding> {
         let mut metadata =
             Metadata::inspect(&self.path).map_err(|_| Failure::MetadataUnavailable)?;
         let tx = metadata.connection.transaction().map_err(db)?;
@@ -119,7 +184,7 @@ impl Registry {
         if row.state == "revoked" {
             return Err(Failure::Revoked);
         }
-        Ok(row.binding.profile.id)
+        Ok(row.binding)
     }
 
     pub fn admit_revalidation(
@@ -149,7 +214,7 @@ impl Registry {
         }
         self.transaction_admission(now, false, |tx, authority, now| {
             if expires <= now { return Err(Failure::Expired); }
-            let row = admitted(tx,binding,reference,revision,now)?;
+            let (row, upgrade) = admitted(tx,binding,reference,revision,now)?;
             tx.execute("DELETE FROM registry_uses WHERE expires_at_ms<=?1", [timestamp(now)?]).map_err(db)?;
             let count: i64 = tx.query_row("SELECT count(*) FROM registry_uses", [], |r| r.get(0)).map_err(db)?;
             if count >= 1000 { return Err(Failure::Capacity); }
@@ -157,7 +222,8 @@ impl Registry {
             let id = new_id();
             tx.execute("INSERT INTO registry_uses (use_id,connection_ref,generation_id,version_id,publication_fence,expires_at_ms) VALUES (?1,?2,?3,?4,?5,?6)",
                 params![id,reference,row.generation,version,row.fence,timestamp(expires)?]).map_err(db)?;
-            Ok(Revalidation {id, version:custody_version(authority,&row.scope_id,version)?, captured:now})
+            Ok(Revalidation {id, version:custody_version(authority,&row.scope_id,version)?, captured:now,
+                upgrade: upgrade.then(|| binding.clone())})
         })
     }
 
@@ -195,6 +261,12 @@ impl Registry {
 
     /// Every terminal outcome consumes this dispatch, including transient failure.
     /// A failed transaction/unknown acknowledgement never grants replay authority.
+    ///
+    /// A configuration upgrade publishes the connection under the configured
+    /// binding, and moves its instance to that revision, only when the new
+    /// provider's validation answers the recorded identity. Every other outcome
+    /// of an upgrade changes nothing: the credential is not proved invalid under
+    /// the configuration it was admitted under.
     pub fn finish_revalidation(
         &self,
         dispatched: RevalidationDispatch,
@@ -203,14 +275,16 @@ impl Registry {
     ) -> Result<()> {
         self.transaction(now, false, |tx, authority, now| {
             let row = current(tx,authority,&dispatched.captured,true,now)?;
+            let upgrade = dispatched.captured.upgrade.as_ref();
+            let binding = upgrade.unwrap_or(&row.binding);
             let decision = match result {
                 Ok(mut native) => {
                     // Reject malformed or stale adapter evidence before treating
                     // its identity as a proved mismatch in the current material.
-                    native.validate(&row.binding,dispatched.consumed,now)?;
+                    native.validate(binding,dispatched.consumed,now)?;
                     if row.identity.as_ref() != Some(&native.identity) {
-                        invalidate(tx,&row,InvalidCredential::Invalid)?;
-                        Err(Failure::IdentityMismatch)
+                        if upgrade.is_none() { invalidate(tx,&row,InvalidCredential::Invalid)?; }
+                        Err(if upgrade.is_some() { Failure::UpgradeIdentityMismatch } else { Failure::IdentityMismatch })
                     } else {
                         // Recollection cannot erase a known expiry for these
                         // unchanged bytes, even if an upstream response omits it.
@@ -218,18 +292,26 @@ impl Registry {
                             native.credential_expires_at_ms = Some(native.credential_expires_at_ms.map_or(known, |expiry| expiry.min(known)));
                             native.valid_until_ms = native.valid_until_ms.min(known);
                         }
-                        native.validate(&row.binding,dispatched.consumed,now)?;
-                        let snapshot = recollected_snapshot(&row.binding,&row.reference,
+                        native.validate(binding,dispatched.consumed,now)?;
+                        let snapshot = recollected_snapshot(binding,&row.reference,
                             row.generation.as_deref().ok_or(Failure::MetadataUnavailable)?,
                             &native,dispatched.captured.captured,dispatched.consumed)?;
                         tx.execute("UPDATE registry_connections SET baseline=?2,publication_fence=?3 WHERE connection_ref=?1",
                             params![row.reference,encode(&snapshot)?,new_id()]).map_err(db)?;
+                        if let Some(upgrade) = upgrade {
+                            // The binding changed, so the public revision advances.
+                            tx.execute("UPDATE registry_connections SET binding=?2,semantic_revision=?3 WHERE connection_ref=?1",
+                                params![row.reference,encode(upgrade)?,new_id()]).map_err(db)?;
+                            tx.execute("UPDATE registry_instances SET configuration_revision=?3 WHERE instance_id=?1 AND adapter_id=?2",
+                                params![upgrade.instance_id,upgrade.adapter_id,upgrade.configuration_revision]).map_err(db)?;
+                            follow_instance(tx,&upgrade.instance_id,&upgrade.configuration_revision)?;
+                        }
                         bump(tx,&row.binding.instance_id)?;
                         Ok(())
                     }
                 }
                 Err(reason) => {
-                    if let Some(reason) = reason { invalidate(tx,&row,reason)?; }
+                    if let Some(reason) = reason.filter(|_| upgrade.is_none()) { invalidate(tx,&row,reason)?; }
                     Ok(())
                 }
             };
