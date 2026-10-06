@@ -443,6 +443,46 @@ impl Client {
         })();
         answer.unwrap_or_else(|error| Err(lost(error)))
     }
+    /// Ask the owner for an admitted consumer launch. Its reply carries the
+    /// consumer's pinned argv; the captured image and the sealed credential
+    /// follow as descriptors, which this process hands to the consumer unread.
+    pub fn launch(
+        mut self,
+        adapter: &str,
+        connection: &str,
+        consumer: &str,
+        deadline_ms: u64,
+    ) -> Result<runtime::launch::Consumer> {
+        self.same_build()?;
+        crate::local::protected::cancellation()?;
+        let deadline = until(deadline_ms)?;
+        channel::write(
+            &mut self.stream,
+            &Request::Launch {
+                adapter: adapter.into(),
+                connection: connection.into(),
+                consumer: consumer.into(),
+                deadline_ms,
+            },
+            None,
+            &[],
+            deadline,
+        )?;
+        let (args, pass_env) = match read_reply(&mut self.stream, deadline, 0)?.control {
+            Reply::Launch { args, pass_env } => (args, pass_env),
+            Reply::Failed { error } => return Err(error),
+            _ => return Err(Code::Unavailable.into()),
+        };
+        let mut files =
+            runtime::launch::receive(&self.stream, runtime::launch::DESCRIPTORS, deadline)?;
+        let credential = files.pop().ok_or(Code::Unavailable)?;
+        let executable = files.pop().ok_or(Code::Unavailable)?;
+        // The owner's final answer follows the release of its read use.
+        self.value(deadline)?;
+        Ok(runtime::launch::Consumer::new(
+            executable, credential, args, pass_env,
+        ))
+    }
     pub fn status(mut self, adapter: &str) -> Result<Value> {
         self.same_build()?;
         self.simple(
@@ -1191,6 +1231,7 @@ fn action(
         | Request::Revalidate { adapter, .. }
         | Request::Invoke { adapter, .. }
         | Request::Status { adapter }
+        | Request::Launch { adapter, .. }
         | Request::Stop { adapter, .. } => adapter.clone(),
         _ => return Err(Code::InvalidInput.into()),
     };
@@ -1420,6 +1461,25 @@ fn action(
                 _ => Err(Code::Unavailable.into()),
             }
         }
+        Request::Launch {
+            connection,
+            consumer,
+            deadline_ms,
+            ..
+        } if document.is_empty() => {
+            if !(1..=30_000).contains(&deadline_ms.saturating_sub(connectors_sdk::now_ms())) {
+                return Err(Code::Timeout.into());
+            }
+            launch(
+                owner,
+                stream,
+                &alias,
+                &config,
+                &connection,
+                &consumer,
+                deadline_ms,
+            )
+        }
         Request::Status { .. } if document.is_empty() => owner.pool.status(&alias, &adapter),
         Request::Stop {
             configuration_revision,
@@ -1439,6 +1499,94 @@ fn action(
         }
         _ => Err(Code::InvalidInput.into()),
     }
+}
+
+/// A consumer launch, in the owner, which alone reads the credential. Admission
+/// is repeated, the consumer image is captured before the credential is read,
+/// and the configuration is re-read after it. The read use is held only across
+/// the delivery: the sealed copy is the consumer's from then on.
+fn launch(
+    owner: &Owner,
+    stream: &mut UnixStream,
+    alias: &str,
+    config: &Config,
+    connection: &str,
+    consumer: &str,
+    deadline_ms: u64,
+) -> Result<Value> {
+    let admitted = admit_launch(&owner.paths, alias, connection, consumer)?;
+    let deadline = super::until(deadline_ms)?;
+    let executable = admitted.consumer.executable.capture(deadline)?;
+    let registry = registry::Registry::with_system_clock(&owner.paths.state);
+    let captured = registry
+        .capture_read(
+            &admitted.binding,
+            connection,
+            &Default::default(),
+            connectors_sdk::now_ms(),
+            deadline_ms,
+        )
+        .map_err(launch_failure)?;
+    let version = captured.version();
+    let material =
+        match custody::Store::open_at(version.scope(), config.secret_service_socket.as_deref())
+            .and_then(|store| store.read(version))
+        {
+            Ok(material) => material,
+            Err(error) => {
+                if matches!(error, custody::Failure::Missing) {
+                    registry.invalidate_read(
+                        &captured,
+                        registry::InvalidCredential::Missing,
+                        connectors_sdk::now_ms(),
+                    )?;
+                }
+                registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                return Err(Code::CustodyUnavailable.into());
+            }
+        };
+    let checked: Result<()> = (|| {
+        let (latest_config, latest) = selected(&owner.paths, alias)?;
+        let binding = &admitted.binding;
+        if latest_config.consumers.get(consumer) != Some(&admitted.consumer)
+            || latest_config.secret_service_socket != config.secret_service_socket
+            || latest.instance_id != binding.instance_id
+            || latest.adapter_id != binding.adapter_id
+            || latest.configuration_revision != binding.configuration_revision
+        {
+            return Err(Code::LifecycleConflict.into());
+        }
+        if !latest.permissions.profiles.contains(&binding.profile.id) {
+            return Err(Code::Forbidden.into());
+        }
+        Ok(())
+    })();
+    if let Err(error) = checked {
+        registry.cancel_read(captured, connectors_sdk::now_ms())?;
+        return Err(error);
+    }
+    let dispatched = registry
+        .dispatch_read(captured, connectors_sdk::now_ms())
+        .map_err(launch_failure)?;
+    let delivered: Result<()> = (|| {
+        let credential = runtime::launch::sealed(&material.0)?;
+        drop(material);
+        channel::write(
+            stream,
+            &Reply::Launch {
+                args: admitted.consumer.executable.args.clone(),
+                pass_env: admitted.consumer.pass_env.clone(),
+            },
+            None,
+            &[],
+            deadline,
+        )?;
+        runtime::launch::send(stream, &[&executable, &credential], deadline)?;
+        Ok(())
+    })();
+    registry.release_read(dispatched, connectors_sdk::now_ms())?;
+    delivered?;
+    Ok(json!({}))
 }
 
 #[cfg(test)]

@@ -86,11 +86,27 @@ management wire payload or a persistent record.
 | `connections connect` | acquisition/configuration coordinator | `ConnectionConnectInput` → `ConnectionConnectResult` | yes / yes, after admission |
 | `connections repair` | exact existing connection's coordinator | `ConnectionRepairInput` → `ConnectionRepairResult` | yes / yes, after admission |
 | `connections revalidate` | exact existing connection's evidence coordinator | `ConnectionRevalidateInput` → `ConnectionRevalidateResult` | yes / yes, after admission |
+| `connections launch` | exact existing connection's read admission and the owner's custody read | `ConnectionLaunchInput` → the consumer's exit status ([consumer launch](consumer-launch.md)) | yes / no |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
 | `connections revoke` | connection metadata authority | `ConnectionRevokeInput` → `ConnectionRevokeResult` | no / no |
 | `operations list` | selected cached descriptor projection | `OperationListInput` → `OperationListResult` | no / no |
 | `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | no / no |
 | `operations invoke` | admitted service request | `OperationInvokeInput` → `OperationInvokeResult` | yes / yes, after admission |
+
+### Consumer launch
+
+`connections launch` is the one command whose successful outcome is not a result
+envelope. It starts an operator-pinned consumer from a `connectors-local/3`
+`[consumers]` entry with the selected connection's protected document on
+descriptor 3, passes the caller's stdin, stdout and stderr through, and exits with
+the consumer's exit status. `ConnectionLaunchResult` is the handler seam's typed
+value only; it is never written, because stdout belongs to the consumer. A refused
+launch writes the ordinary `failure` envelope to stderr and starts no consumer. Its
+argv is the entry's pinned prefix, then the optional `--args` JSON array verbatim;
+the entry's `pass_env` prefixes select the caller's variables it gets. No adapter
+starts; the owner alone reads the credential and hands the consumer a sealed memfd.
+Admission order, delivery, process rules and the same-user boundary are in
+[consumer launch](consumer-launch.md).
 
 `approvals clock-check` performs the bounded authenticated exchange specified in
 [the clock binding](../../service/clock.md). Its public observation cannot be
@@ -258,7 +274,10 @@ load, returns `configuration_exists`; an existing database is never opened,
 migrated or recreated by `setup init`. The file uses
 the current `connectors-local/2` format, whose adapter entries each select a
 `private_protocol` ([private mutation extension](private-mutations.md)); an
-existing `connectors-local/1` file keeps loading unchanged. It records the
+existing `connectors-local/1` file keeps loading unchanged. A
+`connectors-local/3` file is `/2` plus an optional `[consumers]` table of pinned
+[consumer launch](consumer-launch.md) executables; `[consumers]` in a `/1` or `/2`
+file refuses the configuration, and `setup init` keeps writing `/2`. It records the
 local owner policy and OS keyring requirement; it does not write credentials,
 authenticate, install artifacts or start processes. `setup check` checks syntax,
 permissions, configured artifacts and non-interactive keyring availability. A
@@ -505,7 +524,7 @@ never replay a possible write after interruption, timeout or lost response.
 
 A configuration whose adapter entry contradicts its format — a
 `connectors-local/1` entry that carries `private_protocol`, or a
-`connectors-local/2` entry that lacks it — is `invalid_configuration` with
+`connectors-local/2` or `/3` entry that lacks it — is `invalid_configuration` with
 `next_action = check_configuration`, and its `Failure` additionally carries
 `configuration_format` (the file's `format` value) and `instance_id` (the
 entry's `instance_id`). They are named only after every entry has passed every
