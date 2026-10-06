@@ -6,6 +6,7 @@ status: draft
 title: The owner's memory is bounded by the store it holds
 relations:
 - decomposes: epic:connector-probe-20261006
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: Cargo.lock
