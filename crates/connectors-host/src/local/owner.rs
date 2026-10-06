@@ -384,6 +384,78 @@ pub fn admit_invoke(paths: &Paths, alias: &str, call: &Value, document: &[u8]) -
     }
     Ok(())
 }
+/// What an admitted consumer launch may use: the pinned consumer entry and the
+/// binding its connection is read under. Never a reusable grant: the owner
+/// repeats admission and re-reads the configuration around the credential read.
+pub struct LaunchAdmission {
+    pub consumer: super::config::Consumer,
+    pub binding: registry::Binding,
+}
+/// Admission of a consumer launch, in order: the adapter and the consumer are
+/// configured (`not_found`); the consumer lists the adapter (`forbidden`); its
+/// pinned image matches its digest (`invalid_configuration`); the connection is
+/// visible (`not_found`, `revoked`) and its profile granted (`forbidden`); its
+/// evidence is current (`unavailable`); custody is available
+/// (`custody_unavailable`). The binding comes from the saved connection record:
+/// no adapter starts and no credential is read here.
+pub fn admit_launch(
+    paths: &Paths,
+    alias: &str,
+    connection: &str,
+    consumer: &str,
+) -> Result<LaunchAdmission> {
+    let (config, adapter) = selected(paths, alias)?;
+    if !connectors_core::valid_id(connection) || !connectors_core::valid_id(consumer) {
+        return Err(Code::InvalidInput.into());
+    }
+    let entry = config
+        .consumers
+        .get(consumer)
+        .cloned()
+        .ok_or(Code::NotFound)?;
+    if !entry.permissions.connections.contains(alias) {
+        return Err(Code::Forbidden.into());
+    }
+    entry.executable.check()?;
+    let registry = registry::Registry::with_system_clock(&paths.state);
+    let recorded =
+        registry.recorded_binding(&adapter.instance_id, &adapter.adapter_id, connection)?;
+    if !adapter.permissions.profiles.contains(&recorded.profile.id) {
+        return Err(Code::Forbidden.into());
+    }
+    // A connection saved under another configuration revision is a binding
+    // conflict here, as for any read: `connections revalidate` moves it.
+    let binding = registry::Binding {
+        instance_id: adapter.instance_id.clone(),
+        adapter_id: adapter.adapter_id.clone(),
+        configuration_revision: adapter.configuration_revision.clone(),
+        provider_authority: recorded.provider_authority,
+        profile: recorded.profile,
+    };
+    registry
+        .admit_read(
+            &binding,
+            connection,
+            &Default::default(),
+            connectors_sdk::now_ms(),
+        )
+        .map_err(launch_failure)?;
+    if !custody::available_at(config.secret_service_socket.as_deref()) {
+        return Err(Code::CustodyUnavailable.into());
+    }
+    Ok(LaunchAdmission {
+        consumer: entry,
+        binding,
+    })
+}
+/// Evidence that is not current is readiness, `unavailable`, as the
+/// connection's own observation reports it; never a grant refusal.
+fn launch_failure(error: registry::Failure) -> Error {
+    match error {
+        registry::Failure::NotReady => Code::Unavailable.into(),
+        error => error.into(),
+    }
+}
 pub fn connection_value(alias: &str, value: registry::ObservedConnection) -> Value {
     json!({"summary":{"adapter":alias,"instance_id":value.instance,"connection":value.reference,"profile":value.profile,"revision":value.revision,"state":value.state},
         "external_identity":value.identity,"observed_at_ms":value.observed_at_ms,"valid_until_ms":value.valid_until_ms,"source":"authority","stale":value.stale})
@@ -426,6 +498,14 @@ enum Request {
     Status {
         adapter: String,
     },
+    /// A consumer launch. Answered by `Reply::Launch`, then the consumer image
+    /// and the sealed credential as descriptors, then the final answer.
+    Launch {
+        adapter: String,
+        connection: String,
+        consumer: String,
+        deadline_ms: u64,
+    },
     Stop {
         adapter: String,
         configuration_revision: String,
@@ -456,6 +536,12 @@ enum Reply {
         acquisition: String,
         expires_at_ms: u64,
         profile: runtime::Profile,
+    },
+    /// The admitted consumer's pinned argv prefix after argv\[0\], and the
+    /// environment name prefixes its entry passes.
+    Launch {
+        args: Vec<String>,
+        pass_env: std::collections::BTreeSet<String>,
     },
     Success,
     Failed {

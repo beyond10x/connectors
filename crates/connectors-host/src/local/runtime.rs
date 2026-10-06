@@ -2,6 +2,7 @@
 //! exported to business adapters. See contracts/cli/v1alpha1/private-adapter.md.
 pub(crate) mod artifact;
 pub(crate) mod channel;
+pub mod launch;
 mod process;
 mod server;
 pub mod state;

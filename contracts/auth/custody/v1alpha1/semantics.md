@@ -10,7 +10,7 @@
 |---|---|
 | Contract | `auth.custody/v1alpha1` |
 | Profiles | `read_only` (today: env/file-backed references resolved at dispatch), `versioned` (write, read, delete immutable versions; publication and refresh coordination held by the host metadata store) |
-| Parties | host (grants a scoped store capability), store binding (in-memory, owner-only file, later Vault or database), coordinator (writer), execution boundary (reader) |
+| Parties | host (grants a scoped store capability), store binding (in-memory, owner-only file, later Vault or database), coordinator (writer), execution boundary (reader), consumer (receives one delivered version through the host; never a store reader) |
 
 Design responsibility three of four: persist sensitive material through an injected secret-store binding (`docs/design.md:528`). The store knows nothing about provider identity, OAuth, expiry, or refresh (`docs/design.md:576`).
 
@@ -61,7 +61,7 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 - Refresh publication additionally binds the new custody version to a new private credential generation validated under [evidence](../../evidence/v1alpha1/semantics.md). It atomically updates the active reference and invalidates old-generation dispatch admissions. Custody retention never authorizes dispatch or a second exchange. A material version can remain readable for an already-valid use without remaining refreshable.
 - Failure between provider exchange and durable response registration never permits a repeat exchange. An unreferenced candidate version is not proof that refresh did or did not happen. Recovery uses the coordinator ledger; ambiguous candidates are discarded/repair is required. Secret garbage collection must not erase the ledger fact that a source was consumed.
 - Reclaim: superseded versions are deleted once no valid use requires them, after a declared retention (first-profile default 24 h; refresh-token grace behavior is provider-specific and declared in the profile).
-- Scoped access: a capability handed to an adapter reads only its own scope. There is no list operation over values.
+- Scoped access: a capability handed to an adapter reads only its own scope. There is no list operation over values. A consumer holds no capability at all: the host reads on its behalf and delivers one version (§4.2).
 - Bounded values: a version is at most 64 KiB (first-profile default; certificates with chains may need more and set it per binding).
 - No private references in diagnostics: read errors, ordinary logs and metrics expose neither values nor custody scope/version/generation ids. Use separately admitted safe correlation and error codes. Access-controlled internal custody state is not a diagnostic export.
 - Durability claims per binding: in-memory claims none; file binding claims fsync-before-return on the owner-only file; a database or Vault binding declares its own. A binding declares the guarantees it does not provide instead of emulating them (`docs/design.md:578`).
@@ -104,6 +104,19 @@ distributed custody/metadata transaction.
 [auth_bindings.yaml](../../../../ess/domains/auth_bindings.yaml) models these
 identities/references/lifecycle. Actual storage, handle erasure, retirement comparisons
 and trusted clocks remain binding predicates, not executed schema guarantees.
+
+### 4.2 Consumer delivery
+
+A consumer is a reader party that holds no store capability. On an admitted
+[consumer launch](../../../cli/v1alpha1/consumer-launch.md) the host reads the
+connection's current version under the same bounded read use as a dispatch (capture,
+custody read, dispatch, release) and hands the consumer that version's material
+verbatim and uninterpreted, in a memfd sealed with `F_SEAL_WRITE`, `F_SEAL_GROW`,
+`F_SEAL_SHRINK` and `F_SEAL_SEAL`, on descriptor 3. Admission is the existing bounded
+read use: current evidence is required, otherwise the launch is refused at readiness.
+The consumer learns no scope, version or reference, and the delivered copy grants no
+further read. The use is released once the copy is delivered; retirement of the
+version afterwards does not reach the consumer's copy.
 
 ## 5. Limits
 
