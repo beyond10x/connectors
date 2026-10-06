@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:mcp-outbound-stdio-process-ownership
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided whether Connectors spawns an MCP server as a child process
 relations:
 - blocks: epic:mcp-contracts
 withholds: review
-revision: 1
+revision: 4
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-03T14:52:29Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"approval":1}}}
 ---
 ## The relation nobody has decided
 
@@ -69,3 +71,43 @@ nothing, is drafted and is not behind this question. The **inbound** stdio
 direction is also not behind it: there the MCP client spawns `$BIN server`, so
 Connectors is the child rather than the parent, and no provider binary is
 executed by this repository.
+
+## Operator decision — 2026-10-03
+
+The operator answered on 2026-10-03: "Yes: own a pinned process per session
+(recommended)" to whether Connectors should launch one explicitly configured,
+pinned outbound MCP server process per session and supervise its cleanup.
+
+Decision: Connectors owns the outbound stdio server process. Each stdio session
+selects an explicit pinned executable configuration and has its own supervised
+process; sessions do not share one process or attach implicitly to an arbitrary
+operator-started process. Pin verification and bounded cleanup are required parts
+of the binding. This resolves the ownership/cardinality choice that this blocker
+withheld; it is not evidence that a process binding, framing, restart policy,
+credential delivery or runtime conformance already exists.
+
+Next: model the session/process/binding relations in native ESS, specify the
+versioned outbound stdio lifecycle and admission/cleanup cases, then record its
+implementation story. Reuse the shared bounded-process capability where its
+semantics apply, retaining native MCP protocol behavior in the adapter. No
+shell-script execution, automatic business retry or implicit unpinned launch is
+authorized by the process ownership decision.
+
+## Model reconciliation scope — 2026-10-03
+
+The operator has cleared both process ownership decisions. Reconcile native MCP
+stdio selection and the relation census with that answer; retain the full Helm
+scope in its owning initiative. First model the MCP stdio process as a session-owned
+record with a reference to its explicitly selected server binding and the configured
+executable path/digest. A session owns at most one such process; a successfully
+launched stdio session has one, and HTTP sessions have none. Ending the owning
+session requires bounded process cleanup. This is a declared ownership/pin model,
+not implemented launch behavior, an OS PID identity or a second credential owner.
+
+Keep unresolved HTTP/durable-session and caller/Connection relationships explicit.
+The native model must not import shared domains. The general bounded process port,
+Helm command construction, filesystem/credential admission and guarded rollback
+still need their own shared/native typed models and executable acceptance before
+implementation claims. Do not create their implementation stories ahead of those
+models. Update the census/selection checks to distinguish a resolved decision from
+an open blocker instead of requiring the decision to remain open forever.
