@@ -276,8 +276,8 @@
               "description": "Read an admitted project",
               "contract": "operations/v1alpha1",
               "profile": "read",
-              "input_schema": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
-              "output_schema": "{\"type\":\"object\"}"
+              "input_schema": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"], "additionalProperties": false},
+              "output_schema": {"type": "object"}
             }
           ],
           "configuration_schema": "{\"type\":\"object\"}"
@@ -576,8 +576,8 @@
           "description": "Read an admitted project",
           "contract": "operations/v1alpha1",
           "profile": "read",
-          "input_schema": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
-          "output_schema": "{\"type\":\"object\"}"
+          "input_schema": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"], "additionalProperties": false},
+          "output_schema": {"type": "object"}
         },
         "source": "cached",
         "stale": true
@@ -604,7 +604,7 @@
         "adapter": "forge",
         "operation": "project.get",
         "revision": "descriptor-r1",
-        "result": "{\"id\":7,\"name\":\"fixture\"}"
+        "result": {"id": 7, "name": "fixture"}
       }
     },
     {
@@ -633,8 +633,8 @@
               "description": "Read an admitted project",
               "contract": "operations/v1alpha1",
               "profile": "read",
-              "input_schema": "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"integer\"}},\"required\":[\"id\"],\"additionalProperties\":false}",
-              "output_schema": "{\"type\":\"object\"}"
+              "input_schema": {"type": "object", "properties": {"id": {"type": "integer"}}, "required": ["id"], "additionalProperties": false},
+              "output_schema": {"type": "object"}
             }
           ],
           "configuration_schema": "{\"type\":\"object\"}"

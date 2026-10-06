@@ -355,7 +355,7 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
     );
     let args: Vec<&str> = critical.iter().map(String::as_str).collect();
     let value = success(cli.run(&args));
-    let rows: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
+    let rows: Value = value["result"].clone();
     // Two critical rows exist and the minor one must not appear: the parameter
     // reached bind rather than being interpolated into the text.
     assert_eq!(rows["rows"].as_array().map(|r| r.len()), Some(2), "{rows}");
@@ -394,7 +394,7 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
     assert_eq!(refreshed["connection"]["summary"]["state"], "ready");
     assert_eq!(refreshed["connection"]["summary"]["revision"], revision);
     let value = success(cli.run(&args));
-    let rows: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
+    let rows: Value = value["result"].clone();
     assert_eq!(rows["rows"].as_array().map(|r| r.len()), Some(2));
     let current = success(cli.run(&[
         "connections",
@@ -431,7 +431,7 @@ fn a_real_postgres_session_persists_across_cli_and_owner_restart() {
         "--input-json",
         r#"{"schema":"public","limit":100}"#,
     ]));
-    assert!(listed["result"].as_str().unwrap().contains("incidents"));
+    assert!(listed["result"].to_string().contains("incidents"));
 }
 
 // Real-provider acceptance is deliberately opt-in and fails closed when an
@@ -607,7 +607,7 @@ impl LivePg {
     }
     fn rows(&self, query: &str, parameters: Value, limit: u32) -> Value {
         let result = success(self.read(query, parameters, limit));
-        serde_json::from_str(result["result"].as_str().unwrap()).unwrap()
+        result["result"].clone()
     }
     fn snapshot(&self) -> String {
         self.admin.query(&format!(

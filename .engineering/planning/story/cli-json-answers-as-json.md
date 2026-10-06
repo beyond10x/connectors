@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:cli-json-answers-as-json
 kind: story
-status: draft
+status: active
 title: describe and invoke answer JSON as JSON, not as text
 relations:
 - decomposes: epic:connector-probe-20261006
@@ -35,7 +35,10 @@ scope:
   path: crates/connectors-conformance/tests/cli_surface.rs
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 7
+revision: 9
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T09:43:54Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":4}}}
+- {from: "proposed", to: "active", at: "2026-10-06T09:43:54Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":4}}}
 ---
 ## Defect
 

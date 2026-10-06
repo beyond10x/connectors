@@ -388,7 +388,7 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
     ];
     let result = success(cli.run(&invoke));
     assert_eq!(
-        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        result["result"]["body"]["id"],
         7
     );
 
@@ -440,7 +440,7 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
     for child in children {
         let result = success(child.wait_with_output().unwrap());
         assert_eq!(
-            serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+            result["result"]["body"]["id"],
             7
         );
     }
@@ -730,7 +730,7 @@ fn a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission() {
 
     let answered = success(read("project.get", "org/project"));
     assert_eq!(
-        serde_json::from_str::<Value>(answered["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        answered["result"]["body"]["id"],
         7
     );
 
@@ -935,7 +935,7 @@ impl OAuthJourney {
 fn read_project(output: Output) {
     let result = success(output);
     assert_eq!(
-        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        result["result"]["body"]["id"],
         7
     );
 }
