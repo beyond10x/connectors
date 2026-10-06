@@ -93,29 +93,6 @@ management wire payload or a persistent record.
 | `operations describe` | selected cached descriptor projection | `OperationDescribeInput` → `OperationDescribeResult` | no / no |
 | `operations invoke` | admitted service request | `OperationInvokeInput` → `OperationInvokeResult` | yes / yes, after admission |
 
-### Operations by family
-
-`operations list --family CONTRACT` answers only the listed operations whose
-descriptor `contract` is exactly `CONTRACT`, each with its `id`, `contract` and
-native `profile`. It is how a consumer finds a shared family on a saved connection
-without knowledge of the provider: a connection is selected by the `--adapter`
-alias it was made under (§1), and the operations it can be invoked with are that
-adapter's cached description, so the consumer lists them with the same alias, then
-describes and invokes the family's fixed operation ids. For
-[datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/semantics.md) these
-are `feed.containers` and `feed.items` under one profile. An adapter added or
-upgraded after the consumer was built is found the same way once its description
-is cached.
-
-The filter narrows the same selection `operations list` already answers: an
-operation the configuration does not grant stays hidden, and the cursor is bound
-to the family as well as the adapter, revision and granted operations, so a
-cursor issued under one filter refuses as `stale_cursor` under another. A family
-no listed operation binds answers an empty page, a truthful negative observation,
-not `not_found`. The value is matched exactly; one that is empty, longer than 128
-bytes or holds a character other than ASCII letters, digits, `-`, `_`, `.` and
-`/` refuses as `invalid_input` before the cached description is read.
-
 ### Consumer launch
 
 `connections launch` is the one command whose successful outcome is not a result
@@ -749,3 +726,26 @@ durable stop suppression; actual readiness/timeout/isolation; and still-valid
 credential reuse across both process restarts. New ESS and deterministic output
 must be revalidated using the selected exact current-source ESS toolchain. An
 older release binary is provisional authoring evidence only.
+
+## Operations by family
+
+`operations list --family CONTRACT` answers only the listed operations whose
+descriptor `contract` is exactly `CONTRACT`, each with its `id`, `contract` and
+native `profile`. It is how a consumer finds a shared family on a saved connection
+without knowledge of the provider: a connection is selected by the `--adapter`
+alias it was made under (§1), and the operations it can be invoked with are that
+adapter's cached description, so the consumer lists them with the same alias, then
+describes and invokes the family's fixed operation ids. For
+[datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/semantics.md) these
+are `feed.containers` and `feed.items` under one profile. An adapter added or
+upgraded after the consumer was built is found the same way once its description
+is cached.
+
+The filter narrows the same selection `operations list` already answers: an
+operation the configuration does not grant stays hidden, and the cursor is bound
+to the family as well as the adapter, revision and granted operations, so a
+cursor issued under one filter refuses as `stale_cursor` under another. A family
+no listed operation binds answers an empty page, a truthful negative observation,
+not `not_found`. The value is matched exactly; one that is empty, longer than 128
+bytes or holds a character other than ASCII letters, digits, `-`, `_`, `.` and
+`/` refuses as `invalid_input` before the cached description is read.
