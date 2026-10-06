@@ -1350,10 +1350,7 @@ fn oauth_invalid_grant_reports_repair() {
     provider.set_token(grant(60));
     let invoke = journey.connected();
     let result = success(journey.run(&invoke));
-    assert_eq!(
-        result["result"]["body"]["id"],
-        7
-    );
+    assert_eq!(result["result"]["body"]["id"], 7);
 
     // The grant is revoked at the token host.
     provider.set_token(invalid_grant());

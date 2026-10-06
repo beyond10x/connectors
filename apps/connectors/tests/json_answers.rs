@@ -133,7 +133,10 @@ fn operations_describe_answers_schemas_as_json_objects() {
 #[test]
 fn adapters_describe_answers_operation_schemas_as_json_objects() {
     let (root, _) = configured();
-    let result = success(&command(&root, &["adapters", "describe", "--adapter", "forge"]));
+    let result = success(&command(
+        &root,
+        &["adapters", "describe", "--adapter", "forge"],
+    ));
     let operations = result["descriptor"]["operations"].as_array().unwrap();
     assert_eq!(operations.len(), 1);
     assert_eq!(operations[0]["input_schema"], input_schema());
