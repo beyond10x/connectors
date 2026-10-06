@@ -190,6 +190,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     if let Some(service_reason) = error.service_reason {
         data["service_reason"] = json!(service_reason);
     }
+    if let Some(retry_after_seconds) = error.retry_after_seconds {
+        data["retry_after_seconds"] = json!(retry_after_seconds);
+    }
     if usage {
         HandlerReply::UsageError {
             code: "failure".into(),
@@ -525,6 +528,28 @@ mod tests {
         assert_eq!(data["service_code"], "unauthorized");
         assert_eq!(data["service_reason"], "Unauthorized; scope does not match");
         assert_eq!(data["stage"], "dispatch");
+    }
+
+    /// story:catalog-honours-retry-after: a rate-limited read states the delay
+    /// the provider named beside `service_code`, so the caller can wait, and
+    /// states its absence by omitting it.
+    #[test]
+    fn a_rate_limited_failure_states_the_providers_delay_or_its_absence() {
+        let mut error = owner::Error::from(owner::Code::ServiceFailure);
+        error.service_code = Some(connectors_core::ErrorCode::RateLimited);
+        let HandlerReply::Error { data, .. } = invoke_failure(error.clone()) else {
+            panic!("not a failure");
+        };
+        assert!(data.get("retry_after_seconds").is_none(), "{data}");
+        error.retry_after_seconds = Some(3600);
+        let HandlerReply::Error { data, .. } = invoke_failure(error) else {
+            panic!("not a failure");
+        };
+        assert_eq!(data["code"], "service_failure");
+        assert_eq!(data["service_code"], "rate_limited");
+        assert_eq!(data["retry_after_seconds"], 3600);
+        assert_eq!(data["stage"], "dispatch");
+        assert_eq!(data["next_action"], "retry_explicitly");
     }
 
     fn reply(reply: HandlerReply) -> (Value, Value, Value) {

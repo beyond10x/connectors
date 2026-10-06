@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-honours-retry-after
 kind: story
-status: draft
+status: implemented
 title: A catalog read answered 429 honours Retry-After
 relations:
 - decomposes: epic:tech-debt-review-20260930
@@ -24,7 +24,11 @@ scope:
   path: docs/catalog-jira.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 6
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T15:10:45Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-06T15:10:45Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-06T16:21:50Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}}
 ---
 ## Defect
 
@@ -61,3 +65,13 @@ and `owner.rs`, which that story cites. It lands after it (`depends_on`). It als
 `docs/local-catalog-provider.md`, which `story:expired-evidence-invoke-advises-revalidate` and
 `story:forge-issue-create` edit in other sections (Limits here; evidence lifetime and the GitLab
 selection there); the derived waves keep the three apart.
+
+## Decision (2026-10-06, implementation)
+
+A write answered 429 is sent once and never retried, and keeps reporting `unknown`, not a
+refusal: the catalog contract admits a refusal only where no effect is proven, and a 429 does not
+prove that (`a_write_google_answers_429_is_unknown_as_the_guide_says`, the Calendar and Gmail
+guides). The acceptance line "a write answered 429 is sent once and refused" is met as "sent once,
+answered `unknown`". The delay field is `retry_after_seconds`, matching the existing service field;
+the retry lives in the local provider (`adapters/catalog/src/local.rs`), not the engine, which keeps
+its one-request rule.

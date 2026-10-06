@@ -82,6 +82,11 @@ pub struct Error {
     /// provider `forbidden`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_reason: Option<String>,
+    /// The delay in whole seconds the provider named on a dispatched read it
+    /// answered as rate limited (`runtime::Refusal`); only beside
+    /// `service_code = rate_limited`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_after_seconds: Option<u64>,
     #[serde(default, skip_serializing_if = "Origin::is_host")]
     pub origin: Origin,
     /// The connection's authentication changed under the configuration; only a
@@ -96,6 +101,7 @@ impl From<Code> for Error {
             acquisition: None,
             service_code: None,
             service_reason: None,
+            retry_after_seconds: None,
             origin: Origin::Host,
             reconnect: false,
         }
@@ -192,6 +198,7 @@ impl From<runtime::Failure> for Error {
             acquisition: None,
             service_code,
             service_reason: None,
+            retry_after_seconds: None,
             origin,
             reconnect: false,
         }
@@ -200,12 +207,17 @@ impl From<runtime::Failure> for Error {
 impl From<runtime::Refusal> for Error {
     /// The failure's projection, with the upstream's reason kept only beside
     /// a `service_code` or on the provider's own `forbidden`; a provider
-    /// timeout or capacity answer carries none.
+    /// timeout or capacity answer carries none. The delay the provider named
+    /// is kept only beside `service_code = rate_limited`, and only within
+    /// 0..=4294967295 seconds.
     fn from(refusal: runtime::Refusal) -> Self {
         let forbidden = refusal.failure == runtime::Failure::ProviderForbidden;
         let mut error = Error::from(refusal.failure);
         if error.service_code.is_some() || forbidden {
             error.service_reason = refusal.reason;
+        }
+        if error.service_code == Some(connectors_core::ErrorCode::RateLimited) {
+            error.retry_after_seconds = runtime::admitted_delay(refusal.retry_after_seconds);
         }
         error
     }
