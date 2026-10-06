@@ -337,10 +337,13 @@ instance is refused while the old one exists.
   `raw`. See [Large messages and attachments](#the-shipped-selection-set).
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Gmail's exact bytes.
-- The provider does not walk pages itself and does not retry. On a read, and
-  on the preflight read of a send, a `429`, or a `403` whose reason is
-  `rateLimitExceeded`, `userRateLimitExceeded` or `dailyLimitExceeded` (each
-  selection names all three in `rate_limit_reasons`), is returned as
+- The provider does not walk pages itself. A read answered `429` is sent once
+  more after the delay its `Retry-After` names, when that wait leaves the second request
+  time of its own before the invocation deadline; otherwise its `rate_limited` refusal carries that delay
+  as `retry_after_seconds` ([Limits](local-catalog-provider.md#limits)). The
+  preflight read of a send is never sent again. On it, and on any read, a
+  `429`, or a `403` whose reason is `rateLimitExceeded`,
+  `userRateLimitExceeded` or `dailyLimitExceeded` (each selection names all three in `rate_limit_reasons`), is returned as
   `rate_limited`, and no write is sent; every other `403` is `forbidden`. A
   write that Google answers `429` is reported `unknown`, as
   [the catalog provider guide](local-catalog-provider.md) says: only its

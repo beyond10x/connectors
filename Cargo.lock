@@ -619,6 +619,7 @@ dependencies = [
  "entity-store",
  "eventlog-core",
  "hex",
+ "httpdate",
  "libc",
  "rcgen",
  "ring",

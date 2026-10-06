@@ -907,11 +907,20 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             500..=599 => ErrorCode::Unavailable,
             _ => ErrorCode::UpstreamProtocol,
         };
-        // Only the body's admitted reason travels on, beside the code; the
-        // body itself, and every header, stays here.
-        return Err(Error::new(code, "provider refused the request")
+        // Only the body's admitted reason travels on, beside the code, and on
+        // a `429` the delay its `Retry-After` names; the body itself, and every
+        // other header, stays here.
+        let mut error = Error::new(code, "provider refused the request")
             .answered()
-            .with_upstream_reason(connectors_core::reason::from_body(&response.body)));
+            .with_upstream_reason(connectors_core::reason::from_body(&response.body));
+        if response.status == 429 {
+            error.retry_after_seconds = response
+                .headers
+                .iter()
+                .find(|(name, _)| name.eq_ignore_ascii_case("retry-after"))
+                .and_then(|(_, value)| retry_after(value, std::time::SystemTime::now()));
+        }
+        return Err(error);
     }
     // An empty text body is the empty text; an empty JSON body carries no
     // JSON value at all.
@@ -934,6 +943,23 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             .map_err(|_| unreadable());
     }
     connectors_core::read_json(&response.body).map_err(|_| unreadable())
+}
+
+/// The delay a `Retry-After` value names, in whole seconds from `now`: either
+/// form RFC 9110 §10.2.3 gives it, delta-seconds (ASCII digits only) or an
+/// HTTP-date (IMF-fixdate, or the obsolete RFC 850 and asctime formats a
+/// recipient must accept), a date rounded up to the next whole second and a
+/// date already past naming no wait. Anything else, and a delay that does not
+/// fit 32 bits, names none.
+fn retry_after(value: &str, now: std::time::SystemTime) -> Option<u64> {
+    let value = value.trim_matches([' ', '\t']);
+    if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) {
+        return value.parse::<u32>().ok().map(u64::from);
+    }
+    let date = httpdate::parse_http_date(value).ok()?;
+    let ahead = date.duration_since(now).unwrap_or_default();
+    let seconds = ahead.as_secs() + u64::from(ahead.subsec_nanos() > 0);
+    u32::try_from(seconds).ok().map(u64::from)
 }
 
 fn provenance(instance: &str, resource: &str, source_revision: &str) -> Value {
