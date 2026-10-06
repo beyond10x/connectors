@@ -49,6 +49,8 @@ mod oauth2_refresh_adversary;
 mod oauth2_refresh_adversary_pass2;
 #[path = "local_runtime/recorded_state.rs"]
 mod recorded_state;
+#[path = "local_runtime/retry_after_adversary.rs"]
+mod retry_after_adversary;
 
 /// Fictional HTTP basic material the fixture accepts, and the exact header it
 /// expects: `Basic base64("fixture-account@example.test:fixture-api-token-one")`,
@@ -238,6 +240,16 @@ impl Provider {
                         continue;
                     }
                     let forced = forced_status.load(Ordering::SeqCst);
+                    // A busy route answers `429`, naming `retry_after` when set;
+                    // `seen` counts this route's requests, this one included.
+                    let mut retry_after: Option<String> = None;
+                    let seen = observed
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .filter(|p| p.split('?').next() == Some(route))
+                        .count();
+                    let busy = (429, json!({"message":"Too Many Requests"}));
                     let (status, body) = if forced != 0 {
                         (forced, json!({"error":"fixture override"}))
                     } else if !valid {
@@ -276,6 +288,60 @@ impl Provider {
                         (401, json!({"message":format!("Unauthorized for {}", spaced.join(" "))}))
                     } else if route.ends_with("fixture-verbose") {
                         (401, json!({"message":format!("Unauthorized {}", "scopé ".repeat(40))}))
+                    } else if route.ends_with("fixture-busy-once") {
+                        if seen == 1 {
+                            retry_after = Some("1".into());
+                            busy
+                        } else {
+                            (200, json!({"id":7,"name":"fixture-project"}))
+                        }
+                    } else if route.ends_with("fixture-busy-date") {
+                        if seen == 1 {
+                            retry_after = Some(httpdate::fmt_http_date(
+                                std::time::SystemTime::now() + Duration::from_secs(2),
+                            ));
+                            busy
+                        } else {
+                            (200, json!({"id":7,"name":"fixture-project"}))
+                        }
+                    } else if route.ends_with("fixture-busy-stalled") {
+                        // A `429` naming one second, then an answer that takes
+                        // three seconds: longer than any deadline it is read under.
+                        if seen == 1 {
+                            retry_after = Some("1".into());
+                            busy
+                        } else {
+                            tokio::select! { _=&mut stopped=>break, _=tokio::time::sleep(Duration::from_secs(3))=>{} }
+                            (200, json!({"id":7,"name":"fixture-project"}))
+                        }
+                    } else if route.ends_with("fixture-busy-twice") {
+                        retry_after = Some("1".into());
+                        busy
+                    } else if route.ends_with("fixture-busy-five") {
+                        retry_after = Some("5".into());
+                        busy
+                    } else if route.ends_with("fixture-busy-long") {
+                        retry_after = Some("3600".into());
+                        busy
+                    } else if route.ends_with("fixture-busy-garbled") {
+                        retry_after = Some("soon".into());
+                        busy
+                    } else if route.ends_with("fixture-busy-bare") {
+                        busy
+                    } else if route.ends_with("fixture-adversary-busy-slow") {
+                        // Adversary: the first answer is an instant `429`
+                        // naming one second; every later answer takes 800 ms,
+                        // an ordinary provider latency, and is again a `429`.
+                        if seen > 1 {
+                            tokio::time::sleep(Duration::from_millis(800)).await;
+                        }
+                        retry_after = Some("1".into());
+                        busy
+                    } else if route.ends_with("fixture-adversary-busy-conflicting") {
+                        // Adversary: two `Retry-After` field lines on one
+                        // `429`, an hour first and one second last.
+                        retry_after = Some("3600\r\nRetry-After: 1".into());
+                        busy
                     } else if route.ends_with("fixture-refused") {
                         (403, json!({"message":"403 Forbidden"}))
                     } else if route.ends_with("fixture-missing") {
@@ -302,8 +368,11 @@ impl Provider {
                     };
                     let body = serde_json::to_vec(&body).unwrap();
                     let header = format!(
-                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        body.len()
+                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\n{}Connection: close\r\n\r\n",
+                        body.len(),
+                        retry_after
+                            .map(|value| format!("Retry-After: {value}\r\n"))
+                            .unwrap_or_default(),
                     );
                     let _ = stream.write_all(header.as_bytes()).await;
                     let _ = stream.write_all(&body).await;
@@ -759,6 +828,97 @@ fn a_refused_read_carries_the_providers_reason_and_never_credential_material() {
         ),
         Err(Failure::InvalidCredential)
     ));
+}
+
+/// story:catalog-honours-retry-after, through the real child: a read answered
+/// `429` with a `Retry-After` that ends before the invocation deadline is sent
+/// once more after it, in either form; one beyond the deadline, unreadable or
+/// absent is refused after one request, naming the delay or nothing, without
+/// waiting. A second `429` is refused, never a third request.
+#[test]
+fn a_rate_limited_read_waits_once_for_a_delay_that_fits_and_names_any_other() {
+    use connectors_host::local::runtime::Refusal;
+    use std::time::Instant;
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let requests = |project: &str| {
+        let route = format!("/api/v4/projects/org%2F{project}");
+        provider
+            .calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|path| path.split('?').next() == Some(route.as_str()))
+            .count()
+    };
+    let mut read = |project: &str, deadline_ms: u64| -> (Result<Value, Refusal>, Duration) {
+        let started = Instant::now();
+        let result = child
+            .invoke_explained(
+                "project.get",
+                &revision,
+                "one",
+                &token(true),
+                &serde_json::to_vec(&json!({ "id": format!("org/{project}") })).unwrap(),
+                connectors_sdk::now_ms() + deadline_ms,
+            )
+            .map(|bytes| serde_json::from_slice(&bytes).unwrap());
+        (result, started.elapsed())
+    };
+
+    for project in ["fixture-busy-once", "fixture-busy-date"] {
+        let (result, waited) = read(project, 30_000);
+        let value = result.unwrap_or_else(|refusal| panic!("{project}: {refusal:?}"));
+        assert_eq!(value["status"], 200, "{project}");
+        assert_eq!(value["body"]["id"], 7, "{project}");
+        assert_eq!(requests(project), 2, "{project}");
+        assert!(
+            waited >= Duration::from_millis(900),
+            "{project} was sent again after {waited:?}"
+        );
+    }
+
+    // A wait that leaves the second request time is taken, but the second
+    // request is bounded by the deadline less the margin: when it does not
+    // finish, the first answer's refusal and delay stand, before the deadline.
+    let (result, waited) = read("fixture-busy-stalled", 3_000);
+    let refusal = result.unwrap_err();
+    assert_eq!(
+        (refusal.failure, refusal.retry_after_seconds),
+        (Failure::ProviderRateLimited, Some(1)),
+        "after {waited:?}"
+    );
+    assert_eq!(requests("fixture-busy-stalled"), 2);
+    assert!(
+        waited < Duration::from_millis(2_900),
+        "answered after {waited:?}"
+    );
+
+    let (result, _) = read("fixture-busy-twice", 30_000);
+    let refusal = result.unwrap_err();
+    assert_eq!(refusal.failure, Failure::ProviderRateLimited);
+    assert_eq!(refusal.retry_after_seconds, Some(1));
+    assert_eq!(requests("fixture-busy-twice"), 2);
+
+    // Five seconds fits the default deadline but not a three-second one: the
+    // refusal names the delay at once rather than waiting past the deadline.
+    for (project, deadline_ms, named) in [
+        ("fixture-busy-long", 30_000, Some(3600)),
+        ("fixture-busy-five", 3_000, Some(5)),
+        ("fixture-busy-garbled", 30_000, None),
+        ("fixture-busy-bare", 30_000, None),
+    ] {
+        let (result, waited) = read(project, deadline_ms);
+        let refusal = result.unwrap_err();
+        assert_eq!(refusal.failure, Failure::ProviderRateLimited, "{project}");
+        assert_eq!(refusal.retry_after_seconds, named, "{project}");
+        assert_eq!(requests(project), 1, "{project}");
+        assert!(
+            waited < Duration::from_secs(2),
+            "{project} answered after {waited:?}"
+        );
+    }
 }
 
 /// A credential the child derives from the document (here the basic header

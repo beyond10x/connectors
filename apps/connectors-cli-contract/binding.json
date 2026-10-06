@@ -326,6 +326,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -673,6 +679,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -978,6 +990,12 @@
                           "kind": "string"
                         }
                       },
+                      "retry_after_seconds": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "service_code": {
                         "kind": "optional",
                         "of": {
@@ -1270,6 +1288,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -1586,6 +1610,12 @@
                           "kind": "string"
                         }
                       },
+                      "retry_after_seconds": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "service_code": {
                         "kind": "optional",
                         "of": {
@@ -1878,6 +1908,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -2189,6 +2225,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -2519,6 +2561,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -2865,6 +2913,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -3207,6 +3261,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -3553,6 +3613,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -3895,6 +3961,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -4241,6 +4313,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -4577,6 +4655,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -4931,6 +5015,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -5272,6 +5362,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -5798,6 +5894,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -6172,6 +6274,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -6537,6 +6645,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -6847,6 +6961,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -7214,6 +7334,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -7593,6 +7719,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -7961,6 +8093,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -8280,6 +8418,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -8720,6 +8864,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -9058,6 +9208,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {
@@ -9508,6 +9664,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -9863,6 +10025,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -10202,6 +10370,12 @@
                   "kind": "string"
                 }
               },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "service_code": {
                 "kind": "optional",
                 "of": {
@@ -10503,6 +10677,12 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
                 }
               },
               "service_code": {

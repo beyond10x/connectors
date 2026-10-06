@@ -73,7 +73,8 @@ selection. Its closed failure includes `provider_not_found`,
 provider `not_found`, `rate_limited` and `internal` must not become local selection
 `not_found` or generic unavailability. Admission failures keep their existing
 codes. No provider body, header or retry instruction enters the private control
-value. The one exception is the optional `reason` of a failed `invoke`: the
+value, with two exceptions, both only on a failed `invoke`. The first is the
+optional `reason`: the
 upstream's own reason for the refusal in the admitted form
 [semantics](semantics.md) defines for `connectors.cli.Failure.service_reason`,
 omitted when there is none. The host does not trust the child to have redacted
@@ -83,8 +84,23 @@ host sent for that call. The reason never decides the failure's code. A failed
 reply to anything but an `invoke` (a `validate`, a write's prepare, commit or
 cancel) that carries a `reason` is a malformed reply, refused as a protocol
 failure like any other. A host that predates the field
-refuses a reply that carries it. Unknown shared codes still
-refuse decoding; this adds no replay authority.
+refuses a reply that carries it.
+
+The second is the optional `retry_after_seconds` beside
+`code = provider_rate_limited`: the delay, in whole seconds from 0 to
+4294967295, that the provider's `Retry-After` named on the `429` that ended the
+call, projected unchanged into `connectors.cli.Failure.retry_after_seconds`
+([semantics](semantics.md)) and omitted when the provider named none the child
+could read. A child may itself send a rate-limited read once more after that
+delay, but only when the wait still leaves that second request time of its own
+before the request's `deadline_ms` (the catalog provider's rule is in
+[semantics](semantics.md)); it never sends a third, and never retries a write.
+A failed reply that carries `retry_after_seconds` beside any other code, or to
+anything but an `invoke`, is a malformed reply, refused as a protocol failure.
+A value above 4294967295 beside `provider_rate_limited` is not read: the host
+drops it and keeps the failure. A host that predates the field
+refuses a reply that carries it. Unknown shared codes still refuse decoding;
+this adds no replay authority.
 
 Control objects have a required `kind` discriminator and no unknown fields. The
 request/response identity is one fresh opaque id per exchange; it is not an
@@ -99,7 +115,7 @@ idempotency key or authority to repeat provider work.
 | `invoke` | `request_id`, `operation`, `revision`, `partition`, `deadline_ms` | exact retained material / decoded provider-input carrier |
 | `success` | `request_id` | empty / provider-result carrier |
 | `stop` / `stopped` | `request_id` | both empty |
-| `failed` | `request_id`, closed `code`, optional `reason` (a failed `invoke` only) | both empty |
+| `failed` | `request_id`, closed `code`, optional `reason` and `retry_after_seconds` (a failed `invoke` only; the latter beside `provider_rate_limited` only) | both empty |
 
 Version is `connectors-private/1`. Startup challenges and child incarnations are
 UUIDs. Exchange identities and cursor partitions use the shared bounded identifier

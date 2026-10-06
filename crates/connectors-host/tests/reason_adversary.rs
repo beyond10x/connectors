@@ -18,6 +18,7 @@ fn a_reason_rides_only_beside_a_service_code_or_a_provider_forbidden() {
             let error: owner::Error = Refusal {
                 failure,
                 reason: Some("Unauthorized; scope does not match".into()),
+                retry_after_seconds: None,
             }
             .into();
             error

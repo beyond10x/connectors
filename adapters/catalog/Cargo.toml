@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 default = ["service"]
-service = ["dep:connectors-host", "dep:clap"]
+service = ["dep:connectors-host", "dep:clap", "dep:tokio"]
 
 [[bin]]
 name = "connectors-catalog-provider"
@@ -25,7 +25,9 @@ serde_json.workspace = true
 zeroize.workspace = true
 base64.workspace = true
 clap = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
 sha2.workspace = true
+httpdate = "1.0.3"
 
 [dev-dependencies]
 entity-core.workspace = true

@@ -14,6 +14,8 @@ mod guarded_merge;
 mod lifecycle;
 #[path = "reason_cli_adversary.rs"]
 mod reason_cli_adversary;
+#[path = "retry_after_cli.rs"]
+mod retry_after_cli;
 #[path = "settlement_fault.rs"]
 mod settlement_fault;
 
