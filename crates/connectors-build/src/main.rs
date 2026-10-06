@@ -16,6 +16,8 @@ mod aep_toolchain;
 mod cli;
 mod docs;
 mod ess_boundary;
+#[cfg(test)]
+mod feed_conformance;
 mod gate;
 mod ignored;
 mod metadata_conformance;
