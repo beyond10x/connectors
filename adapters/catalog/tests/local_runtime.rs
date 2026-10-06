@@ -202,7 +202,7 @@ impl Provider {
                     observed_authorizations
                         .lock()
                         .unwrap()
-                        .push((route.to_owned(), authorization));
+                        .push((route.to_owned(), authorization.clone()));
                     if route == "/api/v4/projects/org%2Fproject/merge_requests/4" {
                         while merge_behavior.load(Ordering::SeqCst) == 4 {
                             tokio::select! { _=&mut stopped=>return, _=tokio::time::sleep(Duration::from_millis(10))=>{} }
@@ -255,6 +255,27 @@ impl Provider {
                         // response carries merged state for catalog postflight;
                         // merge_effects separately counts every actual effect.
                         (200, merge_record(preflight_merged.load(Ordering::SeqCst)))
+                    } else if route.ends_with("fixture-scope") {
+                        (401, json!({"code":401,"message":"Unauthorized; scope does not match"}))
+                    } else if route.ends_with("fixture-leaky") {
+                        (401, json!({"message":"Unauthorized; token fixtok-AbCdEfGhIjKl0123456789 revoked"}))
+                    } else if route.ends_with("fixture-echo") {
+                        // Echoes the request's own credential, as a careless
+                        // provider might; only ever compared, never printed.
+                        (401, json!({"message":format!("Unauthorized for {}", credential.clone().unwrap_or_default())}))
+                    } else if route.ends_with("fixture-echo-header") {
+                        // Echoes the derived `Authorization` value in short
+                        // words, so neither the shape rules nor the document
+                        // the host holds can catch it; only the child can.
+                        let value = authorization.clone().unwrap_or_default();
+                        let value = value.trim_start_matches("Basic ").as_bytes();
+                        let spaced: Vec<String> = value
+                            .chunks(4)
+                            .map(|chunk| String::from_utf8_lossy(chunk).into_owned())
+                            .collect();
+                        (401, json!({"message":format!("Unauthorized for {}", spaced.join(" "))}))
+                    } else if route.ends_with("fixture-verbose") {
+                        (401, json!({"message":format!("Unauthorized {}", "scopé ".repeat(40))}))
                     } else if route.ends_with("fixture-refused") {
                         (403, json!({"message":"403 Forbidden"}))
                     } else if route.ends_with("fixture-missing") {
@@ -681,6 +702,105 @@ fn catalog_child_validates_reads_and_stops_with_exact_incarnations() {
             .subject,
         "42"
     );
+}
+
+/// story:service-failure-carries-upstream-reason: a provider 401 whose JSON
+/// body names the missing scope reaches the host beside its code, through the
+/// real child; a secret-shaped body and one echoing the request's own token
+/// are withheld; a long one is cut to 256 bytes.
+#[test]
+fn a_refused_read_carries_the_providers_reason_and_never_credential_material() {
+    use connectors_host::local::runtime::Refusal;
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let mut refuse = |id: &str| -> Refusal {
+        child
+            .invoke_explained(
+                "project.get",
+                &revision,
+                "one",
+                &token(true),
+                &serde_json::to_vec(&json!({ "id": id })).unwrap(),
+                deadline(),
+            )
+            .unwrap_err()
+    };
+    let scope = refuse("fixture-scope");
+    assert_eq!(scope.failure, Failure::InvalidCredential);
+    assert_eq!(
+        scope.reason.as_deref(),
+        Some("Unauthorized; scope does not match")
+    );
+    let leaky = refuse("fixture-leaky");
+    assert_eq!(leaky.failure, Failure::InvalidCredential);
+    assert_eq!(leaky.reason, None);
+    let echo = refuse("fixture-echo");
+    assert_eq!(echo.failure, Failure::InvalidCredential);
+    assert_eq!(echo.reason, None);
+    let verbose = refuse("fixture-verbose").reason.unwrap();
+    assert!(verbose.len() <= 256, "{} bytes", verbose.len());
+    assert!(verbose.starts_with("Unauthorized scopé scopé"));
+    // A provider 403 or 404 keeps its own message beside its code too.
+    let refused = refuse("fixture-refused");
+    assert_eq!(refused.failure, Failure::ProviderForbidden);
+    assert_eq!(refused.reason.as_deref(), Some("403 Forbidden"));
+    let missing = refuse("fixture-missing");
+    assert_eq!(missing.failure, Failure::ProviderNotFound);
+    assert_eq!(missing.reason.as_deref(), Some("404 Project Not Found"));
+    // The plain transport keeps its closed failure.
+    assert!(matches!(
+        invoke(
+            &mut child,
+            "project.get",
+            "one",
+            &token(true),
+            json!({"id":"fixture-scope"})
+        ),
+        Err(Failure::InvalidCredential)
+    ));
+}
+
+/// A credential the child derives from the document (here the basic header
+/// value) is not in the document the host checks against, so the child
+/// withholds a reason that echoes it, even split into short words.
+#[test]
+fn a_reason_echoing_the_derived_basic_header_value_is_withheld_by_the_child() {
+    let provider = Provider::basic("api");
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let mut refuse = |id: &str| {
+        child
+            .invoke_explained(
+                "project.get",
+                &revision,
+                "one",
+                &basic(BASIC_TOKEN),
+                &serde_json::to_vec(&json!({ "id": id })).unwrap(),
+                deadline(),
+            )
+            .unwrap_err()
+    };
+    let echo = refuse("fixture-echo-header");
+    assert_eq!(echo.failure, Failure::InvalidCredential);
+    assert_eq!(echo.reason, None);
+    // The same profile still carries an ordinary reason.
+    assert_eq!(
+        refuse("fixture-scope").reason.as_deref(),
+        Some("Unauthorized; scope does not match")
+    );
+    // Neither shape rules nor the host's document check would catch the echo.
+    let encoded = BASIC_HEADER.trim_start_matches("Basic ").as_bytes();
+    let spaced: Vec<String> = encoded
+        .chunks(4)
+        .map(|chunk| String::from_utf8_lossy(chunk).into_owned())
+        .collect();
+    let text = format!("Unauthorized for {}", spaced.join(" "));
+    let admitted = connectors_core::reason::admit(&text).unwrap();
+    assert!(!connectors_core::reason::carries_credential(
+        &admitted,
+        &basic(BASIC_TOKEN).0
+    ));
 }
 
 #[test]

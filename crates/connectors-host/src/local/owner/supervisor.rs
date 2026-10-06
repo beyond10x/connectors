@@ -894,7 +894,7 @@ fn worker(
                     }
                     let dispatched = registry.dispatch_read(captured, connectors_sdk::now_ms())?;
                     drop(guard);
-                    let result = active.invoke(
+                    let result = active.invoke_explained(
                         &operation, &revision, &partition, &material, &document, deadline,
                     );
                     registry.release_read(dispatched, connectors_sdk::now_ms())?;
