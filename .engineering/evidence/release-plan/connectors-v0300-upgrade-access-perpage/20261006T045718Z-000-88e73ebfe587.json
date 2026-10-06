@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-06T04:57:18Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0300-upgrade-access-perpage",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.52.0, AEP 0.65.0, Rust 1.99.0 default, +1.88.0 and +1.91.0 MSRV) on f7f6fbb plus uncommitted release preparation; exit 0; 1312 passed, 0 failed, 66 ignored",
+    "reference": "gate log sha256 09b2bf9d357aecb84cef74f7f301cdb01023d45df152d6e9df117ae5b354220e"
+  }
+}

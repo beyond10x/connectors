@@ -20,6 +20,11 @@
   `/1` and `/2` files keep loading; `[consumers]` in them is refused, and
   `setup init` still writes `/2`. `connectors.cli.ConfigurationFormat` gains
   `connectors-local/3`.
+
+## 0.30.0 — 2026-10-06
+
+### Added
+
 - A connection follows a configuration upgrade of its instance without credential
   re-entry. `connections revalidate` on a connection whose binding names an older
   configuration revision validates the credential already in custody with the new
