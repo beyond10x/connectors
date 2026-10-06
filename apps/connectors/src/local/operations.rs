@@ -10,6 +10,23 @@ fn operation(operation: &connectors_core::Operation) -> Value {
     value["output_schema"] = json!(operation.output_schema.to_string());
     value
 }
+/// The optional `--family` filter: a contract id matched exactly against each
+/// operation's descriptor `contract`. `None` when the value is malformed.
+fn family(input: &Value) -> Option<Option<&str>> {
+    match input.get("family") {
+        None | Some(Value::Null) => Some(None),
+        Some(value) => value
+            .as_str()
+            .filter(|family| {
+                !family.is_empty()
+                    && family.len() <= 128
+                    && family
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || b"-_./".contains(&c))
+            })
+            .map(Some),
+    }
+}
 pub(super) fn descriptor(bootstrap: &Bootstrap) -> owner::Result<Value> {
     let descriptor = bootstrap.descriptor()?;
     Ok(
@@ -26,23 +43,31 @@ pub(super) fn describe(
         super::cursor::Refusal::InvalidInput => Code::InvalidInput,
         super::cursor::Refusal::StaleCursor => Code::StaleCursor,
     };
-    // `--limit` and the cursor's encoding are checked before the cached
-    // description is read.
+    // `--family`, `--limit` and the cursor's encoding are checked before the
+    // cached description is read.
     let request = (call.callable == "operations-list")
-        .then(|| super::cursor::Request::parse(&call.input))
-        .transpose()
-        .map_err(refused)?;
+        .then(|| {
+            let family = family(&call.input).ok_or(Code::InvalidInput)?;
+            let request = super::cursor::Request::parse(&call.input).map_err(refused)?;
+            Ok::<_, owner::Error>((family, request))
+        })
+        .transpose()?;
     let bootstrap = owner::cached(paths, alias)?;
     let descriptor = bootstrap.descriptor()?;
-    if let Some(request) = request {
+    if let Some((family, request)) = request {
         let operations = descriptor
             .operations
             .iter()
+            .filter(|o| family.is_none_or(|family| o.contract == family))
             .filter(|o| owner::admit_operation(adapter, &bootstrap, &o.id).is_ok())
             .collect::<Vec<_>>();
         // The selection a cursor is bound to: the adapter it lists, the
-        // descriptor revision and the operations this configuration permits.
-        let source = json!({"adapter":alias,"instance_id":adapter.instance_id,"revision":descriptor.revision,"operations":operations.iter().map(|o| &o.id).collect::<Vec<_>>()});
+        // descriptor revision, the family it is filtered to and the operations
+        // this configuration permits.
+        let mut source = json!({"adapter":alias,"instance_id":adapter.instance_id,"revision":descriptor.revision,"operations":operations.iter().map(|o| &o.id).collect::<Vec<_>>()});
+        if let Some(family) = family {
+            source["family"] = json!(family);
+        }
         let (range, next) = request.page(&source, operations.len()).map_err(refused)?;
         let mut result = json!({"adapter":alias,"revision":descriptor.revision,"operations":operations[range].iter().map(|o| summary(o)).collect::<Vec<_>>(),"source":"cached","stale":true});
         if let Some(next) = next {
