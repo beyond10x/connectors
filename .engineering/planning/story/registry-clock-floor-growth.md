@@ -7,6 +7,7 @@ title: The registry clock floor no longer records an event on every command
 relations:
 - decomposes: epic:connector-probe-20261006
 - depends_on: story:dependency-refresh-20261006
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: contracts/service/clock.md

@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: story:dependency-refresh-20261006
 kind: story
-status: draft
+status: active
 title: 'Dependencies at their newest releases: crates.io, ESS 0.53.0, AEP 0.68.0'
 relations:
 - decomposes: epic:connector-probe-20261006
 - supersedes: story:toolchain-pins-newest-release-20261001
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: .engineering/project.yaml
@@ -30,7 +31,10 @@ scope:
   path: docs/development.md
 - confidence: inferred
   path: ess/domains
-revision: 4
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T09:42:56Z", actor: "human:timo", revision: 5}
+- {from: "proposed", to: "active", at: "2026-10-06T09:42:56Z", actor: "human:timo", revision: 6}
 ---
 ## Defect
 
