@@ -10,6 +10,7 @@ relations:
 - depends_on: story:feed-contract
 - depends_on: story:feed-bindings-discoverable
 - depends_on: story:catalog-slack-reads
+- depends_on: story:catalog-feed-engine
 revision: 1
 ---
 ## Outcome
