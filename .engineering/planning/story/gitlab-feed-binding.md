@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:gitlab-feed-binding
 kind: story
-status: draft
+status: active
 title: GitLab binds the feed family
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -10,7 +10,11 @@ relations:
 - depends_on: story:feed-contract
 - depends_on: story:feed-bindings-discoverable
 - depends_on: story:catalog-feed-engine
-revision: 1
+- depends_on: story:catalog-feed-engine-extensions
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 3}
 ---
 ## Outcome
 
@@ -22,4 +26,13 @@ The family's conformance suite passes against the binding with recorded provider
 
 ## Depends on
 
-`story:feed-contract`, `story:feed-bindings-discoverable`. 
+`story:feed-contract`, `story:feed-bindings-discoverable`.
+
+## Decided 2026-10-06 (wave 20261006d)
+
+## Decided 2026-10-06 (wave 20261006d)
+
+- Items are merge requests only: one connection carries one binding with the fixed ids, so one profile yields one item kind.
+- Visibility: every project maps to `private` until visibility can be read from two fields (a public project with members-only merge requests must not be listed public).
+- `url` stays null: a project rename changes `web_url` without changing the merge request revision.
+- The unit's binding and engine patch are kept in the worktree archive `connectors-w4-gitlab`.
