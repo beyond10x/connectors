@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-feed-engine
 kind: story
-status: draft
+status: active
 title: The catalog engine realizes a feed binding from declarations
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -13,7 +13,10 @@ scope:
   path: adapters/catalog/src
 - confidence: inferred
   path: contracts/catalog/v1alpha1/semantics.md
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T17:00:04Z", actor: "agent:claude", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-06T17:00:05Z", actor: "agent:claude", revision: 4}
 ---
 ## Outcome
 
