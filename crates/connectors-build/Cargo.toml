@@ -26,3 +26,8 @@ ess-conformance.workspace = true
 ess-primitives.workspace = true
 entity-core.workspace = true
 libc = "0.2"
+
+[dev-dependencies]
+async-trait.workspace = true
+connectors-core.workspace = true
+connectors-sdk.workspace = true

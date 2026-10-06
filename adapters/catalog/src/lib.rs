@@ -7,6 +7,11 @@
 //! approval, records the attempt and supplies the one-use write capability. The
 //! engine turns a declared operation plus validated input into exactly one
 //! request and turns the response into an observation.
+//!
+//! A provider may also declare a `datasource.feed/v1alpha1` binding as data; [`feed`] realizes
+//! it over the same bundle, and the engine answers `feed.containers` and `feed.items` from it.
+pub mod feed;
+
 use connectors_catalog::{
     bundle::Bundle,
     inventory::{Location, Operation, ValueType},
@@ -263,6 +268,7 @@ pub struct Engine {
     source_revision: String,
     exposed: Vec<Exposed>,
     probes: BTreeMap<String, Probe>,
+    feed: Option<feed::Feed>,
 }
 
 /// One request, bound and ready to be sent exactly once.
@@ -282,12 +288,23 @@ impl Engine {
     /// `base_path` is the path the provider authority already carries, such as
     /// `/api/v4`; every selected operation's declared path must start with it.
     pub fn new(bundle: &Bundle, base_path: &str, selections: &[Selection]) -> Result<Self> {
+        Self::with_feed(bundle, base_path, selections, None)
+    }
+
+    /// [`Engine::new`], and the feed binding `feed` declares, if any. With a feed the
+    /// selections may be empty; without one there must be at least one.
+    pub fn with_feed(
+        bundle: &Bundle,
+        base_path: &str,
+        selections: &[Selection],
+        feed: Option<&feed::Declaration>,
+    ) -> Result<Self> {
         let base_segments: Vec<String> = base_path
             .split('/')
             .filter(|s| !s.is_empty())
             .map(str::to_owned)
             .collect();
-        if selections.is_empty() || selections.len() > 256 {
+        if (selections.is_empty() && feed.is_none()) || selections.len() > 256 {
             return Err(refuse("select between one and 256 operations"));
         }
         let find = |operation_id: &str| -> Result<&Operation> {
@@ -305,6 +322,13 @@ impl Engine {
             if !connectors_core::valid_id(&selection.id) || !ids.insert(selection.id.clone()) {
                 return Err(refuse(format!(
                     "invalid or repeated selection id `{}`",
+                    selection.id
+                )));
+            }
+            // The family's ids mean the family's operations and nothing else.
+            if [feed::CONTAINERS, feed::ITEMS].contains(&selection.id.as_str()) {
+                return Err(refuse(format!(
+                    "selection `{}` takes an id of the feed family",
                     selection.id
                 )));
             }
@@ -509,24 +533,41 @@ impl Engine {
                 text,
             });
         }
+        let feed = feed
+            .map(|declaration| feed::Feed::new(bundle, &base_segments, declaration))
+            .transpose()?;
         Ok(Self {
             base_segments,
             source_revision: bundle.source.source_sha256.clone(),
             exposed,
             probes,
+            feed,
         })
     }
 
-    /// The declarations for the selected operations with these effects.
+    /// The declarations for the selected operations with these effects, then the feed's two
+    /// reads when a feed is declared.
     pub fn declarations(&self, effects: &[Effect]) -> Vec<connectors_core::Operation> {
-        self.exposed
+        let mut declarations: Vec<connectors_core::Operation> = self
+            .exposed
             .iter()
             .filter(|e| effects.contains(&e.selection.effect))
             .map(|e| e.declaration.clone())
-            .collect()
+            .collect();
+        if let Some(feed) = self
+            .feed
+            .as_ref()
+            .filter(|_| effects.contains(&Effect::Read))
+        {
+            declarations.extend(feed.declarations());
+        }
+        declarations
     }
 
     pub fn effect(&self, id: &str) -> Option<Effect> {
+        if self.feed.is_some() && [feed::CONTAINERS, feed::ITEMS].contains(&id) {
+            return Some(Effect::Read);
+        }
         self.exposed
             .iter()
             .find(|e| e.selection.id == id)
@@ -624,6 +665,13 @@ impl Engine {
         id: &str,
         input: Value,
     ) -> Result<Value> {
+        if let Some(feed) = &self.feed {
+            match id {
+                feed::CONTAINERS => return feed.containers(http, instance, input).await,
+                feed::ITEMS => return feed.items(http, instance, input).await,
+                _ => {}
+            }
+        }
         let exposed = self.exposed(id)?;
         if exposed.selection.effect != Effect::Read {
             return Err(Error::new(ErrorCode::Forbidden, "operation is a write"));
