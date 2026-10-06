@@ -211,7 +211,7 @@ fn revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledge
     );
     assert_eq!(
         registry.admit_read(&binding(), &reference, &BTreeSet::new(), expired),
-        Err(Failure::NotReady)
+        Err(Failure::EvidenceExpired)
     );
     let capture = registry
         .capture_revalidation(&binding(), &reference, &revision, expired, expired + 30_000)
@@ -245,6 +245,79 @@ fn revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledge
         describe(&registry, &reference, NOW + 3_600_000).state,
         State::ReauthorizationRequired
     );
+}
+
+/// story:expired-evidence-invoke-advises-revalidate. A read on a connection
+/// whose validation evidence expired while its credential is intact is refused
+/// as `EvidenceExpired`, at admission and at capture, and revalidation alone
+/// readmits it. A missing scope on current evidence stays `InsufficientScope`,
+/// and a credential that itself expired or is known invalid stays `NotReady`.
+#[test]
+fn an_expired_evidence_read_is_refused_by_name_and_revalidation_readmits_it() {
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let none = BTreeSet::new();
+    let write = BTreeSet::from(["write".to_owned()]);
+    assert_eq!(
+        registry.admit_read(&binding(), &reference, &write, NOW),
+        Err(Failure::InsufficientScope)
+    );
+    let expired = NOW + 60_001;
+    assert_eq!(
+        describe(&registry, &reference, expired).state,
+        State::Pending
+    );
+    assert_eq!(
+        registry.admit_read(&binding(), &reference, &none, expired),
+        Err(Failure::EvidenceExpired)
+    );
+    assert!(matches!(
+        registry.capture_read(&binding(), &reference, &none, expired, expired + 1000),
+        Err(Failure::EvidenceExpired)
+    ));
+    let capture = registry
+        .capture_revalidation(&binding(), &reference, &revision, expired, expired + 30_000)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(capture, expired).unwrap();
+    registry
+        .finish_revalidation(dispatched, Ok(baseline("one", expired)), expired)
+        .unwrap();
+    registry
+        .admit_read(&binding(), &reference, &none, expired)
+        .unwrap();
+    let read = registry
+        .capture_read(&binding(), &reference, &none, expired, expired + 1000)
+        .unwrap();
+    registry.dispatch_read(read, expired).unwrap();
+    // The credential's own expiry is not evidence a revalidation recollects.
+    assert_eq!(
+        registry.admit_read(&binding(), &reference, &none, NOW + 3_600_000),
+        Err(Failure::NotReady)
+    );
+}
+
+/// Known invalid material is not expired evidence either: only a repair helps.
+#[test]
+fn an_invalid_credential_read_stays_not_ready_after_its_evidence_expired() {
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let none = BTreeSet::new();
+    let captured = registry
+        .capture_read(&binding(), &reference, &none, NOW, NOW + 1000)
+        .unwrap();
+    registry
+        .invalidate_read(&captured, InvalidCredential::Invalid, NOW)
+        .unwrap();
+    for at in [NOW, NOW + 60_001] {
+        assert_eq!(
+            registry.admit_read(&binding(), &reference, &none, at),
+            Err(Failure::NotReady),
+            "{at}"
+        );
+    }
 }
 
 #[test]
