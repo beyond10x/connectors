@@ -30,6 +30,21 @@ types:
     # Raw signature/nonce validation, process continuity, elapsed-time bounds,
     # suspend rejection, TTL and outward rounding are runtime evidence: ESS 0.40
     # has no signature, monotonic-clock or process-continuity construct.
+  - name: connectors.clock.RegistryClockFloorFile
+    kind: struct
+    fields:
+      - {name: last_seen_ms, type: Integer}
+    # contracts/service/clock.md "Registry clock floor": the content of the
+    # registry's durable floor file, the last system-clock sample a registry
+    # transaction admitted. A registry transaction refuses a sample below the
+    # higher of this value and the recorded registry LocalClockFloor; a missing
+    # or unreadable file counts as that recorded floor plus 60,000 ms.
+    invariants:
+      - last_seen_ms: {gte: 0}
+    # ESS-LIMIT: ESS 0.53 has no file-system or storage construct. The file's
+    # location beside the metadata lock, its read and write only under the
+    # metadata lifecycle lock, and its write-temporary/fsync/rename replacement
+    # are host facts (docs/local-er-metadata.md), not schema-proven ones.
 
 entities:
   - name: connectors.clock.LocalClockFloor
@@ -47,9 +62,16 @@ entities:
       terminal: [Recorded]
       transitions:
         - {name: advance, from: [Recorded], to: Recorded}
-    # The local registry and mutation owners use distinct identities. An
-    # advance is recorded even when a separately proposed business action is
-    # refused, so a restart cannot admit a regressed trusted observation.
+    # The local registry and mutation owners use distinct identities. The
+    # mutation floor advances with every observation it admits, even when a
+    # separately proposed business action is refused, so a restart cannot admit
+    # a regressed trusted observation. The registry floor is a coarse bound on
+    # connectors.clock.RegistryClockFloorFile: it advances only to a sample more
+    # than 60,000 ms past its recorded value, so it is never more than that
+    # below any admitted registry sample.
+    # ESS-LIMIT: the 60,000 ms rule compares a subject field with an input plus
+    # a constant; ESS 0.53 predicates take a bare fact path on each side
+    # ("left-hand side must be a fact path"), so the host enforces it.
 
 commands:
   - name: connectors.clock.RecordLocalClockFloor
@@ -71,9 +93,10 @@ commands:
       - {name: owner, type: String}
       - {name: lower_unix_ms, type: Integer}
     outcomes:
-      # docs/local-er-metadata.md:124-125: the floors are owner anti-regression
-      # observations. The host re-records the same value (er.rs advance), so an
-      # equal floor is accepted and only a lower one is refused.
+      # docs/local-er-metadata.md: the floors are owner anti-regression
+      # observations. The host records an advance only for a changed floor; an
+      # equal floor stays accepted so stores recorded before that change, which
+      # re-recorded equal values, replay unchanged. Only a lower one is refused.
       - name: regressed
         when_subject:
           predicate: lower_unix_ms > input.lower_unix_ms

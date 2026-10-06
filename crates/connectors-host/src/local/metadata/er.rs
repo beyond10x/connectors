@@ -3201,6 +3201,19 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         .into_iter()
         .map(|row| ((row.entity.clone(), row.id.clone()), row))
         .collect::<BTreeMap<_, _>>();
+    // Every persist holds the lifecycle lock (`Metadata::require_lifecycle_lock`),
+    // so between this feed read and the batch below no other handle appends.
+    // Before it, another handle can have appended only while this one did not
+    // hold the lock: during an observation's unlocked replay. Such a change
+    // refuses the batch as a stale revision would, before anything is
+    // appended. A runtime-record writer, which an observation never reads or
+    // writes, may land in that window; only those rows may differ.
+    let caught_up = if concurrent_observation || runtime_state_only {
+        None
+    } else {
+        refuse_changed_since_baseline(er, prepared_observation)?
+    };
+    let reference = caught_up.as_ref().unwrap_or(&er.baseline);
     if runtime_state_only {
         // Suppression and cached bootstrap writes read only the runtime
         // table. Reject any attempt to use this path for a registry clock
@@ -3223,8 +3236,8 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
     if prepared_observation {
         // The two admitted observation callers may only persist their
         // registry clock. This check also covers additions and removals.
-        let changed_non_clock = er.baseline.keys().chain(desired.keys()).any(|key| {
-            let changed = match (er.baseline.get(key), desired.get(key)) {
+        let changed_non_clock = reference.keys().chain(desired.keys()).any(|key| {
+            let changed = match (reference.get(key), desired.get(key)) {
                 (Some(current), Some(next)) => {
                     current.fields != next.fields || current.lifecycle_state != next.lifecycle_state
                 }
@@ -3246,7 +3259,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         .collect::<BTreeMap<_, _>>();
     let runtime_registry = registry()?;
     let mut actions = Vec::new();
-    for (key, current) in &er.baseline {
+    for (key, current) in reference {
         match desired.get(key) {
             Some(next)
                 if next.fields == current.fields
@@ -3282,7 +3295,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         }
     }
     for (key, next) in &desired {
-        if !er.baseline.contains_key(key) {
+        if !reference.contains_key(key) {
             let mut stages = creation_stages(next, admitted_registry_use)?;
             let initial = stages.remove(0);
             actions.push(create_action(
@@ -3307,41 +3320,14 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             }
         }
     }
-    if actions.is_empty() && !prepared_observation {
-        return Ok(());
+    if prepared_observation && !reference.keys().any(registry_clock_key) {
+        return Err(Failure::MetadataUnavailable);
     }
-    if !concurrent_observation && !runtime_state_only {
-        // An already-open registry observation may advance its clock after
-        // releasing the physical lifecycle lock. Fence that floor even
-        // when this batch sampled the same millisecond as its baseline,
-        // so the clock subject participates in the atomic revision guard.
-        // Mutation-clock writers retain the lifecycle lock and need no
-        // extra action. The authored transition records the same lower
-        // value; it invents no later time.
-        let mut found_registry_clock = false;
-        for (key, current) in &er.baseline {
-            if current.entity != "connectors.clock.LocalClockFloor"
-                || current.fields.get("owner") != Some(&json!("registry"))
-            {
-                continue;
-            }
-            found_registry_clock = true;
-            if desired.get(key).is_some_and(|next| {
-                next.fields == current.fields && next.lifecycle_state == current.lifecycle_state
-            }) {
-                actions.push(command_action(
-                    &runtime_registry,
-                    &commands,
-                    &desired,
-                    current,
-                    current,
-                    "connectors.clock.AdvanceLocalClockFloor",
-                )?);
-            }
-        }
-        if prepared_observation && !found_registry_clock {
-            return Err(Failure::MetadataUnavailable);
-        }
+    // An unchanged floor is not recorded again. A change another handle made
+    // since this baseline was refused above, before this batch; each action
+    // still names its exact predecessor revision for the subject it writes.
+    if actions.is_empty() {
+        return Ok(());
     }
     let batch = BatchKey::Named(format!(
         "connectors-metadata-batch-{}",
@@ -3477,12 +3463,12 @@ fn postcommit_projection_matches(
     }
     desired.keys().chain(current.keys()).all(|key| {
         if prepared_observation && runtime_record_key(key) {
-            // A runtime-record write holds the lifecycle lock but omits the
-            // registry-clock guard, so it can land between this observation's
-            // unlocked replay and its relock without failing the clock CAS.
-            // The observation's own batch was refused above unless it changed
-            // nothing but the clock, and no registry observation reads these
-            // rows, so their recorded state says nothing about our projection.
+            // A runtime-record write can land between this observation's
+            // unlocked replay and its relock; the feed check before its batch
+            // admits exactly that change. The observation's own batch was
+            // refused above unless it changed nothing but the clock, and no
+            // registry observation reads these rows, so their recorded state
+            // says nothing about our projection.
             return true;
         }
         if runtime_state_only && registry_clock_key(key) {
@@ -3512,13 +3498,39 @@ fn postcommit_projection_matches(
     })
 }
 
+/// Refuses with `ConcurrentRevision` when another handle changed a subject
+/// since `er`'s baseline, except a runtime record when `runtime_records_may_differ`.
+/// Nothing appended since leaves `er` as it was and returns `None`. Otherwise
+/// `er` has caught up, and the baseline this handle decided on is returned:
+/// the batch is still prepared against it.
+fn refuse_changed_since_baseline(
+    er: &mut ErAuthority,
+    runtime_records_may_differ: bool,
+) -> Result<Option<BTreeMap<(String, String), RowImage>>> {
+    let tenant = er.facade.authority().tenant.clone();
+    let (head, _) = feed_after(&er.durable_path, &tenant, er.head.last)?;
+    if head == er.head {
+        return Ok(None);
+    }
+    let decided = er.baseline.clone();
+    catch_up(er, None)?;
+    let changed = decided.keys().chain(er.baseline.keys()).any(|key| {
+        decided.get(key) != er.baseline.get(key)
+            && !(runtime_records_may_differ && runtime_record_key(key))
+    });
+    if changed {
+        return Err(Failure::ConcurrentRevision);
+    }
+    Ok(Some(decided))
+}
+
 fn registry_clock_key(key: &(String, String)) -> bool {
     key.0 == "connectors.clock.LocalClockFloor" && key.1 == "s:registry"
 }
 
-/// The only rows the runtime-state writer may change. That writer omits the
-/// registry-clock guard, so these are also the only rows a prepared
-/// observation's clock revision cannot fence; it never reads them either.
+/// The only rows the runtime-state writer may change. That writer skips the
+/// feed check, and these are the only rows another handle may have changed
+/// when a prepared observation's feed check runs; it never reads them either.
 fn runtime_record_key(key: &(String, String)) -> bool {
     key.0 == "connectors.cli.LocalRuntimeRecord"
 }
@@ -4722,8 +4734,9 @@ mod tests {
     }
 
     // `AdvanceLocalClockFloor` refuses a floor lower than the recorded one and
-    // accepts the same value, which is what the host re-records
-    // (`ess/domains/clock.yaml`, outcome `regressed`).
+    // accepts the same value, which stores recorded before the host stopped
+    // re-recording an unchanged floor still hold (`ess/domains/clock.yaml`,
+    // outcome `regressed`).
     #[test]
     fn clock_floor_advance_refuses_a_lower_floor_and_accepts_the_same_one() {
         let directory = tempfile::tempdir().unwrap();

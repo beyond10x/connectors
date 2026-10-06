@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-06T10:22:12Z",
+  "actor": "human:timo",
+  "artifact": "story:dependency-refresh-20261006",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.53.0, AEP 0.68.0, Rust 1.99.0 default, +1.88.0 and +1.91.0 MSRV) on c2d4edc; exit 0; 1328 passed, 0 failed, 71 ignored",
+    "reference": "gate log sha256 4aabf208449a1af32eaa2e6d83ed944db9ad4ba24aad8df33d55d28f11a4623f"
+  }
+}
