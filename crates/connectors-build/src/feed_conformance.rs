@@ -14,6 +14,9 @@
 //!   binding that loses a change on resume, or advances its watermark past one, leaves that view
 //!   stale and the scenarios that read it fail. `SourceContainers` and `SourceItems` read the
 //!   provider itself; they are the specification's witnesses, not family operations.
+//!
+//! The adapter holds any [`Binding`] over the same provider: [`Native`] is the binding above, and
+//! `catalog_feed_conformance` holds the catalog engine's declared bindings to the same suite.
 use crate::metadata_entities;
 use ess_conformance::{
     AdmittedSuite, CountReport, CountStatus, Runner,
@@ -30,20 +33,20 @@ use std::{
 
 const COMPONENT: &str = "feed-binding";
 
-/// The scenarios the suite holds today: 22 synthesized and 4 authored. A run that executes fewer
+/// The scenarios the suite holds today: 22 synthesized and 6 authored. A run that executes fewer
 /// is not running what the specification obliges.
-const EXPECTED_SCENARIOS: u64 = 26;
+pub(crate) const EXPECTED_SCENARIOS: u64 = 28;
 
 const DOMAIN: &str = "connectors.feed";
 
-fn root() -> PathBuf {
+pub(crate) fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .canonicalize()
         .expect("repository root")
 }
 
-fn suite(root: &Path) -> AdmittedSuite {
+pub(crate) fn suite(root: &Path) -> AdmittedSuite {
     let ir = metadata_entities::compile(&metadata_entities::load(root).expect("load ess"))
         .expect("compile ess");
     let synthesis =
@@ -85,53 +88,99 @@ fn suite(root: &Path) -> AdmittedSuite {
 // ---- the provider ----------------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
-struct Container {
+pub(crate) struct Container {
     /// The connection this container is read through; it references the connection.
-    connection: String,
-    name: Option<String>,
-    kind: String,
-    visibility: String,
+    pub(crate) connection: String,
+    pub(crate) name: Option<String>,
+    pub(crate) kind: String,
+    pub(crate) visibility: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-struct Item {
-    container: String,
-    revision: String,
-    created_at: String,
-    updated_at: String,
-    parent: Option<String>,
-    deleted: bool,
+pub(crate) struct Item {
+    pub(crate) container: String,
+    pub(crate) revision: String,
+    pub(crate) created_at: String,
+    pub(crate) updated_at: String,
+    pub(crate) parent: Option<String>,
+    pub(crate) deleted: bool,
     /// The provider's change sequence at this item's last change.
-    changed: u64,
+    pub(crate) changed: u64,
 }
 
 #[derive(Clone, Debug, Default)]
-struct Source {
-    containers: BTreeMap<String, Container>,
-    items: BTreeMap<String, Item>,
-    sequence: u64,
+pub(crate) struct Source {
+    pub(crate) containers: BTreeMap<String, Container>,
+    pub(crate) items: BTreeMap<String, Item>,
+    pub(crate) sequence: u64,
 }
 
 // ---- the binding -----------------------------------------------------------------------------
 
-/// The service contract codes this binding answers with.
+/// The service contract codes a binding answers with; any other is carried by name.
 #[derive(Debug, PartialEq)]
-enum Code {
+pub(crate) enum Code {
     InvalidInput,
     NotFound,
     StaleCursor,
+    Other(String),
 }
 
-struct ContainersPage {
-    containers: Vec<(String, Container)>,
-    next_cursor: Option<String>,
-    complete: bool,
+pub(crate) struct ContainersPage {
+    pub(crate) containers: Vec<(String, Container)>,
+    pub(crate) next_cursor: Option<String>,
+    pub(crate) complete: bool,
 }
 
-struct ItemsPage {
-    items: Vec<(String, Item)>,
-    next_watermark: String,
-    complete: bool,
+pub(crate) struct ItemsPage {
+    pub(crate) items: Vec<(String, Item)>,
+    pub(crate) next_watermark: String,
+    pub(crate) complete: bool,
+}
+
+/// `feed.containers` and `feed.items` of one binding, reading the provider as it stands.
+pub(crate) trait Binding {
+    /// The implementation name and the native profile the suite reports.
+    fn identity(&self) -> (String, String);
+    fn containers(
+        &self,
+        source: &Source,
+        limit: Option<i64>,
+        cursor: Option<&str>,
+    ) -> Result<ContainersPage, Code>;
+    fn items(
+        &self,
+        source: &Source,
+        container: &str,
+        watermark: Option<&str>,
+        limit: i64,
+    ) -> Result<ItemsPage, Code>;
+}
+
+/// The binding written beside the suite, in [`Source::containers`] and [`Source::items`].
+pub(crate) struct Native;
+
+impl Binding for Native {
+    fn identity(&self) -> (String, String) {
+        ("connectors-feed-fixture".into(), WATERMARK.into())
+    }
+    fn containers(
+        &self,
+        source: &Source,
+        limit: Option<i64>,
+        cursor: Option<&str>,
+    ) -> Result<ContainersPage, Code> {
+        source.containers(limit, cursor)
+    }
+    fn items(
+        &self,
+        source: &Source,
+        container: &str,
+        watermark: Option<&str>,
+        limit: i64,
+    ) -> Result<ItemsPage, Code> {
+        source.items(container, watermark, limit)
+    }
 }
 
 /// The fixture profile's watermark: `fixture-feed/1:<container>:<sequence>`. Opaque to a consumer.
@@ -247,17 +296,24 @@ impl Held {
         self.watermark = Some(page.next_watermark);
     }
 
-    /// Read again from the kept watermark until the binding says it is complete.
-    fn caught_up(&self, source: &Source, container: &str) -> Result<Held, Code> {
+    /// Read again from the kept watermark until the binding says it is complete. A binding that
+    /// never says so within one page per item the source holds, and a few more, is not resuming.
+    fn caught_up(
+        &self,
+        binding: &dyn Binding,
+        source: &Source,
+        container: &str,
+    ) -> Result<Held, Code> {
         let mut held = self.clone();
-        loop {
-            let page = source.items(container, held.watermark.as_deref(), 1)?;
+        for _ in 0..source.items.len() + 3 {
+            let page = binding.items(source, container, held.watermark.as_deref(), 1)?;
             let complete = page.complete;
             held.take(page);
             if complete {
                 return Ok(held);
             }
         }
+        Err(Code::Other("reading again never completes".into()))
     }
 }
 
@@ -271,9 +327,33 @@ struct Scenario {
     writes: u64,
 }
 
-#[derive(Default)]
-struct Fixture {
+pub(crate) struct Fixture<B> {
+    binding: B,
     scenario: RefCell<Option<Scenario>>,
+}
+
+impl<B: Binding> Fixture<B> {
+    pub(crate) fn new(binding: B) -> Self {
+        Self {
+            binding,
+            scenario: RefCell::default(),
+        }
+    }
+}
+
+/// Run the suite against one binding and return its counts, the run's report on failure.
+pub(crate) fn run<B: Binding>(
+    binding: B,
+) -> (ess_conformance::counts::ScenarioCounts, CountStatus, String) {
+    let admitted = suite(&root());
+    let fixture = Fixture::new(binding);
+    let executed = Runner::for_suite(admitted.suite()).run_admitted(&admitted, &fixture);
+    let report = CountReport::from_run(&executed, &admitted).expect("report");
+    (
+        report.counts().clone(),
+        report.execution_status(),
+        executed.report().to_string(),
+    )
 }
 
 fn unsupported(what: impl Into<String>, why: impl Into<String>) -> TargetError {
@@ -324,7 +404,7 @@ fn token(writes: u64) -> Result<ConsistencyToken, TargetError> {
         .map_err(|error| unsupported("consistency", format!("{error:?}")))
 }
 
-impl Fixture {
+impl<B: Binding> Fixture<B> {
     fn execute(
         &self,
         scenario: &mut Scenario,
@@ -460,19 +540,28 @@ impl Fixture {
             }
             "ListContainers" => {
                 let limit = integer(input, "limit")?;
-                if let Some(limit) = limit.filter(|limit| *limit <= 0) {
-                    return Ok(outcome(local, "bad-limit")?.with_error(error(
+                // The binding refuses a limit it cannot honour; the suite's name for that
+                // refusal of a non-positive limit is `bad-limit`.
+                let bad_limit = |limit: i64| -> Result<SemanticCommandResult, TargetError> {
+                    Ok(outcome(local, "bad-limit")?.with_error(error(
                         "InvalidLimit",
                         "limit",
                         Node::Number(Number::from(limit)),
-                    )?));
-                }
+                    )?))
+                };
                 let mut cursor = text(input, "cursor");
                 loop {
-                    let page = scenario
-                        .source
-                        .containers(limit, cursor.as_deref())
-                        .map_err(|code| unsupported(&command, format!("{code:?}")))?;
+                    let page =
+                        match self
+                            .binding
+                            .containers(&scenario.source, limit, cursor.as_deref())
+                        {
+                            Ok(page) => page,
+                            Err(Code::InvalidInput) if limit.is_some_and(|limit| limit <= 0) => {
+                                return bad_limit(limit.unwrap_or_default());
+                            }
+                            Err(code) => return Err(unsupported(&command, format!("{code:?}"))),
+                        };
                     if page.complete {
                         break;
                     }
@@ -483,13 +572,6 @@ impl Fixture {
             "ReadItems" => {
                 let limit =
                     integer(input, "limit")?.ok_or_else(|| unsupported("limit", "missing"))?;
-                if limit <= 0 {
-                    return Ok(outcome(local, "bad-limit")?.with_error(error(
-                        "InvalidLimit",
-                        "limit",
-                        Node::Number(Number::from(limit)),
-                    )?));
-                }
                 let container = required(input, "container_id")?;
                 let held = scenario.consumers.entry(container.clone()).or_default();
                 // A scenario cannot carry the watermark a read returned into the next read, so a
@@ -499,14 +581,20 @@ impl Fixture {
                     Some(_) => held.watermark.clone(),
                     None => None,
                 };
-                match scenario
-                    .source
-                    .items(&container, watermark.as_deref(), limit)
+                match self
+                    .binding
+                    .items(&scenario.source, &container, watermark.as_deref(), limit)
                 {
                     Ok(page) => {
                         held.take(page);
                         outcome(local, "read")
                     }
+                    Err(Code::InvalidInput) if limit <= 0 => Ok(outcome(local, "bad-limit")?
+                        .with_error(error(
+                            "InvalidLimit",
+                            "limit",
+                            Node::Number(Number::from(limit)),
+                        )?)),
                     Err(Code::NotFound) => {
                         let not_found = error(
                             "ContainerNotFound",
@@ -568,9 +656,9 @@ impl Fixture {
                 let mut rows = Vec::new();
                 let mut cursor = None;
                 loop {
-                    let page = scenario
-                        .source
-                        .containers(Some(1), cursor.as_deref())
+                    let page = self
+                        .binding
+                        .containers(&scenario.source, Some(1), cursor.as_deref())
                         .map_err(|code| unsupported(&view, format!("{code:?}")))?;
                     rows.extend(page.containers.iter().map(|(id, c)| container_row(id, c)));
                     if page.complete {
@@ -610,7 +698,7 @@ impl Fixture {
                     .get(container)
                     .cloned()
                     .unwrap_or_default();
-                match held.caught_up(&scenario.source, container) {
+                match held.caught_up(&self.binding, &scenario.source, container) {
                     Ok(held) => Ok(held
                         .items
                         .iter()
@@ -639,12 +727,10 @@ impl Fixture {
     }
 }
 
-impl ConformanceTarget for Fixture {
+impl<B: Binding> ConformanceTarget for Fixture<B> {
     fn identity(&self) -> Result<ImplementationIdentity, TargetError> {
-        Ok(ImplementationIdentity::new(
-            "connectors-feed-fixture",
-            WATERMARK,
-        ))
+        let (implementation, profile) = self.binding.identity();
+        Ok(ImplementationIdentity::new(implementation, profile))
     }
 
     fn begin_scenario(&self, _: &ScenarioContext) -> Result<(), TargetError> {
@@ -720,7 +806,7 @@ impl ConformanceTarget for Fixture {
 fn fixture_binding_passes_the_feed_binding_suite() {
     let root = root();
     let admitted = suite(&root);
-    let fixture = Fixture::default();
+    let fixture = Fixture::new(Native);
     let executed = Runner::for_suite(admitted.suite()).run_admitted(&admitted, &fixture);
     let report = CountReport::from_run(&executed, &admitted).expect("report");
     let counts = report.counts();

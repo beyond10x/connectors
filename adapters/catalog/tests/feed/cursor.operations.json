@@ -1,0 +1,44 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "feed-fixture",
+  "operations": [],
+  "feed": {
+    "profile": "feed-fixture-cursor/1",
+    "max_limit": 100,
+    "containers": {
+      "operation_id": "listRooms",
+      "lookup": {"operation_id": "getRoom", "parameter": "room", "record": "/room"},
+      "limit": "limit",
+      "cursor": {"parameter": "cursor", "next": "/next_cursor"},
+      "records": "/rooms",
+      "id": "/id",
+      "name": "/title",
+      "kind": "/type",
+      "visibility": {"pointer": "/access", "map": {"open": "public", "invite": "private", "im": "direct"}}
+    },
+    "items": {
+      "operation_id": "listChanges",
+      "container": "room",
+      "limit": "limit",
+      "position": {
+        "kind": "cursor",
+        "value": {
+          "parameter": "cursor",
+          "next": "/cursor",
+          "complete": {"pointer": "/has_more", "equals": false},
+          "stale": [410]
+        }
+      },
+      "records": "/changes",
+      "id": "/id",
+      "revision": "/version",
+      "created_at": "/created",
+      "updated_at": "/edited",
+      "author": {"id": "/user/id"},
+      "body": {"pointer": "/text", "representation": "text/plain"},
+      "url": "/link",
+      "parent": "/reply_to",
+      "deleted": {"pointer": "/state", "equals": "removed"}
+    }
+  }
+}
