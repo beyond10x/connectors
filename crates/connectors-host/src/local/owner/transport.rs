@@ -735,7 +735,23 @@ struct Owner {
     shutdown: AtomicBool,
     clients: AtomicUsize,
 }
+/// Holds the owner to one glibc malloc arena. Every metadata handle runs its
+/// own worker threads, and glibc gives each thread an arena that keeps what it
+/// freed; one arena lets the next handle reuse it (#103). The CLI clears the
+/// owner's environment, so `MALLOC_ARENA_MAX` cannot reach it. Called before
+/// the owner starts any thread: glibc fixes its arena limit when a thread
+/// first needs an arena of its own. A no-op on other platforms.
+pub(crate) fn bound_allocator() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    // SAFETY: `mallopt` only sets an allocator parameter. A refusal leaves
+    // glibc's default, which is correct, only larger.
+    unsafe {
+        libc::mallopt(libc::M_ARENA_MAX, 1);
+    }
+}
+
 pub fn serve(paths: Paths) -> Result<()> {
+    bound_allocator();
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
     let (startup, lifetime) = inherited()?;
@@ -1997,5 +2013,75 @@ mod idle_sweep_tests {
             ledger::State::Prepared,
             "the attempt is left for the next owner"
         );
+    }
+}
+
+#[cfg(all(test, target_os = "linux", target_env = "gnu"))]
+mod allocator_tests {
+    /// Set in a run of this test binary that probes one allocator setup.
+    const PROBE: &str = "CONNECTORS_ARENA_PROBE";
+    const STARTED: &str = "-- threads started --";
+
+    /// The glibc arenas created while eight threads allocate at once, counted
+    /// from `malloc_stats` before and after them in a fresh run of this test
+    /// binary: with the owner's allocator setup applied first, or without it.
+    /// libtest's own test thread holds an arena before the setup runs, so the
+    /// count is of arenas created after it, as every owner thread is.
+    fn arenas_created(bounded: bool) -> usize {
+        let test = format!(
+            "{}::the_owner_allocates_from_one_arena",
+            module_path!().split_once("::").unwrap().1
+        );
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([&test, "--exact", "--nocapture", "--test-threads=1"])
+            .env(PROBE, if bounded { "bounded" } else { "default" })
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{output:?}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let (before, after) = stderr.split_once(STARTED).unwrap();
+        let count = |text: &str| {
+            text.lines()
+                .filter(|line| line.starts_with("Arena "))
+                .count()
+        };
+        count(after) - count(before)
+    }
+
+    /// Every metadata handle runs its own worker threads; with one arena,
+    /// what one handle's threads freed is reused by the next (#103).
+    #[test]
+    fn the_owner_allocates_from_one_arena() {
+        if let Some(probe) = std::env::var_os(PROBE) {
+            if probe == "bounded" {
+                super::bound_allocator();
+            }
+            // SAFETY: `malloc_stats` only writes the allocator's counters to
+            // standard error.
+            unsafe { libc::malloc_stats() };
+            eprintln!("{STARTED}");
+            let start = std::sync::Arc::new(std::sync::Barrier::new(8));
+            let threads: Vec<_> = (0..8)
+                .map(|_| {
+                    let start = start.clone();
+                    std::thread::spawn(move || {
+                        start.wait();
+                        std::hint::black_box(vec![1u8; 1 << 20]);
+                    })
+                })
+                .collect();
+            for thread in threads {
+                thread.join().unwrap();
+            }
+            // SAFETY: as above.
+            unsafe { libc::malloc_stats() };
+            return;
+        }
+        let default = arenas_created(false);
+        assert!(
+            default > 0,
+            "glibc's default created no arena for 8 threads"
+        );
+        assert_eq!(arenas_created(true), 0);
     }
 }

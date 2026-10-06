@@ -1805,6 +1805,9 @@ pub(super) fn open(
 /// Records appended since the head a handle last accounted for, per subject.
 type Observed = BTreeMap<(String, String), Vec<StoredRecord>>;
 
+/// Every subject's current row, by entity and id.
+type Baseline = BTreeMap<(String, String), RowImage>;
+
 /// More subjects than this written by other handles since the last catch-up
 /// are cheaper to read in one complete snapshot than one history at a time.
 const SUBJECT_READS: usize = 8;
@@ -1817,19 +1820,7 @@ fn resynchronize(er: &mut ErAuthority) -> Result<Observed> {
     let head = feed_after(&er.durable_path, &er.facade.authority().tenant, i64::MAX)?.0;
     let snapshot = complete_snapshot(&er.facade)?;
     let source_digest = imported_digest(&snapshot)?;
-    let observed = snapshot
-        .histories
-        .iter()
-        .map(|subject| {
-            (
-                (
-                    subject.history.subject.entity.clone(),
-                    subject.history.subject.id.clone(),
-                ),
-                subject.history.records.clone(),
-            )
-        })
-        .collect::<Observed>();
+    let (baseline, observed) = split_snapshot(snapshot)?;
     let positions = observed
         .iter()
         .flat_map(|(key, records)| {
@@ -1838,7 +1829,6 @@ fn resynchronize(er: &mut ErAuthority) -> Result<Observed> {
                 .map(move |record| (record.position.store, key.clone()))
         })
         .collect::<BTreeMap<_, _>>();
-    let baseline = terminal_rows(snapshot)?;
     let mut streams = BTreeMap::new();
     for (position, stream) in subject_streams(&er.durable_path, &er.facade.authority().tenant)? {
         if let Some(subject) = u64::try_from(position)
@@ -2319,35 +2309,41 @@ fn complete_snapshot(facade: &RecordedProviderFacade) -> Result<CompleteStoreSna
     .map_err(|_| Failure::MetadataUnavailable)
 }
 
-fn terminal_rows(snapshot: CompleteStoreSnapshot) -> Result<BTreeMap<(String, String), RowImage>> {
+/// Every subject's terminal row and its verified records, moved out of a
+/// complete snapshot. The snapshot holds every record in the store; copying
+/// the records beside it doubled what a replay holds at its peak.
+fn split_snapshot(snapshot: CompleteStoreSnapshot) -> Result<(Baseline, Observed)> {
     if snapshot.scope != LOGICAL_SCOPE {
         return Err(Failure::MetadataUnavailable);
     }
-    snapshot
-        .histories
-        .into_iter()
-        .map(|subject| {
-            let EntityInstance {
+    let mut baseline = BTreeMap::new();
+    let mut observed = Observed::new();
+    for subject in snapshot.histories {
+        let EntityInstance {
+            entity,
+            id,
+            revision,
+            lifecycle_state,
+            fields,
+            ..
+        } = subject.terminal;
+        baseline.insert(
+            (entity.clone(), id.clone()),
+            RowImage {
                 entity,
                 id,
                 revision,
                 lifecycle_state,
                 fields,
-                ..
-            } = subject.terminal;
-            let key = (entity.clone(), id.clone());
-            Ok((
-                key,
-                RowImage {
-                    entity,
-                    id,
-                    revision,
-                    lifecycle_state,
-                    fields,
-                },
-            ))
-        })
-        .collect()
+            },
+        );
+        let history = subject.history;
+        observed.insert(
+            (history.subject.entity, history.subject.id),
+            history.records,
+        );
+    }
+    Ok((baseline, observed))
 }
 
 pub(super) fn projection(authority_id: uuid::Uuid, er: &ErAuthority) -> Result<Connection> {

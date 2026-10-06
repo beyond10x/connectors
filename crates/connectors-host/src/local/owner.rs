@@ -17,6 +17,8 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+#[cfg(test)]
+pub(crate) use transport::bound_allocator;
 pub use transport::{Capture, Client, WriteClient, serve};
 
 const VERSION: &str = "connectors-owner/1";
