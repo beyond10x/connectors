@@ -6,6 +6,7 @@ status: draft
 title: GitLab issue creation through the forge selection as an approved write
 relations:
 - decomposes: epic:connector-probe-20261006
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: CHANGELOG.md
