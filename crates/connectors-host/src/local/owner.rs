@@ -77,6 +77,11 @@ pub struct Error {
     pub acquisition: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_code: Option<connectors_core::ErrorCode>,
+    /// The upstream's own bounded, redacted reason for a dispatched read it
+    /// refused (`runtime::Refusal`); only beside a `service_code` or on a
+    /// provider `forbidden`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Origin::is_host")]
     pub origin: Origin,
     /// The connection's authentication changed under the configuration; only a
@@ -90,6 +95,7 @@ impl From<Code> for Error {
             code,
             acquisition: None,
             service_code: None,
+            service_reason: None,
             origin: Origin::Host,
             reconnect: false,
         }
@@ -185,9 +191,23 @@ impl From<runtime::Failure> for Error {
             code,
             acquisition: None,
             service_code,
+            service_reason: None,
             origin,
             reconnect: false,
         }
+    }
+}
+impl From<runtime::Refusal> for Error {
+    /// The failure's projection, with the upstream's reason kept only beside
+    /// a `service_code` or on the provider's own `forbidden`; a provider
+    /// timeout or capacity answer carries none.
+    fn from(refusal: runtime::Refusal) -> Self {
+        let forbidden = refusal.failure == runtime::Failure::ProviderForbidden;
+        let mut error = Error::from(refusal.failure);
+        if error.service_code.is_some() || forbidden {
+            error.service_reason = refusal.reason;
+        }
+        error
     }
 }
 fn until(deadline: u64) -> Result<Instant> {

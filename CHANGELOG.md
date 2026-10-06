@@ -69,6 +69,20 @@
   fell from 644–785 MB to 557–588 MB at 601 events and from 1,363–1,538 MB to
   1,024–1,118 MB at 1,201 events (3 runs each). That process plays both CLI and
   owner; a real owner process was not measured (#103).
+- A read the provider refuses at dispatch now says why: `connectors.cli.Failure` gains the
+  optional `service_reason`, beside `service_code` (or on a provider `forbidden`), so a
+  Confluence `unauthorized` names `Unauthorized; scope does not match` and a missing token
+  scope is told apart from a wrong path. Only the catalog provider supplies one, and only
+  from the top-level `message`, `error_description` or `error` string of a JSON refusal
+  body; never a header. It is at most 256 bytes, cut back to a whole word, and withheld
+  whole when it holds a control, format (Unicode Cf, the TAG block included) or other
+  invisible character, an `@` (no email address is carried), a credential-like marker
+  (`authorization`, `bearer`, `token=`, …), a token-like run or word, a piece of the
+  credential value the adapter derived and sent (checked by the adapter), or a piece of
+  the call's own protected document (checked again by the host). Guarded writes and
+  connection probes carry none. The private adapter `failed` reply gains the matching
+  optional `reason`, allowed only on a failed `invoke`; an owner that predates it refuses
+  such a reply. See `contracts/cli/v1alpha1/semantics.md`.
 
 ### Tests
 
