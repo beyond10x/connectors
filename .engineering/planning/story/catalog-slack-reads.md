@@ -8,6 +8,7 @@ relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-confluence-reads
 - serves: vision:independent-contract-adapters
+- depends_on: story:catalog-swagger2-projection
 scope:
 - confidence: cited
   path: adapters/catalog/generated/bundles/index.json
