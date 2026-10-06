@@ -1,0 +1,215 @@
+# datasource.feed/v1alpha1
+
+**Status:** proposed; no binding is implemented.
+
+## Shared contract and adapter ownership
+
+A feed read answers what a connection can be read from and what changed there. A consumer lists the
+connection's containers (channels, projects, spaces, whatever the provider calls them), then reads
+each container's items since a watermark it keeps, and reads again later from where it stopped. Every
+item comes in one shape whatever provider answers: a stable identity, a revision that changes when
+its content changes, its times, its author, a body, a link and its place in a thread.
+
+The family proves neither that a listing is the provider's complete membership at one instant, nor
+that a read is a snapshot, nor that an item is delivered once. It promises that reading again from
+the last watermark loses nothing the provider reported as created or changed after it.
+
+The adapter owns the versioned native profile identifier, the provider protocol, the mapping of each
+family field to a provider field, the encoding of its watermarks, how it observes changes and
+deletions, and every bound it enforces. Profile identifiers are open. A binding's profile states:
+
+- how far back a first read reaches (all history, a fixed window, or what the provider retains);
+- how deletions are observed, or that they are not;
+- the precision of `created_at` and `updated_at`;
+- whether it lists direct conversations, and how it excludes them when it does not;
+- how it derives `revision` where the provider gives none;
+- its ceilings (below).
+
+Every operation is a read: it changes nothing at the provider that a caller can observe, and it
+never marks an item read, seen or acknowledged. A read is not free. Providers meter and rate-limit
+reads, and a profile states what one invocation can cost. An adapter sends these reads through the
+read capability of [auth.capability/v1alpha1](../../../auth/capability/v1alpha1/semantics.md); a
+read never carries a write approval and never reaches a write port.
+
+Writes, push delivery (webhooks) and any change to
+[datasource.records/v1alpha1](../../records/v1alpha1/semantics.md) are outside this family.
+
+## Operations and how a binding names them
+
+A binding exposes the family as exactly two operations, with these fixed ids:
+
+| operation | input | result |
+|---|---|---|
+| `feed.containers` | optional `limit`, optional `cursor` | `containers`, `next_cursor`, `complete`, `provenance` |
+| `feed.items` | `container`; optional `watermark` (absent on a first read); `limit` | `items`, `next_watermark`, `complete`, `provenance` |
+
+Each of the two operations carries, in the adapter's descriptor, its `id` (exactly `feed.containers`
+or `feed.items`), its `contract` (exactly `datasource.feed/v1alpha1`) and its native `profile` id. A
+consumer finds the family on a connection by those ids and that contract, with no knowledge of the
+provider. A binding provides both operations or neither, and binds them under one profile; it does
+not expose either id for an operation of another meaning. An operation with another id is not part
+of the family, whatever it returns.
+
+An input the selected profile cannot honour is refused by name before any request. It is never
+dropped, narrowed or approximated.
+
+## Containers
+
+`feed.containers` lists what the connection can be read from. Each container has:
+
+| field | meaning |
+|---|---|
+| `id` | stable for the life of the container on this connection and unique only within it; the value `feed.items` takes as `container` |
+| `name` | the provider's display name, or null where it gives none |
+| `kind` | the provider's word for the container (channel, project, space, …); open vocabulary, never translated |
+| `visibility` | `public`, `private` or `direct`, as the binding states it |
+
+Visibility is a closed vocabulary of three:
+
+- `public`: any member of the provider's organisation or workspace can read it without being added;
+- `private`: readable only by members added to it, and named as a space rather than as its
+  participants;
+- `direct`: a conversation between named participants (one-to-one or a small group) rather than a
+  named space.
+
+A binding maps each provider kind to one of the three and states the mapping in its profile. A
+container it cannot classify is `private`, never `public`. A container with the character of a
+direct conversation is `direct` whatever else the provider calls it.
+
+**Direct conversations are excluded by default.** `feed.containers` never lists a `direct` container
+unless the binding's profile declares that it does, and a profile states the provider field or rule
+by which it recognises and excludes them. `feed.items` on a `direct` container the profile does not
+declare answers `not_found`, exactly as for a container that does not exist; the answer never
+reveals that a direct conversation is there.
+
+The listing is a bounded list in the sense of
+[datasource.records/v1alpha1](../../records/v1alpha1/semantics.md): `complete` is true only when the
+admitted selection is exhausted, and `next_cursor` continues it under the service contract's cursor
+rules. It promises no snapshot and no stable membership.
+
+## Items
+
+`feed.items` reads one container's items created or changed since `watermark`, at most `limit` of
+them. An item has:
+
+| field | meaning |
+|---|---|
+| `id` | stable within the container; with the container it identifies the item |
+| `revision` | opaque; changes when the item's content changes (below) |
+| `created_at` | when the provider says the item was created, RFC 3339 |
+| `updated_at` | when the provider says it last changed, RFC 3339; equals `created_at` for an unchanged item |
+| `author` | a value on the item, not a record of its own: `id`, stable on the connection, and an optional `display_name`; null where the provider attributes the item to no one |
+| `body` | a [datasource.records/v1alpha1](../../records/v1alpha1/semantics.md) body envelope (`representation`, `bytes`, `content`, `truncated`, `truncation`); null on a deleted item. The type of `content` belongs to the binding's records profile, which names the representation |
+| `url` | an absolute link a person can open, or null where the provider gives none |
+| `parent` | the `id` of another item in the same container that this item replies to or belongs under (a thread root is itself an item), or null for a top-level item |
+| `deleted` | `true` for an item the provider reports removed, otherwise `false` |
+
+A page has `items`, `next_watermark`, `complete` and `provenance`. Provenance identifies the adapter
+instance, the native profile and the instant the adapter received the answer; the host's invocation
+record names the connection.
+
+Item content is untrusted input. The family states no redaction; a consumer that forwards a body to
+a model or a person treats it as data and never as instructions.
+
+### Revisions
+
+A `revision` is an opaque string, compared for equality only; it has no order. Two observations of
+one item with the same revision carry the same `body`, `url`, `parent` and `deleted`. A change to any
+of those gives a new revision that the item has not carried before. A revision may also change with
+no visible difference; a consumer then processes a change that changed nothing. Where the provider
+gives a version or an edit time that changes with the content, the binding uses it; where it gives
+none, the binding derives the revision from the mapped fields (for example, a digest of them) and
+states that in its profile.
+
+### Deletions
+
+A binding whose profile observes deletions reports a removed item as a tombstone: the same
+container and `id`, `deleted: true`, `body` null, and a revision the item has not carried before, so
+a consumer that deduplicates by `(container, id, revision)` never discards the deletion as a
+repeat. `updated_at` is the removal instant where the provider states one, otherwise the instant the
+binding observed it. A tombstone is reported to a read whose watermark precedes the removal; a first
+read need not report items removed before it. A deletion is final: an item is not reported again
+after its tombstone unless the provider reports it present again, and then under a new revision.
+
+A binding whose profile does not observe deletions never reports `deleted: true` and says so; a
+consumer that needs removals reconciles another way, outside this family.
+
+## Watermarks and delivery
+
+The watermark is what makes a read resumable.
+
+- **Opaque.** `next_watermark` is a string the binding encodes. A consumer stores it and passes it
+  back unchanged as `watermark`; it never parses, compares, orders or composes one. Its encoding,
+  length (bounded by the profile) and content are the binding's; it carries no credential and no
+  provider secret.
+- **Scoped.** A watermark is valid only for the connection, the container and the profile that
+  issued it. One a binding recognises as foreign, malformed or no longer resumable is refused as
+  `stale_cursor`, and the consumer starts again with a first read. A binding never silently treats
+  an unusable watermark as a first read, or as the present moment.
+- **Always present.** Every successful page carries `next_watermark`, including an empty one, so a
+  consumer that found nothing new still has a position to keep.
+- **Never past an undelivered change.** `next_watermark` advances only over items this page
+  returned. Reading again with it returns every item created or changed since, including an item
+  changed again after it was returned.
+- **At least once.** An item can be returned more than once: by the overlap a provider's time
+  precision forces, by a page boundary, or by a retry after a lost answer. A consumer deduplicates by
+  `(container, id, revision)`. A changed item comes back with a new revision; an item returned again
+  unchanged comes back with the same one.
+- **Completeness.** `complete` is true when the page reached the newest change the binding could
+  observe at read time. `complete: false` means more changes are already waiting, and the consumer
+  reads again with `next_watermark`. Because the watermark resumes after the last returned item, a
+  page bounded by `limit` or by the result-byte ceiling omits nothing; it ends early. Clipping of a
+  body is reported inside that body's envelope, not as page incompleteness.
+- **A first read.** A read with no watermark starts as far back as the profile states and pages
+  forward from there.
+- **Order.** Within a page the family promises no order. Across pages it promises only the rules
+  above.
+
+The watermark grants no authority. Current admission of the principal, operation, connection and
+container precedes any disclosure, including whether a watermark is valid.
+
+## Admission, limits and errors
+
+Bounds, errors and admission follow [datasource.records/v1alpha1](../../records/v1alpha1/semantics.md)
+and the [service contract](../../../service/v1alpha1/semantics.md). The host admits the principal,
+the visible operation, the connection and its credential evidence before dispatch. The family
+selects no cache: two invocations are two provider reads, and no retained answer is presented as
+fresh.
+
+Each profile declares finite ceilings for `limit`, the watermark length, the per-item body bytes,
+the serialized page and the provider deadline, plus how many provider calls one invocation may make.
+`limit` must be at least one; a value above the profile's ceiling is refused as `invalid_input`, not
+lowered.
+
+Errors use the service contract's codes:
+
+| situation | code |
+|---|---|
+| an input the profile cannot honour, a `limit` out of range | `invalid_input` |
+| an unknown container, one the connection cannot read, or an undeclared direct conversation, indistinguishably | `not_found` |
+| a foreign, malformed or no-longer-resumable watermark | `stale_cursor` |
+| the provider's rate limit | `rate_limited` |
+| deadline exhaustion | `timeout` |
+| a malformed, partial or oversized provider answer | `unavailable`; it never becomes an empty complete page |
+
+No raw provider error, request body, origin or credential enters an ordinary diagnostic.
+
+## Model and conformance
+
+[Shared ESS](../../../../ess/domains/feed.yaml) models the family's values, the two operations under
+their fixed ids, and the observable rules a binding is held to through the `feed-binding` component:
+the Provider commands seed the source a binding reads, `ListContainers` and `ReadItems` are
+`feed.containers` and `feed.items`, `ListedContainers` is the listing and `ContainerItems` one
+container's items, tombstones included. `SourceContainers` and `SourceItems` read the source itself
+and are the suite's witnesses, not family operations.
+[scenarios/](scenarios/) adds the authored scenarios: a first read across a page boundary, a resumed
+read that returns a changed item with a new revision and a new item, a deleted item, and a listing
+that omits a direct conversation.
+
+The model cannot carry the watermark a read returned into the next read, so a scenario's watermark
+stands for the one the consumer kept. A binding's suite adapter reads `ContainerItems` as a consumer
+would: from the watermark it kept, again until complete, deduplicating by `(container, id,
+revision)`. A binding that loses a change on resume then fails the scenarios that read it. The
+repository's fixture binding (`crates/connectors-build/src/feed_conformance.rs`) runs the suite this
+way under `cargo test -p connectors-build`. Native parameters, the profile's ceilings and its
+fixtures belong to the adapter's own model and tests.

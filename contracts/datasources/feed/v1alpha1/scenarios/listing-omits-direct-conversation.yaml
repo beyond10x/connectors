@@ -1,0 +1,59 @@
+# The container listing omits a direct conversation unless the binding's profile
+# declares it; the shared suite holds the default. See ../semantics.md, Containers.
+type: ess-scenario/1
+domain: connectors.feed
+scenario: listing-omits-direct-conversation
+summary: The container listing lists public and private containers and omits a direct conversation.
+timeline:
+- at: '2026-10-06T09:00:00Z'
+  command: connectors.feed.AddContainer
+  input:
+    container_id: team-room
+    connection_ref: workspace-a
+    name: Team room
+    kind: channel
+    visibility: public
+  outcome: added
+  events:
+  - event: connectors.feed.ContainerAdded
+- at: '2026-10-06T09:00:01Z'
+  command: connectors.feed.AddContainer
+  input:
+    container_id: project-board
+    connection_ref: workspace-a
+    name: Project board
+    kind: project
+    visibility: private
+  outcome: added
+  events:
+  - event: connectors.feed.ContainerAdded
+- at: '2026-10-06T09:00:02Z'
+  command: connectors.feed.AddContainer
+  input:
+    container_id: two-person-chat
+    connection_ref: workspace-a
+    kind: conversation
+    visibility: direct
+  outcome: added
+  events:
+  - event: connectors.feed.ContainerAdded
+- at: '2026-10-06T09:00:03Z'
+  command: connectors.feed.ListContainers
+  input:
+    limit: 10
+  outcome: listed
+assert:
+- view: connectors.feed.ListedContainers
+  contains:
+    container_id: team-room
+    visibility: public
+- view: connectors.feed.ListedContainers
+  contains:
+    container_id: project-board
+    visibility: private
+- view: connectors.feed.ListedContainers
+  excludes:
+    container_id: two-person-chat
+- view: connectors.feed.ListedContainers
+  excludes:
+    visibility: direct
