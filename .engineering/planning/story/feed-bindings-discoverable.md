@@ -2,13 +2,16 @@
 format: aep.planning-md/3
 id: story:feed-bindings-discoverable
 kind: story
-status: draft
+status: active
 title: A consumer finds a connection's feed operations at run time
 relations:
 - decomposes: epic:generic-datasource-feeds
 - serves: vision:independent-contract-adapters
 - depends_on: story:feed-contract
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T17:00:04Z", actor: "agent:claude", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-06T17:00:04Z", actor: "agent:claude", revision: 3}
 ---
 ## Outcome
 
