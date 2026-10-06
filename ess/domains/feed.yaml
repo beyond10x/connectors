@@ -1,0 +1,511 @@
+domain: connectors.feed
+summary: Proposed provider-independent incremental reads of a connection's containers and their items; no runtime or persistent provider owner.
+
+# Shared owner: contracts/datasources/feed/v1alpha1/semantics.md. Native parameters, ceilings,
+# watermark encoding and the mapping onto a provider belong to each adapter's own model.
+#
+# Two halves. The types are the family's wire values: the two operations a binding exposes
+# under fixed ids, their inputs and their pages. The entities, commands and views are what a
+# fixture binding is held to by conformance: the Provider actor's commands seed the source a
+# binding reads (they are not operations of the family, which writes nothing), and the
+# Consumer actor's ListContainers and ReadItems are `feed.containers` and `feed.items`, reads
+# that change nothing. The views are what those reads observe.
+#
+# ESS-LIMIT: the watermark's resume rule (a read with the last `next_watermark` returns every
+# item created or changed since, and `next_watermark` never passes an undelivered change) is
+# not expressible: a command outcome returns no value a later command can take, and a view
+# has no "changed since" construct over an opaque position. Scenarios pass a stand-in
+# watermark; the rule is a binding obligation its own tests show.
+# ESS-LIMIT: an item's identity is (container, id); ESS identity is one field, so `item_id`
+# is the identity here and `container_id` a field beside it. A fixture keeps item ids unique
+# across its containers.
+# ESS-LIMIT: "a new revision the item has not carried before" is expressible only against the
+# revision it holds now (RevisionUnchanged); a revision reused from an earlier change is not
+# refused.
+
+types:
+  - name: connectors.feed.ContainerId
+    kind: newtype
+    of: String
+  - name: connectors.feed.ItemId
+    kind: newtype
+    of: String
+  # Opaque; compared for equality only.
+  - name: connectors.feed.Revision
+    kind: newtype
+    of: String
+  # Opaque; the binding encodes it and the consumer passes it back unchanged.
+  - name: connectors.feed.Watermark
+    kind: newtype
+    of: String
+  - name: connectors.feed.Visibility
+    kind: enum
+    variants: [public, private, direct]
+
+  # How a binding marks its operations as the family's: exactly these two ids, each with the
+  # contract `datasource.feed/v1alpha1` and its native profile id in the descriptor.
+  - name: connectors.feed.OperationId
+    kind: enum
+    variants: [feed.containers, feed.items]
+  - name: connectors.feed.OperationBinding
+    kind: struct
+    fields:
+      - {name: id, type: connectors.feed.OperationId}
+      - {name: contract, type: String}
+      - {name: profile, type: String}
+
+  - name: connectors.feed.Container
+    kind: struct
+    fields:
+      - {name: id, type: connectors.feed.ContainerId}
+      - {name: name, type: "Optional<String>"}
+      - {name: kind, type: String}
+      - {name: visibility, type: connectors.feed.Visibility}
+  - name: connectors.feed.Author
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: display_name, type: "Optional<String>"}
+  # The datasource.records/v1alpha1 body envelope, as far as that contract types it.
+  - name: connectors.feed.Body
+    kind: struct
+    fields:
+      - {name: representation, type: String}
+      # A cutoff cannot establish an exact original length (records semantics).
+      - {name: bytes, type: "Optional<Integer>"}
+      # UNMAPPED: `content`. datasource.records/v1alpha1 gives its type to the profile's
+      # representation (text, or a structured native value) and refuses a generic JSON
+      # property bag; no shared ESS type for it exists. The binding's records profile owns it
+      # (contracts/datasources/feed/v1alpha1/semantics.md, Items); it is typed in that
+      # binding's own model.
+      - {name: truncated, type: Boolean}
+      # Truncation causes are profile-owned (records semantics), so open strings here.
+      - {name: truncation, type: "List<String>"}
+  - name: connectors.feed.Item
+    kind: struct
+    fields:
+      - {name: id, type: connectors.feed.ItemId}
+      - {name: revision, type: connectors.feed.Revision}
+      - {name: created_at, type: Timestamp}
+      - {name: updated_at, type: Timestamp}
+      - {name: author, type: "Optional<connectors.feed.Author>"}
+      - {name: body, type: "Optional<connectors.feed.Body>"}
+      - {name: url, type: "Optional<String>"}
+      # The id of the item in the same container this one replies to or belongs under; a
+      # thread root is itself an item.
+      - {name: parent, type: "Optional<connectors.feed.ItemId>"}
+      - {name: deleted, type: Boolean}
+  - name: connectors.feed.Provenance
+    kind: struct
+    fields:
+      - {name: instance, type: String}
+      - {name: profile, type: String}
+      - {name: received_at, type: Timestamp}
+
+  - name: connectors.feed.ContainersInput
+    kind: struct
+    fields:
+      - {name: limit, type: "Optional<Integer>"}
+      - {name: cursor, type: "Optional<String>"}
+  - name: connectors.feed.ContainersPage
+    kind: struct
+    fields:
+      - {name: containers, type: "List<connectors.feed.Container>"}
+      - {name: next_cursor, type: "Optional<String>"}
+      - {name: complete, type: Boolean}
+      - {name: provenance, type: connectors.feed.Provenance}
+  - name: connectors.feed.ItemsInput
+    kind: struct
+    fields:
+      - {name: container, type: connectors.feed.ContainerId}
+      - {name: watermark, type: "Optional<connectors.feed.Watermark>"}
+      - {name: limit, type: Integer}
+  - name: connectors.feed.ItemsPage
+    kind: struct
+    fields:
+      - {name: items, type: "List<connectors.feed.Item>"}
+      - {name: next_watermark, type: connectors.feed.Watermark}
+      - {name: complete, type: Boolean}
+      - {name: provenance, type: connectors.feed.Provenance}
+  # The service contract's codes this family answers with.
+  - name: connectors.feed.ErrorCode
+    kind: enum
+    variants: [invalid_input, not_found, stale_cursor, rate_limited, timeout, unavailable]
+
+entities:
+  - name: connectors.feed.FeedContainer
+    identity:
+      name: container_id
+      type: connectors.feed.ContainerId
+    fields:
+      - {name: connection_ref, type: String}
+      - {name: name, type: "Optional<String>"}
+      - {name: kind, type: String}
+      - {name: visibility, type: connectors.feed.Visibility}
+    # ESS-LIMIT: a container id is unique only within its connection, so its identity is
+    # (connection, id); ESS identity is one field, so `container_id` is the identity here and
+    # `connection_ref` a field beside it. A fixture keeps container ids unique across its
+    # connections.
+    relations:
+      # A container is what one connection can be read from; it references that connection
+      # and does not own it (decided 2026-10-06, wave 20261006b).
+      - name: connection
+        kind: references
+        target: connectors.auth_bindings.Connection
+        cardinality: one
+        via: connection_ref
+      # An item's id is "stable within the container" and its identity is (container, id):
+      # it has no meaning without its container (story:feed-contract, Work).
+      - name: items
+        kind: owns
+        target: connectors.feed.FeedItem
+        cardinality: many
+        via: container_id
+    lifecycle:
+      initial: Present
+      states: [Present]
+      terminal: [Present]
+
+  - name: connectors.feed.FeedItem
+    identity:
+      name: item_id
+      type: connectors.feed.ItemId
+    fields:
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: revision, type: connectors.feed.Revision}
+      - {name: created_at, type: Timestamp}
+      - {name: updated_at, type: Timestamp}
+      - {name: parent, type: "Optional<connectors.feed.ItemId>"}
+    # `author` is a value on each item (connectors.feed.Author on the wire), not a noun of its
+    # own (decided 2026-10-06, wave 20261006b); this entity does not carry it.
+    relations:
+      # A reply or a nested item references the item it belongs under: a thread root is
+      # itself an item (decided 2026-10-06, wave 20261006b).
+      # ESS-LIMIT: "in the same container" is not expressible; a relation does not compare
+      # the two rows' container_id, and AddItem does not check that the parent exists.
+      - name: parent
+        kind: references
+        target: connectors.feed.FeedItem
+        cardinality: one
+        via: parent
+    # Deleted maps to `deleted: true` on the wire; Present to `deleted: false`.
+    lifecycle:
+      initial: Present
+      states: [Present, Deleted]
+      terminal: []
+      transitions:
+        - name: revise
+          from: [Present]
+          to: Present
+        - name: remove
+          from: [Present]
+          to: Deleted
+        - name: restore
+          from: [Deleted]
+          to: Present
+
+actors:
+  # The source a fixture binding reads; seeds containers and items for conformance.
+  - name: connectors.feed.Provider
+    may:
+      - connectors.feed.AddContainer
+      - connectors.feed.AddItem
+      - connectors.feed.ReviseItem
+      - connectors.feed.RemoveItem
+      - connectors.feed.RestoreItem
+  # A consumer reading through the family's two operations.
+  - name: connectors.feed.Consumer
+    may:
+      - connectors.feed.ListContainers
+      - connectors.feed.ReadItems
+
+errors:
+  - name: connectors.feed.InvalidLimit
+    summary: The limit is not at least one; `invalid_input` on the wire.
+    fields:
+      - {name: limit, type: Integer}
+  - name: connectors.feed.RevisionUnchanged
+    summary: A change reported under the revision the item already carries; a revision changes when the content changes.
+    fields:
+      - {name: revision, type: connectors.feed.Revision}
+  - name: connectors.feed.ItemStateConflict
+    summary: The item is not in a state the change applies to, so nothing moved.
+    fields:
+      - {name: state, type: connectors.feed.FeedItem.State}
+  - name: connectors.feed.ItemNotFound
+    summary: No item with this id exists in the source.
+    fields:
+      - {name: item_id, type: connectors.feed.ItemId}
+  - name: connectors.feed.ContainerNotFound
+    summary: Unknown, unreadable on the connection, or an undeclared direct conversation, indistinguishably; `not_found` on the wire.
+    fields:
+      - {name: container_id, type: connectors.feed.ContainerId}
+
+commands:
+  - name: connectors.feed.AddContainer
+    input:
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: name, type: "Optional<String>"}
+      - {name: connection_ref, type: String}
+      - {name: kind, type: String}
+      - {name: visibility, type: connectors.feed.Visibility}
+    outcomes:
+      - name: added
+        creates: connectors.feed.FeedContainer
+        instance: container_id
+        sets:
+          connection_ref: input.connection_ref
+          name: input.name
+          kind: input.kind
+          visibility: input.visibility
+        emits: [connectors.feed.ContainerAdded]
+        payload:
+          connectors.feed.ContainerAdded:
+            container_id: input.container_id
+            visibility: input.visibility
+        summary: The source holds a container a binding can list.
+
+  # An item is added to a container that exists; `when_related` (ess/18) reads that row.
+  - name: connectors.feed.AddItem
+    input:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: revision, type: connectors.feed.Revision}
+      - {name: created_at, type: Timestamp}
+      - {name: parent, type: "Optional<connectors.feed.ItemId>"}
+    outcomes:
+      - name: no-such-container
+        when_related:
+          via: input.container_id
+          exists: false
+        error: connectors.feed.ContainerNotFound
+        summary: The source holds no such container, so nothing was added.
+      - name: added
+        creates: connectors.feed.FeedItem
+        instance: item_id
+        sets:
+          container_id: input.container_id
+          revision: input.revision
+          created_at: input.created_at
+          updated_at: input.created_at
+          parent: input.parent
+        emits: [connectors.feed.ItemAdded]
+        payload:
+          connectors.feed.ItemAdded:
+            item_id: input.item_id
+            container_id: input.container_id
+            revision: input.revision
+        summary: The container holds a new item under its first revision.
+
+  - name: connectors.feed.ReviseItem
+    input:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: revision, type: connectors.feed.Revision}
+      - {name: updated_at, type: Timestamp}
+    outcomes:
+      - name: same-revision
+        when_subject:
+          predicate: revision == input.revision
+        error: connectors.feed.RevisionUnchanged
+        summary: The content changed under the revision it already carried; refused.
+      - name: revised
+        moves: connectors.feed.FeedItem.revise
+        instance: item_id
+        sets:
+          revision: input.revision
+          updated_at: input.updated_at
+        emits: [connectors.feed.ItemRevised]
+        payload:
+          connectors.feed.ItemRevised:
+            item_id: input.item_id
+            revision: input.revision
+        summary: The item's content changed and it carries a new revision.
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.feed.ItemStateConflict
+        summary: The item is removed; a removed item is restored, not revised.
+      - name: no-such-item
+        unknown_instance: true
+        error: connectors.feed.ItemNotFound
+
+  - name: connectors.feed.RemoveItem
+    input:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: revision, type: connectors.feed.Revision}
+      - {name: removed_at, type: Timestamp}
+    outcomes:
+      - name: same-revision
+        when_subject:
+          predicate: revision == input.revision
+        error: connectors.feed.RevisionUnchanged
+        summary: A tombstone under the last content revision would be dropped as a repeat; refused.
+      - name: removed
+        moves: connectors.feed.FeedItem.remove
+        instance: item_id
+        sets:
+          revision: input.revision
+          updated_at: input.removed_at
+        emits: [connectors.feed.ItemRemoved]
+        payload:
+          connectors.feed.ItemRemoved:
+            item_id: input.item_id
+            revision: input.revision
+        summary: The item is a tombstone under a new revision.
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.feed.ItemStateConflict
+        summary: The item is already removed.
+      - name: no-such-item
+        unknown_instance: true
+        error: connectors.feed.ItemNotFound
+
+  - name: connectors.feed.RestoreItem
+    input:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: revision, type: connectors.feed.Revision, example: r-restored}
+      - {name: updated_at, type: Timestamp}
+    outcomes:
+      - name: same-revision
+        when_subject:
+          predicate: revision == input.revision
+        error: connectors.feed.RevisionUnchanged
+        summary: A restored item comes back under a new revision; refused otherwise.
+      - name: restored
+        moves: connectors.feed.FeedItem.restore
+        instance: item_id
+        sets:
+          revision: input.revision
+          updated_at: input.updated_at
+        emits: [connectors.feed.ItemRestored]
+        payload:
+          connectors.feed.ItemRestored:
+            item_id: input.item_id
+            revision: input.revision
+        summary: The provider reports the item present again, under a new revision.
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.feed.ItemStateConflict
+        summary: The item is not removed.
+      - name: no-such-item
+        unknown_instance: true
+        error: connectors.feed.ItemNotFound
+
+  # `feed.containers`: a read; it changes nothing.
+  - name: connectors.feed.ListContainers
+    naming:
+      wire: feed.containers
+    input:
+      - {name: limit, type: "Optional<Integer>"}
+      - {name: cursor, type: "Optional<String>"}
+    outcomes:
+      - name: bad-limit
+        when: limit <= 0
+        error: connectors.feed.InvalidLimit
+        summary: Refused by name before any request.
+      - name: listed
+        accepts: nothing
+        summary: The listing is what ListedContainers holds; no direct conversation is in it.
+
+  # `feed.items`: a read of one container; it changes nothing (`preserves`).
+  - name: connectors.feed.ReadItems
+    naming:
+      wire: feed.items
+    input:
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: watermark, type: "Optional<connectors.feed.Watermark>"}
+      - {name: limit, type: Integer}
+    outcomes:
+      - name: bad-limit
+        when: limit <= 0
+        error: connectors.feed.InvalidLimit
+        summary: Refused by name before any request.
+      # A direct conversation the profile does not declare answers exactly as an unknown
+      # container does: `not_found`, revealing nothing.
+      - name: direct-conversation
+        when_subject:
+          predicate: visibility == direct
+        error: connectors.feed.ContainerNotFound
+        summary: Not readable through the family by default; indistinguishable from absence.
+      - name: read
+        preserves: connectors.feed.FeedContainer
+        instance: container_id
+        summary: The page is what ContainerItems holds for the container, tombstones included.
+      # ESS-LIMIT: an unknown container answers ContainerNotFound (`not_found`). ESS 0.52
+      # refuses `unknown_instance:` on a command whose only instance branch is `preserves:`
+      # (ESS-COMMAND-012, unreachable_branch), so that answer is a binding obligation here.
+
+events:
+  - name: connectors.feed.ContainerAdded
+    fields:
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: visibility, type: connectors.feed.Visibility}
+  - name: connectors.feed.ItemAdded
+    fields:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: revision, type: connectors.feed.Revision}
+  - name: connectors.feed.ItemRevised
+    fields:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: revision, type: connectors.feed.Revision}
+  - name: connectors.feed.ItemRemoved
+    fields:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: revision, type: connectors.feed.Revision}
+  - name: connectors.feed.ItemRestored
+    fields:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: revision, type: connectors.feed.Revision}
+
+views:
+  # What `feed.containers` lists by default: every container except direct conversations.
+  - name: connectors.feed.ListedContainers
+    source: connectors.feed.FeedContainer
+    consistency: read_your_writes
+    filter: visibility != direct
+    fields:
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: name, type: "Optional<String>"}
+      - {name: kind, type: String}
+      - {name: visibility, type: connectors.feed.Visibility}
+
+  # Every container the source holds, direct conversations included: what a conformance run
+  # reads a stored visibility through. Not the listing; `feed.containers` is ListedContainers.
+  - name: connectors.feed.SourceContainers
+    source: connectors.feed.FeedContainer
+    consistency: read_your_writes
+    fields:
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: connection_ref, type: String}
+      - {name: name, type: "Optional<String>"}
+      - {name: kind, type: String}
+      - {name: visibility, type: connectors.feed.Visibility}
+      - {name: state, type: connectors.feed.FeedContainer.State}
+
+  # Every item the source holds, across containers: what a conformance run reads a stored
+  # revision and state through. Not a family operation; `feed.items` reads one container.
+  - name: connectors.feed.SourceItems
+    source: connectors.feed.FeedItem
+    consistency: read_your_writes
+    fields:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: revision, type: connectors.feed.Revision}
+      - {name: created_at, type: Timestamp}
+      - {name: updated_at, type: Timestamp}
+      - {name: parent, type: "Optional<connectors.feed.ItemId>"}
+      - {name: state, type: connectors.feed.FeedItem.State}
+
+  # What `feed.items` returns for one container, tombstones (state Deleted) included.
+  - name: connectors.feed.ContainerItems
+    source: connectors.feed.FeedItem
+    consistency: read_your_writes
+    params:
+      - {name: container_id, type: connectors.feed.ContainerId}
+    filter: container_id == param.container_id
+    fields:
+      - {name: item_id, type: connectors.feed.ItemId}
+      - {name: container_id, type: connectors.feed.ContainerId}
+      - {name: revision, type: connectors.feed.Revision}
+      - {name: updated_at, type: Timestamp}
+      - {name: state, type: connectors.feed.FeedItem.State}

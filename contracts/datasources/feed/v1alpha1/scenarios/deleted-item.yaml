@@ -1,0 +1,77 @@
+# A removed item is reported as a tombstone: the same id, Deleted (`deleted: true` on
+# the wire) and a revision it has not carried before, so deduplication by
+# (container, id, revision) never drops the deletion. See ../semantics.md, Deletions.
+type: ess-scenario/1
+domain: connectors.feed
+scenario: deleted-item
+summary: A removed item comes back as a tombstone under a new revision, never as a repeat.
+timeline:
+- at: '2026-10-06T09:00:00Z'
+  command: connectors.feed.AddContainer
+  input:
+    container_id: team-room
+    connection_ref: workspace-a
+    name: Team room
+    kind: channel
+    visibility: public
+  outcome: added
+  events:
+  - event: connectors.feed.ContainerAdded
+- at: '2026-10-06T09:00:01Z'
+  command: connectors.feed.AddItem
+  input:
+    item_id: item-1
+    container_id: team-room
+    revision: r1
+    created_at: '2026-10-06T09:00:01Z'
+  outcome: added
+  events:
+  - event: connectors.feed.ItemAdded
+- at: '2026-10-06T09:00:02Z'
+  command: connectors.feed.ReadItems
+  input:
+    container_id: team-room
+    limit: 10
+  outcome: read
+- at: '2026-10-06T09:00:03Z'
+  command: connectors.feed.RemoveItem
+  input:
+    item_id: item-1
+    revision: r1
+    removed_at: '2026-10-06T09:00:03Z'
+  outcome: same-revision
+  error:
+    name: connectors.feed.RevisionUnchanged
+- at: '2026-10-06T09:00:04Z'
+  command: connectors.feed.RemoveItem
+  input:
+    item_id: item-1
+    revision: r2-removed
+    removed_at: '2026-10-06T09:00:04Z'
+  outcome: removed
+  events:
+  - event: connectors.feed.ItemRemoved
+    payload:
+      revision: r2-removed
+- at: '2026-10-06T09:00:05Z'
+  command: connectors.feed.ReadItems
+  input:
+    container_id: team-room
+    watermark: w-after-first-read
+    limit: 10
+  outcome: read
+assert:
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  contains:
+    item_id: item-1
+    container_id: team-room
+    revision: r2-removed
+    state: Deleted
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  excludes:
+    item_id: item-1
+    state: Present
