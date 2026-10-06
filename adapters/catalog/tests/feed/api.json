@@ -1,0 +1,53 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Feed fixture provider",
+    "version": "1",
+    "description": "A fictional provider the catalog feed engine is held to the datasource.feed/v1alpha1 suite against. Rooms hold messages; a message is listed by edit time or through a change cursor."
+  },
+  "servers": [{"url": "https://feed.fixture.test/v1"}],
+  "paths": {
+    "/rooms": {
+      "get": {
+        "operationId": "listRooms",
+        "parameters": [
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer"}},
+          {"name": "cursor", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "One page of rooms", "content": {"application/json": {}}}}
+      }
+    },
+    "/rooms/{room}": {
+      "get": {
+        "operationId": "getRoom",
+        "parameters": [
+          {"name": "room", "in": "path", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "One room", "content": {"application/json": {}}}}
+      }
+    },
+    "/rooms/{room}/messages": {
+      "get": {
+        "operationId": "listMessages",
+        "parameters": [
+          {"name": "room", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer"}},
+          {"name": "updated_since", "in": "query", "required": false, "schema": {"type": "string"}},
+          {"name": "order", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Messages edited at or after updated_since", "content": {"application/json": {}}}}
+      }
+    },
+    "/rooms/{room}/changes": {
+      "get": {
+        "operationId": "listChanges",
+        "parameters": [
+          {"name": "room", "in": "path", "required": true, "schema": {"type": "string"}},
+          {"name": "limit", "in": "query", "required": false, "schema": {"type": "integer"}},
+          {"name": "cursor", "in": "query", "required": false, "schema": {"type": "string"}}
+        ],
+        "responses": {"200": {"description": "Changes after cursor", "content": {"application/json": {}}}}
+      }
+    }
+  }
+}

@@ -267,6 +267,12 @@ The complete configuration used against the sandbox is
 - `operations_file` names a shipped selection set; its `provider` must match. An
   inline `operations` list is accepted as well and comes first. The selection
   ids, in either place, are what the host permits and the approval policy names.
+- A selection set may also carry `feed`, a provider's `datasource.feed/v1alpha1`
+  binding declared as data; the service then declares `feed.containers` and
+  `feed.items` as reads under the declaration's profile, and `operations` may be
+  empty. The shape, its watermark forms and what it cannot express are in
+  [the catalog contract, section 3.3](../contracts/catalog/v1alpha1/semantics.md#33-declared-feed-bindings).
+  A selection id may not be `feed.containers` or `feed.items`.
 - Each selection exposes one `operationId` from the bundle under a local id.
   `effect` is declared, not inferred from the method: `read` is allowed only for
   GET, `write` only for POST, PUT, PATCH and DELETE, and a write is a
