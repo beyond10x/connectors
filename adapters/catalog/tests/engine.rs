@@ -585,6 +585,77 @@ async fn a_refused_write_keeps_the_providers_status_as_its_marked_code() {
     }
 }
 
+/// story:service-failure-carries-upstream-reason: a refusal keeps the
+/// provider's own top-level message as its bounded reason, beside its code and
+/// outside its message; a secret-shaped one is withheld.
+#[tokio::test]
+async fn a_refusal_carries_the_providers_bounded_reason_and_withholds_a_secret_shaped_one() {
+    let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();
+    let read = |response: HttpResponse| {
+        let engine = &engine;
+        async move {
+            let http = reads(vec![response]);
+            engine
+                .read(
+                    http.as_ref(),
+                    "fixture",
+                    "merge_requests.list",
+                    json!({"id": "org/project"}),
+                )
+                .await
+                .err()
+                .unwrap()
+        }
+    };
+    let scope = json!({"code": 401, "message": "Unauthorized; scope does not match"});
+    let error = read(response(401, scope.clone())).await;
+    assert_eq!(error.code, ErrorCode::Unauthorized);
+    assert!(error.upstream_answer);
+    assert_eq!(
+        error.upstream_reason.as_deref(),
+        Some("Unauthorized; scope does not match")
+    );
+    assert!(!error.message.contains("scope"));
+    // The reason is in-process only: the service wire never carries it.
+    assert!(
+        !serde_json::to_string(&error)
+            .unwrap()
+            .contains("scope does not match")
+    );
+    let leaky = json!({"message": "Unauthorized; token fixtok-AbCdEfGhIjKl0123456789 revoked"});
+    let error = read(response(401, leaky)).await;
+    assert_eq!(error.code, ErrorCode::Unauthorized);
+    assert_eq!(error.upstream_reason, None);
+    let long = json!({"message": format!("Unauthorized {}", "scopé ".repeat(40))});
+    let reason = read(response(403, long)).await.upstream_reason.unwrap();
+    assert!(reason.len() <= 256 && reason.starts_with("Unauthorized scopé"));
+    assert_eq!(read(raw(404, b"private")).await.upstream_reason, None);
+    // A refused write keeps the same reason.
+    let http = reads(vec![response(200, json!({"commit": {"id": SHA}}))]);
+    let prepared = engine
+        .prepare(
+            http.as_ref(),
+            "fixture",
+            "merge_request.create",
+            create_input(),
+        )
+        .await
+        .unwrap();
+    let WriteOutcome::Refused(error) = prepared
+        .execute(Box::new(Send {
+            sent: Arc::new(Mutex::new(Vec::new())),
+            response: Some(response(401, scope)),
+        }))
+        .await
+    else {
+        panic!("401 was not refused");
+    };
+    assert_eq!(
+        error.upstream_reason.as_deref(),
+        Some("Unauthorized; scope does not match")
+    );
+}
+
 #[tokio::test]
 async fn multi_check_guard_holds_every_check_before_and_after_dispatch() {
     let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();

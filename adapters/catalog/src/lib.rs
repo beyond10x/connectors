@@ -794,7 +794,9 @@ impl Prepared {
                 _ => ErrorCode::Forbidden,
             };
             return WriteOutcome::Refused(
-                Error::new(code, "provider refused the write").answered(),
+                Error::new(code, "provider refused the write")
+                    .answered()
+                    .with_upstream_reason(connectors_core::reason::from_body(&response.body)),
             );
         }
         if !(200..300).contains(&response.status) {
@@ -905,7 +907,11 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             500..=599 => ErrorCode::Unavailable,
             _ => ErrorCode::UpstreamProtocol,
         };
-        return Err(Error::new(code, "provider refused the request").answered());
+        // Only the body's admitted reason travels on, beside the code; the
+        // body itself, and every header, stays here.
+        return Err(Error::new(code, "provider refused the request")
+            .answered()
+            .with_upstream_reason(connectors_core::reason::from_body(&response.body)));
     }
     // An empty text body is the empty text; an empty JSON body carries no
     // JSON value at all.

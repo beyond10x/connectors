@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:service-failure-carries-upstream-reason
 kind: story
-status: draft
+status: active
 title: A dispatch service failure carries the upstream reason, not only its code
 relations:
 - serves: vision:independent-contract-adapters
@@ -35,7 +35,10 @@ scope:
   path: crates/connectors-host/src/local/runtime.rs
 - confidence: cited
   path: ess/domains/cli.yaml
-revision: 4
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T10:22:52Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-06T10:22:53Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"review_outcome":1}}}
 ---
 ## Observed
 
