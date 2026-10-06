@@ -161,6 +161,30 @@
       "value": {"adapter": "forge", "connection": "connection-1"}
     },
     {
+      "id": "valid-consumer-launch-selectors",
+      "type": "connectors.cli.ConnectionLaunchInput",
+      "valid": true,
+      "value": {"adapter": "forge", "connection": "connection-1", "consumer": "probe"}
+    },
+    {
+      "id": "valid-consumer-launch-with-args",
+      "type": "connectors.cli.ConnectionLaunchInput",
+      "valid": true,
+      "value": {"adapter": "forge", "connection": "connection-1", "consumer": "probe", "args": "[\"head\",\"--json\"]"}
+    },
+    {
+      "id": "invalid-consumer-launch-missing-consumer",
+      "type": "connectors.cli.ConnectionLaunchInput",
+      "valid": false,
+      "value": {"adapter": "forge", "connection": "connection-1"}
+    },
+    {
+      "id": "valid-consumer-launch-exit",
+      "type": "connectors.cli.ConnectionLaunchResult",
+      "valid": true,
+      "value": {"consumer": "probe", "exit_code": 0}
+    },
+    {
       "id": "valid-SetupInitResult-1",
       "type": "connectors.cli.SetupInitResult",
       "valid": true,

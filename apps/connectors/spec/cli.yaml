@@ -120,6 +120,11 @@ callables:
     input: connectors.cli.ConnectionRevalidateInput
     result: connectors.cli.ConnectionRevalidateResult
     errors: {failure: connectors.cli.Failure}
+  connections-launch:
+    target: {kind: local, owner: connectors.cli, action: connections-launch}
+    input: connectors.cli.ConnectionLaunchInput
+    result: connectors.cli.ConnectionLaunchResult
+    errors: {failure: connectors.cli.Failure}
   connections-revoke:
     target: {kind: local, owner: connectors.cli, action: connections-revoke}
     input: connectors.cli.ConnectionRevokeInput
@@ -378,6 +383,19 @@ commands:
         source: {kind: option, long: connection}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
+  - path: [connections, launch]
+    aliases: []
+    callable: connections-launch
+    about: Run a pinned consumer with one connection's credential on descriptor 3
+    arguments:
+      - field: adapter
+        source: {kind: option, long: adapter}
+      - field: connection
+        source: {kind: option, long: connection}
+      - field: consumer
+        source: {kind: option, long: consumer}
+      - field: args
+        source: {kind: option, long: args}
   - path: [connections, revoke]
     aliases: []
     callable: connections-revoke
