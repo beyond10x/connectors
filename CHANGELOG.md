@@ -44,6 +44,15 @@
   `cli --check` needs no enrollment. The metadata mutation emitter fills the
   `ess-mutation-manifest/4` fields ESS 0.53.0 added, unset, since it writes `/2`.
 
+### Tests
+
+- Two disposable-custody CLI cases drive an adapter's own `identity_mismatch` through the
+  production CLI, owner and a fixture adapter child. During an upgrading
+  `connections revalidate` it answers `identity_mismatch` with `next_action`
+  `create_connection` and leaves the connection's revision and state unchanged; outside
+  an upgrade it answers `repair_connection` and the connection requires reauthorization.
+  Until now only the CLI's mapping of a hand-set flag and the registry were covered.
+
 ## 0.30.0 — 2026-10-06
 
 ### Added
