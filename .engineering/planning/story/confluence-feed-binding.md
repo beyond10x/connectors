@@ -10,6 +10,7 @@ relations:
 - depends_on: story:feed-contract
 - depends_on: story:feed-bindings-discoverable
 - depends_on: story:catalog-feed-engine
+- depends_on: story:catalog-feed-engine-extensions
 revision: 3
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 2}

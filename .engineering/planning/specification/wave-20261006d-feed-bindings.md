@@ -4,7 +4,7 @@ id: specification:wave-20261006d-feed-bindings
 kind: specification
 status: approved
 title: 'Wave 20261006d: feed bindings for Jira, GitLab, Confluence and the Slack provider'
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-06T19:55:18Z", actor: "agent:claude", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-06T19:55:18Z", actor: "agent:claude", revision: 3}
@@ -27,3 +27,7 @@ Opened 2026-10-06 by the coordinating session, `aep:implementing` 0.19.2 wave mo
 ## Commits approval authorises
 
 One commit per unit through `b10x-gates bot`; their merges into `wave/20261006d`; the closing planning-store commit; the pull request into `main` and its merge. No release.
+
+## Outcome
+
+Closed 2026-10-06 with no unit merged. The four units showed that the bindings need work no story owned: Jira, GitLab and Confluence stopped on the catalog declaration shape, the suite tests every profile as the strongest provider (GitLab passed 21 of 28 with no defect of its own), and the Slack document is Swagger 2.0, which the catalog cannot ingest. Filed: `story:feed-profile-capabilities`, `story:catalog-feed-engine-extensions`, `story:catalog-swagger2-projection`; the bindings and `story:catalog-slack-reads` depend on them and stay active until they land.
