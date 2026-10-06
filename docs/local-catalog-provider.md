@@ -34,6 +34,17 @@ parameters](#array-and-required-query-parameters)). `adapters/catalog/tests/bund
 committed bundle that a fresh run would not reproduce byte for byte. Nothing
 here reaches the network.
 
+`--amendments <file>` applies a `connectors-source-amendments/1` file to the
+extracted inventory: each entry names an `operation_id`, one optional query
+parameter to add (`name`, `location: query`, `required: false`, `type`), the
+https page that documents it and why the pinned document lacks it. The file
+must carry the source's SHA-256, and an operation that is missing or declared
+twice, a parameter it already declares, or anything other than an optional,
+unrepeated query parameter is refused before any bundle is written. The
+bundle's source record then names the file and its SHA-256
+(`crates/connectors-catalog/src/amendment.rs`). Zendesk uses it for the ticket
+export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)).
+
 ## The shipped selection set
 
 The repository reviews and ships one selection set per provider under
