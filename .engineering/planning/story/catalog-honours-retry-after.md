@@ -7,9 +7,15 @@ title: A catalog read answered 429 honours Retry-After
 relations:
 - decomposes: epic:tech-debt-review-20260930
 - serves: vision:independent-contract-adapters
+- decomposes: epic:connector-probe-20261006
+- depends_on: story:service-failure-carries-upstream-reason
 scope:
 - confidence: inferred
   path: adapters/catalog/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/owner.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/runtime.rs
 - confidence: cited
   path: docs/catalog-confluence.md
 - confidence: cited
@@ -18,7 +24,7 @@ scope:
   path: docs/catalog-jira.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 3
+revision: 6
 ---
 ## Defect
 
@@ -47,4 +53,11 @@ can wait. Writes are never retried.
 
 ## Ordering
 
-Lands after wave `20260930c` (Google), which changes `adapters/catalog/src/lib.rs`.
+Revised 2026-10-06 (the Google wave `20260930c` it waited on is implemented). Shares
+`adapters/catalog/src/lib.rs` with `story:service-failure-carries-upstream-reason`: both change the
+status-to-`ErrorCode` match in `read_body` (`lib.rs:895-908`, where `401` and `429` are adjacent),
+and carrying the delay in the refusal would also reach `crates/connectors-host/src/local/runtime.rs`
+and `owner.rs`, which that story cites. It lands after it (`depends_on`). It also edits
+`docs/local-catalog-provider.md`, which `story:expired-evidence-invoke-advises-revalidate` and
+`story:forge-issue-create` edit in other sections (Limits here; evidence lifetime and the GitLab
+selection there); the derived waves keep the three apart.
