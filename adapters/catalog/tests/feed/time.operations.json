@@ -1,0 +1,37 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "feed-fixture",
+  "operations": [],
+  "feed": {
+    "profile": "feed-fixture-time/1",
+    "max_limit": 100,
+    "containers": {
+      "operation_id": "listRooms",
+      "lookup": {"operation_id": "getRoom", "parameter": "room", "record": "/room"},
+      "limit": "limit",
+      "cursor": {"parameter": "cursor", "next": "/next_cursor"},
+      "records": "/rooms",
+      "id": "/id",
+      "name": "/title",
+      "kind": "/type",
+      "visibility": {"pointer": "/access", "map": {"open": "public", "invite": "private", "im": "direct"}}
+    },
+    "items": {
+      "operation_id": "listMessages",
+      "container": "room",
+      "query": {"order": "asc"},
+      "limit": "limit",
+      "position": {"kind": "time", "value": {"parameter": "updated_since"}},
+      "records": "/messages",
+      "id": "/id",
+      "revision": "/version",
+      "created_at": "/created",
+      "updated_at": "/edited",
+      "author": {"id": "/user/id", "display_name": "/user/name"},
+      "body": {"pointer": "/text", "representation": "text/plain"},
+      "url": "/link",
+      "parent": "/reply_to",
+      "deleted": {"pointer": "/deleted", "equals": true}
+    }
+  }
+}

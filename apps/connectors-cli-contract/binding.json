@@ -9809,6 +9809,12 @@
                 "kind": "string"
               }
             },
+            "family": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "limit": {
               "kind": "optional",
               "of": {
@@ -11642,6 +11648,13 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "family",
+          "source": {
+            "kind": "option",
+            "long": "family"
           }
         },
         {

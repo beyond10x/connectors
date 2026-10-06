@@ -2453,13 +2453,17 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__operations__subcmd__list)
-            opts="-h --adapter --limit --cursor --config --state-dir --output --help"
+            opts="-h --adapter --family --limit --cursor --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --family)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

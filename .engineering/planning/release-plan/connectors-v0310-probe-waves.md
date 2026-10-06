@@ -6,16 +6,16 @@ status: active
 title: 'Release 0.31.0: refusal reasons, Retry-After, revalidate advice, clock floor and owner memory'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-06T19:15:33Z", actor: "human:timo", revision: 2}
 ---
 ## Outcome and authorization
 
-Prepare minor release 0.31.0 from origin/main 1f9e450. Operator rule "ready means ship"
+Prepare minor release 0.31.0 from origin/main f5f03c6 (first prepared on 1f9e450; #124 merged before the release PR, so it is in scope). Operator rule "ready means ship"
 (2026-09-25) and the operator's approval of the connector-probe waves on 2026-10-06 ("all
 waves approves by me"). The tag namespace ends at v0.30.0, an ancestor of that base.
-Recheck both before tagging. The conductor session confirmed no hold for open PR #124.
+Recheck both before tagging. The conductor session confirmed no hold for #124.
 
 Minor, not patch: new CLI answer fields (`service_reason`, `retry_after_seconds`), a new
 `next_action` value (`revalidate_connection`), a new catalog write (GitLab `issue.create`),
@@ -24,7 +24,7 @@ Existing configurations, stored metadata and connections keep working; a store w
 the new registry floor file refuses commands for at most 60 s after the upgrade
 (CHANGELOG).
 
-## Released scope (v0.30.0..1f9e450)
+## Released scope (v0.30.0..f5f03c6)
 
 | PR | Change |
 |---|---|
@@ -38,11 +38,12 @@ the new registry floor file refuses commands for at most 60 s after the upgrade
 | #121 | A read answered 429 honours `Retry-After`. |
 | #122 | The owner keeps one malloc arena and no longer copies histories on open (part of #103). |
 | #123 | An invoke on expired evidence advises `revalidate_connection`. |
+| #124 | `operations list --family` and the catalog feed engine (`feed.containers`, `feed.items`); no real provider binding, no invoke through a saved connection yet. |
 | #111, #112, #114 | Planning only. |
 
 ## Not in this release
 
-- #124 feed discovery and the catalog feed engine (open).
+- A feed read through a saved connection, and the four provider feed bindings.
 - #101: every command still opens and verifies the whole store
   (https://github.com/beyond10x/entity-runtime/issues/55).
 - #103: the 506 MB owner peak target at 600 events (story:owner-memory-bounded stays active,
