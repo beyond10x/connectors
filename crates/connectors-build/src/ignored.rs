@@ -247,7 +247,9 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors",
             "failed_connect",
             "a_revalidation_the_owner_definitely_fails_reports_dispatch_at_the_cli"
-            | "a_revalidation_after_a_configuration_change_reaches_the_owner_without_a_cached_description",
+            | "a_revalidation_after_a_configuration_change_reaches_the_owner_without_a_cached_description"
+            | "an_adapter_identity_mismatch_during_an_upgrade_names_a_new_connection"
+            | "an_adapter_identity_mismatch_outside_an_upgrade_names_a_repair",
         ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors",

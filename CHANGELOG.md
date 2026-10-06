@@ -20,9 +20,32 @@
   `/1` and `/2` files keep loading; `[consumers]` in them is refused, and
   `setup init` still writes `/2`. `connectors.cli.ConfigurationFormat` gains
   `connectors-local/3`.
+- GitLab catalog write `issue.create`: `POST /api/v4/projects/{id}/issues`
+  (`postApiV4ProjectsIdIssues`, already in the pinned GitLab document and the
+  committed bundle) opens one issue from `id` and a `body` GitLab requires a
+  `title` in. It is unguarded, as the Drive, Slides and Calendar creates are: nothing
+  exists to compare before a create, so the same input approved and sent again
+  opens a second issue. Like every write it runs only under private protocol two,
+  in the adapter's permitted operations and named by an approval policy; the
+  approval binds the whole input by digest. The shipped selection set changed, so
+  the configuration revision of every instance using it moves: print the bootstrap
+  again and copy its `configuration_revision`, run `connections revalidate`, and
+  issue the instance's approval policies again (`docs/local-catalog-provider.md`).
 
 ### Changed
 
+- The registry clock floor no longer records an Entity Runtime event on every
+  command. Its durable value is the new file `registry-clock.floor` beside
+  `metadata.lock`, written under the metadata lock by temporary file, fsync and
+  rename; the recorded `connectors.clock.LocalClockFloor` `s:registry` advances only
+  to a sample more than 60 s past it, and an unchanged floor is not re-recorded. A
+  read invoke appended 4 floor events of 7 before; now none within 60 s of the last
+  recorded floor. The regression check is unchanged: a sample below the higher of
+  the file and the recorded floor is refused. Migration: none. A store without the
+  file (every existing store, on its first command after the upgrade) treats the
+  floor as the recorded value plus 60 s, so a command within 60 s of the last one
+  before the upgrade answers `metadata_unavailable`; a deleted or corrupt
+  file does the same. `connectors.clock.RegistryClockFloorFile` models the file.
 - ESS 0.53.0 (from 0.52.0) and AEP 0.68.0 (from 0.65.0): the seven ESS crates, the pinned
   toolchains and the planning store's `protocols` pin; 23 compatible crates.io updates
   (among them tokio 1.53.2, jsonschema 0.58.5). uuid stays at 1.26.1: 1.27.0 requires
@@ -32,6 +55,29 @@
   `ess generate output adopt` before regenerating (`docs/development.md`); the gate's
   `cli --check` needs no enrollment. The metadata mutation emitter fills the
   `ess-mutation-manifest/4` fields ESS 0.53.0 added, unset, since it writes `/2`.
+- A read the provider refuses at dispatch now says why: `connectors.cli.Failure` gains the
+  optional `service_reason`, beside `service_code` (or on a provider `forbidden`), so a
+  Confluence `unauthorized` names `Unauthorized; scope does not match` and a missing token
+  scope is told apart from a wrong path. Only the catalog provider supplies one, and only
+  from the top-level `message`, `error_description` or `error` string of a JSON refusal
+  body; never a header. It is at most 256 bytes, cut back to a whole word, and withheld
+  whole when it holds a control, format (Unicode Cf, the TAG block included) or other
+  invisible character, an `@` (no email address is carried), a credential-like marker
+  (`authorization`, `bearer`, `token=`, …), a token-like run or word, a piece of the
+  credential value the adapter derived and sent (checked by the adapter), or a piece of
+  the call's own protected document (checked again by the host). Guarded writes and
+  connection probes carry none. The private adapter `failed` reply gains the matching
+  optional `reason`, allowed only on a failed `invoke`; an owner that predates it refuses
+  such a reply. See `contracts/cli/v1alpha1/semantics.md`.
+
+### Tests
+
+- Two disposable-custody CLI cases drive an adapter's own `identity_mismatch` through the
+  production CLI, owner and a fixture adapter child. During an upgrading
+  `connections revalidate` it answers `identity_mismatch` with `next_action`
+  `create_connection` and leaves the connection's revision and state unchanged; outside
+  an upgrade it answers `repair_connection` and the connection requires reauthorization.
+  Until now only the CLI's mapping of a hand-set flag and the registry were covered.
 
 ## 0.30.0 — 2026-10-06
 

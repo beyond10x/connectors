@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:forge-issue-create
 kind: story
-status: draft
+status: implemented
 title: GitLab issue creation through the forge selection as an approved write
 relations:
 - decomposes: epic:connector-probe-20261006
@@ -22,7 +22,11 @@ scope:
   path: docs/local-catalog-provider.md
 - confidence: inferred
   path: website/docs/adapters/gitlab.mdx
-revision: 4
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T10:51:11Z", actor: "human:timo", revision: 5}
+- {from: "proposed", to: "active", at: "2026-10-06T10:51:11Z", actor: "human:timo", revision: 6}
+- {from: "active", to: "implemented", at: "2026-10-06T10:51:13Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"verification":1}}}
 ---
 ## Source
 
