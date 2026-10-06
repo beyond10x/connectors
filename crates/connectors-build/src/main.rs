@@ -105,6 +105,10 @@ enum Action {
         /// the bundle then records the derivation.
         #[arg(long)]
         derived_from: Option<PathBuf>,
+        /// A `connectors-source-amendments/1` file of cited parameters the pinned
+        /// source leaves out, applied to its inventory and recorded in the bundle.
+        #[arg(long)]
+        amendments: Option<PathBuf>,
     },
     /// Project a pinned Google Discovery document into OpenAPI 3.0.3, and write
     /// its projection record beside it as `<name>.projection.json`.
@@ -209,14 +213,20 @@ fn execute(args: Args) -> Result<()> {
         auth_profile,
         replace,
         derived_from,
+        amendments,
     } = &args.command
     {
+        let amendments = amendments
+            .as_ref()
+            .map(|path| inside(&root, path))
+            .transpose()?;
         let request = connectors_catalog::pipeline::Request {
             provider,
             source: &inside(&root, source)?,
             directory: &inside(&root, directory)?,
             auth_profile,
             replace: *replace,
+            amendments: amendments.as_deref(),
         };
         let run = match derived_from {
             Some(discovery) => {
@@ -687,6 +697,111 @@ mod tests {
             .unwrap()
             .collect();
         assert!(written.is_empty(), "no bundle and no index is written");
+    }
+
+    #[test]
+    fn catalog_applies_and_records_amendments() {
+        let temp = workspace();
+        project_into(temp.path());
+        // The source digest, as an unamended run records it.
+        std::fs::create_dir_all(temp.path().join("plain")).unwrap();
+        cli(
+            temp.path(),
+            &[
+                "catalog",
+                "--provider",
+                "google-drive",
+                "--source",
+                "projected/drive-openapi.json",
+                "--directory",
+                "plain",
+                "--auth-profile",
+                "google.oauth",
+            ],
+        )
+        .expect("unamended catalog run");
+        let digest = bundle::load(&temp.path().join("plain"), "google-drive")
+            .unwrap()
+            .source
+            .source_sha256;
+        let amendments = json!({
+            "format": "connectors-source-amendments/1",
+            "source_sha256": digest,
+            "amendments": [{
+                "operation_id": "drive.about.get",
+                "add_parameter": {"name": "fixture_page_size", "location": "query",
+                                  "required": false, "type": "integer"},
+                "cite": "https://developers.google.com/workspace/drive/api/reference/rest/v3/about/get",
+                "reason": "fixture: a documented parameter the pinned document leaves out",
+            }],
+        });
+        std::fs::write(
+            temp.path().join("projected/amendments.json"),
+            serde_json::to_vec(&amendments).unwrap(),
+        )
+        .unwrap();
+        cli(
+            temp.path(),
+            &[
+                "catalog",
+                "--provider",
+                "google-drive",
+                "--source",
+                "projected/drive-openapi.json",
+                "--directory",
+                "bundles",
+                "--auth-profile",
+                "google.oauth",
+                "--amendments",
+                "projected/amendments.json",
+            ],
+        )
+        .expect("catalog run");
+        let bundle = bundle::load(&temp.path().join("bundles"), "google-drive").unwrap();
+        let record = bundle.source.amendments.expect("amendment record");
+        assert_eq!(record.file_name, "amendments.json");
+        assert_eq!(record.count, 1);
+        let about = bundle
+            .inventory
+            .operations
+            .iter()
+            .find(|operation| operation.operation_id.as_deref() == Some("drive.about.get"))
+            .unwrap();
+        assert!(
+            about
+                .parameters
+                .iter()
+                .any(|parameter| parameter.name == "fixture_page_size")
+        );
+        // Amendments written against another source are refused, and nothing is written.
+        let other = temp.path().join("other");
+        std::fs::create_dir_all(&other).unwrap();
+        let mut stale = amendments.clone();
+        stale["source_sha256"] = json!("00");
+        std::fs::write(
+            temp.path().join("projected/stale.json"),
+            serde_json::to_vec(&stale).unwrap(),
+        )
+        .unwrap();
+        let refused = cli(
+            temp.path(),
+            &[
+                "catalog",
+                "--provider",
+                "google-drive",
+                "--source",
+                "projected/drive-openapi.json",
+                "--directory",
+                "other",
+                "--auth-profile",
+                "google.oauth",
+                "--amendments",
+                "projected/stale.json",
+            ],
+        )
+        .expect_err("amendments for another source are refused");
+        assert!(refused.to_string().contains("amends a source"), "{refused}");
+        assert_eq!(std::fs::read_dir(&other).unwrap().count(), 0);
     }
 
     #[test]

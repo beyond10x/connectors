@@ -126,11 +126,18 @@ list, so the profile declares no `scopes` read and no `minimum_scopes`.
     "bearer": false,
     "account_label": "Account email",
     "label": "API token",
-    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"},
+    "access": {"path": "api/v2/pages", "query": {"limit": "1"}}
   },
   "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
 }
 ```
+
+`access` makes validation also read one page through the v2 API. An Atlassian
+API token whose scopes allow the v1 identity read but not the v2 page reads
+then refuses to connect as `insufficient_scope` instead of connecting and
+answering `unauthorized` on every read (observed 2026-10-06, #102). Create the
+token with the Confluence page scopes the shipped reads need.
 
 Connect each adapter with the same credential document
 `{"account": "<email>", "token": "<API token>"}` and the same profile; every

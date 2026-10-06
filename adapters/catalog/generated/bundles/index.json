@@ -67,7 +67,7 @@
     {
       "provider": "zendesk",
       "file_name": "zendesk.bundle.json",
-      "bundle_sha256": "799e268a8f57dece50fc2a54d3799f6c2635515b73f3d16799878192ac21015b",
+      "bundle_sha256": "8a728057098f07f07f0ae5bdee9ece331ac5b8fc8c1e0a28e6060653496ef273",
       "source_sha256": "5dd6cf1eda8febf02f8fb2f2cfa72d7cb6bc7d5bab188ba97b49ab55fc51dbf2",
       "operations": 652,
       "unsupported": 35

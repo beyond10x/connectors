@@ -3,6 +3,7 @@
 //! touches a runtime; a document this crate cannot represent is refused by name
 //! rather than accepted in part.
 
+pub mod amendment;
 pub mod authored;
 pub mod bundle;
 pub mod coverage;
@@ -93,6 +94,11 @@ pub struct SourceRecord {
     /// so every bundle built from an OpenAPI source keeps its bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub derivation: Option<Derivation>,
+    /// The cited amendments applied to the inventory extracted from this source,
+    /// when there were any. Absent otherwise, and then absent from the serialised
+    /// record too, so every bundle built without amendments keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amendments: Option<amendment::AmendmentRecord>,
 }
 
 /// Where a projected source came from: the pinned document's own name, digest
@@ -167,6 +173,7 @@ pub fn ingest(file_name: &str, bytes: &[u8]) -> std::result::Result<SourceRecord
         info_version: text(&document, &["info", "version"]),
         license: text(&document, &["info", "license", "name"]),
         derivation: None,
+        amendments: None,
     })
 }
 

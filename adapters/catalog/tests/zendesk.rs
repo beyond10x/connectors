@@ -220,7 +220,8 @@ fn each_read_declares_the_pinned_parameters_and_the_comment_cursor_pairs() {
     };
     assert_eq!(
         names("IncrementalTicketExportCursor"),
-        ["start_time", "cursor", "support_type_scope"]
+        // `per_page` is the one cited amendment, not in the pinned document.
+        ["start_time", "cursor", "support_type_scope", "per_page"]
     );
     assert_eq!(
         names("IncrementalUserExportCursor"),
@@ -689,8 +690,10 @@ fn first_pages() -> [(&'static str, Value, String); 7] {
     [
         (
             "tickets.incremental",
-            json!({"start_time": SINCE, "support_type_scope": "all"}),
-            format!("/api/v2/incremental/tickets/cursor?start_time={SINCE}&support_type_scope=all"),
+            json!({"start_time": SINCE, "support_type_scope": "all", "per_page": 2}),
+            format!(
+                "/api/v2/incremental/tickets/cursor?start_time={SINCE}&support_type_scope=all&per_page=2"
+            ),
         ),
         (
             "ticket.show",
@@ -772,10 +775,14 @@ fn a_withheld_or_undeclared_parameter_is_refused_before_any_request() {
             "ticket.comments",
             json!({"ticket_id": 101, "sort_order": "desc"}),
         ),
-        // The pinned ticket export declares no `per_page`.
+        // The ticket export's `per_page` is bounded to Zendesk's 1 to 1,000.
         (
             "tickets.incremental",
-            json!({"start_time": SINCE, "per_page": 2}),
+            json!({"start_time": SINCE, "per_page": 0}),
+        ),
+        (
+            "tickets.incremental",
+            json!({"start_time": SINCE, "per_page": 1001}),
         ),
         // The organization export requires `start_time`.
         ("organizations.incremental", json!({"per_page": 2})),
@@ -838,7 +845,7 @@ fn each_list_walks_two_pages_and_stops_at_its_documented_end_condition() {
         (
             "tickets.incremental",
             "tickets",
-            "/api/v2/incremental/tickets/cursor?cursor=fixture-ticket-cursor-2&support_type_scope=all"
+            "/api/v2/incremental/tickets/cursor?cursor=fixture-ticket-cursor-2&support_type_scope=all&per_page=2"
                 .to_owned(),
         ),
         (

@@ -14,13 +14,27 @@
   needs a new instance id and a fresh credential.
 - `connectors.auth_bindings.Connection` gains the optional `configuration_revision`,
   recorded while a connection's revision differs from its instance's.
+- Catalog profiles take an optional `auth.access` read that validation makes after the
+  identity read. A `401` or `403` answer refuses the connection as `insufficient_scope`
+  instead of connecting it; the Confluence guide declares a v2 page read, because a token
+  whose scopes pass the v1 identity read but not the v2 page reads connected as `ready`
+  and then answered `unauthorized` with `next_action: repair_connection` on every read
+  (#102). Configurations without `access` keep their revision.
+- Zendesk `tickets.incremental` accepts `per_page` (1 to 1,000). A full page of 1,000
+  tickets can pass the 4 MiB provider response bound and was refused as `capacity`; a
+  smaller page keeps a long export walkable. The pinned Zendesk document leaves the
+  parameter out of the ticket export, so it is added by a cited amendment,
+  `adapters/zendesk/upstream/zendesk-support.amendments.json`; the pinned bytes and their
+  digest are unchanged.
+- `connectors-build catalog --amendments <file>` applies a `connectors-source-amendments/1`
+  file: optional query parameters a vendor documents but its pinned document leaves out,
+  bound to the source's SHA-256 and recorded in the bundle's source record.
 
 ### Changed
 
 - `connections revalidate` on a connection whose provider authority or profile
   declaration changed still answers `lifecycle_conflict`, now with `next_action`
-  `create_connection` instead of `retry_status`: only a new connection helps
-  (beyond10x/connectors#102). Any profile revision change refuses, a
+  `create_connection` instead of `retry_status`: only a new connection helps. Any profile revision change refuses, a
   minimum-scope change included. A different identity answered during an upgrade
   answers `identity_mismatch` with `next_action` `create_connection`, because repair
   refuses the changed binding; outside an upgrade it keeps `repair_connection`.
