@@ -330,6 +330,11 @@ types:
       # As for instance_id below, ESS declares no invariant on a CLI type, so the bound, the
       # redaction and the presence rule are enforced by the host and pinned by tests.
       - {name: service_reason, type: "Optional<String>"}
+      # ESS-LIMIT: retry_after_seconds is the provider's Retry-After delay in whole seconds
+      # (0 to 4294967295), present only beside service_code = rate_limited
+      # (contracts/cli/v1alpha1/semantics.md). ESS declares no invariant on a CLI type, so the
+      # range and the presence rule are enforced by the host and pinned by tests.
+      - {name: retry_after_seconds, type: "Optional<Integer>"}
       - {name: connection, type: "Optional<String>"}
       - {name: acquisition, type: "Optional<String>"}
       - {name: request_id, type: "Optional<String>"}

@@ -619,6 +619,29 @@ missing token scope behind an `unauthorized`. It never decides `code`, `stage`
 or `next_action`, and a client must not parse it. A guarded write's failure, a
 connection probe's answer and every other route carry none.
 
+`Failure.retry_after_seconds` is the delay a provider named before a
+rate-limited read may be sent again, so the caller can wait. It appears on
+`operations invoke` of a read, at `stage = dispatch`, only beside
+`service_code = rate_limited`, and only when the provider's `429` carried a
+`Retry-After` the adapter could read: delta-seconds, or an HTTP-date counted
+from when the answer arrived and rounded up to a whole second (a date already
+past is `0`). It is a whole number of seconds from 0 to 4294967295; a value
+outside that range, or in any other form, is not read: the adapter does not
+read it, and the host drops one an adapter reports, keeping the failure. Two
+`Retry-After` field lines on one answer that disagree name no delay; identical
+repeats count as one. Its absence beside `rate_limited` states that the
+provider named no delay the adapter could read.
+Before refusing, the catalog provider sends such a read once more after the
+named delay, never more than once, and only when the wait, then a second
+request as long as the first one took, then a 500 ms margin, all end before
+the invocation's deadline. The second request is bounded by the deadline less
+that margin; if it does not finish, the first answer's refusal and delay
+stand. A failure carrying `retry_after_seconds` therefore names a delay that
+did not leave such time, a delay whose second request did not finish, or the
+delay the second `429` named. A guarded write is never sent again and carries
+none. The field never decides `code`, `stage` or
+`next_action`.
+
 The stage names who refused, because the same code can come from either side.
 A refusal made before any provider request — by the host's admission (an
 unknown adapter alias included), or by an adapter from its own configured
@@ -665,7 +688,8 @@ report `timeout` / `capacity` at `stage = dispatch` with
 and is not one of them. The host's own deadline and limits, and an adapter's
 own connect or work deadline and result bounds, keep `stage = admission`
 (`retry_explicitly`). An HTTP 429 stays `service_failure` with
-`service_code = rate_limited`. `unsupported` is always `admission`: every
+`service_code = rate_limited`, and with `retry_after_seconds` when the provider
+named a delay. `unsupported` is always `admission`: every
 source of it is raised before dispatch.
 
 A guarded write's failure carries its `mutation` record, and its stage follows

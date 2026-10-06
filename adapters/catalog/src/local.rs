@@ -1207,6 +1207,35 @@ fn document_base(base_path: &str, prefix: &str) -> Option<String> {
     Some(format!("/{rest}"))
 }
 
+/// Time kept back from a rate-limited read's second request: it must finish
+/// this long before the invocation deadline, so the reply still reaches the
+/// host in time.
+const RETRY_MARGIN: Duration = Duration::from_millis(500);
+
+/// How long to wait before sending a rate-limited read once more: the delay
+/// the provider named on its own `429` answer, when the wait from `now`, then
+/// a second request as long as the first one took (`latency`), then
+/// [`RETRY_MARGIN`], all end strictly before `deadline`. Any other refusal, a
+/// `429` naming no readable delay, and a delay that leaves the second request
+/// no such time get no wait: the refusal is returned at once, naming the delay
+/// when there is one.
+fn retry_wait(
+    error: &connectors_core::Error,
+    latency: Duration,
+    now: Instant,
+    deadline: Instant,
+) -> Option<Duration> {
+    if error.code != connectors_core::ErrorCode::RateLimited || !error.upstream_answer {
+        return None;
+    }
+    let wait = Duration::from_secs(error.retry_after_seconds?);
+    now.checked_add(wait)?
+        .checked_add(latency)?
+        .checked_add(RETRY_MARGIN)
+        .filter(|end| *end < deadline)
+        .map(|_| wait)
+}
+
 fn probe_failure(status: u16) -> Failure {
     match status {
         401 => Failure::InvalidCredential,
@@ -1292,7 +1321,8 @@ impl runtime::Adapter for Local {
         document: Secret,
         input: Value,
     ) -> Result<Value> {
-        self.invoke_explained(operation, partition, document, input)
+        // No deadline is known here, so no rate-limited read is waited for.
+        self.invoke_explained(operation, partition, document, input, Instant::now())
             .await
             .map_err(|refusal| refusal.failure)
     }
@@ -1302,6 +1332,7 @@ impl runtime::Adapter for Local {
         _partition: &str,
         document: Secret,
         input: Value,
+        deadline: Instant,
     ) -> std::result::Result<Value, runtime::Refusal> {
         let (credential, key) = self.credential(document).await?;
         // The host checks a reason against the document it sent; only this
@@ -1309,17 +1340,36 @@ impl runtime::Adapter for Local {
         // OAuth access token), so it withholds a reason holding any of that.
         let derived = Zeroizing::new(credential.0.clone());
         let http = self.with(credential);
-        let result = self
+        let started = Instant::now();
+        let mut result = self
             .engine
-            .read(&http, &self.instance, operation, input)
-            .await
-            .map_err(|error| {
-                let mut refusal = runtime::Refusal::from_provider(error);
-                refusal.reason = refusal.reason.filter(|reason| {
-                    !connectors_core::reason::carries_value(reason, derived.as_slice())
-                });
-                refusal
+            .read(&http, &self.instance, operation, input.clone())
+            .await;
+        // A read is sent once more, and only once, after the delay the
+        // provider named on its own `429`, when that wait still leaves the
+        // second request time of its own before the invocation deadline. The
+        // second request is bounded by the deadline less the margin; if it
+        // does not finish, the first answer's refusal, with its delay, stands.
+        // A write never comes here.
+        if let Err(error) = &result
+            && let Some(wait) = retry_wait(error, started.elapsed(), Instant::now(), deadline)
+            && let Some(bound) = deadline.checked_sub(RETRY_MARGIN)
+        {
+            tokio::time::sleep(wait).await;
+            let second = self.engine.read(&http, &self.instance, operation, input);
+            if let Ok(second) =
+                tokio::time::timeout_at(tokio::time::Instant::from_std(bound), second).await
+            {
+                result = second;
+            }
+        }
+        let result = result.map_err(|error| {
+            let mut refusal = runtime::Refusal::from_provider(error);
+            refusal.reason = refusal.reason.filter(|reason| {
+                !connectors_core::reason::carries_value(reason, derived.as_slice())
             });
+            refusal
+        });
         self.evict_refused(
             key,
             &result

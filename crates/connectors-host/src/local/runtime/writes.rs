@@ -143,6 +143,7 @@ pub(super) fn serve_write(
                     request_id: id,
                     code,
                     reason: None,
+                    retry_after_seconds: None,
                 },
                 None,
                 &[],

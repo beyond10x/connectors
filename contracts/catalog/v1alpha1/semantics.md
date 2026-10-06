@@ -113,7 +113,7 @@ Status to safe `ErrorCode` for **generic reads only** (base vocabulary in `crate
 | 403 | `Forbidden` |
 | 404, 410 | `NotFound` |
 | 409, 412 | `InvalidInput` |
-| 429 | `RateLimited`, `retry_after_seconds` from `Retry-After` when present |
+| 429 | `RateLimited`, `retry_after_seconds` from `Retry-After` when it is delta-seconds or an HTTP-date (whole seconds from 0 to 4294967295, a date rounded up and a past date `0`); absent otherwise, and when two `Retry-After` field lines disagree (the transport combines repeated lines, RFC 9110 §5.3; identical repeats count as one) |
 | 5xx, connection refused, TLS failure | `Unavailable` |
 | deadline exceeded | `Timeout` |
 | non-JSON body, oversize body, redirect | `UpstreamProtocol` |
@@ -202,7 +202,7 @@ What a declaration cannot express, each a reviewed extension of this shape rathe
 | Generic request | 256 KiB including the extended envelope; selected first-profile ceiling |
 | Generic result | 4 MiB including envelope and metadata; a provider body too large to fit gives safe `UpstreamProtocol` for reads; mutations preserve actual effect knowledge |
 | Generic deadlines | 40 s total execution, 30 s provider within it, 5 s connect within provider time; advertised through Operation.limits. No independent budget reset or silent clipping to the legacy 20 s execution limit |
-| Retry | none by the engine; `RateLimited` carries `retry_after_seconds` for the caller |
+| Retry | none by the engine: it sends exactly one request. The local catalog provider sends a read answered `429` once more after the `retry_after_seconds` it names, never a third time, and only when the wait, a second request as long as the first one took and a 500 ms margin all end before the invocation deadline. The second request is bounded by the deadline less 500 ms; if it does not finish, the first answer's `RateLimited` with its `retry_after_seconds` stands; otherwise, and for every write, `RateLimited` carries `retry_after_seconds` for the caller |
 | Refresh | never on read; only by the refresh tool |
 
 The [service compatibility limits](../../service/compatibility.md#7-limits-and-compatibility-obligations) own envelope accounting and admission. These new generic limits are not implemented legacy host capabilities. Catalog inventory reads use the ordinary read limits; only generic execution selects the generic ceilings.
@@ -215,7 +215,7 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 - Tamper: change one byte of a bundle file → `catalog.bundle.describe` returns `Unavailable` naming the file; the index generation is not served.
 - Format refusal: an index with format version `v9` → `Unsupported` before any record is served.
 - Credential-location refusal: a bundle/descriptor/index containing `{ "kind": "environment", "name": "ZENDESK_TOKEN" }` or a real custody/file locator → refused before publication or catalog disclosure, even though it contains no secret bytes. A safe auth-profile requirement and an unpopulated protected-slot schema are permitted; they grant no credential access.
-- Read engine: fixture 200 with JSON → `body` structurally identical, `provenance.resource` carries parameter names not values; 429 with `Retry-After: 7` → `RateLimited`, `retry_after_seconds: 7`; 404 → `NotFound`; 500 → `Unavailable`; `text/html` body → `UpstreamProtocol`; body that exceeds the total response budget after metadata/envelope accounting → `UpstreamProtocol`; 302 → `UpstreamProtocol` and no second request.
+- Read engine: fixture 200 with JSON → `body` structurally identical, `provenance.resource` carries parameter names not values; 429 with `Retry-After: 7`, or with an HTTP-date seven seconds ahead → `RateLimited`, `retry_after_seconds: 7`, one request; 429 with `Retry-After: soon` or none → `RateLimited` without `retry_after_seconds`; 404 → `NotFound`; 500 → `Unavailable`; `text/html` body → `UpstreamProtocol`; body that exceeds the total response budget after metadata/envelope accounting → `UpstreamProtocol`; 302 → `UpstreamProtocol` and no second request.
 - Engine discipline: an input containing a URL-shaped string in a path parameter is percent-encoded into its segment; the fixture observes exactly one request to the declared path.
 - Paged: a mapping with `pagination.page` → `generic-http-page` returns `complete: true` when the fixture returns fewer items than the page size; the cursor is opaque and bound to the input digest.
 - No network: run generation and every catalog operation with a network sentinel; zero connections (old `tests/main/no_network.rs` shape).
