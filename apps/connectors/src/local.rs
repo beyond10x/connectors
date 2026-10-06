@@ -175,8 +175,12 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     };
     // A refusal during a configuration upgrade, or of a changed binding: repair
     // refuses a changed binding, so only a new connection helps.
+    // Only the connection's validation evidence expired, its credential is
+    // intact: a revalidation recollects it, a repair would ask for re-entry.
     let action = if error.reconnect {
         "create_connection"
+    } else if error.revalidate {
+        "revalidate_connection"
     } else {
         action
     };
@@ -689,5 +693,54 @@ mod tests {
                 assert_eq!(stage(error).1, json!("create_connection"), "{failure:?}");
             }
         }
+    }
+
+    /// story:expired-evidence-invoke-advises-revalidate: an invoke refused
+    /// only because the connection's validation evidence expired keeps
+    /// `not_granted` at admission and names `revalidate_connection`, also as
+    /// the CLI receives it across the owner transport. An insufficient scope,
+    /// and a connection not ready for any other reason, keep
+    /// `repair_connection`.
+    #[test]
+    fn an_expired_evidence_refusal_names_revalidation_not_repair() {
+        use connectors_host::local::{registry, runtime};
+        let revalidate = (
+            json!("not_granted"),
+            json!("admission"),
+            json!("revalidate_connection"),
+        );
+        let repair = (
+            json!("not_granted"),
+            json!("admission"),
+            json!("repair_connection"),
+        );
+        let expired = owner::Error::from(registry::Failure::EvidenceExpired);
+        assert_eq!(expired.code, owner::Code::NotGranted);
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&expired).unwrap()).unwrap();
+        for error in [expired, received] {
+            assert_eq!(reply(invoke_failure(error)), revalidate);
+        }
+        assert_eq!(
+            reply(connections::registry_failure(
+                registry::Failure::EvidenceExpired
+            )),
+            revalidate
+        );
+        for failure in [
+            registry::Failure::InsufficientScope,
+            registry::Failure::NotReady,
+        ] {
+            let error = owner::Error::from(failure);
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+            for error in [error, received] {
+                assert_eq!(reply(invoke_failure(error)), repair, "{failure:?}");
+            }
+        }
+        assert_eq!(
+            reply(invoke_failure(runtime::Failure::InsufficientScope.into())),
+            repair
+        );
     }
 }

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:expired-evidence-invoke-advises-revalidate
 kind: story
-status: draft
+status: active
 title: An invoke on a connection whose evidence expired advises revalidate, not repair
 relations:
 - serves: vision:independent-contract-adapters
@@ -28,7 +28,10 @@ scope:
   path: docs/local-catalog-provider.md
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 6
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T17:00:34Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "proposed", to: "active", at: "2026-10-06T17:00:34Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
 ---
 ## Observed
 
