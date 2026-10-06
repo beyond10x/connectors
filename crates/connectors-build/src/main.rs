@@ -13,9 +13,13 @@ use std::{
 };
 
 mod aep_toolchain;
+#[cfg(test)]
+mod catalog_feed_conformance;
 mod cli;
 mod docs;
 mod ess_boundary;
+#[cfg(test)]
+mod feed_conformance;
 mod gate;
 mod ignored;
 mod metadata_conformance;

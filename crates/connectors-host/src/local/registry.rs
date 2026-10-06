@@ -27,6 +27,9 @@ use uuid::Uuid;
 const ENTRY_MS: u64 = 300_000;
 const RETENTION_MS: u64 = 86_400_000;
 const USE_MS: u64 = 120_000;
+/// The registry clock floor reaches Entity Runtime only for a sample more than
+/// this past the recorded one (contracts/service/clock.md, "Registry clock floor").
+const FLOOR_RECORD_MS: i64 = 60_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {
@@ -42,6 +45,11 @@ pub enum Failure {
     StaleCursor,
     Capacity,
     NotReady,
+    /// A read refused only because the connection's validation evidence is no
+    /// longer current, while its credential is intact: a revalidation
+    /// recollects it from the retained custody version, a repair is not needed.
+    /// Public code `not_granted`.
+    EvidenceExpired,
     InsufficientScope,
     CustodyUnavailable,
     /// The connection's binding differs from the configured one in more than
@@ -254,13 +262,14 @@ impl Registry {
         self.transaction_inner(now, migrate, false, Observation::None, action)
     }
 
-    // Only these read-only observation closures may be replayed. A stale
-    // expected clock revision is known not to have committed, so each bounded
-    // retry prepares a fresh authority and re-evaluates the original checks.
+    // Only these read-only observation closures may be replayed. A batch
+    // refused as a stale revision, by its feed check or by a predecessor
+    // revision, is known not to have committed, so each bounded retry
+    // prepares a fresh authority and re-evaluates the original checks.
     // The first attempt replays ER outside the lifecycle lock so concurrent
-    // readers do not serialize on it. A writer can advance the clock in that
+    // readers do not serialize on it. A writer can change the store in that
     // window every time, so after one lost race the observation replays
-    // under the lock instead, where no clock writer can intervene; the bound
+    // under the lock instead, where no writer can intervene; the bound
     // is kept for a provider that still reports a conflict.
     fn transaction_observation<T>(
         &self,
@@ -309,6 +318,7 @@ impl Registry {
         // All clock writers are now excluded. Sample time only after
         // acquiring the lock, including on a prepared observation.
         let authority = metadata.authority().map_err(host_failure)?;
+        let floor_file = metadata.registry_floor().map_err(host_failure)?;
         let tx = metadata
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -319,21 +329,33 @@ impl Registry {
             now
         };
         let now_sql = timestamp(now)?;
-        let previous: i64 = tx
+        // The projection's row is the floor Entity Runtime recorded; the floor
+        // file holds the last sample admitted. Without a readable file, the
+        // recorded floor plus one interval bounds every sample ever admitted.
+        let recorded: i64 = tx
             .query_row(
                 "SELECT last_seen_ms FROM registry_clock WHERE singleton=1",
                 [],
                 |r| r.get(0),
             )
             .map_err(db)?;
-        if now_sql < previous {
+        let floor = match floor_file.read() {
+            Some(file) => file.max(recorded),
+            None => recorded.saturating_add(FLOOR_RECORD_MS),
+        };
+        if now_sql < floor {
             return Err(Failure::MetadataUnavailable);
         }
-        tx.execute(
-            "UPDATE registry_clock SET last_seen_ms=?1 WHERE singleton=1",
-            [now_sql],
-        )
-        .map_err(db)?;
+        // Before Entity Runtime commits anything: a commit that then fails
+        // leaves the file higher than needed, which only refuses more.
+        floor_file.record(now_sql).map_err(host_failure)?;
+        if now_sql > recorded.saturating_add(FLOOR_RECORD_MS) {
+            tx.execute(
+                "UPDATE registry_clock SET last_seen_ms=?1 WHERE singleton=1",
+                [now_sql],
+            )
+            .map_err(db)?;
+        }
         // Time observations persist even when the requested semantic action
         // refuses. A savepoint rolls back its work without forgetting the clock.
         tx.execute_batch("SAVEPOINT action").map_err(db)?;

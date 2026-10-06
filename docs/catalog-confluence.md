@@ -231,5 +231,8 @@ document, expiry and scopes as in the Jira guide. **Not verified live.**
   integers, such as `"65538,98305"`; anything else is refused as
   `invalid_input` before any request. See
   [array and required query parameters](local-catalog-provider.md#array-and-required-query-parameters).
-- The provider does not walk pages itself and does not retry on `429`; a
-  rate-limited read is returned as a refusal.
+- The provider does not walk pages itself. It sends a read answered `429` once more after
+  the delay its `Retry-After` names, when that wait leaves the second request
+  time of its own before the invocation deadline, and otherwise returns it as a `rate_limited` refusal carrying that
+  delay as `retry_after_seconds`
+  ([Limits](local-catalog-provider.md#limits)).

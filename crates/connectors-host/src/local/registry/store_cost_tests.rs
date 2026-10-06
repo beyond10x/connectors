@@ -1,6 +1,8 @@
 //! What one read invoke's metadata transactions cost as the store grows by
 //! read invokes, the way an operator's store grows.
-use super::tests::{NOW, binding, fixture, prepared, publish_fixture, recorded_events};
+use super::tests::{
+    NOW, binding, fixture, prepared, publish_fixture, recorded_clock_floor_events, recorded_events,
+};
 use super::*;
 use std::{collections::BTreeMap, os::unix::fs::PermissionsExt, time::Duration};
 
@@ -76,18 +78,33 @@ struct Step {
     costs: BTreeMap<&'static str, (u64, Duration)>,
 }
 
-fn process_cpu() -> Duration {
+fn own_usage() -> libc::rusage {
     // SAFETY: `getrusage` writes only the struct it is handed.
-    let usage = unsafe {
+    unsafe {
         let mut usage = std::mem::zeroed::<libc::rusage>();
         libc::getrusage(libc::RUSAGE_SELF, &mut usage);
         usage
-    };
+    }
+}
+
+fn process_cpu() -> Duration {
+    let usage = own_usage();
     let time = |value: libc::timeval| {
         Duration::from_secs(value.tv_sec as u64) + Duration::from_micros(value.tv_usec as u64)
     };
     time(usage.ru_utime) + time(usage.ru_stime)
 }
+
+/// This process's peak resident set so far, in MiB. It only rises, so it
+/// says something about one store size only in a process that measured no
+/// other (Linux reports `ru_maxrss` in KiB).
+fn peak_rss_mb() -> i64 {
+    own_usage().ru_maxrss / 1024
+}
+
+/// Set in a process `read_invoke_cost_by_store_size` started to measure the
+/// one store size in `CONNECTORS_STORE_COST_EVENTS`.
+const ONE_SIZE: &str = "CONNECTORS_STORE_COST_ONE_SIZE";
 
 /// A store grown by read invokes to each of `sizes` recorded events, in
 /// ascending order. With `saved`, each size's store is copied there once and
@@ -139,7 +156,16 @@ fn save(root: &Path, stored: &Path, reference: &str) {
         .pragma_update(None, "journal_mode", "WAL")
         .unwrap();
     std::fs::write(stored.join("reference"), reference).unwrap();
+    // The registry's durable clock floor belongs to the store; a store copied
+    // without it would refuse every sample within one interval of its record.
+    let floor = stored.join(FLOOR_FILE);
+    let _ = std::fs::remove_file(&floor);
+    if root.join(FLOOR_FILE).exists() {
+        std::fs::copy(root.join(FLOOR_FILE), &floor).unwrap();
+    }
 }
+
+const FLOOR_FILE: &str = "registry-clock.floor";
 
 fn load(stored: &Path) -> (tempfile::TempDir, Registry, String) {
     let root = tempfile::tempdir().unwrap();
@@ -147,7 +173,12 @@ fn load(stored: &Path) -> (tempfile::TempDir, Registry, String) {
     let target = root.path().join("metadata.sqlite3");
     std::fs::copy(stored.join("metadata.sqlite3"), &target).unwrap();
     std::fs::write(root.path().join("metadata.lock"), b"").unwrap();
-    for name in ["metadata.sqlite3", "metadata.lock"] {
+    let mut names = vec!["metadata.sqlite3", "metadata.lock"];
+    if stored.join(FLOOR_FILE).exists() {
+        std::fs::copy(stored.join(FLOOR_FILE), root.path().join(FLOOR_FILE)).unwrap();
+        names.push(FLOOR_FILE);
+    }
+    for name in names {
         std::fs::set_permissions(
             root.path().join(name),
             std::fs::Permissions::from_mode(0o600),
@@ -165,10 +196,13 @@ fn ms(duration: Duration) -> f64 {
 
 /// Per-invoke metadata time at 50, 600 and 1,200 recorded events, or at the
 /// comma-separated sizes in `CONNECTORS_STORE_COST_EVENTS`, with where the
-/// time went: per step, and per kind of metadata work. A measurement, not a
-/// check; run it in a release build:
+/// time went: per step, and per kind of metadata work, and the peak resident
+/// set of measuring that size. A measurement, not a check; run it in a
+/// release build:
 /// `CONNECTORS_STORE_COST_STORES=<dir> cargo test --release -p connectors-host --lib read_invoke_cost_by_store_size -- --ignored --nocapture`.
 /// The first run grows and saves the stores in `<dir>`; later runs reuse them.
+/// Each size is then measured in its own run of this test binary, so the
+/// peak a size reports was not reached by growing or measuring another.
 #[test]
 #[ignore = "timing measurement; run explicitly"]
 fn read_invoke_cost_by_store_size() {
@@ -182,7 +216,21 @@ fn read_invoke_cost_by_store_size() {
                 .collect()
         },
     );
-    const MEASURED: u64 = 5;
+    if std::env::var_os(ONE_SIZE).is_none() {
+        measure_each_size_alone(&sizes, saved);
+        return;
+    }
+    assert_eq!(sizes.len(), 1, "a measuring process measures one size");
+    // The measuring process plays both the CLI and the owner. With
+    // `CONNECTORS_STORE_COST_OWNER_ALLOCATOR` set it takes the owner's
+    // allocator setup before it opens anything.
+    if std::env::var_os("CONNECTORS_STORE_COST_OWNER_ALLOCATOR").is_some() {
+        crate::local::owner::bound_allocator();
+    }
+    // Invokes measured after the one that starts the owner; a heap profile
+    // of one open and one read invoke sets `CONNECTORS_STORE_COST_INVOKES=0`.
+    let invokes: u64 = std::env::var("CONNECTORS_STORE_COST_INVOKES")
+        .map_or(5, |invokes| invokes.trim().parse().unwrap());
     let stores = grown_stores(&sizes, saved.as_deref());
     for (root, registry, reference) in &stores {
         let recorded = recorded_events(root.path());
@@ -191,12 +239,13 @@ fn read_invoke_cost_by_store_size() {
             measured_invoke(root.path(), registry, reference, NOW + 10_000)
         }));
         let before = recorded_events(root.path());
+        let floors_before = recorded_clock_floor_events(root.path());
         let mut totals = Vec::new();
         let mut cpu = Vec::new();
         let mut failed = 0;
         let mut by_step: BTreeMap<String, (Duration, Duration)> = BTreeMap::new();
         let mut by_kind: BTreeMap<&'static str, (u64, Duration)> = BTreeMap::new();
-        for invoke in 1..=MEASURED {
+        for invoke in 1..=invokes {
             // An invoke past the bridge deadline answers `OutcomeUnknown`, as
             // it does for an operator: counted, not measured.
             let Ok(steps) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -223,20 +272,26 @@ fn read_invoke_cost_by_store_size() {
         }
         let measured = totals.len();
         if measured == 0 {
-            println!("events={recorded} invokes={MEASURED} failed={failed}");
+            println!(
+                "events={recorded} invokes={invokes} failed={failed} peak_rss_mb={}",
+                peak_rss_mb()
+            );
             continue;
         }
         let appended = recorded_events(root.path()) - before;
+        let floors = recorded_clock_floor_events(root.path()) - floors_before;
         totals.sort_unstable();
         cpu.sort_unstable();
         let per = |total: Duration| ms(total) / measured as f64;
         println!(
-            "events={recorded} invokes={measured} failed={failed} appended_per_invoke={} median_ms={:.0} min_ms={:.0} max_ms={:.0} median_cpu_ms={:.0}",
-            appended / MEASURED as i64,
+            "events={recorded} invokes={measured} failed={failed} appended_per_invoke={} clock_floor_events_per_invoke={:.1} median_ms={:.0} min_ms={:.0} max_ms={:.0} median_cpu_ms={:.0} peak_rss_mb={}",
+            appended / invokes as i64,
+            floors as f64 / invokes as f64,
             ms(totals[measured / 2]),
             ms(totals[0]),
             ms(totals[measured - 1]),
             ms(cpu[measured / 2]),
+            peak_rss_mb(),
         );
         for (step, (spent, batch)) in &by_step {
             println!(
@@ -252,6 +307,49 @@ fn read_invoke_cost_by_store_size() {
                 per(*spent),
             );
         }
+    }
+}
+
+/// Grows and saves the store for every size, then measures each in a run of
+/// this test binary that selects only `read_invoke_cost_by_store_size` and
+/// loads only that size, and prints the lines that run reports.
+fn measure_each_size_alone(sizes: &[i64], saved: Option<std::path::PathBuf>) {
+    let scratch = tempfile::tempdir().unwrap();
+    let saved = saved.unwrap_or_else(|| scratch.path().to_owned());
+    drop(grown_stores(sizes, Some(&saved)));
+    let test = format!(
+        "{}::read_invoke_cost_by_store_size",
+        module_path!().split_once("::").unwrap().1
+    );
+    for events in sizes {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                &test,
+                "--exact",
+                "--ignored",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("CONNECTORS_STORE_COST_STORES", &saved)
+            .env("CONNECTORS_STORE_COST_EVENTS", events.to_string())
+            .env(ONE_SIZE, "1")
+            .stderr(std::process::Stdio::inherit())
+            .output()
+            .unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // The first line follows libtest's `test <name> ... ` on one line.
+        let lines: Vec<&str> = stdout
+            .lines()
+            .filter_map(|line| line.find("events=").map(|start| &line[start..]))
+            .collect();
+        for line in &lines {
+            println!("{line}");
+        }
+        assert!(
+            output.status.success() && !lines.is_empty(),
+            "measuring {events} events: {}\n{stdout}",
+            output.status
+        );
     }
 }
 

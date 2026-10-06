@@ -2,7 +2,7 @@
 //! protected entry terminate here. The engine receives only an immutable
 //! authenticated HTTP port; the host keeps admission, approval and the ledger.
 use connectors_catalog::bundle;
-use connectors_catalog_provider::{Effect, Engine, Selection};
+use connectors_catalog_provider::{Effect, Engine, Selection, feed};
 use connectors_host::{
     http::{HttpConfig, ScopedHttp},
     local::{
@@ -187,6 +187,9 @@ struct OperationsFile {
     format: String,
     provider: String,
     operations: Vec<Selection>,
+    /// The provider's `datasource.feed/v1alpha1` binding, declared as data.
+    #[serde(default)]
+    feed: Option<feed::Declaration>,
 }
 
 /// Sensitive input intentionally has no Debug or Serialize implementation.
@@ -722,6 +725,7 @@ impl Local {
             return Err(Failure::InvalidConfiguration);
         }
         let mut operations = config.operations.clone();
+        let mut feed = None;
         if let Some(path) = &config.operations_file {
             // A shipped selection set is ordinary repository content, readable by
             // anyone; only the configuration that names it must be private.
@@ -737,6 +741,7 @@ impl Local {
                 return Err(Failure::InvalidConfiguration);
             }
             operations.extend(shipped.operations);
+            feed = shipped.feed;
         }
         let bundle = bundle::load(&config.bundle_directory, &config.provider)
             .map_err(Failure::from_service)?;
@@ -824,8 +829,8 @@ impl Local {
             }
             None => None,
         };
-        let engine =
-            Engine::new(&bundle, &document_base, &operations).map_err(Failure::from_service)?;
+        let engine = Engine::with_feed(&bundle, &document_base, &operations, feed.as_ref())
+            .map_err(Failure::from_service)?;
         // Trust roots enter the revision by their bytes only, as `ca_file` does, so
         // the same roots at another path keep it.
         let mut auth = serde_json::to_value(&config.auth).map_err(|_| Failure::Protocol)?;
@@ -849,6 +854,10 @@ impl Local {
         // other configuration keeps its revision.
         if let Some(bytes) = &token_ca {
             effective["token_ca_digest"] = json!(connectors_core::digest(&json!(bytes)));
+        }
+        // Present only when declared, so a configuration without a feed keeps its revision.
+        if let Some(feed) = &feed {
+            effective["feed"] = serde_json::to_value(feed).map_err(|_| Failure::Protocol)?;
         }
         // Present only when stated, so a configuration without it keeps its revision.
         if let Some(prefix) = &config.request_prefix {
@@ -1006,6 +1015,13 @@ impl Local {
     /// The API port for one request and, for an OAuth profile, the cache key of
     /// the access token it carries, so a refusal of that token can evict it.
     async fn authenticated(&self, document: Secret) -> Result<(ScopedHttp, Option<[u8; 32]>)> {
+        let (credential, key) = self.credential(document).await?;
+        Ok((self.with(credential), key))
+    }
+    /// The credential value a request carries, derived from the protected
+    /// document (the token, the basic header value or an OAuth access token),
+    /// and for an OAuth profile the cache key of that access token.
+    async fn credential(&self, document: Secret) -> Result<(Secret, Option<[u8; 32]>)> {
         let credential = match self.auth.scheme {
             Scheme::Token => {
                 let document = Self::document(document)?;
@@ -1029,10 +1045,10 @@ impl Local {
                         exchanged.access
                     }
                 };
-                return Ok((self.with(Secret(access.as_bytes().to_vec())), Some(key)));
+                return Ok((Secret(access.as_bytes().to_vec()), Some(key)));
             }
         };
-        Ok((self.with(credential), None))
+        Ok((credential, None))
     }
     fn baseline(
         &self,
@@ -1191,6 +1207,35 @@ fn document_base(base_path: &str, prefix: &str) -> Option<String> {
     Some(format!("/{rest}"))
 }
 
+/// Time kept back from a rate-limited read's second request: it must finish
+/// this long before the invocation deadline, so the reply still reaches the
+/// host in time.
+const RETRY_MARGIN: Duration = Duration::from_millis(500);
+
+/// How long to wait before sending a rate-limited read once more: the delay
+/// the provider named on its own `429` answer, when the wait from `now`, then
+/// a second request as long as the first one took (`latency`), then
+/// [`RETRY_MARGIN`], all end strictly before `deadline`. Any other refusal, a
+/// `429` naming no readable delay, and a delay that leaves the second request
+/// no such time get no wait: the refusal is returned at once, naming the delay
+/// when there is one.
+fn retry_wait(
+    error: &connectors_core::Error,
+    latency: Duration,
+    now: Instant,
+    deadline: Instant,
+) -> Option<Duration> {
+    if error.code != connectors_core::ErrorCode::RateLimited || !error.upstream_answer {
+        return None;
+    }
+    let wait = Duration::from_secs(error.retry_after_seconds?);
+    now.checked_add(wait)?
+        .checked_add(latency)?
+        .checked_add(RETRY_MARGIN)
+        .filter(|end| *end < deadline)
+        .map(|_| wait)
+}
+
 fn probe_failure(status: u16) -> Failure {
     match status {
         401 => Failure::InvalidCredential,
@@ -1272,17 +1317,66 @@ impl runtime::Adapter for Local {
     async fn invoke(
         &self,
         operation: &str,
-        _partition: &str,
+        partition: &str,
         document: Secret,
         input: Value,
     ) -> Result<Value> {
-        let (http, key) = self.authenticated(document).await?;
-        let result = self
-            .engine
-            .read(&http, &self.instance, operation, input)
+        // No deadline is known here, so no rate-limited read is waited for.
+        self.invoke_explained(operation, partition, document, input, Instant::now())
             .await
-            .map_err(Failure::from_provider);
-        self.evict_refused(key, &result);
+            .map_err(|refusal| refusal.failure)
+    }
+    async fn invoke_explained(
+        &self,
+        operation: &str,
+        _partition: &str,
+        document: Secret,
+        input: Value,
+        deadline: Instant,
+    ) -> std::result::Result<Value, runtime::Refusal> {
+        let (credential, key) = self.credential(document).await?;
+        // The host checks a reason against the document it sent; only this
+        // child holds what it derived from it (the basic header value, an
+        // OAuth access token), so it withholds a reason holding any of that.
+        let derived = Zeroizing::new(credential.0.clone());
+        let http = self.with(credential);
+        let started = Instant::now();
+        let mut result = self
+            .engine
+            .read(&http, &self.instance, operation, input.clone())
+            .await;
+        // A read is sent once more, and only once, after the delay the
+        // provider named on its own `429`, when that wait still leaves the
+        // second request time of its own before the invocation deadline. The
+        // second request is bounded by the deadline less the margin; if it
+        // does not finish, the first answer's refusal, with its delay, stands.
+        // A write never comes here.
+        if let Err(error) = &result
+            && let Some(wait) = retry_wait(error, started.elapsed(), Instant::now(), deadline)
+            && let Some(bound) = deadline.checked_sub(RETRY_MARGIN)
+        {
+            tokio::time::sleep(wait).await;
+            let second = self.engine.read(&http, &self.instance, operation, input);
+            if let Ok(second) =
+                tokio::time::timeout_at(tokio::time::Instant::from_std(bound), second).await
+            {
+                result = second;
+            }
+        }
+        let result = result.map_err(|error| {
+            let mut refusal = runtime::Refusal::from_provider(error);
+            refusal.reason = refusal.reason.filter(|reason| {
+                !connectors_core::reason::carries_value(reason, derived.as_slice())
+            });
+            refusal
+        });
+        self.evict_refused(
+            key,
+            &result
+                .as_ref()
+                .map(|_| ())
+                .map_err(|refusal| refusal.failure),
+        );
         result
     }
 }

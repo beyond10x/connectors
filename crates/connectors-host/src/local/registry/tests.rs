@@ -211,7 +211,7 @@ fn revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledge
     );
     assert_eq!(
         registry.admit_read(&binding(), &reference, &BTreeSet::new(), expired),
-        Err(Failure::NotReady)
+        Err(Failure::EvidenceExpired)
     );
     let capture = registry
         .capture_revalidation(&binding(), &reference, &revision, expired, expired + 30_000)
@@ -245,6 +245,79 @@ fn revalidation_after_expiry_preserves_material_and_recovers_unknown_acknowledge
         describe(&registry, &reference, NOW + 3_600_000).state,
         State::ReauthorizationRequired
     );
+}
+
+/// story:expired-evidence-invoke-advises-revalidate. A read on a connection
+/// whose validation evidence expired while its credential is intact is refused
+/// as `EvidenceExpired`, at admission and at capture, and revalidation alone
+/// readmits it. A missing scope on current evidence stays `InsufficientScope`,
+/// and a credential that itself expired or is known invalid stays `NotReady`.
+#[test]
+fn an_expired_evidence_read_is_refused_by_name_and_revalidation_readmits_it() {
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let revision = describe(&registry, &reference, NOW).revision;
+    let none = BTreeSet::new();
+    let write = BTreeSet::from(["write".to_owned()]);
+    assert_eq!(
+        registry.admit_read(&binding(), &reference, &write, NOW),
+        Err(Failure::InsufficientScope)
+    );
+    let expired = NOW + 60_001;
+    assert_eq!(
+        describe(&registry, &reference, expired).state,
+        State::Pending
+    );
+    assert_eq!(
+        registry.admit_read(&binding(), &reference, &none, expired),
+        Err(Failure::EvidenceExpired)
+    );
+    assert!(matches!(
+        registry.capture_read(&binding(), &reference, &none, expired, expired + 1000),
+        Err(Failure::EvidenceExpired)
+    ));
+    let capture = registry
+        .capture_revalidation(&binding(), &reference, &revision, expired, expired + 30_000)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(capture, expired).unwrap();
+    registry
+        .finish_revalidation(dispatched, Ok(baseline("one", expired)), expired)
+        .unwrap();
+    registry
+        .admit_read(&binding(), &reference, &none, expired)
+        .unwrap();
+    let read = registry
+        .capture_read(&binding(), &reference, &none, expired, expired + 1000)
+        .unwrap();
+    registry.dispatch_read(read, expired).unwrap();
+    // The credential's own expiry is not evidence a revalidation recollects.
+    assert_eq!(
+        registry.admit_read(&binding(), &reference, &none, NOW + 3_600_000),
+        Err(Failure::NotReady)
+    );
+}
+
+/// Known invalid material is not expired evidence either: only a repair helps.
+#[test]
+fn an_invalid_credential_read_stays_not_ready_after_its_evidence_expired() {
+    let (_root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let none = BTreeSet::new();
+    let captured = registry
+        .capture_read(&binding(), &reference, &none, NOW, NOW + 1000)
+        .unwrap();
+    registry
+        .invalidate_read(&captured, InvalidCredential::Invalid, NOW)
+        .unwrap();
+    for at in [NOW, NOW + 60_001] {
+        assert_eq!(
+            registry.admit_read(&binding(), &reference, &none, at),
+            Err(Failure::NotReady),
+            "{at}"
+        );
+    }
 }
 
 #[test]
@@ -482,13 +555,10 @@ fn concurrent_observations_replay_current_clock_without_losing_a_floor() {
         .into_iter()
         .map(|worker| worker.join().unwrap())
         .collect::<Vec<_>>();
-    let floor: i64 = Metadata::inspect(root.path())
+    // The floor is the higher of the durable floor file and the recorded one.
+    let floor = floor_file(root.path())
         .unwrap()
-        .connection
-        .query_row("SELECT last_seen_ms FROM registry_clock", [], |row| {
-            row.get(0)
-        })
-        .unwrap();
+        .max(recorded_registry_floor(root.path()));
     assert!(floor >= i64::try_from(*observed.iter().max().unwrap()).unwrap());
 }
 
@@ -549,16 +619,17 @@ fn an_observation_raced_on_every_unlocked_replay_still_completes() {
     let reference = publish_fixture(&registry, candidate, NOW);
     // Every time the observation has replayed ER outside the lifecycle lock
     // and is about to take it back, a serialized writer advances the
-    // registry clock first. Unanswered, each optimistic attempt loses its
-    // clock revision and the observation is starved.
+    // registry clock first. Unanswered, each optimistic attempt is refused
+    // by its feed check and the observation is starved.
     let writer = Registry::new(root.path());
     let races = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let counted = races.clone();
     super::super::metadata::set_relock_hook(Some(Box::new(move || {
         let race = counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u64;
-        // A later millisecond, so the write changes the clock subject.
+        // More than one recording interval later, so the write changes the
+        // recorded clock subject.
         writer
-            .transaction(NOW + 1 + race, false, |_, _, _| Ok(()))
+            .transaction(NOW + 60_001 + race, false, |_, _, _| Ok(()))
             .unwrap();
     })));
     let observed = registry.describe(
@@ -566,7 +637,7 @@ fn an_observation_raced_on_every_unlocked_replay_still_completes() {
         "fixture-adapter",
         "config-1",
         &reference,
-        NOW + 100,
+        NOW + 120_000,
         true,
     );
     super::super::metadata::set_relock_hook(None);
@@ -598,14 +669,13 @@ fn refused_business_action_still_advances_the_restart_clock_floor() {
         Some(Failure::Conflict)
     );
     drop(registry);
-    let floor: i64 = Metadata::inspect(root.path())
-        .unwrap()
-        .connection
-        .query_row("SELECT last_seen_ms FROM registry_clock", [], |row| {
-            row.get(0)
-        })
-        .unwrap();
-    assert_eq!(floor, i64::try_from(refused_at).unwrap());
+    // The durable floor file holds the refused sample; the recorded floor,
+    // within one interval of it, is not advanced.
+    assert_eq!(
+        floor_file(root.path()),
+        Some(i64::try_from(refused_at).unwrap())
+    );
+    assert_eq!(recorded_registry_floor(root.path()), NOW as i64);
     let restarted = Registry::new(root.path());
     assert!(matches!(
         restarted.list(
@@ -1601,6 +1671,177 @@ pub(super) fn recorded_events(root: &Path) -> i64 {
         r.get(0)
     })
     .unwrap()
+}
+
+/// Recorded entries whose subject is a `connectors.clock.LocalClockFloor`,
+/// read from the wrapper blob each `er.recorded_entry` event names.
+pub(super) fn recorded_clock_floor_events(root: &Path) -> i64 {
+    rusqlite::Connection::open_with_flags(
+        root.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap()
+    .query_row(
+        "SELECT count(*) FROM connectors_er_events e JOIN connectors_er_blobs b \
+         ON b.tenant_id=e.tenant_id AND b.digest=json_extract(e.data,'$.blob') \
+         WHERE e.event_name='er.recorded_entry' \
+         AND instr(CAST(b.bytes AS TEXT),'\"subject\":[\"connectors.clock.LocalClockFloor\",')>0",
+        [],
+        |row| row.get(0),
+    )
+    .unwrap()
+}
+
+/// The registry clock floor Entity Runtime records, as a fresh open reads it.
+fn recorded_registry_floor(root: &Path) -> i64 {
+    super::super::metadata::simulate_process(u64::MAX - 1);
+    Metadata::inspect(root)
+        .unwrap()
+        .connection
+        .query_row(
+            "SELECT last_seen_ms FROM registry_clock WHERE singleton=1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+}
+
+const FLOOR_FILE: &str = "registry-clock.floor";
+
+fn floor_file(root: &Path) -> Option<i64> {
+    let bytes = std::fs::read(root.join(FLOOR_FILE)).ok()?;
+    serde_json::from_slice::<serde_json::Value>(&bytes).ok()?["last_seen_ms"].as_i64()
+}
+
+fn write_floor_file(root: &Path, last_seen_ms: u64) {
+    let path = root.join(FLOOR_FILE);
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&serde_json::json!({ "last_seen_ms": last_seen_ms })).unwrap(),
+    )
+    .unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+/// One registry transaction that does nothing but sample the clock.
+fn tick(registry: &Registry, now: u64) -> Result<()> {
+    registry.transaction(now, false, |_, _, _| Ok(()))
+}
+
+/// One read invoke whose steps each read the clock at their own millisecond,
+/// as a production CLI and owner do: equal-value records cannot pass this.
+fn read_invoke_with_distinct_step_clocks(
+    root: &Path,
+    registry: &Registry,
+    reference: &str,
+    now: u64,
+) {
+    super::super::metadata::simulate_process(now);
+    drop(Metadata::inspect(root).unwrap());
+    registry
+        .admit_read(&binding(), reference, &BTreeSet::new(), now)
+        .unwrap();
+    super::super::metadata::simulate_process(1);
+    let captured = registry
+        .capture_read(&binding(), reference, &BTreeSet::new(), now + 1, now + 1000)
+        .unwrap();
+    let dispatched = registry.dispatch_read(captured, now + 2).unwrap();
+    registry.release_read(dispatched, now + 3).unwrap();
+}
+
+#[test]
+fn read_invokes_record_the_registry_floor_once_per_interval_not_once_per_step() {
+    let (root, registry) = fixture();
+    let (_, candidate) = prepared(&registry, "one", NOW);
+    let reference = publish_fixture(&registry, candidate, NOW);
+    let before = recorded_clock_floor_events(root.path());
+    // Five invokes, twenty distinct clock readings, all within one interval.
+    for invoke in 0..5 {
+        read_invoke_with_distinct_step_clocks(
+            root.path(),
+            &registry,
+            &reference,
+            NOW + 1 + invoke * 10,
+        );
+    }
+    let within = recorded_clock_floor_events(root.path()) - before;
+    assert_eq!(
+        within, 0,
+        "five read invokes inside one interval recorded {within} registry floors"
+    );
+    assert_eq!(recorded_registry_floor(root.path()), NOW as i64);
+    assert_eq!(floor_file(root.path()), Some((NOW + 44) as i64));
+    // Exactly at the interval the floor is not recorded; one past it is.
+    tick(&registry, NOW + 60_000).unwrap();
+    assert_eq!(recorded_registry_floor(root.path()), NOW as i64);
+    tick(&registry, NOW + 60_001).unwrap();
+    assert_eq!(recorded_registry_floor(root.path()), (NOW + 60_001) as i64);
+    assert_eq!(recorded_clock_floor_events(root.path()) - before, 1);
+}
+
+#[test]
+fn a_missing_floor_file_falls_back_to_the_recorded_floor_plus_the_interval() {
+    let (root, registry) = fixture();
+    tick(&registry, NOW).unwrap();
+    tick(&registry, NOW + 10).unwrap();
+    assert_eq!(recorded_registry_floor(root.path()), NOW as i64);
+    let _ = std::fs::remove_file(root.path().join(FLOOR_FILE));
+    let restarted = Registry::new(root.path());
+    super::super::metadata::simulate_process(42);
+    assert_eq!(
+        tick(&restarted, NOW + 59_999),
+        Err(Failure::MetadataUnavailable)
+    );
+    tick(&restarted, NOW + 60_000).unwrap();
+    assert_eq!(floor_file(root.path()), Some((NOW + 60_000) as i64));
+}
+
+#[test]
+fn a_corrupt_floor_file_falls_back_to_the_recorded_floor_plus_the_interval() {
+    let (root, registry) = fixture();
+    tick(&registry, NOW).unwrap();
+    tick(&registry, NOW + 10).unwrap();
+    let path = root.path().join(FLOOR_FILE);
+    std::fs::write(&path, b"not a floor").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(
+        tick(&registry, NOW + 59_999),
+        Err(Failure::MetadataUnavailable)
+    );
+    tick(&registry, NOW + 60_000).unwrap();
+}
+
+#[test]
+fn a_rolled_back_floor_file_is_still_bounded_by_the_recorded_floor() {
+    let (root, registry) = fixture();
+    tick(&registry, NOW).unwrap();
+    tick(&registry, NOW + 70_000).unwrap();
+    tick(&registry, NOW + 80_000).unwrap();
+    assert_eq!(recorded_registry_floor(root.path()), (NOW + 70_000) as i64);
+    // The file is rolled back by hand to a value below the recorded floor.
+    write_floor_file(root.path(), NOW);
+    super::super::metadata::simulate_process(43);
+    let restarted = Registry::new(root.path());
+    assert_eq!(
+        tick(&restarted, NOW + 69_999),
+        Err(Failure::MetadataUnavailable)
+    );
+    // At most one interval below the last committed sample is admitted.
+    tick(&restarted, NOW + 70_000).unwrap();
+}
+
+#[test]
+fn a_cross_process_regression_is_refused() {
+    let (root, registry) = fixture();
+    tick(&registry, NOW).unwrap();
+    super::super::metadata::simulate_process(44);
+    tick(&registry, NOW + 5_000).unwrap();
+    super::super::metadata::exit_process();
+    super::super::metadata::simulate_process(45);
+    let other = Registry::new(root.path());
+    assert_eq!(tick(&other, NOW + 4_999), Err(Failure::MetadataUnavailable));
+    tick(&other, NOW + 5_000).unwrap();
+    assert_eq!(recorded_registry_floor(root.path()), NOW as i64);
 }
 
 /// The metadata transactions one `operations invoke` of a read operation

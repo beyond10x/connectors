@@ -274,7 +274,14 @@ fn catalog_cli_explicit_revalidation_after_real_expiry_without_reentry() {
         success(cli.run(&status))["connection"]["summary"]["state"],
         "pending"
     );
-    refusal(cli.run(&invoke), "not_granted");
+    // story:expired-evidence-invoke-advises-revalidate: the credential is
+    // intact, so the read names the revalidation that helps, not a repair.
+    let expired = refusal(cli.run(&invoke), "not_granted");
+    assert_eq!(
+        (&expired["stage"], &expired["next_action"]),
+        (&json!("admission"), &json!("revalidate_connection")),
+        "{expired}"
+    );
     assert_eq!(provider.count(), before);
     assert!(!cli.paths.state.join("owner.sock").exists());
     let refreshed = success(cli.run(&revalidate))["connection"].clone();
@@ -307,6 +314,10 @@ fn catalog_cli_explicit_revalidation_after_real_expiry_without_reentry() {
     );
     cli.shutdown();
     let before = provider.count();
+    // A credential the provider refused is not expired evidence: only a
+    // repair helps, and a revalidation is refused.
+    let invalid = refusal(cli.run(&invoke), "not_granted");
+    assert_eq!(invalid["next_action"], "repair_connection", "{invalid}");
     refusal(cli.run(&revalidate), "not_granted");
     assert_eq!(provider.count(), before);
     assert!(!cli.paths.state.join("owner.sock").exists());

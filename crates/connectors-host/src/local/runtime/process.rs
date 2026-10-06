@@ -186,9 +186,14 @@ impl Child {
                 request_id,
                 baseline,
             } if request_id == id && frame.document.is_empty() => Ok(baseline),
-            Reply::Failed { request_id, code } if request_id == id && frame.document.is_empty() => {
-                Err(code)
-            }
+            // Only a failed `invoke` may carry a reason; one on a validation
+            // reply is a protocol violation, like any other malformed reply.
+            Reply::Failed {
+                request_id,
+                code,
+                reason: None,
+                retry_after_seconds: None,
+            } if request_id == id && frame.document.is_empty() => Err(code),
             _ => {
                 self.terminate();
                 Err(Failure::Protocol)
@@ -205,6 +210,51 @@ impl Child {
         secret: &Secret,
         input: &[u8],
         deadline_ms: u64,
+    ) -> Result<Vec<u8>> {
+        self.invoke_explained(operation, revision, partition, secret, input, deadline_ms)
+            .map_err(|refusal| refusal.failure)
+    }
+    /// [`Child::invoke`] with the upstream's reason for a failure, admitted
+    /// again here against `secret` (see [`super::admitted`]), and the delay
+    /// the provider named beside a rate-limit failure.
+    pub fn invoke_explained(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        deadline_ms: u64,
+    ) -> std::result::Result<Vec<u8>, Refusal> {
+        let mut reason = None;
+        let mut delay = None;
+        self.dispatch(
+            operation,
+            revision,
+            partition,
+            secret,
+            input,
+            deadline_ms,
+            &mut reason,
+            &mut delay,
+        )
+        .map_err(|failure| Refusal {
+            failure,
+            reason: super::admitted(reason, secret),
+            retry_after_seconds: delay,
+        })
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn dispatch(
+        &mut self,
+        operation: &str,
+        revision: &str,
+        partition: &str,
+        secret: &Secret,
+        input: &[u8],
+        deadline_ms: u64,
+        reason: &mut Option<String>,
+        delay: &mut Option<u64>,
     ) -> Result<Vec<u8>> {
         if input.len() > INPUT_LIMIT || !connectors_core::valid_id(partition) {
             return Err(Failure::InvalidInput);
@@ -254,7 +304,19 @@ impl Child {
                 }
                 Ok(frame.document)
             }
-            Reply::Failed { request_id, code } if request_id == id && frame.document.is_empty() => {
+            // A delay belongs beside the provider's rate limit only; one beside
+            // any other code is a malformed reply.
+            Reply::Failed {
+                request_id,
+                code,
+                reason: carried,
+                retry_after_seconds,
+            } if request_id == id
+                && frame.document.is_empty()
+                && (retry_after_seconds.is_none() || code == Failure::ProviderRateLimited) =>
+            {
+                *reason = carried;
+                *delay = super::admitted_delay(retry_after_seconds);
                 Err(code)
             }
             _ => {
@@ -642,9 +704,73 @@ mod tests {
         )
         .unwrap();
         let request = channel::read::<Request>(&mut stream, until, true, INPUT_LIMIT).unwrap();
+        if mode == "fixture-mode-validate-retry-after" {
+            let Request::Validate { request_id, .. } = request.control else {
+                panic!("expected validation")
+            };
+            channel::write(
+                &mut stream,
+                &Reply::Failed {
+                    request_id,
+                    code: Failure::ProviderRateLimited,
+                    reason: None,
+                    retry_after_seconds: Some(7),
+                },
+                None,
+                &[],
+                until,
+            )
+            .unwrap();
+            std::thread::sleep(Duration::from_secs(30));
+            return;
+        }
+        if mode == "fixture-mode-validate-reason" {
+            let Request::Validate { request_id, .. } = request.control else {
+                panic!("expected validation")
+            };
+            channel::write(
+                &mut stream,
+                &Reply::Failed {
+                    request_id,
+                    code: Failure::InvalidCredential,
+                    reason: Some("Unauthorized; scope does not match".into()),
+                    retry_after_seconds: None,
+                },
+                None,
+                &[],
+                until,
+            )
+            .unwrap();
+            std::thread::sleep(Duration::from_secs(30));
+            return;
+        }
         let Request::Invoke { request_id, .. } = request.control else {
             panic!("expected invocation")
         };
+        // A failed invoke naming a delay: beside a rate limit it is the
+        // provider's, beside any other code it is a malformed reply.
+        let delayed = match mode.as_str() {
+            "fixture-mode-retry-after" => Some(Failure::ProviderRateLimited),
+            "fixture-mode-retry-after-unauthorized" => Some(Failure::InvalidCredential),
+            _ => None,
+        };
+        if let Some(code) = delayed {
+            channel::write(
+                &mut stream,
+                &Reply::Failed {
+                    request_id,
+                    code,
+                    reason: None,
+                    retry_after_seconds: Some(7),
+                },
+                None,
+                &[],
+                until,
+            )
+            .unwrap();
+            std::thread::sleep(Duration::from_secs(30));
+            return;
+        }
         let (id, body) = match mode.as_str() {
             "fixture-mode-json" => (request_id, b"{\"value\":}".as_slice()),
             "fixture-mode-schema" => (request_id, br#"{"value":"wrong-type"}"#.as_slice()),
@@ -704,6 +830,117 @@ mod tests {
             assert!(!child.live);
             assert!(child.process.try_wait().unwrap().is_some());
         }
+    }
+
+    /// story:service-failure-carries-upstream-reason: only a failed `invoke`
+    /// may carry a reason. A failed validation that carries one is refused
+    /// like any malformed reply, and the child is terminated.
+    #[test]
+    fn a_reason_on_a_failed_validation_is_a_protocol_violation() {
+        let path = std::env::current_exe().unwrap();
+        let config = Adapter {
+            private_protocol: None,
+            permissions: Default::default(),
+            instance_id: "fixture".into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "fixture-config".into(),
+            protocol: "v1alpha1".into(),
+            startup: Startup::OnDemand,
+            restart: Restart::Never,
+            executable: Executable {
+                sha256: hex::encode(Sha256::digest(std::fs::read(&path).unwrap())),
+                path,
+                args: vec![
+                    "--exact".into(),
+                    "local::runtime::process::tests::protocol_fixture".into(),
+                    "--".into(),
+                    "fixture-mode-validate-reason".into(),
+                ],
+            },
+        };
+        let mut child = Child::spawn(&config).unwrap();
+        assert_eq!(
+            child
+                .validate(
+                    "fixture",
+                    &Secret(b"fictional".to_vec()),
+                    connectors_sdk::now_ms() + 2000
+                )
+                .err(),
+            Some(Failure::Protocol)
+        );
+        assert!(!child.live);
+        assert!(child.process.try_wait().unwrap().is_some());
+    }
+
+    fn fixture_child(mode: &str) -> Child {
+        let path = std::env::current_exe().unwrap();
+        Child::spawn(&Adapter {
+            private_protocol: None,
+            permissions: Default::default(),
+            instance_id: "fixture".into(),
+            adapter_id: "fixture".into(),
+            configuration_revision: "fixture-config".into(),
+            protocol: "v1alpha1".into(),
+            startup: Startup::OnDemand,
+            restart: Restart::Never,
+            executable: Executable {
+                sha256: hex::encode(Sha256::digest(std::fs::read(&path).unwrap())),
+                path,
+                args: vec![
+                    "--exact".into(),
+                    "local::runtime::process::tests::protocol_fixture".into(),
+                    "--".into(),
+                    mode.into(),
+                ],
+            },
+        })
+        .unwrap()
+    }
+
+    /// story:catalog-honours-retry-after: a failed `invoke` answered as the
+    /// provider's rate limit carries the delay it named to the host; a delay
+    /// beside any other code, or on a failed validation, is a malformed reply,
+    /// refused as a protocol failure, and the child is terminated.
+    #[test]
+    fn a_named_delay_crosses_only_beside_a_rate_limited_invoke() {
+        let invoke = |child: &mut Child| {
+            child.invoke_explained(
+                "read",
+                "fixture-descriptor",
+                "partition",
+                &Secret(b"fictional".to_vec()),
+                b"{}",
+                connectors_sdk::now_ms() + 2000,
+            )
+        };
+        let mut limited = fixture_child("fixture-mode-retry-after");
+        let refusal = invoke(&mut limited).unwrap_err();
+        assert_eq!(refusal.failure, Failure::ProviderRateLimited);
+        assert_eq!(refusal.retry_after_seconds, Some(7));
+        assert!(limited.live);
+        limited.terminate();
+
+        let mut misplaced = fixture_child("fixture-mode-retry-after-unauthorized");
+        let refusal = invoke(&mut misplaced).unwrap_err();
+        assert_eq!(refusal.failure, Failure::Protocol);
+        assert_eq!(refusal.retry_after_seconds, None);
+        assert!(!misplaced.live);
+        assert!(misplaced.process.try_wait().unwrap().is_some());
+
+        let mut validation = fixture_child("fixture-mode-validate-retry-after");
+        assert_eq!(
+            validation
+                .validate(
+                    "fixture",
+                    &Secret(b"fictional".to_vec()),
+                    connectors_sdk::now_ms() + 2000
+                )
+                .err(),
+            Some(Failure::Protocol)
+        );
+        assert!(!validation.live);
+        assert!(validation.process.try_wait().unwrap().is_some());
     }
 }
 

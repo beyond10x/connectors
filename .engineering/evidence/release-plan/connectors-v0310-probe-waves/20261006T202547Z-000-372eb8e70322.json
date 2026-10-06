@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T20:25:47Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0310-probe-waves",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv (ESS 0.53.0 release binary via CONNECTORS_ESS, AEP 0.68.0, Rust default plus +1.88.0 and +1.91.0) on 6db05b34dc (release branch merged with main f5f03c6, #124 included): all checks passed; 1394 passed, 0 failed, 75 ignored in 166 test binaries"
+  }
+}

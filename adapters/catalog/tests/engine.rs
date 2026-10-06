@@ -585,6 +585,77 @@ async fn a_refused_write_keeps_the_providers_status_as_its_marked_code() {
     }
 }
 
+/// story:service-failure-carries-upstream-reason: a refusal keeps the
+/// provider's own top-level message as its bounded reason, beside its code and
+/// outside its message; a secret-shaped one is withheld.
+#[tokio::test]
+async fn a_refusal_carries_the_providers_bounded_reason_and_withholds_a_secret_shaped_one() {
+    let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();
+    let read = |response: HttpResponse| {
+        let engine = &engine;
+        async move {
+            let http = reads(vec![response]);
+            engine
+                .read(
+                    http.as_ref(),
+                    "fixture",
+                    "merge_requests.list",
+                    json!({"id": "org/project"}),
+                )
+                .await
+                .err()
+                .unwrap()
+        }
+    };
+    let scope = json!({"code": 401, "message": "Unauthorized; scope does not match"});
+    let error = read(response(401, scope.clone())).await;
+    assert_eq!(error.code, ErrorCode::Unauthorized);
+    assert!(error.upstream_answer);
+    assert_eq!(
+        error.upstream_reason.as_deref(),
+        Some("Unauthorized; scope does not match")
+    );
+    assert!(!error.message.contains("scope"));
+    // The reason is in-process only: the service wire never carries it.
+    assert!(
+        !serde_json::to_string(&error)
+            .unwrap()
+            .contains("scope does not match")
+    );
+    let leaky = json!({"message": "Unauthorized; token fixtok-AbCdEfGhIjKl0123456789 revoked"});
+    let error = read(response(401, leaky)).await;
+    assert_eq!(error.code, ErrorCode::Unauthorized);
+    assert_eq!(error.upstream_reason, None);
+    let long = json!({"message": format!("Unauthorized {}", "scopé ".repeat(40))});
+    let reason = read(response(403, long)).await.upstream_reason.unwrap();
+    assert!(reason.len() <= 256 && reason.starts_with("Unauthorized scopé"));
+    assert_eq!(read(raw(404, b"private")).await.upstream_reason, None);
+    // A refused write keeps the same reason.
+    let http = reads(vec![response(200, json!({"commit": {"id": SHA}}))]);
+    let prepared = engine
+        .prepare(
+            http.as_ref(),
+            "fixture",
+            "merge_request.create",
+            create_input(),
+        )
+        .await
+        .unwrap();
+    let WriteOutcome::Refused(error) = prepared
+        .execute(Box::new(Send {
+            sent: Arc::new(Mutex::new(Vec::new())),
+            response: Some(response(401, scope)),
+        }))
+        .await
+    else {
+        panic!("401 was not refused");
+    };
+    assert_eq!(
+        error.upstream_reason.as_deref(),
+        Some("Unauthorized; scope does not match")
+    );
+}
+
 #[tokio::test]
 async fn multi_check_guard_holds_every_check_before_and_after_dispatch() {
     let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();
@@ -1711,4 +1782,132 @@ async fn a_required_repeated_parameter_declares_and_refuses_an_empty_list() {
             .get("minItems")
             .is_none()
     );
+}
+
+/// A `429` naming `retry_after` in a `Retry-After` header, or naming nothing.
+fn limited(retry_after: Option<&str>) -> HttpResponse {
+    HttpResponse {
+        status: 429,
+        headers: retry_after
+            .map(|value| BTreeMap::from([("retry-after".to_owned(), value.to_owned())]))
+            .unwrap_or_default(),
+        body: serde_json::to_vec(&json!({"message": "Too Many Requests"})).unwrap(),
+    }
+}
+
+async fn refused_read(answer: HttpResponse) -> (connectors_core::Error, usize) {
+    let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();
+    let http = reads(vec![answer]);
+    let error = engine
+        .read(
+            http.as_ref(),
+            "fixture",
+            "merge_requests.list",
+            json!({"id": "org/project"}),
+        )
+        .await
+        .expect_err("a 429 is a refusal");
+    let calls = http.calls.lock().unwrap().len();
+    (error, calls)
+}
+
+/// story:catalog-honours-retry-after: a read answered `429` is the provider's
+/// `rate_limited` and carries the delay its `Retry-After` names, in either
+/// form RFC 9110 gives it (delta-seconds or an HTTP-date, the latter in all
+/// three date formats a recipient must accept), in whole seconds rounded up.
+/// The engine sends exactly one request; waiting is the composition's.
+#[tokio::test]
+async fn a_read_answered_429_carries_the_delay_its_retry_after_names() {
+    let now = std::time::SystemTime::now();
+    let ahead = httpdate::fmt_http_date(now + std::time::Duration::from_secs(90));
+    for (header, low, high) in [
+        ("7".to_owned(), 7, 7),
+        ("0".to_owned(), 0, 0),
+        (" 120 ".to_owned(), 120, 120),
+        ("4294967295".to_owned(), 4_294_967_295, 4_294_967_295),
+        (ahead, 89, 91),
+        // A date already past names no wait at all.
+        ("Sun, 06 Nov 1994 08:49:37 GMT".to_owned(), 0, 0),
+        ("Sunday, 06-Nov-94 08:49:37 GMT".to_owned(), 0, 0),
+        ("Sun Nov  6 08:49:37 1994".to_owned(), 0, 0),
+    ] {
+        let (error, calls) = refused_read(limited(Some(&header))).await;
+        assert_eq!(error.code, ErrorCode::RateLimited, "{header:?}");
+        assert!(error.upstream_answer, "{header:?}");
+        let named = error.retry_after_seconds.unwrap_or_else(|| {
+            panic!("`Retry-After: {header}` named no delay");
+        });
+        assert!((low..=high).contains(&named), "{header:?} named {named}");
+        assert_eq!(calls, 1, "{header:?}");
+    }
+}
+
+/// story:catalog-honours-retry-after: a `Retry-After` the engine cannot read,
+/// or none, leaves the refusal without a delay, after one request. A delay
+/// that does not fit 32 bits is not read either.
+#[tokio::test]
+async fn a_429_without_a_readable_retry_after_names_no_delay() {
+    let mut answers = vec![limited(None)];
+    for header in [
+        "",
+        "soon",
+        "-1",
+        "+7",
+        "1.5",
+        "7 seconds",
+        "0x10",
+        "4294967296",
+        "99999999999999999999999",
+        "Sun, 06 Nov 1994 08:49:37 PST",
+        "2026-10-06T12:00:00Z",
+        // Two disagreeing field lines, as the transport combines them.
+        "3600, 1",
+    ] {
+        answers.push(limited(Some(header)));
+    }
+    for answer in answers {
+        let header = answer.headers.get("retry-after").cloned();
+        let (error, calls) = refused_read(answer).await;
+        assert_eq!(error.code, ErrorCode::RateLimited, "{header:?}");
+        assert_eq!(error.retry_after_seconds, None, "{header:?}");
+        assert_eq!(calls, 1, "{header:?}");
+    }
+    // Only a 429 is read for a delay: an unavailable answer carries none.
+    let mut unavailable = limited(Some("7"));
+    unavailable.status = 503;
+    let (error, _) = refused_read(unavailable).await;
+    assert_eq!(error.code, ErrorCode::Unavailable);
+    assert_eq!(error.retry_after_seconds, None);
+}
+
+/// story:catalog-honours-retry-after: a write answered `429` is sent once
+/// and never again, whatever delay it names; its outcome stays `unknown`, as
+/// the guides say, because a `429` is not among the documented definite
+/// refusals of a write.
+#[tokio::test]
+async fn a_write_answered_429_is_sent_once_and_not_retried() {
+    let engine = Engine::new(&bundle(), "/api/v4", &selections()).unwrap();
+    for header in [Some("1"), Some("0"), None] {
+        let http = reads(vec![response(200, json!({"commit": {"id": SHA}}))]);
+        let prepared = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "merge_request.create",
+                create_input(),
+            )
+            .await
+            .unwrap();
+        let sent: Sent = Arc::new(Mutex::new(Vec::new()));
+        let outcome = prepared
+            .execute(Box::new(Send {
+                sent: sent.clone(),
+                response: Some(limited(header)),
+            }))
+            .await;
+        assert_eq!(classify(outcome), "unknown", "{header:?}");
+        assert_eq!(sent.lock().unwrap().len(), 1, "{header:?}");
+        // Only the preflight read went through the read port.
+        assert_eq!(http.calls.lock().unwrap().len(), 1, "{header:?}");
+    }
 }

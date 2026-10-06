@@ -1,9 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.31.0 — 2026-10-06
 
 ### Added
 
+- `operations list --family <contract id>` answers the operations that bind a datasource
+  family, for any adapter, including one installed after the consumer
+  (`OperationListInput.family` in `ess/domains/cli.yaml`).
+- The `datasource.feed/v1alpha1` contract family, and a catalog feed engine: a provider
+  declared only as data answers `feed.containers` and `feed.items` through the catalog
+  engine. The feed suite has 28 scenarios; a native, a time and a cursor fixture provider
+  pass all 28. Not yet: an invoke through a saved connection, and any real provider
+  binding.
 - `connections launch --adapter --connection --consumer [--args <JSON array>]` runs
   an operator-pinned consumer executable with one saved connection's protected
   document on file descriptor 3, with the caller's stdio, and exits with the
@@ -20,17 +28,116 @@
   `/1` and `/2` files keep loading; `[consumers]` in them is refused, and
   `setup init` still writes `/2`. `connectors.cli.ConfigurationFormat` gains
   `connectors-local/3`.
+- GitLab catalog write `issue.create`: `POST /api/v4/projects/{id}/issues`
+  (`postApiV4ProjectsIdIssues`, already in the pinned GitLab document and the
+  committed bundle) opens one issue from `id` and a `body` GitLab requires a
+  `title` in. It is unguarded, as the Drive, Slides and Calendar creates are: nothing
+  exists to compare before a create, so the same input approved and sent again
+  opens a second issue. Like every write it runs only under private protocol two,
+  in the adapter's permitted operations and named by an approval policy; the
+  approval binds the whole input by digest. The shipped selection set changed, so
+  the configuration revision of every instance using it moves: print the bootstrap
+  again and copy its `configuration_revision`, run `connections revalidate`, and
+  issue the instance's approval policies again (`docs/local-catalog-provider.md`).
 
 ### Changed
 
+- The registry clock floor no longer records an Entity Runtime event on every
+  command. Its durable value is the new file `registry-clock.floor` beside
+  `metadata.lock`, written under the metadata lock by temporary file, fsync and
+  rename; the recorded `connectors.clock.LocalClockFloor` `s:registry` advances only
+  to a sample more than 60 s past it, and an unchanged floor is not re-recorded. A
+  read invoke appended 4 floor events of 7 before; now none within 60 s of the last
+  recorded floor. The regression check is unchanged: a sample below the higher of
+  the file and the recorded floor is refused. Migration: none. A store without the
+  file (every existing store, on its first command after the upgrade) treats the
+  floor as the recorded value plus 60 s, so a command within 60 s of the last one
+  before the upgrade answers `metadata_unavailable`; a deleted or corrupt
+  file does the same. `connectors.clock.RegistryClockFloorFile` models the file.
 - ESS 0.53.0 (from 0.52.0) and AEP 0.68.0 (from 0.65.0): the seven ESS crates, the pinned
-  toolchains and the planning store's `protocols` pin; 24 compatible crates.io updates
-  (among them tokio 1.53.2, uuid 1.27.0, jsonschema 0.58.5). The generated CLI contract is
+  toolchains and the planning store's `protocols` pin; 23 compatible crates.io updates
+  (among them tokio 1.53.2, jsonschema 0.58.5). uuid stays at 1.26.1: 1.27.0 requires
+  rustc 1.89 and the MSRV is 1.88.0. The generated CLI contract is
   byte-identical under 0.53.0. `ess generate cli` now writes only into output it owns:
   a fresh checkout enrolls `apps/connectors-cli-contract` once with
   `ess generate output adopt` before regenerating (`docs/development.md`); the gate's
   `cli --check` needs no enrollment. The metadata mutation emitter fills the
   `ess-mutation-manifest/4` fields ESS 0.53.0 added, unset, since it writes `/2`.
+- A metadata open no longer copies every recorded history beside the Entity Runtime
+  complete snapshot it replays; the records are moved out of the snapshot. Peak RSS
+  of `read_invoke_cost_by_store_size` (release build, 5 read invokes) fell from
+  696 MB to 645 MB at 601 events and from 1,468 MB to 1,371 MB at 1,201 events
+  (#103). The rest of the peak is Entity Runtime's verified model, its complete
+  snapshot and Eventlog's verified blobs, held once by each open handle.
+- The owner process limits glibc to one malloc arena (`mallopt(M_ARENA_MAX, 1)`)
+  before it starts any thread, on Linux with glibc; elsewhere nothing changes. Each
+  metadata handle runs its own worker threads, and each thread's arena kept what it
+  freed. The CLI clears the owner's environment, so `MALLOC_ARENA_MAX` never reached
+  it. With the owner's setup applied, peak RSS of `read_invoke_cost_by_store_size`
+  fell from 644–785 MB to 557–588 MB at 601 events and from 1,363–1,538 MB to
+  1,024–1,118 MB at 1,201 events (3 runs each). That process plays both CLI and
+  owner; a real owner process was not measured (#103).
+- A read the provider refuses at dispatch now says why: `connectors.cli.Failure` gains the
+  optional `service_reason`, beside `service_code` (or on a provider `forbidden`), so a
+  Confluence `unauthorized` names `Unauthorized; scope does not match` and a missing token
+  scope is told apart from a wrong path. Only the catalog provider supplies one, and only
+  from the top-level `message`, `error_description` or `error` string of a JSON refusal
+  body; never a header. It is at most 256 bytes, cut back to a whole word, and withheld
+  whole when it holds a control, format (Unicode Cf, the TAG block included) or other
+  invisible character, an `@` (no email address is carried), a credential-like marker
+  (`authorization`, `bearer`, `token=`, …), a token-like run or word, a piece of the
+  credential value the adapter derived and sent (checked by the adapter), or a piece of
+  the call's own protected document (checked again by the host). Guarded writes and
+  connection probes carry none. The private adapter `failed` reply gains the matching
+  optional `reason`, allowed only on a failed `invoke`; an owner that predates it refuses
+  such a reply. See `contracts/cli/v1alpha1/semantics.md`.
+- A catalog read answered `429` honours `Retry-After`: when the header names a delay
+  (delta-seconds, or an HTTP-date rounded up to a whole second) and the wait, a second
+  request as long as the first one took and a 500 ms margin all end before the
+  invocation deadline, the provider waits and sends the read once more, never a third
+  time, bounding it by the deadline less the margin (if it does not finish, the first
+  `rate_limited` refusal and its delay stand), so a page walk over Jira, Confluence, HubSpot, Zendesk or Google no longer
+  fails at the first rate limit. Otherwise, and after a second `429`, the failure
+  carries the new optional `connectors.cli.Failure.retry_after_seconds` beside
+  `service_code: rate_limited`, so the caller can wait; its absence means the provider
+  named no delay the engine could read (no header, another form, two `Retry-After`
+  lines that disagree, or more than 4294967295 seconds, which the host also drops when
+  a child reports one). The HTTP transport now combines a response's repeated field
+  lines into one value joined by `, ` (RFC 9110 §5.3) instead of keeping the last;
+  identical repeats count once. Guarded writes and their preflight reads are never sent again
+  and carry no delay; a write answered `429` stays `unknown`. The private adapter
+  `failed` reply gains the matching optional `retry_after_seconds`, allowed only on a
+  failed `invoke` beside `provider_rate_limited`; an owner that predates it refuses
+  such a reply.
+- An `operations invoke` of a read on a connection whose validation evidence expired,
+  while its credential is intact (`connections status` says `pending`), now answers
+  `not_granted` at `admission` with `next_action: revalidate_connection` instead of
+  `repair_connection`: `connections revalidate` renews the evidence with no credential
+  re-entry and the same invoke then succeeds. The invoke still does not revalidate on
+  its own. `connectors.cli.NextAction` gains `revalidate_connection`. A credential the
+  provider refused or that expired, and a credential below an operation's scopes, keep
+  `repair_connection`; consumer launch on lapsed evidence keeps `unavailable`. Catalog
+  provider evidence lasts the `auth` object's `evidence_lifetime_ms` (60 s by default;
+  `docs/local-catalog-provider.md`). Migration: a client that matches `next_action`
+  exhaustively adds the new value.
+
+### Tests
+
+- `read_invoke_cost_by_store_size` reports `peak_rss_mb` per store size, each size
+  measured in its own run of the test binary, since a process's peak resident set
+  only rises. `CONNECTORS_STORE_COST_INVOKES` sets how many invokes follow the one
+  that starts the owner (default 5); `0` profiles one open and one read invoke.
+  `CONNECTORS_STORE_COST_OWNER_ALLOCATOR` applies the owner's allocator setup to
+  the measuring process.
+- `the_owner_allocates_from_one_arena` starts eight threads after the owner's
+  allocator setup in a fresh process and counts arenas from `malloc_stats`. With the
+  setup, no new arena is created; with glibc's default, eight are.
+- Two disposable-custody CLI cases drive an adapter's own `identity_mismatch` through the
+  production CLI, owner and a fixture adapter child. During an upgrading
+  `connections revalidate` it answers `identity_mismatch` with `next_action`
+  `create_connection` and leaves the connection's revision and state unchanged; outside
+  an upgrade it answers `repair_connection` and the connection requires reauthorization.
+  Until now only the CLI's mapping of a hand-set flag and the registry were covered.
 
 ## 0.30.0 — 2026-10-06
 

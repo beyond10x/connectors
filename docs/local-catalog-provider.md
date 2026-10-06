@@ -55,7 +55,8 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Zendesk guide](catalog-zendesk.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
-serves the provider from the pinned source alone, plus seven repository reads:
+serves the provider from the pinned source alone, plus seven repository reads
+and one unguarded write, `issue.create`:
 
 | id | source operation | effect |
 |---|---|---|
@@ -63,6 +64,7 @@ serves the provider from the pinned source alone, plus seven repository reads:
 | `merge_requests.list`, `merge_request.get` | `getApiV4ProjectsIdMergeRequests`, `…MergeRequestIid` | read |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | the matching `getApiV4Projects…` | read |
 | `job.trace` | `getApiV4ProjectsIdJobsJobIdTrace`, `"response": "text"` | read |
+| `issue.create` | `postApiV4ProjectsIdIssues`, unguarded | write |
 | `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
@@ -265,6 +267,12 @@ The complete configuration used against the sandbox is
 - `operations_file` names a shipped selection set; its `provider` must match. An
   inline `operations` list is accepted as well and comes first. The selection
   ids, in either place, are what the host permits and the approval policy names.
+- A selection set may also carry `feed`, a provider's `datasource.feed/v1alpha1`
+  binding declared as data; the service then declares `feed.containers` and
+  `feed.items` as reads under the declaration's profile, and `operations` may be
+  empty. The shape, its watermark forms and what it cannot express are in
+  [the catalog contract, section 3.3](../contracts/catalog/v1alpha1/semantics.md#33-declared-feed-bindings).
+  A selection id may not be `feed.containers` or `feed.items`.
 - Each selection exposes one `operationId` from the bundle under a local id.
   `effect` is declared, not inferred from the method: `read` is allowed only for
   GET, `write` only for POST, PUT, PATCH and DELETE, and a write is a
@@ -419,7 +427,7 @@ restart = "never"
 
 [adapters.forge.permissions]
 profiles = ["gitlab.pat"]
-operations = ["project.get", "issues.list", "file.get", "branch.get", "merge_requests.list", "merge_request.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.create", "merge_request.update", "merge_request.merge"]
+operations = ["project.get", "issues.list", "file.get", "branch.get", "merge_requests.list", "merge_request.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "issue.create", "merge_request.create", "merge_request.update", "merge_request.merge"]
 
 [adapters.forge.executable]
 path = "/absolute/path/connectors-catalog-provider"
@@ -439,10 +447,14 @@ target/release/connectors --output json operations describe --adapter forge --op
 ```
 
 Connect runs the declared identity and scope reads and refuses a token below
-`minimum_scopes`. Validation evidence lasts `evidence_lifetime_ms` (60 seconds by
-default); after expiry the connection reports `pending` and reads refuse until
+`minimum_scopes`. Validation evidence lasts the `auth` object's `evidence_lifetime_ms`
+(60 seconds when omitted, at most 300 000 ms); after expiry the
+connection reports `pending`, and `operations invoke` of a read refuses with
+`not_granted` at `admission` and `next_action: revalidate_connection` until
 `connections revalidate --adapter forge --connection CONNECTION --expected-revision REVISION`
-renews it with no credential re-entry. `connections repair` replaces an invalid
+renews it with no credential re-entry. The invoke does not revalidate on its own.
+A credential the provider refused or one below an operation's scopes still
+answers `next_action: repair_connection`. `connections repair` replaces an invalid
 credential and refuses a changed identity; `connections revoke` is terminal local
 revocation and does not revoke the token at GitLab. Lists, descriptions and status
 start nothing. Writes need `private_protocol = "connectors-private/2"` and an
@@ -507,6 +519,19 @@ appeared, which opened merge request 11 at the moved head and was classified
   a live provider, and the provider does not acquire the OAuth entry itself.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
+- A read answered `429` is sent once more, and never a third time, after the
+  delay its `Retry-After` names (delta-seconds, or an HTTP-date rounded up to a
+  whole second), when that wait leaves the second request time of its own: the
+  wait, then as long again as the first request took, then 500 ms, must all end
+  before the invocation deadline. The second request must finish 500 ms before
+  the deadline; if it does not, the first answer's refusal and delay stand.
+  Otherwise, and after a second `429`, `operations invoke` fails with
+  `service_code: rate_limited` and `retry_after_seconds` set to the named delay,
+  so the caller can wait; without `retry_after_seconds` the provider named no
+  delay the engine could read. Two `Retry-After` lines on one answer that
+  disagree name no delay; identical repeats count as one. A guarded write, and
+  its preflight read, is sent once and never again, and its failure carries no
+  delay.
 - A guard compares scalars for equality. It cannot express "any of", ordering or
   a value the preflight must not have.
 - Only GitLab has run live. A second provider through the same engine is still

@@ -35,6 +35,49 @@ const AUDIT_MIGRATION: &str = include_str!("metadata/audit.sql");
 pub const WAIT_BOUND: Duration = Duration::from_secs(30);
 const NAME: &str = "metadata.sqlite3";
 const LOCK: &str = "metadata.lock";
+/// The registry's durable clock floor, beside the lock that guards it.
+const REGISTRY_FLOOR: &str = "registry-clock.floor";
+
+/// `connectors.clock.RegistryClockFloorFile` (ess/domains/clock.yaml).
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RegistryFloorFile {
+    last_seen_ms: u64,
+}
+
+/// The registry's durable clock floor: the last system-clock sample a registry
+/// transaction admitted, kept outside Entity Runtime so that the floor Entity
+/// Runtime records may lag it by at most one recording interval.
+pub(super) struct RegistryFloor {
+    directory: std::fs::File,
+}
+
+impl RegistryFloor {
+    /// `None` when the file is missing, unreadable or not exactly a
+    /// `connectors.clock.RegistryClockFloorFile`.
+    pub(super) fn read(&self) -> Option<i64> {
+        let file = fs::private_file_at(&self.directory, OsStr::new(REGISTRY_FLOOR)).ok()?;
+        let bytes = fs::read_bounded(file, 64).ok()?;
+        let floor = serde_json::from_slice::<RegistryFloorFile>(&bytes).ok()?;
+        i64::try_from(floor.last_seen_ms)
+            .ok()
+            .filter(|floor| *floor <= 9_007_199_254_740_991)
+    }
+
+    /// Replaces the file by write-temporary, fsync and rename, then syncs the
+    /// directory.
+    pub(super) fn record(&self, last_seen_ms: i64) -> Result<()> {
+        let last_seen_ms = u64::try_from(last_seen_ms).map_err(|_| Failure::MetadataUnavailable)?;
+        let bytes = serde_json::to_vec(&RegistryFloorFile { last_seen_ms })
+            .map_err(|_| Failure::MetadataUnavailable)?;
+        fs::publish_replace(&self.directory, OsStr::new(REGISTRY_FLOOR), &bytes).map_err(
+            |failure| match failure {
+                Failure::OutcomeUnknown => Failure::OutcomeUnknown,
+                _ => Failure::MetadataUnavailable,
+            },
+        )
+    }
+}
 type SchemaObject = (String, String, String, Option<String>);
 
 #[cfg(test)]
@@ -201,6 +244,9 @@ pub struct Metadata {
     _directory: std::fs::File,
     _lifecycle_lock: Option<std::fs::File>,
     concurrent_observation: bool,
+    /// The flock on `_lifecycle_lock` was released before an ER replay (passive
+    /// inspection and an observation's unlocked replay); only a relock clears it.
+    lock_released: bool,
 }
 
 impl Drop for Metadata {
@@ -368,6 +414,7 @@ impl Metadata {
                 .as_ref()
                 .ok_or(Failure::MetadataUnavailable)?,
         )?;
+        self.lock_released = false;
         self.concurrent_observation = false;
         Ok(())
     }
@@ -451,6 +498,20 @@ impl Metadata {
         Ok(metadata)
     }
 
+    /// The registry's durable clock floor file in this handle's state
+    /// directory. Only a handle holding the lifecycle lock hands it out: a
+    /// passive inspection never does, and an unlocked observation must relock
+    /// first. Use it only while this handle, and so its lock, is alive.
+    pub(super) fn registry_floor(&self) -> Result<RegistryFloor> {
+        self.require_lifecycle_lock()?;
+        Ok(RegistryFloor {
+            directory: self
+                ._directory
+                .try_clone()
+                .map_err(|_| Failure::MetadataUnavailable)?,
+        })
+    }
+
     pub(super) fn authority(&self) -> Result<uuid::Uuid> {
         let text: String = self
             .connection
@@ -519,10 +580,18 @@ impl Metadata {
         self.persist_with_admission(true)
     }
 
-    pub(super) fn persist_prepared_observation(&mut self) -> Result<()> {
-        if self.concurrent_observation {
+    /// Every lock-guarded operation (a write, the registry floor file) needs a
+    /// handle that took the lifecycle lock and has not released it since: not a
+    /// passive inspection, not an observation before its relock.
+    fn require_lifecycle_lock(&self) -> Result<()> {
+        if self.concurrent_observation || self.lock_released || self._lifecycle_lock.is_none() {
             return Err(Failure::MetadataUnavailable);
         }
+        Ok(())
+    }
+
+    pub(super) fn persist_prepared_observation(&mut self) -> Result<()> {
+        self.require_lifecycle_lock()?;
         let authority = self.er.as_mut().ok_or(Failure::MetadataUnavailable)?;
         er::persist(
             authority,
@@ -534,9 +603,7 @@ impl Metadata {
     /// Runtime suppression and remembered bootstrap read only their own rows.
     /// This named path cannot persist registry-dependent business changes.
     pub(super) fn persist_runtime_state(&mut self) -> Result<()> {
-        if self.concurrent_observation {
-            return Err(Failure::MetadataUnavailable);
-        }
+        self.require_lifecycle_lock()?;
         let authority = self.er.as_mut().ok_or(Failure::MetadataUnavailable)?;
         er::persist(
             authority,
@@ -546,6 +613,10 @@ impl Metadata {
     }
 
     fn persist_with_admission(&mut self, admitted_registry_use: bool) -> Result<()> {
+        // An unlocked handle could append between a locked writer's feed check
+        // and its batch. Every write needs the lifecycle lock, so the feed
+        // check sees every append that can precede its batch.
+        self.require_lifecycle_lock()?;
         if let Some(authority) = &mut self.er {
             er::persist(
                 authority,
@@ -685,6 +756,8 @@ impl Metadata {
                 ._lifecycle_lock
                 .as_ref()
                 .ok_or(Failure::MetadataUnavailable)?;
+            // Recorded first: after a failed unlock the lock is not known held.
+            self.lock_released = true;
             if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_UN) } != 0 {
                 return Err(Failure::MetadataUnavailable);
             }
@@ -755,6 +828,7 @@ impl Metadata {
             _directory: dir,
             _lifecycle_lock: Some(lock),
             concurrent_observation: false,
+            lock_released: false,
         })
     }
 
@@ -1170,14 +1244,14 @@ mod tests {
         drop(Metadata::initialize(&path).unwrap());
         let mut observation = Metadata::update_observation(&path).unwrap();
         let mut business = Metadata::update(&path, false).unwrap();
-        // The business handle read the same clock value as its baseline. Its
-        // business row is changed later, while an already-open observer can
-        // durably advance the clock despite the business lifecycle lock.
+        // The business handle read the same clock value as its baseline. An
+        // already-open observer that released the lifecycle lock cannot
+        // durably advance the clock behind the business lifecycle lock.
         observation
             .connection
             .execute("UPDATE registry_clock SET last_seen_ms=1", [])
             .unwrap();
-        observation.persist().unwrap();
+        assert_eq!(observation.persist(), Err(Failure::MetadataUnavailable));
         business
             .connection
             .execute("INSERT INTO registry_instances(instance_id,adapter_id,configuration_revision,epoch) VALUES ('fixture','adapter','revision',0)", [])
@@ -1186,16 +1260,16 @@ mod tests {
         drop(business);
         drop(observation);
         let reopened = Metadata::inspect(&path).unwrap();
-        let count: i64 = reopened
+        let (count, floor): (i64, i64) = reopened
             .connection
             .query_row(
-                "SELECT count(*) FROM registry_instances WHERE instance_id='fixture'",
+                "SELECT (SELECT count(*) FROM registry_instances WHERE instance_id='fixture'),last_seen_ms FROM registry_clock",
                 [],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .unwrap();
-        assert_eq!(count, 0, "a stale business batch must not commit");
-        assert_eq!(result, Err(Failure::ConcurrentRevision));
+        // No clock advance landed, so the business batch is not stale.
+        assert_eq!((count, floor, result), (1, 0, Ok(())));
     }
 
     #[test]
@@ -1257,9 +1331,9 @@ mod tests {
         // replayed ER without the lifecycle lock. Its baseline has no runtime
         // record yet.
         let mut prepared = Metadata::update_observation(&path).unwrap();
-        // A runtime-record write lands before the observation relocks. This
-        // path deliberately omits the registry-clock guard, so the observation's
-        // clock revision cannot detect it.
+        // A runtime-record write lands before the observation relocks. The
+        // observation's feed check sees it and admits it: it changed only a
+        // runtime record, which no registry observation reads or writes.
         let mut runtime = Metadata::update(&path, true).unwrap();
         runtime
             .connection
@@ -1913,7 +1987,7 @@ mod tests {
                     limit: 10,
                     cursor: None
                 },
-                1000,
+                100_000,
                 false
             ),
             Err(crate::local::registry::Failure::MetadataUnavailable)
@@ -1942,7 +2016,7 @@ mod tests {
                         limit: 10,
                         cursor: None
                     },
-                    1000,
+                    100_000,
                     false
                 )
                 .unwrap()

@@ -223,6 +223,16 @@ pub(crate) fn require_absent(parent: &File, child: &OsStr) -> Result<()> {
 
 /// Publish one durable private file, atomically refusing any existing name.
 pub fn publish_new(parent: &File, child: &OsStr, contents: &[u8]) -> Result<()> {
+    publish(parent, child, contents, libc::RENAME_NOREPLACE)
+}
+
+/// Publish one durable private file, atomically replacing any file at the name:
+/// a reader sees the old bytes or the new ones, never a partial write.
+pub fn publish_replace(parent: &File, child: &OsStr, contents: &[u8]) -> Result<()> {
+    publish(parent, child, contents, 0)
+}
+
+fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: libc::c_uint) -> Result<()> {
     let temporary = format!(".connectors-{}", uuid::Uuid::new_v4());
     let temp_name = OsStr::new(&temporary);
     let mut file = open_at(
@@ -240,13 +250,14 @@ pub fn publish_new(parent: &File, child: &OsStr, contents: &[u8]) -> Result<()> 
         file.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
         // SAFETY: valid directory descriptors and C strings; RENAME_NOREPLACE
         // gives concurrent creators a single winner, including symlink targets.
+        // Without it the rename replaces the name itself, never a link target.
         let status = unsafe {
             libc::renameat2(
                 parent.as_raw_fd(),
                 temporary_c.as_ptr(),
                 parent.as_raw_fd(),
                 child_c.as_ptr(),
-                libc::RENAME_NOREPLACE,
+                flags,
             )
         };
         if status != 0 {

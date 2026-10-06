@@ -244,9 +244,12 @@ instance is refused while the old one exists.
   presentation has been created or changed.
 - The engine parses and re-serialises the body, so it is returned as equal JSON,
   not as Google's exact bytes.
-- The provider does not retry on `429`; a rate-limited read is returned as a
-  refusal. A `403` whose reason is `rateLimitExceeded`,
-  `userRateLimitExceeded` or `dailyLimitExceeded` is Google's quota answer:
+- The provider sends a read answered `429` once more after
+  the delay its `Retry-After` names, when that wait leaves the second request
+  time of its own before the invocation deadline, and otherwise returns it as a `rate_limited` refusal carrying that
+  delay as `retry_after_seconds`
+  ([Limits](local-catalog-provider.md#limits)). A `403` whose reason is
+  `rateLimitExceeded`, `userRateLimitExceeded` or `dailyLimitExceeded` is Google's quota answer:
   every selection names all three in `rate_limit_reasons`, so it reaches the
   caller as `rate_limited`, not
   `forbidden`. Adding them changed the selection set, and so the

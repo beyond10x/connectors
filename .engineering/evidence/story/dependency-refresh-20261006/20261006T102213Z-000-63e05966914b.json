@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-06T10:22:13Z",
+  "actor": "human:timo",
+  "artifact": "story:dependency-refresh-20261006",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "PR #113 merged as 90a7a72 with repository gate, docs check, planning validate and security checks green; generated CLI contract byte-identical under ESS 0.53.0; cli --check passes without the ownership ledger",
+    "reference": "https://github.com/beyond10x/connectors/pull/113"
+  }
+}

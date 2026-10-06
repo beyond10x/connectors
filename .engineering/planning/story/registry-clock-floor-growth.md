@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:registry-clock-floor-growth
 kind: story
-status: draft
+status: implemented
 title: The registry clock floor no longer records an event on every command
 relations:
 - decomposes: epic:connector-probe-20261006
@@ -27,7 +27,11 @@ scope:
   path: docs/local-er-metadata.md
 - confidence: cited
   path: ess/domains/clock.yaml
-revision: 6
+revision: 11
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T10:22:14Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "proposed", to: "active", at: "2026-10-06T10:22:15Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-06T14:56:50Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":3,"verification":1}}}
 ---
 ## Observed
 
@@ -84,3 +88,62 @@ from the story or the tree) or **inferred** (a reading that could be wrong).
   (`registry.rs:323-331`). Recording the floor less often in Entity Runtime weakens the check only
   on a rebuild, where `er.rs:2392` deletes the row and `er.rs:2661-2668` refills it from the Entity
   Runtime floor, which could then admit a regression of up to the lag — unproven
+
+## Design record (decided 2026-10-06)
+
+Facts (Scope): the strict refusal reads only the SQLite `registry_clock.last_seen_ms` row inside one
+`IMMEDIATE` transaction (`registry.rs:323-331`); the Entity Runtime `LocalClockFloor` matters only
+on a rebuild, which deletes the row and refills it from the Entity Runtime floor
+(`er.rs:2392`, `er.rs:2661-2668`).
+
+Decision:
+
+- `registry_clock` gains `recorded_ms`, the value the Entity Runtime floor holds; the
+  `LocalClockFloor` / `s:registry` projection reads `recorded_ms`, not `last_seen_ms`.
+- Every registry transaction still writes `last_seen_ms = now` and still refuses `now <
+  last_seen_ms` (unchanged check, no Entity Runtime event). It sets `recorded_ms = now` only when
+  `now > recorded_ms + Δ`, Δ = 60 s; only then does the projection record a floor advance.
+- Invariant after every transaction: `last_seen_ms <= recorded_ms + Δ`.
+- A rebuild refills `recorded_ms` from the Entity Runtime floor and `last_seen_ms = recorded_ms + Δ`,
+  which is at least every `last_seen_ms` ever committed, so no regression the current check refuses
+  is admitted after a rebuild either. Cost: after a rebuild, transactions whose clock reads below
+  the refilled `last_seen_ms` are refused for at most Δ.
+- Authority: the SQLite row is authoritative while it exists; the Entity Runtime floor is
+  authoritative for a rebuild, read through the Δ bound.
+
+Rejected: a lease-ahead floor written only when the clock passes it (2026-10-06): it accepts a
+regression of up to the lease between commands, which the current check refuses.
+
+## Design amendment (decided 2026-10-06, supersedes the "Design record" above)
+
+Finding (implementor, 2026-10-06): the SQLite `registry_clock` row is not durable. The projection is
+an in-memory connection (`er.rs:2359` `Connection::open_in_memory`) built again from Entity Runtime
+by `build_projection` on every registry transaction (a probe of two transactions counted two
+builds). Every command is therefore "after a rebuild", and the refill rule above refuses every
+command within Δ of the last recorded floor: emulated, `cargo test -p connectors-host --lib
+local::registry` gave 0 passed, 43 failed. Between processes Entity Runtime is today the only
+durable home of the floor, so a strict cross-process check needs a record on every command unless
+the floor gets another durable home.
+
+Decision: the floor gets a durable home outside Entity Runtime.
+
+- A floor file beside the metadata lock in the connectors state directory holds `last_seen_ms`.
+  It is read and written only while the metadata lifecycle lock is held, written by write-to-temp,
+  fsync, rename.
+- Every registry transaction refuses `now < max(file floor, Entity Runtime floor)` (the strict
+  check, unchanged in meaning) and writes the file floor `= now` before its Entity Runtime batch
+  commits. A failed commit leaves the file higher than needed, which only refuses more.
+- The Entity Runtime `LocalClockFloor` / `s:registry` floor advances only when `now > recorded + Δ`,
+  Δ = 60 s.
+- Missing or unreadable floor file (first run, deleted, corrupt): the floor is the Entity Runtime
+  floor `+ Δ`, which is at least every `now` ever committed. Cost: refusals for at most Δ after the
+  file is lost.
+- A floor file rolled back by hand can admit a regression of at most Δ below the last committed
+  `now`, because the Entity Runtime floor still bounds it.
+- The same-millisecond fence (`er.rs:3313-3343`) keeps its concurrency guarantee; whether it can
+  stop emitting `AdvanceLocalClockFloor` for an unchanged floor is the implementor's call, proven by
+  `prepared_same_millisecond_observation_refuses_stale_registry_state` staying green.
+
+Rejected 2026-10-06: the `recorded_ms` refill design above (the row it relies on is not durable);
+a bounded regression (lease-ahead, rejected earlier); not advancing on read invokes (a read invoke
+appends 7 events and is not read-only at the store).
