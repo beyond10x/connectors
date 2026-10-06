@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:feed-contract
 kind: story
-status: draft
+status: active
 title: The datasource.feed/v1alpha1 family is stated and modelled
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -12,7 +12,10 @@ scope:
   path: contracts/datasources/feed/v1alpha1
 - confidence: inferred
   path: ess
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T09:58:15Z", actor: "agent:claude", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-06T09:58:16Z", actor: "agent:claude", revision: 4}
 ---
 ## Outcome
 
