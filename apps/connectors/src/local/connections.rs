@@ -214,6 +214,7 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
         StaleCursor => ("stale_cursor", "observation", "retry_explicitly", false),
         Capacity => ("capacity", "admission", "retry_explicitly", false),
         NotReady => ("unavailable", "readiness", "repair_connection", false),
+        EvidenceExpired => ("not_granted", "admission", "revalidate_connection", false),
         InsufficientScope => ("not_granted", "admission", "repair_connection", false),
         CustodyUnavailable => ("custody_unavailable", "custody", "unlock_keyring", false),
     };

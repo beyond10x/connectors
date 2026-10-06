@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T18:06:25Z",
+  "actor": "human:timo",
+  "artifact": "story:expired-evidence-invoke-advises-revalidate",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "on merge 698142d86 with main: cargo test --no-fail-fast -p connectors-host -p connectors -p connectors-catalog-provider -p connectors-build, 0 failed except one ESS-dependent test that found ess 0.54.0 on PATH, which passed against the pinned ess 0.53.0 release binary; before the merge: the ignored journey catalog_cli_explicit_revalidation_after_real_expiry_without_reentry red (repair_connection) then green (revalidate_connection) with the real 60 s lifetime; fmt and clippy -D warnings exit 0"
+  }
+}

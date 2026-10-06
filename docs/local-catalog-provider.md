@@ -447,10 +447,14 @@ target/release/connectors --output json operations describe --adapter forge --op
 ```
 
 Connect runs the declared identity and scope reads and refuses a token below
-`minimum_scopes`. Validation evidence lasts `evidence_lifetime_ms` (60 seconds by
-default); after expiry the connection reports `pending` and reads refuse until
+`minimum_scopes`. Validation evidence lasts the `auth` object's `evidence_lifetime_ms`
+(60 seconds when omitted, at most 300 000 ms); after expiry the
+connection reports `pending`, and `operations invoke` of a read refuses with
+`not_granted` at `admission` and `next_action: revalidate_connection` until
 `connections revalidate --adapter forge --connection CONNECTION --expected-revision REVISION`
-renews it with no credential re-entry. `connections repair` replaces an invalid
+renews it with no credential re-entry. The invoke does not revalidate on its own.
+A credential the provider refused or one below an operation's scopes still
+answers `next_action: repair_connection`. `connections repair` replaces an invalid
 credential and refuses a changed identity; `connections revoke` is terminal local
 revocation and does not revoke the token at GitLab. Lists, descriptions and status
 start nothing. Writes need `private_protocol = "connectors-private/2"` and an

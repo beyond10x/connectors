@@ -678,6 +678,17 @@ the Kubernetes token review) is classified separately and not by this rule: a
 `service_code = upstream_protocol` at `dispatch` and
 `next_action = retry_explicitly`.
 
+A read on `operations invoke` refused before dispatch only because the
+connection's validation evidence expired, while its credential is intact (the
+connection reports `pending`), is `code = not_granted` at `stage = admission`
+with `next_action = revalidate_connection`. `connections revalidate`
+recollects the evidence from the credential already in custody, with no
+re-entry, and the same invoke is then admitted. The invoke never revalidates
+on its own: a business read runs no implicit identity probe. A connection whose
+credential expired or is known invalid (`reauthorization_required`), and a
+credential below the operation's scopes, keep `code = not_granted` with
+`next_action = repair_connection`.
+
 A provider's timeout or capacity answer is the provider's too: a request the
 provider transport sent whose deadline then passed (a connection probe's
 included, and one that passes while the provider's answer is still being

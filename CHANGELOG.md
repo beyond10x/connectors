@@ -87,6 +87,17 @@
   `failed` reply gains the matching optional `retry_after_seconds`, allowed only on a
   failed `invoke` beside `provider_rate_limited`; an owner that predates it refuses
   such a reply.
+- An `operations invoke` of a read on a connection whose validation evidence expired,
+  while its credential is intact (`connections status` says `pending`), now answers
+  `not_granted` at `admission` with `next_action: revalidate_connection` instead of
+  `repair_connection`: `connections revalidate` renews the evidence with no credential
+  re-entry and the same invoke then succeeds. The invoke still does not revalidate on
+  its own. `connectors.cli.NextAction` gains `revalidate_connection`. A credential the
+  provider refused or that expired, and a credential below an operation's scopes, keep
+  `repair_connection`; consumer launch on lapsed evidence keeps `unavailable`. Catalog
+  provider evidence lasts the `auth` object's `evidence_lifetime_ms` (60 s by default;
+  `docs/local-catalog-provider.md`). Migration: a client that matches `next_action`
+  exhaustively adds the new value.
 
 ### Tests
 
