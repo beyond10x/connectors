@@ -97,6 +97,11 @@ For automation, `--credential-file /absolute/private/file.json` or
 Files must be singly linked, regular, owner-only (0400 or 0600), with admitted
 ancestors. Protected values are not accepted as argv or printed in results.
 
+To hand the saved password to another program, such as a service that reads a
+password file, pin that program as a consumer and start it with
+`connections launch`: it receives the `{"password":"..."}` document on file
+descriptor 3. See [Launch a consumer](local-consumer-launch.md).
+
 ## What the connection is bound to
 
 **The session is the credential check.** PostgreSQL accepts or rejects the

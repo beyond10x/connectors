@@ -31,6 +31,8 @@ pub(super) struct Session {
     pub approval_deadline: Instant,
     pub mutation_deadline: Option<owner::mutation::Deadline>,
     pub cancelled: bool,
+    /// The exit code of a consumer `connections launch` ran.
+    pub launched: Option<i32>,
 }
 impl Session {
     pub fn new(args: &[OsString]) -> Shared {
@@ -92,6 +94,7 @@ impl Session {
             approval_deadline,
             mutation_deadline,
             cancelled: false,
+            launched: None,
         }))
     }
     /// The preparsed callable and its context, when the arguments parsed.

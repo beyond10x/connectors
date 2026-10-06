@@ -30,6 +30,7 @@
     "handler:approval-prepare: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-connect: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-describe: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-launch: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-list: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-repair: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract",

@@ -303,7 +303,7 @@ types:
     variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
-    variants: [connectors-local/1, connectors-local/2]
+    variants: [connectors-local/1, connectors-local/2, connectors-local/3]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created, state_initialized]
@@ -566,6 +566,25 @@ types:
     kind: struct
     fields:
       - {name: connection, type: "connectors.cli.ConnectionDescription"}
+  # Selectors and the caller's arguments. args is one JSON array of strings, appended
+  # verbatim after the consumer's pinned argv prefix; the handler refuses any other value,
+  # or an element holding NUL, as invalid_input. The protected document reaches the consumer
+  # on descriptor 3, never a field, response, argv, environment or file.
+  # See contracts/cli/v1alpha1/consumer-launch.md.
+  - name: connectors.cli.ConnectionLaunchInput
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connection, type: "String"}
+      - {name: consumer, type: "String"}
+      - {name: args, type: "Optional<String>"}
+  # The handler seam's typed result. It is never written: stdout belongs to the consumer and
+  # the process exits with exit_code.
+  - name: connectors.cli.ConnectionLaunchResult
+    kind: struct
+    fields:
+      - {name: consumer, type: "String"}
+      - {name: exit_code, type: "Integer"}
   # Exactly one selector required by the binding; Optional alone does not enforce exclusivity.
   - name: connectors.cli.ConnectionStatusInput
     kind: struct
@@ -740,7 +759,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:351, docs/local-connection-registry.md:105-106;
+    # contracts/cli/v1alpha1/semantics.md:370, docs/local-connection-registry.md:105-106;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -862,7 +881,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:355) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:374) and the host
     # removal path (er.rs:3789-3791) only expires Active cursors. The error name is
     # the decision; no source names one.
 

@@ -86,7 +86,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_twenty_seven_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_twenty_eight_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -105,6 +105,7 @@ fn the_selected_inventory_has_twenty_seven_grouped_commands_and_explicit_runtime
         "connections connect",
         "connections repair",
         "connections revalidate",
+        "connections launch",
         "connections status",
         "connections revoke",
         "operations list",
@@ -390,6 +391,21 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         (
             &[
                 "connections",
+                "launch",
+                "--adapter",
+                "forge",
+                "--connection",
+                "c1",
+                "--consumer",
+                "probe",
+                "--args",
+                "[\"head\",\"--json\"]",
+            ],
+            "ConnectionLaunchResult",
+        ),
+        (
+            &[
+                "connections",
                 "status",
                 "--adapter",
                 "forge",
@@ -444,7 +460,7 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         assert_eq!(handler.calls, 1);
         if matches!(
             *result_type,
-            "ConnectionRevalidateResult" | "ApprovalClockCheckResult"
+            "ConnectionRevalidateResult" | "ConnectionLaunchResult" | "ApprovalClockCheckResult"
         ) {
             assert!(sources.calls.is_empty());
         }

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:launch-consumer-with-connection-credential
 kind: story
-status: draft
+status: implemented
 title: A pinned consumer is launched with one connection's credential on fd 3
 relations:
 - serves: vision:independent-contract-adapters
@@ -43,7 +43,11 @@ scope:
   path: docs/local-postgres-cli.md
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 21
+revision: 25
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T04:36:26Z", actor: "agent:claude", revision: 22}
+- {from: "proposed", to: "active", at: "2026-10-06T04:36:26Z", actor: "agent:claude", revision: 23}
+- {from: "active", to: "implemented", at: "2026-10-06T06:33:46Z", actor: "agent:claude", revision: 25, decided_on: {"recorded":{"test_result":1,"review_outcome":2}}}
 ---
 ## Outcome
 
@@ -101,7 +105,7 @@ Decided 2026-10-06 by the coordinating session under the operator's delegation (
 
 | # | question | decision |
 |---|---|---|
-| 1 | trailing argument list | No `-- <args…>` passthrough. A consumer's whole argv is pinned in its `[consumers]` entry; the launch takes only `--consumer <name>` and `--connection <id>`. The CLI stays expressible in `ess-cli/1` as it is, so the story no longer waits for beyond10x/ess#466. |
+| 1 | trailing argument list | Revised the same day: the first decision (a fully pinned argv, no passthrough) would have stopped cortex, which starts every `ekr` subcommand through the launch. The launch takes an optional `--args <JSON array of strings>`, one option value, so the CLI stays expressible in `ess-cli/1` and the story does not wait for beyond10x/ess#466. The consumer receives its `[consumers]` entry's pinned argv followed by those elements. A `[consumers]` entry may list `pass_env` prefixes (for example `EKR_`); only caller variables with those prefixes reach the consumer, and its environment is otherwise empty. Arguments and passed variables come from the same-user caller; the binary and its argv prefix are pinned by the operator; the credential reaches only fd 3. |
 | 2 | exec and stdio | The handler starts the consumer as a child with stdin, stdout and stderr inherited, waits for it, and exits with the consumer's exit status; the structured reply goes to stderr only when the launch itself is refused. |
 | 3 | lapsed evidence | Keeps the existing contract: `unavailable` (readiness). The Acceptance names `unavailable`, not `not_granted`. |
 | 5 | binding without starting the adapter | From the saved connection record: provider authority and profile are read from the registry entry the connection was saved with. No adapter process is started for a launch. |

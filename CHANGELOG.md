@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `connections launch --adapter --connection --consumer [--args <JSON array>]` runs
+  an operator-pinned consumer executable with one saved connection's protected
+  document on file descriptor 3, with the caller's stdio, and exits with the
+  consumer's status. The owner process reads the credential and hands the consumer a
+  sealed memfd; no response, argv, environment or file of the caller holds it, and no
+  adapter starts. Consumers are declared under `[consumers]` with a pinned
+  `executable` (path, `sha256`, argv prefix), `permissions.connections` (adapter
+  aliases; omitted denies) and optional `pass_env` (caller variable name prefixes;
+  omitted passes none). `--args` elements are appended verbatim after the pinned
+  prefix; a value that is not a JSON array of strings, or holds NUL, is
+  `invalid_input`. Lapsed evidence answers `unavailable` at readiness; a locked
+  keyring `custody_unavailable`. See `docs/local-consumer-launch.md`.
+- Configuration format `connectors-local/3`: `connectors-local/2` plus `[consumers]`.
+  `/1` and `/2` files keep loading; `[consumers]` in them is refused, and
+  `setup init` still writes `/2`. `connectors.cli.ConfigurationFormat` gains
+  `connectors-local/3`.
+
 ## 0.30.0 — 2026-10-06
 
 ### Added
