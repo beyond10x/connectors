@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.29.0
+# Source release v0.30.0
 
-Version **0.29.0** specifies at ESS source format `ess/15` with the released
+Version **0.30.0** specifies at ESS source format `ess/15` with the released
 ESS 0.52.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -19,8 +19,18 @@ with a duplicate object key itself, as `cli_dynamic_input`, before the owner see
 exit code 2, empty stdout and no dispatch are as before.
 
 Since 0.29.0 local metadata runs on Entity Runtime 0.26.0 with provider-tracked capture:
-a read invoke takes 2.3 s at 1,203 recorded events instead of 40.2 s, so
-`connections revalidate` and invokes on a grown store no longer pass the 30 s deadline.
+a read invoke takes 2.3 s at 1,203 recorded events instead of 40.2 s. Every command still
+opens and verifies the whole store, and about 8 events are recorded per read, so the cost
+keeps growing with use: on 2026-10-06 an operator store of 2,800 events took 4 s per
+`connections list` and 10 to 21 s per read invoke
+([#101](https://github.com/beyond10x/connectors/issues/101)).
+
+Since 0.30.0 a connection follows a configuration upgrade of its instance (a rebuilt
+bundle or selection) on its next `connections revalidate`, without credential re-entry,
+when its provider authority, profile and identity are unchanged. Catalog profiles can
+declare an `access` read that validation makes, so a credential that identifies but
+cannot read is refused as `insufficient_scope`; the Confluence guide declares one.
+Zendesk's ticket export accepts `per_page`.
 
 ## Available runtime
 
