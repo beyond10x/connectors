@@ -175,8 +175,12 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     };
     // A refusal during a configuration upgrade, or of a changed binding: repair
     // refuses a changed binding, so only a new connection helps.
+    // Only the connection's validation evidence expired, its credential is
+    // intact: a revalidation recollects it, a repair would ask for re-entry.
     let action = if error.reconnect {
         "create_connection"
+    } else if error.revalidate {
+        "revalidate_connection"
     } else {
         action
     };
@@ -186,6 +190,12 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     }
     if let Some(service_code) = error.service_code {
         data["service_code"] = json!(service_code);
+    }
+    if let Some(service_reason) = error.service_reason {
+        data["service_reason"] = json!(service_reason);
+    }
+    if let Some(retry_after_seconds) = error.retry_after_seconds {
+        data["retry_after_seconds"] = json!(retry_after_seconds);
     }
     if usage {
         HandlerReply::UsageError {
@@ -503,6 +513,49 @@ mod tests {
         );
     }
 
+    /// story:service-failure-carries-upstream-reason: the provider's bounded
+    /// reason is in the failure data beside `service_code`, and absent when
+    /// the owner reported none.
+    #[test]
+    fn a_service_failure_carries_the_upstream_reason_beside_its_code() {
+        let mut error = owner::Error::from(owner::Code::ServiceFailure);
+        error.service_code = Some(connectors_core::ErrorCode::Unauthorized);
+        let HandlerReply::Error { data, .. } = invoke_failure(error.clone()) else {
+            panic!("not a failure");
+        };
+        assert!(data.get("service_reason").is_none(), "{data}");
+        error.service_reason = Some("Unauthorized; scope does not match".into());
+        let HandlerReply::Error { data, .. } = invoke_failure(error) else {
+            panic!("not a failure");
+        };
+        assert_eq!(data["code"], "service_failure");
+        assert_eq!(data["service_code"], "unauthorized");
+        assert_eq!(data["service_reason"], "Unauthorized; scope does not match");
+        assert_eq!(data["stage"], "dispatch");
+    }
+
+    /// story:catalog-honours-retry-after: a rate-limited read states the delay
+    /// the provider named beside `service_code`, so the caller can wait, and
+    /// states its absence by omitting it.
+    #[test]
+    fn a_rate_limited_failure_states_the_providers_delay_or_its_absence() {
+        let mut error = owner::Error::from(owner::Code::ServiceFailure);
+        error.service_code = Some(connectors_core::ErrorCode::RateLimited);
+        let HandlerReply::Error { data, .. } = invoke_failure(error.clone()) else {
+            panic!("not a failure");
+        };
+        assert!(data.get("retry_after_seconds").is_none(), "{data}");
+        error.retry_after_seconds = Some(3600);
+        let HandlerReply::Error { data, .. } = invoke_failure(error) else {
+            panic!("not a failure");
+        };
+        assert_eq!(data["code"], "service_failure");
+        assert_eq!(data["service_code"], "rate_limited");
+        assert_eq!(data["retry_after_seconds"], 3600);
+        assert_eq!(data["stage"], "dispatch");
+        assert_eq!(data["next_action"], "retry_explicitly");
+    }
+
     fn reply(reply: HandlerReply) -> (Value, Value, Value) {
         let (HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. }) = reply
         else {
@@ -640,5 +693,54 @@ mod tests {
                 assert_eq!(stage(error).1, json!("create_connection"), "{failure:?}");
             }
         }
+    }
+
+    /// story:expired-evidence-invoke-advises-revalidate: an invoke refused
+    /// only because the connection's validation evidence expired keeps
+    /// `not_granted` at admission and names `revalidate_connection`, also as
+    /// the CLI receives it across the owner transport. An insufficient scope,
+    /// and a connection not ready for any other reason, keep
+    /// `repair_connection`.
+    #[test]
+    fn an_expired_evidence_refusal_names_revalidation_not_repair() {
+        use connectors_host::local::{registry, runtime};
+        let revalidate = (
+            json!("not_granted"),
+            json!("admission"),
+            json!("revalidate_connection"),
+        );
+        let repair = (
+            json!("not_granted"),
+            json!("admission"),
+            json!("repair_connection"),
+        );
+        let expired = owner::Error::from(registry::Failure::EvidenceExpired);
+        assert_eq!(expired.code, owner::Code::NotGranted);
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&expired).unwrap()).unwrap();
+        for error in [expired, received] {
+            assert_eq!(reply(invoke_failure(error)), revalidate);
+        }
+        assert_eq!(
+            reply(connections::registry_failure(
+                registry::Failure::EvidenceExpired
+            )),
+            revalidate
+        );
+        for failure in [
+            registry::Failure::InsufficientScope,
+            registry::Failure::NotReady,
+        ] {
+            let error = owner::Error::from(failure);
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+            for error in [error, received] {
+                assert_eq!(reply(invoke_failure(error)), repair, "{failure:?}");
+            }
+        }
+        assert_eq!(
+            reply(invoke_failure(runtime::Failure::InsufficientScope.into())),
+            repair
+        );
     }
 }

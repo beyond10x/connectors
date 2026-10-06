@@ -300,7 +300,7 @@ types:
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
   - name: connectors.cli.NextAction
     kind: enum
-    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, none]
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3]
@@ -325,6 +325,16 @@ types:
       - {name: stage, type: "connectors.cli.FailureStage"}
       - {name: next_action, type: "connectors.cli.NextAction"}
       - {name: service_code, type: "Optional<connectors.service_wire.ErrorCode>"}
+      # ESS-LIMIT: service_reason is at most 256 bytes of admitted provider text, present only
+      # beside service_code or on a provider forbidden (contracts/cli/v1alpha1/semantics.md).
+      # As for instance_id below, ESS declares no invariant on a CLI type, so the bound, the
+      # redaction and the presence rule are enforced by the host and pinned by tests.
+      - {name: service_reason, type: "Optional<String>"}
+      # ESS-LIMIT: retry_after_seconds is the provider's Retry-After delay in whole seconds
+      # (0 to 4294967295), present only beside service_code = rate_limited
+      # (contracts/cli/v1alpha1/semantics.md). ESS declares no invariant on a CLI type, so the
+      # range and the presence rule are enforced by the host and pinned by tests.
+      - {name: retry_after_seconds, type: "Optional<Integer>"}
       - {name: connection, type: "Optional<String>"}
       - {name: acquisition, type: "Optional<String>"}
       - {name: request_id, type: "Optional<String>"}
@@ -615,6 +625,7 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: family, type: "Optional<String>"}
       - {name: limit, type: "Optional<Integer>"}
       - {name: cursor, type: "Optional<String>"}
   - name: connectors.cli.OperationListResult
@@ -881,7 +892,7 @@ commands:
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
     # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:374) and the host
-    # removal path (er.rs:3789-3791) only expires Active cursors. The error name is
+    # removal path (er.rs:3797-3799) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

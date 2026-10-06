@@ -1,4 +1,4 @@
-format: ess/15
+format: ess/18
 system: connectors
 # ESS model version; implemented v1alpha1 and proposed v1alpha2 wire versions are independent.
 version: v1
@@ -22,6 +22,7 @@ domains:
   - connectors.discovery_state
   - connectors.datasource_reads
   - connectors.websearch
+  - connectors.feed
   - connectors.artifact_provenance
   - connectors.auth_bindings
   - connectors.cli

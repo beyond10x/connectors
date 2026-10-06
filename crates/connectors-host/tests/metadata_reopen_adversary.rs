@@ -68,10 +68,19 @@ fn copy_store(from: &Path, to: &Path) {
         .pragma_update(None, "journal_mode", "WAL")
         .unwrap();
     fs::write(to.join("metadata.lock"), b"").unwrap();
-    for name in [NAME, "metadata.lock"] {
+    let mut names = vec![NAME, "metadata.lock"];
+    // The registry's durable clock floor is part of the state directory; a copy
+    // without it refuses every sample within one interval of the recorded floor.
+    if from.join(FLOOR).exists() {
+        fs::copy(from.join(FLOOR), to.join(FLOOR)).unwrap();
+        names.push(FLOOR);
+    }
+    for name in names {
         fs::set_permissions(to.join(name), fs::Permissions::from_mode(0o600)).unwrap();
     }
 }
+
+const FLOOR: &str = "registry-clock.floor";
 
 fn events(path: &Path) -> Vec<(i64, String, String)> {
     let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();

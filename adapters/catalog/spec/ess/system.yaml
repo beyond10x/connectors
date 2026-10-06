@@ -1,0 +1,5 @@
+format: ess/22
+system: connectors_catalog
+version: v1
+domains:
+  - connectors_catalog.feed

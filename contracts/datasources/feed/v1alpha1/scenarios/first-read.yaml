@@ -1,0 +1,68 @@
+# A first read: no watermark, and every item the container holds is returned with
+# its revision. The read is bounded to one item, so the second is reached only by
+# reading again from the watermark the first page returned; a watermark that passes
+# an undelivered item loses it. See ../semantics.md, Items and Watermarks and delivery.
+type: ess-scenario/1
+domain: connectors.feed
+scenario: first-read
+summary: A first read bounded to one item per page reaches every item the container holds, each with its revision.
+timeline:
+- at: '2026-10-06T09:00:00Z'
+  command: connectors.feed.AddContainer
+  input:
+    container_id: team-room
+    connection_ref: workspace-a
+    name: Team room
+    kind: channel
+    visibility: public
+  outcome: added
+  events:
+  - event: connectors.feed.ContainerAdded
+- at: '2026-10-06T09:00:01Z'
+  command: connectors.feed.AddItem
+  input:
+    item_id: item-1
+    container_id: team-room
+    revision: r1
+    created_at: '2026-10-06T09:00:01Z'
+  outcome: added
+  events:
+  - event: connectors.feed.ItemAdded
+- at: '2026-10-06T09:00:02Z'
+  command: connectors.feed.AddItem
+  input:
+    item_id: item-2
+    container_id: team-room
+    revision: r1
+    created_at: '2026-10-06T09:00:02Z'
+  outcome: added
+  events:
+  - event: connectors.feed.ItemAdded
+- at: '2026-10-06T09:00:03Z'
+  command: connectors.feed.ReadItems
+  input:
+    container_id: team-room
+    limit: 1
+  outcome: read
+assert:
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  contains:
+    item_id: item-1
+    container_id: team-room
+    revision: r1
+    state: Present
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  contains:
+    item_id: item-2
+    container_id: team-room
+    revision: r1
+    state: Present
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  counts:
+    at_most: 2

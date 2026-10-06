@@ -545,8 +545,9 @@ dependencies = [
 
 [[package]]
 name = "connectors"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
+ "async-trait",
  "base64 0.23.1",
  "clap",
  "connectors-cli-contract",
@@ -563,11 +564,14 @@ dependencies = [
 
 [[package]]
 name = "connectors-build"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
+ "async-trait",
  "clap",
  "connectors-catalog",
  "connectors-catalog-provider",
+ "connectors-core",
+ "connectors-sdk",
  "connectors-spec",
  "entity-core 0.26.0",
  "ess-compiler",
@@ -589,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "connectors-core",
  "hex",
@@ -604,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-catalog-provider"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -618,6 +622,7 @@ dependencies = [
  "entity-store",
  "eventlog-core",
  "hex",
+ "httpdate",
  "libc",
  "rcgen",
  "ring",
@@ -646,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-client"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "connectors-core",
  "futures-util",
@@ -659,7 +664,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-conformance"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "clap",
  "connectors-cli-contract",
@@ -674,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-contracts"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -682,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-core"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "hex",
  "serde",
@@ -693,7 +698,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-host"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -734,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-kubernetes"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -760,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sdk"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -777,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-spec"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "clap",
  "connectors-core",
@@ -793,7 +798,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-sql"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -820,7 +825,7 @@ dependencies = [
 
 [[package]]
 name = "connectors-tavily"
-version = "0.30.0"
+version = "0.31.0"
 dependencies = [
  "async-trait",
  "clap",
@@ -3264,7 +3269,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.3",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -3723,9 +3728,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.27.0"
+version = "1.26.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97277d36b9c3ace13e58fa6e753f8b0bbbf302a18dd193240d70f9e29681059a"
+checksum = "2ef6dac1e96601b4fb3acccccff2139741fcb757cb9a36089bf5be91cfb285ce"
 dependencies = [
  "getrandom 0.4.3",
  "js-sys",

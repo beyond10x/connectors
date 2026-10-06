@@ -414,6 +414,8 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: family
+        source: {kind: option, long: family}
       - field: limit
         source: {kind: option, long: limit}
       - field: cursor

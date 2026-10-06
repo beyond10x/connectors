@@ -23,8 +23,12 @@ fn admitted_read(
     }
     // Custody is only a bounded observation here. The captured material and
     // current fence are checked separately at the final dispatch boundary.
-    if observation::readiness(tx, &row, now, true)? != State::Ready {
-        return Err(Failure::NotReady);
+    // Published material that is only `pending` has an intact credential whose
+    // validation evidence is no longer current (`observation::readiness`).
+    match observation::readiness(tx, &row, now, true)? {
+        State::Ready => {}
+        State::Pending if row.material.is_some() => return Err(Failure::EvidenceExpired),
+        _ => return Err(Failure::NotReady),
     }
     let baseline = row.baseline.as_ref().ok_or(Failure::MetadataUnavailable)?;
     if !required_scopes.is_empty()

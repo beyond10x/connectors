@@ -551,6 +551,81 @@ Provider strings never bypass safe message projection. Failure has a safe stage
 and next-action enum, plus optional opaque correlation refs under current result
 access; it never contains raw provider evidence or custody references.
 
+`Failure.service_reason` is the one provider text a failure may carry, and only
+in this admitted form. It appears on `operations invoke` of a read, at
+`stage = dispatch`, when the provider refused the dispatched request: beside
+`service_code`, or on the provider's own `forbidden`. It is absent otherwise,
+and absent unless every rule below holds:
+
+- **Source.** The provider adapter read it from the refusal's response body, and
+  only from the first of the top-level `message`, `error_description` and
+  `error` members of a JSON object body that holds a string. A header, a nested
+  member (`error.message`), an array, any other member and a body that is not a
+  JSON object are never read. Today only the catalog provider supplies one.
+- **Shape.** Whitespace runs are folded to one space and the ends trimmed. The
+  reason is withheld when it is empty, or when its first 4096 bytes hold a
+  control character (Unicode Cc), any format character (Unicode Cf, as of
+  Unicode 16.0: U+00AD, U+0600–U+0605, U+061C, U+06DD, U+070F, U+0890–U+0891,
+  U+08E2, U+180E, U+200B–U+200F, U+202A–U+202E, U+2060–U+2064, U+2066–U+206F,
+  U+FEFF, U+FFF9–U+FFFB, U+110BD, U+110CD, U+13430–U+1343F, U+1BCA0–U+1BCA3,
+  U+1D173–U+1D17A and the TAG block U+E0000–U+E007F), or another character that
+  renders as nothing and can carry hidden data (U+034F, U+115F–U+1160, U+3164,
+  U+FFA0, and the variation selectors U+FE00–U+FE0F and U+E0100–U+E01EF).
+- **No personal data or secret shape.** The reason is withheld whole, never
+  partly masked, when its first 4096 bytes hold an `@` (or U+FF20, U+FE6B), so
+  no email address is ever carried; or, without regard to ASCII case, a header-
+  or credential-like marker (`authorization`, `bearer`, `basic `, `password`,
+  `passwd`, `secret`, `cookie`, `api_key`, `apikey`, `api-key`, `private_key`,
+  `private key`, `-----begin`, `token=`, `token:`, `access_token`,
+  `refresh_token`, `id_token`, `client_assertion`, `signature=`, `sig=`,
+  `session=`); or a token-like run: a maximal run of ASCII letters, digits and
+  `-_+/=.~` that is at least 32 bytes long, or at least 20 bytes long and holds
+  both a letter and a digit; or a token-like word: a space-separated word of at
+  least 16 bytes that holds a digit, or whose ASCII letters change case at
+  least once per four letters. UUIDs, long numbers and request identifiers are
+  withheld by these rules too.
+- **Not the request's credential.** The adapter child withholds a reason that
+  holds any piece of the credential value it derived and sent (an HTTP basic
+  header value, an OAuth access token), and the host admits the reason again
+  after the child returns it, withholding it when it holds any piece of any
+  string value of the protected document the call carried (the whole document,
+  when it is not JSON or holds no string). A piece is eight consecutive bytes
+  compared without regard to ASCII case, or eight consecutive ASCII letters and
+  digits compared lowercased with every other character removed from both
+  sides, so an echo with changed separators matches; a value shorter than
+  eight counts whole. The reason is also read with its `%XX` escapes decoded.
+- **Bound.** It is at most 256 bytes of UTF-8. A longer reason is cut on a
+  character boundary and then back to its last whole space-separated word; one
+  whose first word does not fit is withheld.
+
+The reason is text for a person reading why the provider refused, such as the
+missing token scope behind an `unauthorized`. It never decides `code`, `stage`
+or `next_action`, and a client must not parse it. A guarded write's failure, a
+connection probe's answer and every other route carry none.
+
+`Failure.retry_after_seconds` is the delay a provider named before a
+rate-limited read may be sent again, so the caller can wait. It appears on
+`operations invoke` of a read, at `stage = dispatch`, only beside
+`service_code = rate_limited`, and only when the provider's `429` carried a
+`Retry-After` the adapter could read: delta-seconds, or an HTTP-date counted
+from when the answer arrived and rounded up to a whole second (a date already
+past is `0`). It is a whole number of seconds from 0 to 4294967295; a value
+outside that range, or in any other form, is not read: the adapter does not
+read it, and the host drops one an adapter reports, keeping the failure. Two
+`Retry-After` field lines on one answer that disagree name no delay; identical
+repeats count as one. Its absence beside `rate_limited` states that the
+provider named no delay the adapter could read.
+Before refusing, the catalog provider sends such a read once more after the
+named delay, never more than once, and only when the wait, then a second
+request as long as the first one took, then a 500 ms margin, all end before
+the invocation's deadline. The second request is bounded by the deadline less
+that margin; if it does not finish, the first answer's refusal and delay
+stand. A failure carrying `retry_after_seconds` therefore names a delay that
+did not leave such time, a delay whose second request did not finish, or the
+delay the second `429` named. A guarded write is never sent again and carries
+none. The field never decides `code`, `stage` or
+`next_action`.
+
 The stage names who refused, because the same code can come from either side.
 A refusal made before any provider request — by the host's admission (an
 unknown adapter alias included), or by an adapter from its own configured
@@ -587,6 +662,17 @@ the Kubernetes token review) is classified separately and not by this rule: a
 `service_code = upstream_protocol` at `dispatch` and
 `next_action = retry_explicitly`.
 
+A read on `operations invoke` refused before dispatch only because the
+connection's validation evidence expired, while its credential is intact (the
+connection reports `pending`), is `code = not_granted` at `stage = admission`
+with `next_action = revalidate_connection`. `connections revalidate`
+recollects the evidence from the credential already in custody, with no
+re-entry, and the same invoke is then admitted. The invoke never revalidates
+on its own: a business read runs no implicit identity probe. A connection whose
+credential expired or is known invalid (`reauthorization_required`), and a
+credential below the operation's scopes, keep `code = not_granted` with
+`next_action = repair_connection`.
+
 A provider's timeout or capacity answer is the provider's too: a request the
 provider transport sent whose deadline then passed (a connection probe's
 included, and one that passes while the provider's answer is still being
@@ -597,7 +683,8 @@ report `timeout` / `capacity` at `stage = dispatch` with
 and is not one of them. The host's own deadline and limits, and an adapter's
 own connect or work deadline and result bounds, keep `stage = admission`
 (`retry_explicitly`). An HTTP 429 stays `service_failure` with
-`service_code = rate_limited`. `unsupported` is always `admission`: every
+`service_code = rate_limited`, and with `retry_after_seconds` when the provider
+named a delay. `unsupported` is always `admission`: every
 source of it is raised before dispatch.
 
 A guarded write's failure carries its `mutation` record, and its stage follows
@@ -646,3 +733,26 @@ durable stop suppression; actual readiness/timeout/isolation; and still-valid
 credential reuse across both process restarts. New ESS and deterministic output
 must be revalidated using the selected exact current-source ESS toolchain. An
 older release binary is provisional authoring evidence only.
+
+## Operations by family
+
+`operations list --family CONTRACT` answers only the listed operations whose
+descriptor `contract` is exactly `CONTRACT`, each with its `id`, `contract` and
+native `profile`. It is how a consumer finds a shared family on a saved connection
+without knowledge of the provider: a connection is selected by the `--adapter`
+alias it was made under (§1), and the operations it can be invoked with are that
+adapter's cached description, so the consumer lists them with the same alias, then
+describes and invokes the family's fixed operation ids. For
+[datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/semantics.md) these
+are `feed.containers` and `feed.items` under one profile. An adapter added or
+upgraded after the consumer was built is found the same way once its description
+is cached.
+
+The filter narrows the same selection `operations list` already answers: an
+operation the configuration does not grant stays hidden, and the cursor is bound
+to the family as well as the adapter, revision and granted operations, so a
+cursor issued under one filter refuses as `stale_cursor` under another. A family
+no listed operation binds answers an empty page, a truthful negative observation,
+not `not_found`. The value is matched exactly; one that is empty, longer than 128
+bytes or holds a character other than ASCII letters, digits, `-`, `_`, `.` and
+`/` refuses as `invalid_input` before the cached description is read.

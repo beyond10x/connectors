@@ -10,7 +10,7 @@
 |---|---|
 | Contract | `catalog/v1alpha1` |
 | Realizations | `index` (a directory of bundles plus one index file, no process), `service` (an adapter service answering the operations below over the ordinary wire) |
-| Companion profile | `operations/v1alpha1` `generic-http`; paged variant `datasource.records/v1alpha1` `generic-http-page` |
+| Companion profile | `operations/v1alpha1` `generic-http`; paged variant `datasource.records/v1alpha1` `generic-http-page`; declared `datasource.feed/v1alpha1` bindings (section 3.3) |
 | Relation to `operations/v1alpha1` | catalog operations are ordinary read operations; the catalog is optional and grants nothing (`docs/design.md:39,147,325,1006`) |
 
 A catalog answers three questions: which reviewed adapter definitions exist, with what provenance, and which artifact (by digest) realizes each. It never answers whether a caller may invoke anything; execution authority is unchanged whether a service was found directly or through a catalog (`docs/design.md:1006`). Bundles are data; the executable they name is separate trust (`docs/design.md:808`).
@@ -113,7 +113,7 @@ Status to safe `ErrorCode` for **generic reads only** (base vocabulary in `crate
 | 403 | `Forbidden` |
 | 404, 410 | `NotFound` |
 | 409, 412 | `InvalidInput` |
-| 429 | `RateLimited`, `retry_after_seconds` from `Retry-After` when present |
+| 429 | `RateLimited`, `retry_after_seconds` from `Retry-After` when it is delta-seconds or an HTTP-date (whole seconds from 0 to 4294967295, a date rounded up and a past date `0`); absent otherwise, and when two `Retry-After` field lines disagree (the transport combines repeated lines, RFC 9110 §5.3; identical repeats count as one) |
 | 5xx, connection refused, TLS failure | `Unavailable` |
 | deadline exceeded | `Timeout` |
 | non-JSON body, oversize body, redirect | `UpstreamProtocol` |
@@ -123,6 +123,60 @@ The public `Error.message` is a host-selected safe classification, bounded to 51
 For **generic mutations**, status alone does not prove business-effect knowledge. Use the mutation contract’s admitted `not_attempted`, proven `refused`, known `applied`, or conservative `unknown` observation. Ambiguous 5xx, lost responses, malformed or oversized replies after possible dispatch give `outcome_unknown` unless independent definitive evidence exists, with a safe secondary cause. A provider 409/412 is not the receiver’s `idempotency_conflict`; that code belongs exclusively to a conflict in its admitted key namespace. Any definitive refusal mapping must prove no business effect under the selected operation semantics.
 
 Profile selection is singular: a generic operation whose curation declares `external_write` selects `mutation` with `realization: generic` and all its rules. A mapping that declares `pagination` is exposed as `datasource.records/v1alpha1` profile `generic-http-page` (items from the declared items pointer, cursor from the page or cursor parameter, `complete` from the declared end condition) instead of `generic-http`.
+
+### 3.3 Declared feed bindings
+
+**Status:** implemented in `adapters/catalog/src/feed.rs`; held to the `feed-binding` suite by `crates/connectors-build/src/catalog_feed_conformance.rs`.
+
+A provider binds [datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/semantics.md) as data: the optional `feed` of its `connectors-catalog-operations/1` selection file. The engine then answers `feed.containers` and `feed.items`, each with `contract: datasource.feed/v1alpha1` and the declaration's `profile`, from operations of the provider's pinned bundle. No provider has Rust of its own. The declaration is modelled in [adapters/catalog/spec/ess/domains/feed.yaml](../../../adapters/catalog/spec/ess/domains/feed.yaml); a pointer is an RFC 6901 JSON pointer, a parameter a query parameter of the operation it is named for.
+
+```json
+{
+  "profile": "<native profile id>",
+  "max_limit": 100,
+  "containers": {
+    "operation_id": "<list>", "query": {"<name>": "<fixed value>"},
+    "limit": "<parameter>", "cursor": {"parameter": "<parameter>", "next": "<pointer>"},
+    "records": "<pointer>", "id": "<pointer>", "name": "<pointer>", "kind": "<pointer>",
+    "visibility": {"pointer": "<pointer>", "map": {"<provider value>": "public | private | direct"}},
+    "lookup": {"operation_id": "<get one>", "parameter": "<parameter>", "record": "<pointer>"}
+  },
+  "items": {
+    "operation_id": "<list>", "container": "<parameter>", "query": {}, "limit": "<parameter>",
+    "position": {"kind": "time", "value": {"parameter": "<parameter>"}},
+    "records": "<pointer>", "id": "<pointer>", "revision": "<pointer>",
+    "created_at": "<pointer>", "updated_at": "<pointer>",
+    "author": {"id": "<pointer>", "display_name": "<pointer>"},
+    "body": {"pointer": "<pointer>", "representation": "<name>"},
+    "url": "<pointer>", "parent": "<pointer>",
+    "deleted": {"pointer": "<pointer>", "equals": "<JSON value>"}
+  }
+}
+```
+
+`query`, `name`, `visibility`, `author`, `display_name`, `url`, `parent` and `deleted` are optional. Every named operation must be a GET under the base path, every named parameter one its operation takes, no parameter bound twice, every required parameter bound on every request, and a resume parameter not required; otherwise the selection file is refused when it loads, before any request.
+
+| Concern | Rule |
+|---|---|
+| Containers | One provider page per call: `limit` (default `max_limit`) and the provider's cursor, which comes back at `cursor.next`. An absent, null or empty `next` is `complete: true`. `next_cursor` wraps the provider's cursor with the profile and the instance. |
+| Visibility and direct conversations | The value at `visibility.pointer`, as text, is looked up in `map`; a value the map does not name, and a record with none, is `private`. A container mapped to `direct` is never listed. `feed.items` first reads the container through `lookup`; a 404 or 410 and a container mapped to `direct` both answer `not_found` with the same message. |
+| Watermark: `time` | The provider lists items at or after `parameter` (inclusive), oldest `updated_at` first; any fixed ordering parameter goes in `query`. The watermark is the last returned item's `updated_at`, sent back unchanged as that filter, and the `(id, revision)` pairs already returned at that instant, which are skipped on resume. The engine asks for `limit` plus that many records, so a page of unseen items stays within reach. An answer out of `updated_at` order, or before the filter, is `unavailable`. `complete` is true when the provider answered fewer records than asked and none was held back. |
+| Watermark: `cursor` | The provider keeps a change cursor: `parameter` sends it, `next` reads the new one, `complete` is a condition on the answer. A cursor the provider refuses with a status listed in `stale` is `stale_cursor`. An answer with more records than `limit` is `unavailable`: its cursor is already past all of them. |
+| Watermark scope | Every watermark carries the format, the profile, the instance and the container. Any other, or one that is not a watermark, is `stale_cursor`, never a first read. A first read omits the resume parameter and reaches as far back as the provider lists. |
+| Items | `id` and `revision` are required scalars; `created_at` and `updated_at` required RFC 3339 instants. `deleted` is true when the value at its pointer equals `equals`; a tombstone has `body: null`. Without `deleted` the profile observes no deletions. `author` is null when its `id` is absent. `url` is kept only when it is `http(s)://`. |
+| Body | A records body envelope with the declared `representation`; the text at `body.pointer`, null or absent as empty text, clipped at 64 KiB on a UTF-8 boundary (`truncation: ["content_bytes"]`). A non-text value is `unavailable`. |
+| Ceilings | `limit` 1 to `max_limit` (at most 100), refused as `invalid_input` above it; watermark and listing cursor 16 KiB; serialized page 3 MiB (`unavailable` above it); `feed.containers` makes one provider request, `feed.items` two. |
+| Errors | Provider 400, 409, 412, 422 are `invalid_input`; 404, 410 `not_found`; 401, 403, 429 and 5xx as the generic read table; any other status and any body that is not JSON `unavailable`. Provenance is `instance`, `profile` and `received_at`. |
+
+What a declaration cannot express, each a reviewed extension of this shape rather than per-provider code:
+
+- container or item listings paged by page number or offset, by a response header (`Link`), or by the last record's key;
+- a time filter that is exclusive, takes another format than the provider's own `updated_at` text, or is sent in a body or a query language (a `jql` or `cql` clause); a provider answering newest first with no way to ask otherwise;
+- an item endpoint per container type, or a container that is not one list request plus one lookup;
+- a fixed `kind` word for providers whose records carry none; visibility from more than one field; `direct` containers declared readable;
+- a revision derived by the engine (a digest of the mapped fields) where the provider gives no version or edit time; deletions observed other than as a record the list returns;
+- a body built from several fields, or anything but text, and an `author` or `parent` that is not one scalar field;
+- binding a watermark to the connection rather than the instance: the engine is not told which connection it reads through.
 
 ## 4. Rules
 
@@ -136,7 +190,7 @@ Profile selection is singular: a generic operation whose curation declares `exte
 - Deterministic: identical inputs and toolchain produce identical bundles and an identical index digest (`spec-kinds/adapter/v2/semantics.md:52-55`).
 - Refusal by name: an unknown bundle or index format version is refused before any record is served.
 - Engine discipline: the request is built only from the mapping, the validated input, and the host-injected credential capability; the caller supplies no URL, method, header, or path; body comes from the declared template with `$param` splices only; the response is bounded; redirects are not followed; one hop.
-- Unary only: the generic profile serves unary HTTP operations; datasources beyond `generic-http-page`, events, channels, discoveries and acquisition are not served by the engine (old `integration-catalog` exclusions preserved).
+- Unary only: the generic profile serves unary HTTP operations; datasources beyond `generic-http-page` and a declared `datasource.feed/v1alpha1` binding (section 3.3), events, channels, discoveries and acquisition are not served by the engine (old `integration-catalog` exclusions preserved).
 - Public authentication metadata: bundle files, descriptors, indexes and catalog outputs may name safe auth-profile identifiers and configuration requirements, but contain neither credential values nor actual runtime credential locators (custody/version references, environment-variable names, filesystem paths or secret-store addresses). A schema may describe a protected configuration slot; it cannot populate that slot with a deployment's credential location. The receiving host owns those private bindings and injects an admitted capability at runtime. Reject an artifact violating this boundary before publication or serving; value freedom alone is insufficient.
 
 ## 5. Ordering and limits
@@ -148,7 +202,7 @@ Profile selection is singular: a generic operation whose curation declares `exte
 | Generic request | 256 KiB including the extended envelope; selected first-profile ceiling |
 | Generic result | 4 MiB including envelope and metadata; a provider body too large to fit gives safe `UpstreamProtocol` for reads; mutations preserve actual effect knowledge |
 | Generic deadlines | 40 s total execution, 30 s provider within it, 5 s connect within provider time; advertised through Operation.limits. No independent budget reset or silent clipping to the legacy 20 s execution limit |
-| Retry | none by the engine; `RateLimited` carries `retry_after_seconds` for the caller |
+| Retry | none by the engine: it sends exactly one request. The local catalog provider sends a read answered `429` once more after the `retry_after_seconds` it names, never a third time, and only when the wait, a second request as long as the first one took and a 500 ms margin all end before the invocation deadline. The second request is bounded by the deadline less 500 ms; if it does not finish, the first answer's `RateLimited` with its `retry_after_seconds` stands; otherwise, and for every write, `RateLimited` carries `retry_after_seconds` for the caller |
 | Refresh | never on read; only by the refresh tool |
 
 The [service compatibility limits](../../service/compatibility.md#7-limits-and-compatibility-obligations) own envelope accounting and admission. These new generic limits are not implemented legacy host capabilities. Catalog inventory reads use the ordinary read limits; only generic execution selects the generic ceilings.
@@ -161,7 +215,7 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 - Tamper: change one byte of a bundle file → `catalog.bundle.describe` returns `Unavailable` naming the file; the index generation is not served.
 - Format refusal: an index with format version `v9` → `Unsupported` before any record is served.
 - Credential-location refusal: a bundle/descriptor/index containing `{ "kind": "environment", "name": "ZENDESK_TOKEN" }` or a real custody/file locator → refused before publication or catalog disclosure, even though it contains no secret bytes. A safe auth-profile requirement and an unpopulated protected-slot schema are permitted; they grant no credential access.
-- Read engine: fixture 200 with JSON → `body` structurally identical, `provenance.resource` carries parameter names not values; 429 with `Retry-After: 7` → `RateLimited`, `retry_after_seconds: 7`; 404 → `NotFound`; 500 → `Unavailable`; `text/html` body → `UpstreamProtocol`; body that exceeds the total response budget after metadata/envelope accounting → `UpstreamProtocol`; 302 → `UpstreamProtocol` and no second request.
+- Read engine: fixture 200 with JSON → `body` structurally identical, `provenance.resource` carries parameter names not values; 429 with `Retry-After: 7`, or with an HTTP-date seven seconds ahead → `RateLimited`, `retry_after_seconds: 7`, one request; 429 with `Retry-After: soon` or none → `RateLimited` without `retry_after_seconds`; 404 → `NotFound`; 500 → `Unavailable`; `text/html` body → `UpstreamProtocol`; body that exceeds the total response budget after metadata/envelope accounting → `UpstreamProtocol`; 302 → `UpstreamProtocol` and no second request.
 - Engine discipline: an input containing a URL-shaped string in a path parameter is percent-encoded into its segment; the fixture observes exactly one request to the declared path.
 - Paged: a mapping with `pagination.page` → `generic-http-page` returns `complete: true` when the fixture returns fewer items than the page size; the cursor is opaque and bound to the input digest.
 - No network: run generation and every catalog operation with a network sentinel; zero connections (old `tests/main/no_network.rs` shape).
@@ -171,6 +225,7 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 ## 7. Compatibility
 
 - New contract; new profile strings `generic-http` and `generic-http-page`.
+- `connectors-catalog-operations/1` gains the optional `feed` (section 3.3). A selection file without it loads, and its configuration revision is computed, exactly as before; one with it is refused by a reader older than this section, which denies unknown fields.
 - [Service compatibility](../../service/compatibility.md) owns the extended descriptor fields, singular profile, auth alternatives and generic limits. These require the proposed `v1alpha2` codec. Index, adapter-kind, bundle and configuration readers retain their own independent version decisions; a service-wire bump does not extend them.
 - Old `catalog/<id>.catalog.json` documents and `catalog.pack` bytes are not preserved (`docs/design.md:911`). Old operation ids are preserved only where the migration contract selects them (`docs/design.md:1095`).
 - The published `codewandler-connector-catalog-reader` crate has no successor in this design; its consumers need an explicit migration decision (`docs/design.md:151`).

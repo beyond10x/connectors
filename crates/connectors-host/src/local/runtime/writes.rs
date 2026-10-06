@@ -142,6 +142,8 @@ pub(super) fn serve_write(
                 &Reply::Failed {
                     request_id: id,
                     code,
+                    reason: None,
+                    retry_after_seconds: None,
                 },
                 None,
                 &[],

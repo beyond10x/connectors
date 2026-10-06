@@ -17,6 +17,8 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
+#[cfg(test)]
+pub(crate) use transport::bound_allocator;
 pub use transport::{Capture, Client, WriteClient, serve};
 
 const VERSION: &str = "connectors-owner/1";
@@ -75,12 +77,27 @@ pub struct Error {
     pub acquisition: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service_code: Option<connectors_core::ErrorCode>,
+    /// The upstream's own bounded, redacted reason for a dispatched read it
+    /// refused (`runtime::Refusal`); only beside a `service_code` or on a
+    /// provider `forbidden`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_reason: Option<String>,
+    /// The delay in whole seconds the provider named on a dispatched read it
+    /// answered as rate limited (`runtime::Refusal`); only beside
+    /// `service_code = rate_limited`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry_after_seconds: Option<u64>,
     #[serde(default, skip_serializing_if = "Origin::is_host")]
     pub origin: Origin,
     /// The connection's authentication changed under the configuration; only a
     /// new connection helps (`registry::Failure::BindingChanged`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reconnect: bool,
+    /// A `not_granted` read whose connection's validation evidence expired
+    /// while its credential is intact; a revalidation helps, not a repair
+    /// (`registry::Failure::EvidenceExpired`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub revalidate: bool,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -88,8 +105,11 @@ impl From<Code> for Error {
             code,
             acquisition: None,
             service_code: None,
+            service_reason: None,
+            retry_after_seconds: None,
             origin: Origin::Host,
             reconnect: false,
+            revalidate: false,
         }
     }
 }
@@ -124,10 +144,11 @@ impl From<registry::Failure> for Error {
             F::InvalidInput => Code::InvalidInput,
             F::StaleCursor => Code::StaleCursor,
             F::Capacity => Code::Capacity,
-            F::NotReady | F::InsufficientScope => Code::NotGranted,
+            F::NotReady | F::EvidenceExpired | F::InsufficientScope => Code::NotGranted,
             F::CustodyUnavailable => Code::CustodyUnavailable,
         });
         error.reconnect = reconnect;
+        error.revalidate = e == F::EvidenceExpired;
         error
     }
 }
@@ -183,9 +204,30 @@ impl From<runtime::Failure> for Error {
             code,
             acquisition: None,
             service_code,
+            service_reason: None,
+            retry_after_seconds: None,
             origin,
             reconnect: false,
+            revalidate: false,
         }
+    }
+}
+impl From<runtime::Refusal> for Error {
+    /// The failure's projection, with the upstream's reason kept only beside
+    /// a `service_code` or on the provider's own `forbidden`; a provider
+    /// timeout or capacity answer carries none. The delay the provider named
+    /// is kept only beside `service_code = rate_limited`, and only within
+    /// 0..=4294967295 seconds.
+    fn from(refusal: runtime::Refusal) -> Self {
+        let forbidden = refusal.failure == runtime::Failure::ProviderForbidden;
+        let mut error = Error::from(refusal.failure);
+        if error.service_code.is_some() || forbidden {
+            error.service_reason = refusal.reason;
+        }
+        if error.service_code == Some(connectors_core::ErrorCode::RateLimited) {
+            error.retry_after_seconds = runtime::admitted_delay(refusal.retry_after_seconds);
+        }
+        error
     }
 }
 fn until(deadline: u64) -> Result<Instant> {
@@ -452,7 +494,9 @@ pub fn admit_launch(
 /// connection's own observation reports it; never a grant refusal.
 fn launch_failure(error: registry::Failure) -> Error {
     match error {
-        registry::Failure::NotReady => Code::Unavailable.into(),
+        registry::Failure::NotReady | registry::Failure::EvidenceExpired => {
+            Code::Unavailable.into()
+        }
         error => error.into(),
     }
 }

@@ -103,6 +103,158 @@ mod failure_tests {
         assert!(serde_json::from_str::<Failure>(r#"{"provider":"unreviewed_code"}"#).is_err());
     }
 
+    /// story:service-failure-carries-upstream-reason.
+    #[test]
+    fn a_providers_reason_crosses_the_private_boundary_only_beside_its_own_answer() {
+        use crate::local::owner::{Code, Error};
+        let scope = "Unauthorized; scope does not match";
+        let answered = |code| {
+            connectors_core::Error::new(code, "private-provider-message")
+                .answered()
+                .with_upstream_reason(Some(scope.into()))
+        };
+        let refusal = Refusal::from_provider(answered(ErrorCode::Unauthorized));
+        assert_eq!(refusal.failure, Failure::InvalidCredential);
+        assert_eq!(refusal.reason.as_deref(), Some(scope));
+        let error: Error = refusal.into();
+        assert_eq!(error.code, Code::ServiceFailure);
+        assert_eq!(error.service_code, Some(ErrorCode::Unauthorized));
+        assert_eq!(error.service_reason.as_deref(), Some(scope));
+        let bytes = serde_json::to_string(&error).unwrap();
+        assert_eq!(
+            bytes,
+            r#"{"code":"service_failure","service_code":"unauthorized","service_reason":"Unauthorized; scope does not match"}"#
+        );
+        let back: Error = serde_json::from_str(&bytes).unwrap();
+        assert_eq!(back.service_reason.as_deref(), Some(scope));
+        // A provider 403 keeps its reason beside its provider origin.
+        let refused: Error = Refusal::from_provider(answered(ErrorCode::Forbidden)).into();
+        assert_eq!(refused.code, Code::Forbidden);
+        assert_eq!(refused.service_reason.as_deref(), Some(scope));
+        // A failure the host reports as its own carries none: a 5xx reads as
+        // unavailability, and an adapter's own refusal is not the provider's.
+        let unavailable: Error = Refusal::from_provider(answered(ErrorCode::Unavailable)).into();
+        assert_eq!(unavailable.code, Code::Unavailable);
+        assert_eq!(unavailable.service_reason, None);
+        let raised = Refusal::from_provider(
+            connectors_core::Error::new(ErrorCode::Unauthorized, "configured")
+                .with_upstream_reason(Some(scope.into())),
+        );
+        assert_eq!(raised.reason, None);
+        assert_eq!(
+            Error::from(Refusal::from(Failure::Protocol)).service_reason,
+            None
+        );
+        // The private reply carries the reason only when there is one, so a
+        // failure without one keeps its earlier bytes.
+        let without = Reply::Failed {
+            request_id: "r".into(),
+            code: Failure::InvalidCredential,
+            reason: None,
+            retry_after_seconds: None,
+        };
+        assert_eq!(
+            serde_json::to_string(&without).unwrap(),
+            r#"{"kind":"failed","request_id":"r","code":"invalid_credential"}"#
+        );
+        let with: Reply = serde_json::from_str(
+            r#"{"kind":"failed","request_id":"r","code":"invalid_credential","reason":"Unauthorized; scope does not match"}"#,
+        )
+        .unwrap();
+        assert!(matches!(with, Reply::Failed { reason: Some(r), .. } if r == scope));
+    }
+
+    /// story:catalog-honours-retry-after: the delay a provider named on its
+    /// own rate-limit answer reaches the owner's failure beside
+    /// `service_code = rate_limited`, and nothing else carries one.
+    #[test]
+    fn a_named_delay_reaches_the_owner_only_beside_a_providers_rate_limit() {
+        use crate::local::owner::{Code, Error};
+        let delayed = |code, answered: bool| {
+            let mut error = connectors_core::Error::new(code, "provider refused the request");
+            if answered {
+                error = error.answered();
+            }
+            error.retry_after_seconds = Some(7);
+            error
+        };
+        let refusal = Refusal::from_provider(delayed(ErrorCode::RateLimited, true));
+        assert_eq!(refusal.failure, Failure::ProviderRateLimited);
+        assert_eq!(refusal.retry_after_seconds, Some(7));
+        let error: Error = refusal.into();
+        assert_eq!(error.code, Code::ServiceFailure);
+        assert_eq!(error.service_code, Some(ErrorCode::RateLimited));
+        assert_eq!(error.retry_after_seconds, Some(7));
+        let bytes = serde_json::to_string(&error).unwrap();
+        assert_eq!(
+            bytes,
+            r#"{"code":"service_failure","service_code":"rate_limited","retry_after_seconds":7}"#
+        );
+        let back: Error = serde_json::from_str(&bytes).unwrap();
+        assert_eq!(back.retry_after_seconds, Some(7));
+        // A rate limit the adapter raised itself, and any other answer, name none.
+        assert_eq!(
+            Refusal::from_provider(delayed(ErrorCode::RateLimited, false)).retry_after_seconds,
+            None
+        );
+        for code in [
+            ErrorCode::Unavailable,
+            ErrorCode::Unauthorized,
+            ErrorCode::Forbidden,
+        ] {
+            assert_eq!(
+                Refusal::from_provider(delayed(code.clone(), true)).retry_after_seconds,
+                None,
+                "{code:?}"
+            );
+        }
+        // The owner keeps a delay only beside the provider's rate limit.
+        let misplaced = Error::from(Refusal {
+            failure: Failure::InvalidCredential,
+            reason: None,
+            retry_after_seconds: Some(7),
+        });
+        assert_eq!(misplaced.retry_after_seconds, None);
+        // The private reply names the delay only when there is one.
+        let with: Reply = serde_json::from_str(
+            r#"{"kind":"failed","request_id":"r","code":"provider_rate_limited","retry_after_seconds":7}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            with,
+            Reply::Failed {
+                retry_after_seconds: Some(7),
+                ..
+            }
+        ));
+    }
+
+    /// The host admits a child's reason again, against the credential document
+    /// it sent: the child is not trusted to have redacted it.
+    #[test]
+    fn the_host_drops_a_childs_reason_that_carries_the_credential_or_is_unbounded() {
+        let secret = connectors_sdk::Secret(br#"{"token":"fixture-pat-one"}"#.to_vec());
+        let scope = "Unauthorized; scope does not match";
+        assert_eq!(
+            admitted(Some(scope.into()), &secret).as_deref(),
+            Some(scope)
+        );
+        for withheld in [
+            "Unauthorized for fixture-pat-one".to_owned(),
+            "Bearer abc".to_owned(),
+            format!("{}a", "abc ".repeat(64)),
+            "two\nlines".to_owned(),
+            String::new(),
+        ] {
+            assert_eq!(
+                admitted(Some(withheld.clone()), &secret),
+                None,
+                "{withheld:?}"
+            );
+        }
+        assert_eq!(admitted(None, &secret), None);
+    }
+
     #[test]
     fn a_provider_refusal_keeps_its_code_and_names_the_provider_as_origin() {
         use crate::local::owner::{Code, Error, Origin};
@@ -188,6 +340,63 @@ mod failure_tests {
         .into();
         assert_eq!(unsupported.origin, Origin::Host);
     }
+}
+
+/// A dispatched read's failure and, when it is the upstream's own answer, the
+/// bounded reason the upstream gave (`connectors_core::reason`). The failure
+/// stays the closed private code; the reason never decides anything.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Refusal {
+    pub failure: Failure,
+    pub reason: Option<String>,
+    /// The delay the upstream named before a rate-limited read may be sent
+    /// again, in whole seconds; only on [`Failure::ProviderRateLimited`].
+    pub retry_after_seconds: Option<u64>,
+}
+impl From<Failure> for Refusal {
+    fn from(failure: Failure) -> Self {
+        Self {
+            failure,
+            reason: None,
+            retry_after_seconds: None,
+        }
+    }
+}
+impl Refusal {
+    /// [`Failure::from_provider`], keeping the reason only of an upstream's
+    /// own answer, and the delay only of its rate-limit answer.
+    pub fn from_provider(error: connectors_core::Error) -> Self {
+        let reason = error
+            .upstream_reason
+            .as_deref()
+            .filter(|_| error.upstream_answer)
+            .and_then(connectors_core::reason::admit);
+        // Only the provider's own rate-limit answer names a delay.
+        let retry_after_seconds = error
+            .retry_after_seconds
+            .filter(|_| error.upstream_answer && error.code == ErrorCode::RateLimited);
+        Self {
+            failure: Failure::from_provider(error),
+            reason,
+            retry_after_seconds,
+        }
+    }
+}
+/// A child's named delay as the host accepts it: a whole number of seconds
+/// from 0 to 4294967295, the range the CLI contract gives
+/// `Failure.retry_after_seconds`. A larger value is not read; the failure
+/// itself still stands.
+pub(crate) fn admitted_delay(seconds: Option<u64>) -> Option<u64> {
+    seconds.filter(|seconds| *seconds <= u64::from(u32::MAX))
+}
+/// A child's reason as the host accepts it: already in admitted form, and
+/// holding no piece of the credential document the host sent for the call.
+/// Anything else is dropped; the failure itself still stands.
+pub(crate) fn admitted(reason: Option<String>, secret: &connectors_sdk::Secret) -> Option<String> {
+    reason.filter(|reason| {
+        connectors_core::reason::admit(reason).as_deref() == Some(reason.as_str())
+            && !connectors_core::reason::carries_credential(reason, &secret.0)
+    })
 }
 
 impl Failure {
@@ -508,5 +717,14 @@ enum Reply {
     Failed {
         request_id: String,
         code: Failure,
+        /// The upstream's admitted reason for a failed `invoke`; omitted when
+        /// there is none. Additive: a host that predates it refuses the reply.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reason: Option<String>,
+        /// The delay the upstream named before a rate-limited read may be
+        /// sent again, in whole seconds; only on a failed `invoke` whose code
+        /// is `provider_rate_limited`, and omitted when there is none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_after_seconds: Option<u64>,
     },
 }
