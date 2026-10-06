@@ -6,7 +6,44 @@ status: draft
 title: A pinned consumer is launched with one connection's credential on fd 3
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: cited
+  path: apps/connectors-cli-contract
+- confidence: cited
+  path: apps/connectors/spec/cli.yaml
+- confidence: inferred
+  path: apps/connectors/src/local.rs
+- confidence: cited
+  path: apps/connectors/src/local/connections.rs
+- confidence: cited
+  path: contracts/auth/custody/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/consumer-launch.md
+- confidence: inferred
+  path: contracts/cli/v1alpha1/fixtures/values.json
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: inferred
+  path: crates/connectors-build/src/ignored.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/config.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/registry/use_and_retirement.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/runtime.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/runtime/artifact.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/runtime/launch.rs
+- confidence: cited
+  path: docs/local-consumer-launch.md
+- confidence: cited
+  path: docs/local-postgres-cli.md
+- confidence: inferred
+  path: ess/domains/cli.yaml
+revision: 20
 ---
 ## Outcome
 
@@ -39,3 +76,21 @@ mimics only the Connectors verb.
 - An unlisted consumer/connection pair is refused.
 
 ## Files (from the design, unverified) `contracts/cli/v1alpha1/semantics.md`, new `contracts/cli/v1alpha1/consumer-launch.md`, `contracts/auth/custody/v1alpha1/semantics.md`, `apps/connectors/spec/cli.yaml`, `apps/connectors-cli-contract/*` (regenerated), `apps/connectors/src/local/connections.rs`, `crates/connectors-host/src/local/config.rs`, `crates/connectors-host/src/local/runtime/artifact.rs` (reuse; possibly expose `capture`), new `crates/connectors-host/src/local/runtime/launch.rs`, new `docs/local-consumer-launch.md`, `CHANGELOG.md`.
+
+## Open design questions (scoped 2026-10-06)
+
+Found 2026-10-06 by `story-scoper` against the tree (`9806140d7` + 0.29.0). The story came from a cortex design note and its Work does not hold as written on these points:
+
+| # | question | evidence |
+|---|---|---|
+| 1 | The `-- <args…>` passthrough cannot be expressed in the CLI spec: the pinned `ess-cli/1` (ESS 0.52.0) has only option, positional (one value each), document and protected sources. Either ESS gains a trailing-arguments source, or the parser is hand-written (against "regenerate, never hand-edit"). | ess 0.52.0 `crates/specify/ess-cli-contract/src/wire.rs:130-159`, `crates/generate/ess-cli-project/src/runtime.rs:318-322` |
+| 2 | Whether the generated handler can exec, pass stdio through and return the consumer's exit status; `call` returns a structured reply. | `apps/connectors/src/local.rs:59` |
+| 3 | Lapsed evidence answers `unavailable` (readiness), not `not_granted`; the Acceptance needs a contract decision. | `use_and_retirement.rs:26-27`, `connections.rs:164-165`, `contracts/cli/v1alpha1/semantics.md:502` |
+| 4 | "Registry use guard" is the `capture_read` → `dispatch_read` → `release_read` sequence, not a symbol. | `docs/local-runtime-foundation.md:84` |
+| 5 | How a launch obtains the `Binding` (provider authority + profile) without starting the adapter. | `registry.rs:81-87`, `runtime.rs:338`, `supervisor.rs:830` |
+| 6 | Which process may read the credential: every connection-credential read today happens in the owner process. | `supervisor.rs:840`, `owner/mutation/execution.rs:206` |
+| 7 | `execveat(AT_EMPTY_PATH)` is used nowhere; the adapter path runs `/proc/self/fd/N` through `Command`, and fd 3 is its channel. | `runtime/process.rs:36-63` |
+| 8 | Adding `[consumers]` may need a new config format (unknown fields refused; only `connectors-local/1` and `/2`). | `config.rs:30-31`, `:238`, `:252-264` |
+| 9 | A release must also update the website guides and CLI examples. | `AGENTS.md:114-117` |
+
+Questions 1, 5 and 6 are design decisions for this repository's owners (the custody model and the CLI contract); `decision-blocker:consumer-launch-design` holds the story until they are settled. Question 1 is filed upstream as an ESS gap.
