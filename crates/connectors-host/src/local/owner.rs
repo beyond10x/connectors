@@ -91,6 +91,11 @@ pub struct Error {
     /// new connection helps (`registry::Failure::BindingChanged`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reconnect: bool,
+    /// A `not_granted` read whose connection's validation evidence expired
+    /// while its credential is intact; a revalidation helps, not a repair
+    /// (`registry::Failure::EvidenceExpired`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub revalidate: bool,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -102,6 +107,7 @@ impl From<Code> for Error {
             retry_after_seconds: None,
             origin: Origin::Host,
             reconnect: false,
+            revalidate: false,
         }
     }
 }
@@ -136,10 +142,11 @@ impl From<registry::Failure> for Error {
             F::InvalidInput => Code::InvalidInput,
             F::StaleCursor => Code::StaleCursor,
             F::Capacity => Code::Capacity,
-            F::NotReady | F::InsufficientScope => Code::NotGranted,
+            F::NotReady | F::EvidenceExpired | F::InsufficientScope => Code::NotGranted,
             F::CustodyUnavailable => Code::CustodyUnavailable,
         });
         error.reconnect = reconnect;
+        error.revalidate = e == F::EvidenceExpired;
         error
     }
 }
@@ -199,6 +206,7 @@ impl From<runtime::Failure> for Error {
             retry_after_seconds: None,
             origin,
             reconnect: false,
+            revalidate: false,
         }
     }
 }
@@ -484,7 +492,9 @@ pub fn admit_launch(
 /// connection's own observation reports it; never a grant refusal.
 fn launch_failure(error: registry::Failure) -> Error {
     match error {
-        registry::Failure::NotReady => Code::Unavailable.into(),
+        registry::Failure::NotReady | registry::Failure::EvidenceExpired => {
+            Code::Unavailable.into()
+        }
         error => error.into(),
     }
 }

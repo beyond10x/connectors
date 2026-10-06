@@ -45,6 +45,11 @@ pub enum Failure {
     StaleCursor,
     Capacity,
     NotReady,
+    /// A read refused only because the connection's validation evidence is no
+    /// longer current, while its credential is intact: a revalidation
+    /// recollects it from the retained custody version, a repair is not needed.
+    /// Public code `not_granted`.
+    EvidenceExpired,
     InsufficientScope,
     CustodyUnavailable,
     /// The connection's binding differs from the configured one in more than
