@@ -20,6 +20,17 @@
   `/1` and `/2` files keep loading; `[consumers]` in them is refused, and
   `setup init` still writes `/2`. `connectors.cli.ConfigurationFormat` gains
   `connectors-local/3`.
+- GitLab catalog write `issue.create`: `POST /api/v4/projects/{id}/issues`
+  (`postApiV4ProjectsIdIssues`, already in the pinned GitLab document and the
+  committed bundle) opens one issue from `id` and a `body` GitLab requires a
+  `title` in. It is unguarded, as the Drive, Slides and Calendar creates are: nothing
+  exists to compare before a create, so the same input approved and sent again
+  opens a second issue. Like every write it runs only under private protocol two,
+  in the adapter's permitted operations and named by an approval policy; the
+  approval binds the whole input by digest. The shipped selection set changed, so
+  the configuration revision of every instance using it moves: print the bootstrap
+  again and copy its `configuration_revision`, run `connections revalidate`, and
+  issue the instance's approval policies again (`docs/local-catalog-provider.md`).
 
 ## 0.30.0 — 2026-10-06
 
