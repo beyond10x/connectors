@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:jira-feed-binding
 kind: story
-status: draft
+status: active
 title: Jira binds the feed family
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -10,7 +10,10 @@ relations:
 - depends_on: story:feed-contract
 - depends_on: story:feed-bindings-discoverable
 - depends_on: story:catalog-feed-engine
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T19:55:09Z", actor: "agent:claude", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-06T19:55:09Z", actor: "agent:claude", revision: 3}
 ---
 ## Outcome
 
