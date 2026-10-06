@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T10:51:12Z",
+  "actor": "human:timo",
+  "artifact": "story:forge-issue-create",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "fixture: issue.create with an approval sends POST /api/v4/projects/org%2Fproject/issues with the body and receives 201; without an approval it is refused with 0 requests sent; bundle_drift unchanged"
+  }
+}

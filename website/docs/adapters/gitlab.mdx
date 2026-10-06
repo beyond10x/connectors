@@ -27,6 +27,7 @@ operation of the pinned source under a local id with a declared effect:
 | `merge_requests.list`, `merge_request.get` | read | the project's merge requests, one merge request by IID |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | read | pipelines, one pipeline, its jobs, one job |
 | `job.trace` | read | a job's log, answered as text |
+| `issue.create` | write | one POST opening an issue, unguarded |
 | `merge_request.create` | write | one POST, guarded on the pinned source head |
 | `merge_request.update` | write | one PUT, guarded on the pinned source head |
 | `merge_request.merge` | write | one PUT, guarded on five checks |
@@ -40,7 +41,9 @@ GitLab answers it.
 ## Writes and the guard
 
 A write is a required-approval mutation under private protocol two, with the
-host's approval, audit and attempt controls. The guard is data in the selection:
+host's approval, audit and attempt controls. An approval policy must name
+each write before the host issues an approval for it, and the approval binds the
+whole input by digest. The guard is data in the selection:
 before the one request it reads the merge request and refuses unless every check
 holds; after it, it compares the response and leaves the outcome uncertain,
 never refused, when a check fails, because GitLab may already have applied the
@@ -52,6 +55,12 @@ The merge guard requires the request to be open and mergeable, at the pinned
 checks `sha` atomically on the merge. Update has no such precondition at GitLab,
 so a head that moves between the preflight read and the PUT leaves the outcome
 uncertain.
+
+`issue.create` carries no guard: before a create nothing exists to compare, so
+the one POST is sent as approved. The same input approved and sent again opens a
+second issue. GitLab requires `body.title`; every other body member, such as
+`assignee_ids` or `confidential`, is sent as supplied, so read the whole input
+before approving.
 
 ## Against a live GitLab
 
