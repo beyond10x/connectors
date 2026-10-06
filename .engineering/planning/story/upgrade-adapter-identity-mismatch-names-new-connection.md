@@ -6,6 +6,7 @@ status: draft
 title: An adapter-reported identity mismatch during an upgrade names a new connection
 relations:
 - decomposes: epic:connector-probe-20261006
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: cited
   path: apps/connectors/src/local.rs
