@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T18:17:50Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-memory-bounded",
+  "kind": "story",
+  "revision": 12,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate (connectors-build gate) on 0d48b468c, merged with main 012c06a: all checks passed, 1374 tests passed in 164 test binaries, CONNECTORS_ESS set to the ess 0.53.0 release binary because ess 0.54.0 is on PATH; the 506 MB target stays unmet (upstream-blocker:er-model-record-copies)"
+  }
+}

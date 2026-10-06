@@ -55,6 +55,20 @@
   `ess generate output adopt` before regenerating (`docs/development.md`); the gate's
   `cli --check` needs no enrollment. The metadata mutation emitter fills the
   `ess-mutation-manifest/4` fields ESS 0.53.0 added, unset, since it writes `/2`.
+- A metadata open no longer copies every recorded history beside the Entity Runtime
+  complete snapshot it replays; the records are moved out of the snapshot. Peak RSS
+  of `read_invoke_cost_by_store_size` (release build, 5 read invokes) fell from
+  696 MB to 645 MB at 601 events and from 1,468 MB to 1,371 MB at 1,201 events
+  (#103). The rest of the peak is Entity Runtime's verified model, its complete
+  snapshot and Eventlog's verified blobs, held once by each open handle.
+- The owner process limits glibc to one malloc arena (`mallopt(M_ARENA_MAX, 1)`)
+  before it starts any thread, on Linux with glibc; elsewhere nothing changes. Each
+  metadata handle runs its own worker threads, and each thread's arena kept what it
+  freed. The CLI clears the owner's environment, so `MALLOC_ARENA_MAX` never reached
+  it. With the owner's setup applied, peak RSS of `read_invoke_cost_by_store_size`
+  fell from 644–785 MB to 557–588 MB at 601 events and from 1,363–1,538 MB to
+  1,024–1,118 MB at 1,201 events (3 runs each). That process plays both CLI and
+  owner; a real owner process was not measured (#103).
 - A read the provider refuses at dispatch now says why: `connectors.cli.Failure` gains the
   optional `service_reason`, beside `service_code` (or on a provider `forbidden`), so a
   Confluence `unauthorized` names `Unauthorized; scope does not match` and a missing token
@@ -101,6 +115,15 @@
 
 ### Tests
 
+- `read_invoke_cost_by_store_size` reports `peak_rss_mb` per store size, each size
+  measured in its own run of the test binary, since a process's peak resident set
+  only rises. `CONNECTORS_STORE_COST_INVOKES` sets how many invokes follow the one
+  that starts the owner (default 5); `0` profiles one open and one read invoke.
+  `CONNECTORS_STORE_COST_OWNER_ALLOCATOR` applies the owner's allocator setup to
+  the measuring process.
+- `the_owner_allocates_from_one_arena` starts eight threads after the owner's
+  allocator setup in a fresh process and counts arenas from `malloc_stats`. With the
+  setup, no new arena is created; with glibc's default, eight are.
 - Two disposable-custody CLI cases drive an adapter's own `identity_mismatch` through the
   production CLI, owner and a fixture adapter child. During an upgrading
   `connections revalidate` it answers `identity_mismatch` with `next_action`
