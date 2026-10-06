@@ -8,7 +8,7 @@ relations:
 - informed_by: specification:recent-agent-adapter-usage-20260909
 - informed_by: specification:contract-driven-connectors-design
 - informed_by: review-result:concept-stack-integration-20260908
-revision: 8
+revision: 9
 ---
 ## Operator request
 
@@ -37,7 +37,7 @@ Review wire/protocol fidelity and security/credential boundaries, then prove map
 
 1. Outbound local CLI connects to a selected MCP fixture, authenticates, invokes an advertised capability, exits/restarts and reuses its persisted credential binding. Missing, expired, revoked or unavailable credentials produce distinct safe outcomes.
 2. A local MCP client connects to the selected `$BIN server` local binding, discovers only supported/admitted capabilities and receives correctly mapped results and errors. No cloud control plane is necessary.
-3. The cloud server profile specifies authenticated inbound access, transport/session lifetime, streaming and failure behavior. A fixture verifies caller isolation and no provider-secret disclosure; this epic does not authorize deployment.
+3. The cloud server profile specifies authenticated inbound access, transport/session lifetime, streaming and failure behavior. A fixture verifies no provider-secret disclosure; this epic does not authorize deployment. Caller isolation is not in this epic (decided 2026-10-07): the inbound MCP caller is the configured owner, a single principal, and the isolation fixture for a multi-caller placement is `story:mcp-cloud-caller-isolation`, a draft that waits on a cloud placement being selected.
 4. Selected protocol versions, transports and optional capabilities have a coverage matrix. Unsupported functionality is explicitly refused, not silently approximated.
 5. Cancellation, malformed input, version/capability mismatch, partial output, lost replies and mutation uncertainty have reviewed scenarios. A repeated MCP request cannot automatically duplicate an uncertain business effect.
 6. All selected contractual gaps have owners, applicable ESS declarations/scenarios and independent review evidence before runtime stories are scheduled. CLI/docs describe the final selected behavior for humans and agents.

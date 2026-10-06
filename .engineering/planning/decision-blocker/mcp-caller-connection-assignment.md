@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:mcp-caller-connection-assignment
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided which provider connection an inbound MCP caller may use
 relations:
 - blocks: epic:mcp-contracts
 withholds: review
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-06T23:34:31Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"approval":1}}}
 ---
 ## The relation nobody has decided
 
@@ -75,3 +77,22 @@ does not have ("no Identity dependency (`Cargo.lock`: 0 hits for
 MCP the owner of a fact the epic says to leave with an established owner.
 
 No answer is assumed here, and no story carries either option.
+
+## Decision — 2026-10-07
+
+Decided 2026-10-07 under the operator's standing delegation for this repository:
+option A, a single principal.
+
+- The inbound MCP caller is the configured owner: the effective Linux UID that
+  `contracts/cli/v1alpha1/semantics.md` section 1 admits, verified at the owner's
+  Unix-domain socket by kernel peer credentials. With one principal there is no
+  assignment to make, so no `McpCaller → Connection` relation is modelled.
+- A multi-caller cloud placement is deferred. The caller-isolation half of
+  `epic:mcp-contracts` acceptance criterion 3 moved out of the epic into
+  `story:mcp-cloud-caller-isolation` (draft), which waits on
+  `decision-blocker:mcp-cloud-placement-selection`.
+- Not chosen: B, caller-owned connections, which needs a caller identity owner and
+  an Identity dependency this repository does not have; such a design goes back to
+  the operator. C, instance-owned connections with a per-caller allow-list, which
+  adds configuration and a fixture for a placement nobody has selected.
+- Why: the goal in hand runs one local instance unattended, which has one caller.
