@@ -29,7 +29,8 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
     // The complete shipped list: every operation the retired native GitLab
     // adapter declared, except its composite `merge_request.validate`, which
     // is two of these reads and a comparison the merge guard now makes itself;
-    // then the repository reads. A renamed, dropped or added id fails here.
+    // then the repository reads and the unguarded issue create. A renamed,
+    // dropped or added id fails here.
     let mut expected = vec![
         "project.get",
         "issues.list",
@@ -52,12 +53,14 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "commits.list",
         "repository.compare",
         "deployments.list",
+        "issue.create",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 21);
+    assert_eq!(declared.len(), 22);
     assert_eq!(engine.effect("merge_request.merge"), Some(Effect::Write));
     assert_eq!(engine.effect("job.trace"), Some(Effect::Read));
+    assert_eq!(engine.effect("issue.create"), Some(Effect::Write));
 
     // The repository reads keep the ids and source operations a consumer
     // already selects, and are reads.
