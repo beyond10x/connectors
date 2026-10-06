@@ -13,6 +13,8 @@ use std::{
 };
 
 mod aep_toolchain;
+#[cfg(test)]
+mod catalog_feed_conformance;
 mod cli;
 mod docs;
 mod ess_boundary;

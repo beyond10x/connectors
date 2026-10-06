@@ -1,0 +1,152 @@
+domain: connectors_catalog.feed
+summary: The declaration, written as data, from which the catalog engine realizes a datasource.feed/v1alpha1 binding over a provider's list endpoints.
+
+# Normative owner: contracts/catalog/v1alpha1/semantics.md, section 3.3. The family's values
+# (containers, items, pages, watermarks) are the shared model's; this domain types only what a
+# provider's declaration says, and the engine reads it as `feed` in a
+# `connectors-catalog-operations/1` selection file.
+#
+# Every operation a declaration names is a GET in the provider's pinned bundle. A Pointer is an
+# RFC 6901 JSON pointer, read either in one record of a list answer or in the whole answer.
+
+types:
+  - name: connectors_catalog.feed.Pointer
+    kind: newtype
+    of: String
+
+  # A query parameter of the operation it is named for.
+  - name: connectors_catalog.feed.Parameter
+    kind: newtype
+    of: String
+
+  # The family's closed visibility vocabulary.
+  - name: connectors_catalog.feed.Visibility
+    kind: enum
+    variants: [public, private, direct]
+
+  # True for a record or an answer whose value at `pointer` equals `equals`.
+  - name: connectors_catalog.feed.Condition
+    kind: struct
+    fields:
+      - {name: pointer, type: connectors_catalog.feed.Pointer}
+      - {name: equals, type: Json}
+
+  # The provider value at `pointer`, rendered as text, selects the visibility. A value the map
+  # does not name, and a record with none, is private.
+  - name: connectors_catalog.feed.VisibilityRule
+    kind: struct
+    fields:
+      - {name: pointer, type: connectors_catalog.feed.Pointer}
+      - {name: map, type: "Map<String, connectors_catalog.feed.Visibility>"}
+
+  # The provider's own continuation: sent as `parameter`, read back at `next`. An absent, null or
+  # empty `next` ends the listing.
+  - name: connectors_catalog.feed.CursorPaging
+    kind: struct
+    fields:
+      - {name: parameter, type: connectors_catalog.feed.Parameter}
+      - {name: next, type: connectors_catalog.feed.Pointer}
+
+  # Reads one container by id, so that `feed.items` answers an unknown and an excluded direct
+  # container alike, before any item is read.
+  - name: connectors_catalog.feed.Lookup
+    kind: struct
+    fields:
+      - {name: operation_id, type: String}
+      # The parameter that takes the container id.
+      - {name: parameter, type: String}
+      # The container record in the lookup's answer; empty for the whole answer.
+      - {name: record, type: connectors_catalog.feed.Pointer}
+
+  - name: connectors_catalog.feed.Containers
+    kind: struct
+    fields:
+      - {name: operation_id, type: String}
+      - {name: lookup, type: connectors_catalog.feed.Lookup}
+      # Fixed query values sent with every listing request.
+      - {name: query, type: "Optional<Map<String, String>>"}
+      - {name: limit, type: connectors_catalog.feed.Parameter}
+      - {name: cursor, type: connectors_catalog.feed.CursorPaging}
+      # The array of container records in one answer.
+      - {name: records, type: connectors_catalog.feed.Pointer}
+      - {name: id, type: connectors_catalog.feed.Pointer}
+      - {name: name, type: "Optional<connectors_catalog.feed.Pointer>"}
+      # The provider's word for every container this declaration lists.
+      - {name: kind, type: String}
+      # Absent: every container is private and none is direct.
+      - {name: visibility, type: "Optional<connectors_catalog.feed.VisibilityRule>"}
+
+  # The watermark is the last returned item's `updated_at` and the (id, revision) pairs returned
+  # at that instant. `parameter` is an inclusive lower bound on `updated_at`, and the provider
+  # answers in ascending `updated_at` order; the engine checks that order on every answer.
+  - name: connectors_catalog.feed.TimeFilter
+    kind: struct
+    fields:
+      - {name: parameter, type: connectors_catalog.feed.Parameter}
+
+  # The watermark is the provider's own change cursor: a position after the last change the
+  # answer carried. `complete` holds on the answer that reached the newest change; `stale` lists
+  # the statuses with which the provider refuses a cursor it no longer resumes.
+  - name: connectors_catalog.feed.ChangeCursor
+    kind: struct
+    fields:
+      - {name: parameter, type: connectors_catalog.feed.Parameter}
+      - {name: next, type: connectors_catalog.feed.Pointer}
+      - {name: complete, type: connectors_catalog.feed.Condition}
+      - {name: stale, type: "Optional<List<Integer>>"}
+
+  # How `feed.items` resumes: exactly one of the two.
+  - name: connectors_catalog.feed.Position
+    kind: union
+    tag: kind
+    variants:
+      time: connectors_catalog.feed.TimeFilter
+      cursor: connectors_catalog.feed.ChangeCursor
+
+  - name: connectors_catalog.feed.AuthorFields
+    kind: struct
+    fields:
+      - {name: id, type: connectors_catalog.feed.Pointer}
+      - {name: display_name, type: "Optional<connectors_catalog.feed.Pointer>"}
+
+  # The item's text; `representation` names it in the records body envelope.
+  - name: connectors_catalog.feed.BodyField
+    kind: struct
+    fields:
+      - {name: pointer, type: connectors_catalog.feed.Pointer}
+      - {name: representation, type: String}
+
+  - name: connectors_catalog.feed.Items
+    kind: struct
+    fields:
+      - {name: operation_id, type: String}
+      # The parameter that takes the container id.
+      - {name: container, type: String}
+      - {name: query, type: "Optional<Map<String, String>>"}
+      - {name: limit, type: connectors_catalog.feed.Parameter}
+      - {name: position, type: connectors_catalog.feed.Position}
+      - {name: records, type: connectors_catalog.feed.Pointer}
+      - {name: id, type: connectors_catalog.feed.Pointer}
+      # A provider version or edit time that changes with the content.
+      - {name: revision, type: connectors_catalog.feed.Pointer}
+      - {name: created_at, type: connectors_catalog.feed.Pointer}
+      - {name: updated_at, type: connectors_catalog.feed.Pointer}
+      - {name: author, type: "Optional<connectors_catalog.feed.AuthorFields>"}
+      - {name: body, type: connectors_catalog.feed.BodyField}
+      - {name: url, type: "Optional<connectors_catalog.feed.Pointer>"}
+      - {name: parent, type: "Optional<connectors_catalog.feed.Pointer>"}
+      # Absent: the profile observes no deletions and never reports a tombstone.
+      - {name: deleted, type: "Optional<connectors_catalog.feed.Condition>"}
+
+  - name: connectors_catalog.feed.Declaration
+    kind: struct
+    fields:
+      # The native profile id both operations carry.
+      - {name: profile, type: String}
+      # The provider's page-size cap, and the ceiling of `limit` on both operations.
+      - {name: max_limit, type: Integer}
+      - {name: containers, type: connectors_catalog.feed.Containers}
+      - {name: items, type: connectors_catalog.feed.Items}
+    invariants:
+      - max_limit >= 1
+      - max_limit <= 100
