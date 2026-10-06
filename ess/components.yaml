@@ -72,3 +72,24 @@ components:
         - connectors.cli.RememberLocalRuntimeBootstrap
         - connectors.cli.RecordConnectionListCursor
         - connectors.cli.ExpireConnectionListCursor
+  - component: feed-binding
+    summary: Any adapter that binds datasource.feed/v1alpha1; a fixture binding realises it for conformance, its Provider commands seeding the source it reads.
+    owns:
+      domains:
+        - connectors.feed
+    accepts:
+      commands:
+        - connectors.feed.AddContainer
+        - connectors.feed.AddItem
+        - connectors.feed.ReviseItem
+        - connectors.feed.RemoveItem
+        - connectors.feed.RestoreItem
+        - connectors.feed.ListContainers
+        - connectors.feed.ReadItems
+    publishes:
+      events:
+        - connectors.feed.ContainerAdded
+        - connectors.feed.ItemAdded
+        - connectors.feed.ItemRevised
+        - connectors.feed.ItemRemoved
+        - connectors.feed.ItemRestored
