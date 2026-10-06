@@ -1351,7 +1351,7 @@ fn oauth_invalid_grant_reports_repair() {
     let invoke = journey.connected();
     let result = success(journey.run(&invoke));
     assert_eq!(
-        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
+        result["result"]["body"]["id"],
         7
     );
 

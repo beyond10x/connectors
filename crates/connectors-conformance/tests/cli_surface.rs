@@ -548,15 +548,8 @@ impl DynamicValidator for FixtureSchemas {
             }
             DynamicPhase::Result => {
                 self.phases.push("result");
-                let decoded: Value = connectors_core::read_json(
-                    value["result"]
-                        .as_str()
-                        .ok_or(DynamicError::InvalidValue)?
-                        .as_bytes(),
-                )
-                .map_err(|_| DynamicError::InvalidValue)?;
                 (
-                    decoded,
+                    value["result"].clone(),
                     json!({"type":"object","properties":{"count":{"type":"integer"}},"required":["count"],"additionalProperties":false}),
                 )
             }
@@ -589,7 +582,7 @@ const INVOKE: &[&str] = &[
     "--output",
     "json",
 ];
-fn invocation_result(result: &str) -> Value {
+fn invocation_result(result: Value) -> Value {
     json!({"adapter":"forge","operation":"read","revision":"r1","result":result})
 }
 
@@ -604,7 +597,7 @@ fn dynamic_business_sources_are_acquired_once_and_validate_both_directions() {
             value: r#"{"selector":"fixture"}"#.into(),
             ..Default::default()
         };
-        let mut handler = Recorder::new(invocation_result(r#"{"count":1}"#));
+        let mut handler = Recorder::new(invocation_result(json!({"count":1})));
         let mut validator = FixtureSchemas::default();
         let output = run(
             &[INVOKE, &source].concat(),
@@ -626,11 +619,60 @@ fn dynamic_business_sources_are_acquired_once_and_validate_both_directions() {
     }
 }
 
+/// beyond10x/connectors#105: schemas and the provider result are JSON values in
+/// the answer, so a caller decodes the output once.
+#[test]
+fn describe_and_invoke_answer_json_values_not_json_text() {
+    let input_schema = json!({"type":"object","properties":{"selector":{"type":"string"}}});
+    let output_schema = json!({"type":"object","properties":{"count":{"type":"integer"}}});
+    let operation = json!({"id":"read","description":"Read","contract":"operations/v1alpha1","profile":"read","input_schema":input_schema,"output_schema":output_schema});
+    let described = json!({"adapter":"forge","revision":"r1","schema":"fixture-input","operation":operation,"source":"cached","stale":true});
+    let mut adapter = fixture("AdapterDescribeResult");
+    adapter["descriptor"]["operations"] = json!([operation]);
+    let cases: [(&[&str], Value); 2] = [
+        (
+            &["operations", "describe", "--adapter", "forge", "--operation", "read"],
+            described,
+        ),
+        (&["adapters", "describe", "--adapter", "forge"], adapter),
+    ];
+    for (args, result) in cases {
+        let mut handler = Recorder::new(result.clone());
+        let output = run(
+            &[&["--output", "json"][..], args].concat(),
+            &mut InputSources::default(),
+            &mut handler,
+            None,
+        );
+        assert_eq!(output.exit_code, 0, "{args:?}: {output:?}");
+        let answer = serde_json::from_str::<Value>(&output.stdout).unwrap()["result"].clone();
+        assert_eq!(answer, result);
+        let answered = answer["operation"]
+            .as_object()
+            .or_else(|| answer["descriptor"]["operations"][0].as_object())
+            .unwrap();
+        assert_eq!(answered["input_schema"], input_schema);
+        assert_eq!(answered["output_schema"], output_schema);
+    }
+    let mut handler = Recorder::new(invocation_result(json!({"count":1})));
+    let output = run(
+        &[INVOKE, &["--input-json", r#"{"selector":"fixture"}"#]].concat(),
+        &mut InputSources::default(),
+        &mut handler,
+        Some(&mut FixtureSchemas::default()),
+    );
+    assert_eq!(output.exit_code, 0, "{output:?}");
+    assert_eq!(
+        serde_json::from_str::<Value>(&output.stdout).unwrap()["result"]["result"],
+        json!({"count":1})
+    );
+}
+
 #[test]
 fn native_schema_refusals_prevent_handler_dispatch_and_bad_results_never_reach_stdout() {
     let good_args = [INVOKE, &["--input-json", r#"{"selector":"fixture"}"#]].concat();
     let mut sources = InputSources::default();
-    let mut handler = Recorder::new(invocation_result(r#"{"count":1}"#));
+    let mut handler = Recorder::new(invocation_result(json!({"count":1})));
     refusal(&run(&good_args, &mut sources, &mut handler, None), 1);
     assert_eq!(handler.calls, 0);
     for document in [
@@ -666,7 +708,7 @@ fn native_schema_refusals_prevent_handler_dispatch_and_bad_results_never_reach_s
         1,
     );
     assert_eq!(handler.calls, 0);
-    let mut bad_output = Recorder::new(invocation_result(r#"{"count":"wrong"}"#));
+    let mut bad_output = Recorder::new(invocation_result(json!({"count":"wrong"})));
     refusal(
         &run(
             &good_args,
