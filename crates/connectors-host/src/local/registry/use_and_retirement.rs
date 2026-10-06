@@ -102,6 +102,26 @@ impl Retirement {
 }
 
 impl Registry {
+    /// The binding a connection was saved with: its provider authority and
+    /// profile declaration, for a consumer launch that starts no adapter.
+    /// Visible only to the configured instance; readiness is `admit_read`'s.
+    pub fn recorded_binding(
+        &self,
+        instance: &str,
+        adapter: &str,
+        reference: &str,
+    ) -> Result<Binding> {
+        let mut metadata =
+            Metadata::inspect(&self.path).map_err(|_| Failure::MetadataUnavailable)?;
+        let tx = metadata.connection.transaction().map_err(db)?;
+        let row = Self::connection(&tx, reference)?;
+        observation::visible(&row, instance, adapter)?;
+        if row.state == "revoked" {
+            return Err(Failure::Revoked);
+        }
+        Ok(row.binding)
+    }
+
     /// Preflight without reserving a use or resolving material. Dispatch still
     /// requires a fresh capture and the final generation/fence checks.
     pub fn admit_read(

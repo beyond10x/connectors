@@ -130,6 +130,51 @@ pub(super) fn execute(
     }
 }
 
+/// `connections launch`: admit here, before any owner starts; then the owner
+/// reads the credential and hands this process the captured consumer image and
+/// a sealed copy of the credential, which it passes to the consumer as
+/// descriptor 3 without reading it. Returns the consumer's exit code.
+pub(super) fn launch(call: &Invocation<'_>) -> Result<i32, HandlerReply> {
+    let paths = Paths::resolve(
+        call.context.config.as_deref(),
+        call.context.state_dir.as_deref(),
+    )
+    .map_err(host_failure)?;
+    Config::read(&paths.config).map_err(configuration_refusal)?;
+    let text = |field| {
+        call.input[field]
+            .as_str()
+            .ok_or_else(|| failure("invalid_input", "arguments", "none", true))
+    };
+    let (alias, connection, consumer) = (text("adapter")?, text("connection")?, text("consumer")?);
+    // `--args` is one JSON array of strings, appended verbatim after the
+    // pinned argv prefix. Anything else, or an element holding NUL, is usage.
+    let extra = match call.input.get("args").and_then(Value::as_str) {
+        None => Vec::new(),
+        Some(value) => serde_json::from_str::<Vec<String>>(value)
+            .ok()
+            .filter(|args| !args.iter().any(|arg| arg.contains('\0')))
+            .ok_or_else(|| failure("invalid_input", "arguments", "none", true))?,
+    };
+    // No owner is contacted by the preflight, so its `unavailable` is only the
+    // connection's readiness, reported as the connection's own observation does.
+    owner::admit_launch(&paths, alias, connection, consumer).map_err(|error| {
+        if error.code == owner::Code::Unavailable {
+            registry_failure(registry::Failure::NotReady)
+        } else {
+            owner_failure(error)
+        }
+    })?;
+    let deadline = connectors_sdk::now_ms() + 30_000;
+    let consumer = owner::Client::connect(&paths, true)
+        .and_then(|client| client.launch(alias, connection, consumer, deadline))
+        .map_err(owner_failure)?;
+    // The consumer's entry selects which of this caller's variables pass.
+    consumer
+        .run(&extra, std::env::vars_os())
+        .map_err(|error| owner_failure(owner::Error::from(error)))
+}
+
 fn summary(alias: &str, connection: &ObservedConnection) -> Value {
     json!({"adapter":alias,"instance_id":connection.instance,"connection":connection.reference,"profile":connection.profile,
         "revision":connection.revision,"state":connection.state})

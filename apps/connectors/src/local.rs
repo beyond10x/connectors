@@ -30,6 +30,15 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         Some(&mut session::NativeValidator(session.clone())),
     );
     session.borrow_mut().finish(&mut output);
+    // A consumer ran: stdout and stderr were its own, and its exit status is
+    // the launch's. No envelope follows it.
+    if let Some(code) = session.borrow().launched {
+        output = connectors_cli_contract::ProcessOutput {
+            exit_code: code,
+            stdout: String::new(),
+            stderr: String::new(),
+        };
+    }
     if root_help && output.exit_code == 0 {
         output.stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n  describe  Read a complete service descriptor\n  invoke    Invoke an explicit service operation\n  serve     Run the configured federation service\n");
     }
@@ -75,6 +84,11 @@ impl Handler for LocalHandler {
             let session = self.0.borrow();
             return operations::dispatch(call, session.deadline, session.mutation_deadline)
                 .unwrap_or_else(invoke_failure);
+        } else if call.callable == "connections-launch" {
+            connections::launch(call).map(|code| {
+                self.0.borrow_mut().launched = Some(code);
+                json!({"consumer":call.input["consumer"],"exit_code":code})
+            })
         } else if call.callable == "connections-revalidate" {
             self.0
                 .borrow_mut()

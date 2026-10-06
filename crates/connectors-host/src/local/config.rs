@@ -21,6 +21,9 @@ pub struct Config {
     pub default_adapter: Option<String>,
     #[serde(default)]
     pub adapters: BTreeMap<String, Adapter>,
+    /// Operator-pinned consumer executables (`connectors-local/3` only).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub consumers: BTreeMap<String, Consumer>,
 }
 
 // Deserialize the closed envelope before selecting its version. Validation is
@@ -36,6 +39,8 @@ struct ConfigInput {
     default_adapter: Option<String>,
     #[serde(default)]
     adapters: BTreeMap<String, Adapter>,
+    #[serde(default)]
+    consumers: BTreeMap<String, Consumer>,
 }
 impl Config {
     fn assemble(input: ConfigInput) -> Self {
@@ -46,6 +51,7 @@ impl Config {
             secret_service_socket: input.secret_service_socket,
             default_adapter: input.default_adapter,
             adapters: input.adapters,
+            consumers: input.consumers,
         }
     }
 }
@@ -66,8 +72,8 @@ impl TryFrom<ConfigInput> for Config {
 pub enum Refusal {
     Failure(Failure),
     /// An entry's `private_protocol` presence contradicts the file's format:
-    /// `connectors-local/1` forbids it, `connectors-local/2` requires it.
-    /// `format` is one of those two values and `instance_id` a valid selector.
+    /// `connectors-local/1` forbids it, `connectors-local/2` and `/3` require
+    /// it. `format` is one of those values and `instance_id` a valid selector.
     PrivateProtocolMismatch {
         format: String,
         instance_id: String,
@@ -138,6 +144,30 @@ impl Adapter {
     }
 }
 
+/// An operator-pinned consumer: an executable that `connections launch` starts
+/// with one connection's protected document on descriptor 3. `executable.args`
+/// is the pinned argv prefix; the caller's `--args` follow it.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Consumer {
+    pub executable: Executable,
+    #[serde(default)]
+    pub permissions: ConsumerPermissions,
+    /// Name prefixes of the caller's environment variables passed to the
+    /// consumer. Omitted or empty passes nothing.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub pass_env: BTreeSet<String>,
+}
+
+/// The adapter aliases whose connections a consumer may receive. Omitted or
+/// empty denies every connection.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConsumerPermissions {
+    #[serde(default)]
+    pub connections: BTreeSet<String>,
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
 pub enum Startup {
     #[default]
@@ -154,7 +184,7 @@ pub enum Restart {
     Never,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Executable {
     pub path: PathBuf,
@@ -235,9 +265,11 @@ impl Config {
         }
         if !matches!(
             self.format.as_str(),
-            "connectors-local/1" | "connectors-local/2"
+            "connectors-local/1" | "connectors-local/2" | "connectors-local/3"
         ) || self.owner_uid != fs::uid()
             || self.adapters.len() > 64
+            || self.consumers.len() > 64
+            || (self.format != "connectors-local/3" && !self.consumers.is_empty())
             || self
                 .default_adapter
                 .as_ref()
@@ -274,28 +306,36 @@ impl Config {
                     .iter()
                     .chain(&entry.permissions.operations)
                     .any(|id| !selector(id))
-                || entry.executable.sha256.len() != 64
-                || !entry
-                    .executable
-                    .sha256
-                    .bytes()
-                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-                || entry.executable.args.len() > 256
-                || entry
-                    .executable
-                    .args
-                    .iter()
-                    .any(|arg| arg.len() > 4096 || arg.contains('\0'))
             {
                 return Err(Failure::InvalidConfiguration.into());
             }
-            fs::validate_path(&entry.executable.path)?;
+            entry.executable.validate()?;
+        }
+        for (name, consumer) in &self.consumers {
+            if !selector(name)
+                || consumer.permissions.connections.len() > 64
+                || consumer
+                    .permissions
+                    .connections
+                    .iter()
+                    .any(|alias| !self.adapters.contains_key(alias))
+                || consumer.pass_env.len() > 64
+                || consumer.pass_env.iter().any(|prefix| {
+                    prefix.is_empty()
+                        || prefix.len() > 256
+                        || prefix.contains('=')
+                        || prefix.contains('\0')
+                })
+            {
+                return Err(Failure::InvalidConfiguration.into());
+            }
+            consumer.executable.validate()?;
         }
         // Named only once every entry passed every other check, so the refusal
         // does not depend on alias order and both coordinates are already a
         // supported format and a valid selector. The first mismatch in alias
         // order is named.
-        let current = self.format == "connectors-local/2";
+        let current = self.format != "connectors-local/1";
         if let Some(entry) = self
             .adapters
             .values()
@@ -332,6 +372,7 @@ impl Config {
             secret_service_socket: None,
             default_adapter: None,
             adapters: BTreeMap::new(),
+            consumers: BTreeMap::new(),
         };
         let text = format!(
             "# Linux Secret Service custody is required; credentials never belong here.\n{}",
@@ -391,6 +432,25 @@ impl Initialized {
 }
 
 impl Executable {
+    /// The pinned selection's own form: a lowercase SHA-256 digest, a bounded
+    /// argv without NUL and an admissible absolute path.
+    fn validate(&self) -> Result<()> {
+        if self.sha256.len() != 64
+            || !self
+                .sha256
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            || self.args.len() > 256
+            || self
+                .args
+                .iter()
+                .any(|arg| arg.len() > 4096 || arg.contains('\0'))
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        fs::validate_path(&self.path)
+    }
+
     /// Inspect the admitted artifact without executing it. Launch must repeat
     /// admission and retain the exact descriptor for exec; this is no readiness.
     pub fn check(&self) -> Result<()> {
@@ -477,5 +537,135 @@ impl Executable {
             return Err(Failure::InvalidConfiguration);
         }
         Ok(file)
+    }
+}
+
+#[cfg(test)]
+mod consumer_tests {
+    //! story:launch-consumer-with-connection-credential: `connectors-local/3`
+    //! adds `[consumers]`; `/1` and `/2` stay readable and refuse it.
+    use super::*;
+
+    const ADAPTER: &str = "[adapters.fixture]\ninstance_id='fixture-instance'\nadapter_id='fixture-adapter'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nPRIVATE[adapters.fixture.executable]\npath='/not-installed/adapter'\nsha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\nargs=[]\n";
+    const PROBE: &str = "[consumers.probe.executable]\npath='/not-installed/consumer'\nsha256='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'\nargs=['--password-file','/proc/self/fd/3']\n[consumers.probe.permissions]\nconnections=['fixture']\n";
+
+    fn read(format: &str, private: bool, consumers: &str) -> std::result::Result<Config, Refusal> {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        let adapter = ADAPTER.replace(
+            "PRIVATE",
+            if private {
+                "private_protocol='connectors-private/1'\n"
+            } else {
+                ""
+            },
+        );
+        std::fs::write(
+            &paths.config,
+            format!(
+                "format='{format}'\nowner_uid={}\n{adapter}{consumers}",
+                fs::uid()
+            ),
+        )
+        .unwrap();
+        Config::read(&paths.config)
+    }
+
+    #[test]
+    fn format_three_adds_consumers_whose_permissions_name_adapter_aliases() {
+        let config = read("connectors-local/3", true, PROBE).unwrap();
+        let probe = &config.consumers["probe"];
+        assert_eq!(
+            probe.permissions.connections,
+            BTreeSet::from(["fixture".to_owned()])
+        );
+        assert_eq!(
+            probe.executable.args,
+            ["--password-file", "/proc/self/fd/3"]
+        );
+        // Omitted permissions deny every connection.
+        let bare = PROBE.replace(
+            "[consumers.probe.permissions]\nconnections=['fixture']\n",
+            "",
+        );
+        let config = read("connectors-local/3", true, &bare).unwrap();
+        assert!(config.consumers["probe"].permissions.connections.is_empty());
+        // `/3` without consumers loads, and the earlier formats keep loading.
+        assert!(
+            read("connectors-local/3", true, "")
+                .unwrap()
+                .consumers
+                .is_empty()
+        );
+        assert!(read("connectors-local/2", true, "").is_ok());
+        assert!(read("connectors-local/1", false, "").is_ok());
+    }
+
+    #[test]
+    fn a_consumer_passes_caller_variables_only_by_listed_prefix() {
+        let entry = |pass_env: &str| {
+            PROBE.replace(
+                "[consumers.probe.executable]",
+                &format!("[consumers.probe]\npass_env={pass_env}\n[consumers.probe.executable]"),
+            )
+        };
+        let config = read("connectors-local/3", true, &entry("['EKR_','CORTEX_']")).unwrap();
+        assert_eq!(
+            config.consumers["probe"].pass_env,
+            BTreeSet::from(["CORTEX_".to_owned(), "EKR_".to_owned()])
+        );
+        // Without `pass_env` nothing passes.
+        let config = read("connectors-local/3", true, PROBE).unwrap();
+        assert!(config.consumers["probe"].pass_env.is_empty());
+        // An empty prefix would pass everything; `=` and NUL are no name.
+        for refused in ["['']", "['A=B']", "[\"A\\u0000\"]", "'EKR_'"] {
+            assert_eq!(
+                read("connectors-local/3", true, &entry(refused)).err(),
+                Some(Refusal::Failure(Failure::InvalidConfiguration)),
+                "{refused}"
+            );
+        }
+    }
+
+    #[test]
+    fn consumers_are_refused_outside_format_three_and_when_malformed() {
+        let invalid = Some(Refusal::Failure(Failure::InvalidConfiguration));
+        assert_eq!(
+            read("connectors-local/2", true, PROBE).err(),
+            invalid.clone()
+        );
+        assert_eq!(
+            read("connectors-local/1", false, PROBE).err(),
+            invalid.clone()
+        );
+        for malformed in [
+            // A permission naming no configured adapter alias.
+            PROBE.replace("connections=['fixture']", "connections=['absent']"),
+            // A name that is no selector.
+            PROBE.replace("consumers.probe", "consumers.'not a selector'"),
+            PROBE.replace("sha256='bbbb", "sha256='BBBB"),
+            PROBE.replace("path='/not-installed/consumer'", "path='consumer'"),
+            PROBE.replace("args=[", "env=[]\nargs=["),
+            PROBE.replace("connections=", "operations=[]\nconnections="),
+        ] {
+            assert_eq!(
+                read("connectors-local/3", true, &malformed).err(),
+                invalid.clone(),
+                "{malformed}"
+            );
+        }
+        // `/3` keeps `/2`'s rule: every adapter entry selects a private protocol.
+        assert_eq!(
+            read("connectors-local/3", false, PROBE).err(),
+            Some(Refusal::PrivateProtocolMismatch {
+                format: "connectors-local/3".into(),
+                instance_id: "fixture-instance".into(),
+            })
+        );
     }
 }
