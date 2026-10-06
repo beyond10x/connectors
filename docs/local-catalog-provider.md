@@ -55,7 +55,8 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Zendesk guide](catalog-zendesk.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
-serves the provider from the pinned source alone, plus seven repository reads:
+serves the provider from the pinned source alone, plus seven repository reads
+and one unguarded write, `issue.create`:
 
 | id | source operation | effect |
 |---|---|---|
@@ -63,6 +64,7 @@ serves the provider from the pinned source alone, plus seven repository reads:
 | `merge_requests.list`, `merge_request.get` | `getApiV4ProjectsIdMergeRequests`, `…MergeRequestIid` | read |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | the matching `getApiV4Projects…` | read |
 | `job.trace` | `getApiV4ProjectsIdJobsJobIdTrace`, `"response": "text"` | read |
+| `issue.create` | `postApiV4ProjectsIdIssues`, unguarded | write |
 | `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
@@ -419,7 +421,7 @@ restart = "never"
 
 [adapters.forge.permissions]
 profiles = ["gitlab.pat"]
-operations = ["project.get", "issues.list", "file.get", "branch.get", "merge_requests.list", "merge_request.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "merge_request.create", "merge_request.update", "merge_request.merge"]
+operations = ["project.get", "issues.list", "file.get", "branch.get", "merge_requests.list", "merge_request.get", "pipelines.list", "pipeline.get", "pipeline.jobs", "job.get", "job.trace", "issue.create", "merge_request.create", "merge_request.update", "merge_request.merge"]
 
 [adapters.forge.executable]
 path = "/absolute/path/connectors-catalog-provider"
