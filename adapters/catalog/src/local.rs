@@ -68,6 +68,17 @@ struct ScopesProbe {
     path: String,
     pointer: String,
 }
+/// A read validation makes after the identity read, so a credential that identifies
+/// its holder but cannot read what the selection needs is refused as
+/// `insufficient_scope` instead of connected. The path is relative to the provider
+/// authority; the body is not read.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AccessProbe {
+    path: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    query: BTreeMap<String, String>,
+}
 /// How the protected entry becomes the credential header.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -115,6 +126,9 @@ struct AuthConfig {
     identity: IdentityProbe,
     #[serde(default)]
     scopes: Option<ScopesProbe>,
+    /// Omitted when absent, so existing configuration revisions hold.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    access: Option<AccessProbe>,
     #[serde(default)]
     minimum_scopes: BTreeSet<String>,
     #[serde(default = "default_evidence_lifetime")]
@@ -653,6 +667,14 @@ impl Local {
                 .scopes
                 .as_ref()
                 .is_some_and(|s| segments(&s.path).is_empty())
+            || config.auth.access.as_ref().is_some_and(|a| {
+                segments(&a.path).is_empty()
+                    || a.path.contains('?')
+                    || a.query.len() > 16
+                    || a.query
+                        .iter()
+                        .any(|(k, v)| k.is_empty() || k.len() > 128 || v.len() > 1024)
+            })
             || match config.auth.scheme {
                 Scheme::Token => config.auth.account_label.is_some(),
                 // Basic has one fixed placement; the file states it rather than
@@ -1101,6 +1123,24 @@ impl Local {
                 Some(granted)
             }
         };
+        if let Some(access) = &self.auth.access {
+            let query: Vec<(&str, String)> = access
+                .query
+                .iter()
+                .map(|(name, value)| (name.as_str(), value.clone()))
+                .collect();
+            let response = http
+                .get(&segments(&access.path), &query)
+                .await
+                .map_err(Failure::from_provider)?;
+            match response.status {
+                200..=299 => {}
+                // The credential identified its holder a moment ago; a refusal of
+                // this read is what it may not do, not a credential to repair.
+                401 | 403 => return Err(Failure::InsufficientScope),
+                status => return Err(probe_failure(status)),
+            }
+        }
         self.baseline(subject, granted_scopes, collected_at_ms)
     }
     /// The access token a refused request carried is not used again.

@@ -4,6 +4,12 @@
 
 ### Added
 
+- Catalog profiles take an optional `auth.access` read that validation makes after the
+  identity read. A `401` or `403` answer refuses the connection as `insufficient_scope`
+  instead of connecting it; the Confluence guide declares a v2 page read, because a token
+  whose scopes pass the v1 identity read but not the v2 page reads connected as `ready`
+  and then answered `unauthorized` with `next_action: repair_connection` on every read
+  (#102). Configurations without `access` keep their revision.
 - Zendesk `tickets.incremental` accepts `per_page` (1 to 1,000). A full page of 1,000
   tickets can pass the 4 MiB provider response bound and was refused as `capacity`; a
   smaller page keeps a long export walkable. The pinned Zendesk document leaves the
