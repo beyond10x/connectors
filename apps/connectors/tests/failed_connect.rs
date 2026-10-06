@@ -576,3 +576,70 @@ fn a_revalidation_the_owner_definitely_fails_reports_dispatch_at_the_cli() {
         );
     }
 }
+
+/// story:connection-follows-configuration-upgrade. After the configuration
+/// moves to a new revision nothing is cached for it until the adapter is
+/// launched under it, and an on-demand adapter is launched by the request
+/// itself. Revalidation admits the connection against its own binding and
+/// reaches the owner, whose capture compares it with the launched provider's.
+#[test]
+#[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
+fn a_revalidation_after_a_configuration_change_reaches_the_owner_without_a_cached_description() {
+    let root = tempfile::tempdir().unwrap();
+    let custody = Custody::new(root.path());
+    let cli = Cli {
+        paths: Paths {
+            config: root.path().join("cli/config.toml"),
+            state: root.path().join("cli/state"),
+        },
+    };
+    assert!(cli.run(&["setup", "init"]).status.success());
+    let config = |revision: &str| {
+        format!(
+            "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='{revision}'\nprotocol='v1alpha1'\n[adapters.forge.permissions]\nprofiles=['fixture.basic']\noperations=[]\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            connectors_host::local::filesystem::uid(),
+            serde_json::to_string(custody.socket.to_str().unwrap()).unwrap(),
+            "a".repeat(64),
+        )
+    };
+    private(&cli.paths.config, config("cfg-1").as_bytes());
+    let adapter = Config::load(&cli.paths.config).unwrap().adapters["forge"].clone();
+    let bootstrap = bootstrap();
+    runtime::state::State::new(&cli.paths.state)
+        .remember(&adapter.selection(), &bootstrap)
+        .unwrap();
+    let reference = publish(&cli.paths.state, &bootstrap, &custody.socket);
+    let revision = registry::Registry::with_system_clock(&cli.paths.state)
+        .describe(
+            "forge-local",
+            "catalog",
+            "cfg-1",
+            &reference,
+            connectors_sdk::now_ms(),
+            true,
+        )
+        .unwrap()
+        .revision;
+    private(&cli.paths.config, config("cfg-2").as_bytes());
+    let image = fs::read(env!("CARGO_BIN_EXE_connectors")).unwrap();
+    let build = hex(ring::digest::digest(&ring::digest::SHA256, &image).as_ref());
+    let owner = serve(&cli.paths, build, Answer::Failed(Code::Unavailable));
+    let refused = cli.run(&[
+        "connections",
+        "revalidate",
+        "--adapter",
+        "forge",
+        "--connection",
+        &reference,
+        "--expected-revision",
+        &revision,
+    ]);
+    let data = serde_json::from_slice::<Value>(&refused.stderr).unwrap()["error"]["data"].clone();
+    // The stand-in owner's own answer, not an admission refusal.
+    assert_eq!(
+        (&data["code"], &data["stage"]),
+        (&json!("unavailable"), &json!("dispatch")),
+        "{data}"
+    );
+    assert_eq!(owner.join().unwrap(), ["revalidate"]);
+}

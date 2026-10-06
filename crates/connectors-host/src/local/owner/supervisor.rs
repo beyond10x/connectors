@@ -740,6 +740,7 @@ fn worker(
                         registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
                         return Err(error);
                     }
+                    let upgrade = captured.upgrades();
                     let dispatched =
                         registry.dispatch_revalidation(captured, connectors_sdk::now_ms())?;
                     drop(guard);
@@ -775,7 +776,11 @@ fn worker(
                                 Err(reason),
                                 connectors_sdk::now_ms(),
                             )?;
-                            return Err(error.into());
+                            // Repair refuses the changed binding of an upgrade, so a
+                            // credential the new provider refuses needs a new connection.
+                            let mut error = Error::from(error);
+                            error.reconnect = upgrade && reason.is_some();
+                            return Err(error);
                         }
                     }
                     drop(guard);

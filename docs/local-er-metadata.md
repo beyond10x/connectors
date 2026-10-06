@@ -71,6 +71,11 @@ existing closed ESS values before an action is proposed. Their JSON spelling is
 only a compatibility encoding. The original primary key decodes to the existing
 ESS identity; it is never replaced by a table-row identity.
 
+A connection's binding takes its configuration revision from its instance. Only
+while the two differ, after a [configuration
+upgrade](local-connection-registry.md#configuration-upgrades) of another connection
+of the instance, does the connection record its own as `configuration_revision`.
+
 `registry_uses` retains a bounded captured read, its selected connection,
 generation and custody version, the publication fence, the original expiry,
 and whether dispatch opened or the use was released. The host's
