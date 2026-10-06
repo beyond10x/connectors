@@ -1022,11 +1022,10 @@ fn mr10_repeated_final_audit_observation_is_a_pure_replay() {
 }
 
 /// MR11 — a passive observation in the same millisecond as the last write
-/// re-records the same clock floor and leaves every view unchanged; a lower
-/// sample is refused and also leaves every view unchanged (clock).
-/// docs/local-er-metadata.md:189-190 "Even an unchanged millisecond gets a
-/// clock revision guard"; docs/local-connection-registry.md:44 "A durable
-/// clock floor rejects wall-clock regression."
+/// records nothing and leaves every view unchanged; a lower sample is refused
+/// and also leaves every view unchanged (clock). docs/local-er-metadata.md
+/// "An unchanged floor is not recorded again"; docs/local-connection-registry.md
+/// "A durable clock floor rejects wall-clock regression."
 #[test]
 fn mr11_same_millisecond_and_regressed_observations_leave_views_unchanged() {
     let mut world = World::new();
@@ -1436,5 +1435,85 @@ fn adversary_timeout_before_dispatch_releases_ownership_without_a_commit() {
     assert_eq!(
         count, 0,
         "deadline-before-acceptance became a durable effect"
+    );
+}
+
+// ------------------------------------- adversary: story:registry-clock-floor-growth
+
+/// The removed same-millisecond fence put the registry clock subject into every
+/// locked batch, so ER's revision guard refused a batch behind any clock append,
+/// at whatever point before the append it landed. Its replacement reads the
+/// event feed once (`refuse_changed_since_baseline`) and then appends; the doc
+/// comment above it names "a handle persisting without the lock" as covered.
+/// Here that unlocked append lands after the feed read and before
+/// `execute_batch`, which is the window the fence closed.
+#[test]
+fn adversary_a_business_batch_cannot_commit_behind_a_clock_advance_after_its_feed_check() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("state");
+    fs::directory(&path, true, true).unwrap();
+    drop(Metadata::initialize(&path).unwrap());
+    let mut observation = Metadata::update_observation(&path).unwrap();
+    let mut business = Metadata::update(&path, false).unwrap();
+    observation
+        .connection
+        .execute("UPDATE registry_clock SET last_seen_ms=1", [])
+        .unwrap();
+    business
+        .connection
+        .execute("INSERT INTO registry_instances(instance_id,adapter_id,configuration_revision,epoch) VALUES ('fixture','adapter','revision',0)", [])
+        .unwrap();
+    let raced = Arc::new(Mutex::new(None));
+    let slot = raced.clone();
+    er::before_batch(move || {
+        let persisted = observation.persist();
+        drop(observation);
+        *slot.lock().unwrap() = Some(persisted);
+    });
+    let result = business.persist();
+    drop(business);
+    // The window is closed by refusing the append: a handle that released the
+    // lifecycle lock cannot persist, so nothing lands between the feed check
+    // and the batch, and the business batch is not stale.
+    assert_eq!(
+        raced.lock().unwrap().take(),
+        Some(Err(super::Failure::MetadataUnavailable)),
+        "a handle without the lifecycle lock appended inside the window"
+    );
+    let reopened = Metadata::inspect(&path).unwrap();
+    let (count, floor): (i64, i64) = reopened
+        .connection
+        .query_row(
+            "SELECT (SELECT count(*) FROM registry_instances WHERE instance_id='fixture'),last_seen_ms FROM registry_clock",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        (count, floor, result),
+        (1, 0, Ok(())),
+        "a clock advance landed inside the window, or the batch behind none was refused"
+    );
+}
+
+/// `Metadata::registry_floor` documents "Only a handle holding the lifecycle
+/// lock hands it out". A passive inspection releases the flock before its ER
+/// replay but keeps the file and `concurrent_observation == false`, so the
+/// guard admits it while another handle holds the lock.
+#[test]
+fn adversary_a_handle_that_released_the_lifecycle_lock_is_not_handed_the_registry_floor() {
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("state");
+    fs::directory(&path, true, true).unwrap();
+    drop(Metadata::initialize(&path).unwrap());
+    let passive = Metadata::inspect(&path).unwrap();
+    // The lock is free again: an ordinary writer takes it.
+    let holder = Metadata::update(&path, false).unwrap();
+    let handed_out = passive.registry_floor().is_ok();
+    drop(holder);
+    drop(passive);
+    assert!(
+        !handed_out,
+        "a handle that does not hold the lifecycle lock was handed the registry floor file"
     );
 }

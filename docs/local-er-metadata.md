@@ -131,6 +131,25 @@ fact because conflating it with a transient admission both fabricated absent
 evidence during legacy migration and made revoke unable to preserve a
 historical use. No generic row type is introduced.
 
+The `registry_clock` row is a projection, built again from Entity Runtime on
+every open, so it is not where the registry's anti-regression floor is kept
+between commands. That floor is the file `registry-clock.floor` beside
+`metadata.lock` (`connectors.clock.RegistryClockFloorFile`, JSON
+`{"last_seen_ms": <ms>}`). It is read and replaced only under the lifecycle lock,
+by write-temporary, fsync and rename. A registry transaction refuses a sample
+below the higher of the file and the row, then writes the file before its
+Entity Runtime batch commits. The row, and so the recorded
+`connectors.clock.LocalClockFloor` `s:registry`, advances only to a sample more
+than 60,000 ms past its recorded value, so it lies at most that far below any
+admitted sample. A missing or unreadable file counts as the row plus 60,000 ms:
+samples are refused for at most that long after the file is lost, and never
+below any sample admitted before. A file rolled back by hand admits at most
+60,000 ms of regression, because the row still bounds it. An unchanged floor is
+not recorded again. A batch prepared by a handle that did not hold the lock
+throughout (an observation's unlocked replay) is refused as a stale revision
+when another handle has changed a subject other than a runtime record since its
+baseline; the check reads the event feed before anything is appended.
+
 Credential bytes never enter these records. `material_version`, `custody_scope`
 and other already admitted opaque references remain metadata; Secret Service
 continues to own the corresponding material.
@@ -190,15 +209,20 @@ sidecar retirement, and remains held across legacy migration and business
 writes. On an established level 9 authority, passive inspection closes the
 physical handle while holding that lock, then replays Entity Runtime outside
 it. The two pure registry clock observations prepare a fresh replay the same
-way, then reacquire that lock before sampling time, re-evaluating their guards,
-and committing an authored clock action. Even an unchanged millisecond gets a
-clock revision guard, so a prepared observation cannot return stale registry
-state after an intervening business write. A runtime-record write holds the
-lifecycle lock but omits that clock guard by design, so it can land between an
-observation's unlocked replay and its relock; the observation's post-commit
-equivalence therefore excludes `LocalRuntimeRecord` rows, which no registry
-observation reads or writes, exactly as the runtime-state write excludes the
-unread registry clock. Only a proved uncommitted revision
+way, then reacquire that lock before sampling time and re-evaluating their
+guards. Every write requires a handle that holds the lock and never released
+it: a passive inspection and an unrelocked observation can neither persist nor
+obtain the registry floor file. Before any batch, including one that changes
+nothing, which then appends nothing, a writer reads the event feed past its
+baseline. Since every writer holds the lock, nothing can append between that
+read and its batch, so the read sees every change that precedes it. A change
+to any subject refuses the batch as a stale revision, so a prepared
+observation cannot return stale registry state after an intervening business
+write, at any millisecond. A runtime-record write can land between an
+observation's unlocked replay and its relock; the observation's feed check and
+post-commit equivalence therefore admit changes to `LocalRuntimeRecord` rows,
+which no registry observation reads or writes, exactly as the runtime-state
+write excludes the unread registry clock. Only a proved uncommitted revision
 conflict repeats the pure observation with a fresh replay and a finite bound.
 Eventlog SQLite owns the runtime handles and serializes guarded appends. An
 acknowledged batch is checked against its immutable receipt and a
