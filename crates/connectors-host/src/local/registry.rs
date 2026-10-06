@@ -12,6 +12,8 @@ pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retireme
 mod store_cost_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod upgrade_tests;
 
 use super::{keyring::custody, metadata::Metadata};
 use rusqlite::{OptionalExtension, Transaction, TransactionBehavior, params};
@@ -42,6 +44,14 @@ pub enum Failure {
     NotReady,
     InsufficientScope,
     CustodyUnavailable,
+    /// The connection's binding differs from the configured one in more than
+    /// its configuration revision: neither revalidation nor repair can move it,
+    /// a new connection can. Public code `lifecycle_conflict`.
+    BindingChanged,
+    /// A configuration upgrade's validation answered another identity. Repair
+    /// refuses the changed binding, a new connection can help. Public code
+    /// `identity_mismatch`.
+    UpgradeIdentityMismatch,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -377,8 +387,12 @@ impl Registry {
         row.binding
             .validate()
             .map_err(|_| Failure::MetadataUnavailable)?;
-        let bound: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM registry_connections c JOIN registry_instances i ON c.instance_id=i.instance_id WHERE c.connection_ref=?1 AND i.instance_id=?2 AND i.adapter_id=?3 AND i.configuration_revision=?4)",
-            params![row.reference,row.binding.instance_id,row.binding.adapter_id,row.binding.configuration_revision], |r| r.get(0)).map_err(db)?;
+        // A connection keeps the configuration revision it was admitted or
+        // last upgraded under; its instance may already have moved on to the
+        // configured one (registry/revalidation.rs). Every use compares the
+        // connection's whole binding with the configured one.
+        let bound: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM registry_connections c JOIN registry_instances i ON c.instance_id=i.instance_id WHERE c.connection_ref=?1 AND i.instance_id=?2 AND i.adapter_id=?3)",
+            params![row.reference,row.binding.instance_id,row.binding.adapter_id], |r| r.get(0)).map_err(db)?;
         if !bound {
             return Err(Failure::MetadataUnavailable);
         }

@@ -370,12 +370,16 @@ parameter. After upgrading:
    adapter entry (see [Bind the provider to the local
    CLI](#bind-the-provider-to-the-local-cli)). Until then the adapter does not
    start: the host refuses a bootstrap whose revision differs from the entry's.
-2. An instance that was already connected cannot reconnect or be repaired under
-   the new binding: the connection registry keeps an instance id bound to the
-   configuration revision it first connected under, and refuses the new one
-   (`Conflict` on connect, `IdentityMismatch` on repair). Connect it again under
-   a new `instance` id, or with fresh local state. Configuration upgrades are
-   not implemented (see [the connection registry](local-connection-registry.md)).
+2. Run `connections revalidate` on each connection of an instance that was
+   already connected. It moves the connection to the new configuration revision
+   with the credential already in custody, and asks for no credential, when the
+   provider host and the profile are unchanged and the provider still answers
+   the same identity. Until then the connection reports `pending` and reads
+   refuse. When the provider host or the profile changed, revalidate refuses
+   with `lifecycle_conflict` and `next_action = create_connection`; when the
+   provider answers another identity, with `identity_mismatch` and the same
+   `next_action`. Either changes nothing. Connect that one again under a new `instance` id. See [Configuration
+   upgrades](local-connection-registry.md#configuration-upgrades).
 3. Issue every write approval policy bound to the instance again.
 
 Separately, the declared input of these shipped reads changed, because each

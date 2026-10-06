@@ -1425,6 +1425,26 @@ fn connection_row(
         timestamp_value(integer(row, "created_at_ms")?)?,
     );
     copy_optional_timestamp(row, fields, "revoked_at_ms", "revoked_at")?;
+    // A connection keeps the configuration revision it was admitted or last
+    // upgraded under. It is recorded only while it differs from its instance's,
+    // so a connection that follows its instance records none. A revoked
+    // connection is terminal and always follows its instance
+    // (registry/revalidation.rs `follow_instance`), so an upgrade never
+    // re-records it.
+    let revision = binding
+        .get("configuration_revision")
+        .and_then(Value::as_str)
+        .ok_or(Failure::MetadataUnavailable)?;
+    let instance_revision: String = connection
+        .query_row(
+            "SELECT configuration_revision FROM registry_instances WHERE instance_id=?1",
+            [text_field(row, "instance_id")?],
+            |record| record.get(0),
+        )
+        .map_err(unavailable)?;
+    if revision != instance_revision {
+        fields.insert("configuration_revision".into(), json!(revision));
+    }
     Ok((
         id.to_owned(),
         match text_field(row, "state")? {
@@ -2766,10 +2786,15 @@ fn connection_projection(
         .remove("profile_id")
         .ok_or(Failure::MetadataUnavailable)?;
     object.insert("id".into(), profile_id);
+    let configuration_revision = match row.fields.get("configuration_revision") {
+        Some(kept) if kept != domain(instance, "revision")? => kept,
+        Some(_) => return Err(Failure::MetadataUnavailable),
+        None => domain(instance, "revision")?,
+    };
     let binding = json!({
         "instance_id": domain(row, "instance_id")?,
         "adapter_id": domain(instance, "adapter_id")?,
-        "configuration_revision": domain(instance, "revision")?,
+        "configuration_revision": configuration_revision,
         "provider_authority": domain(row, "provider_authority")?,
         "profile": static_profile,
     });

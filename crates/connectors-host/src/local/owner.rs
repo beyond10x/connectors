@@ -77,6 +77,10 @@ pub struct Error {
     pub service_code: Option<connectors_core::ErrorCode>,
     #[serde(default, skip_serializing_if = "Origin::is_host")]
     pub origin: Origin,
+    /// The connection's authentication changed under the configuration; only a
+    /// new connection helps (`registry::Failure::BindingChanged`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reconnect: bool,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -85,6 +89,7 @@ impl From<Code> for Error {
             acquisition: None,
             service_code: None,
             origin: Origin::Host,
+            reconnect: false,
         }
     }
 }
@@ -104,22 +109,26 @@ impl From<super::Failure> for Error {
 impl From<registry::Failure> for Error {
     fn from(e: registry::Failure) -> Self {
         use registry::Failure as F;
-        match e {
+        // Only a new connection helps: repair refuses a changed binding.
+        let reconnect = matches!(e, F::BindingChanged | F::UpgradeIdentityMismatch);
+        let mut error = Error::from(match e {
+            F::BindingChanged => Code::LifecycleConflict,
             F::MetadataUnavailable => Code::MetadataUnavailable,
             F::ConcurrentRevision => Code::RevisionConflict,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
             F::Conflict => Code::LifecycleConflict,
             F::Revoked => Code::Revoked,
-            F::IdentityMismatch => Code::IdentityMismatch,
+            F::IdentityMismatch | F::UpgradeIdentityMismatch => Code::IdentityMismatch,
             F::Expired => Code::Timeout,
             F::InvalidInput => Code::InvalidInput,
             F::StaleCursor => Code::StaleCursor,
             F::Capacity => Code::Capacity,
             F::NotReady | F::InsufficientScope => Code::NotGranted,
             F::CustodyUnavailable => Code::CustodyUnavailable,
-        }
-        .into()
+        });
+        error.reconnect = reconnect;
+        error
     }
 }
 impl From<runtime::Failure> for Error {
@@ -175,6 +184,7 @@ impl From<runtime::Failure> for Error {
             acquisition: None,
             service_code,
             origin,
+            reconnect: false,
         }
     }
 }
@@ -303,19 +313,31 @@ pub fn admit_revalidation(
     revision: &str,
 ) -> Result<String> {
     let (config, adapter) = selected(paths, alias)?;
-    let profile = registry::Registry::new(&paths.state).revalidation_profile(
+    let recorded = registry::Registry::new(&paths.state).revalidation_binding(
         &adapter.instance_id,
         &adapter.adapter_id,
         connection,
         revision,
     )?;
+    let profile = recorded.profile.id.clone();
     if !adapter.permissions.profiles.contains(&profile) {
         return Err(Code::Forbidden.into());
     }
     if !custody::available_at(config.secret_service_socket.as_deref()) {
         return Err(Code::CustodyUnavailable.into());
     }
-    let binding = cached(paths, alias)?.binding(&profile)?;
+    // Nothing is cached for a configuration until the adapter is launched
+    // under it, as after a configuration upgrade. Admit against the binding the
+    // connection was admitted under; the owner's capture compares it with the
+    // launched provider's binding before any material is read.
+    let binding = match cached(paths, alias) {
+        Ok(bootstrap) => bootstrap.binding(&profile)?,
+        Err(Error {
+            code: Code::DescriptionUnavailable,
+            ..
+        }) => recorded,
+        Err(error) => return Err(error),
+    };
     registry::Registry::with_system_clock(&paths.state).admit_revalidation(
         &binding,
         connection,
