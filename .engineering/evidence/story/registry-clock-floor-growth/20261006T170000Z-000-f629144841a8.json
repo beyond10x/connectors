@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T17:00:00Z",
+  "actor": "human:timo",
+  "artifact": "story:registry-clock-floor-growth",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "aep:adversary: F1 unlocked persist and F2 released-lock floor access refused by require_lifecycle_lock, their 2 red tests green (F1 test rewritten to assert the refusal); F3 docs rewritten; floor file loss, rollback, corruption, 60 s boundary, crash order and upgrade path attacked without a break"
+  }
+}

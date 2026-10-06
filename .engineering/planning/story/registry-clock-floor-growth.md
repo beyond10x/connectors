@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:registry-clock-floor-growth
 kind: story
-status: active
+status: implemented
 title: The registry clock floor no longer records an event on every command
 relations:
 - decomposes: epic:connector-probe-20261006
@@ -27,10 +27,11 @@ scope:
   path: docs/local-er-metadata.md
 - confidence: cited
   path: ess/domains/clock.yaml
-revision: 10
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T10:22:14Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-10-06T10:22:15Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-06T14:56:50Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"test_result":1,"review_outcome":3,"verification":1}}}
 ---
 ## Observed
 

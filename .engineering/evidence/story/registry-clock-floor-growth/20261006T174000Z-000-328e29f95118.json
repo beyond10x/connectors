@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T17:40:00Z",
+  "actor": "human:timo",
+  "artifact": "story:registry-clock-floor-growth",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "repository gate exit 0 (1335 passed, 0 failed, 71 ignored) on the b98ddf81b6 tree; cargo test -p connectors-host on merge d95ad9c55e: 0 failed; read_invoke_cost_by_store_size LocalClockFloor per read invoke 4.0 -> 0.0"
+  }
+}
