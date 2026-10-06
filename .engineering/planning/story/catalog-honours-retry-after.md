@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-honours-retry-after
 kind: story
-status: active
+status: implemented
 title: A catalog read answered 429 honours Retry-After
 relations:
 - decomposes: epic:tech-debt-review-20260930
@@ -24,10 +24,11 @@ scope:
   path: docs/catalog-jira.md
 - confidence: cited
   path: docs/local-catalog-provider.md
-revision: 9
+revision: 10
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T15:10:45Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"review_outcome":1}}}
 - {from: "proposed", to: "active", at: "2026-10-06T15:10:45Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "active", to: "implemented", at: "2026-10-06T16:21:50Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}}
 ---
 ## Defect
 
