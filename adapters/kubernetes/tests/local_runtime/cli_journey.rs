@@ -397,11 +397,7 @@ fn persistent_kubernetes_cli_owner_and_keyring_restart() {
         r#"{"namespace":"fixture","kind":"pods","limit":1}"#,
     ];
     let value = success(cli.run(&invoke));
-    assert_eq!(
-        value["result"]["items"][0]["metadata"]
-            ["name"],
-        "pod-0"
-    );
+    assert_eq!(value["result"]["items"][0]["metadata"]["name"], "pod-0");
 
     let old_host = cli.status()["host_incarnation"].clone();
     cli.shutdown();
@@ -555,10 +551,7 @@ fn kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_cre
         "--input-json",
         r#"{"namespace":"fixture","limit":10}"#,
     ]));
-    assert_eq!(
-        result["result"]["items"][0]["address"],
-        "10.0.0.7"
-    );
+    assert_eq!(result["result"]["items"][0]["address"], "10.0.0.7");
 }
 
 #[test]

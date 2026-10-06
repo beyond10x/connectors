@@ -631,7 +631,14 @@ fn describe_and_invoke_answer_json_values_not_json_text() {
     adapter["descriptor"]["operations"] = json!([operation]);
     let cases: [(&[&str], Value); 2] = [
         (
-            &["operations", "describe", "--adapter", "forge", "--operation", "read"],
+            &[
+                "operations",
+                "describe",
+                "--adapter",
+                "forge",
+                "--operation",
+                "read",
+            ],
             described,
         ),
         (&["adapters", "describe", "--adapter", "forge"], adapter),
