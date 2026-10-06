@@ -9,6 +9,7 @@ relations:
 - depends_on: story:dependency-refresh-20261006
 - depends_on: story:service-failure-carries-upstream-reason
 - depends_on: story:expired-evidence-invoke-advises-revalidate
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: CHANGELOG.md
