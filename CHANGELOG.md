@@ -69,6 +69,24 @@
   connection probes carry none. The private adapter `failed` reply gains the matching
   optional `reason`, allowed only on a failed `invoke`; an owner that predates it refuses
   such a reply. See `contracts/cli/v1alpha1/semantics.md`.
+- A catalog read answered `429` honours `Retry-After`: when the header names a delay
+  (delta-seconds, or an HTTP-date rounded up to a whole second) and the wait, a second
+  request as long as the first one took and a 500 ms margin all end before the
+  invocation deadline, the provider waits and sends the read once more, never a third
+  time, bounding it by the deadline less the margin (if it does not finish, the first
+  `rate_limited` refusal and its delay stand), so a page walk over Jira, Confluence, HubSpot, Zendesk or Google no longer
+  fails at the first rate limit. Otherwise, and after a second `429`, the failure
+  carries the new optional `connectors.cli.Failure.retry_after_seconds` beside
+  `service_code: rate_limited`, so the caller can wait; its absence means the provider
+  named no delay the engine could read (no header, another form, two `Retry-After`
+  lines that disagree, or more than 4294967295 seconds, which the host also drops when
+  a child reports one). The HTTP transport now combines a response's repeated field
+  lines into one value joined by `, ` (RFC 9110 §5.3) instead of keeping the last;
+  identical repeats count once. Guarded writes and their preflight reads are never sent again
+  and carry no delay; a write answered `429` stays `unknown`. The private adapter
+  `failed` reply gains the matching optional `retry_after_seconds`, allowed only on a
+  failed `invoke` beside `provider_rate_limited`; an owner that predates it refuses
+  such a reply.
 
 ### Tests
 

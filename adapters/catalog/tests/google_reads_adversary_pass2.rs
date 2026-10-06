@@ -78,8 +78,8 @@ async fn an_empty_text_export_is_the_empty_string() {
     assert_eq!(read["body"], json!(""));
 }
 
-/// The Drive guide's Limits: "does not retry on `429`; a rate-limited read is
-/// returned as a refusal". Drive's published usage-limit answer is a `403`
+/// The Drive guide's Limits: a read answered `429` is returned as a
+/// `rate_limited` refusal once any delay it names no longer fits. Drive's published usage-limit answer is a `403`
 /// whose reason is `userRateLimitExceeded` (or `rateLimitExceeded`), beside
 /// `429`. The caller has to be able to tell that apart from a permission
 /// denial to decide whether a walk can be resumed, so it arrives as

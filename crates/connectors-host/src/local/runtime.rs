@@ -151,6 +151,7 @@ mod failure_tests {
             request_id: "r".into(),
             code: Failure::InvalidCredential,
             reason: None,
+            retry_after_seconds: None,
         };
         assert_eq!(
             serde_json::to_string(&without).unwrap(),
@@ -161,6 +162,71 @@ mod failure_tests {
         )
         .unwrap();
         assert!(matches!(with, Reply::Failed { reason: Some(r), .. } if r == scope));
+    }
+
+    /// story:catalog-honours-retry-after: the delay a provider named on its
+    /// own rate-limit answer reaches the owner's failure beside
+    /// `service_code = rate_limited`, and nothing else carries one.
+    #[test]
+    fn a_named_delay_reaches_the_owner_only_beside_a_providers_rate_limit() {
+        use crate::local::owner::{Code, Error};
+        let delayed = |code, answered: bool| {
+            let mut error = connectors_core::Error::new(code, "provider refused the request");
+            if answered {
+                error = error.answered();
+            }
+            error.retry_after_seconds = Some(7);
+            error
+        };
+        let refusal = Refusal::from_provider(delayed(ErrorCode::RateLimited, true));
+        assert_eq!(refusal.failure, Failure::ProviderRateLimited);
+        assert_eq!(refusal.retry_after_seconds, Some(7));
+        let error: Error = refusal.into();
+        assert_eq!(error.code, Code::ServiceFailure);
+        assert_eq!(error.service_code, Some(ErrorCode::RateLimited));
+        assert_eq!(error.retry_after_seconds, Some(7));
+        let bytes = serde_json::to_string(&error).unwrap();
+        assert_eq!(
+            bytes,
+            r#"{"code":"service_failure","service_code":"rate_limited","retry_after_seconds":7}"#
+        );
+        let back: Error = serde_json::from_str(&bytes).unwrap();
+        assert_eq!(back.retry_after_seconds, Some(7));
+        // A rate limit the adapter raised itself, and any other answer, name none.
+        assert_eq!(
+            Refusal::from_provider(delayed(ErrorCode::RateLimited, false)).retry_after_seconds,
+            None
+        );
+        for code in [
+            ErrorCode::Unavailable,
+            ErrorCode::Unauthorized,
+            ErrorCode::Forbidden,
+        ] {
+            assert_eq!(
+                Refusal::from_provider(delayed(code.clone(), true)).retry_after_seconds,
+                None,
+                "{code:?}"
+            );
+        }
+        // The owner keeps a delay only beside the provider's rate limit.
+        let misplaced = Error::from(Refusal {
+            failure: Failure::InvalidCredential,
+            reason: None,
+            retry_after_seconds: Some(7),
+        });
+        assert_eq!(misplaced.retry_after_seconds, None);
+        // The private reply names the delay only when there is one.
+        let with: Reply = serde_json::from_str(
+            r#"{"kind":"failed","request_id":"r","code":"provider_rate_limited","retry_after_seconds":7}"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            with,
+            Reply::Failed {
+                retry_after_seconds: Some(7),
+                ..
+            }
+        ));
     }
 
     /// The host admits a child's reason again, against the credential document
@@ -283,29 +349,45 @@ mod failure_tests {
 pub struct Refusal {
     pub failure: Failure,
     pub reason: Option<String>,
+    /// The delay the upstream named before a rate-limited read may be sent
+    /// again, in whole seconds; only on [`Failure::ProviderRateLimited`].
+    pub retry_after_seconds: Option<u64>,
 }
 impl From<Failure> for Refusal {
     fn from(failure: Failure) -> Self {
         Self {
             failure,
             reason: None,
+            retry_after_seconds: None,
         }
     }
 }
 impl Refusal {
     /// [`Failure::from_provider`], keeping the reason only of an upstream's
-    /// own answer.
+    /// own answer, and the delay only of its rate-limit answer.
     pub fn from_provider(error: connectors_core::Error) -> Self {
         let reason = error
             .upstream_reason
             .as_deref()
             .filter(|_| error.upstream_answer)
             .and_then(connectors_core::reason::admit);
+        // Only the provider's own rate-limit answer names a delay.
+        let retry_after_seconds = error
+            .retry_after_seconds
+            .filter(|_| error.upstream_answer && error.code == ErrorCode::RateLimited);
         Self {
             failure: Failure::from_provider(error),
             reason,
+            retry_after_seconds,
         }
     }
+}
+/// A child's named delay as the host accepts it: a whole number of seconds
+/// from 0 to 4294967295, the range the CLI contract gives
+/// `Failure.retry_after_seconds`. A larger value is not read; the failure
+/// itself still stands.
+pub(crate) fn admitted_delay(seconds: Option<u64>) -> Option<u64> {
+    seconds.filter(|seconds| *seconds <= u64::from(u32::MAX))
 }
 /// A child's reason as the host accepts it: already in admitted form, and
 /// holding no piece of the credential document the host sent for the call.
@@ -639,5 +721,10 @@ enum Reply {
         /// there is none. Additive: a host that predates it refuses the reply.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
+        /// The delay the upstream named before a rate-limited read may be
+        /// sent again, in whole seconds; only on a failed `invoke` whose code
+        /// is `provider_rate_limited`, and omitted when there is none.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        retry_after_seconds: Option<u64>,
     },
 }
