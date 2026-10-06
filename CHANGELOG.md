@@ -34,6 +34,18 @@
 
 ### Changed
 
+- The registry clock floor no longer records an Entity Runtime event on every
+  command. Its durable value is the new file `registry-clock.floor` beside
+  `metadata.lock`, written under the metadata lock by temporary file, fsync and
+  rename; the recorded `connectors.clock.LocalClockFloor` `s:registry` advances only
+  to a sample more than 60 s past it, and an unchanged floor is not re-recorded. A
+  read invoke appended 4 floor events of 7 before; now none within 60 s of the last
+  recorded floor. The regression check is unchanged: a sample below the higher of
+  the file and the recorded floor is refused. Migration: none. A store without the
+  file (every existing store, on its first command after the upgrade) treats the
+  floor as the recorded value plus 60 s, so a command within 60 s of the last one
+  before the upgrade answers `metadata_unavailable`; a deleted or corrupt
+  file does the same. `connectors.clock.RegistryClockFloorFile` models the file.
 - ESS 0.53.0 (from 0.52.0) and AEP 0.68.0 (from 0.65.0): the seven ESS crates, the pinned
   toolchains and the planning store's `protocols` pin; 23 compatible crates.io updates
   (among them tokio 1.53.2, jsonschema 0.58.5). uuid stays at 1.26.1: 1.27.0 requires
