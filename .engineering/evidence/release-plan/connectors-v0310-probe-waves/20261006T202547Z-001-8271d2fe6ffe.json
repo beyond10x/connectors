@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T20:25:47Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0310-probe-waves",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "website on 6db05b34dc: typecheck 0, build 0 (498 public files checked, no private path markers), reference:check 0 (45 contract / 101 reference pages, no drift), test:examples 0 (15 passed)"
+  }
+}

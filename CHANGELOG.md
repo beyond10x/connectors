@@ -1,9 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.31.0 — 2026-10-06
 
 ### Added
 
+- `operations list --family <contract id>` answers the operations that bind a datasource
+  family, for any adapter, including one installed after the consumer
+  (`OperationListInput.family` in `ess/domains/cli.yaml`).
+- The `datasource.feed/v1alpha1` contract family, and a catalog feed engine: a provider
+  declared only as data answers `feed.containers` and `feed.items` through the catalog
+  engine. The feed suite has 28 scenarios; a native, a time and a cursor fixture provider
+  pass all 28. Not yet: an invoke through a saved connection, and any real provider
+  binding.
 - `connections launch --adapter --connection --consumer [--args <JSON array>]` runs
   an operator-pinned consumer executable with one saved connection's protected
   document on file descriptor 3, with the caller's stdio, and exits with the
