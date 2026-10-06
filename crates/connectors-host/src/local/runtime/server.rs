@@ -33,15 +33,18 @@ pub trait Adapter: Send + Sync {
         document: Secret,
         input: Value,
     ) -> Result<Value>;
-    /// [`Adapter::invoke`] with the upstream's admitted reason for a refusal
-    /// (see [`Refusal::from_provider`]); the server answers through this one.
-    /// By default no reason is given.
+    /// [`Adapter::invoke`] with the upstream's admitted reason and named delay
+    /// for a refusal (see [`Refusal::from_provider`]); the server answers
+    /// through this one. `deadline` is the instant the invocation's reply is
+    /// due: an adapter that waits before sending again never waits past it.
+    /// By default no reason or delay is given and the deadline is not read.
     async fn invoke_explained(
         &self,
         operation: &str,
         partition: &str,
         document: Secret,
         input: Value,
+        _deadline: Instant,
     ) -> std::result::Result<Value, Refusal> {
         self.invoke(operation, partition, document, input)
             .await
@@ -201,6 +204,7 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
             budget
         };
         let mut reason = None;
+        let mut retry_after_seconds = None;
         let reply = executor.block_on(async {
             let future = async {
                 match operation {
@@ -247,10 +251,11 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
                         connectors_sdk::validate(&declaration.input_schema, &input)
                             .map_err(Failure::from_service)?;
                         let result = adapter
-                            .invoke_explained(&operation, &partition, frame.secret, input)
+                            .invoke_explained(&operation, &partition, frame.secret, input, until)
                             .await
                             .map_err(|refusal| {
                                 reason = refusal.reason;
+                                retry_after_seconds = refusal.retry_after_seconds;
                                 refusal.failure
                             })?;
                         connectors_sdk::validate(&declaration.output_schema, &result)
@@ -280,6 +285,7 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
                     request_id: id,
                     code,
                     reason,
+                    retry_after_seconds,
                 },
                 Vec::new(),
             ),

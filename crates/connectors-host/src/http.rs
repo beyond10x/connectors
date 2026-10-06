@@ -400,7 +400,7 @@ impl AuthenticatedWrite for ScopedWrite {
                 ));
             }
             if let Ok(value) = value.to_str() {
-                headers.insert(name.to_string(), value.to_owned());
+                keep_header(&mut headers, name.as_str(), value);
             }
         }
         let body = connectors_client::bounded(response)
@@ -454,7 +454,7 @@ impl AuthProbe for ScopedProbe {
                 ));
             }
             if let Ok(value) = value.to_str() {
-                headers.insert(name.to_string(), value.to_owned());
+                keep_header(&mut headers, name.as_str(), value);
             }
         }
         let body = connectors_client::bounded(response)
@@ -534,7 +534,7 @@ async fn bounded_response(response: reqwest::Response) -> Result<HttpResponse> {
             ));
         }
         if let Ok(value) = value.to_str() {
-            headers.insert(name.to_string(), value.to_owned());
+            keep_header(&mut headers, name.as_str(), value);
         }
     }
     let body = connectors_client::bounded(response)
@@ -571,16 +571,37 @@ fn provider_error(error: reqwest::Error) -> Error {
     }
 }
 
+/// Keep one response field line. Lines repeating a field name are combined
+/// into one value joined by `, `, as RFC 9110 §5.3 lets a recipient do, so a
+/// singleton field given two different values (two `Retry-After` lines that
+/// disagree) reads as neither; a line repeating the value already kept counts
+/// once.
+fn keep_header(headers: &mut std::collections::BTreeMap<String, String>, name: &str, value: &str) {
+    match headers.entry(name.to_owned()) {
+        std::collections::btree_map::Entry::Vacant(entry) => {
+            entry.insert(value.to_owned());
+        }
+        std::collections::btree_map::Entry::Occupied(mut entry) => {
+            if entry.get() != value {
+                let kept = entry.get_mut();
+                kept.push_str(", ");
+                kept.push_str(value);
+            }
+        }
+    }
+}
+
 #[async_trait]
 impl AuthenticatedHttp for ScopedHttp {
     async fn get(&self, segments: &[&str], query: &[(&str, String)]) -> Result<HttpResponse> {
         let response = self.send_get(segments, query).await?;
         let status = response.status().as_u16();
-        let headers = response
-            .headers()
-            .iter()
-            .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), v.to_owned())))
-            .collect();
+        let mut headers = std::collections::BTreeMap::new();
+        for (name, value) in response.headers() {
+            if let Ok(value) = value.to_str() {
+                keep_header(&mut headers, name.as_str(), value);
+            }
+        }
         let body = connectors_client::bounded(response)
             .await
             .map_err(body_error)?;
@@ -616,7 +637,7 @@ impl AuthenticatedHttp for ScopedHttp {
                 ));
             }
             if let Ok(value) = value.to_str() {
-                headers.insert(name.to_string(), value.to_owned());
+                keep_header(&mut headers, name.as_str(), value);
             }
         }
         let mut body = Vec::with_capacity(limit);
@@ -671,11 +692,12 @@ impl AuthenticatedHttp for ScopedHttp {
             .await
             .map_err(provider_error)?;
         let status = response.status().as_u16();
-        let headers = response
-            .headers()
-            .iter()
-            .filter_map(|(k, v)| v.to_str().ok().map(|v| (k.to_string(), v.to_owned())))
-            .collect();
+        let mut headers = std::collections::BTreeMap::new();
+        for (name, value) in response.headers() {
+            if let Ok(value) = value.to_str() {
+                keep_header(&mut headers, name.as_str(), value);
+            }
+        }
         let body = connectors_client::bounded(response)
             .await
             .map_err(body_error)?;
@@ -691,6 +713,23 @@ impl AuthenticatedHttp for ScopedHttp {
 mod tests {
     use super::*;
     use connectors_sdk::PROBE_BODY_LIMIT;
+
+    /// story:catalog-honours-retry-after: repeated field lines are combined,
+    /// so two disagreeing `Retry-After` lines keep neither value alone; an
+    /// identical repeat counts once.
+    #[test]
+    fn repeated_field_lines_are_combined_and_an_identical_repeat_counts_once() {
+        let mut headers = std::collections::BTreeMap::new();
+        keep_header(&mut headers, "retry-after", "3600");
+        keep_header(&mut headers, "retry-after", "1");
+        assert_eq!(headers["retry-after"], "3600, 1");
+        let mut headers = std::collections::BTreeMap::new();
+        keep_header(&mut headers, "retry-after", "7");
+        keep_header(&mut headers, "retry-after", "7");
+        keep_header(&mut headers, "content-type", "application/json");
+        assert_eq!(headers["retry-after"], "7");
+        assert_eq!(headers["content-type"], "application/json");
+    }
 
     /// A base that resolves nowhere, so any test reaching I/O fails with
     /// `Unavailable` rather than the refusal the case is asserting.
