@@ -283,7 +283,8 @@ fn documented_auth(guide: &str, provider: &str) -> Value {
 
 /// Jira and Confluence use one profile: the same id, scheme, labels and
 /// identity kind, so one credential document connects both. Only the identity
-/// read differs, because each product answers it at its own path.
+/// read differs, because each product answers it at its own path, and Confluence
+/// also declares a v2 page read as its access probe.
 #[test]
 fn confluence_and_jira_document_one_profile() {
     let confluence = documented_auth("catalog-confluence.md", "confluence");
@@ -295,6 +296,8 @@ fn confluence_and_jira_document_one_profile() {
     let without_identity_path = |auth: &Value| {
         let mut auth = auth.clone();
         auth["identity"]["path"] = Value::Null;
+        // Confluence also checks a v2 page read at validation (#102).
+        auth["access"] = Value::Null;
         auth
     };
     assert_eq!(

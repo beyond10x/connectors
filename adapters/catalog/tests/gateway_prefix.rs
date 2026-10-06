@@ -137,11 +137,13 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
         "285ef4ae7a2543c531aaf0de24366edd6a911027875335f8beb241e8c86f8a35",
         "a365c570b8410d96a46906986efe97b668a7e061c121ee46180ac0cfadef35a0",
     ),
+    // The Confluence guide declares an `access` probe since #102, which is part of
+    // its configuration and so of its revision.
     (
         "catalog-confluence.md",
         "confluence",
-        "211317303cd6fa5c21355bc440b15593beb3170f78831fad711fd22ab8a2bf61",
-        "e5c2788b2e079a0cf80bf6803180382f4d4b647836be297ec8e7aa1c3691770e",
+        "b6620549f33372b55a07ec1e1abc582583e2aff7f14a9434e73fcc4272a2cc0a",
+        "86a936572eaa670f31dfb80ea503d568c7e3732384bbe46207047796a5599e28",
     ),
 ];
 
