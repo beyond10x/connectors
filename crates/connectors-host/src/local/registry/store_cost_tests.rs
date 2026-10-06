@@ -1,6 +1,8 @@
 //! What one read invoke's metadata transactions cost as the store grows by
 //! read invokes, the way an operator's store grows.
-use super::tests::{NOW, binding, fixture, prepared, publish_fixture, recorded_events};
+use super::tests::{
+    NOW, binding, fixture, prepared, publish_fixture, recorded_clock_floor_events, recorded_events,
+};
 use super::*;
 use std::{collections::BTreeMap, os::unix::fs::PermissionsExt, time::Duration};
 
@@ -139,7 +141,16 @@ fn save(root: &Path, stored: &Path, reference: &str) {
         .pragma_update(None, "journal_mode", "WAL")
         .unwrap();
     std::fs::write(stored.join("reference"), reference).unwrap();
+    // The registry's durable clock floor belongs to the store; a store copied
+    // without it would refuse every sample within one interval of its record.
+    let floor = stored.join(FLOOR_FILE);
+    let _ = std::fs::remove_file(&floor);
+    if root.join(FLOOR_FILE).exists() {
+        std::fs::copy(root.join(FLOOR_FILE), &floor).unwrap();
+    }
 }
+
+const FLOOR_FILE: &str = "registry-clock.floor";
 
 fn load(stored: &Path) -> (tempfile::TempDir, Registry, String) {
     let root = tempfile::tempdir().unwrap();
@@ -147,7 +158,12 @@ fn load(stored: &Path) -> (tempfile::TempDir, Registry, String) {
     let target = root.path().join("metadata.sqlite3");
     std::fs::copy(stored.join("metadata.sqlite3"), &target).unwrap();
     std::fs::write(root.path().join("metadata.lock"), b"").unwrap();
-    for name in ["metadata.sqlite3", "metadata.lock"] {
+    let mut names = vec!["metadata.sqlite3", "metadata.lock"];
+    if stored.join(FLOOR_FILE).exists() {
+        std::fs::copy(stored.join(FLOOR_FILE), root.path().join(FLOOR_FILE)).unwrap();
+        names.push(FLOOR_FILE);
+    }
+    for name in names {
         std::fs::set_permissions(
             root.path().join(name),
             std::fs::Permissions::from_mode(0o600),
@@ -191,6 +207,7 @@ fn read_invoke_cost_by_store_size() {
             measured_invoke(root.path(), registry, reference, NOW + 10_000)
         }));
         let before = recorded_events(root.path());
+        let floors_before = recorded_clock_floor_events(root.path());
         let mut totals = Vec::new();
         let mut cpu = Vec::new();
         let mut failed = 0;
@@ -227,12 +244,14 @@ fn read_invoke_cost_by_store_size() {
             continue;
         }
         let appended = recorded_events(root.path()) - before;
+        let floors = recorded_clock_floor_events(root.path()) - floors_before;
         totals.sort_unstable();
         cpu.sort_unstable();
         let per = |total: Duration| ms(total) / measured as f64;
         println!(
-            "events={recorded} invokes={measured} failed={failed} appended_per_invoke={} median_ms={:.0} min_ms={:.0} max_ms={:.0} median_cpu_ms={:.0}",
+            "events={recorded} invokes={measured} failed={failed} appended_per_invoke={} clock_floor_events_per_invoke={:.1} median_ms={:.0} min_ms={:.0} max_ms={:.0} median_cpu_ms={:.0}",
             appended / MEASURED as i64,
+            floors as f64 / MEASURED as f64,
             ms(totals[measured / 2]),
             ms(totals[0]),
             ms(totals[measured - 1]),
