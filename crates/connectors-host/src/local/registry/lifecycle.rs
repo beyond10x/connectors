@@ -268,6 +268,8 @@ impl Registry {
                 .query_map([reference], |r| r.get::<_,String>(0)).map_err(db)?.collect::<std::result::Result<Vec<_>,_>>().map_err(db)?;
             for version in versions { retire(tx, &version, now)?; }
             tx.execute("UPDATE registry_uses SET released=1 WHERE connection_ref=?1 AND dispatched=0", [reference]).map_err(db)?;
+            let configured: String = tx.query_row("SELECT configuration_revision FROM registry_instances WHERE instance_id=?1", [instance], |r| r.get(0)).map_err(db)?;
+            super::revalidation::follow_instance(tx, instance, &configured)?;
             bump(tx, instance)?;
             Ok(revision)
         })

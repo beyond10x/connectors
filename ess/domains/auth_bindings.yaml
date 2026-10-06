@@ -112,6 +112,7 @@ entities:
       - {name: superseded_custody_version_refs, type: "List<String>"}
       - {name: created_at, type: Timestamp}
       - {name: revoked_at, type: "Optional<Timestamp>"}
+      - {name: configuration_revision, type: "Optional<String>"}
     relations:
       - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
       - {name: auth_profile, kind: references, target: connectors.auth_bindings.AuthProfile, cardinality: one, via: profile_record_ref}
@@ -142,6 +143,13 @@ entities:
     # under connection §4.2. No value before publication or for non-material modes.
     # Generation/binding equality, check subset/uniqueness, byte/freshness bounds,
     # invalidation and retention are owner predicates, not enforced by Optional.
+    # configuration_revision is the instance configuration revision this
+    # connection was admitted or last upgraded under, recorded only while it
+    # differs from its instance's revision; absent, it is the instance's. An
+    # upgrade (registry/revalidation.rs) moves the instance and the revalidated
+    # connection to the configured revision and records every other connection
+    # of the instance with the revision it keeps until it is revalidated itself.
+    # A revoked connection is terminal: it records none and follows its instance.
     # Fixed mediated route and parent are present together only for a via binding;
     # parent identity is this field, not duplicated route authority. Historical
     # observation coordinates impose no live observation FK or retention pin.

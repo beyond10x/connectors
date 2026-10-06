@@ -88,8 +88,8 @@ invocations are two charges.
 The entry pins the executable's SHA-256, and the host serves the bootstrap it cached at the last
 admitted launch. After rebuilding `connectors-tavily`, update `sha256`, stop the running
 incarnation exactly, then repair the connection, which performs the admitted launch under the same
-connection id. Until then `operations describe` and `connections revalidate` answer
-`description_unavailable`:
+connection id. Until then `operations describe` answers `description_unavailable`;
+`connections revalidate` performs the admitted launch too:
 
 ```sh
 target/release/connectors --output json adapters status --adapter tavily
