@@ -79,6 +79,7 @@ fn request<'a>(
         directory,
         auth_profile: "fixture.token",
         replace,
+        amendments: None,
     }
 }
 
