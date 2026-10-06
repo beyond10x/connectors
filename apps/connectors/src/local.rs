@@ -187,6 +187,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     if let Some(service_code) = error.service_code {
         data["service_code"] = json!(service_code);
     }
+    if let Some(service_reason) = error.service_reason {
+        data["service_reason"] = json!(service_reason);
+    }
     if usage {
         HandlerReply::UsageError {
             code: "failure".into(),
@@ -501,6 +504,27 @@ mod tests {
             stage(error(Code::Unsupported, Origin::Provider)),
             (json!("admission"), json!("none"))
         );
+    }
+
+    /// story:service-failure-carries-upstream-reason: the provider's bounded
+    /// reason is in the failure data beside `service_code`, and absent when
+    /// the owner reported none.
+    #[test]
+    fn a_service_failure_carries_the_upstream_reason_beside_its_code() {
+        let mut error = owner::Error::from(owner::Code::ServiceFailure);
+        error.service_code = Some(connectors_core::ErrorCode::Unauthorized);
+        let HandlerReply::Error { data, .. } = invoke_failure(error.clone()) else {
+            panic!("not a failure");
+        };
+        assert!(data.get("service_reason").is_none(), "{data}");
+        error.service_reason = Some("Unauthorized; scope does not match".into());
+        let HandlerReply::Error { data, .. } = invoke_failure(error) else {
+            panic!("not a failure");
+        };
+        assert_eq!(data["code"], "service_failure");
+        assert_eq!(data["service_code"], "unauthorized");
+        assert_eq!(data["service_reason"], "Unauthorized; scope does not match");
+        assert_eq!(data["stage"], "dispatch");
     }
 
     fn reply(reply: HandlerReply) -> (Value, Value, Value) {

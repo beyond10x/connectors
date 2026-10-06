@@ -4,6 +4,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
+pub mod reason;
+
 pub const WIRE_VERSION: &str = "v1alpha1";
 pub const REQUEST_LIMIT: usize = 64 * 1024;
 pub const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
@@ -39,6 +41,11 @@ pub struct Error {
     /// from its configuration before any request. Never on the wire.
     #[serde(skip)]
     pub upstream_answer: bool,
+    /// In-process only: the upstream's own bounded, redacted reason for its
+    /// answer, as [`reason::from_body`] admits it. Never on the wire, and never
+    /// in `message`; only the local private adapter route forwards it.
+    #[serde(skip)]
+    pub upstream_reason: Option<String>,
 }
 
 impl Error {
@@ -48,11 +55,17 @@ impl Error {
             message: message.into(),
             retry_after_seconds: None,
             upstream_answer: false,
+            upstream_reason: None,
         }
     }
     /// Mark this error as the upstream's own answer.
     pub fn answered(mut self) -> Self {
         self.upstream_answer = true;
+        self
+    }
+    /// Attach the upstream's admitted reason; see [`reason`].
+    pub fn with_upstream_reason(mut self, reason: Option<String>) -> Self {
+        self.upstream_reason = reason;
         self
     }
     pub fn invalid(message: impl Into<String>) -> Self {

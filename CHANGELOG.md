@@ -43,6 +43,20 @@
   `ess generate output adopt` before regenerating (`docs/development.md`); the gate's
   `cli --check` needs no enrollment. The metadata mutation emitter fills the
   `ess-mutation-manifest/4` fields ESS 0.53.0 added, unset, since it writes `/2`.
+- A read the provider refuses at dispatch now says why: `connectors.cli.Failure` gains the
+  optional `service_reason`, beside `service_code` (or on a provider `forbidden`), so a
+  Confluence `unauthorized` names `Unauthorized; scope does not match` and a missing token
+  scope is told apart from a wrong path. Only the catalog provider supplies one, and only
+  from the top-level `message`, `error_description` or `error` string of a JSON refusal
+  body; never a header. It is at most 256 bytes, cut back to a whole word, and withheld
+  whole when it holds a control, format (Unicode Cf, the TAG block included) or other
+  invisible character, an `@` (no email address is carried), a credential-like marker
+  (`authorization`, `bearer`, `token=`, …), a token-like run or word, a piece of the
+  credential value the adapter derived and sent (checked by the adapter), or a piece of
+  the call's own protected document (checked again by the host). Guarded writes and
+  connection probes carry none. The private adapter `failed` reply gains the matching
+  optional `reason`, allowed only on a failed `invoke`; an owner that predates it refuses
+  such a reply. See `contracts/cli/v1alpha1/semantics.md`.
 
 ### Tests
 
