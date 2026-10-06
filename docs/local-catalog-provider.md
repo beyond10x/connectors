@@ -509,6 +509,19 @@ appeared, which opened merge request 11 at the moved head and was classified
   a live provider, and the provider does not acquire the OAuth entry itself.
 - Pagination and error envelopes are not declared; a paged read returns one page
   as the provider answers it.
+- A read answered `429` is sent once more, and never a third time, after the
+  delay its `Retry-After` names (delta-seconds, or an HTTP-date rounded up to a
+  whole second), when that wait leaves the second request time of its own: the
+  wait, then as long again as the first request took, then 500 ms, must all end
+  before the invocation deadline. The second request must finish 500 ms before
+  the deadline; if it does not, the first answer's refusal and delay stand.
+  Otherwise, and after a second `429`, `operations invoke` fails with
+  `service_code: rate_limited` and `retry_after_seconds` set to the named delay,
+  so the caller can wait; without `retry_after_seconds` the provider named no
+  delay the engine could read. Two `Retry-After` lines on one answer that
+  disagree name no delay; identical repeats count as one. A guarded write, and
+  its preflight read, is sent once and never again, and its failure carries no
+  delay.
 - A guard compares scalars for equality. It cannot express "any of", ordering or
   a value the preflight must not have.
 - Only GitLab has run live. A second provider through the same engine is still
