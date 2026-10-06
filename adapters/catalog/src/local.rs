@@ -1006,6 +1006,13 @@ impl Local {
     /// The API port for one request and, for an OAuth profile, the cache key of
     /// the access token it carries, so a refusal of that token can evict it.
     async fn authenticated(&self, document: Secret) -> Result<(ScopedHttp, Option<[u8; 32]>)> {
+        let (credential, key) = self.credential(document).await?;
+        Ok((self.with(credential), key))
+    }
+    /// The credential value a request carries, derived from the protected
+    /// document (the token, the basic header value or an OAuth access token),
+    /// and for an OAuth profile the cache key of that access token.
+    async fn credential(&self, document: Secret) -> Result<(Secret, Option<[u8; 32]>)> {
         let credential = match self.auth.scheme {
             Scheme::Token => {
                 let document = Self::document(document)?;
@@ -1029,10 +1036,10 @@ impl Local {
                         exchanged.access
                     }
                 };
-                return Ok((self.with(Secret(access.as_bytes().to_vec())), Some(key)));
+                return Ok((Secret(access.as_bytes().to_vec()), Some(key)));
             }
         };
-        Ok((self.with(credential), None))
+        Ok((credential, None))
     }
     fn baseline(
         &self,
@@ -1272,17 +1279,45 @@ impl runtime::Adapter for Local {
     async fn invoke(
         &self,
         operation: &str,
-        _partition: &str,
+        partition: &str,
         document: Secret,
         input: Value,
     ) -> Result<Value> {
-        let (http, key) = self.authenticated(document).await?;
+        self.invoke_explained(operation, partition, document, input)
+            .await
+            .map_err(|refusal| refusal.failure)
+    }
+    async fn invoke_explained(
+        &self,
+        operation: &str,
+        _partition: &str,
+        document: Secret,
+        input: Value,
+    ) -> std::result::Result<Value, runtime::Refusal> {
+        let (credential, key) = self.credential(document).await?;
+        // The host checks a reason against the document it sent; only this
+        // child holds what it derived from it (the basic header value, an
+        // OAuth access token), so it withholds a reason holding any of that.
+        let derived = Zeroizing::new(credential.0.clone());
+        let http = self.with(credential);
         let result = self
             .engine
             .read(&http, &self.instance, operation, input)
             .await
-            .map_err(Failure::from_provider);
-        self.evict_refused(key, &result);
+            .map_err(|error| {
+                let mut refusal = runtime::Refusal::from_provider(error);
+                refusal.reason = refusal.reason.filter(|reason| {
+                    !connectors_core::reason::carries_value(reason, derived.as_slice())
+                });
+                refusal
+            });
+        self.evict_refused(
+            key,
+            &result
+                .as_ref()
+                .map(|_| ())
+                .map_err(|refusal| refusal.failure),
+        );
         result
     }
 }

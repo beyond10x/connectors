@@ -72,8 +72,19 @@ selection. Its closed failure includes `provider_not_found`,
 `connectors.cli.Failure.service_code`, with `code=service_failure`. In particular,
 provider `not_found`, `rate_limited` and `internal` must not become local selection
 `not_found` or generic unavailability. Admission failures keep their existing
-codes. No provider message, body or retry instruction enters the private control
-value. Unknown shared codes still refuse decoding; this adds no replay authority.
+codes. No provider body, header or retry instruction enters the private control
+value. The one exception is the optional `reason` of a failed `invoke`: the
+upstream's own reason for the refusal in the admitted form
+[semantics](semantics.md) defines for `connectors.cli.Failure.service_reason`,
+omitted when there is none. The host does not trust the child to have redacted
+it: it admits the reason again and drops it, keeping the failure's code, when it
+is not already in admitted form or holds any piece of the protected document the
+host sent for that call. The reason never decides the failure's code. A failed
+reply to anything but an `invoke` (a `validate`, a write's prepare, commit or
+cancel) that carries a `reason` is a malformed reply, refused as a protocol
+failure like any other. A host that predates the field
+refuses a reply that carries it. Unknown shared codes still
+refuse decoding; this adds no replay authority.
 
 Control objects have a required `kind` discriminator and no unknown fields. The
 request/response identity is one fresh opaque id per exchange; it is not an
@@ -88,7 +99,7 @@ idempotency key or authority to repeat provider work.
 | `invoke` | `request_id`, `operation`, `revision`, `partition`, `deadline_ms` | exact retained material / decoded provider-input carrier |
 | `success` | `request_id` | empty / provider-result carrier |
 | `stop` / `stopped` | `request_id` | both empty |
-| `failed` | `request_id`, closed `code` | both empty |
+| `failed` | `request_id`, closed `code`, optional `reason` (a failed `invoke` only) | both empty |
 
 Version is `connectors-private/1`. Startup challenges and child incarnations are
 UUIDs. Exchange identities and cursor partitions use the shared bounded identifier
