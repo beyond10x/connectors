@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.28.0
+# Source release v0.29.0
 
-Version **0.28.0** specifies at ESS source format `ess/15` with the released
+Version **0.29.0** specifies at ESS source format `ess/15` with the released
 ESS 0.52.0 and plans with the released AEP 0.65.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -17,6 +17,10 @@ discovery, GitLab and SQL.
 Since 0.28.0 the CLI's generated decoder refuses `operations invoke` business input
 with a duplicate object key itself, as `cli_dynamic_input`, before the owner sees it;
 exit code 2, empty stdout and no dispatch are as before.
+
+Since 0.29.0 local metadata runs on Entity Runtime 0.26.0 with provider-tracked capture:
+a read invoke takes 2.3 s at 1,203 recorded events instead of 40.2 s, so
+`connections revalidate` and invokes on a grown store no longer pass the 30 s deadline.
 
 ## Available runtime
 
@@ -50,11 +54,14 @@ deals and every other object type. It has no updated-since filter yet and has be
 exercised against local fixtures only.
 [Zendesk Support](https://github.com/beyond10x/connectors/blob/main/docs/catalog-zendesk.md)
 runs since 0.26.0 from its pinned Support API document, redacted of example
-credentials and contact data, with an API token as HTTP basic (`zendesk.basic`):
-tickets, users and organizations changed since a `start_time`, one of each by id,
-and a ticket's comments, seven reads and no writes. Lists return one page per call;
-the caller walks pages. It has been exercised against a local HTTPS fixture with
-synthetic records only, not a live Zendesk account.
+credentials and contact data: tickets, users and organizations changed since a
+`start_time`, one of each by id, and a ticket's comments, seven reads and no writes.
+Lists return one page per call; the caller walks pages. Since 0.29.0 it authenticates
+with an OAuth client's credentials (`zendesk.oauth`, scheme `oauth2_client_credentials`),
+which needs no refresh; the API token as HTTP basic (`zendesk.basic`) remains until
+Zendesk retires API tokens on 2027-04-30. On 2026-10-05 `zendesk.oauth` connected to a
+live account and the incremental exports, `user.show` and the reads a ticket triage
+makes answered 200.
 
 [Google](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-oauth.md)
 Drive, Slides, Calendar and Gmail run through the same catalog provider since 0.21.0,

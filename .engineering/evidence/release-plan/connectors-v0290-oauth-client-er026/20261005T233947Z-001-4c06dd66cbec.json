@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-05T23:39:47Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0290-oauth-client-er026",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "website: npm ci 0, typecheck 0, build 0 (494 public files audited, no private paths), reference:check 0 (45 contract / 100 reference pages, no drift), test:examples 0 (15 passed)",
+    "reference": "website log sha256 f5e24707fb7751697965d13a488f79dfe5629fd8f8c52b5dc66e829239b260ab"
+  }
+}
