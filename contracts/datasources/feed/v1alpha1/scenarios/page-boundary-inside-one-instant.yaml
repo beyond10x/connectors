@@ -1,0 +1,96 @@
+# Several items share one instant and a page boundary falls inside it: the first read is
+# bounded to one item, and reading again from the kept watermark returns the others. A binding
+# that resumes after the instant, rather than after the items it returned, loses them. A repeat
+# under the same revision is permitted (at least once) and invisible once deduplicated by
+# (container, id, revision); the count holds the container to exactly its three items. See
+# ../semantics.md, Watermarks and delivery.
+type: ess-scenario/1
+domain: connectors.feed
+scenario: page-boundary-inside-one-instant
+summary: Items sharing one instant across a page boundary are each returned on resume, none lost.
+timeline:
+- at: '2026-10-06T09:00:00Z'
+  command: connectors.feed.AddContainer
+  input:
+    container_id: team-room
+    connection_ref: workspace-a
+    name: Team room
+    kind: channel
+    visibility: public
+  outcome: added
+  events:
+  - event: connectors.feed.ContainerAdded
+- at: '2026-10-06T09:00:01Z'
+  command: connectors.feed.AddItem
+  input:
+    item_id: item-1
+    container_id: team-room
+    revision: r1
+    created_at: '2026-10-06T09:00:01Z'
+  outcome: added
+  events:
+  - event: connectors.feed.ItemAdded
+- at: '2026-10-06T09:00:02Z'
+  command: connectors.feed.AddItem
+  input:
+    item_id: item-2
+    container_id: team-room
+    revision: r1
+    created_at: '2026-10-06T09:00:01Z'
+  outcome: added
+  events:
+  - event: connectors.feed.ItemAdded
+- at: '2026-10-06T09:00:03Z'
+  command: connectors.feed.AddItem
+  input:
+    item_id: item-3
+    container_id: team-room
+    revision: r1
+    created_at: '2026-10-06T09:00:01Z'
+  outcome: added
+  events:
+  - event: connectors.feed.ItemAdded
+- at: '2026-10-06T09:00:04Z'
+  command: connectors.feed.ReadItems
+  input:
+    container_id: team-room
+    limit: 1
+  outcome: read
+- at: '2026-10-06T09:00:05Z'
+  command: connectors.feed.ReadItems
+  input:
+    container_id: team-room
+    watermark: w-after-first-read
+    limit: 1
+  outcome: read
+assert:
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  contains:
+    item_id: item-1
+    container_id: team-room
+    revision: r1
+    state: Present
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  contains:
+    item_id: item-2
+    container_id: team-room
+    revision: r1
+    state: Present
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  contains:
+    item_id: item-3
+    container_id: team-room
+    revision: r1
+    state: Present
+- view: connectors.feed.ContainerItems
+  params:
+    container_id: team-room
+  counts:
+    at_least: 3
+    at_most: 3

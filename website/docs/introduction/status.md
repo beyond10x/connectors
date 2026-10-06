@@ -47,8 +47,9 @@ address or invisible text; a read answered `429` is retried once when its `Retry
 fits the deadline and otherwise names `retry_after_seconds`; an invoke on lapsed
 validation evidence advises `revalidate_connection`. GitLab `issue.create` is an
 approved write, `connections launch` hands one connection's protected document to a
-pinned consumer, and the `datasource.feed/v1alpha1` contract family is specified; the
-feed engine is not in this release.
+pinned consumer, and the `datasource.feed/v1alpha1` contract family is specified with a
+catalog feed engine that `operations list --family` discovers; no real provider binds a
+feed yet, and a feed is not yet read through a saved connection.
 
 ## Available runtime
 
