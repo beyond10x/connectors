@@ -325,6 +325,11 @@ types:
       - {name: stage, type: "connectors.cli.FailureStage"}
       - {name: next_action, type: "connectors.cli.NextAction"}
       - {name: service_code, type: "Optional<connectors.service_wire.ErrorCode>"}
+      # ESS-LIMIT: service_reason is at most 256 bytes of admitted provider text, present only
+      # beside service_code or on a provider forbidden (contracts/cli/v1alpha1/semantics.md).
+      # As for instance_id below, ESS declares no invariant on a CLI type, so the bound, the
+      # redaction and the presence rule are enforced by the host and pinned by tests.
+      - {name: service_reason, type: "Optional<String>"}
       - {name: connection, type: "Optional<String>"}
       - {name: acquisition, type: "Optional<String>"}
       - {name: request_id, type: "Optional<String>"}
