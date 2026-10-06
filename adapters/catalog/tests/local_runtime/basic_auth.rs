@@ -90,6 +90,69 @@ fn basic_profile_loads_and_sends_the_exact_basic_authorization() {
     assert_children_carry_no_basic_material(&provider.config);
 }
 
+/// The basic fixture with `auth.access` set to `access`, or refused at load.
+fn with_access(access: Value) -> Provider {
+    let provider = Provider::basic("api");
+    let mut config: Value = serde_json::from_slice(&fs::read(&provider.config).unwrap()).unwrap();
+    config["auth"]["access"] = access;
+    private(&provider.config, &serde_json::to_vec(&config).unwrap());
+    provider
+}
+
+#[test]
+fn an_access_read_the_credential_may_not_make_refuses_as_insufficient_scope() {
+    // The identity read succeeds; the access read answers 403, so the
+    // credential identifies its holder but cannot read: not connected.
+    let provider = with_access(json!({"path": "projects/fixture-refused"}));
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    assert!(matches!(
+        child.validate(BASIC_PROFILE, &basic(BASIC_TOKEN), deadline()),
+        Err(Failure::InsufficientScope)
+    ));
+    assert_eq!(authorization_of(&provider, "/api/v4/user").len(), 1);
+    assert_eq!(
+        authorization_of(&provider, "/api/v4/projects/fixture-refused"),
+        [Some(BASIC_HEADER.to_owned())]
+    );
+    // A missing resource is not a scope: it stays a protocol failure.
+    let provider = with_access(json!({"path": "projects/fixture-missing"}));
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    assert!(matches!(
+        child.validate(BASIC_PROFILE, &basic(BASIC_TOKEN), deadline()),
+        Err(Failure::Protocol)
+    ));
+}
+
+#[test]
+fn an_access_read_that_answers_connects_and_sends_its_query() {
+    let provider = with_access(json!({"path": "user", "query": {"per_page": "1"}}));
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let baseline = child
+        .validate(BASIC_PROFILE, &basic(BASIC_TOKEN), deadline())
+        .unwrap_or_else(|failure| panic!("validation {failure:?}"));
+    assert_eq!(baseline.identity.subject, "42");
+    // The identity read and the access read both reach `/api/v4/user`.
+    assert_eq!(authorization_of(&provider, "/api/v4/user").len(), 2);
+}
+
+#[test]
+fn an_access_probe_without_a_path_or_with_a_query_in_its_path_is_refused_at_load() {
+    for access in [
+        json!({"path": ""}),
+        json!({"path": "user?per_page=1"}),
+        json!({"path": "user", "query": {"": "1"}}),
+    ] {
+        let provider = with_access(access.clone());
+        let output = Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
+            .arg("--local-config")
+            .arg(&provider.config)
+            .arg("--print-local-bootstrap")
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{access}");
+    }
+}
+
 #[test]
 fn basic_profile_below_minimum_scopes_refuses_as_insufficient() {
     let provider = Provider::basic("admin");
