@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:upgrade-adapter-identity-mismatch-names-new-connection
 kind: story
-status: draft
+status: implemented
 title: An adapter-reported identity mismatch during an upgrade names a new connection
 relations:
 - decomposes: epic:connector-probe-20261006
@@ -16,7 +16,11 @@ scope:
   path: crates/connectors-host/src/local/registry/revalidation.rs
 - confidence: cited
   path: crates/connectors-host/src/local/registry/upgrade_tests.rs
-revision: 4
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T10:50:42Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1,"verification":1}}}
+- {from: "proposed", to: "active", at: "2026-10-06T10:50:43Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1,"verification":1}}}
+- {from: "active", to: "implemented", at: "2026-10-06T10:50:43Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"verification":1}}}
 ---
 ## Defect
 

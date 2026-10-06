@@ -11,6 +11,11 @@
 //! built catalog provider named by `CONNECTORS_TEST_CATALOG_PROVIDER`); and a
 //! revalidation of a published connection that a stand-in owner definitely
 //! fails.
+//!
+//! story:upgrade-adapter-identity-mismatch-names-new-connection adds two more
+//! ignored CLI cases: the production owner launches this test binary as the
+//! adapter child, whose validation answers the adapter's own
+//! `identity_mismatch`, during an upgrading revalidation and outside one.
 use connectors_host::local::{
     config::{Config, Paths},
     owner::{self, Client, Code},
@@ -642,4 +647,202 @@ fn a_revalidation_after_a_configuration_change_reaches_the_owner_without_a_cache
         "{data}"
     );
     assert_eq!(owner.join().unwrap(), ["revalidate"]);
+}
+
+/// The adapter child of the identity cases below: the production owner
+/// launches this test binary, re-entered through libtest's exact filter, and
+/// it answers every validation with the adapter's own `identity_mismatch`,
+/// recording each one under `fixture-root`. The ordinary run does nothing.
+#[test]
+fn identity_mismatch_provider_fixture() {
+    let args: Vec<String> = std::env::args().collect();
+    if !args.iter().any(|arg| arg == "--connectors-private-fd") {
+        return;
+    }
+    let value = |prefix: &str| {
+        args.iter()
+            .find_map(|arg| arg.strip_prefix(prefix))
+            .unwrap()
+            .to_owned()
+    };
+    let _ = runtime::serve(
+        3,
+        MismatchingProvider {
+            revision: value("fixture-revision="),
+            root: PathBuf::from(value("fixture-root=")),
+        },
+    );
+}
+
+struct MismatchingProvider {
+    revision: String,
+    root: PathBuf,
+}
+
+#[async_trait::async_trait]
+impl runtime::Adapter for MismatchingProvider {
+    fn bootstrap(&self) -> runtime::Bootstrap {
+        runtime::Bootstrap {
+            configuration_revision: self.revision.clone(),
+            ..bootstrap()
+        }
+    }
+    async fn validate(
+        &self,
+        _: &str,
+        _: connectors_sdk::Secret,
+    ) -> runtime::Result<runtime::Baseline> {
+        let mut log = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(self.root.join("validations"))
+            .unwrap();
+        log.write_all(b"validate\n").unwrap();
+        Err(runtime::Failure::IdentityMismatch)
+    }
+    async fn invoke(
+        &self,
+        _: &str,
+        _: &str,
+        _: connectors_sdk::Secret,
+        _: Value,
+    ) -> runtime::Result<Value> {
+        Err(runtime::Failure::Unsupported)
+    }
+}
+
+/// What one revalidation against [`MismatchingProvider`] left behind.
+struct Mismatched {
+    /// The CLI refusal's `error.data`.
+    data: Value,
+    /// The connection's public revision and state before and after.
+    before: (String, registry::State),
+    after: (String, registry::State),
+    /// Validations the provider child answered.
+    validations: usize,
+}
+
+/// Publishes a ready connection under `cfg-1`, configures `configured` with
+/// [`MismatchingProvider`] as its executable, and revalidates the connection
+/// through the production CLI, owner and adapter child.
+fn revalidate_against_a_mismatching_provider(configured: &str) -> Mismatched {
+    let root = tempfile::tempdir().unwrap();
+    let custody = Custody::new(root.path());
+    let cli = Cli {
+        paths: Paths {
+            config: root.path().join("cli/config.toml"),
+            state: root.path().join("cli/state"),
+        },
+    };
+    assert!(cli.run(&["setup", "init"]).status.success());
+    let provider = std::env::current_exe().unwrap().canonicalize().unwrap();
+    let digest =
+        hex(ring::digest::digest(&ring::digest::SHA256, &fs::read(&provider).unwrap()).as_ref());
+    let q = |value: &str| serde_json::to_string(value).unwrap();
+    let config = |revision: &str| {
+        let args = [
+            "--exact".to_owned(),
+            "identity_mismatch_provider_fixture".to_owned(),
+            "--".to_owned(),
+            format!("fixture-revision={revision}"),
+            format!("fixture-root={}", root.path().display()),
+        ];
+        format!(
+            "format='connectors-local/1'\nowner_uid={}\nsecret_service_socket={}\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='{revision}'\nprotocol='v1alpha1'\n[adapters.forge.permissions]\nprofiles=['fixture.basic']\noperations=[]\n[adapters.forge.executable]\npath={}\nsha256='{digest}'\nargs={}\n",
+            connectors_host::local::filesystem::uid(),
+            q(custody.socket.to_str().unwrap()),
+            q(provider.to_str().unwrap()),
+            serde_json::to_string(&args).unwrap(),
+        )
+    };
+    private(&cli.paths.config, config("cfg-1").as_bytes());
+    let adapter = Config::load(&cli.paths.config).unwrap().adapters["forge"].clone();
+    runtime::state::State::new(&cli.paths.state)
+        .remember(&adapter.selection(), &bootstrap())
+        .unwrap();
+    let reference = publish(&cli.paths.state, &bootstrap(), &custody.socket);
+    let observe = || {
+        let observed = registry::Registry::with_system_clock(&cli.paths.state)
+            .describe(
+                "forge-local",
+                "catalog",
+                "cfg-1",
+                &reference,
+                connectors_sdk::now_ms(),
+                true,
+            )
+            .unwrap();
+        (observed.revision, observed.state)
+    };
+    let before = observe();
+    private(&cli.paths.config, config(configured).as_bytes());
+    let refused = cli.run(&[
+        "connections",
+        "revalidate",
+        "--adapter",
+        "forge",
+        "--connection",
+        &reference,
+        "--expected-revision",
+        &before.0,
+    ]);
+    assert_eq!(refused.status.code(), Some(1), "{refused:?}");
+    assert!(refused.stdout.is_empty());
+    let data = serde_json::from_slice::<Value>(&refused.stderr).unwrap()["error"]["data"].clone();
+    let after = observe();
+    let validations = fs::read_to_string(root.path().join("validations"))
+        .unwrap_or_default()
+        .lines()
+        .count();
+    Mismatched {
+        data,
+        before,
+        after,
+        validations,
+    }
+}
+
+/// story:upgrade-adapter-identity-mismatch-names-new-connection. The adapter's
+/// own `identity_mismatch`, answered to the validation of an upgrading
+/// revalidation, reaches the CLI as `identity_mismatch` naming a new
+/// connection: repair refuses the changed binding. The upgrade publishes
+/// nothing and invalidates nothing.
+#[test]
+#[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
+fn an_adapter_identity_mismatch_during_an_upgrade_names_a_new_connection() {
+    let mismatched = revalidate_against_a_mismatching_provider("cfg-2");
+    assert_eq!(mismatched.validations, 1, "the provider answered it");
+    let data = &mismatched.data;
+    assert_eq!(
+        (&data["code"], &data["stage"], &data["next_action"]),
+        (
+            &json!("identity_mismatch"),
+            &json!("admission"),
+            &json!("create_connection")
+        ),
+        "{data}"
+    );
+    assert_eq!(mismatched.before.1, registry::State::Ready);
+    assert_eq!(mismatched.after, mismatched.before);
+}
+
+/// The same adapter failure outside an upgrade proves the stored credential
+/// invalid under the binding it was admitted under, so a repair helps.
+#[test]
+#[ignore = "requires dbus-daemon and gnome-keyring-daemon"]
+fn an_adapter_identity_mismatch_outside_an_upgrade_names_a_repair() {
+    let mismatched = revalidate_against_a_mismatching_provider("cfg-1");
+    assert_eq!(mismatched.validations, 1, "the provider answered it");
+    let data = &mismatched.data;
+    assert_eq!(
+        (&data["code"], &data["stage"], &data["next_action"]),
+        (
+            &json!("identity_mismatch"),
+            &json!("admission"),
+            &json!("repair_connection")
+        ),
+        "{data}"
+    );
+    assert_eq!(mismatched.before.1, registry::State::Ready);
+    assert_eq!(mismatched.after.1, registry::State::ReauthorizationRequired);
 }

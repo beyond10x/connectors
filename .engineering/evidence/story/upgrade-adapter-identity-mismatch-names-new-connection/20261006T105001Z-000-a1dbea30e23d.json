@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T10:50:01Z",
+  "actor": "human:timo",
+  "artifact": "story:upgrade-adapter-identity-mismatch-names-new-connection",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate on the change: all checks passed, 159 suites, 1329 passed, 0 failed, 73 ignored; failed_connect ignored lane with a disposable Secret Service: the two new cases passed"
+  }
+}
