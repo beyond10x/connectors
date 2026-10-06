@@ -364,6 +364,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -705,6 +711,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -1004,6 +1016,12 @@
                           ]
                         }
                       },
+                      "service_reason": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "source_audit": {
                         "kind": "optional",
                         "of": {
@@ -1290,6 +1308,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -1600,6 +1624,12 @@
                           ]
                         }
                       },
+                      "service_reason": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "source_audit": {
                         "kind": "optional",
                         "of": {
@@ -1886,6 +1916,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -2191,6 +2227,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -2515,6 +2557,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -2855,6 +2903,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -3191,6 +3245,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -3531,6 +3591,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -3867,6 +3933,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -4207,6 +4279,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -4537,6 +4615,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -4885,6 +4969,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -5220,6 +5310,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -5740,6 +5836,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -6108,6 +6210,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -6467,6 +6575,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -6771,6 +6885,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -7132,6 +7252,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -7505,6 +7631,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -7867,6 +7999,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -8180,6 +8318,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -8614,6 +8758,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -8946,6 +9096,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
@@ -9390,6 +9546,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -9733,6 +9895,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -10066,6 +10234,12 @@
                   ]
                 }
               },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "source_audit": {
                 "kind": "optional",
                 "of": {
@@ -10361,6 +10535,12 @@
                     "lease_expired",
                     "revoked"
                   ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
                 }
               },
               "source_audit": {
