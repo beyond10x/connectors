@@ -90,7 +90,7 @@ fn private_protocol_requires_explicit_v2_configuration_without_rewriting_v1() {
     assert_ne!(v1_explicit.adapters["fixture"].selection(), digest);
     for invalid in [
         explicit.replace("connectors-private/2", "connectors-private/3"),
-        explicit.replace("connectors-local/2", "connectors-local/3"),
+        explicit.replace("connectors-local/2", "connectors-local/4"),
         explicit.replace("private_protocol=", "unreviewed="),
     ] {
         assert!(toml::from_str::<Config>(&invalid).is_err());

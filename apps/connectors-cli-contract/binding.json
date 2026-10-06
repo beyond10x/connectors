@@ -201,7 +201,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -541,7 +542,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -839,7 +841,8 @@
                           "kind": "enum",
                           "variants": [
                             "connectors-local/1",
-                            "connectors-local/2"
+                            "connectors-local/2",
+                            "connectors-local/3"
                           ]
                         }
                       },
@@ -1126,7 +1129,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -1433,7 +1437,8 @@
                           "kind": "enum",
                           "variants": [
                             "connectors-local/1",
-                            "connectors-local/2"
+                            "connectors-local/2",
+                            "connectors-local/3"
                           ]
                         }
                       },
@@ -1720,7 +1725,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -2024,7 +2030,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -2347,7 +2354,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -2684,7 +2692,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -3021,7 +3030,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -3358,7 +3368,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -3695,7 +3706,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -4032,7 +4044,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -4363,7 +4376,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -4708,7 +4722,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -5044,7 +5059,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -5561,7 +5577,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -5928,7 +5945,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -6286,7 +6304,314 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
+                  ]
+                }
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "mutation": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "attempt": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "id": {
+                            "kind": "string"
+                          },
+                          "instance": {
+                            "kind": "string"
+                          }
+                        }
+                      }
+                    },
+                    "cause": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "code": {
+                            "kind": "enum",
+                            "variants": [
+                              "invalid_input",
+                              "unsupported",
+                              "unauthorized",
+                              "forbidden",
+                              "not_found",
+                              "stale_description",
+                              "stale_cursor",
+                              "rate_limited",
+                              "unavailable",
+                              "capacity",
+                              "timeout",
+                              "upstream_protocol",
+                              "internal"
+                            ]
+                          },
+                          "stage": {
+                            "kind": "enum",
+                            "variants": [
+                              "preflight",
+                              "attempt_store",
+                              "approval",
+                              "dispatch",
+                              "response",
+                              "observation",
+                              "audit"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "classification": {
+                      "kind": "enum",
+                      "variants": [
+                        "not_attempted",
+                        "refused",
+                        "applied",
+                        "unknown"
+                      ]
+                    },
+                    "original_request_id": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "replayed": {
+                      "kind": "boolean"
+                    }
+                  }
+                }
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "stop_owner",
+                  "none"
+                ]
+              },
+              "request_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "source_audit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "audit_ref": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "audit_status": {
+                      "kind": "enum",
+                      "variants": [
+                        "complete",
+                        "incomplete",
+                        "unavailable",
+                        "not_required"
+                      ]
+                    },
+                    "instance": {
+                      "kind": "string"
+                    }
+                  }
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections-launch": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "connections-launch"
+      },
+      "input": {
+        "type_ref": "connectors.cli.ConnectionLaunchInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "adapter": {
+              "kind": "string"
+            },
+            "args": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connection": {
+              "kind": "string"
+            },
+            "consumer": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.ConnectionLaunchResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "consumer": {
+              "kind": "string"
+            },
+            "exit_code": {
+              "kind": "integer"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "metadata_unavailable",
+                  "revision_conflict",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure",
+                  "approval_required",
+                  "approval_refused",
+                  "approval_replayed",
+                  "idempotency_conflict",
+                  "owner_build_mismatch"
+                ]
+              },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -6646,7 +6971,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -7016,7 +7342,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -7377,7 +7704,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -7691,7 +8019,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -8122,7 +8451,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -8455,7 +8785,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -8896,7 +9227,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -9238,7 +9570,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -9570,7 +9903,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -9866,7 +10200,8 @@
                   "kind": "enum",
                   "variants": [
                     "connectors-local/1",
-                    "connectors-local/2"
+                    "connectors-local/2",
+                    "connectors-local/3"
                   ]
                 }
               },
@@ -10602,6 +10937,45 @@
     {
       "path": [
         "connections",
+        "launch"
+      ],
+      "aliases": [],
+      "callable": "connections-launch",
+      "about": "Run a pinned consumer with one connection's credential on descriptor 3",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connection",
+          "source": {
+            "kind": "option",
+            "long": "connection"
+          }
+        },
+        {
+          "field": "consumer",
+          "source": {
+            "kind": "option",
+            "long": "consumer"
+          }
+        },
+        {
+          "field": "args",
+          "source": {
+            "kind": "option",
+            "long": "args"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "connections",
         "list"
       ],
       "aliases": [],
@@ -10933,6 +11307,7 @@
     "handler:approval-prepare: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-connect: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-describe: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-launch: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-list: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-repair: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract",

@@ -142,6 +142,14 @@ Callable: `connections-describe`. Input: `connectors.cli.ConnectionDescribeInput
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `connections launch`
+
+Run a pinned consumer with one connection's credential on descriptor 3
+
+Callable: `connections-launch`. Input: `connectors.cli.ConnectionLaunchInput`. Result: `connectors.cli.ConnectionLaunchResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `connections list`
 
 List safe connection metadata
@@ -241,6 +249,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:approval-prepare: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-connect: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-describe: implement the owner-qualified callable and its declared result/error contract
+- handler:connections-launch: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-list: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-repair: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract
