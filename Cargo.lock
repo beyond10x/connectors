@@ -566,9 +566,12 @@ dependencies = [
 name = "connectors-build"
 version = "0.30.0"
 dependencies = [
+ "async-trait",
  "clap",
  "connectors-catalog",
  "connectors-catalog-provider",
+ "connectors-core",
+ "connectors-sdk",
  "connectors-spec",
  "entity-core 0.26.0",
  "ess-compiler",

@@ -203,8 +203,9 @@ the Provider commands seed the source a binding reads, `ListContainers` and `Rea
 container's items, tombstones included. `SourceContainers` and `SourceItems` read the source itself
 and are the suite's witnesses, not family operations.
 [scenarios/](scenarios/) adds the authored scenarios: a first read across a page boundary, a resumed
-read that returns a changed item with a new revision and a new item, a deleted item, and a listing
-that omits a direct conversation.
+read that returns a changed item with a new revision and a new item, a deleted item, a listing
+that omits a direct conversation, items sharing one instant across a page boundary, and more
+unseen changes than one page's limit read page by page from each returned watermark.
 
 The model cannot carry the watermark a read returned into the next read, so a scenario's watermark
 stands for the one the consumer kept. A binding's suite adapter reads `ContainerItems` as a consumer

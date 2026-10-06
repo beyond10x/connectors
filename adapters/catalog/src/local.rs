@@ -2,7 +2,7 @@
 //! protected entry terminate here. The engine receives only an immutable
 //! authenticated HTTP port; the host keeps admission, approval and the ledger.
 use connectors_catalog::bundle;
-use connectors_catalog_provider::{Effect, Engine, Selection};
+use connectors_catalog_provider::{Effect, Engine, Selection, feed};
 use connectors_host::{
     http::{HttpConfig, ScopedHttp},
     local::{
@@ -187,6 +187,9 @@ struct OperationsFile {
     format: String,
     provider: String,
     operations: Vec<Selection>,
+    /// The provider's `datasource.feed/v1alpha1` binding, declared as data.
+    #[serde(default)]
+    feed: Option<feed::Declaration>,
 }
 
 /// Sensitive input intentionally has no Debug or Serialize implementation.
@@ -722,6 +725,7 @@ impl Local {
             return Err(Failure::InvalidConfiguration);
         }
         let mut operations = config.operations.clone();
+        let mut feed = None;
         if let Some(path) = &config.operations_file {
             // A shipped selection set is ordinary repository content, readable by
             // anyone; only the configuration that names it must be private.
@@ -737,6 +741,7 @@ impl Local {
                 return Err(Failure::InvalidConfiguration);
             }
             operations.extend(shipped.operations);
+            feed = shipped.feed;
         }
         let bundle = bundle::load(&config.bundle_directory, &config.provider)
             .map_err(Failure::from_service)?;
@@ -824,8 +829,8 @@ impl Local {
             }
             None => None,
         };
-        let engine =
-            Engine::new(&bundle, &document_base, &operations).map_err(Failure::from_service)?;
+        let engine = Engine::with_feed(&bundle, &document_base, &operations, feed.as_ref())
+            .map_err(Failure::from_service)?;
         // Trust roots enter the revision by their bytes only, as `ca_file` does, so
         // the same roots at another path keep it.
         let mut auth = serde_json::to_value(&config.auth).map_err(|_| Failure::Protocol)?;
@@ -849,6 +854,10 @@ impl Local {
         // other configuration keeps its revision.
         if let Some(bytes) = &token_ca {
             effective["token_ca_digest"] = json!(connectors_core::digest(&json!(bytes)));
+        }
+        // Present only when declared, so a configuration without a feed keeps its revision.
+        if let Some(feed) = &feed {
+            effective["feed"] = serde_json::to_value(feed).map_err(|_| Failure::Protocol)?;
         }
         // Present only when stated, so a configuration without it keeps its revision.
         if let Some(prefix) = &config.request_prefix {
