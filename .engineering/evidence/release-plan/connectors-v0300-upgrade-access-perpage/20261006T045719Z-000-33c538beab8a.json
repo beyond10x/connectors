@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-06T04:57:19Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0300-upgrade-access-perpage",
+  "kind": "release-plan",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "website: npm ci 0, typecheck 0, build 0 (494 public files audited, no private paths), reference:check 0 (45 contract / 100 reference pages, no drift), test:examples 0 (15 passed)",
+    "reference": "website log sha256 d91b2ec37e014251fae64e103c5067618db70f7a576d66b6f8213cb2f1434aba"
+  }
+}
