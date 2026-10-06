@@ -38,6 +38,17 @@ floor guards wall-clock time, not this clock. Both floors are
 `connectors.clock.LocalClockFloor` records with distinct owner identities
 (`ess/domains/clock.yaml`, `docs/local-er-metadata.md`).
 
+### Registry clock floor
+
+The registry floor's durable value is a private file beside the metadata lock
+(`connectors.clock.RegistryClockFloorFile`), read and replaced only under the
+metadata lifecycle lock. A registry transaction refuses a wall-clock sample below
+the higher of that file and the recorded `LocalClockFloor`, and writes the file
+before it records anything else. The recorded floor advances only to a sample more
+than 60,000 ms past it. Without a readable file the floor is the recorded value
+plus 60,000 ms, which is at least every sample ever admitted; a file restored to an
+older value can admit at most 60,000 ms of regression.
+
 ## Authenticated acquisition
 
 The selected wire format is the explicit test version `0x8000000c` of

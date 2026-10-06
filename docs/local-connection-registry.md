@@ -41,7 +41,9 @@ only nonsecret metadata. Public results exclude private scope, version, fence,
 generation, capture and completion-owner coordinates.
 
 Each operation holds an immediate transaction and bounded metadata handle.
-A durable clock floor rejects wall-clock regression. The production binding
+A durable clock floor rejects wall-clock regression; it is kept in
+`registry-clock.floor` beside the metadata lock and bounded by the recorded floor
+([local ER metadata](local-er-metadata.md)). The production binding
 samples that clock after acquiring the transaction; a caller timestamp sampled
 before lock contention cannot establish regression. Request and capture deadlines
 remain their original absolute values. It records time even when

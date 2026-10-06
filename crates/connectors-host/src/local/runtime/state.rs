@@ -159,16 +159,20 @@ mod tests {
         bootstrap.validate().unwrap();
         let bytes = serde_json::to_string(&bootstrap).unwrap();
 
-        // The observer opened before the runtime write and may append while
-        // the writer holds the physical lifecycle lock. Remembering this
-        // exact bootstrap must not invent a dependency on registry time.
+        // The observer opened before the runtime write and released the
+        // physical lifecycle lock, so it cannot append while the writer holds
+        // it. Remembering this exact bootstrap must not invent a dependency on
+        // registry time either way.
         state
             .remember_before_persist("selection", &bootstrap, || {
                 observation
                     .connection
                     .execute("UPDATE registry_clock SET last_seen_ms=1", [])
                     .unwrap();
-                observation.persist().unwrap();
+                assert_eq!(
+                    observation.persist(),
+                    Err(crate::local::Failure::MetadataUnavailable)
+                );
             })
             .unwrap();
         drop(observation);
@@ -190,6 +194,6 @@ mod tests {
             )
             .unwrap();
         assert_eq!(saved, bytes);
-        assert_eq!(floor, 1);
+        assert_eq!(floor, 0);
     }
 }
