@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:launch-consumer-with-connection-credential
 kind: story
-status: draft
+status: active
 title: A pinned consumer is launched with one connection's credential on fd 3
 relations:
 - serves: vision:independent-contract-adapters
@@ -43,7 +43,10 @@ scope:
   path: docs/local-postgres-cli.md
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 21
+revision: 23
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T04:36:26Z", actor: "agent:claude", revision: 22}
+- {from: "proposed", to: "active", at: "2026-10-06T04:36:26Z", actor: "agent:claude", revision: 23}
 ---
 ## Outcome
 
