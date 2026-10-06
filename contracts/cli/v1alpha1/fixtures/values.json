@@ -536,6 +536,15 @@
       }
     },
     {
+      "id": "valid-OperationListInput-family",
+      "type": "connectors.cli.OperationListInput",
+      "valid": true,
+      "value": {
+        "adapter": "forge",
+        "family": "datasource.feed/v1alpha1"
+      }
+    },
+    {
       "id": "valid-OperationListResult-24",
       "type": "connectors.cli.OperationListResult",
       "valid": true,

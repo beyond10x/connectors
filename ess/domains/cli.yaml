@@ -621,6 +621,7 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: family, type: "Optional<String>"}
       - {name: limit, type: "Optional<Integer>"}
       - {name: cursor, type: "Optional<String>"}
   - name: connectors.cli.OperationListResult
