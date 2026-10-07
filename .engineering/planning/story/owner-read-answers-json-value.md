@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:owner-read-answers-json-value
 kind: story
-status: active
+status: implemented
 title: A read through the owner answers its result as a JSON value
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:cli-json-answers-as-json
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-07T01:58:11Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-07T01:58:11Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-07T03:39:02Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1,"review_outcome":1,"verification":1}}}
 ---
 ## Defect
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:gitlab-feed-binding
 kind: story
-status: active
+status: implemented
 title: GitLab binds the feed family
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -44,10 +44,11 @@ scope:
   path: crates/connectors-build/src/gitlab_feed_conformance.rs
 - confidence: cited
   path: crates/connectors-build/src/main.rs
-revision: 11
+revision: 12
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-07T03:39:02Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"test_result":1,"review_outcome":3,"verification":1}}}
 ---
 ## Outcome
 

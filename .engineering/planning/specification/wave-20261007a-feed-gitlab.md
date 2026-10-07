@@ -7,7 +7,7 @@ title: 'Wave 20261007a: feed profile capabilities and the GitLab feed binding'
 relations:
 - informed_by: epic:generic-datasource-feeds
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T00:10:05Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T00:10:06Z", actor: "human:timo", revision: 3}
@@ -91,3 +91,33 @@ fewest engine changes (two of the six shapes).
 The planning commits already on `wave/20261007a`; the merge of `main` into it; one commit per
 unit through `b10x-gates bot`; the merge of each unit into `wave/20261007a`; the closing
 planning-store commit; the one pull request into `main` and its merge. Not a release.
+
+## Outcome
+
+Closed 2026-10-07 with all three units merged into `wave/20261007a` (`2ac242fb6`, `b9f59f1d0`).
+
+| unit | adversary findings | outcome |
+|---|---|---|
+| U1 `story:feed-profile-capabilities` | pass 1: 4, pass 2: 4 (0 carried) | all 8 fixed; the correction after pass 2 was reviewed by the coordinator |
+| U2 `story:gitlab-feed-binding` | pass 1: 2, pass 2: 1 | 2 fixed; the sandbox read (item 6) split into `task:gitlab-feed-sandbox-replay` |
+| U3 `story:owner-read-answers-json-value` (found by U2) | pass 1: 1 | fixed |
+
+Full gate on the integration branch: `cargo run --locked -p connectors-build -- gate --msrv` on
+`b9f59f1d0`: all checks passed, 171 suites, 1,435 passed, 0 failed, 77 ignored. The new cases
+are in the run's own output.
+
+Scope learned:
+
+- U1: the `contracts/datasources/feed/v1alpha1/scenarios/` scope line was wrong. The harness
+  selects scenarios by their content, so the only change there was
+  `listing-omits-direct-conversation.yaml`, which went from inferred to edited.
+- U2: the shared journey permissions in `cli_journey.rs` `configure` cannot take the feed
+  operations, because `lifecycle.rs` and `guarded_merge.rs` rewrite that exact string. The feed
+  journey sets its own. The stand-in routes in `local_runtime.rs` were confirmed.
+- U3: answers are built in four places: owner read (`supervisor.rs`), the CLI result check
+  (`apps/connectors/src/local/session.rs`), owner write (`operations.rs` `project()`) and the
+  legacy invoke (`legacy.rs`). Only the first two were wrong.
+
+Filed for later: `story:owner-read-answer-size-envelope`, a pre-existing defect: a result
+within about 150 bytes of `RESULT_LIMIT` is refused at the owner.
+`task:gitlab-feed-sandbox-replay` is also filed.
