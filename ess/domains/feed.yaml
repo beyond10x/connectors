@@ -57,8 +57,8 @@ types:
       - {name: profile, type: String}
 
   # What a profile states its provider lets it observe. Each first variant is what the strongest
-  # provider gives; the suite holds a binding to what its profile declares, and leaves out, by
-  # name, each scenario a weaker declaration makes inapplicable.
+  # provider gives; the suite holds a binding to what its profile declares, and names each
+  # scenario a weaker declaration leaves out and each expected field it masks.
   # Whether a removed item comes back as a tombstone; `not-observed` never reports one.
   - name: connectors.feed.DeletionCapability
     kind: enum
@@ -78,6 +78,8 @@ types:
   - name: connectors.feed.VisibilityCapability
     kind: enum
     variants: [mapped, all-private]
+  # What the profile named by OperationBinding.profile states. A binding binds both operations
+  # under one profile, so one statement holds for both.
   - name: connectors.feed.ProfileCapabilities
     kind: struct
     fields:
@@ -85,13 +87,6 @@ types:
       - {name: kind, type: connectors.feed.KindCapability}
       - {name: revision, type: connectors.feed.RevisionCapability}
       - {name: visibility, type: connectors.feed.VisibilityCapability}
-  # A binding's profile: the id both operations carry, and what that profile states. A binding
-  # binds both operations under one profile, so one statement holds for both.
-  - name: connectors.feed.Profile
-    kind: struct
-    fields:
-      - {name: id, type: String}
-      - {name: capabilities, type: connectors.feed.ProfileCapabilities}
 
   - name: connectors.feed.Container
     kind: struct

@@ -525,8 +525,8 @@ fn every_declared_feed_passes_the_feed_binding_suite() {
 
 /// A declaration that carries less claims less, and the engine realizing it passes the suite
 /// its claim selects: no `deleted` condition claims no deletions, and a visibility rule that maps
-/// nothing to `public` claims every container private. Each scenario left out is named with the
-/// capability that left it out.
+/// nothing to `public` claims every container private. Each scenario left out, and each field
+/// held to `private`, is named with the capability that did it.
 #[test]
 fn a_declaration_that_observes_less_passes_the_scenarios_it_declares() {
     let mut weaker = declared().remove(0);
@@ -541,21 +541,23 @@ fn a_declaration_that_observes_less_passes_the_scenarios_it_declares() {
     assert!(run.accounts_for_the_family(), "{}", run.summary());
     assert_eq!(run.status, CountStatus::Passed, "{}", run.report);
     assert_eq!(run.counts.passed, run.counts.total, "{}", run.report);
-    assert_eq!(run.counts.total, feed_conformance::EXPECTED_SCENARIOS - 5);
-    assert!(
-        !run.left_out
-            .iter()
-            .any(|left| left.scenario.ends_with("listing-omits-direct-conversation"))
-    );
-    let named: BTreeSet<&str> = run
+    assert_eq!(run.counts.total, feed_conformance::EXPECTED_SCENARIOS - 3);
+    let left_out_by: BTreeSet<&str> = run
         .left_out
         .iter()
         .flat_map(|left| left.by.iter().map(|capability| capability.name()))
         .collect();
+    assert_eq!(left_out_by, BTreeSet::from(["deletions: not-observed"]));
+    let masked: BTreeSet<(&str, Option<&str>, &str)> = run
+        .masked
+        .iter()
+        .map(|masked| (masked.field, masked.held_to, masked.by.name()))
+        .collect();
     assert_eq!(
-        named,
-        BTreeSet::from(["deletions: not-observed", "visibility: all-private"])
+        masked,
+        BTreeSet::from([("visibility", Some("private"), "visibility: all-private")])
     );
+    assert_eq!(run.masked_ids().len(), 2, "{}", run.summary());
 }
 
 /// Every declaration is a value of the adapter's own model (`adapters/catalog/spec/ess`), and the
@@ -879,4 +881,53 @@ fn no_rust_names_a_declared_provider() {
             }
         }
     }
+}
+
+// ---- adversary, wave 20261007a U1 ----------------------------------------------------------
+
+/// A declaration whose revision pointer is its `updated_at` pointer must claim
+/// `revision: update-time` (the engine refuses `opaque` for it). The harness then leaves out only
+/// the scenarios that give one item two revisions at one instant, so every scenario it keeps must
+/// be one this honest update-time binding passes.
+#[test]
+fn adversary_an_update_time_declaration_passes_the_scenarios_it_declares() {
+    let mut weaker = declared()
+        .into_iter()
+        .find(|declared| declared.position() == "cursor")
+        .expect("a cursor declaration");
+    let feed = &mut weaker.raw["feed"];
+    feed["items"]["revision"] = feed["items"]["updated_at"].clone();
+    feed["capabilities"]["revision"] = json!("update-time");
+    weaker.feed = serde_json::from_value(feed.clone()).unwrap();
+    let run = feed_conformance::run(Catalog::new(&weaker));
+    println!("{}", run.summary());
+    assert!(run.accounts_for_the_family(), "{}", run.summary());
+    assert_eq!(
+        run.status,
+        CountStatus::Passed,
+        "an honest update-time binding failed scenarios it is held to: {:?}\n{}",
+        run.failed,
+        run.summary()
+    );
+}
+
+/// An all-private declaration still claims `kind: provider-word` (the engine refuses
+/// `fixed-word`), so the suite still holds it to the provider's word. Reading the room's id as
+/// its kind is not the provider's word, and must fail.
+#[test]
+fn adversary_an_all_private_declaration_is_still_held_to_the_providers_kind() {
+    let mut weaker = declared().remove(0);
+    let feed = &mut weaker.raw["feed"];
+    feed["containers"]["visibility"]["map"] = json!({"im": "direct"});
+    feed["capabilities"]["visibility"] = json!("all-private");
+    feed["containers"]["kind"] = feed["containers"]["id"].clone();
+    weaker.feed = serde_json::from_value(feed.clone()).unwrap();
+    let run = feed_conformance::run(Catalog::new(&weaker));
+    println!("{}", run.summary());
+    assert_eq!(
+        run.status,
+        CountStatus::Failed,
+        "a declaration reading the container id as its kind passed under `kind: provider-word`:\n{}",
+        run.summary()
+    );
 }

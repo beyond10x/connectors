@@ -19,9 +19,11 @@
 //! `catalog_feed_conformance` holds the catalog engine's declared bindings to the same suite.
 //!
 //! A binding is held to what its profile declares ([`Capabilities`]), not to the strongest
-//! provider. A scenario a weaker capability makes inapplicable is left out of that binding's
-//! suite before admission, since a Rust producer admits no skip, and [`Run`] names each one with
-//! the capability that left it out, beside the count of scenarios run and the family's total.
+//! provider. Before admission, since a Rust producer admits no skip, a scenario a weaker
+//! capability makes inapplicable is left out, and in every scenario kept, an expected field a
+//! weaker capability makes inapplicable is masked or held to what the profile states. [`Run`]
+//! names each scenario left out and each field changed with the capability that did it, beside
+//! the count of scenarios run and the family's total.
 use crate::metadata_entities;
 use ess_conformance::{
     AdmittedSuite, CountReport, CountStatus, Runner,
@@ -122,7 +124,8 @@ impl Capabilities {
     }
 }
 
-/// A capability below the strongest provider's, and the scenarios it makes inapplicable.
+/// A capability below the strongest provider's, and what it makes inapplicable: a whole scenario,
+/// or one field of what a scenario expects of the binding's own reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Weaker {
     DeletionsNotObserved,
@@ -142,14 +145,14 @@ impl Weaker {
         }
     }
 
-    /// True when a binding stating this capability cannot be held to `scenario`, read from what
-    /// the scenario expects of the binding's own reads (`ListedContainers`, `ContainerItems`),
-    /// never from its id:
+    /// True when a binding stating this capability cannot be held to `scenario` at all, read from
+    /// what the scenario expects of the binding's own reads (`ListedContainers`,
+    /// `ContainerItems`), never from its id:
     /// - `deletions: not-observed`: it expects a consumer to hold a tombstone (`state: Deleted`);
-    /// - `kind: fixed-word`: it compares a listed container's `kind` with the stored one;
     /// - `revision: update-time`: it reads one item's items after the source gave that item two
-    ///   revisions at one instant, which an update-time revision cannot tell apart;
-    /// - `visibility: all-private`: it expects a container listed `public`.
+    ///   revisions at one instant, which an update-time revision cannot tell apart.
+    ///
+    /// `kind` and `visibility` leave no scenario out; [`Weaker::mask`] changes one field.
     fn leaves_out(self, scenario: &Value) -> bool {
         let steps = scenario["steps"].as_array().map_or(&[][..], Vec::as_slice);
         match self {
@@ -157,17 +160,95 @@ impl Weaker {
                 expectation["expect"] == "contains"
                     && literal(&expectation["fields"]["state"]) == Some(&Value::from("Deleted"))
             }),
-            Self::KindFixedWord => expects(steps, "ListedContainers")
-                .any(|expectation| expectation["fields"].get("kind").is_some()),
             Self::RevisionUpdateTime => {
                 reads(steps, "ContainerItems") && one_item_reuses_an_instant(steps)
             }
-            Self::VisibilityAllPrivate => expects(steps, "ListedContainers").any(|expectation| {
-                expectation["expect"] == "contains"
-                    && literal(&expectation["fields"]["visibility"]) == Some(&Value::from("public"))
-            }),
+            Self::KindFixedWord | Self::VisibilityAllPrivate => false,
         }
     }
+
+    /// The field of a binding view this capability speaks about.
+    fn field(self) -> Option<(&'static str, &'static str)> {
+        match self {
+            Self::DeletionsNotObserved => None,
+            Self::KindFixedWord => Some(("ListedContainers", "kind")),
+            Self::RevisionUpdateTime => Some(("ContainerItems", "revision")),
+            Self::VisibilityAllPrivate => Some(("ListedContainers", "visibility")),
+        }
+    }
+
+    /// Change, in a scenario the binding is held to, what this capability makes inapplicable in
+    /// the expectations on the binding's own reads, and record each change:
+    /// - `kind: fixed-word` masks a listed container's `kind`: the stored word is not the one the
+    ///   profile fixes;
+    /// - `revision: update-time` masks a read item's `revision`: the scenario's revision word is
+    ///   not the update time the binding carries;
+    /// - `visibility: all-private` holds a container stored `public` to being listed `private`,
+    ///   which is what the profile states.
+    ///
+    /// A masked field leaves a `contains` with the rest of its fields; an `excludes` naming it is
+    /// masked whole, since without the field it would refuse more rather than less.
+    fn mask(self, scenario_id: &str, scenario: &mut Value) -> Vec<Masked> {
+        let Some((view, field)) = self.field() else {
+            return Vec::new();
+        };
+        let Some(steps) = scenario["steps"].as_array_mut() else {
+            return Vec::new();
+        };
+        let qualified = format!("{DOMAIN}.{view}");
+        let mut masked = Vec::new();
+        steps.retain_mut(|step| {
+            if step["step"] != "expect_view" || step["view"] != qualified.as_str() {
+                return true;
+            }
+            let expectation = &mut step["expectation"];
+            let expect = expectation["expect"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            let Some(fields) = expectation.get_mut("fields").and_then(Value::as_object_mut) else {
+                return true;
+            };
+            let Some(value) = fields.get_mut(field) else {
+                return true;
+            };
+            let record = |held_to: Option<&'static str>| Masked {
+                scenario: scenario_id.to_owned(),
+                view,
+                field,
+                expect: expect.clone(),
+                held_to,
+                by: self,
+            };
+            if self == Self::VisibilityAllPrivate {
+                if expect == "contains" && literal(value) == Some(&Value::from("public")) {
+                    value["value"] = Value::from("private");
+                    masked.push(record(Some("private")));
+                }
+                return true;
+            }
+            masked.push(record(None));
+            if expect == "contains" {
+                fields.remove(field);
+                return !fields.is_empty();
+            }
+            false
+        });
+        masked
+    }
+}
+
+/// One field of what a kept scenario expects of a binding view, changed by a capability.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Masked {
+    pub(crate) scenario: String,
+    pub(crate) view: &'static str,
+    pub(crate) field: &'static str,
+    /// `contains` or `excludes`.
+    pub(crate) expect: String,
+    /// The value the field is held to instead; `None` where its assertion is masked.
+    pub(crate) held_to: Option<&'static str>,
+    pub(crate) by: Weaker,
 }
 
 /// Every expectation a scenario states about one of the family's views.
@@ -306,32 +387,51 @@ fn family(root: &Path) -> ConformanceSuite {
     suite
 }
 
-/// The suite a binding stating `capabilities` is held to, and the family's scenarios it leaves
-/// out, each with the capabilities that left it out.
-pub(crate) fn suite(root: &Path, capabilities: &Capabilities) -> (AdmittedSuite, Vec<LeftOut>) {
+/// The suite a binding stating some capabilities is held to.
+pub(crate) struct Selected {
+    pub(crate) admitted: AdmittedSuite,
+    /// The family's scenarios left out, each with the capabilities that left it out.
+    pub(crate) left_out: Vec<LeftOut>,
+    /// Every field of a kept scenario a capability masked or held to another value.
+    pub(crate) masked: Vec<Masked>,
+}
+
+/// The suite a binding stating `capabilities` is held to: the family's scenarios less the ones a
+/// capability leaves out, with the fields a capability makes inapplicable masked in the rest.
+pub(crate) fn suite(root: &Path, capabilities: &Capabilities) -> Selected {
     let mut suite = family(root);
     let weaker = capabilities.weaker();
     let mut left_out = Vec::new();
+    let mut masked = Vec::new();
     suite.scenarios.retain(|id, scenario| {
-        let scenario = serde_json::to_value(scenario).expect("scenario");
+        let id = id.to_string();
+        let mut value = serde_json::to_value(&*scenario).expect("scenario");
         let by: Vec<Weaker> = weaker
             .iter()
             .copied()
-            .filter(|capability| capability.leaves_out(&scenario))
+            .filter(|capability| capability.leaves_out(&value))
             .collect();
-        if by.is_empty() {
-            return true;
+        if !by.is_empty() {
+            left_out.push(LeftOut { scenario: id, by });
+            return false;
         }
-        left_out.push(LeftOut {
-            scenario: id.to_string(),
-            by,
-        });
-        false
+        let changed: Vec<Masked> = weaker
+            .iter()
+            .flat_map(|capability| capability.mask(&id, &mut value))
+            .collect();
+        if !changed.is_empty() {
+            *scenario = serde_json::from_value(value).expect("a masked scenario is a scenario");
+            masked.extend(changed);
+        }
+        true
     });
-    (
-        AdmittedSuite::from_suite(&suite).expect("admitted"),
+    masked.sort();
+    masked.dedup();
+    Selected {
+        admitted: AdmittedSuite::from_suite(&suite).expect("admitted"),
         left_out,
-    )
+        masked,
+    }
 }
 
 // ---- the provider ----------------------------------------------------------------------------
@@ -604,12 +704,15 @@ pub(crate) struct Run {
     pub(crate) failed: BTreeSet<String>,
     /// The family's scenarios this profile's capabilities left out, named.
     pub(crate) left_out: Vec<LeftOut>,
+    /// The fields of kept scenarios this profile's capabilities masked or held to another value.
+    pub(crate) masked: Vec<Masked>,
     /// The runner's report, for a failure message.
     pub(crate) report: String,
 }
 
 impl Run {
-    /// The scenarios run beside the family's total, then every one left out and why.
+    /// The scenarios run beside the family's total, then every one left out and every field
+    /// masked, each with the capability that did it.
     pub(crate) fn summary(&self) -> String {
         let mut summary = format!(
             "{}: ran {} of the {EXPECTED_SCENARIOS} scenarios the family defines ({} passed)",
@@ -623,6 +726,18 @@ impl Run {
                 by.join(", ")
             ));
         }
+        for masked in &self.masked {
+            let change = match masked.held_to {
+                Some(value) => format!("held {}.{} to `{value}`", masked.view, masked.field),
+                None => format!("masked {}.{}", masked.view, masked.field),
+            };
+            summary.push_str(&format!(
+                "\n  {change} ({}) in {} ({})",
+                masked.expect,
+                masked.scenario,
+                masked.by.name()
+            ));
+        }
         summary
     }
 
@@ -631,6 +746,14 @@ impl Run {
         self.left_out
             .iter()
             .map(|left| left.scenario.as_str())
+            .collect()
+    }
+
+    /// The kept scenarios with a field a capability changed, by id.
+    pub(crate) fn masked_ids(&self) -> BTreeSet<&str> {
+        self.masked
+            .iter()
+            .map(|masked| masked.scenario.as_str())
             .collect()
     }
 
@@ -643,7 +766,11 @@ impl Run {
 /// Run the suite a binding's capabilities select against it.
 pub(crate) fn run<B: Binding>(binding: B) -> Run {
     let (_, profile) = binding.identity();
-    let (admitted, left_out) = suite(&root(), &binding.capabilities());
+    let Selected {
+        admitted,
+        left_out,
+        masked,
+    } = suite(&root(), &binding.capabilities());
     let fixture = Fixture::new(binding);
     let executed = Runner::for_suite(admitted.suite()).run_admitted(&admitted, &fixture);
     let report = CountReport::from_run(&executed, &admitted).expect("report");
@@ -659,6 +786,7 @@ pub(crate) fn run<B: Binding>(binding: B) -> Run {
         status: report.execution_status(),
         failed,
         left_out,
+        masked,
         report: executed.report().to_string(),
     }
 }
@@ -1133,6 +1261,8 @@ struct Shaped {
     lists_direct_conversations: bool,
     /// Every listed container carries this word as its `kind`.
     kind_word: Option<&'static str>,
+    /// The provider gives no version: an item's revision is its `updated_at`.
+    revision_is_update_time: bool,
 }
 
 impl Shaped {
@@ -1143,6 +1273,7 @@ impl Shaped {
             lists_all_private: false,
             lists_direct_conversations: false,
             kind_word: None,
+            revision_is_update_time: false,
         }
     }
 }
@@ -1188,12 +1319,19 @@ impl Binding for Shaped {
         watermark: Option<&str>,
         limit: i64,
     ) -> Result<ItemsPage, Code> {
-        if self.deletes_outright {
+        let mut page = if self.deletes_outright {
             let mut listed = source.clone();
             listed.items.retain(|_, item| !item.deleted);
-            return listed.items(container, watermark, limit);
+            listed.items(container, watermark, limit)?
+        } else {
+            source.items(container, watermark, limit)?
+        };
+        if self.revision_is_update_time {
+            for (_, item) in &mut page.items {
+                item.revision = item.updated_at.clone();
+            }
         }
-        source.items(container, watermark, limit)
+        Ok(page)
     }
 }
 
@@ -1213,6 +1351,19 @@ const RESTORE_AT_A_REUSED_INSTANT: [&str; 2] = [
 const PUBLIC_LISTING: [&str; 2] = [
     "connectors.feed.AddContainer/outcome/added",
     "connectors.feed.ReadItems/outcome/read",
+];
+/// Every kept scenario that compares a read item's revision with the scenario's revision word.
+const REVISION_WORDS: [&str; 10] = [
+    "connectors.feed.AddItem/outcome/added",
+    "connectors.feed.FeedItem/transition/remove/by/connectors.feed.RemoveItem/removed",
+    "connectors.feed.FeedItem/transition/revise/by/connectors.feed.ReviseItem/revised",
+    "connectors.feed.RemoveItem/outcome/removed",
+    "connectors.feed.ReviseItem/outcome/revised",
+    "connectors.feed/authored/deleted-item",
+    "connectors.feed/authored/first-read",
+    "connectors.feed/authored/more-unseen-than-limit",
+    "connectors.feed/authored/page-boundary-inside-one-instant",
+    "connectors.feed/authored/resumed-read",
 ];
 const OMITS_DIRECT: &str = "connectors.feed/authored/listing-omits-direct-conversation";
 
@@ -1273,12 +1424,17 @@ fn a_profile_that_observes_no_deletions_is_not_held_to_tombstones() {
     );
 }
 
-/// A profile that lists every container `private` passes with the public-listing scenarios left
-/// out and named, and is still held to omitting a direct conversation from its listing; one that
-/// claims a mapped visibility while listing everything private fails the two scenarios that hold
-/// a mapped profile to `public`.
+fn failed(run: &Run) -> BTreeSet<&str> {
+    run.failed.iter().map(String::as_str).collect()
+}
+
+/// A profile that lists every container `private` runs every scenario: a container stored
+/// `public` is held to being listed `private`, and the profile is still held to the listed
+/// container's `kind` and `name` and to omitting a direct conversation. Claiming `all-private`
+/// while listing one `public` fails; so does claiming `mapped` while listing everything
+/// `private`.
 #[test]
-fn an_all_private_profile_is_not_held_to_a_public_listing() {
+fn an_all_private_profile_is_held_to_listing_every_container_private() {
     let all_private = Capabilities {
         visibility: Visibility::AllPrivate,
         ..Capabilities::STRONGEST
@@ -1288,18 +1444,24 @@ fn an_all_private_profile_is_not_held_to_a_public_listing() {
         ..Shaped::declaring(all_private)
     });
     assert_passes(&honest);
-    assert_eq!(honest.left_out_ids(), ids(&PUBLIC_LISTING));
+    assert!(honest.left_out.is_empty(), "{}", honest.summary());
+    assert_eq!(honest.masked_ids(), ids(&PUBLIC_LISTING));
     assert!(
         honest
-            .left_out
+            .masked
             .iter()
-            .all(|left| left.by == [Weaker::VisibilityAllPrivate])
+            .all(|masked| masked.field == "visibility"
+                && masked.held_to == Some("private")
+                && masked.by == Weaker::VisibilityAllPrivate)
     );
     assert!(honest.summary().contains(&format!(
-        "left out {} (visibility: all-private)",
+        "held ListedContainers.visibility to `private` (contains) in {} (visibility: all-private)",
         PUBLIC_LISTING[1]
     )));
-    assert!(!honest.left_out_ids().contains(OMITS_DIRECT));
+
+    let lists_public = run(Shaped::declaring(all_private));
+    println!("{}", lists_public.summary());
+    assert_eq!(failed(&lists_public), ids(&PUBLIC_LISTING));
 
     let lists_direct = run(Shaped {
         lists_all_private: true,
@@ -1319,21 +1481,12 @@ fn an_all_private_profile_is_not_held_to_a_public_listing() {
         ..Shaped::declaring(Capabilities::STRONGEST)
     });
     println!("{}", overclaimed.summary());
-    assert_eq!(overclaimed.status, CountStatus::Failed);
-    assert_eq!(
-        overclaimed
-            .failed
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>(),
-        ids(&PUBLIC_LISTING),
-        "{}",
-        overclaimed.report
-    );
+    assert_eq!(failed(&overclaimed), ids(&PUBLIC_LISTING));
 }
 
-/// A profile that fixes one `kind` word passes with the scenarios that compare a listed
-/// container's stored kind left out; one that claims the provider's word fails them.
+/// A profile that fixes one `kind` word runs every scenario with a listed container's stored
+/// kind masked, and is still held to the rest of each listing; one that claims the provider's
+/// word fails the scenarios that compare it.
 #[test]
 fn a_fixed_kind_word_profile_is_not_held_to_the_stored_kind() {
     let fixed = Capabilities {
@@ -1345,76 +1498,124 @@ fn a_fixed_kind_word_profile_is_not_held_to_the_stored_kind() {
         ..Shaped::declaring(fixed)
     });
     assert_passes(&honest);
-    assert_eq!(honest.left_out_ids(), ids(&STORED_KIND));
+    assert!(honest.left_out.is_empty(), "{}", honest.summary());
+    assert_eq!(honest.masked_ids(), ids(&STORED_KIND));
+    assert!(honest.masked.iter().all(|masked| masked.field == "kind"
+        && masked.held_to.is_none()
+        && masked.by == Weaker::KindFixedWord));
 
     let overclaimed = run(Shaped {
         kind_word: Some("room"),
         ..Shaped::declaring(Capabilities::STRONGEST)
     });
-    assert_eq!(overclaimed.status, CountStatus::Failed);
-    assert_eq!(
-        overclaimed
-            .failed
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>(),
-        ids(&STORED_KIND),
-        "{}",
-        overclaimed.report
-    );
+    assert_eq!(failed(&overclaimed), ids(&STORED_KIND));
 }
 
-/// What each capability leaves out of the family's 28, and that capabilities combine: a scenario
-/// two of them make inapplicable is left out once, naming both.
+/// A profile whose revision is the item's update time passes with the scenarios that give one
+/// item two revisions at one instant left out and every read item's revision word masked in the
+/// rest, an `excludes` naming one masked whole; claiming an opaque revision fails all of them.
 #[test]
-fn each_capability_leaves_out_exactly_the_scenarios_it_makes_inapplicable() {
+fn an_update_time_profile_is_not_held_to_the_revision_words() {
+    let update_time = Capabilities {
+        revision: Revision::UpdateTime,
+        ..Capabilities::STRONGEST
+    };
+    let honest = run(Shaped {
+        revision_is_update_time: true,
+        ..Shaped::declaring(update_time)
+    });
+    assert_passes(&honest);
+    assert_eq!(honest.left_out_ids(), ids(&RESTORE_AT_A_REUSED_INSTANT));
+    assert_eq!(honest.masked_ids(), ids(&REVISION_WORDS));
+    assert!(honest.masked.iter().all(|masked| masked.field == "revision"
+        && masked.held_to.is_none()
+        && masked.by == Weaker::RevisionUpdateTime));
+    let excludes: BTreeSet<&str> = honest
+        .masked
+        .iter()
+        .filter(|masked| masked.expect == "excludes")
+        .map(|masked| masked.scenario.as_str())
+        .collect();
+    assert_eq!(
+        excludes,
+        BTreeSet::from([
+            "connectors.feed/authored/more-unseen-than-limit",
+            "connectors.feed/authored/resumed-read"
+        ])
+    );
+
+    let overclaimed = run(Shaped {
+        revision_is_update_time: true,
+        ..Shaped::declaring(Capabilities::STRONGEST)
+    });
+    let mut expected = ids(&REVISION_WORDS);
+    expected.extend(RESTORE_AT_A_REUSED_INSTANT);
+    assert_eq!(failed(&overclaimed), expected, "{}", overclaimed.report);
+}
+
+/// What each capability leaves out of the family's 28 and masks in the rest, and that
+/// capabilities combine: a field two of them speak about is changed by each, and a scenario two
+/// of them leave out is left out once.
+#[test]
+fn each_capability_leaves_out_or_masks_exactly_what_it_makes_inapplicable() {
     let root = root();
     assert_eq!(family(&root).len() as u64, EXPECTED_SCENARIOS);
-    let left_out = |capabilities: Capabilities| -> BTreeMap<String, Vec<Weaker>> {
-        suite(&root, &capabilities)
-            .1
-            .into_iter()
-            .map(|left| (left.scenario, left.by))
-            .collect()
+    type Changed = (BTreeSet<String>, BTreeSet<(String, &'static str)>);
+    let select = |capabilities: Capabilities| -> Changed {
+        let selected = suite(&root, &capabilities);
+        (
+            selected
+                .left_out
+                .into_iter()
+                .map(|left| left.scenario)
+                .collect(),
+            selected
+                .masked
+                .into_iter()
+                .map(|masked| (masked.scenario, masked.field))
+                .collect(),
+        )
     };
-    assert!(left_out(Capabilities::STRONGEST).is_empty());
+    let owned = |ids: &[&str]| -> BTreeSet<String> { ids.iter().map(|id| (*id).into()).collect() };
+    let fields = |ids: &[&str], field: &'static str| -> BTreeSet<(String, &'static str)> {
+        ids.iter().map(|id| ((*id).into(), field)).collect()
+    };
+    assert_eq!(select(Capabilities::STRONGEST), Changed::default());
     let single = [
         (
             Capabilities {
                 deletions: Deletions::NotObserved,
                 ..Capabilities::STRONGEST
             },
-            ids(&TOMBSTONES),
+            (owned(&TOMBSTONES), BTreeSet::new()),
         ),
         (
             Capabilities {
                 kind: Kind::FixedWord,
                 ..Capabilities::STRONGEST
             },
-            ids(&STORED_KIND),
+            (BTreeSet::new(), fields(&STORED_KIND, "kind")),
         ),
         (
             Capabilities {
                 revision: Revision::UpdateTime,
                 ..Capabilities::STRONGEST
             },
-            ids(&RESTORE_AT_A_REUSED_INSTANT),
+            (
+                owned(&RESTORE_AT_A_REUSED_INSTANT),
+                fields(&REVISION_WORDS, "revision"),
+            ),
         ),
         (
             Capabilities {
                 visibility: Visibility::AllPrivate,
                 ..Capabilities::STRONGEST
             },
-            ids(&PUBLIC_LISTING),
+            (BTreeSet::new(), fields(&PUBLIC_LISTING, "visibility")),
         ),
     ];
     for (capabilities, expected) in single {
-        let got = left_out(capabilities);
-        assert_eq!(
-            got.keys().map(String::as_str).collect::<BTreeSet<_>>(),
-            expected,
-            "{capabilities:?}"
-        );
+        assert_eq!(select(capabilities), expected, "{capabilities:?}");
     }
     let weakest = Capabilities {
         deletions: Deletions::NotObserved,
@@ -1422,14 +1623,18 @@ fn each_capability_leaves_out_exactly_the_scenarios_it_makes_inapplicable() {
         revision: Revision::UpdateTime,
         visibility: Visibility::AllPrivate,
     };
-    let got = left_out(weakest);
-    assert_eq!(got.len(), 7, "{got:#?}");
-    assert_eq!(
-        got["connectors.feed.AddContainer/outcome/added"],
-        [Weaker::KindFixedWord, Weaker::VisibilityAllPrivate]
-    );
-    let (admitted, _) = suite(&root, &weakest);
-    assert_eq!(admitted.suite().len(), 21);
+    let (left_out, masked) = select(weakest);
+    let mut expected_left_out = owned(&TOMBSTONES);
+    expected_left_out.extend(owned(&RESTORE_AT_A_REUSED_INSTANT));
+    assert_eq!(left_out, expected_left_out);
+    assert_eq!(left_out.len(), 5);
+    assert_eq!(masked.len(), 11, "{masked:#?}");
+    assert!(masked.contains(&("connectors.feed.AddContainer/outcome/added".into(), "kind")));
+    assert!(masked.contains(&(
+        "connectors.feed.AddContainer/outcome/added".into(),
+        "visibility"
+    )));
+    assert_eq!(suite(&root, &weakest).admitted.suite().len(), 23);
 }
 
 /// The capabilities this harness reads are the shared model's: the same four fields, and each
@@ -1668,5 +1873,29 @@ fn direct_conversations_are_excluded_indistinguishably() {
     assert_eq!(
         source.items("b-direct", None, 10).err(),
         Some(Code::NotFound)
+    );
+}
+
+// ---- adversary, wave 20261007a U1 ----------------------------------------------------------
+
+/// A profile that fixes its kind word still claims `visibility: mapped`, so it is still held to
+/// listing a public container `public` ("mapped bindings stay checked for public"). Listing every
+/// container `private` under that claim must fail.
+#[test]
+fn adversary_a_fixed_word_profile_claiming_mapped_visibility_is_held_to_public() {
+    let overclaimed = run(Shaped {
+        kind_word: Some("room"),
+        lists_all_private: true,
+        ..Shaped::declaring(Capabilities {
+            kind: Kind::FixedWord,
+            ..Capabilities::STRONGEST
+        })
+    });
+    println!("{}", overclaimed.summary());
+    assert_eq!(
+        overclaimed.status,
+        CountStatus::Failed,
+        "every container listed `private` passed under `visibility: mapped`:\n{}",
+        overclaimed.summary()
     );
 }

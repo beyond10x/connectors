@@ -232,18 +232,19 @@ way under `cargo test -p connectors-build`. Native parameters, the profile's cei
 fixtures belong to the adapter's own model and tests.
 
 The suite holds a binding to what its profile declares, not to the strongest provider. Before the
-suite is admitted, the harness leaves out each scenario a declared capability makes inapplicable,
-read from what the scenario expects of the binding's own reads:
+suite is admitted, the harness reads what each scenario expects of the binding's own reads and
+leaves out a scenario a declared capability makes inapplicable, or changes one expected field in a
+scenario it keeps:
 
-| declared | leaves out every scenario that |
-|---|---|
-| `deletions: not-observed` | expects a consumer to hold a tombstone |
-| `kind: fixed-word` | compares a listed container's `kind` with the stored one |
-| `revision: update-time` | reads an item after the source gave it two revisions at one instant |
-| `visibility: all-private` | expects a container listed `public` |
+| declared | leaves out every scenario that | in every scenario kept |
+|---|---|---|
+| `deletions: not-observed` | expects a consumer to hold a tombstone | — |
+| `kind: fixed-word` | — | masks a listed container's `kind` |
+| `revision: update-time` | reads an item after the source gave it two revisions at one instant | masks a read item's `revision`; an expectation that excludes a revision is masked whole |
+| `visibility: all-private` | — | holds a container stored `public` to being listed `private` |
 
 A scenario cannot be reported as skipped (the conformance count of a Rust producer refuses a
 non-zero `skipped`), so a left-out scenario is absent from the run. The harness names each one,
-with the capabilities that left it out, beside the number of scenarios run and the number the
-family defines. A binding that declares a capability stronger than it honours fails the scenarios
-that capability keeps.
+and each field it masked or held to another value, with the capability that did it, beside the
+number of scenarios run and the number the family defines. A binding that declares a capability
+stronger than it honours fails the scenarios and fields that capability keeps.
