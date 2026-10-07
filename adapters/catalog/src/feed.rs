@@ -184,11 +184,55 @@ pub struct Items {
     pub deleted: Option<Condition>,
 }
 
+/// Whether a removed item comes back as a tombstone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DeletionCapability {
+    Observed,
+    NotObserved,
+}
+
+/// Where a container's `kind` comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum KindCapability {
+    ProviderWord,
+    FixedWord,
+}
+
+/// How a revision is formed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RevisionCapability {
+    Opaque,
+    UpdateTime,
+}
+
+/// How a container's visibility is stated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum VisibilityCapability {
+    Mapped,
+    AllPrivate,
+}
+
+/// What the profile states its provider lets it observe: the family's profile capabilities. The
+/// declaration must support each claim; [`Feed::new`] refuses one it does not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Capabilities {
+    pub deletions: DeletionCapability,
+    pub kind: KindCapability,
+    pub revision: RevisionCapability,
+    pub visibility: VisibilityCapability,
+}
+
 /// One provider's feed, as data: the `feed` of a `connectors-catalog-operations/1` file.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Declaration {
     pub profile: String,
+    pub capabilities: Capabilities,
     pub max_limit: u64,
     pub containers: Containers,
     pub items: Items,
@@ -307,6 +351,57 @@ fn bind(
     Template::from_operation(operation).map_err(|refusal| refuse(refusal.reason()))
 }
 
+/// Each capability the declaration claims is the one the rest of it supports: the suite holds the
+/// binding to its claim, so a claim stronger than the declaration cannot be honoured, and one
+/// weaker would leave out scenarios the binding is able to pass.
+fn supports(d: &Declaration) -> Result<()> {
+    let claims = &d.capabilities;
+    let public = d
+        .containers
+        .visibility
+        .as_ref()
+        .is_some_and(|rule| rule.map.values().any(|v| *v == Visibility::Public));
+    let checks = [
+        (
+            claims.deletions == DeletionCapability::Observed,
+            d.items.deleted.is_some(),
+            "deletions: observed",
+            "deletions: not-observed",
+            "a tombstone is reported exactly when `items.deleted` is declared",
+        ),
+        (
+            claims.kind == KindCapability::ProviderWord,
+            true,
+            "kind: provider-word",
+            "kind: fixed-word",
+            "the declaration reads the provider's word at `containers.kind` and carries no fixed word",
+        ),
+        (
+            claims.revision == RevisionCapability::UpdateTime,
+            d.items.revision == d.items.updated_at,
+            "revision: update-time",
+            "revision: opaque",
+            "the revision is the update time exactly when `items.revision` is `items.updated_at`",
+        ),
+        (
+            claims.visibility == VisibilityCapability::Mapped,
+            public,
+            "visibility: mapped",
+            "visibility: all-private",
+            "visibility is mapped exactly when `containers.visibility` maps a value to `public`",
+        ),
+    ];
+    for (claimed, supported, strong, weak, rule) in checks {
+        if claimed != supported {
+            let claim = if claimed { strong } else { weak };
+            return Err(refuse(format!(
+                "feed capabilities claim `{claim}`, which the declaration does not support: {rule}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 impl Feed {
     pub(crate) fn new(bundle: &Bundle, base: &[String], declaration: &Declaration) -> Result<Self> {
         let d = declaration;
@@ -358,6 +453,7 @@ impl Feed {
         if i.body.representation.is_empty() {
             return Err(refuse("feed body names no representation"));
         }
+        supports(d)?;
         let resume = match &i.position {
             Position::Time(time) => &time.parameter,
             Position::Cursor(cursor) => {
