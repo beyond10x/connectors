@@ -20,7 +20,7 @@ scope:
   path: crates/connectors-host/src/local/registry.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
@@ -43,16 +43,25 @@ So the consumer's ~700-invoke workload will still reach the admission bound, lat
 
 ## Acceptance
 
-Revised 2026-10-06. Entity Runtime 0.26.0 is adopted (#96) and batch execution is flat; what grows
-is the complete verification every open performs (`er.start`), blocked on
-upstream-blocker:entity-runtime-open-verifies-whole-store (beyond10x/entity-runtime#55).
+Revised 2026-10-07: Entity Runtime 0.29.0 is pinned (`story:entity-runtime-029-pin`); its durable
+open checkpoints are adopted as decided in `decision-blocker:store-checkpoints-one-way` (option C).
 
-- The host adopts the Entity Runtime release that closes beyond10x/entity-runtime#55.
-- `read_invoke_cost_by_store_size`, release build, same command at 600 and 6,000 events: the median
-  per-invoke time at 6,000 events is at most twice the median at 600.
-- Separately: a workload of 700 consecutive read invokes against one store completes with no
-  admission `timeout` and no `outcome_unknown`, run by a 700-invoke mode this story adds to
-  `read_invoke_cost_by_store_size` (`CONNECTORS_STORE_COST_INVOKES=700`).
+- Spec first: the store-creation behaviour and the new command are modelled in the CLI
+  specification (`ess/domains/cli.yaml` and `apps/connectors/spec/cli.yaml`) and validated before
+  the handler exists.
+- `setup init` (and any path that creates a new metadata store) creates it with durable open
+  checkpoints enabled.
+- An explicit command enables checkpoints on an existing store. It states that the change is
+  one-way (connectors 0.32.0 and earlier can no longer open the store) and refuses to run
+  without a confirming flag; run twice it answers that the store is already enabled.
+- Tests: a new store is created with checkpoints; an existing store (the 0.26.0 fixture of
+  `tests/metadata_store_previous_pin.rs` restored) is enabled by the command and then opens from
+  its checkpoint; a store without the flag is refused unchanged.
+- `read_invoke_cost_by_store_size`, release build, on stores with checkpoints: the median
+  per-invoke time at 6,000 events is at most twice the median at 600; a 700-invoke run
+  (`CONNECTORS_STORE_COST_INVOKES=700`) completes with no admission `timeout` and no
+  `outcome_unknown`.
+- `CHANGELOG.md` names the command under Migration and the one-way change under Breaking.
 
 ## Not taken
 

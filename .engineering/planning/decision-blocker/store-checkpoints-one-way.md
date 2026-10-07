@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:store-checkpoints-one-way
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided whether the host enables one-way store checkpoints by itself
 relations:
 - blocks: story:metadata-invoke-cost-flat-in-store-size
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-07T17:15:32Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"approval":1}}}
 ---
 ## The question
 
@@ -28,3 +30,20 @@ rolls back can no longer open the store with the older binary.
 ## What would clear it
 
 A decision naming A, B or C, which the story's acceptance and CHANGELOG then state.
+
+## Decision — 2026-10-07
+
+Decided 2026-10-07: option C. New stores are created with durable open checkpoints; an existing
+store is enabled only by an explicit command its owner runs. Option A was refused because it
+would change an existing user's store irreversibly without an act of its owner; B would leave
+new installs without the fix.
+
+Conditions the story carries:
+
+1. The explicit command states that the change is one-way (connectors 0.32.0 and earlier can no
+   longer open the store) and refuses to run without a confirming flag.
+2. The release notes name it under Breaking or Migration.
+3. Both paths are tested: a new store created with checkpoints, and an existing store enabled
+   by the command.
+4. A long-running consumer instance that started before this change is not enabled before
+   2026-10-14.
