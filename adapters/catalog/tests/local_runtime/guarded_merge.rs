@@ -925,7 +925,7 @@ fn journey_case(mode: u8) {
         assert_eq!(first["mutation"]["cause"]["code"], "unavailable", "{first}");
         assert_eq!(first["mutation"]["cause"]["stage"], "attempt_store");
         if known {
-            let payload: Value = serde_json::from_str(first["result"].as_str().unwrap()).unwrap();
+            let payload: Value = first["result"].clone();
             assert_eq!(payload["body"]["state"], "merged");
         }
         // The same unwritable metadata leaves the admitted audit incomplete.
@@ -1318,7 +1318,7 @@ fn journey_case(mode: u8) {
     match error {
         Some(code) => assert_eq!(replay["error"]["code"], code),
         None => {
-            let expected: Value = serde_json::from_str(first["result"].as_str().unwrap()).unwrap();
+            let expected: Value = first["result"].clone();
             assert_eq!(replay["result"], expected);
             assert!(replay["error"].is_null());
         }

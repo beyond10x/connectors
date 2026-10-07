@@ -114,10 +114,10 @@
                           "kind": "string"
                         },
                         "input_schema": {
-                          "kind": "string"
+                          "kind": "json"
                         },
                         "output_schema": {
-                          "kind": "string"
+                          "kind": "json"
                         },
                         "profile": {
                           "kind": "string"
@@ -9028,10 +9028,10 @@
                   "kind": "string"
                 },
                 "input_schema": {
-                  "kind": "string"
+                  "kind": "json"
                 },
                 "output_schema": {
-                  "kind": "string"
+                  "kind": "json"
                 },
                 "profile": {
                   "kind": "string"
@@ -9479,7 +9479,7 @@
               }
             },
             "result": {
-              "kind": "string"
+              "kind": "json"
             },
             "revision": {
               "kind": "string"

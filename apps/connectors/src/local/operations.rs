@@ -6,8 +6,8 @@ fn summary(operation: &connectors_core::Operation) -> Value {
 }
 fn operation(operation: &connectors_core::Operation) -> Value {
     let mut value = summary(operation);
-    value["input_schema"] = json!(operation.input_schema.to_string());
-    value["output_schema"] = json!(operation.output_schema.to_string());
+    value["input_schema"] = operation.input_schema.clone();
+    value["output_schema"] = operation.output_schema.clone();
     value
 }
 /// The optional `--family` filter: a contract id matched exactly against each
@@ -229,7 +229,7 @@ fn project(
         }
     }
     let mut output = if let Some(payload) = value.result {
-        json!({"adapter":call.input["adapter"],"operation":call.input["operation"],"revision":call.input["revision"],"result":payload.to_string()})
+        json!({"adapter":call.input["adapter"],"operation":call.input["operation"],"revision":call.input["revision"],"result":payload})
     } else {
         let error = value.error.as_ref().ok_or(Code::OutcomeUnknown)?;
         let classification = value.mutation.classification;
