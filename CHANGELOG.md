@@ -8,13 +8,18 @@
   (`observed | not-observed`), `kind` (`provider-word | fixed-word`), `revision`
   (`opaque | update-time`) and `visibility` (`mapped | all-private`), typed
   `connectors.feed.ProfileCapabilities` in `ess/domains/feed.yaml`. The feed suite holds a
-  binding to what its profile declares: it leaves out, before admission, each scenario a
-  weaker capability makes inapplicable (a tombstone, a stored `kind`, two revisions of one
-  item at one instant, a `public` listing), and names each one with the capability that
-  left it out, beside the number run and the 28 the family defines. The native fixture and
-  the time and cursor catalog fixtures declare the strongest capabilities and still run and
-  pass all 28. The descriptor's operation is unchanged; the capabilities belong to the
-  profile, not to the wire.
+  binding to what its profile declares. Before admission it leaves out the scenarios that
+  expect a tombstone (`not-observed`) or give one item two revisions at one instant
+  (`update-time`); in the scenarios it keeps it masks a listed container's `kind`
+  (`fixed-word`) and a read item's `revision` (`update-time`), and holds a container stored
+  `public` to being listed `private` (`all-private`). It names each scenario left out and
+  each field changed with the capability that did it, beside the number run and the 28 the
+  family defines; all four weak values together run 23. The native fixture and the time and
+  cursor catalog fixtures declare the strongest capabilities and still run and pass all 28.
+  The descriptor's operation is unchanged; the capabilities belong to the profile, not to
+  the wire. `listing-omits-direct-conversation` no longer asserts the public container's
+  listed visibility, so every visibility capability is held to omitting a direct
+  conversation.
 
 ### Changed
 
