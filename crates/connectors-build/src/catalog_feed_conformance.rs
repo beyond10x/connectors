@@ -10,7 +10,7 @@
 //! suite's provider state, as `api.json` documents them. It is the remote service, not the
 //! binding: the binding is the declaration, read by the engine.
 use crate::feed_conformance::{
-    self, Binding, Code, Container, ContainersPage, Item, ItemsPage, Source,
+    self, Binding, Capabilities, Code, Container, ContainersPage, Item, ItemsPage, Source,
 };
 use connectors_catalog::{bundle::Bundle, ingest, inventory};
 use connectors_catalog_provider::{Effect, Engine, feed::Declaration};
@@ -276,6 +276,7 @@ impl AuthenticatedHttp for Simulated<'_> {
 struct Catalog {
     engine: Engine,
     profile: String,
+    capabilities: Capabilities,
 }
 
 impl Catalog {
@@ -286,9 +287,15 @@ impl Catalog {
             Engine::with_feed(&bundle, &base, &[], Some(&declared.feed)).unwrap_or_else(|e| {
                 panic!("{:?}: {e}", declared.path);
             });
+        // The declaration's claim, read in the family's vocabulary: a word one side does not
+        // know is a vocabulary that moved on one side only.
+        let capabilities =
+            serde_json::from_value(serde_json::to_value(declared.feed.capabilities).unwrap())
+                .unwrap_or_else(|e| panic!("{:?}: {e}", declared.path));
         Self {
             engine,
             profile: declared.feed.profile.clone(),
+            capabilities,
         }
     }
 
@@ -335,6 +342,10 @@ fn text(value: &Value) -> Option<String> {
 impl Binding for Catalog {
     fn identity(&self) -> (String, String) {
         ("connectors-catalog-feed".into(), self.profile.clone())
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        self.capabilities
     }
 
     fn containers(
@@ -475,35 +486,76 @@ fn the_fixture_declarations_cover_both_watermark_forms() {
     );
 }
 
+/// Each fixture declaration passes every scenario its capabilities select; both claim the
+/// strongest provider's, so each runs all the family defines.
 #[test]
 fn every_declared_feed_passes_the_feed_binding_suite() {
     let declared = declared();
     assert!(!declared.is_empty());
     for declaration in &declared {
-        let (counts, status, report) = feed_conformance::run(Catalog::new(declaration));
+        let run = feed_conformance::run(Catalog::new(declaration));
+        println!("{}", run.summary());
         println!(
             "{}: {}",
             declaration.path.display(),
-            serde_json::to_string(&counts).unwrap()
+            serde_json::to_string(&run.counts).unwrap()
         );
+        assert!(run.accounts_for_the_family(), "{}", run.summary());
+        assert!(run.left_out.is_empty(), "{}", run.summary());
         assert_eq!(
-            counts.total,
+            run.counts.total,
             feed_conformance::EXPECTED_SCENARIOS,
             "{:?}: scenario count moved",
             declaration.path
         );
         assert_eq!(
-            status,
+            run.status,
             CountStatus::Passed,
-            "{:?}\n{report}",
-            declaration.path
+            "{:?}\n{}",
+            declaration.path,
+            run.report
         );
         assert_eq!(
-            counts.passed, counts.total,
-            "{:?}\n{report}",
-            declaration.path
+            run.counts.passed, run.counts.total,
+            "{:?}\n{}",
+            declaration.path, run.report
         );
     }
+}
+
+/// A declaration that carries less claims less, and the engine realizing it passes the suite
+/// its claim selects: no `deleted` condition claims no deletions, and a visibility rule that maps
+/// nothing to `public` claims every container private. Each scenario left out is named with the
+/// capability that left it out.
+#[test]
+fn a_declaration_that_observes_less_passes_the_scenarios_it_declares() {
+    let mut weaker = declared().remove(0);
+    let feed = &mut weaker.raw["feed"];
+    feed["items"].as_object_mut().unwrap().remove("deleted");
+    feed["containers"]["visibility"]["map"] = json!({"im": "direct"});
+    feed["capabilities"]["deletions"] = json!("not-observed");
+    feed["capabilities"]["visibility"] = json!("all-private");
+    weaker.feed = serde_json::from_value(feed.clone()).unwrap();
+    let run = feed_conformance::run(Catalog::new(&weaker));
+    println!("{}", run.summary());
+    assert!(run.accounts_for_the_family(), "{}", run.summary());
+    assert_eq!(run.status, CountStatus::Passed, "{}", run.report);
+    assert_eq!(run.counts.passed, run.counts.total, "{}", run.report);
+    assert_eq!(run.counts.total, feed_conformance::EXPECTED_SCENARIOS - 5);
+    assert!(
+        !run.left_out
+            .iter()
+            .any(|left| left.scenario.ends_with("listing-omits-direct-conversation"))
+    );
+    let named: BTreeSet<&str> = run
+        .left_out
+        .iter()
+        .flat_map(|left| left.by.iter().map(|capability| capability.name()))
+        .collect();
+    assert_eq!(
+        named,
+        BTreeSet::from(["deletions: not-observed", "visibility: all-private"])
+    );
 }
 
 /// Every declaration is a value of the adapter's own model (`adapters/catalog/spec/ess`), and the

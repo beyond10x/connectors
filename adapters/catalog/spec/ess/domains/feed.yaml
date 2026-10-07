@@ -138,11 +138,44 @@ types:
       # Absent: the profile observes no deletions and never reports a tombstone.
       - {name: deleted, type: "Optional<connectors_catalog.feed.Condition>"}
 
+  # The family's profile capabilities (connectors.feed.ProfileCapabilities in the shared model),
+  # each first variant the strongest. The engine refuses, when the selection file loads, a claim
+  # the rest of the declaration does not support:
+  # - deletions: `observed` exactly when `items.deleted` is declared;
+  # - kind: `provider-word` reads `containers.kind`; this shape carries no fixed word, so
+  #   `fixed-word` is refused;
+  # - revision: `update-time` exactly when `items.revision` and `items.updated_at` are one pointer;
+  # - visibility: `mapped` exactly when `containers.visibility` maps some value to `public`.
+  # ESS-LIMIT: an invariant reads no optional field's presence and compares no two fields of
+  # nested structs, so these rules are the engine's, stated in contracts/catalog/v1alpha1
+  # section 3.3.
+  - name: connectors_catalog.feed.DeletionCapability
+    kind: enum
+    variants: [observed, not-observed]
+  - name: connectors_catalog.feed.KindCapability
+    kind: enum
+    variants: [provider-word, fixed-word]
+  - name: connectors_catalog.feed.RevisionCapability
+    kind: enum
+    variants: [opaque, update-time]
+  - name: connectors_catalog.feed.VisibilityCapability
+    kind: enum
+    variants: [mapped, all-private]
+  - name: connectors_catalog.feed.Capabilities
+    kind: struct
+    fields:
+      - {name: deletions, type: connectors_catalog.feed.DeletionCapability}
+      - {name: kind, type: connectors_catalog.feed.KindCapability}
+      - {name: revision, type: connectors_catalog.feed.RevisionCapability}
+      - {name: visibility, type: connectors_catalog.feed.VisibilityCapability}
+
   - name: connectors_catalog.feed.Declaration
     kind: struct
     fields:
       # The native profile id both operations carry.
       - {name: profile, type: String}
+      # What the profile states it observes; the suite holds the binding to it.
+      - {name: capabilities, type: connectors_catalog.feed.Capabilities}
       # The provider's page-size cap, and the ceiling of `limit` on both operations.
       - {name: max_limit, type: Integer}
       - {name: containers, type: connectors_catalog.feed.Containers}

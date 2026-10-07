@@ -47,12 +47,51 @@ types:
   - name: connectors.feed.OperationId
     kind: enum
     variants: [feed.containers, feed.items]
+  # The descriptor carries the profile id, not the profile's capabilities: the descriptor's
+  # operation is every family's wire value, and the profile id names the statement below.
   - name: connectors.feed.OperationBinding
     kind: struct
     fields:
       - {name: id, type: connectors.feed.OperationId}
       - {name: contract, type: String}
       - {name: profile, type: String}
+
+  # What a profile states its provider lets it observe. Each first variant is what the strongest
+  # provider gives; the suite holds a binding to what its profile declares, and leaves out, by
+  # name, each scenario a weaker declaration makes inapplicable.
+  # Whether a removed item comes back as a tombstone; `not-observed` never reports one.
+  - name: connectors.feed.DeletionCapability
+    kind: enum
+    variants: [observed, not-observed]
+  # Where a container's `kind` comes from: the provider's word for each container, or one word
+  # the profile fixes for every container it lists.
+  - name: connectors.feed.KindCapability
+    kind: enum
+    variants: [provider-word, fixed-word]
+  # How a revision is formed: an opaque provider version, or the item's update time, under which
+  # two changes of one item at one instant are one revision.
+  - name: connectors.feed.RevisionCapability
+    kind: enum
+    variants: [opaque, update-time]
+  # How a container's visibility is stated: mapped from the provider, or every listed container
+  # `private`.
+  - name: connectors.feed.VisibilityCapability
+    kind: enum
+    variants: [mapped, all-private]
+  - name: connectors.feed.ProfileCapabilities
+    kind: struct
+    fields:
+      - {name: deletions, type: connectors.feed.DeletionCapability}
+      - {name: kind, type: connectors.feed.KindCapability}
+      - {name: revision, type: connectors.feed.RevisionCapability}
+      - {name: visibility, type: connectors.feed.VisibilityCapability}
+  # A binding's profile: the id both operations carry, and what that profile states. A binding
+  # binds both operations under one profile, so one statement holds for both.
+  - name: connectors.feed.Profile
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: capabilities, type: connectors.feed.ProfileCapabilities}
 
   - name: connectors.feed.Container
     kind: struct
