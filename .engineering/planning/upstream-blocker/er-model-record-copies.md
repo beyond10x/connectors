@@ -2,14 +2,16 @@
 format: aep.planning-md/3
 id: upstream-blocker:er-model-record-copies
 kind: upstream-blocker
-status: open
+status: cleared
 title: Entity Runtime keeps each record three times with its own decoded definition (entity-runtime#59)
 refs:
 - provider: github
   reference: beyond10x/entity-runtime#59
 relations:
 - blocks: story:owner-memory-bounded
-revision: 2
+revision: 4
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-07T11:03:14Z", actor: "human:timo", revision: 4}
 ---
 ## What blocks
 
@@ -25,3 +27,7 @@ An Entity Runtime release keeps one copy per committed record and one decoded de
 distinct definition (https://github.com/beyond10x/entity-runtime/issues/59), or stops modelling the
 whole store on every open (https://github.com/beyond10x/entity-runtime/issues/55), and connectors
 pins it; then the story re-measures with `read_invoke_cost_by_store_size`.
+
+## Cleared
+
+Cleared 2026-10-07: connectors pins Entity Runtime 0.29.0 (`story:entity-runtime-029-pin`), which includes 0.28.0's fix — a verified model holds each committed record once (entity-runtime#59). The re-measurement belongs to `story:owner-memory-bounded`.

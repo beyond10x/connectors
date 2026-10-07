@@ -7,7 +7,7 @@ title: 'Wave 20261007b: Entity Runtime 0.29.0'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:entity-runtime-029-pin
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T08:02:01Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T08:02:01Z", actor: "human:timo", revision: 3}
@@ -51,3 +51,7 @@ Dispatch: `aep:implementor`, then one `aep:adversary` pass (a storage dependency
 The opening planning commit; one unit commit through `b10x-gates bot`; its merge into
 `wave/20261007b`; the closing planning commit; the one pull request into `main` and its merge.
 Not a release.
+
+## Outcome
+
+Closed 2026-10-07. U1 merged at `959779023` after one adversary pass (green, two notes: the fixture hashes have no test; the website status page names Entity Runtime 0.26.0 until the release updates it). Full gate on the integration branch: `gate --msrv` on `959779023`: all checks passed, 172 suites, 1,437 passed, 0 failed, 77 ignored. Both upstream blockers on the store-cost stories are cleared; those stories go into the next wave.

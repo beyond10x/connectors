@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-07T11:03:14Z",
+  "actor": "human:timo",
+  "artifact": "story:entity-runtime-029-pin",
+  "kind": "story",
+  "revision": 8,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv on wave/20261007b@959779023 (Entity Runtime 0.29.0, Eventlog 0.8.0): all checks passed, 172 suites, 1437 passed, 0 failed, 77 ignored",
+    "reference": "wave/20261007b@959779023"
+  }
+}
