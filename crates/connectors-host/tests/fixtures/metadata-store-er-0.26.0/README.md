@@ -8,6 +8,10 @@ connectors 0.31.0 released with. The store was then copied with SQLite
 state directory, and `references` lists the acquisition reference `seed`
 returned for each instance.
 
+Its `local_authority.owner_uid` is 1000, the uid that wrote it. Connectors
+refuses a store another uid owns, so the test's restore rewrites that row in
+its copy to the uid running the test; the fixture itself is never modified.
+
 It holds 15 recorded events, 21 tables, 20 indexes and no triggers. Its only
 binding is the synthetic `fixture-adapter` with the provider authority
 `https://fixture.invalid/fixed-authority`; it carries no credentials, no
