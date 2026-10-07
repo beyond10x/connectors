@@ -289,7 +289,7 @@ fn catalog_cli_explicit_revalidation_after_real_expiry_without_reentry() {
     assert!(refreshed["valid_until_ms"].as_u64().unwrap() > until);
     assert_eq!(provider.count(), before + 2);
     let result = success(cli.run(&invoke));
-    let result: Value = serde_json::from_str(result["result"].as_str().unwrap()).unwrap();
+    let result: Value = result["result"].clone();
     assert_eq!(result["body"]["name"], "fixture-project");
     // Upstream unavailability is not positive invalidity of the retained token.
     provider
