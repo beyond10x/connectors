@@ -4,6 +4,7 @@
   "operations": [],
   "feed": {
     "profile": "feed-fixture-time/1",
+    "capabilities": {"deletions": "observed", "kind": "provider-word", "revision": "opaque", "visibility": "mapped"},
     "max_limit": 100,
     "containers": {
       "operation_id": "listRooms",
