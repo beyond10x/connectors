@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-07T03:15:20Z",
+  "actor": "human:timo",
+  "artifact": "story:owner-read-answers-json-value",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart failed at cli_journey.rs:394 (Null vs 7) on the base and passes on unit/gitlab-feed-binding-20261007@537ca2592; read_answer and NativeValidator tests pin the JSON value",
+    "reference": "unit/gitlab-feed-binding-20261007@537ca2592 vs wave/20261007a@2ac242fb6"
+  }
+}

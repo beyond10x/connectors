@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-07T03:15:20Z",
+  "actor": "human:timo",
+  "artifact": "story:gitlab-feed-binding",
+  "kind": "story",
+  "revision": 11,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "unit/gitlab-feed-binding-20261007@537ca2592: gitlab_feed_conformance runs 26 of 28 feed scenarios and passes all 26; the ignored CLI journey reads feed.containers, a first items page and a resumed page through a saved connection; the base has no GitLab feed",
+    "reference": "unit/gitlab-feed-binding-20261007@537ca2592 vs wave/20261007a@2ac242fb6"
+  }
+}

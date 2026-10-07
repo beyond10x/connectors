@@ -251,3 +251,196 @@ fn project(
         HandlerReply::Success(output)
     })
 }
+
+/// story:owner-read-answers-json-value: every `operations invoke` answer
+/// carries the provider result as a JSON value. A read's answer comes from the
+/// owner (`owner/supervisor.rs`) and passes the native result check here; a
+/// write's is projected here from the owner's delivery, fresh, replayed or
+/// observed alike.
+#[cfg(test)]
+mod json_value_tests {
+    use super::*;
+    use connectors_cli_contract::{
+        Context, DynamicError, DynamicPhase, DynamicValidator, OutputMode, wire::Target,
+    };
+    use connectors_host::local::{config::Config, registry, runtime};
+    use std::{collections::BTreeSet, path::PathBuf};
+
+    const READ: &str = "item.read";
+    const WRITE: &str = "item.write";
+
+    fn output_schema() -> Value {
+        json!({"type":"object","additionalProperties":false,
+               "properties":{"id":{"type":"integer"}},"required":["id"]})
+    }
+
+    fn bootstrap() -> runtime::Bootstrap {
+        let operation = |id: &str| connectors_core::Operation {
+            id: id.into(),
+            description: "fixture operation".into(),
+            contract: "operations/v1alpha1".into(),
+            profile: "resource".into(),
+            input_schema: json!({"type":"object"}),
+            output_schema: output_schema(),
+        };
+        let descriptor = connectors_core::Descriptor {
+            version: "v1alpha1".into(),
+            instance: "forge-local".into(),
+            adapter: "catalog".into(),
+            revision: "desc-1".into(),
+            operations: vec![operation(READ), operation(WRITE)],
+            configuration_schema: json!({"type":"object"}),
+        };
+        let requirement = |id: &str, effect| runtime::Requirement {
+            operation: id.into(),
+            profile: "token".into(),
+            scopes: BTreeSet::new(),
+            effect,
+        };
+        runtime::Bootstrap {
+            instance: "forge-local".into(),
+            adapter: "catalog".into(),
+            protocol: "v1alpha1".into(),
+            configuration_revision: "cfg-1".into(),
+            provider_authority: "https://fixture.invalid".into(),
+            descriptor: serde_json::to_string(&descriptor).unwrap(),
+            profiles: vec![runtime::Profile {
+                id: "token".into(),
+                revision: "profile-1".into(),
+                purpose: registry::Purpose::DelegatedUser,
+                subject: registry::Subject::User,
+                scheme: "http_bearer".into(),
+                capability: "http-bearer".into(),
+                minimum_scopes: BTreeSet::new(),
+                evidence_lifetime_ms: 60_000,
+                fields: vec![runtime::EntryField {
+                    name: "token".into(),
+                    label: "Token".into(),
+                    max_bytes: 1024,
+                }],
+                acquisition: None,
+            }],
+            requirements: vec![
+                requirement(READ, runtime::Effect::Read),
+                requirement(WRITE, runtime::Effect::Write),
+            ],
+        }
+    }
+
+    /// A configured adapter `forge` with a cached description of one read and
+    /// one write; no adapter executable exists and none is launched.
+    fn configured(root: &std::path::Path) -> (Context, String) {
+        let config = root.join("config/config.toml");
+        let state = root.join("state");
+        let arg = |path: &PathBuf| path.as_os_str().to_owned();
+        let init = super::super::run(vec![
+            "connectors".into(),
+            "--output".into(),
+            "json".into(),
+            "--config".into(),
+            arg(&config),
+            "--state-dir".into(),
+            arg(&state),
+            "setup".into(),
+            "init".into(),
+        ]);
+        assert_eq!(init.exit_code, 0, "{}", init.stderr);
+        let text = std::fs::read_to_string(&config).unwrap()
+            + &format!(
+                "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{READ}','{WRITE}']\n",
+                "a".repeat(64)
+            );
+        std::fs::write(&config, text).unwrap();
+        let adapter = Config::load(&config).unwrap().adapters["forge"].clone();
+        let bootstrap = bootstrap();
+        runtime::state::State::new(&state)
+            .remember(&adapter.selection(), &bootstrap)
+            .unwrap();
+        let schema = owner::schema(&bootstrap, READ).unwrap();
+        (
+            Context {
+                config: Some(config),
+                state_dir: Some(state),
+                output: OutputMode::Json,
+            },
+            schema,
+        )
+    }
+
+    fn target() -> Target {
+        Target::Local {
+            owner: "connectors.cli".into(),
+            action: "operations-invoke".into(),
+        }
+    }
+
+    /// The owner read path: the native result check holds the answer's
+    /// `result` to the selected output schema as a JSON value. The provider's
+    /// object passes; the same object as a string holding its JSON text, which
+    /// the owner answered before, is refused, so it never reaches stdout.
+    #[test]
+    fn a_read_answer_passes_the_native_check_only_as_a_json_value() {
+        let root = tempfile::tempdir().unwrap();
+        let (context, schema) = configured(root.path());
+        let target = target();
+        let call = Invocation {
+            callable: "operations-invoke",
+            target: &target,
+            context,
+            input: json!({"adapter":"forge","connection":"connection","operation":READ,
+                          "schema":schema,"revision":"desc-1","input":"{}"}),
+        };
+        let mut validator =
+            super::super::session::NativeValidator(super::super::session::Session::new(&[]));
+        let answer = |result: Value| json!({"adapter":"forge","operation":READ,"revision":"desc-1","result":result});
+        assert!(
+            validator
+                .validate(&call, DynamicPhase::Result, &answer(json!({"id": 7})))
+                .is_ok(),
+            "a JSON value result is refused"
+        );
+        assert!(matches!(
+            validator.validate(&call, DynamicPhase::Result, &answer(json!(r#"{"id":7}"#))),
+            Err(DynamicError::InvalidValue)
+        ));
+        assert!(matches!(
+            validator.validate(&call, DynamicPhase::Result, &answer(json!({"id": "7"}))),
+            Err(DynamicError::InvalidValue)
+        ));
+    }
+
+    /// The owner write path: whatever delivery the owner answers (a fresh
+    /// execution, a replayed original, an observed concurrent winner), the
+    /// projected answer carries its result as the JSON value it holds.
+    #[test]
+    fn a_write_answer_projects_the_delivered_result_as_a_json_value() {
+        let root = tempfile::tempdir().unwrap();
+        let (context, _) = configured(root.path());
+        let target = target();
+        let call = Invocation {
+            callable: "operations-invoke",
+            target: &target,
+            context,
+            input: json!({"adapter":"forge","connection":"connection","operation":WRITE,
+                          "revision":"desc-1","input":"{}"}),
+        };
+        for replayed in [false, true] {
+            let delivery: owner::mutation::Delivery = serde_json::from_value(json!({
+                "request_id": "00000000-0000-4000-8000-000000000001",
+                "result": {"id": 7},
+                "error": null,
+                "mutation": {"classification":"applied","attempt":null,
+                             "original_request_id":null,"replayed":replayed,"cause":null},
+                "source_audit": {"instance":"forge-local","audit_ref":null,
+                                 "audit_status":"complete"}
+            }))
+            .unwrap();
+            let HandlerReply::Success(answer) = project(&call, &bootstrap(), delivery).unwrap()
+            else {
+                panic!("a delivered result is not a success");
+            };
+            assert_eq!(answer["result"], json!({"id": 7}), "{answer}");
+            assert_eq!(answer["mutation"]["replayed"], replayed);
+        }
+    }
+}

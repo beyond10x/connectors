@@ -44,7 +44,7 @@ scope:
   path: crates/connectors-build/src/gitlab_feed_conformance.rs
 - confidence: cited
   path: crates/connectors-build/src/main.rs
-revision: 9
+revision: 11
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-06T19:55:10Z", actor: "agent:claude", revision: 3}
@@ -61,7 +61,7 @@ Revised 2026-10-07 for the first feed binding a consumer reads (cortex `story:fe
 2. `adapters/catalog/providers/gitlab/operations.json` declares the feed: projects the token's user is a member of as containers, merge requests as items, `url` null, every container `private` (no visibility rule), as decided 2026-10-06. The profile declares its capabilities (`story:feed-profile-capabilities`): deletions not observed, fixed kind word, update-time revision, all-private visibility.
 3. The family's suite passes against the binding with recorded provider fixtures, every scenario its declared capabilities select, and the harness names the ones left out. `adapters/catalog/contracts/feed/v1alpha1/gitlab.md` states what a container is, how the watermark is formed, how far a first read reaches, that deletions are not observed and why every project is listed `private`.
 4. A CLI journey through a saved GitLab connection against the stand-in provider (`adapters/catalog/tests/local_runtime.rs`, new `/projects` and `/projects/:id/merge_requests` routes): `operations list --family datasource.feed/v1alpha1` names `feed.containers` and `feed.items`, `operations invoke` lists containers, reads a first items page, and resumes from the returned watermark.
-5. The configuration revision of a saved GitLab connection moves (the effective configuration gains `feed`); the CHANGELOG states the migration (`connections upgrade`), and the revision pins in `gateway_prefix.rs`, `oauth2_refresh.rs` and `gitlab_commit_reads_adversary.rs` move with it.
+5. The configuration revision of a saved GitLab connection moves (the effective configuration gains `feed`); the CHANGELOG states the migration (`connections revalidate` after the configuration upgrade; there is no `connections upgrade` command), and the revision pins in `gateway_prefix.rs`, `oauth2_refresh.rs` and `gitlab_commit_reads_adversary.rs` move with it.
 6. Where the GitLab sandbox of `docs/evidence/gitlab-sandbox-20260913/` is running, a recorded real-CLI transcript (containers, a first items page, a resumed page) is kept as evidence; where it is not, that is stated and the release says the binding is checked against recorded fixtures only.
 
 The 2026-10-06 attempt is the archive `connectors-w4-gitlab` (`dirty.patch`, applies to main with `git apply --3way`); it maps `public` and `internal` to `public`, which item 2 reverses.
@@ -96,3 +96,7 @@ Derived 2026-10-07 by `aep:story-scoper`. **Cited** = read from the story, the t
 - **Confidence:** high for the binding files, medium for the engine lines, low for the journey routes.
 - **Would collide with:** `story:feed-profile-capabilities` (conformance harness, `feed.rs`, `feed.yaml`, §3.3) — lands after it; `story:catalog-feed-engine-extensions` (`feed.rs`, §3.3); any unit editing `providers/gitlab/operations.json` or `adapters/catalog/tests/local_runtime.rs`.
 - **Safety fact:** `feed` enters the effective configuration only when declared (`local.rs:858-861`), so only GitLab's revision moves; a connection saved under the old revision is refused `Conflict` until upgraded — cited, unproven at runtime.
+
+## Sandbox read
+
+Acceptance item 6, 2026-10-07: the sandbox was running, but no credential for it was available to the unit, so the binding is checked against recorded provider shapes and the stand-in provider only, as item 6 allows. The sandbox read is `task:gitlab-feed-sandbox-replay`, after the release.

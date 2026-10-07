@@ -7,7 +7,7 @@ title: 'Wave 20261007a: feed profile capabilities and the GitLab feed binding'
 relations:
 - informed_by: epic:generic-datasource-feeds
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T00:10:05Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T00:10:06Z", actor: "human:timo", revision: 3}
@@ -34,17 +34,19 @@ branch, and open one pull request from it, so CI runs one full gate per wave.
 
 ## Units
 
-They run one after the other: U2 forks from the integration branch after U1 has merged,
-because both edit `crates/connectors-build/src/catalog_feed_conformance.rs`,
-`adapters/catalog/src/feed.rs`, `adapters/catalog/spec/ess/domains/feed.yaml` and
-`contracts/catalog/v1alpha1/semantics.md` (both stories' `## Scope`).
+They ran one after the other: U2 forked from the integration branch after U1 merged, because
+both edit `crates/connectors-build/src/catalog_feed_conformance.rs`, `adapters/catalog/src/feed.rs`,
+`adapters/catalog/spec/ess/domains/feed.yaml` and `contracts/catalog/v1alpha1/semantics.md`. U3
+was found by U2 and ran in U2's tree after it, by the same implementor.
 
-| unit | story | serves | branch | worktree (managed id) | build dir | scratch | stage |
-|---|---|---|---|---|---|---|---|
-| U1 | `story:feed-profile-capabilities` | `vision:independent-contract-adapters` | `unit/feed-profile-capabilities` | `conn-u1-fpc` | `<tree>/target` | `<tree>/.local/tmp/u1` | planned |
-| U2 | `story:gitlab-feed-binding` | `vision:independent-contract-adapters` | `unit/gitlab-feed-binding` | `conn-u2-gitlab` | `<tree>/target` | `<tree>/.local/tmp/u2` | planned |
+| unit | story | branch | worktree (managed id) | head | stage |
+|---|---|---|---|---|---|
+| U1 | `story:feed-profile-capabilities` | `unit/feed-profile-capabilities` | `conn-u1-fpc` (removed; archive kept) | `1e7567cfe` | merged into `wave/20261007a` at `2ac242fb6` after two adversary passes |
+| U2 | `story:gitlab-feed-binding` | `unit/gitlab-feed-binding-20261007` | `conn-u2-gitlab` | `38f0523db`, `3d50a0740` | two adversary passes; final correction |
+| U3 | `story:owner-read-answers-json-value` | same branch as U2 | `conn-u2-gitlab` | `cab270ebe`, `3d50a0740` | two adversary passes (with U2) |
 
-Dispatch: `aep:implementor` per unit, then `aep:adversary` per unit (at most two passes).
+Build dirs are each tree's own `target/`; scratch is `<tree>/.local/tmp/<unit>`. Dispatch:
+`aep:implementor` per unit, `aep:adversary` two passes per unit.
 
 ## Selection
 

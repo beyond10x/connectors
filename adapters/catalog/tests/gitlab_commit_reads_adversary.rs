@@ -309,8 +309,9 @@ async fn adversary_base_twin_projects_list_last_activity_after_not_a_date_time_i
 /// by the added selections alone: the documented site-form configuration,
 /// loaded with the shipped selection set cut back to the eighteen ids the base
 /// shipped (so without `commits.list`, `repository.compare` and every
-/// selection added after them), prints the bootstrap whose digest and revision
-/// the base pinned (`3fe50e13…`, `f87354a4…`).
+/// selection added after them, and without the feed binding), prints the
+/// bootstrap whose digest and revision the base pinned (`3fe50e13…`,
+/// `f87354a4…`).
 #[test]
 fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
     use connectors_host::local::filesystem;
@@ -363,6 +364,12 @@ fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
         .map(|o| o["id"].as_str().unwrap())
         .collect();
     assert_eq!(kept, base);
+    // The base shipped no feed binding either; the merge request feed came later.
+    selection
+        .as_object_mut()
+        .unwrap()
+        .remove("feed")
+        .expect("the shipped set declares the feed");
 
     let directory = tempfile::tempdir().unwrap();
     let private = directory.path().join("private");
