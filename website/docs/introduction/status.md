@@ -4,10 +4,10 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.31.0
+# Source release v0.32.0
 
-Version **0.31.0** specifies at ESS source format `ess/15` with the released
-ESS 0.53.0 and plans with the released AEP 0.68.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
+Version **0.32.0** specifies at ESS source format `ess/15` with the released
+ESS 0.55.0 and plans with the released AEP 0.68.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
 provider, as in 0.11.0, which retired the native GitLab adapter. The earlier **v0.1.0
@@ -18,7 +18,7 @@ Since 0.28.0 the CLI's generated decoder refuses `operations invoke` business in
 with a duplicate object key itself, as `cli_dynamic_input`, before the owner sees it;
 exit code 2, empty stdout and no dispatch are as before.
 
-Since 0.29.0 local metadata runs on Entity Runtime 0.26.0 with provider-tracked capture:
+Since 0.29.0 local metadata runs with provider-tracked capture (Entity Runtime 0.26.0 then):
 a read invoke takes 2.3 s at 1,203 recorded events instead of 40.2 s. Every command still
 opens and verifies the whole store, and about 8 events are recorded per read, so the cost
 keeps growing with use: on 2026-10-06 an operator store of 2,800 events took 4 s per
@@ -51,6 +51,22 @@ pinned consumer, and the `datasource.feed/v1alpha1` contract family is specified
 catalog feed engine that `operations list --family` discovers; no real provider binds a
 feed yet, and a feed is not yet read through a saved connection.
 
+Since 0.32.0 `--output json` answers carry JSON values where they carried JSON text:
+`operations invoke` answers the provider result as a JSON value on every path, reads through
+the owner included, and `operations describe`, the `adapters describe` descriptor and the
+compatibility `describe` answer operation schemas as JSON objects. This is breaking for a
+caller that decoded those fields a second time. GitLab is the first provider that binds the
+`datasource.feed/v1alpha1` family (profile `gitlab-merge-requests/1`): member projects as
+containers and merge requests as items, read through a saved connection with
+`operations invoke` and resumed from a watermark. The binding is checked against recorded
+GitLab shapes and a stand-in provider; it has not yet been read from a running GitLab. A feed
+profile now declares what its provider can observe (deletions, kind, revision, visibility),
+and the feed suite holds a binding to what it declares. Local metadata runs on Entity
+Runtime 0.29.0 and Eventlog 0.8.0, which keep each committed record once instead of three
+times; their durable open checkpoints are not enabled yet, so every command still verifies
+the whole store ([#101](https://github.com/beyond10x/connectors/issues/101)). Stores this
+version writes stay readable by 0.31.0. ESS is 0.55.0.
+
 ## Available runtime
 
 [GitLab](/adapters/gitlab) runs through the [catalog provider](/adapters/catalog):
@@ -65,7 +81,7 @@ returned HTTP 200 for all eighteen current reads, each within its requested page
 bounds, and reused saved credentials across an owner restart. Tags, releases and
 deployments returned empty lists. An initial revalidation refusal remains
 unexplained; later explicit retries succeeded. The replay made no provider writes;
-the live mutation evidence above comes from earlier runs.
+the live mutation evidence above comes from earlier runs. Since 0.32.0 GitLab also binds the feed family as data: `feed.containers` lists the projects the token's user is a member of and `feed.items` reads a project's merge requests, every project listed `private` ([GitLab feed profile](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/contracts/feed/v1alpha1/gitlab.md)).
 
 [Jira Cloud](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) runs
 through the same catalog provider with HTTP basic authentication: issue search by
