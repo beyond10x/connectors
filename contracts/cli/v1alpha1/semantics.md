@@ -8,7 +8,7 @@ generated parser nor a recording handler proves keyring durability, process
 ownership, provider authentication or restart recovery. The existing runtime
 continues to support the [documented three-adapter slice](../../../README.md#where-the-project-stands).
 Setup, configured inventory and passive connection management have production
-handlers. The [private adapter transport](private-adapter.md) has process/TLS
+handlers; `setup checkpoints-enable` (§3) is specified ahead of its handler. The [private adapter transport](private-adapter.md) has process/TLS
 fixtures. Protected GitLab acquisition and restart reuse pass disposable runtime
 journeys; dedicated provider sandbox acceptance and the other adapters' persistent
 lifecycle bindings remain open. [Approval-key management](../../service/approval-issuers.md)
@@ -72,6 +72,7 @@ management wire payload or a persistent record.
 |---|---|---|---|
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
+| `setup checkpoints-enable` | local metadata store, under the owner lifetime lock | `SetupCheckpointsEnableInput` → `SetupCheckpointsEnableResult` | no / no |
 | `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
 | `approvals policy-status` | local policy inspector | `ApprovalPolicyStatusInput` → `ApprovalPolicyResult` | no / no |
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
@@ -147,7 +148,7 @@ status read their existing owner's observations or report owner unavailability;
 they have no cached-result fallback. Connection status can carry a cached
 `ConnectionDescription` only with its explicit cached/stale labels.
 
-Both setup actions explicitly bind `input: null` and an empty argument list in
+`setup init` and `setup check` explicitly bind `input: null` and an empty argument list in
 `ess-cli/1`; the handler receives `{}` plus Context. ESS has no empty struct type,
 so no dummy payload field or fictitious type is introduced for these actions.
 
@@ -271,7 +272,12 @@ owner-only state directory and initialises its metadata database, leaves the
 configuration byte-for-byte unchanged and returns `state_initialized`. An
 existing configuration with an existing metadata database, or one that does not
 load, returns `configuration_exists`; an existing database is never opened,
-migrated or recreated by `setup init`. The file uses
+migrated or recreated by `setup init`. The metadata database `setup init`
+creates, on `created` and `state_initialized` alike, has Entity Runtime durable
+open checkpoints enabled before `setup init` returns, so its opens start from a
+persisted checkpoint instead of verifying the whole history, and connectors
+0.32.0 and earlier cannot open it. `setup init` never enables a database that
+already exists; only `setup checkpoints-enable` does (below). The file uses
 the current `connectors-local/2` format, whose adapter entries each select a
 `private_protocol` ([private mutation extension](private-mutations.md)); an
 existing `connectors-local/1` file keeps loading unchanged. A
@@ -301,6 +307,55 @@ bytes, keyring locators or actionable acquisition continuations. A default adapt
 must name exactly one entry; connection defaults, if used by a future binding,
 must be explicitly recorded and cannot be inferred from last usage. This first
 binding requires an explicit connection for a credentialed operation.
+
+### Durable open checkpoints on an existing store
+
+`setup checkpoints-enable --confirm one-way` enables Entity Runtime durable open
+checkpoints on the metadata database in the selected state directory. It is the
+only way an existing store gets them: no other command, open or upgrade enables
+them. Enabling installs Eventlog's triggers and continuity tables, and is one-way
+for older releases: Entity Runtime 0.28.0 and earlier, and so connectors 0.32.0
+and earlier, refuse to open the store afterwards. This binding has no command
+that removes them. Every `SetupCheckpointsEnableResult` states this:
+`change = one-way` and `newest_incompatible_release = "0.32.0"`. The command
+starts no local host or adapter and runs in this order:
+
+1. Without `--confirm one-way` it refuses `confirmation_required` (`kind = usage`,
+   exit 2, `stage = arguments`, `next_action = retry_explicitly`) before it takes
+   a lock or opens the store, and changes nothing. `--confirm` admits only the
+   value `one-way`; any other value is the presentation's `cli_input`.
+   `ess-cli/1` has no valueless switch, so the confirmation carries its value.
+2. It takes the owner lifetime lock of [local owner transport](owner.md) without
+   waiting and holds it until it returns, so no owner starts meanwhile. A lock
+   another process holds, a running owner for this state directory, refuses
+   `lifecycle_conflict` (`stage = admission`, `next_action = stop_owner`) with the
+   store unchanged. The command never signals the owner; the user stops the
+   running `__connectors-owner` process, as for `owner_build_mismatch`.
+3. It opens the store as an admitted mutating open under `metadata.lock`, within
+   the usual 30-second wait. As every mutating open does, it first migrates a
+   level 1–8 database to level 9 ([local metadata](../../../docs/local-er-metadata.md#compatible-migration-from-levels-18)).
+   It never creates a database. A missing, unreadable, foreign-owned,
+   unrecognised or integrity-refused store, a `metadata.lock` not released within
+   the wait, and Eventlog's refusal to enable (a trigger or continuity table the
+   provider did not create) are `metadata_unavailable` (`stage = observation`,
+   `next_action = retry_status`), with the store unchanged.
+4. A store that already carries checkpoints answers `disposition = already_enabled`,
+   a success with exit 0, and changes nothing. A second confirmed run answers it,
+   and so does a run on a store `setup init` created.
+5. Otherwise it enables them in one transaction, persists the open checkpoint at
+   the head it verified, so the next open starts from that checkpoint, and answers
+   `disposition = enabled`. A lost acknowledgement is `outcome_unknown`
+   (`stage = publication`) with `next_action = retry_explicitly`: enabling an
+   enabled store changes nothing, so running the command again answers
+   `already_enabled` or enables.
+
+The command sees only running owners. A second installed `connectors` binary or
+another tool built on Entity Runtime 0.28.0 or earlier that is not running cannot
+be detected; it fails to open the store once enabled. A tracked open from a
+checkpoint does not detect raw edits of the database file that bypass SQLite
+while no handle is open; a write through any SQLite connection still makes the
+next open verify completely, and a read of an edited blob refuses it (Entity
+Runtime 0.29.0).
 
 ## 4. Lifecycle and bounded startup
 
@@ -510,12 +565,13 @@ never replay a possible write after interruption, timeout or lost response.
 | TOML syntax, unsupported startup/restart, duplicate identity, bad permissions | `invalid_configuration` | 2 |
 | configuration already exists (`setup init`: with a metadata database, or one that does not load) | `configuration_exists` | 1 |
 | no safe entry channel (in place of the presentation's `cli_source`) | `protected_entry_unavailable` | 2 |
+| `setup checkpoints-enable` without `--confirm one-way`; nothing changed (`stage = arguments`, `next_action = retry_explicitly`) | `confirmation_required` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
-| stale revision, occupied changed configuration | `lifecycle_conflict` | 1 |
+| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
 | running owner is a different executable build (`next_action = stop_owner`) | `owner_build_mismatch` | 1 |
@@ -729,8 +785,11 @@ Runtime acceptance must exercise real Linux ownership/no-symlink descriptor chec
 echo restoration and output redaction before parsing failures; keyring lock/write/
 durability and crash recovery; metadata publication/revoke/dispatch atomicity;
 same-target repair and revision races; child launch coalescing and pidfd stop;
-durable stop suppression; actual readiness/timeout/isolation; and still-valid
-credential reuse across both process restarts. New ESS and deterministic output
+durable stop suppression; actual readiness/timeout/isolation; still-valid
+credential reuse across both process restarts; and durable open checkpoints: a
+store `setup init` creates carries them, an existing store `setup checkpoints-enable`
+enabled then opens from its checkpoint, and an unconfirmed run is refused with
+the store unchanged. New ESS and deterministic output
 must be revalidated using the selected exact current-source ESS toolchain. An
 older release binary is provisional authoring evidence only.
 
