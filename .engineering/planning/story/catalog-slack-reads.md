@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: story:catalog-slack-reads
 kind: story
-status: draft
+status: active
 title: Slack channel history and thread replies through the catalog provider
 relations:
 - decomposes: epic:catalog-knowledge-sources
 - depends_on: story:catalog-confluence-reads
+- serves: vision:independent-contract-adapters
+- depends_on: story:catalog-swagger2-projection
 scope:
 - confidence: cited
   path: adapters/catalog/generated/bundles/index.json
@@ -20,7 +22,10 @@ scope:
   path: adapters/slack/upstream/slack-web-api.json
 - confidence: cited
   path: docs/catalog-slack.md
-revision: 6
+revision: 8
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-06T19:55:25Z", actor: "agent:claude", revision: 7, decided_on: {"recorded":{"review_outcome":5}}}
+- {from: "proposed", to: "active", at: "2026-10-06T19:55:25Z", actor: "agent:claude", revision: 8, decided_on: {"recorded":{"review_outcome":5}}}
 ---
 ## Source
 
