@@ -39,13 +39,20 @@ types:
       - {name: pointer, type: connectors_catalog.feed.Pointer}
       - {name: map, type: "Map<String, connectors_catalog.feed.Visibility>"}
 
-  # The provider's own continuation: sent as `parameter`, read back at `next`. An absent, null or
-  # empty `next` ends the listing.
+  # How a listing continues, sent as `parameter`; exactly one of `next` and `last` (Declaration's
+  # invariants).
+  # - `next`: the provider's own continuation, read in the whole answer. An absent, null or empty
+  #   `next` ends the listing.
+  # - `last`: the key of the last record of a full page, read in that record, for a provider that
+  #   lists after a key it is given; the declaration's `query` orders the listing by that key. A
+  #   page with fewer records than the limit ends the listing, and a full page whose last record
+  #   has no key is unavailable, never complete.
   - name: connectors_catalog.feed.CursorPaging
     kind: struct
     fields:
       - {name: parameter, type: connectors_catalog.feed.Parameter}
-      - {name: next, type: connectors_catalog.feed.Pointer}
+      - {name: next, type: "Optional<connectors_catalog.feed.Pointer>"}
+      - {name: last, type: "Optional<connectors_catalog.feed.Pointer>"}
 
   # Reads one container by id, so that `feed.items` answers an unknown and an excluded direct
   # container alike, before any item is read.
@@ -71,8 +78,12 @@ types:
       - {name: records, type: connectors_catalog.feed.Pointer}
       - {name: id, type: connectors_catalog.feed.Pointer}
       - {name: name, type: "Optional<connectors_catalog.feed.Pointer>"}
-      # The provider's word for every container this declaration lists.
-      - {name: kind, type: String}
+      # The provider's word for a container: the pointer at which each record carries it, or, for
+      # a provider whose records carry none, the one `kind_word` (1 to 128 visible ASCII bytes)
+      # every container this declaration lists carries. Exactly one of the two (Declaration's
+      # invariants).
+      - {name: kind, type: "Optional<connectors_catalog.feed.Pointer>"}
+      - {name: kind_word, type: "Optional<String>"}
       # Absent: every container is private and none is direct.
       - {name: visibility, type: "Optional<connectors_catalog.feed.VisibilityRule>"}
 
@@ -142,9 +153,9 @@ types:
   # each first variant the strongest. Declaration's invariants refuse a claim the rest of the
   # declaration does not support, and the engine refuses it when the selection file loads:
   # - deletions: `observed` exactly when `items.deleted` is declared;
-  # - kind: `provider-word` reads `containers.kind`; this shape carries no fixed word, so
-  #   `fixed-word` is refused. A fixed word will be `containers.kind_word` (story
-  #   gitlab-feed-binding), and the family's `kind_word` is read from there, not repeated here;
+  # - kind: `provider-word` exactly when `containers.kind` is read, `fixed-word` exactly when
+  #   `containers.kind_word` states the word; the family's `kind_word` is read from there, not
+  #   repeated here;
   # - revision: `update-time` exactly when `items.revision` and `items.updated_at` are one pointer;
   # - visibility: `mapped` exactly when `containers.visibility` maps some value to `public`.
   - name: connectors_catalog.feed.DeletionCapability
@@ -183,7 +194,13 @@ types:
       - max_limit <= 100
       - any: [{capabilities.deletions: not-observed}, defined(items.deleted)]
       - any: [{capabilities.deletions: observed}, {not: defined(items.deleted)}]
-      - {capabilities.kind: provider-word}
+      - any: [defined(containers.cursor.next), defined(containers.cursor.last)]
+      - any: [{not: defined(containers.cursor.next)}, {not: defined(containers.cursor.last)}]
+      - any: [defined(containers.kind), defined(containers.kind_word)]
+      - any: [{not: defined(containers.kind)}, {not: defined(containers.kind_word)}]
+      - any: [{not: defined(containers.kind_word)}, {containers.kind_word.count: {gte: 1, lte: 128}}]
+      - any: [{capabilities.kind: fixed-word}, defined(containers.kind)]
+      - any: [{capabilities.kind: provider-word}, defined(containers.kind_word)]
       - any: [{capabilities.revision: update-time}, items.revision != items.updated_at]
       - any: [{capabilities.revision: opaque}, items.revision == items.updated_at]
       - any:

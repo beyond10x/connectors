@@ -23,6 +23,27 @@
   the wire. `listing-omits-direct-conversation` no longer asserts the public container's
   listed visibility, so every visibility capability is held to omitting a direct
   conversation.
+- GitLab binds `datasource.feed/v1alpha1` as data, profile `gitlab-merge-requests/1`
+  (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`): `feed.containers` lists the
+  projects the token's user is a member of, oldest id first, continued after the last
+  project id of a full page (`id_after`); `feed.items` reads one project's merge requests in
+  every state, oldest `updated_at` first, resumed from a time watermark on `updated_at`
+  (`updated_after`, inclusive). The profile declares `deletions: not-observed`,
+  `kind: fixed-word` (`project`), `revision: update-time` and `visibility: all-private`:
+  every project is listed `private`, because a public project may keep its merge requests to
+  its members and one field cannot tell; `url` is null, because a project rename changes
+  `web_url` without changing the merge request's revision. The feed suite runs the 26 of its
+  28 scenarios these capabilities select and passes all 26; `revision: update-time` leaves
+  out the two that restore an item at an instant it already carried another revision at. The
+  binding is checked against recorded GitLab shapes and a stand-in provider through the CLI
+  only; it has not been read from a running GitLab.
+- A catalog feed declaration may continue its container listing after the key of a full
+  page's last record (`containers.cursor.last`, GitLab's `id_after`) instead of the
+  provider's own continuation (`cursor.next`), and may state one fixed word for every
+  container (`containers.kind_word`) instead of reading one (`containers.kind`). Exactly one
+  of each pair; `kind: fixed-word` is now accepted exactly when `kind_word` is declared
+  (`contracts/catalog/v1alpha1/semantics.md` section 3.3, `adapters/catalog/spec/ess`).
+  Existing declarations load unchanged.
 
 ### Changed
 
@@ -54,6 +75,13 @@
   (`contracts/catalog/v1alpha1/semantics.md` section 3.3). No shipped provider declares a
   feed, so no saved connection's configuration revision moves. Migration: a selection file
   with a `feed` adds the `capabilities` its declaration supports.
+- The shipped GitLab selection set declares the feed, so the configuration revision of every
+  instance using it moves, and with it the descriptor revision. Migration: print the
+  bootstrap again and copy its `configuration_revision` into the adapter entry, run
+  `connections revalidate` on each connection of the instance, and issue the instance's
+  approval policies again (`docs/local-catalog-provider.md`). Until then the adapter does
+  not start and the connection reports `pending`. To read the feed, add `feed.containers`
+  and `feed.items` to the adapter's permitted operations.
 
 ## 0.31.0 — 2026-10-06
 

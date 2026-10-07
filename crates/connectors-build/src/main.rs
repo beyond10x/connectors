@@ -21,6 +21,8 @@ mod ess_boundary;
 #[cfg(test)]
 mod feed_conformance;
 mod gate;
+#[cfg(test)]
+mod gitlab_feed_conformance;
 mod ignored;
 mod metadata_conformance;
 mod metadata_entities;
