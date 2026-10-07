@@ -397,11 +397,7 @@ fn persistent_kubernetes_cli_owner_and_keyring_restart() {
         r#"{"namespace":"fixture","kind":"pods","limit":1}"#,
     ];
     let value = success(cli.run(&invoke));
-    assert_eq!(
-        serde_json::from_str::<Value>(value["result"].as_str().unwrap()).unwrap()["items"][0]["metadata"]
-            ["name"],
-        "pod-0"
-    );
+    assert_eq!(value["result"]["items"][0]["metadata"]["name"], "pod-0");
 
     let old_host = cli.status()["host_incarnation"].clone();
     cli.shutdown();
@@ -555,10 +551,7 @@ fn kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_cre
         "--input-json",
         r#"{"namespace":"fixture","limit":10}"#,
     ]));
-    assert_eq!(
-        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["items"][0]["address"],
-        "10.0.0.7"
-    );
+    assert_eq!(result["result"]["items"][0]["address"], "10.0.0.7");
 }
 
 #[test]
@@ -630,7 +623,7 @@ fn kubernetes_cli_reads_helm_release_history_and_redacted_values() {
         let printed = String::from_utf8_lossy(&output.stdout).into_owned();
         assert!(!printed.contains(RECORDED_VALUE_SECRET), "{operation}");
         assert!(!printed.contains(RENDERED_MANIFEST_SECRET), "{operation}");
-        serde_json::from_str(success(output)["result"].as_str().unwrap()).unwrap()
+        success(output)["result"].clone()
     };
 
     let history = read(
@@ -864,7 +857,7 @@ fn a_real_cluster_session_persists_across_cli_and_owner_restart() {
         r#"{"namespace":"fixture","kind":"pods","limit":10}"#,
     ];
     let value = success(cli.run(&pods));
-    let page: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
+    let page: Value = value["result"].clone();
     assert!(
         page["items"].as_array().is_some_and(|i| !i.is_empty()),
         "the sandbox namespace has a pod: {page}"
@@ -898,7 +891,7 @@ fn a_real_cluster_session_persists_across_cli_and_owner_restart() {
     fs::remove_file(&credential).unwrap();
     // The saved exact token version carries the read after both restarts.
     let value = success(cli.run(&pods));
-    let page: Value = serde_json::from_str(value["result"].as_str().unwrap()).unwrap();
+    let page: Value = value["result"].clone();
     assert!(page["items"].as_array().is_some_and(|i| !i.is_empty()));
     let current = success(cli.run(&[
         "connections",
@@ -935,7 +928,7 @@ fn a_real_cluster_session_persists_across_cli_and_owner_restart() {
         "--input-json",
         r#"{"namespace":"fixture","limit":50}"#,
     ]));
-    let page: Value = serde_json::from_str(listed["result"].as_str().unwrap()).unwrap();
+    let page: Value = listed["result"].clone();
     assert!(page["items"].is_array(), "{page}");
 }
 
@@ -1379,7 +1372,7 @@ impl RealJourney {
             self.command(operation, input, &self.connection)
                 .observed_output(),
         );
-        serde_json::from_str(result["result"].as_str().unwrap()).unwrap()
+        result["result"].clone()
     }
     fn current(&self) -> Value {
         success(self.cli.run(&[
