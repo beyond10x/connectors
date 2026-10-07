@@ -20,7 +20,7 @@ scope:
   path: crates/connectors-host/src/local/registry.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 13
+revision: 14
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
@@ -130,3 +130,16 @@ connection, still verifies.
 Operator observation the same day: on the default store (1,022 events, 29 MB) and on a fresh
 Zendesk store grown to 489 events, `connections revalidate` answered `outcome_unknown` at
 `publication` after 30 s with the 0.27.0 and 0.28.0 CLIs.
+
+## Integrity
+
+Added 2026-10-07 (`decision-blocker:checkpoint-offline-edit-detection`, option B):
+
+- Only the owner, holding a handle for its whole run, opens from a checkpoint without full
+  verification, after one FullVerification open at its start. Every other open (a command run
+  without the owner, a second process, recovery) keeps a FullVerification open.
+- Tests: an offline raw edit of the SQLite file is refused before the first command after it, on
+  the owner path (edited while the owner is stopped, then started) and on the direct path.
+- `CHANGELOG.md` and the store contract (`docs/local-er-metadata.md`,
+  `contracts/cli/v1alpha1/semantics.md` §3) say which open verifies what.
+- No disable command is offered.

@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-07T17:26:05Z",
+  "actor": "human:timo",
+  "artifact": "decision-blocker:checkpoint-offline-edit-detection",
+  "kind": "decision-blocker",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "Decision 2026-10-07 under the operator's standing delegation: option B with four conditions that keep the integrity guarantee unchanged"
+  }
+}
