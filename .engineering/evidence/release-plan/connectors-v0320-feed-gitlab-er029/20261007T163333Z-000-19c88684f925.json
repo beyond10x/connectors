@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-07T16:33:33Z",
+  "actor": "human:timo",
+  "artifact": "release-plan:connectors-v0320-feed-gitlab-er029",
+  "kind": "release-plan",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo run --locked -p connectors-build -- gate --msrv on release/0.32.0@92c019526a: all checks passed, 172 suites, 1437 passed, 0 failed, 77 ignored; website npm ci, typecheck, build exit 0; reference:check no drift (101 pages)",
+    "reference": "release/0.32.0@92c019526a"
+  }
+}
