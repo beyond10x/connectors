@@ -425,7 +425,6 @@ types:
       - {name: description, type: "String"}
       - {name: contract, type: "String"}
       - {name: profile, type: "String"}
-  # Schema fields are bounded UTF-8 JSON document carriers, decoded into JSON schema values by the wire codec.
   - name: connectors.cli.OperationDescription
     kind: struct
     fields:
@@ -433,9 +432,9 @@ types:
       - {name: description, type: "String"}
       - {name: contract, type: "String"}
       - {name: profile, type: "String"}
-      - {name: input_schema, type: "String"}
-      - {name: output_schema, type: "String"}
-  # Complete legacy service descriptor value, with explicit JSON text carriers for dynamic schema documents.
+      - {name: input_schema, type: "Json"}
+      - {name: output_schema, type: "Json"}
+  # Complete legacy service descriptor value; configuration_schema is a JSON text carrier.
   - name: connectors.cli.ServiceDescriptor
     kind: struct
     fields:
@@ -666,14 +665,14 @@ types:
       # buffer after current admission and exact-key observation; never parser JSON.
       - {name: approval_file, type: "Optional<String>"}
       - {name: idempotency_key, type: "Optional<String>"}
-  # result is the bounded JSON text carrier for selected provider output; it must pass that operation's output schema.
+  # result is the selected provider output as a JSON value; it must pass that operation's output schema.
   - name: connectors.cli.OperationInvokeResult
     kind: struct
     fields:
       - {name: adapter, type: "String"}
       - {name: operation, type: "String"}
       - {name: revision, type: "String"}
-      - {name: result, type: "String"}
+      - {name: result, type: "Json"}
       - {name: request_id, type: "Optional<String>"}
       - {name: mutation, type: "Optional<connectors.cli.MutationObservation>"}
       - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>"}
@@ -700,7 +699,7 @@ types:
       - {name: endpoint, type: "String"}
       - {name: token_file, type: "String"}
       - {name: allow_plaintext, type: "Optional<Boolean>"}
-  # The legacy renderer unwraps and decodes descriptor schema carriers into the complete original wire object.
+  # The legacy renderer unwraps the descriptor and decodes its configuration_schema carrier into the complete original wire object.
   - name: connectors.cli.LegacyDescribeResult
     kind: struct
     fields:
