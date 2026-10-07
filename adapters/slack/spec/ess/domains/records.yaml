@@ -1,0 +1,188 @@
+domain: connectors_slack.records
+summary: Slack-owned provider records the parity units read or write — conversations,
+  messages, users, files and emoji — with the relations no source answers marked.
+
+# Status: proposed draft for parity units U02, U08 and U13; not implemented.
+# Normative owner: adapters/slack/design.md. Shared ESS includes none of this root
+# and imports none of its types (adapters/README.md:70-74).
+#
+# Citation keys used below:
+#   fx:<line>     the fluxplane-plugin skill reference `references/slack.md`, plugin
+#                 0.23.0, read 2026-10-07. It is not in this repository; it states
+#                 operation inputs only, never an output shape.
+#   parity:<line> docs/fluxplane-plugin-parity.md (2026-10-07), § slack and § Gap units.
+#   usage:<line>  docs/recent-adapter-usage-20260909.md.
+#
+# Field names below are this model's. The wire members come from the pinned upstream
+# document once one is adopted (adapters/slack/design.md); no wire name is declared
+# here because no source in reach states one.
+#
+# Every lifecycle has one terminal state: the repository's idiom for "the record
+# exists; no transition is selected" (ess/domains/auth_bindings.yaml:85-88). This
+# domain declares nouns, not behaviour, so it declares no command and no transition.
+
+types:
+  # A message is addressed by its conversation and its timestamp together: fx:153
+  # "ref (permalink URL or channel:timestamp) OR channel and ts together"; message
+  # edit and delete take `channel` plus `ref` (fx:108, fx:112). usage:155 "Preserve
+  # string timestamps/thread identity", so `ts` is a String, never a parsed instant.
+  - name: connectors_slack.records.MessageRef
+    kind: struct
+    fields:
+      - {name: conversation_id, type: String}
+      - {name: ts, type: String}
+
+entities:
+  # A conversation is what a message is sent to or read from: a channel, or the
+  # direct-message conversation `slack.message.send` opens when given a user (fx:120),
+  # and the target of an upload "to a Slack channel, DM, or thread" (fx:90). The Web
+  # API method family is `conversations.*` (parity:210-215, parity:230-231), so the
+  # noun is Conversation; fluxplane names the listed ones channels (fx:168).
+  - name: connectors_slack.records.Conversation
+    # fx:120 "channel accepts a channel id"; every operation passes it as a JSON
+    # string (fx:45, fx:50, fx:87).
+    identity:
+      name: conversation_id
+      type: String
+    fields:
+      # fx:120 "a channel id or #name".
+      # UNMAPPED: whether a direct-message conversation carries a name is not stated
+      # (fx:120 reaches one through a user id or @name instead), so it is optional.
+      - name: name
+        type: Optional<String>
+    # UNMAPPED: the conversation's kind. story:slack-feed-binding separates channels
+    # from "direct and group conversations"; no source states how the provider
+    # marks the kind, whether a private channel is a kind or a flag, or its type.
+    # UNMAPPED: membership, private and archived state. usage:155 requires the
+    # adapter to distinguish them; no source states the members or their types.
+    lifecycle:
+      initial: Present
+      states: [Present]
+      terminal: [Present]
+
+  # `slack.user.list` (fx:159-162, parity:214 `users.list`); fluxplane entity
+  # `slack.user` (fx:174).
+  - name: connectors_slack.records.User
+    # fx:120 "a user id (U…/W…)"; passed as a JSON string (fx:126). The U/W prefix
+    # is fluxplane's rule for telling an id from a name on input, not a stated
+    # guarantee about every id, so it is not declared as an invariant.
+    identity:
+      name: user_id
+      type: String
+    fields:
+      # fx:120 "or @name": every user is addressable by name.
+      # UNMAPPED: which provider member backs @name (a handle, a display name or a
+      # real name) is not stated.
+      - name: name
+        type: String
+    lifecycle:
+      initial: Present
+      states: [Present]
+      terminal: [Present]
+
+  # Read by `slack.message.list` (fx:113-116, `conversations.history`) and
+  # `slack.thread` (fx:151-153, parity:210 `conversations.replies`); found by
+  # `slack.search` (parity:213 `search.messages`, fluxplane entity `slack.message`
+  # fx:170); written by send, edit and delete (parity:211, parity:217, parity:220).
+  - name: connectors_slack.records.Message
+    identity:
+      name: message_ref
+      type: connectors_slack.records.MessageRef
+    fields:
+      # fx:153 "Message text … text_format selects mrkdwn/both": the native text is
+      # Slack mrkdwn. Rendering to Markdown (fx:115, fx:153) and sending Markdown
+      # (fx:122 `markdown`) are fluxplane presentation, not a record field.
+      - name: text
+        type: String
+    # UNMAPPED: Conversation → Message. A conversation holds many messages (fx:115
+    # reads "recent messages from a Slack channel" and pages them with next_cursor),
+    # and MessageRef carries the conversation; no source states whether a message
+    # outlives its conversation, so owns versus references is open and no
+    # `relations:` entry is written.
+    # UNMAPPED: thread replies, Message → Message. A thread is its parent message
+    # plus its replies (fx:153 addresses it by the parent's channel and ts;
+    # CHANGELOG.md:1580 "a thread's parent and its replies"), so a parent has many
+    # replies. No source names the reply's link to its parent, and none states owns
+    # versus references. fluxplane keeps a separate `slack.thread_message` entity
+    # (fx:172); whether that is a distinct noun is not stated, and it is not one here.
+    # UNMAPPED: Message → User (the author). usage:155 requires resolving users;
+    # no source states the author member, its cardinality or whether bot messages
+    # carry a user at all.
+    # UNMAPPED: a search result's address. fx:170 says search returns messages; no
+    # source states that each result carries the conversation id and ts MessageRef
+    # needs.
+    lifecycle:
+      initial: Present
+      states: [Present]
+      terminal: [Present]
+
+  # Parity unit U13 (parity:788): info, list, upload, download and delete
+  # (fx:69-91; parity:216, parity:219, parity:221-223).
+  - name: connectors_slack.records.File
+    # `file_id`, a JSON string, is the only address info, download and delete take
+    # (fx:72, fx:77, fx:82).
+    identity:
+      name: file_id
+      type: String
+    fields:
+      # parity:219 "A binary fetch of `url_private`": the download reads this URL
+      # with the connection's token, so it is credential-scoped material.
+      - name: url_private
+        type: String
+    # UNMAPPED: File → Conversation. An upload targets "a Slack channel, DM, or
+    # thread" (fx:90) and list filters by `channel` (fx:87); no source states
+    # whether a file is in one conversation or many, or owns versus references.
+    # UNMAPPED: File → Message. An upload into a thread (fx:90) implies a message;
+    # no source states the link or its cardinality.
+    # UNMAPPED: the file's name, type and size. No source states any member beyond
+    # url_private.
+    lifecycle:
+      initial: Present
+      states: [Present]
+      terminal: [Present]
+
+  # `slack.emoji.list` (fx:65-68, parity:225 `emoji.list`), in unit U02 (parity:777).
+  - name: connectors_slack.records.Emoji
+    # The only address an emoji has in reach is the JSON string `emoji` that the
+    # reaction operations take (fx:135-136).
+    # UNMAPPED: whether emoji.list identifies each entry by that same string, and
+    # whether it lists the standard set or only the workspace's own.
+    identity:
+      name: emoji
+      type: String
+    # UNMAPPED: every member of an emoji entry. No source states one.
+    fields: []
+    lifecycle:
+      initial: Present
+      states: [Present]
+      terminal: [Present]
+
+# ── Nouns the units touch that are not declared ────────────────────────────────
+#
+# UNMAPPED: Workspace. `slack.info` shows "token identity and workspace information"
+#   (fx:97-99, parity:218 `auth.test` and `team.info`). No source states its identity
+#   or any member, and ESS refuses an entity without an identity, so it is absent.
+#   Its edges to Conversation, User and Emoji are UNMAPPED with it.
+# Token identity (`slack.info`, `slack.test`, fx:147-149) is not a record of this
+#   domain: a `*.test` operation is answered by `connections revalidate`, which
+#   re-runs the auth profile's identity probe (parity:81-83).
+# UNMAPPED: Conversation ↔ User membership. fluxplane's `slack.channel_member`
+#   datasource lists a channel's members (fx:166) and usage:155 requires membership;
+#   no unit operation reads it, and no source states the cardinality on the user side.
+# UNMAPPED: a direct-message conversation → its User. fx:120 opens one from a user id
+#   (parity:211 `conversations.open`); no source states the member or cardinality.
+#
+# Out of scope, 0 calls and in no unit (parity:837): bookmarks, presence, reactions,
+# unreads, mentions, channel join and mark-read, and the fluxplane-local index.
+#
+# ── Relation census ────────────────────────────────────────────────────────────
+# `relations:` appears nowhere above: every edge lacks a stated ownership, and most
+# lack a stated cardinality.
+#   Conversation → Message      many (fx:115); owns/references UNMAPPED
+#   Message → Message (replies) many (CHANGELOG.md:1580); link and owns/references UNMAPPED
+#   Message → User (author)     UNMAPPED
+#   Conversation ↔ User         UNMAPPED
+#   Conversation(direct) → User UNMAPPED
+#   File → Conversation         UNMAPPED
+#   File → Message              UNMAPPED
+#   Workspace → *               UNMAPPED (Workspace not declared)
