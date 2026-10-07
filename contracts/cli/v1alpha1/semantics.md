@@ -481,9 +481,16 @@ once; the provider JSON decoder then rejects malformed/duplicate/trailing input 
 validates the decoded JSON value against the exact selected operation schema.
 Carrier validation and provider-schema validation establish separate facts. When
 serializing the service request, `input` is that decoded JSON value, never the
-quoted carrier string or a double-encoded document. Results and schema documents
-use the same explicit carrier distinction. Structured command metadata uses
-specific types, not a catch-all string.
+quoted carrier string or a double-encoded document. Answers are not carriers:
+`OperationInvokeResult.result` is the provider result as a JSON value, validated
+against the selected operation's output schema, and `OperationDescription`
+answers `input_schema` and `output_schema` as JSON schema objects in
+`operations describe`, in the `adapters describe` descriptor and in the
+compatibility `describe`. A caller decodes the answer once; none of these fields
+is a string holding JSON. The schema digest (`schema`), not the schema document,
+remains the identity an invocation selects. `ServiceDescriptor.configuration_schema`
+remains a JSON text carrier. Structured command metadata uses specific types, not
+a catch-all string.
 
 Invocation selects adapter, operation, exact schema identity (`schema`), description
 revision (`revision`) and explicit

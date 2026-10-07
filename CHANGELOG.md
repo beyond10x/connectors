@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Breaking: `--output json` answers carry JSON values where they carried JSON text
+  (#105). `operations invoke` answers the provider result in `result.result` as a JSON
+  value; `operations describe`, the `adapters describe` descriptor and the compatibility
+  `describe` answer each operation's `input_schema` and `output_schema` as JSON schema
+  objects. A caller decodes the answer once. The CLI contract stays `v1alpha1`, so the
+  answers change in place, without a new output version. Migration: a caller that
+  decoded these fields a second time reads the value directly. The schema digest
+  (`schema`) is still the identity an invocation selects;
+  `ServiceDescriptor.configuration_schema` is still JSON text.
+  `connectors.cli.OperationDescription` and `connectors.cli.OperationInvokeResult` type
+  the fields `Json` in `ess/domains/cli.yaml`.
+- ESS 0.55.0 (from 0.53.0): the seven ESS crates and the pinned toolchain. 0.55.0 is the
+  first release whose `ess generate cli` admits a `Json` result field
+  (beyond10x/ess#468); the regenerated CLI contract carries new `src/wire.rs` and
+  `src/runtime.rs` bytes. `ess specify validate` now warns `ESS-ENTITY-019` twice, for
+  `generation_id` on `connectors.auth_bindings.Acquisition` and `CustodyVersion`; the
+  specification stays valid. Entity Runtime stays at 0.26.0.
+
 ## 0.31.0 — 2026-10-06
 
 ### Added

@@ -391,10 +391,7 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
         r#"{"id":"org/project"}"#,
     ];
     let result = success(cli.run(&invoke));
-    assert_eq!(
-        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
-        7
-    );
+    assert_eq!(result["result"]["body"]["id"], 7);
 
     let old_host = success(cli.run(&["adapters", "status", "--adapter", "gitlab"]))["observation"]
         ["host_incarnation"]
@@ -443,10 +440,7 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
         .collect();
     for child in children {
         let result = success(child.wait_with_output().unwrap());
-        assert_eq!(
-            serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
-            7
-        );
+        assert_eq!(result["result"]["body"]["id"], 7);
     }
     assert_eq!(provider.count(), calls_before + 4);
     let new_host = success(cli.run(&["adapters", "status", "--adapter", "gitlab"]))["observation"]
@@ -733,10 +727,7 @@ fn a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission() {
     };
 
     let answered = success(read("project.get", "org/project"));
-    assert_eq!(
-        serde_json::from_str::<Value>(answered["result"].as_str().unwrap()).unwrap()["body"]["id"],
-        7
-    );
+    assert_eq!(answered["result"]["body"]["id"], 7);
 
     let before = provider.count();
     let refused = refused_data(read("project.get", "org/fixture-refused"));
@@ -938,10 +929,7 @@ impl OAuthJourney {
 #[track_caller]
 fn read_project(output: Output) {
     let result = success(output);
-    assert_eq!(
-        serde_json::from_str::<Value>(result["result"].as_str().unwrap()).unwrap()["body"]["id"],
-        7
-    );
+    assert_eq!(result["result"]["body"]["id"], 7);
 }
 
 /// `connections connect` with Google's client file runs consent against the
