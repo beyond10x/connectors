@@ -605,16 +605,12 @@ fn gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection() 
             .map(|record| record["id"].as_str().unwrap().to_owned())
             .collect()
     };
-    // The family's page an invoke answered. A read through the owner answers
-    // `result` as JSON text (`connectors-host` `owner/supervisor.rs`), a write
-    // as a JSON value; either is read as the page.
+    // The family's page an invoke answered, as the JSON value the answer
+    // carries (story:owner-read-answers-json-value).
     let read = |operation: &str, input: Value| -> Value {
         let invoked = cli.operation_result(&reference, operation, input);
-        match &invoked["result"] {
-            Value::String(text) => serde_json::from_str(text)
-                .unwrap_or_else(|error| panic!("{operation}: {error}: {invoked:#}")),
-            page => page.clone(),
-        }
+        assert!(invoked["result"].is_object(), "{operation}: {invoked:#}");
+        invoked["result"].clone()
     };
     let first = read("feed.containers", json!({"limit": 2}));
     assert_eq!(
