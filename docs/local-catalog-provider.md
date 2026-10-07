@@ -69,6 +69,18 @@ and one unguarded write, `issue.create`:
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
 
+The GitLab set also declares the merge request feed, a `datasource.feed/v1alpha1`
+binding under profile `gitlab-merge-requests/1`: `feed.containers` lists the
+projects the token's user is a member of (`getApiV4Projects`, continued after
+the last project id with `id_after`), and `feed.items` reads one project's merge
+requests changed since a watermark (`getApiV4ProjectsId`, then
+`getApiV4ProjectsIdMergeRequests` with `updated_after`). Both are reads. Every
+project is listed `private`, every merge request has a null `url`, and deleted
+merge requests are not observed; the profile statement is
+[gitlab.md](../adapters/catalog/contracts/feed/v1alpha1/gitlab.md). Add both ids
+to an adapter's permitted operations to read the feed;
+`operations list --family datasource.feed/v1alpha1` then names them.
+
 The repository reads other than `repository.compare` list one page per call. Each takes `page` and `per_page`;
 a caller has walked the list when a page comes back shorter than `per_page`.
 GitLab serves at most 100 items per page, so with a larger value every page

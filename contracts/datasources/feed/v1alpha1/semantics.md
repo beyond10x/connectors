@@ -1,6 +1,6 @@
 # datasource.feed/v1alpha1
 
-**Status:** proposed; no binding is implemented.
+**Status:** proposed. One binding is implemented: GitLab, profile `gitlab-merge-requests/1` (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`), checked against recorded provider shapes.
 
 ## Shared contract and adapter ownership
 
