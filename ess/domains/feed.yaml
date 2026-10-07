@@ -47,12 +47,53 @@ types:
   - name: connectors.feed.OperationId
     kind: enum
     variants: [feed.containers, feed.items]
+  # The descriptor carries the profile id, not the profile's capabilities: the descriptor's
+  # operation is every family's wire value, and the profile id names the statement below.
   - name: connectors.feed.OperationBinding
     kind: struct
     fields:
       - {name: id, type: connectors.feed.OperationId}
       - {name: contract, type: String}
       - {name: profile, type: String}
+
+  # What a profile states its provider lets it observe. Each first variant is what the strongest
+  # provider gives; the suite holds a binding to what its profile declares, and names each
+  # scenario a weaker declaration leaves out and each expected field it masks.
+  # Whether a removed item comes back as a tombstone; `not-observed` never reports one.
+  - name: connectors.feed.DeletionCapability
+    kind: enum
+    variants: [observed, not-observed]
+  # Where a container's `kind` comes from: the provider's word for each container, or one word
+  # the profile fixes for every container it lists, stated as ProfileCapabilities.kind_word.
+  - name: connectors.feed.KindCapability
+    kind: enum
+    variants: [provider-word, fixed-word]
+  # How a revision is formed: an opaque provider version, or the item's update time, under which
+  # two changes of one item at one instant are one revision.
+  - name: connectors.feed.RevisionCapability
+    kind: enum
+    variants: [opaque, update-time]
+  # How a container's visibility is stated: mapped from the provider, or every listed container
+  # `private`.
+  - name: connectors.feed.VisibilityCapability
+    kind: enum
+    variants: [mapped, all-private]
+  # What the profile named by OperationBinding.profile states. A binding binds both operations
+  # under one profile, so one statement holds for both.
+  - name: connectors.feed.ProfileCapabilities
+    kind: struct
+    fields:
+      - {name: deletions, type: connectors.feed.DeletionCapability}
+      - {name: kind, type: connectors.feed.KindCapability}
+      # The one word every listed container carries; stated exactly under `kind: fixed-word`.
+      - {name: kind_word, type: "Optional<String>"}
+      - {name: revision, type: connectors.feed.RevisionCapability}
+      - {name: visibility, type: connectors.feed.VisibilityCapability}
+    # ESS-LIMIT: "kind_word is defined exactly when kind is fixed-word" is expressible as two
+    # invariants, but the feed-binding suite then refuses (ESS-SYNTH-013): no view publishes this
+    # type, which is a profile's statement and not a value any binding returns, so no scenario
+    # can witness them. The conformance harness holds a claim that breaks the rule to the
+    # provider's word (crates/connectors-build/src/feed_conformance.rs, Capabilities::refused).
 
   - name: connectors.feed.Container
     kind: struct

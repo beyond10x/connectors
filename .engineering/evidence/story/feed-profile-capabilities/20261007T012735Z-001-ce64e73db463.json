@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-07T01:27:35Z",
+  "actor": "human:timo",
+  "artifact": "story:feed-profile-capabilities",
+  "kind": "story",
+  "revision": 10,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "cargo test --locked -p connectors-build feed on unit/feed-profile-capabilities@1e7567cfe: 25 passed, including the 7 adversary cases (3 pass 1, 4 pass 2) that fail on the base; the base has no capabilities, so the behaviour is new",
+    "reference": "unit/feed-profile-capabilities@1e7567cfe vs wave/20261007a@ba8968e3e"
+  }
+}

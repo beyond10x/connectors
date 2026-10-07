@@ -133,6 +133,10 @@ A provider binds [datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/sema
 ```json
 {
   "profile": "<native profile id>",
+  "capabilities": {
+    "deletions": "observed | not-observed", "kind": "provider-word | fixed-word",
+    "revision": "opaque | update-time", "visibility": "mapped | all-private"
+  },
   "max_limit": 100,
   "containers": {
     "operation_id": "<list>", "query": {"<name>": "<fixed value>"},
@@ -158,12 +162,13 @@ A provider binds [datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/sema
 
 | Concern | Rule |
 |---|---|
+| Capabilities | Required: the profile's capabilities in the family's vocabulary ([datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/semantics.md)), each the one the rest of the declaration supports, or the selection file is refused when it loads. `deletions: observed` exactly when `items.deleted` is declared. `kind: provider-word`: the shape reads the provider's word at `containers.kind` and carries no fixed word, so `fixed-word` is refused; a fixed word will be declared as `containers.kind_word`, which the suite reads as the family's `kind_word`, never repeated under `capabilities`. `revision: update-time` exactly when `items.revision` and `items.updated_at` are one pointer. `visibility: mapped` exactly when `containers.visibility` maps some value to `public`. The model's `Declaration` invariants state the same rules. The suite holds the binding to its claim. |
 | Containers | One provider page per call: `limit` (default `max_limit`) and the provider's cursor, which comes back at `cursor.next`. An absent, null or empty `next` is `complete: true`. `next_cursor` wraps the provider's cursor with the profile and the instance. |
 | Visibility and direct conversations | The value at `visibility.pointer`, as text, is looked up in `map`; a value the map does not name, and a record with none, is `private`. A container mapped to `direct` is never listed. `feed.items` first reads the container through `lookup`; a 404 or 410 and a container mapped to `direct` both answer `not_found` with the same message. |
 | Watermark: `time` | The provider lists items at or after `parameter` (inclusive), oldest `updated_at` first; any fixed ordering parameter goes in `query`. The watermark is the last returned item's `updated_at`, sent back unchanged as that filter, and the `(id, revision)` pairs already returned at that instant, which are skipped on resume. The engine asks for `limit` plus that many records, so a page of unseen items stays within reach. An answer out of `updated_at` order, or before the filter, is `unavailable`. `complete` is true when the provider answered fewer records than asked and none was held back. |
 | Watermark: `cursor` | The provider keeps a change cursor: `parameter` sends it, `next` reads the new one, `complete` is a condition on the answer. A cursor the provider refuses with a status listed in `stale` is `stale_cursor`. An answer with more records than `limit` is `unavailable`: its cursor is already past all of them. |
 | Watermark scope | Every watermark carries the format, the profile, the instance and the container. Any other, or one that is not a watermark, is `stale_cursor`, never a first read. A first read omits the resume parameter and reaches as far back as the provider lists. |
-| Items | `id` and `revision` are required scalars; `created_at` and `updated_at` required RFC 3339 instants. `deleted` is true when the value at its pointer equals `equals`; a tombstone has `body: null`. Without `deleted` the profile observes no deletions. `author` is null when its `id` is absent. `url` is kept only when it is `http(s)://`. |
+| Items | `id` and `revision` are required scalars; `created_at` and `updated_at` required RFC 3339 instants. `deleted` is true when the value at its pointer equals `equals`; a tombstone has `body: null`. Without `deleted` the profile observes no deletions and declares `deletions: not-observed`. `author` is null when its `id` is absent. `url` is kept only when it is `http(s)://`. |
 | Body | A records body envelope with the declared `representation`; the text at `body.pointer`, null or absent as empty text, clipped at 64 KiB on a UTF-8 boundary (`truncation: ["content_bytes"]`). A non-text value is `unavailable`. |
 | Ceilings | `limit` 1 to `max_limit` (at most 100), refused as `invalid_input` above it; watermark and listing cursor 16 KiB; serialized page 3 MiB (`unavailable` above it); `feed.containers` makes one provider request, `feed.items` two. |
 | Errors | Provider 400, 409, 412, 422 are `invalid_input`; 404, 410 `not_found`; 401, 403, 429 and 5xx as the generic read table; any other status and any body that is not JSON `unavailable`. Provenance is `instance`, `profile` and `received_at`. |
