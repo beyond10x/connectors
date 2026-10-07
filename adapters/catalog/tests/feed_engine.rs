@@ -404,6 +404,136 @@ async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
     }
 }
 
+/// A room the lookup answers, or does not, and an item listing answered with `status`; every
+/// item request's query is kept.
+struct Admitting {
+    known: bool,
+    status: u16,
+    listed: Value,
+    queries: std::sync::Mutex<Vec<Vec<String>>>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Admitting {
+    async fn get(
+        &self,
+        path: &[&str],
+        query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        let (status, body) = match path {
+            ["rooms", "room"] if self.known => {
+                (200, json!({"room": {"id": "room", "access": "invite"}}))
+            }
+            ["rooms", "room"] => (404, json!({"error": "no such room"})),
+            ["rooms", "room", _] => {
+                let mut names: Vec<String> = query.iter().map(|(k, _)| k.to_string()).collect();
+                names.sort();
+                self.queries.lock().unwrap().push(names);
+                (self.status, self.listed.clone())
+            }
+            other => panic!("unexpected read {other:?}"),
+        };
+        Ok(connectors_sdk::HttpResponse {
+            status,
+            headers: Default::default(),
+            body: serde_json::to_vec(&body).unwrap(),
+        })
+    }
+}
+
+/// Admission of the container precedes whether a watermark is valid: with a watermark this read
+/// cannot resume (another container's, another profile's, or none at all), an unknown room and
+/// one whose items the provider refuses both answer `not_found` with one message, and only a
+/// room whose listing answers is `stale_cursor`. The listing that decides it is a first read: it
+/// carries no resume parameter, and none of its records is returned.
+#[tokio::test]
+async fn a_watermark_is_judged_only_after_the_container_is_admitted() {
+    for (name, listed) in [
+        ("time.operations.json", json!({"messages": []})),
+        (
+            "cursor.operations.json",
+            json!({"changes": [], "cursor": "7", "has_more": false}),
+        ),
+    ] {
+        let engine = build(&declaration(name), &[]).unwrap();
+        let read = |known: bool, status: u16, watermark: Option<&str>| {
+            let http = Admitting {
+                known,
+                status,
+                listed: listed.clone(),
+                queries: Default::default(),
+            };
+            let engine = &engine;
+            let mut input = json!({"container": "room", "limit": 10});
+            if let Some(watermark) = watermark {
+                input["watermark"] = json!(watermark);
+            }
+            async move {
+                let answer = engine.read(&http, "feed-instance", ITEMS, input).await;
+                (answer, http.queries.into_inner().unwrap())
+            }
+        };
+        let (issued, _) = read(true, 200, None).await;
+        let issued = issued.unwrap()["next_watermark"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let other = build(
+            &with(&declaration(name), "/profile", json!("another-profile/1")),
+            &[],
+        )
+        .unwrap()
+        .read(
+            &Admitting {
+                known: true,
+                status: 200,
+                listed: listed.clone(),
+                queries: Default::default(),
+            },
+            "feed-instance",
+            ITEMS,
+            json!({"container": "room", "limit": 10}),
+        )
+        .await
+        .unwrap()["next_watermark"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        for watermark in [other.as_str(), "not-a-watermark", ""] {
+            let (unknown, queries) = read(false, 200, Some(watermark)).await;
+            let unknown = unknown.unwrap_err();
+            assert_eq!(unknown.code, connectors_core::ErrorCode::NotFound, "{name}");
+            assert!(
+                queries.is_empty(),
+                "{name}: an unknown room's items were read"
+            );
+            let (refused, _) = read(true, 403, Some(watermark)).await;
+            let refused = refused.unwrap_err();
+            assert_eq!(
+                (refused.code, &refused.message),
+                (unknown.code, &unknown.message),
+                "{name}: {watermark:?}"
+            );
+            let (stale, queries) = read(true, 200, Some(watermark)).await;
+            assert_eq!(
+                stale.unwrap_err().code,
+                connectors_core::ErrorCode::StaleCursor,
+                "{name}: {watermark:?}"
+            );
+            assert_eq!(queries.len(), 1, "{name}");
+            assert!(
+                !queries[0]
+                    .iter()
+                    .any(|q| q == "updated_since" || q == "cursor"),
+                "{name}: the deciding listing resumed from {watermark:?}: {queries:?}"
+            );
+        }
+        // The watermark this read issued still resumes.
+        let (resumed, _) = read(true, 200, Some(&issued)).await;
+        assert!(resumed.is_ok(), "{name}: {resumed:?}");
+    }
+}
+
 /// A listing declared with `cursor.last` continues after the key of a full page's last record,
 /// a direct one included; a shorter page is the end; a full page whose last record has no key is
 /// `unavailable`, never complete. A fixed `kind_word` is every listed container's `kind`.

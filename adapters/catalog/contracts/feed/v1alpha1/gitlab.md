@@ -118,7 +118,10 @@ As the engine maps them: GitLab 400, 409, 412 and 422 are `invalid_input`; 404 a
 not JSON `unavailable`. One exception: when GitLab shows the project (`GET /projects/:id`
 answers) but refuses its merge requests with 403, as it does for a project whose merge requests
 feature is disabled or kept to members, `feed.items` answers `not_found`, exactly as for a
-project the token cannot see; the family answers a container the connection cannot read so. A
+project the token cannot see, whatever watermark the read carries; the family answers a
+container the connection cannot read so. A watermark not issued for this profile, instance and
+project is `stale_cursor` only after the merge request list answered: the binding then sends it
+without `updated_after` and discards what it lists, so `feed.items` still makes two requests. A
 403 on the project itself, or on the project listing, stays `forbidden`: it does not tell a
 credential that can read nothing from one project it cannot read.
 
