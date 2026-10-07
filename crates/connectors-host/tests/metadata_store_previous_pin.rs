@@ -15,7 +15,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::{
     collections::BTreeSet,
     fs,
-    os::unix::fs::PermissionsExt,
+    os::unix::fs::{MetadataExt, PermissionsExt},
     path::{Path, PathBuf},
 };
 
@@ -73,18 +73,35 @@ pub fn seed(state: &Path) -> Vec<(String, String)> {
 
 /// Copies the single store file `file`, and the clock floor beside it, into
 /// the new state directory `to`, as a restore would: WAL mode, a lock file,
-/// private permissions. No handle of this process has opened `to` before.
+/// private permissions, owned by the user running this test. No handle of
+/// this process has opened `to` before.
+///
+/// A store records the uid that created it in `local_authority.owner_uid`, and
+/// `Metadata` refuses a store another uid owns as `MetadataUnavailable` before
+/// any runtime reads it. The fixture records the uid of the machine that wrote
+/// it, so the copy is handed to the uid that owns `to`, which this process
+/// created: a user restoring their own store, whatever uid runs the test.
 fn restore(file: &Path, floor: &Path, to: &Path) {
     private_dir(to);
+    let owner = fs::metadata(to).unwrap().uid();
     let target = to.join(NAME);
     Connection::open_with_flags(file, OpenFlags::SQLITE_OPEN_READ_ONLY)
         .unwrap()
         .execute("VACUUM INTO ?1", [target.to_str().unwrap()])
         .unwrap();
-    Connection::open(&target)
-        .unwrap()
-        .pragma_update(None, "journal_mode", "WAL")
-        .unwrap();
+    let restored = Connection::open(&target).unwrap();
+    restored.pragma_update(None, "journal_mode", "WAL").unwrap();
+    assert_eq!(
+        restored
+            .execute(
+                "UPDATE local_authority SET owner_uid = ?1 WHERE singleton = 1",
+                [owner],
+            )
+            .unwrap(),
+        1,
+        "the restored store has no ownership record"
+    );
+    drop(restored);
     fs::write(to.join("metadata.lock"), b"").unwrap();
     fs::copy(floor, to.join(FLOOR)).unwrap();
     for name in [NAME, "metadata.lock", FLOOR] {
