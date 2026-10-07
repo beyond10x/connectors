@@ -31,7 +31,7 @@ the strongest provider gives:
 | capability | values | the profile states |
 |---|---|---|
 | `deletions` | `observed`, `not-observed` | whether a removed item is reported as a tombstone ([Deletions](#deletions)) |
-| `kind` | `provider-word`, `fixed-word` | whether a container's `kind` is the provider's word for it, or one word the profile fixes for every container it lists |
+| `kind` | `provider-word`, `fixed-word` | whether a container's `kind` is the provider's word for it, or one word the profile fixes for every container it lists and states as `kind_word` |
 | `revision` | `opaque`, `update-time` | whether a revision is a provider version, or the item's update time ([Revisions](#revisions)) |
 | `visibility` | `mapped`, `all-private` | whether visibility is mapped from the provider, or every listed container is `private` |
 
@@ -232,19 +232,21 @@ way under `cargo test -p connectors-build`. Native parameters, the profile's cei
 fixtures belong to the adapter's own model and tests.
 
 The suite holds a binding to what its profile declares, not to the strongest provider. Before the
-suite is admitted, the harness reads what each scenario expects of the binding's own reads and
-leaves out a scenario a declared capability makes inapplicable, or changes one expected field in a
-scenario it keeps:
+suite is admitted, the harness reads what each scenario seeds and expects of the binding's own
+reads, leaves out a scenario no binding declaring a capability can be held to, and holds each
+expectation a capability speaks about in the scenarios it keeps to what the profile states:
 
 | declared | leaves out every scenario that | in every scenario kept |
 |---|---|---|
-| `deletions: not-observed` | expects a consumer to hold a tombstone | — |
-| `kind: fixed-word` | — | masks a listed container's `kind` |
-| `revision: update-time` | reads an item after the source gave it two revisions at one instant | masks a read item's `revision`; an expectation that excludes a revision is masked whole |
-| `visibility: all-private` | — | holds a container stored `public` to being listed `private` |
+| `deletions: not-observed` | — | an expected tombstone becomes an expectation that the item is never held deleted; an expectation that a removed item is no longer held present, which needs the removal observed, is masked |
+| `kind: fixed-word` | — | a listed container's `kind` is held to the stated `kind_word` |
+| `revision: update-time` | reads an item after the source gave it two revisions at one instant | a read item's revision word, expected or excluded, is held to the instant the item took that revision |
+| `visibility: all-private` | — | a container stored `public` is held to being listed `private` |
+
+A `kind: fixed-word` claim that states no `kind_word` is held to the provider's word.
 
 A scenario cannot be reported as skipped (the conformance count of a Rust producer refuses a
 non-zero `skipped`), so a left-out scenario is absent from the run. The harness names each one,
-and each field it masked or held to another value, with the capability that did it, beside the
-number of scenarios run and the number the family defines. A binding that declares a capability
-stronger than it honours fails the scenarios and fields that capability keeps.
+and each expectation it changed, with the capability that did it, beside the number of scenarios
+run and the number the family defines. A binding that declares a capability it does not honour
+fails the scenarios that hold it to that capability.

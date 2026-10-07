@@ -64,7 +64,7 @@ types:
     kind: enum
     variants: [observed, not-observed]
   # Where a container's `kind` comes from: the provider's word for each container, or one word
-  # the profile fixes for every container it lists.
+  # the profile fixes for every container it lists, stated as ProfileCapabilities.kind_word.
   - name: connectors.feed.KindCapability
     kind: enum
     variants: [provider-word, fixed-word]
@@ -85,8 +85,15 @@ types:
     fields:
       - {name: deletions, type: connectors.feed.DeletionCapability}
       - {name: kind, type: connectors.feed.KindCapability}
+      # The one word every listed container carries; stated exactly under `kind: fixed-word`.
+      - {name: kind_word, type: "Optional<String>"}
       - {name: revision, type: connectors.feed.RevisionCapability}
       - {name: visibility, type: connectors.feed.VisibilityCapability}
+    # ESS-LIMIT: "kind_word is defined exactly when kind is fixed-word" is expressible as two
+    # invariants, but the feed-binding suite then refuses (ESS-SYNTH-013): no view publishes this
+    # type, which is a profile's statement and not a value any binding returns, so no scenario
+    # can witness them. The conformance harness holds a claim that breaks the rule to the
+    # provider's word (crates/connectors-build/src/feed_conformance.rs, Capabilities::refused).
 
   - name: connectors.feed.Container
     kind: struct
