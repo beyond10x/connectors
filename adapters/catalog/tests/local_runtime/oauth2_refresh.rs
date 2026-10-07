@@ -1141,19 +1141,23 @@ fn oauth_entry_unknown_field_refused() {
 
 /// The configuration revision of the token and basic fixtures is the digest the
 /// provider computed before the OAuth profile existed: the same effective
-/// document, with `auth` serialized exactly as it was.
+/// document, with `auth` serialized exactly as it was. The shipped GitLab
+/// selection file declares a feed, which the effective document carries as the
+/// provider reads it.
 #[test]
 fn oauth_existing_configuration_revisions_unchanged() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
     let bundles = repository.join("generated/bundles");
     let index = connectors_catalog::bundle::read_index(&bundles).unwrap();
     let bundle = connectors_catalog::bundle::load(&bundles, "gitlab").unwrap();
-    let operations: Value = serde_json::from_slice(
+    let shipped: Value = serde_json::from_slice(
         &fs::read(repository.join("providers/gitlab/operations.json")).unwrap(),
     )
     .unwrap();
     let operations: Vec<connectors_catalog_provider::Selection> =
-        serde_json::from_value(operations["operations"].clone()).unwrap();
+        serde_json::from_value(shipped["operations"].clone()).unwrap();
+    let feed: connectors_catalog_provider::feed::Declaration =
+        serde_json::from_value(shipped["feed"].clone()).unwrap();
     for (provider, auth) in [
         (
             Provider::new(),
@@ -1196,6 +1200,7 @@ fn oauth_existing_configuration_revisions_unchanged() {
             "ca_digest": connectors_core::digest(&json!(ca)),
             "auth": auth,
             "operations": serde_json::to_value(&operations).unwrap(),
+            "feed": serde_json::to_value(&feed).unwrap(),
         });
         let bootstrap = print_bootstrap(&provider.config).unwrap();
         assert_eq!(

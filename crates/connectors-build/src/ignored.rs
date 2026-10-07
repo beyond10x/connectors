@@ -196,6 +196,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "local_runtime",
             "cli_journey::gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart"
+            | "cli_journey::gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection"
             | "cli_journey::basic_catalog_cli_connects_by_file_and_stdin_and_refuses_by_code"
             | "cli_journey::basic_catalog_cli_refuses_a_credential_below_minimum_scopes"
             | "cli_journey::adversary_basic_cli_wrong_token_is_unauthorized_and_malformed_is_invalid_input"

@@ -186,6 +186,56 @@ fn a_declaration_the_bundle_cannot_carry_is_refused_before_any_request() {
             with(&cursor, "/items/position/value/stale", json!([500])),
             "stale statuses",
         ),
+        (
+            "listing continued both ways",
+            adding(&base, "/containers/cursor", "last", json!("/id")),
+            "exactly one of `next` and `last`",
+        ),
+        (
+            "listing continued neither way",
+            removing(&base, "/containers/cursor", "next"),
+            "exactly one of `next` and `last`",
+        ),
+        (
+            "last record key not a pointer",
+            adding(
+                &removing(&base, "/containers/cursor", "next"),
+                "/containers/cursor",
+                "last",
+                json!("id"),
+            ),
+            "`containers.cursor.last` is not a JSON pointer",
+        ),
+        (
+            "kind read and fixed",
+            adding(&base, "/containers", "kind_word", json!("room")),
+            "exactly one of `kind` and `kind_word`",
+        ),
+        (
+            "kind neither read nor fixed",
+            removing(&base, "/containers", "kind"),
+            "exactly one of `kind` and `kind_word`",
+        ),
+        ("empty kind word", fixed_word(&base, json!("")), "kind_word"),
+        (
+            "kind word with a space",
+            fixed_word(&base, json!("merge request")),
+            "kind_word",
+        ),
+        (
+            "kind word longer than 128 bytes",
+            fixed_word(&base, json!("k".repeat(129))),
+            "kind_word",
+        ),
+        (
+            "kind word under a provider-word claim",
+            with(
+                &fixed_word(&base, json!("room")),
+                "/capabilities/kind",
+                json!("provider-word"),
+            ),
+            "`kind: provider-word`",
+        ),
     ];
     for (case, feed, reason) in cases {
         match build(&feed, &[]) {
@@ -211,6 +261,130 @@ fn with(feed: &Value, pointer: &str, value: Value) -> Value {
     let mut changed = feed.clone();
     *changed.pointer_mut(pointer).expect(pointer) = value;
     changed
+}
+
+fn adding(feed: &Value, object: &str, field: &str, value: Value) -> Value {
+    let mut changed = feed.clone();
+    changed
+        .pointer_mut(object)
+        .and_then(Value::as_object_mut)
+        .expect(object)
+        .insert(field.into(), value);
+    changed
+}
+
+fn removing(feed: &Value, object: &str, field: &str) -> Value {
+    let mut changed = feed.clone();
+    changed
+        .pointer_mut(object)
+        .and_then(Value::as_object_mut)
+        .expect(object)
+        .remove(field)
+        .expect(field);
+    changed
+}
+
+/// `feed` with its container kind fixed to `word` and the claim that goes with it.
+fn fixed_word(feed: &Value, word: Value) -> Value {
+    let fixed = adding(
+        &removing(feed, "/containers", "kind"),
+        "/containers",
+        "kind_word",
+        word,
+    );
+    with(&fixed, "/capabilities/kind", json!("fixed-word"))
+}
+
+/// The rooms listing as a provider that lists after a key it is given answers it.
+struct Rooms {
+    pages: std::sync::Mutex<Vec<Value>>,
+    queries: std::sync::Mutex<Vec<Vec<(String, String)>>>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Rooms {
+    async fn get(
+        &self,
+        path: &[&str],
+        query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        assert_eq!(path, ["rooms"]);
+        let mut query: Vec<(String, String)> = query
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        query.sort();
+        self.queries.lock().unwrap().push(query);
+        let page = self.pages.lock().unwrap().remove(0);
+        Ok(connectors_sdk::HttpResponse {
+            status: 200,
+            headers: Default::default(),
+            body: serde_json::to_vec(&page).unwrap(),
+        })
+    }
+}
+
+/// A listing declared with `cursor.last` continues after the key of a full page's last record,
+/// a direct one included; a shorter page is the end; a full page whose last record has no key is
+/// `unavailable`, never complete. A fixed `kind_word` is every listed container's `kind`.
+#[tokio::test]
+async fn a_last_key_listing_continues_after_a_full_page_and_a_fixed_word_is_every_kind() {
+    let base = declaration("time.operations.json");
+    let keyed = adding(
+        &removing(&base, "/containers/cursor", "next"),
+        "/containers/cursor",
+        "last",
+        json!("/id"),
+    );
+    let feed = fixed_word(&keyed, json!("room"));
+    let engine = build(&feed, &[]).unwrap_or_else(|error| panic!("{}", error.message));
+    let room = |id: &str, access: &str| json!({"id": id, "title": id, "type": "channel", "access": access});
+    let rooms = Rooms {
+        pages: std::sync::Mutex::new(vec![
+            json!({"rooms": [room("a", "open"), room("b", "im")]}),
+            json!({"rooms": [room("c", "invite")]}),
+            json!({"rooms": [room("d", "open"), {"title": "keyless", "access": "open"}]}),
+        ]),
+        queries: Default::default(),
+    };
+    let first = engine
+        .read(&rooms, "feed-instance", CONTAINERS, json!({"limit": 2}))
+        .await
+        .unwrap();
+    assert_eq!(
+        first["containers"],
+        json!([{"id": "a", "name": "a", "kind": "room", "visibility": "public"}])
+    );
+    assert_eq!(first["complete"], json!(false));
+    let second = engine
+        .read(
+            &rooms,
+            "feed-instance",
+            CONTAINERS,
+            json!({"limit": 2, "cursor": first["next_cursor"]}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        second["containers"],
+        json!([{"id": "c", "name": "c", "kind": "room", "visibility": "private"}])
+    );
+    assert_eq!(second["complete"], json!(true));
+    assert_eq!(second["next_cursor"], Value::Null);
+    let keyless = engine
+        .read(&rooms, "feed-instance", CONTAINERS, json!({"limit": 2}))
+        .await
+        .unwrap_err();
+    assert_eq!(keyless.code, connectors_core::ErrorCode::Unavailable);
+    let pair = |k: &str, v: &str| (k.to_owned(), v.to_owned());
+    assert_eq!(
+        *rooms.queries.lock().unwrap(),
+        [
+            vec![pair("limit", "2")],
+            vec![pair("cursor", "b"), pair("limit", "2")],
+            vec![pair("limit", "2")],
+        ]
+    );
 }
 
 /// The local service reads the declaration from its `operations_file` and declares both
