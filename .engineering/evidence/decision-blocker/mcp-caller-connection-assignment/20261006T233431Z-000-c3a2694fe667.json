@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-06T23:34:31Z",
+  "actor": "human:timo",
+  "artifact": "decision-blocker:mcp-caller-connection-assignment",
+  "kind": "decision-blocker",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "Decision 2026-10-07 under the operator's standing delegation: option A, single principal; multi-caller cloud placement deferred"
+  }
+}

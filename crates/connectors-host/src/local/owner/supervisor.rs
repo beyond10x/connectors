@@ -898,10 +898,7 @@ fn worker(
                         &operation, &revision, &partition, &material, &document, deadline,
                     );
                     registry.release_read(dispatched, connectors_sdk::now_ms())?;
-                    let body = String::from_utf8(result?).map_err(|_| Code::Unavailable)?;
-                    Ok(Output::Value(
-                        json!({"adapter":job.alias,"operation":operation,"revision":revision,"result":body}),
-                    ))
+                    read_answer(&job.alias, &operation, &revision, result?).map(Output::Value)
                 }
             }
         })();
@@ -915,6 +912,16 @@ fn worker(
         busy.store(false, Ordering::SeqCst);
         let _ = job.reply.send(result);
     }
+}
+
+/// The answer to a read: the provider result as the JSON value the adapter
+/// answered, never a string holding its JSON text
+/// (`contracts/cli/v1alpha1/semantics.md` section 6). The child has already
+/// held the document to the operation's output schema; one that is not a single
+/// unambiguous JSON value here is the adapter's fault.
+fn read_answer(alias: &str, operation: &str, revision: &str, document: Vec<u8>) -> Result<Value> {
+    let result: Value = connectors_core::read_json(&document).map_err(|_| Code::Unavailable)?;
+    Ok(json!({"adapter":alias,"operation":operation,"revision":revision,"result":result}))
 }
 
 /// A worker's markers, shared with the pool.
@@ -1215,6 +1222,43 @@ mod revalidate_wait_tests {
             assert_eq!(code(&pool, revalidate()), Code::OutcomeUnknown);
             assert_eq!(code(&pool, Task::Ensure { resume: false }), other);
             pool.shutdown().unwrap();
+        }
+    }
+}
+
+#[cfg(test)]
+mod read_answer_tests {
+    use super::*;
+
+    /// story:owner-read-answers-json-value: the answer a read through the owner
+    /// carries holds the provider result as the JSON value the adapter
+    /// answered, never as a string holding its JSON text.
+    #[test]
+    fn a_read_answer_carries_the_provider_result_as_a_json_value() {
+        let answer = read_answer(
+            "forge",
+            "item.read",
+            "desc-1",
+            br#"{"id":7,"body":{"name":"fixture"}}"#.to_vec(),
+        )
+        .unwrap();
+        assert_eq!(
+            answer,
+            json!({"adapter":"forge","operation":"item.read","revision":"desc-1",
+                   "result":{"id":7,"body":{"name":"fixture"}}})
+        );
+        assert!(answer["result"].is_object(), "{answer}");
+        // An array and a scalar result stay what the adapter answered.
+        let listed = read_answer("forge", "items.list", "desc-1", b"[1,\"two\"]".to_vec()).unwrap();
+        assert_eq!(listed["result"], json!([1, "two"]));
+        // A document that is not one unambiguous JSON value is the adapter's
+        // fault, never a string handed on.
+        for document in [&b"not json"[..], b"{\"a\":1,\"a\":2}", b"\xff"] {
+            let refused = read_answer("forge", "item.read", "desc-1", document.to_vec());
+            assert_eq!(
+                refused.map_err(|error| error.code).unwrap_err(),
+                Code::Unavailable
+            );
         }
     }
 }

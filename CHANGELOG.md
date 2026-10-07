@@ -2,6 +2,49 @@
 
 ## Unreleased
 
+### Added
+
+- A `datasource.feed/v1alpha1` profile declares four capabilities: `deletions`
+  (`observed | not-observed`), `kind` (`provider-word | fixed-word`, the fixed word stated
+  as `kind_word`), `revision` (`opaque | update-time`) and `visibility`
+  (`mapped | all-private`), typed `connectors.feed.ProfileCapabilities` in
+  `ess/domains/feed.yaml`. The feed suite holds a binding to what its profile declares.
+  Before admission it leaves out only the scenarios that give one item two revisions at one
+  instant (`update-time`). In every scenario kept it holds each affected expectation on the
+  binding's reads to the claim: an expected tombstone becomes an expectation that the item
+  is never held deleted (`not-observed`), a listed container's `kind` is held to the stated
+  word (`fixed-word`), a read item's revision word to the instant the item took it
+  (`update-time`), and a container stored `public` to being listed `private`
+  (`all-private`). It names each scenario left out and each expectation changed with the
+  capability that did it, beside the number run and the 28 the family defines; all four weak
+  values together run 26. The native fixture and the time and
+  cursor catalog fixtures declare the strongest capabilities and still run and pass all 28.
+  The descriptor's operation is unchanged; the capabilities belong to the profile, not to
+  the wire. `listing-omits-direct-conversation` no longer asserts the public container's
+  listed visibility, so every visibility capability is held to omitting a direct
+  conversation.
+- GitLab binds `datasource.feed/v1alpha1` as data, profile `gitlab-merge-requests/1`
+  (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`): `feed.containers` lists the
+  projects the token's user is a member of, oldest id first, continued after the last
+  project id of a full page (`id_after`); `feed.items` reads one project's merge requests in
+  every state, oldest `updated_at` first, resumed from a time watermark on `updated_at`
+  (`updated_after`, inclusive). The profile declares `deletions: not-observed`,
+  `kind: fixed-word` (`project`), `revision: update-time` and `visibility: all-private`:
+  every project is listed `private`, because a public project may keep its merge requests to
+  its members and one field cannot tell; `url` is null, because a project rename changes
+  `web_url` without changing the merge request's revision. The feed suite runs the 26 of its
+  28 scenarios these capabilities select and passes all 26; `revision: update-time` leaves
+  out the two that restore an item at an instant it already carried another revision at. The
+  binding is checked against recorded GitLab shapes and a stand-in provider through the CLI
+  only; it has not been read from a running GitLab.
+- A catalog feed declaration may continue its container listing after the key of a full
+  page's last record (`containers.cursor.last`, GitLab's `id_after`) instead of the
+  provider's own continuation (`cursor.next`), and may state one fixed word for every
+  container (`containers.kind_word`) instead of reading one (`containers.kind`). Exactly one
+  of each pair; `kind: fixed-word` is now accepted exactly when `kind_word` is declared
+  (`contracts/catalog/v1alpha1/semantics.md` section 3.3, `adapters/catalog/spec/ess`).
+  Existing declarations load unchanged.
+
 ### Changed
 
 - Breaking: `--output json` answers carry JSON values where they carried JSON text
@@ -21,6 +64,24 @@
   `src/runtime.rs` bytes. `ess specify validate` now warns `ESS-ENTITY-019` twice, for
   `generation_id` on `connectors.auth_bindings.Acquisition` and `CustodyVersion`; the
   specification stays valid. Entity Runtime stays at 0.26.0.
+- Breaking for catalog feed declarations: the `feed` of a
+  `connectors-catalog-operations/1` selection file requires `capabilities`, and the engine
+  refuses, when the file loads, a claim the declaration does not support:
+  `deletions: observed` exactly when `items.deleted` is declared, `kind: provider-word`
+  (the shape carries no fixed word yet; it will be `containers.kind_word`),
+  `revision: update-time` exactly when
+  `items.revision` and `items.updated_at` are one pointer, `visibility: mapped` exactly
+  when `containers.visibility` maps a value to `public`
+  (`contracts/catalog/v1alpha1/semantics.md` section 3.3). No shipped provider declares a
+  feed, so no saved connection's configuration revision moves. Migration: a selection file
+  with a `feed` adds the `capabilities` its declaration supports.
+- The shipped GitLab selection set declares the feed, so the configuration revision of every
+  instance using it moves, and with it the descriptor revision. Migration: print the
+  bootstrap again and copy its `configuration_revision` into the adapter entry, run
+  `connections revalidate` on each connection of the instance, and issue the instance's
+  approval policies again (`docs/local-catalog-provider.md`). Until then the adapter does
+  not start and the connection reports `pending`. To read the feed, add `feed.containers`
+  and `feed.items` to the adapter's permitted operations.
 
 ## 0.31.0 — 2026-10-06
 

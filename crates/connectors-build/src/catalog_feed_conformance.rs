@@ -10,7 +10,7 @@
 //! suite's provider state, as `api.json` documents them. It is the remote service, not the
 //! binding: the binding is the declaration, read by the engine.
 use crate::feed_conformance::{
-    self, Binding, Code, Container, ContainersPage, Item, ItemsPage, Source,
+    self, Binding, Capabilities, Code, Container, ContainersPage, Item, ItemsPage, Source,
 };
 use connectors_catalog::{bundle::Bundle, ingest, inventory};
 use connectors_catalog_provider::{Effect, Engine, feed::Declaration};
@@ -276,6 +276,7 @@ impl AuthenticatedHttp for Simulated<'_> {
 struct Catalog {
     engine: Engine,
     profile: String,
+    capabilities: Capabilities,
 }
 
 impl Catalog {
@@ -289,6 +290,7 @@ impl Catalog {
         Self {
             engine,
             profile: declared.feed.profile.clone(),
+            capabilities: claimed(&declared.feed),
         }
     }
 
@@ -319,6 +321,18 @@ impl Catalog {
     }
 }
 
+/// A declaration's claim, read in the family's vocabulary: a word one side does not know is a
+/// vocabulary that moved on one side only. The family's `kind_word` is the declaration's
+/// `containers.kind_word`, never repeated under `capabilities`.
+pub(crate) fn claimed(feed: &Declaration) -> Capabilities {
+    let mut claim = serde_json::to_value(feed.capabilities).unwrap();
+    let containers = serde_json::to_value(&feed.containers).unwrap();
+    if let Some(word) = containers.get("kind_word") {
+        claim["kind_word"] = word.clone();
+    }
+    serde_json::from_value(claim).unwrap_or_else(|e| panic!("{}: {e}", feed.profile))
+}
+
 fn code(error: Error) -> Code {
     match error.code {
         ErrorCode::InvalidInput => Code::InvalidInput,
@@ -335,6 +349,10 @@ fn text(value: &Value) -> Option<String> {
 impl Binding for Catalog {
     fn identity(&self) -> (String, String) {
         ("connectors-catalog-feed".into(), self.profile.clone())
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        self.capabilities
     }
 
     fn containers(
@@ -475,39 +493,131 @@ fn the_fixture_declarations_cover_both_watermark_forms() {
     );
 }
 
+/// Each fixture declaration passes every scenario its capabilities select; both claim the
+/// strongest provider's, so each runs all the family defines.
 #[test]
 fn every_declared_feed_passes_the_feed_binding_suite() {
     let declared = declared();
     assert!(!declared.is_empty());
     for declaration in &declared {
-        let (counts, status, report) = feed_conformance::run(Catalog::new(declaration));
+        let run = feed_conformance::run(Catalog::new(declaration));
+        println!("{}", run.summary());
         println!(
             "{}: {}",
             declaration.path.display(),
-            serde_json::to_string(&counts).unwrap()
+            serde_json::to_string(&run.counts).unwrap()
         );
+        assert!(run.accounts_for_the_family(), "{}", run.summary());
+        assert!(run.left_out.is_empty(), "{}", run.summary());
         assert_eq!(
-            counts.total,
+            run.counts.total,
             feed_conformance::EXPECTED_SCENARIOS,
             "{:?}: scenario count moved",
             declaration.path
         );
         assert_eq!(
-            status,
+            run.status,
             CountStatus::Passed,
-            "{:?}\n{report}",
-            declaration.path
+            "{:?}\n{}",
+            declaration.path,
+            run.report
         );
         assert_eq!(
-            counts.passed, counts.total,
-            "{:?}\n{report}",
-            declaration.path
+            run.counts.passed, run.counts.total,
+            "{:?}\n{}",
+            declaration.path, run.report
         );
     }
 }
 
-/// Every declaration is a value of the adapter's own model (`adapters/catalog/spec/ess`), and the
-/// engine's reader carries every field of it: read and written back, it is the same document.
+/// A declaration that carries less claims less, and the engine realizing it passes the suite
+/// its claim selects: no `deleted` condition claims no deletions, and a visibility rule that maps
+/// nothing to `public` claims every container private. It runs every scenario the family
+/// defines: each expected tombstone is held to never being reported, and each container stored
+/// `public` to being listed `private`, each change named with the capability that made it.
+#[test]
+fn a_declaration_that_observes_less_passes_the_scenarios_it_declares() {
+    let mut weaker = declared().remove(0);
+    let feed = &mut weaker.raw["feed"];
+    feed["items"].as_object_mut().unwrap().remove("deleted");
+    feed["containers"]["visibility"]["map"] = json!({"im": "direct"});
+    feed["capabilities"]["deletions"] = json!("not-observed");
+    feed["capabilities"]["visibility"] = json!("all-private");
+    weaker.feed = serde_json::from_value(feed.clone()).unwrap();
+    let run = feed_conformance::run(Catalog::new(&weaker));
+    println!("{}", run.summary());
+    assert!(run.accounts_for_the_family(), "{}", run.summary());
+    assert_eq!(run.status, CountStatus::Passed, "{}", run.report);
+    assert_eq!(run.counts.passed, run.counts.total, "{}", run.report);
+    assert_eq!(run.counts.total, feed_conformance::EXPECTED_SCENARIOS);
+    assert!(run.left_out.is_empty(), "{}", run.summary());
+    let changed: BTreeSet<(&str, &str, &str)> = run
+        .changed
+        .iter()
+        .map(|changed| (changed.field, changed.expect.as_str(), changed.by.name()))
+        .collect();
+    assert_eq!(
+        changed,
+        BTreeSet::from([
+            ("state", "contains", "deletions: not-observed"),
+            ("state", "excludes", "deletions: not-observed"),
+            ("visibility", "contains", "visibility: all-private"),
+        ])
+    );
+    assert_eq!(run.changed_ids().len(), 5, "{}", run.summary());
+}
+
+/// A declaration whose records carry no word for a container states one, `containers.kind_word`,
+/// and claims `kind: fixed-word`; the suite reads that word as the family's `kind_word` and holds
+/// every listed container to it. It runs every scenario the family defines.
+#[test]
+fn a_fixed_kind_word_declaration_passes_the_scenarios_it_declares() {
+    let mut fixed = declared().remove(0);
+    let feed = &mut fixed.raw["feed"];
+    feed["containers"].as_object_mut().unwrap().remove("kind");
+    feed["containers"]["kind_word"] = json!("room");
+    feed["capabilities"]["kind"] = json!("fixed-word");
+    fixed.feed = serde_json::from_value(feed.clone()).unwrap();
+    let run = feed_conformance::run(Catalog::new(&fixed));
+    println!("{}", run.summary());
+    assert_eq!(run.capabilities.kind_word, Some("room"));
+    assert!(run.accounts_for_the_family(), "{}", run.summary());
+    assert_eq!(run.status, CountStatus::Passed, "{}", run.report);
+    assert_eq!(run.counts.total, feed_conformance::EXPECTED_SCENARIOS);
+    assert!(run.left_out.is_empty(), "{}", run.summary());
+    assert!(
+        run.changed
+            .iter()
+            .any(|changed| changed.field == "kind" && changed.by.name() == "kind: fixed-word"),
+        "{}",
+        run.summary()
+    );
+}
+
+/// Every shipped provider selection file that declares a feed, in name order:
+/// `adapters/catalog/providers/<provider>/operations.json`.
+fn shipped() -> Vec<(PathBuf, Value)> {
+    let providers = feed_conformance::root().join("adapters/catalog/providers");
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(providers)
+        .expect("providers")
+        .map(|entry| entry.expect("entry").path().join("operations.json"))
+        .filter(|path| path.is_file())
+        .collect();
+    paths.sort();
+    paths
+        .into_iter()
+        .map(|path| {
+            let raw: Value =
+                serde_json::from_slice(&std::fs::read(&path).expect("selection file")).unwrap();
+            (path, raw)
+        })
+        .filter(|(_, raw)| raw.get("feed").is_some())
+        .collect()
+}
+
+/// Every declaration, the fixtures' and the shipped providers', is a value of the adapter's own
+/// model (`adapters/catalog/spec/ess`), and the engine's reader carries every field of it: read
+/// and written back, it is the same document.
 #[test]
 fn every_declared_feed_is_a_value_of_the_catalog_feed_model() {
     let root = feed_conformance::root();
@@ -537,14 +647,22 @@ fn every_declared_feed_is_a_value_of_the_catalog_feed_model() {
     )
     .unwrap();
     let validator = jsonschema::validator_for(&schema).unwrap();
-    for declaration in declared() {
+    let fixtures = declared().into_iter().map(|d| (d.path, d.raw));
+    let shipped = shipped();
+    assert!(
+        !shipped.is_empty(),
+        "no shipped provider declares a feed, so none is checked here"
+    );
+    for (path, raw) in fixtures.chain(shipped) {
         let errors: Vec<String> = validator
-            .iter_errors(&declaration.raw["feed"])
+            .iter_errors(&raw["feed"])
             .map(|e| format!("{}: {e}", e.instance_path()))
             .collect();
-        assert!(errors.is_empty(), "{:?}: {errors:?}", declaration.path);
-        let written = serde_json::to_value(&declaration.feed).unwrap();
-        assert_eq!(written, declaration.raw["feed"], "{:?}", declaration.path);
+        assert!(errors.is_empty(), "{path:?}: {errors:?}");
+        let feed: Declaration = serde_json::from_value(raw["feed"].clone())
+            .unwrap_or_else(|error| panic!("{path:?}: {error}"));
+        let written = serde_json::to_value(&feed).unwrap();
+        assert_eq!(written, raw["feed"], "{path:?}");
     }
 }
 
@@ -801,8 +919,8 @@ fn direct_conversations_are_neither_listed_nor_readable() {
     }
 }
 
-/// No Rust in the catalog engine, or in this suite adapter, names a declared provider: not its
-/// provider id, its profile or an operation it reads.
+/// No Rust in the catalog engine, or in this suite adapter, names a declared provider, a fixture
+/// or a shipped one: not its provider id, its profile or an operation it reads.
 #[test]
 fn no_rust_names_a_declared_provider() {
     let root = feed_conformance::root();
@@ -810,10 +928,11 @@ fn no_rust_names_a_declared_provider() {
     for entry in std::fs::read_dir(root.join("adapters/catalog/src")).unwrap() {
         sources.push(entry.unwrap().path());
     }
-    for declaration in declared() {
-        let feed = &declaration.raw["feed"];
+    let fixtures = declared().into_iter().map(|declaration| declaration.raw);
+    for raw in fixtures.chain(shipped().into_iter().map(|(_, raw)| raw)) {
+        let feed = &raw["feed"];
         let names = [
-            &declaration.raw["provider"],
+            &raw["provider"],
             &feed["profile"],
             &feed["containers"]["operation_id"],
             &feed["containers"]["lookup"]["operation_id"],
@@ -827,4 +946,54 @@ fn no_rust_names_a_declared_provider() {
             }
         }
     }
+}
+
+// ---- adversary, wave 20261007a U1 ----------------------------------------------------------
+
+/// A declaration whose revision pointer is its `updated_at` pointer must claim
+/// `revision: update-time` (the engine refuses `opaque` for it). The harness then leaves out only
+/// the scenarios that give one item two revisions at one instant, so every scenario it keeps must
+/// be one this honest update-time binding passes.
+#[test]
+fn adversary_an_update_time_declaration_passes_the_scenarios_it_declares() {
+    let mut weaker = declared()
+        .into_iter()
+        .find(|declared| declared.position() == "cursor")
+        .expect("a cursor declaration");
+    let feed = &mut weaker.raw["feed"];
+    feed["items"]["revision"] = feed["items"]["updated_at"].clone();
+    feed["capabilities"]["revision"] = json!("update-time");
+    weaker.feed = serde_json::from_value(feed.clone()).unwrap();
+    let run = feed_conformance::run(Catalog::new(&weaker));
+    println!("{}", run.summary());
+    assert!(run.accounts_for_the_family(), "{}", run.summary());
+    assert_eq!(
+        run.status,
+        CountStatus::Passed,
+        "an honest update-time binding failed scenarios it is held to: {:?}\n{}",
+        run.failed,
+        run.summary()
+    );
+}
+
+/// An all-private declaration that reads `containers.kind` claims `kind: provider-word` (the
+/// engine refuses `fixed-word` without `containers.kind_word`), so the suite still holds it to
+/// the provider's word. Reading the room's id as its kind is not the provider's word, and must
+/// fail.
+#[test]
+fn adversary_an_all_private_declaration_is_still_held_to_the_providers_kind() {
+    let mut weaker = declared().remove(0);
+    let feed = &mut weaker.raw["feed"];
+    feed["containers"]["visibility"]["map"] = json!({"im": "direct"});
+    feed["capabilities"]["visibility"] = json!("all-private");
+    feed["containers"]["kind"] = feed["containers"]["id"].clone();
+    weaker.feed = serde_json::from_value(feed.clone()).unwrap();
+    let run = feed_conformance::run(Catalog::new(&weaker));
+    println!("{}", run.summary());
+    assert_eq!(
+        run.status,
+        CountStatus::Failed,
+        "a declaration reading the container id as its kind passed under `kind: provider-word`:\n{}",
+        run.summary()
+    );
 }

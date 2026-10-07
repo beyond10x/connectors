@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:v1-remote-branch-retirement
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided which of 32 unmerged remote branches may be deleted
 relations:
 - blocks: story:retire-unmerged-remote-branches
-revision: 2
+revision: 4
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-07T00:09:58Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"approval":1}}}
 ---
 # Nobody has decided which of 32 unmerged remote branches may be deleted
 
@@ -81,3 +83,23 @@ Branches created after 2026-09-30 are current work and are not in this question:
 ## What would clear this
 
 An operator decision naming one of the options, or a keep/archive/delete call per branch.
+
+## Decision — 2026-10-07
+
+Decided 2026-10-07 under the operator's standing delegation for this repository.
+
+- The 15 branches whose every commit is reachable from `main` or a tag were deleted through the
+  bot App (`b10x-gates bot -- push origin --delete`), each after re-checking that its tip was the
+  one listed above and that `git rev-list --count <branch> --not origin/main <every tag>` was 0.
+- The 17 branches holding commits nothing else reaches are kept as branches. The decision was to
+  tag each tip `archive/<branch>` and delete the branch, but the bot route refuses the tag push:
+  `b10x-gates: candidate does not descend from its adoption baseline` (tried on
+  `archive/pre-contracts`; the 17 tips are v1-lineage history older than the Gates baseline).
+  Creating the tags through the REST API would reach the outcome the pre-push scan refused, so
+  that was not done, and the 17 stay. Outcome: 15 deleted, 17 kept, 0 tagged.
+- Every one of the 32 had exactly one push in the seven days before, a `force_push` by the bot at
+  2026-10-05T09:39:23Z: the history rewrite that removed personal paths from every branch. That
+  rewrite was not counted as work on the branches; none is checked out in a live worktree.
+- `git ls-remote origin 'refs/heads/*'` on 2026-10-07: 23 heads — `main`, the 17 kept, and five
+  branches of current work (`feat/cli-json-answers-as-json`, `unit/mcp-local-runtime-20261003`,
+  `unit/mcp-local-runtime-20261003-rebased`, `wave/20261006b`, `wave/20261006d`).

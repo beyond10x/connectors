@@ -79,5 +79,36 @@
                                 {"pointer": "/head_pipeline/status", "expect": {"literal": "success"}}]},
        "postflight": {"checks": [{"pointer": "/state", "expect": {"literal": "merged"}},
                                  {"pointer": "/sha", "expect": {"input": "body.sha"}}]}}}
-  ]
+  ],
+  "feed": {
+    "profile": "gitlab-merge-requests/1",
+    "capabilities": {"deletions": "not-observed", "kind": "fixed-word",
+                     "revision": "update-time", "visibility": "all-private"},
+    "max_limit": 100,
+    "containers": {
+      "operation_id": "getApiV4Projects",
+      "lookup": {"operation_id": "getApiV4ProjectsId", "parameter": "id", "record": ""},
+      "query": {"membership": "true", "order_by": "id", "sort": "asc"},
+      "limit": "per_page",
+      "cursor": {"parameter": "id_after", "last": "/id"},
+      "records": "",
+      "id": "/id",
+      "name": "/name_with_namespace",
+      "kind_word": "project"
+    },
+    "items": {
+      "operation_id": "getApiV4ProjectsIdMergeRequests",
+      "container": "id",
+      "query": {"order_by": "updated_at", "sort": "asc", "state": "all", "scope": "all"},
+      "limit": "per_page",
+      "position": {"kind": "time", "value": {"parameter": "updated_after"}},
+      "records": "",
+      "id": "/iid",
+      "revision": "/updated_at",
+      "created_at": "/created_at",
+      "updated_at": "/updated_at",
+      "author": {"id": "/author/id", "display_name": "/author/name"},
+      "body": {"pointer": "/description", "representation": "text/markdown"}
+    }
+  }
 }

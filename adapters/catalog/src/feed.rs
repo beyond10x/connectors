@@ -10,7 +10,9 @@
 //! - **cursor**: the provider keeps a change cursor. The watermark carries it unchanged.
 //!
 //! Both are wrapped with the profile, the instance and the container, so a watermark issued for
-//! any other is refused as `stale_cursor`, never read as a first read.
+//! any other is refused as `stale_cursor`, never answered as a first read. That refusal comes
+//! after the container's admission: an unknown container and one whose items the provider
+//! refuses answer `not_found` whatever the watermark.
 use crate::{path_within, read_body, scalar};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use connectors_catalog::{
@@ -82,12 +84,17 @@ pub struct VisibilityRule {
     pub map: BTreeMap<String, Visibility>,
 }
 
-/// The provider's own continuation: sent as `parameter`, read back at `next`.
+/// How a listing continues, sent as `parameter`: the provider's own continuation read back at
+/// `next` in the answer, or the key at `last` in the last record of a full page, for a provider
+/// that lists after a key it is given. Exactly one of the two.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CursorPaging {
     pub parameter: String,
-    pub next: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last: Option<String>,
 }
 
 /// Reads one container by id; `record` points at it in the answer.
@@ -112,7 +119,12 @@ pub struct Containers {
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    pub kind: String,
+    /// The provider's word for a container, read at this pointer in each record; or, for a
+    /// provider whose records carry none, `kind_word`. Exactly one of the two.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind_word: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visibility: Option<VisibilityRule>,
 }
@@ -184,11 +196,55 @@ pub struct Items {
     pub deleted: Option<Condition>,
 }
 
+/// Whether a removed item comes back as a tombstone.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DeletionCapability {
+    Observed,
+    NotObserved,
+}
+
+/// Where a container's `kind` comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum KindCapability {
+    ProviderWord,
+    FixedWord,
+}
+
+/// How a revision is formed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RevisionCapability {
+    Opaque,
+    UpdateTime,
+}
+
+/// How a container's visibility is stated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum VisibilityCapability {
+    Mapped,
+    AllPrivate,
+}
+
+/// What the profile states its provider lets it observe: the family's profile capabilities. The
+/// declaration must support each claim; [`Feed::new`] refuses one it does not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Capabilities {
+    pub deletions: DeletionCapability,
+    pub kind: KindCapability,
+    pub revision: RevisionCapability,
+    pub visibility: VisibilityCapability,
+}
+
 /// One provider's feed, as data: the `feed` of a `connectors-catalog-operations/1` file.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Declaration {
     pub profile: String,
+    pub capabilities: Capabilities,
     pub max_limit: u64,
     pub containers: Containers,
     pub items: Items,
@@ -307,6 +363,57 @@ fn bind(
     Template::from_operation(operation).map_err(|refusal| refuse(refusal.reason()))
 }
 
+/// Each capability the declaration claims is the one the rest of it supports: the suite holds the
+/// binding to its claim, so a claim stronger than the declaration cannot be honoured, and one
+/// weaker would leave out scenarios the binding is able to pass.
+fn supports(d: &Declaration) -> Result<()> {
+    let claims = &d.capabilities;
+    let public = d
+        .containers
+        .visibility
+        .as_ref()
+        .is_some_and(|rule| rule.map.values().any(|v| *v == Visibility::Public));
+    let checks = [
+        (
+            claims.deletions == DeletionCapability::Observed,
+            d.items.deleted.is_some(),
+            "deletions: observed",
+            "deletions: not-observed",
+            "a tombstone is reported exactly when `items.deleted` is declared",
+        ),
+        (
+            claims.kind == KindCapability::ProviderWord,
+            d.containers.kind.is_some(),
+            "kind: provider-word",
+            "kind: fixed-word",
+            "the kind is the provider's word exactly when `containers.kind` reads it, and a fixed word exactly when `containers.kind_word` states it",
+        ),
+        (
+            claims.revision == RevisionCapability::UpdateTime,
+            d.items.revision == d.items.updated_at,
+            "revision: update-time",
+            "revision: opaque",
+            "the revision is the update time exactly when `items.revision` is `items.updated_at`",
+        ),
+        (
+            claims.visibility == VisibilityCapability::Mapped,
+            public,
+            "visibility: mapped",
+            "visibility: all-private",
+            "visibility is mapped exactly when `containers.visibility` maps a value to `public`",
+        ),
+    ];
+    for (claimed, supported, strong, weak, rule) in checks {
+        if claimed != supported {
+            let claim = if claimed { strong } else { weak };
+            return Err(refuse(format!(
+                "feed capabilities claim `{claim}`, which the declaration does not support: {rule}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 impl Feed {
     pub(crate) fn new(bundle: &Bundle, base: &[String], declaration: &Declaration) -> Result<Self> {
         let d = declaration;
@@ -321,12 +428,27 @@ impl Feed {
         }
         let c = &d.containers;
         let i = &d.items;
+        if c.cursor.next.is_some() == c.cursor.last.is_some() {
+            return Err(refuse(
+                "feed listing continues by exactly one of `next` and `last`",
+            ));
+        }
+        if c.kind.is_some() == c.kind_word.is_some() {
+            return Err(refuse(
+                "feed containers take exactly one of `kind` and `kind_word`",
+            ));
+        }
+        if c.kind_word.as_ref().is_some_and(|word| {
+            word.is_empty() || word.len() > 128 || !word.bytes().all(|b| b.is_ascii_graphic())
+        }) {
+            return Err(refuse(
+                "feed kind_word must be 1 to 128 visible ASCII bytes",
+            ));
+        }
         for (name, value) in [
             ("containers.lookup.record", &c.lookup.record),
-            ("containers.cursor.next", &c.cursor.next),
             ("containers.records", &c.records),
             ("containers.id", &c.id),
-            ("containers.kind", &c.kind),
             ("items.records", &i.records),
             ("items.id", &i.id),
             ("items.revision", &i.revision),
@@ -337,6 +459,9 @@ impl Feed {
             pointer(name, value)?;
         }
         for (name, value) in [
+            ("containers.cursor.next", c.cursor.next.as_ref()),
+            ("containers.cursor.last", c.cursor.last.as_ref()),
+            ("containers.kind", c.kind.as_ref()),
             ("containers.name", c.name.as_ref()),
             (
                 "containers.visibility",
@@ -358,6 +483,7 @@ impl Feed {
         if i.body.representation.is_empty() {
             return Err(refuse("feed body names no representation"));
         }
+        supports(d)?;
         let resume = match &i.position {
             Position::Time(time) => &time.parameter,
             Position::Cursor(cursor) => {
@@ -571,23 +697,45 @@ impl Feed {
             .get(http, &self.list, values, c.query.as_ref())
             .await?
             .map_err(refused)?;
+        let records = Self::records(&answer, &c.records)?;
         let mut containers = Vec::new();
-        for record in Self::records(&answer, &c.records)? {
+        for record in records {
             let visibility = self.visibility(record);
             if visibility == Visibility::Direct {
                 continue;
             }
+            let kind = match (&c.kind, &c.kind_word) {
+                (Some(pointer), _) => required(record, pointer)?,
+                (None, Some(word)) => word.clone(),
+                (None, None) => return Err(Error::internal()),
+            };
             containers.push(json!({
                 "id": required(record, &c.id)?,
                 "name": c.name.as_ref().and_then(|p| record.pointer(p)).and_then(Value::as_str),
-                "kind": required(record, &c.kind)?,
+                "kind": kind,
                 "visibility": visibility.as_str(),
             }));
         }
-        let next = answer
-            .pointer(&c.cursor.next)
-            .and_then(scalar)
-            .filter(|next| !next.is_empty());
+        let next = match (&c.cursor.next, &c.cursor.last) {
+            (Some(next), _) => answer
+                .pointer(next)
+                .and_then(scalar)
+                .filter(|next| !next.is_empty()),
+            // A page shorter than the limit is the end. A full one continues after the key of
+            // its last record, a direct one included; one without a key cannot be continued
+            // and is never reported complete.
+            (None, Some(last)) if records.len() as u64 >= limit => Some(
+                records
+                    .last()
+                    .and_then(|record| record.pointer(last))
+                    .and_then(scalar)
+                    .filter(|key| !key.is_empty())
+                    .ok_or_else(|| {
+                        unavailable("provider answered a full page whose last record has no key")
+                    })?,
+            ),
+            (None, _) => None,
+        };
         let next_cursor = match next {
             None => None,
             Some(next) => {
@@ -634,16 +782,38 @@ impl Feed {
         if self.visibility(record) == Visibility::Direct {
             return Err(not_found());
         }
-        let mark = match input.get("watermark").and_then(Value::as_str) {
-            None => self.mark(instance, Some(container)),
-            Some(token) => self.open(token, instance, Some(container))?,
+        // Admission of the container precedes any disclosure, whether the watermark is valid
+        // included: a watermark this read cannot resume is answered `stale_cursor` only once the
+        // listing shows the connection can read the container. Until then it reads as a first
+        // read, whose records are discarded, never returned.
+        let (mark, resumable) = match input.get("watermark").and_then(Value::as_str) {
+            None => (self.mark(instance, Some(container)), true),
+            Some(token) => match self.open(token, instance, Some(container)) {
+                Ok(mark) => (mark, true),
+                Err(error) if error.code == ErrorCode::StaleCursor => {
+                    (self.mark(instance, Some(container)), false)
+                }
+                Err(error) => return Err(error),
+            },
         };
         let page = match &self.declaration.items.position {
-            Position::Time(time) => self.by_time(http, container, limit, mark, time).await?,
-            Position::Cursor(cursor) => {
-                self.by_cursor(http, container, limit, mark, cursor).await?
+            Position::Time(time) => self.by_time(http, container, limit, mark, time).await,
+            Position::Cursor(cursor) => self.by_cursor(http, container, limit, mark, cursor).await,
+        }
+        // The lookup answered, so the connection sees the container; the provider's own refusal
+        // of its items that is not a quota refusal (classified `rate_limited`) is a container the
+        // connection cannot read, which the family answers exactly as an unknown one. A refusal
+        // the host raised, not the provider, keeps its code.
+        .map_err(|error| {
+            if error.code == ErrorCode::Forbidden && error.upstream_answer {
+                not_found()
+            } else {
+                error
             }
-        };
+        })?;
+        if !resumable {
+            return Err(stale());
+        }
         let (items, next, complete) = page;
         Self::bounded(json!({
             "items": items,
