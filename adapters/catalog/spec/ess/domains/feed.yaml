@@ -139,16 +139,14 @@ types:
       - {name: deleted, type: "Optional<connectors_catalog.feed.Condition>"}
 
   # The family's profile capabilities (connectors.feed.ProfileCapabilities in the shared model),
-  # each first variant the strongest. The engine refuses, when the selection file loads, a claim
-  # the rest of the declaration does not support:
+  # each first variant the strongest. Declaration's invariants refuse a claim the rest of the
+  # declaration does not support, and the engine refuses it when the selection file loads:
   # - deletions: `observed` exactly when `items.deleted` is declared;
   # - kind: `provider-word` reads `containers.kind`; this shape carries no fixed word, so
-  #   `fixed-word` is refused;
+  #   `fixed-word` is refused. A fixed word will be `containers.kind_word` (story
+  #   gitlab-feed-binding), and the family's `kind_word` is read from there, not repeated here;
   # - revision: `update-time` exactly when `items.revision` and `items.updated_at` are one pointer;
   # - visibility: `mapped` exactly when `containers.visibility` maps some value to `public`.
-  # ESS-LIMIT: an invariant reads no optional field's presence and compares no two fields of
-  # nested structs, so these rules are the engine's, stated in contracts/catalog/v1alpha1
-  # section 3.3.
   - name: connectors_catalog.feed.DeletionCapability
     kind: enum
     variants: [observed, not-observed]
@@ -183,3 +181,14 @@ types:
     invariants:
       - max_limit >= 1
       - max_limit <= 100
+      - any: [{capabilities.deletions: not-observed}, defined(items.deleted)]
+      - any: [{capabilities.deletions: observed}, {not: defined(items.deleted)}]
+      - {capabilities.kind: provider-word}
+      - any: [{capabilities.revision: update-time}, items.revision != items.updated_at]
+      - any: [{capabilities.revision: opaque}, items.revision == items.updated_at]
+      - any:
+          - {capabilities.visibility: all-private}
+          - exists: {in: containers.visibility.map, as: value, that: {value: public}}
+      - any:
+          - {capabilities.visibility: mapped}
+          - not: {exists: {in: containers.visibility.map, as: value, that: {value: public}}}

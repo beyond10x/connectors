@@ -5,16 +5,19 @@
 ### Added
 
 - A `datasource.feed/v1alpha1` profile declares four capabilities: `deletions`
-  (`observed | not-observed`), `kind` (`provider-word | fixed-word`), `revision`
-  (`opaque | update-time`) and `visibility` (`mapped | all-private`), typed
-  `connectors.feed.ProfileCapabilities` in `ess/domains/feed.yaml`. The feed suite holds a
-  binding to what its profile declares. Before admission it leaves out the scenarios that
-  expect a tombstone (`not-observed`) or give one item two revisions at one instant
-  (`update-time`); in the scenarios it keeps it masks a listed container's `kind`
-  (`fixed-word`) and a read item's `revision` (`update-time`), and holds a container stored
-  `public` to being listed `private` (`all-private`). It names each scenario left out and
-  each field changed with the capability that did it, beside the number run and the 28 the
-  family defines; all four weak values together run 23. The native fixture and the time and
+  (`observed | not-observed`), `kind` (`provider-word | fixed-word`, the fixed word stated
+  as `kind_word`), `revision` (`opaque | update-time`) and `visibility`
+  (`mapped | all-private`), typed `connectors.feed.ProfileCapabilities` in
+  `ess/domains/feed.yaml`. The feed suite holds a binding to what its profile declares.
+  Before admission it leaves out only the scenarios that give one item two revisions at one
+  instant (`update-time`). In every scenario kept it holds each affected expectation on the
+  binding's reads to the claim: an expected tombstone becomes an expectation that the item
+  is never held deleted (`not-observed`), a listed container's `kind` is held to the stated
+  word (`fixed-word`), a read item's revision word to the instant the item took it
+  (`update-time`), and a container stored `public` to being listed `private`
+  (`all-private`). It names each scenario left out and each expectation changed with the
+  capability that did it, beside the number run and the 28 the family defines; all four weak
+  values together run 26. The native fixture and the time and
   cursor catalog fixtures declare the strongest capabilities and still run and pass all 28.
   The descriptor's operation is unchanged; the capabilities belong to the profile, not to
   the wire. `listing-omits-direct-conversation` no longer asserts the public container's
@@ -44,7 +47,8 @@
   `connectors-catalog-operations/1` selection file requires `capabilities`, and the engine
   refuses, when the file loads, a claim the declaration does not support:
   `deletions: observed` exactly when `items.deleted` is declared, `kind: provider-word`
-  (the shape carries no fixed word yet), `revision: update-time` exactly when
+  (the shape carries no fixed word yet; it will be `containers.kind_word`),
+  `revision: update-time` exactly when
   `items.revision` and `items.updated_at` are one pointer, `visibility: mapped` exactly
   when `containers.visibility` maps a value to `public`
   (`contracts/catalog/v1alpha1/semantics.md` section 3.3). No shipped provider declares a

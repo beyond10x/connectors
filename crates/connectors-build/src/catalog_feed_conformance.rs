@@ -525,8 +525,9 @@ fn every_declared_feed_passes_the_feed_binding_suite() {
 
 /// A declaration that carries less claims less, and the engine realizing it passes the suite
 /// its claim selects: no `deleted` condition claims no deletions, and a visibility rule that maps
-/// nothing to `public` claims every container private. Each scenario left out, and each field
-/// held to `private`, is named with the capability that did it.
+/// nothing to `public` claims every container private. It runs every scenario the family
+/// defines: each expected tombstone is held to never being reported, and each container stored
+/// `public` to being listed `private`, each change named with the capability that made it.
 #[test]
 fn a_declaration_that_observes_less_passes_the_scenarios_it_declares() {
     let mut weaker = declared().remove(0);
@@ -541,23 +542,22 @@ fn a_declaration_that_observes_less_passes_the_scenarios_it_declares() {
     assert!(run.accounts_for_the_family(), "{}", run.summary());
     assert_eq!(run.status, CountStatus::Passed, "{}", run.report);
     assert_eq!(run.counts.passed, run.counts.total, "{}", run.report);
-    assert_eq!(run.counts.total, feed_conformance::EXPECTED_SCENARIOS - 3);
-    let left_out_by: BTreeSet<&str> = run
-        .left_out
+    assert_eq!(run.counts.total, feed_conformance::EXPECTED_SCENARIOS);
+    assert!(run.left_out.is_empty(), "{}", run.summary());
+    let changed: BTreeSet<(&str, &str, &str)> = run
+        .changed
         .iter()
-        .flat_map(|left| left.by.iter().map(|capability| capability.name()))
-        .collect();
-    assert_eq!(left_out_by, BTreeSet::from(["deletions: not-observed"]));
-    let masked: BTreeSet<(&str, Option<&str>, &str)> = run
-        .masked
-        .iter()
-        .map(|masked| (masked.field, masked.held_to, masked.by.name()))
+        .map(|changed| (changed.field, changed.expect.as_str(), changed.by.name()))
         .collect();
     assert_eq!(
-        masked,
-        BTreeSet::from([("visibility", Some("private"), "visibility: all-private")])
+        changed,
+        BTreeSet::from([
+            ("state", "contains", "deletions: not-observed"),
+            ("state", "excludes", "deletions: not-observed"),
+            ("visibility", "contains", "visibility: all-private"),
+        ])
     );
-    assert_eq!(run.masked_ids().len(), 2, "{}", run.summary());
+    assert_eq!(run.changed_ids().len(), 5, "{}", run.summary());
 }
 
 /// Every declaration is a value of the adapter's own model (`adapters/catalog/spec/ess`), and the
