@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: upstream-blocker:gates-superseded-update-merge
 kind: upstream-blocker
-status: open
+status: cleared
 title: Gates refuses a branch update that a later update of the same pull request superseded
 relations:
 - blocks: specification:wave-20261007a-feed-gitlab
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-07T11:05:43Z", actor: "human:timo", revision: 3}
 ---
 ## What stops delivery
 
@@ -26,3 +28,7 @@ refused.
 A Gates release that admits an update merge superseded by a later update of the same pull
 request (the final head descends from it, and each update between is GitHub-committed and
 associated with that pull request), installed in this repository with `b10x-gates install`.
+
+## Cleared
+
+Cleared 2026-10-07: Gates 0.1.15 admits an update merge that a later update of the same pull request superseded. With this repository's hooks installed from 0.1.15, `b10x-gates check` passed on the push range (147 commits) and `wave/20261007a` pushed.
