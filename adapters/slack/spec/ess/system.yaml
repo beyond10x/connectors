@@ -1,0 +1,5 @@
+format: ess/23
+system: connectors_slack
+version: v1
+domains:
+  - connectors_slack.records

@@ -1,0 +1,202 @@
+domain: connectors_homer.capture
+summary: Homer-owned captured SIP call records read by parity unit U17. Proposed; not
+  implemented.
+
+# Sources. No Homer API document is vendored in this repository; nothing was fetched.
+#   homer-ref:<line>  the fluxplane-plugin skill reference `references/homer.md`, plugin
+#                     homer 0.4.1, read 2026-10-07. Not in this repository.
+#   parity:<line>     docs/fluxplane-plugin-parity.md (`## homer` :360-376, unit U17 :792).
+# Scope: the records the five U17 operations read (parity:792): homer.call.list,
+# homer.call.show, homer.test, homer.call.qos, homer.search. homer.test reads no record.
+#
+# Every field, identity or edge the sources do not state is an `UNMAPPED:` marker
+# where its declaration would go. A marker is an open question for the owner, not a
+# default; replace one only with a source line.
+#
+# The configured Homer instance is not a record here. Every operation targets one
+# instance (homer-ref:23, `endpoint_ref`); in Connectors that is the saved connection
+# the operation runs on, a shared noun this root cannot name (adapters/README.md:71).
+# No record below carries a connection or instance field.
+
+types:
+  # One captured SIP message. homer-ref:58 "Search SIP messages by number, caller,
+  # callee, user agent, method, Call-ID, or query DSL"; homer-ref:48 "the SIP message
+  # flow of one or more calls: ordered events".
+  # A value, not an entity: no source names a message identity.
+  # UNMAPPED: the identity of a captured message. Until it is known the message cannot
+  # be an entity, so the Call edge below cannot be a `relations:` entry.
+  - name: connectors_homer.capture.SipMessage
+    kind: struct
+    fields:
+      # Edge SipMessage -> Call, carried by this field. Cardinality one: a message falls
+      # in exactly one Call-ID group (homer-ref:38). Call -> SipMessage: many, a group
+      # of messages (homer-ref:38,48).
+      # UNMAPPED: owns or references for Call -> SipMessage. Messages are searched
+      # without a call (homer-ref:58), and a call is defined by its messages
+      # (homer-ref:38), so neither side is stated to stand on its own.
+      - {name: call_id, type: String}
+      # homer-ref:58 "method".
+      # UNMAPPED: what a SIP response carries here: its CSeq method, its status code or
+      # nothing.
+      - {name: method, type: String}
+      # homer-ref:58 "caller, callee". Same open question as Call.caller.
+      - {name: caller, type: String}
+      - {name: callee, type: String}
+      # homer-ref:58 "user agent".
+      # UNMAPPED: whether every captured message carries one. Optional until stated.
+      - {name: user_agent, type: Optional<String>}
+      # homer-ref:48 "optionally raw messages": present only when the read asks for it.
+      # UNMAPPED: the input that asks for it (no name in homer-ref:48-50), and whether
+      # the raw message is text or bytes.
+      - {name: raw, type: Optional<String>}
+      # UNMAPPED: capture time. homer-ref:48 orders the flow but names no time field,
+      # type or precision.
+      # UNMAPPED: source and destination address and port. homer-ref:28 aliases name
+      # IP/port pairs; no message field is stated.
+      # UNMAPPED: SDP. homer-ref:48 annotates the flow's events with SDP; not whether
+      # that is a Homer field or the reader's parse of the message body.
+
+  # One media stream's quality in a call. homer-ref:43 "Per-stream call quality from
+  # RTCP reports: packet loss, jitter, and an E-model MOS estimate".
+  # A value, not an entity: no source names a stream identity.
+  # UNMAPPED: the stream identity (an RTP SSRC, an address pair or a report id).
+  # UNMAPPED: the fields of the RTCP report records Homer stores; homer-ref:43 names
+  # only the derived quality.
+  - name: connectors_homer.capture.StreamQuality
+    kind: struct
+    fields:
+      # Edge StreamQuality -> Call, carried by this field: homer.call.qos takes call_ids
+      # (homer-ref:44) and answers per stream (homer-ref:43). Call -> StreamQuality:
+      # many, "per-stream".
+      # UNMAPPED: how Homer attributes an RTCP report to a Call-ID, and so whether a
+      # stream belongs to exactly one call (cardinality of StreamQuality -> Call).
+      - {name: call_id, type: String}
+      # UNMAPPED: `packet_loss` (homer-ref:43). A fraction, a percentage or a packet
+      # count is not stated.
+      # UNMAPPED: `jitter` (homer-ref:43). Unit not stated. homer-ref:45 takes a
+      # `clock_rate` input (an integer); not whether Homer reports RTP timestamp units
+      # that the reader converts with it.
+      # UNMAPPED: `mos` (homer-ref:43). "An E-model MOS estimate" is computed from loss
+      # and jitter by the reader, not stated as a Homer field. Who computes it is a
+      # route decision (design.md, Route).
+
+  # ── Read selections: each operation's input, without the instance selector ──────
+  #
+  # Only `endpoint_ref` is required where homer-ref names no other input
+  # (homer-ref:39,59,64); the other members below come from the examples (:40,:45,
+  # :50,:60), so they are optional unless a "Required input" line names them.
+  # `endpoint_ref` is not a member: a saved connection selects the instance
+  # (story:parity-homer-sip-reads acceptance, "on a saved connection").
+  #
+  # UNMAPPED: `since` grammar, for every selection below. The examples are "1h", "2h",
+  # "6h", "24h" (homer-ref:40,45,50,60); the admitted units, the bound and the default
+  # when absent are not stated. Text until stated, not Duration.
+
+  # homer.call.list (homer-ref:36-40).
+  - name: connectors_homer.capture.CallListSelection
+    kind: struct
+    fields:
+      # homer-ref:40 example `number`, a string.
+      # UNMAPPED: whether `number` matches the caller, the callee or either.
+      - {name: number, type: Optional<String>}
+      # homer-ref:40 example `limit`, an integer.
+      # UNMAPPED: the default, the upper bound, and whether it counts calls or messages.
+      - {name: limit, type: Optional<Integer>}
+      - {name: since, type: Optional<String>}
+
+  # homer.call.show (homer-ref:46-50).
+  - name: connectors_homer.capture.CallFlowSelection
+    kind: struct
+    fields:
+      # homer-ref:49 required `call_ids`; a list of strings in :50.
+      # UNMAPPED: the minimum and maximum number of call ids.
+      - {name: call_ids, type: List<String>}
+      - {name: since, type: Optional<String>}
+      # UNMAPPED: the member that asks for raw messages (homer-ref:48 "optionally raw
+      # messages"); no name or type is stated.
+
+  # homer.call.qos (homer-ref:41-45).
+  - name: connectors_homer.capture.CallQualitySelection
+    kind: struct
+    fields:
+      # homer-ref:44 required `call_ids`; a list of strings in :45.
+      # UNMAPPED: the minimum and maximum number of call ids.
+      - {name: call_ids, type: List<String>}
+      - {name: since, type: Optional<String>}
+      # homer-ref:45 example `clock_rate`, an integer.
+      # UNMAPPED: its unit (Hz is the RTP convention, not stated), its default, and
+      # whether one rate applies to every stream of every requested call.
+      - {name: clock_rate, type: Optional<Integer>}
+
+  # homer.search (homer-ref:56-60).
+  - name: connectors_homer.capture.MessageSearchSelection
+    kind: struct
+    fields:
+      # homer-ref:60 example `number`, a string. Same open question as
+      # CallListSelection.number.
+      - {name: number, type: Optional<String>}
+      - {name: since, type: Optional<String>}
+      # UNMAPPED: the input names and types of the caller, callee, user agent, method
+      # and Call-ID filters (homer-ref:58 names the filters, not the members).
+      # UNMAPPED: the query DSL (homer-ref:58): its member name, grammar and owner.
+
+entities:
+  # One call as Homer search groups it: the captured messages that share one Call-ID.
+  # homer-ref:38 "List calls (messages grouped by Call-ID)"; homer-ref:69 datasource
+  # `homer.calls`, entity `homer.call`, "Homer SIP calls grouped by Call-ID".
+  # UNMAPPED: whether the Homer API serves a call as a record or only messages that the
+  # reader groups by Call-ID. homer-ref:38 does not say which side groups. This decides
+  # whether a generic HTTP mapping can serve homer.call.list (design.md, Route).
+  - name: connectors_homer.capture.Call
+    # The group key is the Call-ID (homer-ref:38,69); homer.call.show and homer.call.qos
+    # select calls by it (homer-ref:44,49 `call_ids`, a list of strings in :45,:50).
+    # UNMAPPED: whether a Call-ID names one call over the instance's whole retention or
+    # only within the `since` window every by-id read also takes (homer-ref:45,50).
+    identity: {name: call_id, type: String}
+    fields:
+      # homer-ref:38 "with caller, callee". Text: the number filter in :40 and :60 is a
+      # JSON string.
+      # UNMAPPED: whether caller and callee are the From/To URI, its user part or a
+      # display name.
+      - {name: caller, type: String}
+      - {name: callee, type: String}
+      # UNMAPPED: `status` (homer-ref:38). No type, value set or mapping from SIP
+      # response codes is stated.
+      # UNMAPPED: `duration` (homer-ref:38). No unit, and not whether it spans setup only
+      # or the whole dialog.
+      # UNMAPPED: `route` (homer-ref:38). No shape: a hop list, an address pair or an
+      # alias name (homer-ref:28 aliases name IP/port pairs).
+    # One state, terminal, no transition: a captured call is read, never changed by
+    # Connectors. Every operation in scope is read-only (homer-ref:36,41,46,56,61). The
+    # repository idiom for "the record exists; no transition is selected" is
+    # ess/domains/auth_bindings.yaml:85-88.
+    lifecycle:
+      initial: Captured
+      states: [Captured]
+      terminal: [Captured]
+
+# ── Edge census: no `relations:` entry, and why ───────────────────────────────────
+#
+#   1. SipMessage -> Call     one, by Call-ID (homer-ref:38). Not declarable: SipMessage
+#                             has no identity. UNMAPPED: owns or references.
+#   2. Call -> SipMessage     many (homer-ref:38,48). Same two blockers as row 1.
+#   3. Call -> StreamQuality  many, "per-stream" (homer-ref:43). Not declarable:
+#                             StreamQuality has no identity.
+#   4. StreamQuality -> Call  UNMAPPED: cardinality; RTCP-to-Call-ID attribution is
+#                             not stated.
+#   5. Call -> Homer instance one instance per read (homer-ref:23). Cross-root, the
+#                             saved connection; prose only (adapters/README.md:71).
+#
+# ── Not modelled: nouns of operations outside U17 ─────────────────────────────────
+#
+# parity:841 lists homer.alias.list, homer.call.analyze and homer.pcap.export as not
+# planned until used. Their nouns stay out until a unit selects them:
+#   · alias, an IP/port label (homer-ref:28);
+#   · call leg and logical call, linked by a shared correlation header (homer-ref:33);
+#     parity:375 calls that correlation composition on the reader's side;
+#   · PCAP export, a binary blob (homer-ref:53, parity:376).
+#
+# This root shares no vocabulary with adapters/sip: that adapter places calls and lists
+# the sessions it owns (adapters/sip/design.md:16-17). Homer reads signalling captured
+# from calls Connectors did not necessarily place. No edge from a sip session to a Homer
+# call is declared or implied.
