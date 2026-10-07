@@ -17,11 +17,11 @@ connectors-contracts = { path = "crates/connectors-contracts" }
 connectors-sdk = { path = "crates/connectors-sdk" }
 connectors-client = { path = "crates/connectors-client" }
 connectors-host = { path = "crates/connectors-host" }
-entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.26.0" }
-entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.26.0", features = ["sqlite", "sync-bridge"] }
-entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.26.0" }
-entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.26.0" }
-eventlog-core = { git = "https://github.com/beyond10x/eventlog", rev = "6983cc25eb92e07844b3a6fa3e0decbdb300f43c" }
+entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.29.0" }
+entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.29.0", features = ["sqlite", "sync-bridge"] }
+entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.29.0" }
+entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.29.0" }
+eventlog-core = { git = "https://github.com/beyond10x/eventlog", tag = "0.8.0" }
 ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.55.0" }
 ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.55.0" }
 ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.55.0" }

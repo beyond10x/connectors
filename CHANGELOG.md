@@ -82,6 +82,17 @@
   approval policies again (`docs/local-catalog-provider.md`). Until then the adapter does
   not start and the connection reports `pending`. To read the feed, add `feed.containers`
   and `feed.items` to the adapter's permitted operations.
+- Connectors builds on Entity Runtime 0.29.0 (from 0.26.0) and Eventlog 0.8.0 (from the
+  unreleased revision `6983cc25`), one copy of each; ESS 0.55.0 still brings Entity Runtime
+  Core 0.24.1 through `ess-entity-runtime`. No call site changed. Entity Runtime 0.28.0 keeps
+  each committed record of a verified model once rather than three times; 0.29.0 adds
+  durable open checkpoints, which Connectors does not enable, so a tracked open still
+  verifies the whole store. Stores this version writes stay readable by 0.31.0 and earlier:
+  without that enable call Eventlog installs no continuity table, journal or trigger, and
+  `tests/metadata_store_previous_pin.rs` checks that a write leaves the store's schema as
+  the previous runtime wrote it. The same test opens a committed store that Entity Runtime
+  0.26.0 wrote (`tests/fixtures/metadata-store-er-0.26.0/`), reads it and writes to it.
+
 
 ## 0.31.0 — 2026-10-06
 
