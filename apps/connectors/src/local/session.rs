@@ -346,12 +346,14 @@ impl DynamicValidator for NativeValidator {
                         runtime::INPUT_LIMIT,
                     )
                 }
+                // The result is the provider's JSON value, held to the selected
+                // output schema and the result bound as the document it encodes.
+                // The generated `Json` field admits any value; this check is what
+                // refuses a string holding JSON text where the schema names an
+                // object.
                 DynamicPhase::Result => owner::validate_document(
                     &operation.output_schema,
-                    value["result"]
-                        .as_str()
-                        .ok_or(Code::InvalidInput)?
-                        .as_bytes(),
+                    &serde_json::to_vec(&value["result"]).map_err(|_| Code::InvalidInput)?,
                     runtime::RESULT_LIMIT,
                 ),
                 DynamicPhase::Error(_) => unreachable!(),
