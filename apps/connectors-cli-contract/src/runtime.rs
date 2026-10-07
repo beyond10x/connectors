@@ -326,6 +326,12 @@ fn value_arg(id: String) -> Arg {
 fn leaf_command(name: &str, declaration: &Command, callable: &Callable) -> clap::Command {
     let mut command = clap::Command::new(name.to_owned()).about(declaration.about.clone());
     let fields = field_shapes(callable);
+    // Positionals are consecutive from 1, so a trailing list takes the next index.
+    let trailing_index = 1 + declaration
+        .arguments
+        .iter()
+        .filter(|a| matches!(a.source, ArgumentSource::Positional { .. }))
+        .count();
     for argument in &declaration.arguments {
         let field = &argument.field;
         let required = !fields[field].optional();
@@ -397,6 +403,17 @@ fn leaf_command(name: &str, declaration: &Command, callable: &Callable) -> clap:
                             .required(required)
                             .multiple(false),
                     );
+            }
+            // Reachable only after the first `--`; a later `--` is a value.
+            ArgumentSource::Trailing {} => {
+                command = command.arg(
+                    Arg::new(format!("field:{field}"))
+                        .index(trailing_index)
+                        .last(true)
+                        .num_args(1..)
+                        .action(ArgAction::Append)
+                        .value_parser(clap::builder::StringValueParser::new()),
+                );
             }
         }
     }
@@ -497,7 +514,21 @@ fn argument_text(
                 };
             selected.map(|s| acquired(s, sources, output)).transpose()
         }
+        ArgumentSource::Trailing {} => unreachable!("payload reads a trailing list as words"),
     }
+}
+
+/// The words after `--`, verbatim; `[]` when there are none.
+fn trailing_words(field: &str, matches: &ArgMatches) -> Value {
+    Value::Array(
+        matches
+            .get_many::<String>(&format!("field:{field}"))
+            .into_iter()
+            .flatten()
+            .cloned()
+            .map(Value::String)
+            .collect(),
+    )
 }
 
 fn json_argument(text: &str) -> Result<Value, serde_json::Error> {
@@ -616,6 +647,13 @@ fn payload(
     arguments.sort_by_key(|a| matches!(a.source, ArgumentSource::Protected { .. }));
     for argument in arguments {
         let shape = &fields[&argument.field];
+        if matches!(argument.source, ArgumentSource::Trailing {}) {
+            object.insert(
+                argument.field.clone(),
+                trailing_words(&argument.field, matches),
+            );
+            continue;
+        }
         let Some(text) =
             argument_text(&argument.source, &argument.field, matches, sources, output)?
         else {
