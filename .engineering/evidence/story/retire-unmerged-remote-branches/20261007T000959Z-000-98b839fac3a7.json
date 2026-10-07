@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-07T00:09:59Z",
+  "actor": "human:timo",
+  "artifact": "story:retire-unmerged-remote-branches",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "git ls-remote origin 'refs/heads/*' on 2026-10-07: 23 heads; none of the 15 deleted remains, all 17 kept remain, the other 6 are main and five branches of current work",
+    "reference": "beyond10x/connectors refs/heads"
+  }
+}

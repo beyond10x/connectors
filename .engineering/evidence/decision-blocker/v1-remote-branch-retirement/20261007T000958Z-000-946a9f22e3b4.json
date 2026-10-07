@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-07T00:09:58Z",
+  "actor": "human:timo",
+  "artifact": "decision-blocker:v1-remote-branch-retirement",
+  "kind": "decision-blocker",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "approval",
+    "source": "Decision 2026-10-07 under the operator's standing delegation: delete the 15 with no unique commits; tag and delete the 17, amended to keep the 17 after the bot route refused the archive tags"
+  }
+}

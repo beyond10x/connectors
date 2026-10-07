@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:feed-profile-capabilities
 kind: story
-status: draft
+status: active
 title: A feed profile declares what its provider observes, and the suite tests that
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -27,7 +27,10 @@ scope:
   path: crates/connectors-build/src/feed_conformance.rs
 - confidence: cited
   path: ess/domains/feed.yaml
-revision: 8
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-07T00:10:06Z", actor: "human:timo", revision: 9}
+- {from: "proposed", to: "active", at: "2026-10-07T00:10:06Z", actor: "human:timo", revision: 10}
 ---
 ## Outcome
 

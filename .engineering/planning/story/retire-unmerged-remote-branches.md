@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:retire-unmerged-remote-branches
 kind: story
-status: draft
+status: implemented
 title: Decide and retire 32 unmerged remote branches
 relations:
 - decomposes: epic:tech-debt-review-20260930
@@ -10,7 +10,11 @@ relations:
 scope:
 - confidence: cited
   path: refs/heads/* on beyond10x/connectors
-revision: 2
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-07T00:09:58Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-10-07T00:09:59Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-07T00:09:59Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Defect
 
@@ -37,3 +41,7 @@ holds that choice.
   and where that commit is still reachable or archived.
 - `git ls-remote origin 'refs/heads/*'` shows only `main` and the branches marked keep.
 - Every deletion goes through the bot App.
+
+## Outcome
+
+Done 2026-10-07; the per-branch list and the decision are in `decision-blocker:v1-remote-branch-retirement`. 15 deleted through the bot App, 17 kept (the bot route refuses archive tags on history older than the Gates baseline), 0 tagged. `git ls-remote origin 'refs/heads/*'` answers 23 heads: `main`, the 17 kept and five branches of current work created after this story was written.
