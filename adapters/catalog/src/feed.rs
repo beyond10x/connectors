@@ -10,7 +10,9 @@
 //! - **cursor**: the provider keeps a change cursor. The watermark carries it unchanged.
 //!
 //! Both are wrapped with the profile, the instance and the container, so a watermark issued for
-//! any other is refused as `stale_cursor`, never read as a first read.
+//! any other is refused as `stale_cursor`, never answered as a first read. That refusal comes
+//! after the container's admission: an unknown container and one whose items the provider
+//! refuses answer `not_found` whatever the watermark.
 use crate::{path_within, read_body, scalar};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use connectors_catalog::{
@@ -780,9 +782,19 @@ impl Feed {
         if self.visibility(record) == Visibility::Direct {
             return Err(not_found());
         }
-        let mark = match input.get("watermark").and_then(Value::as_str) {
-            None => self.mark(instance, Some(container)),
-            Some(token) => self.open(token, instance, Some(container))?,
+        // Admission of the container precedes any disclosure, whether the watermark is valid
+        // included: a watermark this read cannot resume is answered `stale_cursor` only once the
+        // listing shows the connection can read the container. Until then it reads as a first
+        // read, whose records are discarded, never returned.
+        let (mark, resumable) = match input.get("watermark").and_then(Value::as_str) {
+            None => (self.mark(instance, Some(container)), true),
+            Some(token) => match self.open(token, instance, Some(container)) {
+                Ok(mark) => (mark, true),
+                Err(error) if error.code == ErrorCode::StaleCursor => {
+                    (self.mark(instance, Some(container)), false)
+                }
+                Err(error) => return Err(error),
+            },
         };
         let page = match &self.declaration.items.position {
             Position::Time(time) => self.by_time(http, container, limit, mark, time).await,
@@ -799,6 +811,9 @@ impl Feed {
                 error
             }
         })?;
+        if !resumable {
+            return Err(stale());
+        }
         let (items, next, complete) = page;
         Self::bounded(json!({
             "items": items,
