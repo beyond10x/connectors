@@ -1,9 +1,13 @@
 # The container listing omits a direct conversation unless the binding's profile
 # declares it; the shared suite holds the default. See ../semantics.md, Containers.
+# The public container's listed visibility is not asserted: it is `public` under
+# `visibility: mapped` and `private` under `visibility: all-private`, and the synthesized
+# AddContainer and ReadItems scenarios hold a mapped profile to `public`. This scenario
+# therefore holds for every visibility capability.
 type: ess-scenario/1
 domain: connectors.feed
 scenario: listing-omits-direct-conversation
-summary: The container listing lists public and private containers and omits a direct conversation.
+summary: The container listing lists every container except a direct conversation, which it omits.
 timeline:
 - at: '2026-10-06T09:00:00Z'
   command: connectors.feed.AddContainer
@@ -46,7 +50,6 @@ assert:
 - view: connectors.feed.ListedContainers
   contains:
     container_id: team-room
-    visibility: public
 - view: connectors.feed.ListedContainers
   contains:
     container_id: project-board

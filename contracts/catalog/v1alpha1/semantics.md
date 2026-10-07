@@ -126,18 +126,22 @@ Profile selection is singular: a generic operation whose curation declares `exte
 
 ### 3.3 Declared feed bindings
 
-**Status:** implemented in `adapters/catalog/src/feed.rs`; held to the `feed-binding` suite by `crates/connectors-build/src/catalog_feed_conformance.rs`.
+**Status:** implemented in `adapters/catalog/src/feed.rs`; held to the `feed-binding` suite by `crates/connectors-build/src/catalog_feed_conformance.rs`. GitLab declares the first shipped binding ([adapters/catalog/contracts/feed/v1alpha1/gitlab.md](../../../adapters/catalog/contracts/feed/v1alpha1/gitlab.md)), held to the suite by `crates/connectors-build/src/gitlab_feed_conformance.rs`.
 
 A provider binds [datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/semantics.md) as data: the optional `feed` of its `connectors-catalog-operations/1` selection file. The engine then answers `feed.containers` and `feed.items`, each with `contract: datasource.feed/v1alpha1` and the declaration's `profile`, from operations of the provider's pinned bundle. No provider has Rust of its own. The declaration is modelled in [adapters/catalog/spec/ess/domains/feed.yaml](../../../adapters/catalog/spec/ess/domains/feed.yaml); a pointer is an RFC 6901 JSON pointer, a parameter a query parameter of the operation it is named for.
 
 ```json
 {
   "profile": "<native profile id>",
+  "capabilities": {
+    "deletions": "observed | not-observed", "kind": "provider-word | fixed-word",
+    "revision": "opaque | update-time", "visibility": "mapped | all-private"
+  },
   "max_limit": 100,
   "containers": {
     "operation_id": "<list>", "query": {"<name>": "<fixed value>"},
-    "limit": "<parameter>", "cursor": {"parameter": "<parameter>", "next": "<pointer>"},
-    "records": "<pointer>", "id": "<pointer>", "name": "<pointer>", "kind": "<pointer>",
+    "limit": "<parameter>", "cursor": {"parameter": "<parameter>", "next": "<pointer>" | "last": "<pointer>"},
+    "records": "<pointer>", "id": "<pointer>", "name": "<pointer>", "kind": "<pointer>" | "kind_word": "<word>",
     "visibility": {"pointer": "<pointer>", "map": {"<provider value>": "public | private | direct"}},
     "lookup": {"operation_id": "<get one>", "parameter": "<parameter>", "record": "<pointer>"}
   },
@@ -154,26 +158,27 @@ A provider binds [datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/sema
 }
 ```
 
-`query`, `name`, `visibility`, `author`, `display_name`, `url`, `parent` and `deleted` are optional. Every named operation must be a GET under the base path, every named parameter one its operation takes, no parameter bound twice, every required parameter bound on every request, and a resume parameter not required; otherwise the selection file is refused when it loads, before any request.
+`query`, `name`, `visibility`, `author`, `display_name`, `url`, `parent` and `deleted` are optional; a listing names exactly one of `cursor.next` and `cursor.last`, and the containers exactly one of `kind` and `kind_word` (1 to 128 visible ASCII bytes). Every named operation must be a GET under the base path, every named parameter one its operation takes, no parameter bound twice, every required parameter bound on every request, and a resume parameter not required; otherwise the selection file is refused when it loads, before any request.
 
 | Concern | Rule |
 |---|---|
-| Containers | One provider page per call: `limit` (default `max_limit`) and the provider's cursor, which comes back at `cursor.next`. An absent, null or empty `next` is `complete: true`. `next_cursor` wraps the provider's cursor with the profile and the instance. |
+| Capabilities | Required: the profile's capabilities in the family's vocabulary ([datasource.feed/v1alpha1](../../datasources/feed/v1alpha1/semantics.md)), each the one the rest of the declaration supports, or the selection file is refused when it loads. `deletions: observed` exactly when `items.deleted` is declared. `kind: provider-word` exactly when `containers.kind` reads the provider's word, `kind: fixed-word` exactly when `containers.kind_word` states the one word, which the suite reads as the family's `kind_word`, never repeated under `capabilities`. `revision: update-time` exactly when `items.revision` and `items.updated_at` are one pointer. `visibility: mapped` exactly when `containers.visibility` maps some value to `public`. The model's `Declaration` invariants state the same rules. The suite holds the binding to its claim. |
+| Containers | One provider page per call: `limit` (default `max_limit`) and the provider's cursor, which comes back at `cursor.next`. An absent, null or empty `next` is `complete: true`. With `cursor.last` instead, the provider lists after a key it is given, ordered by that key through `query`: a page of fewer than `limit` records is `complete: true`, and a full page continues after the value at `last` in its last record, a direct one included; a full page whose last record has none is `unavailable`, never complete. `next_cursor` wraps the provider's cursor or key with the profile and the instance. `kind` is read at its pointer in each record; `kind_word` is the one word for every container. |
 | Visibility and direct conversations | The value at `visibility.pointer`, as text, is looked up in `map`; a value the map does not name, and a record with none, is `private`. A container mapped to `direct` is never listed. `feed.items` first reads the container through `lookup`; a 404 or 410 and a container mapped to `direct` both answer `not_found` with the same message. |
 | Watermark: `time` | The provider lists items at or after `parameter` (inclusive), oldest `updated_at` first; any fixed ordering parameter goes in `query`. The watermark is the last returned item's `updated_at`, sent back unchanged as that filter, and the `(id, revision)` pairs already returned at that instant, which are skipped on resume. The engine asks for `limit` plus that many records, so a page of unseen items stays within reach. An answer out of `updated_at` order, or before the filter, is `unavailable`. `complete` is true when the provider answered fewer records than asked and none was held back. |
 | Watermark: `cursor` | The provider keeps a change cursor: `parameter` sends it, `next` reads the new one, `complete` is a condition on the answer. A cursor the provider refuses with a status listed in `stale` is `stale_cursor`. An answer with more records than `limit` is `unavailable`: its cursor is already past all of them. |
-| Watermark scope | Every watermark carries the format, the profile, the instance and the container. Any other, or one that is not a watermark, is `stale_cursor`, never a first read. A first read omits the resume parameter and reaches as far back as the provider lists. |
-| Items | `id` and `revision` are required scalars; `created_at` and `updated_at` required RFC 3339 instants. `deleted` is true when the value at its pointer equals `equals`; a tombstone has `body: null`. Without `deleted` the profile observes no deletions. `author` is null when its `id` is absent. `url` is kept only when it is `http(s)://`. |
+| Watermark scope | Every watermark carries the format, the profile, the instance and the container. Any other, or one that is not a watermark, is `stale_cursor`, never a first read. Admission of the container comes before that answer, as the family requires: `feed.items` reads the container through `lookup`, then sends the item listing, as a first read when the watermark cannot be resumed; `stale_cursor` is answered only when that listing is answered, its records discarded, and a container the lookup or the listing refuses answers as the Errors row says, whatever the watermark. A first read omits the resume parameter and reaches as far back as the provider lists. |
+| Items | `id` and `revision` are required scalars; `created_at` and `updated_at` required RFC 3339 instants. `deleted` is true when the value at its pointer equals `equals`; a tombstone has `body: null`. Without `deleted` the profile observes no deletions and declares `deletions: not-observed`. `author` is null when its `id` is absent. `url` is kept only when it is `http(s)://`. |
 | Body | A records body envelope with the declared `representation`; the text at `body.pointer`, null or absent as empty text, clipped at 64 KiB on a UTF-8 boundary (`truncation: ["content_bytes"]`). A non-text value is `unavailable`. |
 | Ceilings | `limit` 1 to `max_limit` (at most 100), refused as `invalid_input` above it; watermark and listing cursor 16 KiB; serialized page 3 MiB (`unavailable` above it); `feed.containers` makes one provider request, `feed.items` two. |
-| Errors | Provider 400, 409, 412, 422 are `invalid_input`; 404, 410 `not_found`; 401, 403, 429 and 5xx as the generic read table; any other status and any body that is not JSON `unavailable`. Provenance is `instance`, `profile` and `received_at`. |
+| Errors | Provider 400, 409, 412, 422 are `invalid_input`; 404, 410 `not_found`; 401, 403, 429 and 5xx as the generic read table, except that in `feed.items`, once the lookup has answered the container, a 403 from the item listing that is not a quota refusal is `not_found`: the connection can see the container but not read its items, which the family answers as for a container it cannot read; any other status and any body that is not JSON `unavailable`. Provenance is `instance`, `profile` and `received_at`. |
 
 What a declaration cannot express, each a reviewed extension of this shape rather than per-provider code:
 
-- container or item listings paged by page number or offset, by a response header (`Link`), or by the last record's key;
+- container or item listings paged by page number or offset or by a response header (`Link`), and item listings paged by the last record's key;
 - a time filter that is exclusive, takes another format than the provider's own `updated_at` text, or is sent in a body or a query language (a `jql` or `cql` clause); a provider answering newest first with no way to ask otherwise;
 - an item endpoint per container type, or a container that is not one list request plus one lookup;
-- a fixed `kind` word for providers whose records carry none; visibility from more than one field; `direct` containers declared readable;
+- visibility from more than one field (a container's own and that of the feature its items belong to); `direct` containers declared readable;
 - a revision derived by the engine (a digest of the mapped fields) where the provider gives no version or edit time; deletions observed other than as a record the list returns;
 - a body built from several fields, or anything but text, and an `author` or `parent` that is not one scalar field;
 - binding a watermark to the connection rather than the instance: the engine is not told which connection it reads through.

@@ -350,6 +350,17 @@ impl Provider {
                         (403, json!({"message":"403 Forbidden"}))
                     } else if route.contains("/projects/fixture-missing/") {
                         (404, json!({"message":"404 Project Not Found"}))
+                    } else if let Some(levels) = route
+                        .strip_prefix("/api/v4/projects/fixture-deep-")
+                        .and_then(|levels| levels.parse::<usize>().ok())
+                    {
+                        // Adversary, wave 20261007a U3: a body that is `levels`
+                        // arrays nested in one another, so the generic read's
+                        // result (`{"status","body","provenance"}`) is one deeper.
+                        let nested = format!("{}{}", "[".repeat(levels), "]".repeat(levels));
+                        (200, serde_json::from_str::<Value>(&nested).unwrap())
+                    } else if let Some(page) = feed_page(route, &path) {
+                        (200, page)
                     } else if let Some(page) = repository_page(route, &path) {
                         (200, page)
                     } else if let Some(body) = commit_graph_page(route, &path) {
@@ -495,6 +506,91 @@ impl Drop for Provider {
         self.thread.take().unwrap().join().unwrap();
     }
 }
+/// The GitLab reads the shipped merge request feed sends, answered as GitLab
+/// answers them: the member projects by id ascending, after `id_after`
+/// (`GET /projects` asked with `order_by=id`), one project by its number, and
+/// one project's merge requests updated at or after `updated_after`, oldest
+/// `updated_at` first. Three member projects; project 1 is `public` at GitLab
+/// and holds three merge requests. `None` for any other route.
+fn feed_page(route: &str, path: &str) -> Option<Value> {
+    let query: std::collections::BTreeMap<&str, String> = path
+        .split_once('?')
+        .map(|(_, query)| {
+            query
+                .split('&')
+                .filter_map(|pair| pair.split_once('='))
+                .map(|(name, value)| (name, value.replace("%3A", ":").replace("%2B", "+")))
+                .collect()
+        })
+        .unwrap_or_default();
+    let per_page = query
+        .get("per_page")
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(20);
+    let project = |id: u64| {
+        json!({
+            "id": id,
+            "name_with_namespace": format!("Org / Project {id}"),
+            "path_with_namespace": format!("org/project-{id}"),
+            "visibility": if id == 1 { "public" } else { "private" },
+            "web_url": format!("https://gitlab.example.test/org/project-{id}")
+        })
+    };
+    if route == "/api/v4/projects" {
+        if query.get("order_by").map(String::as_str) != Some("id") {
+            return None;
+        }
+        let after = query
+            .get("id_after")
+            .map_or(0, |value| value.parse::<u64>().unwrap());
+        let page: Vec<Value> = (1..=3)
+            .filter(|id| *id > after)
+            .take(per_page)
+            .map(project)
+            .collect();
+        return Some(json!(page));
+    }
+    let rest = route.strip_prefix("/api/v4/projects/")?;
+    let (number, tail) = rest
+        .split_once('/')
+        .map_or((rest, None), |(n, t)| (n, Some(t)));
+    let number = number.parse::<u64>().ok().filter(|n| (1..=3).contains(n))?;
+    match tail {
+        None => Some(project(number)),
+        Some("merge_requests") => {
+            let held: &[(u64, &str)] = if number == 1 {
+                &[
+                    (1, "2026-10-06T09:00:00.081Z"),
+                    (2, "2026-10-06T09:00:01.000Z"),
+                    (3, "2026-10-06T09:00:02.000Z"),
+                ]
+            } else {
+                &[]
+            };
+            let since = query.get("updated_after");
+            let page: Vec<Value> = held
+                .iter()
+                .filter(|(_, updated)| since.is_none_or(|since| *updated >= since.as_str()))
+                .take(per_page)
+                .map(|(iid, updated)| {
+                    json!({
+                        "id": 50_000 + iid, "iid": iid, "project_id": number,
+                        "title": format!("Merge request {iid}"),
+                        "description": format!("Change {iid}"),
+                        "state": "opened",
+                        "created_at": "2026-10-06T08:00:00.000Z",
+                        "updated_at": updated,
+                        "author": {"id": 42, "username": "fixture-member", "name": "Fixture Member"},
+                        "web_url": format!("https://gitlab.example.test/org/project-{number}/-/merge_requests/{iid}")
+                    })
+                })
+                .collect();
+            Some(json!(page))
+        }
+        Some(_) => None,
+    }
+}
+
 /// The recorded GitLab repository listings the fixture serves: projects, tags,
 /// releases and project events, two items on page one and one on page two, so
 /// a walk at `per_page=2` ends on the short second page. `None` for any other

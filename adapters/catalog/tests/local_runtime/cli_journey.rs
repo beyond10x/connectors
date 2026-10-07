@@ -531,6 +531,175 @@ fn gitlab_catalog_cli_reuses_custody_across_owner_and_keyring_restart() {
     assert!(!cli.paths.state.join("owner.sock").exists());
 }
 
+/// story:gitlab-feed-binding through the production CLI: a saved GitLab
+/// connection finds the merge request feed by its family, lists the member
+/// projects across a full page, reads one project's first page of merge
+/// requests and resumes from the watermark that page returned.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn gitlab_catalog_cli_reads_the_merge_request_feed_through_a_saved_connection() {
+    const FAMILY: &str = "datasource.feed/v1alpha1";
+    const PROFILE: &str = "gitlab-merge-requests/1";
+    let provider = Provider::new();
+    let custody = Custody::new(provider.root.path());
+    let cli = Cli::new(provider.root.path());
+    configure(&cli, &provider, &custody);
+    let configured = fs::read_to_string(&cli.paths.config).unwrap();
+    let permitted = configured.replace(
+        "operations=['project.get','issues.list']",
+        "operations=['project.get','feed.containers','feed.items']",
+    );
+    assert_ne!(permitted, configured);
+    private(&cli.paths.config, permitted.as_bytes());
+    let credential = provider.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let reference = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "gitlab",
+        "--profile",
+        "gitlab.pat",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    fs::remove_file(&credential).unwrap();
+
+    let listed = success(cli.run(&[
+        "operations",
+        "list",
+        "--adapter",
+        "gitlab",
+        "--family",
+        FAMILY,
+    ]));
+    let family: Vec<(&str, &str, &str)> = listed["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| {
+            (
+                o["id"].as_str().unwrap(),
+                o["contract"].as_str().unwrap(),
+                o["profile"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        family,
+        [
+            ("feed.containers", FAMILY, PROFILE),
+            ("feed.items", FAMILY, PROFILE)
+        ]
+    );
+    assert!(listed.get("next_cursor").is_none(), "{listed}");
+
+    let ids = |page: &Value, field: &str| -> Vec<String> {
+        page[field]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|record| record["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    // The family's page an invoke answered, as the JSON value the answer
+    // carries (story:owner-read-answers-json-value).
+    let read = |operation: &str, input: Value| -> Value {
+        let invoked = cli.operation_result(&reference, operation, input);
+        assert!(invoked["result"].is_object(), "{operation}: {invoked:#}");
+        invoked["result"].clone()
+    };
+    let first = read("feed.containers", json!({"limit": 2}));
+    assert_eq!(
+        first["containers"][0],
+        json!({"id": "1", "name": "Org / Project 1", "kind": "project", "visibility": "private"}),
+        "{first:#}"
+    );
+    assert_eq!(ids(&first, "containers"), ["1", "2"]);
+    assert_eq!(first["complete"], false);
+    let rest = read(
+        "feed.containers",
+        json!({"limit": 2, "cursor": first["next_cursor"]}),
+    );
+    assert_eq!(ids(&rest, "containers"), ["3"]);
+    assert_eq!(rest["complete"], true);
+    assert_eq!(rest["next_cursor"], Value::Null);
+
+    let page = read("feed.items", json!({"container": "1", "limit": 2}));
+    assert_eq!(ids(&page, "items"), ["1", "2"]);
+    assert_eq!(page["complete"], false);
+    assert_eq!(page["provenance"]["profile"], PROFILE);
+    let first_item = &page["items"][0];
+    assert_eq!(first_item["revision"], "2026-10-06T09:00:00.081Z");
+    assert_eq!(first_item["updated_at"], first_item["revision"]);
+    assert_eq!(first_item["url"], Value::Null);
+    assert_eq!(first_item["deleted"], false);
+    assert_eq!(
+        first_item["author"],
+        json!({"id": "42", "display_name": "Fixture Member"})
+    );
+    assert_eq!(first_item["body"]["content"], "Change 1");
+    let resumed = read(
+        "feed.items",
+        json!({"container": "1", "limit": 2, "watermark": page["next_watermark"]}),
+    );
+    assert_eq!(ids(&resumed, "items"), ["3"]);
+    assert_eq!(resumed["complete"], true);
+
+    // The requests the binding sent, each query as a set of pairs.
+    let sent: Vec<(String, std::collections::BTreeSet<String>)> = provider
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|path| path.starts_with("/api/v4/projects"))
+        .map(|path| {
+            let (route, query) = path.split_once('?').unwrap_or((path, ""));
+            let pairs = query
+                .split('&')
+                .filter(|pair| !pair.is_empty())
+                .map(str::to_owned)
+                .collect();
+            (route.to_owned(), pairs)
+        })
+        .collect();
+    let request = |route: &str, pairs: &[&str]| {
+        (
+            route.to_owned(),
+            pairs.iter().map(|pair| (*pair).to_owned()).collect(),
+        )
+    };
+    let listing = ["membership=true", "order_by=id", "sort=asc", "per_page=2"];
+    let merge_requests = ["order_by=updated_at", "sort=asc", "state=all", "scope=all"];
+    assert_eq!(
+        sent,
+        [
+            request("/api/v4/projects", &listing),
+            request(
+                "/api/v4/projects",
+                &[&listing[..], &["id_after=2"]].concat()
+            ),
+            request("/api/v4/projects/1", &[]),
+            request(
+                "/api/v4/projects/1/merge_requests",
+                &[&merge_requests[..], &["per_page=2"]].concat()
+            ),
+            request("/api/v4/projects/1", &[]),
+            request(
+                "/api/v4/projects/1/merge_requests",
+                &[
+                    &merge_requests[..],
+                    &["per_page=3", "updated_after=2026-10-06T09%3A00%3A01.000Z"]
+                ]
+                .concat()
+            ),
+        ]
+    );
+}
+
 fn arguments(owned: &[String]) -> Vec<&str> {
     owned.iter().map(String::as_str).collect()
 }
@@ -1038,4 +1207,110 @@ fn oauth_repair_journey() {
         "the read used an access token issued before the repair"
     );
     journey.assert_no_material_at_rest();
+}
+
+/// Adversary, wave 20261007a U3: the deepest array or object nesting of `value`.
+fn adversary_u23_depth(value: &Value) -> usize {
+    match value {
+        Value::Array(values) => 1 + values.iter().map(adversary_u23_depth).max().unwrap_or(0),
+        Value::Object(map) => 1 + map.values().map(adversary_u23_depth).max().unwrap_or(0),
+        _ => 0,
+    }
+}
+
+/// Adversary, wave 20261007a U3 (story:owner-read-answers-json-value): the bound a read result
+/// is held to where the host reads it from the adapter child (`runtime/process.rs`,
+/// `channel::depth`): 64 levels pass, 65 are refused. The generic read's result is the body plus
+/// one level.
+#[test]
+fn adversary_u23_the_child_admits_a_read_result_64_levels_deep_and_refuses_65() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    child
+        .validate("gitlab.pat", &token(true), deadline())
+        .unwrap();
+    let admitted = invoke(
+        &mut child,
+        "project.get",
+        "one",
+        &token(true),
+        json!({"id": "fixture-deep-63"}),
+    )
+    .unwrap_or_else(|failure| panic!("a 64-level result is refused: {failure:?}"));
+    assert_eq!(adversary_u23_depth(&admitted), 64);
+    assert!(
+        invoke(
+            &mut child,
+            "project.get",
+            "one",
+            &token(true),
+            json!({"id": "fixture-deep-64"}),
+        )
+        .is_err(),
+        "a 65-level result is admitted"
+    );
+}
+
+/// F2 story:owner-read-answers-json-value: a read result the adapter child admitted (64 levels,
+/// the child's bound; see the case above) is answered through the owner. Before this unit the
+/// owner carried it as one string, one level deep; now it nests the value in its answer
+/// (`supervisor.rs` `read_answer`), and the CLI holds the whole owner answer to the same 64-level
+/// bound (`owner/transport.rs` `answer`, `channel::depth`), so the read the child admitted never
+/// reaches stdout. 63 levels, the control, pass.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_owner() {
+    let provider = Provider::new();
+    let custody = Custody::new(provider.root.path());
+    let cli = Cli::new(provider.root.path());
+    configure(&cli, &provider, &custody);
+    let credential = provider.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let reference = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "gitlab",
+        "--profile",
+        "gitlab.pat",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    fs::remove_file(&credential).unwrap();
+    let control = cli.operation_result(&reference, "project.get", json!({"id": "fixture-deep-62"}));
+    assert_eq!(adversary_u23_depth(&control["result"]), 63, "{control}");
+    let description = success(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "gitlab",
+        "--operation",
+        "project.get",
+    ]));
+    let deep = cli.run(&[
+        "operations",
+        "invoke",
+        "--adapter",
+        "gitlab",
+        "--connection",
+        &reference,
+        "--operation",
+        "project.get",
+        "--schema",
+        description["schema"].as_str().unwrap(),
+        "--revision",
+        description["revision"].as_str().unwrap(),
+        "--input-json",
+        r#"{"id":"fixture-deep-63"}"#,
+    ]);
+    assert!(
+        deep.status.success(),
+        "a 64-level result the child admits is refused: {}",
+        String::from_utf8_lossy(&deep.stderr)
+    );
+    let answer: Value = serde_json::from_slice(&deep.stdout).unwrap();
+    assert_eq!(adversary_u23_depth(&answer["result"]["result"]), 64);
 }

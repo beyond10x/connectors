@@ -186,6 +186,56 @@ fn a_declaration_the_bundle_cannot_carry_is_refused_before_any_request() {
             with(&cursor, "/items/position/value/stale", json!([500])),
             "stale statuses",
         ),
+        (
+            "listing continued both ways",
+            adding(&base, "/containers/cursor", "last", json!("/id")),
+            "exactly one of `next` and `last`",
+        ),
+        (
+            "listing continued neither way",
+            removing(&base, "/containers/cursor", "next"),
+            "exactly one of `next` and `last`",
+        ),
+        (
+            "last record key not a pointer",
+            adding(
+                &removing(&base, "/containers/cursor", "next"),
+                "/containers/cursor",
+                "last",
+                json!("id"),
+            ),
+            "`containers.cursor.last` is not a JSON pointer",
+        ),
+        (
+            "kind read and fixed",
+            adding(&base, "/containers", "kind_word", json!("room")),
+            "exactly one of `kind` and `kind_word`",
+        ),
+        (
+            "kind neither read nor fixed",
+            removing(&base, "/containers", "kind"),
+            "exactly one of `kind` and `kind_word`",
+        ),
+        ("empty kind word", fixed_word(&base, json!("")), "kind_word"),
+        (
+            "kind word with a space",
+            fixed_word(&base, json!("merge request")),
+            "kind_word",
+        ),
+        (
+            "kind word longer than 128 bytes",
+            fixed_word(&base, json!("k".repeat(129))),
+            "kind_word",
+        ),
+        (
+            "kind word under a provider-word claim",
+            with(
+                &fixed_word(&base, json!("room")),
+                "/capabilities/kind",
+                json!("provider-word"),
+            ),
+            "`kind: provider-word`",
+        ),
     ];
     for (case, feed, reason) in cases {
         match build(&feed, &[]) {
@@ -211,6 +261,340 @@ fn with(feed: &Value, pointer: &str, value: Value) -> Value {
     let mut changed = feed.clone();
     *changed.pointer_mut(pointer).expect(pointer) = value;
     changed
+}
+
+fn adding(feed: &Value, object: &str, field: &str, value: Value) -> Value {
+    let mut changed = feed.clone();
+    changed
+        .pointer_mut(object)
+        .and_then(Value::as_object_mut)
+        .expect(object)
+        .insert(field.into(), value);
+    changed
+}
+
+fn removing(feed: &Value, object: &str, field: &str) -> Value {
+    let mut changed = feed.clone();
+    changed
+        .pointer_mut(object)
+        .and_then(Value::as_object_mut)
+        .expect(object)
+        .remove(field)
+        .expect(field);
+    changed
+}
+
+/// `feed` with its container kind fixed to `word` and the claim that goes with it.
+fn fixed_word(feed: &Value, word: Value) -> Value {
+    let fixed = adding(
+        &removing(feed, "/containers", "kind"),
+        "/containers",
+        "kind_word",
+        word,
+    );
+    with(&fixed, "/capabilities/kind", json!("fixed-word"))
+}
+
+/// The rooms listing as a provider that lists after a key it is given answers it.
+struct Rooms {
+    pages: std::sync::Mutex<Vec<Value>>,
+    queries: std::sync::Mutex<Vec<Vec<(String, String)>>>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Rooms {
+    async fn get(
+        &self,
+        path: &[&str],
+        query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        assert_eq!(path, ["rooms"]);
+        let mut query: Vec<(String, String)> = query
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect();
+        query.sort();
+        self.queries.lock().unwrap().push(query);
+        let page = self.pages.lock().unwrap().remove(0);
+        Ok(connectors_sdk::HttpResponse {
+            status: 200,
+            headers: Default::default(),
+            body: serde_json::to_vec(&page).unwrap(),
+        })
+    }
+}
+
+/// A room the lookup answers, then the item listing answered by `listing`.
+struct Refusing {
+    listing: fn() -> connectors_core::Result<connectors_sdk::HttpResponse>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Refusing {
+    async fn get(
+        &self,
+        path: &[&str],
+        _query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        match path {
+            ["rooms", "room"] => Ok(connectors_sdk::HttpResponse {
+                status: 200,
+                headers: Default::default(),
+                body: serde_json::to_vec(&json!({"room": {"id": "room", "access": "invite"}}))
+                    .unwrap(),
+            }),
+            ["rooms", "room", _] => (self.listing)(),
+            other => panic!("unexpected read {other:?}"),
+        }
+    }
+}
+
+/// Once the lookup answered the container, the provider's own 403 on its item listing is a
+/// container the connection cannot read: `not_found`, with the message an unknown container gets.
+/// A quota refusal is not that, and neither is a refusal the host raised before any answer.
+#[tokio::test]
+async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
+    for name in ["time.operations.json", "cursor.operations.json"] {
+        let engine = build(&declaration(name), &[]).unwrap();
+        let read = |listing| {
+            let engine = &engine;
+            async move {
+                engine
+                    .read(
+                        &Refusing { listing },
+                        "feed-instance",
+                        ITEMS,
+                        json!({"container": "room", "limit": 10}),
+                    )
+                    .await
+                    .unwrap_err()
+            }
+        };
+        let forbidden = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 403,
+                headers: Default::default(),
+                body: br#"{"message":"403 Forbidden"}"#.to_vec(),
+            })
+        })
+        .await;
+        assert_eq!(
+            forbidden.code,
+            connectors_core::ErrorCode::NotFound,
+            "{name}"
+        );
+        assert_eq!(forbidden.message, "container not found", "{name}");
+        let busy = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 429,
+                headers: Default::default(),
+                body: b"{}".to_vec(),
+            })
+        })
+        .await;
+        assert_eq!(busy.code, connectors_core::ErrorCode::RateLimited, "{name}");
+        let host = read(|| {
+            Err(connectors_core::Error::new(
+                connectors_core::ErrorCode::Forbidden,
+                "the host refused the read",
+            ))
+        })
+        .await;
+        assert_eq!(host.code, connectors_core::ErrorCode::Forbidden, "{name}");
+    }
+}
+
+/// A room the lookup answers, or does not, and an item listing answered with `status`; every
+/// item request's query is kept.
+struct Admitting {
+    known: bool,
+    status: u16,
+    listed: Value,
+    queries: std::sync::Mutex<Vec<Vec<String>>>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Admitting {
+    async fn get(
+        &self,
+        path: &[&str],
+        query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        let (status, body) = match path {
+            ["rooms", "room"] if self.known => {
+                (200, json!({"room": {"id": "room", "access": "invite"}}))
+            }
+            ["rooms", "room"] => (404, json!({"error": "no such room"})),
+            ["rooms", "room", _] => {
+                let mut names: Vec<String> = query.iter().map(|(k, _)| k.to_string()).collect();
+                names.sort();
+                self.queries.lock().unwrap().push(names);
+                (self.status, self.listed.clone())
+            }
+            other => panic!("unexpected read {other:?}"),
+        };
+        Ok(connectors_sdk::HttpResponse {
+            status,
+            headers: Default::default(),
+            body: serde_json::to_vec(&body).unwrap(),
+        })
+    }
+}
+
+/// Admission of the container precedes whether a watermark is valid: with a watermark this read
+/// cannot resume (another container's, another profile's, or none at all), an unknown room and
+/// one whose items the provider refuses both answer `not_found` with one message, and only a
+/// room whose listing answers is `stale_cursor`. The listing that decides it is a first read: it
+/// carries no resume parameter, and none of its records is returned.
+#[tokio::test]
+async fn a_watermark_is_judged_only_after_the_container_is_admitted() {
+    for (name, listed) in [
+        ("time.operations.json", json!({"messages": []})),
+        (
+            "cursor.operations.json",
+            json!({"changes": [], "cursor": "7", "has_more": false}),
+        ),
+    ] {
+        let engine = build(&declaration(name), &[]).unwrap();
+        let read = |known: bool, status: u16, watermark: Option<&str>| {
+            let http = Admitting {
+                known,
+                status,
+                listed: listed.clone(),
+                queries: Default::default(),
+            };
+            let engine = &engine;
+            let mut input = json!({"container": "room", "limit": 10});
+            if let Some(watermark) = watermark {
+                input["watermark"] = json!(watermark);
+            }
+            async move {
+                let answer = engine.read(&http, "feed-instance", ITEMS, input).await;
+                (answer, http.queries.into_inner().unwrap())
+            }
+        };
+        let (issued, _) = read(true, 200, None).await;
+        let issued = issued.unwrap()["next_watermark"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let other = build(
+            &with(&declaration(name), "/profile", json!("another-profile/1")),
+            &[],
+        )
+        .unwrap()
+        .read(
+            &Admitting {
+                known: true,
+                status: 200,
+                listed: listed.clone(),
+                queries: Default::default(),
+            },
+            "feed-instance",
+            ITEMS,
+            json!({"container": "room", "limit": 10}),
+        )
+        .await
+        .unwrap()["next_watermark"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        for watermark in [other.as_str(), "not-a-watermark", ""] {
+            let (unknown, queries) = read(false, 200, Some(watermark)).await;
+            let unknown = unknown.unwrap_err();
+            assert_eq!(unknown.code, connectors_core::ErrorCode::NotFound, "{name}");
+            assert!(
+                queries.is_empty(),
+                "{name}: an unknown room's items were read"
+            );
+            let (refused, _) = read(true, 403, Some(watermark)).await;
+            let refused = refused.unwrap_err();
+            assert_eq!(
+                (refused.code, &refused.message),
+                (unknown.code, &unknown.message),
+                "{name}: {watermark:?}"
+            );
+            let (stale, queries) = read(true, 200, Some(watermark)).await;
+            assert_eq!(
+                stale.unwrap_err().code,
+                connectors_core::ErrorCode::StaleCursor,
+                "{name}: {watermark:?}"
+            );
+            assert_eq!(queries.len(), 1, "{name}");
+            assert!(
+                !queries[0]
+                    .iter()
+                    .any(|q| q == "updated_since" || q == "cursor"),
+                "{name}: the deciding listing resumed from {watermark:?}: {queries:?}"
+            );
+        }
+        // The watermark this read issued still resumes.
+        let (resumed, _) = read(true, 200, Some(&issued)).await;
+        assert!(resumed.is_ok(), "{name}: {resumed:?}");
+    }
+}
+
+/// A listing declared with `cursor.last` continues after the key of a full page's last record,
+/// a direct one included; a shorter page is the end; a full page whose last record has no key is
+/// `unavailable`, never complete. A fixed `kind_word` is every listed container's `kind`.
+#[tokio::test]
+async fn a_last_key_listing_continues_after_a_full_page_and_a_fixed_word_is_every_kind() {
+    let base = declaration("time.operations.json");
+    let keyed = adding(
+        &removing(&base, "/containers/cursor", "next"),
+        "/containers/cursor",
+        "last",
+        json!("/id"),
+    );
+    let feed = fixed_word(&keyed, json!("room"));
+    let engine = build(&feed, &[]).unwrap_or_else(|error| panic!("{}", error.message));
+    let room = |id: &str, access: &str| json!({"id": id, "title": id, "type": "channel", "access": access});
+    let rooms = Rooms {
+        pages: std::sync::Mutex::new(vec![
+            json!({"rooms": [room("a", "open"), room("b", "im")]}),
+            json!({"rooms": [room("c", "invite")]}),
+            json!({"rooms": [room("d", "open"), {"title": "keyless", "access": "open"}]}),
+        ]),
+        queries: Default::default(),
+    };
+    let first = engine
+        .read(&rooms, "feed-instance", CONTAINERS, json!({"limit": 2}))
+        .await
+        .unwrap();
+    assert_eq!(
+        first["containers"],
+        json!([{"id": "a", "name": "a", "kind": "room", "visibility": "public"}])
+    );
+    assert_eq!(first["complete"], json!(false));
+    let second = engine
+        .read(
+            &rooms,
+            "feed-instance",
+            CONTAINERS,
+            json!({"limit": 2, "cursor": first["next_cursor"]}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        second["containers"],
+        json!([{"id": "c", "name": "c", "kind": "room", "visibility": "private"}])
+    );
+    assert_eq!(second["complete"], json!(true));
+    assert_eq!(second["next_cursor"], Value::Null);
+    let keyless = engine
+        .read(&rooms, "feed-instance", CONTAINERS, json!({"limit": 2}))
+        .await
+        .unwrap_err();
+    assert_eq!(keyless.code, connectors_core::ErrorCode::Unavailable);
+    let pair = |k: &str, v: &str| (k.to_owned(), v.to_owned());
+    assert_eq!(
+        *rooms.queries.lock().unwrap(),
+        [
+            vec![pair("limit", "2")],
+            vec![pair("cursor", "b"), pair("limit", "2")],
+            vec![pair("limit", "2")],
+        ]
+    );
 }
 
 /// The local service reads the declaration from its `operations_file` and declares both

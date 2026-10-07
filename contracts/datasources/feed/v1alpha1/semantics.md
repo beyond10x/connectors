@@ -1,6 +1,6 @@
 # datasource.feed/v1alpha1
 
-**Status:** proposed; no binding is implemented.
+**Status:** proposed. One binding is implemented: GitLab, profile `gitlab-merge-requests/1` (`adapters/catalog/contracts/feed/v1alpha1/gitlab.md`), checked against recorded provider shapes.
 
 ## Shared contract and adapter ownership
 
@@ -24,6 +24,19 @@ deletions, and every bound it enforces. Profile identifiers are open. A binding'
 - whether it lists direct conversations, and how it excludes them when it does not;
 - how it derives `revision` where the provider gives none;
 - its ceilings (below).
+
+A profile also declares four capabilities, each from a closed vocabulary whose first value is what
+the strongest provider gives:
+
+| capability | values | the profile states |
+|---|---|---|
+| `deletions` | `observed`, `not-observed` | whether a removed item is reported as a tombstone ([Deletions](#deletions)) |
+| `kind` | `provider-word`, `fixed-word` | whether a container's `kind` is the provider's word for it, or one word the profile fixes for every container it lists and states as `kind_word` |
+| `revision` | `opaque`, `update-time` | whether a revision is a provider version, or the item's update time ([Revisions](#revisions)) |
+| `visibility` | `mapped`, `all-private` | whether visibility is mapped from the provider, or every listed container is `private` |
+
+The shared model types them as `connectors.feed.ProfileCapabilities`. The descriptor names the
+profile, and the profile states its capabilities; the descriptor's operation does not carry them.
 
 Every operation is a read: it changes nothing at the provider that a caller can observe, and it
 never marks an item read, seen or acknowledged. A read is not free. Providers meter and rate-limit
@@ -61,7 +74,7 @@ dropped, narrowed or approximated.
 |---|---|
 | `id` | stable for the life of the container on this connection and unique only within it; the value `feed.items` takes as `container` |
 | `name` | the provider's display name, or null where it gives none |
-| `kind` | the provider's word for the container (channel, project, space, …); open vocabulary, never translated |
+| `kind` | the provider's word for the container (channel, project, space, …); open vocabulary, never translated. Under `kind: fixed-word`, the one word the profile states for every container it lists |
 | `visibility` | `public`, `private` or `direct`, as the binding states it |
 
 Visibility is a closed vocabulary of three:
@@ -74,7 +87,8 @@ Visibility is a closed vocabulary of three:
 
 A binding maps each provider kind to one of the three and states the mapping in its profile. A
 container it cannot classify is `private`, never `public`. A container with the character of a
-direct conversation is `direct` whatever else the provider calls it.
+direct conversation is `direct` whatever else the provider calls it. A profile that lists no
+container `public` declares `visibility: all-private`.
 
 **Direct conversations are excluded by default.** `feed.containers` never lists a `direct` container
 unless the binding's profile declares that it does, and a profile states the provider field or rule
@@ -119,7 +133,9 @@ of those gives a new revision that the item has not carried before. A revision m
 no visible difference; a consumer then processes a change that changed nothing. Where the provider
 gives a version or an edit time that changes with the content, the binding uses it; where it gives
 none, the binding derives the revision from the mapped fields (for example, a digest of them) and
-states that in its profile.
+states that in its profile. A profile whose revision is the item's update time declares
+`revision: update-time`: a change at an instant the item already carried under another revision
+gives no new revision, so a consumer cannot tell the two apart.
 
 ### Deletions
 
@@ -131,8 +147,8 @@ binding observed it. A tombstone is reported to a read whose watermark precedes 
 read need not report items removed before it. A deletion is final: an item is not reported again
 after its tombstone unless the provider reports it present again, and then under a new revision.
 
-A binding whose profile does not observe deletions never reports `deleted: true` and says so; a
-consumer that needs removals reconciles another way, outside this family.
+A binding whose profile does not observe deletions declares `deletions: not-observed` and never
+reports `deleted: true`; a consumer that needs removals reconciles another way, outside this family.
 
 ## Watermarks and delivery
 
@@ -214,3 +230,23 @@ revision)`. A binding that loses a change on resume then fails the scenarios tha
 repository's fixture binding (`crates/connectors-build/src/feed_conformance.rs`) runs the suite this
 way under `cargo test -p connectors-build`. Native parameters, the profile's ceilings and its
 fixtures belong to the adapter's own model and tests.
+
+The suite holds a binding to what its profile declares, not to the strongest provider. Before the
+suite is admitted, the harness reads what each scenario seeds and expects of the binding's own
+reads, leaves out a scenario no binding declaring a capability can be held to, and holds each
+expectation a capability speaks about in the scenarios it keeps to what the profile states:
+
+| declared | leaves out every scenario that | in every scenario kept |
+|---|---|---|
+| `deletions: not-observed` | — | an expected tombstone becomes an expectation that the item is never held deleted; an expectation that a removed item is no longer held present, which needs the removal observed, is masked |
+| `kind: fixed-word` | — | a listed container's `kind` is held to the stated `kind_word` |
+| `revision: update-time` | reads an item after the source gave it two revisions at one instant | a read item's revision word, expected or excluded, is held to the instant the item took that revision |
+| `visibility: all-private` | — | a container stored `public` is held to being listed `private` |
+
+A `kind: fixed-word` claim that states no `kind_word` is held to the provider's word.
+
+A scenario cannot be reported as skipped (the conformance count of a Rust producer refuses a
+non-zero `skipped`), so a left-out scenario is absent from the run. The harness names each one,
+and each expectation it changed, with the capability that did it, beside the number of scenarios
+run and the number the family defines. A binding that declares a capability it does not honour
+fails the scenarios that hold it to that capability.

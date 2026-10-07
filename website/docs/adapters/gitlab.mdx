@@ -31,12 +31,25 @@ operation of the pinned source under a local id with a declared effect:
 | `merge_request.create` | write | one POST, guarded on the pinned source head |
 | `merge_request.update` | write | one PUT, guarded on the pinned source head |
 | `merge_request.merge` | write | one PUT, guarded on five checks |
+| `feed.containers`, `feed.items` | read | the merge request feed (`datasource.feed/v1alpha1`, profile `gitlab-merge-requests/1`): member projects, then one project's merge requests changed since a watermark |
 
 Input is one property per declared path or query parameter, named as GitLab
 names it, plus a `body` object where the operation takes one. Output is the
 provider's status, its body unchanged, and provenance naming the instance, the
 resource path and the pinned source's SHA-256. A paged read returns one page as
 GitLab answers it.
+
+## The merge request feed
+
+`feed.containers` lists the projects the token's user is a member of, oldest
+project id first, continued after the last id of a full page. `feed.items` reads
+one project's merge requests in every state, oldest change first, and resumes
+from the watermark the previous page returned. The revision is the merge
+request's `updated_at`. Every project is listed `private`, because a public
+project may keep its merge requests to its members; `url` is null, because a
+project rename changes the merge request's link without changing its revision;
+deleted merge requests are not observed. The binding is checked against recorded
+GitLab answers.
 
 ## Writes and the guard
 
