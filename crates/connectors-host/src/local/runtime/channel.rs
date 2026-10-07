@@ -191,7 +191,15 @@ pub(crate) fn write(
     write_all(stream, protected, until)?;
     write_all(stream, document, until)
 }
+/// The deepest array and object nesting a document may carry across a channel.
+pub(crate) const DEPTH: usize = 64;
+
 pub(crate) fn depth(bytes: &[u8]) -> Result<()> {
+    depth_within(bytes, DEPTH)
+}
+
+/// [`depth`] with another bound, for a document that wraps one already held to [`DEPTH`].
+pub(crate) fn depth_within(bytes: &[u8], limit: usize) -> Result<()> {
     let (mut quoted, mut escaped, mut depth) = (false, false, 0usize);
     for &b in bytes {
         if quoted {
@@ -207,7 +215,7 @@ pub(crate) fn depth(bytes: &[u8]) -> Result<()> {
                 b'"' => quoted = true,
                 b'{' | b'[' => {
                     depth += 1;
-                    if depth > 64 {
+                    if depth > limit {
                         return Err(Failure::Protocol);
                     }
                 }

@@ -785,11 +785,20 @@ impl Feed {
             Some(token) => self.open(token, instance, Some(container))?,
         };
         let page = match &self.declaration.items.position {
-            Position::Time(time) => self.by_time(http, container, limit, mark, time).await?,
-            Position::Cursor(cursor) => {
-                self.by_cursor(http, container, limit, mark, cursor).await?
+            Position::Time(time) => self.by_time(http, container, limit, mark, time).await,
+            Position::Cursor(cursor) => self.by_cursor(http, container, limit, mark, cursor).await,
+        }
+        // The lookup answered, so the connection sees the container; the provider's own refusal
+        // of its items that is not a quota refusal (classified `rate_limited`) is a container the
+        // connection cannot read, which the family answers exactly as an unknown one. A refusal
+        // the host raised, not the provider, keeps its code.
+        .map_err(|error| {
+            if error.code == ErrorCode::Forbidden && error.upstream_answer {
+                not_found()
+            } else {
+                error
             }
-        };
+        })?;
         let (items, next, complete) = page;
         Self::bounded(json!({
             "items": items,

@@ -414,7 +414,7 @@ impl Client {
             document,
             until(deadline_ms)?,
         )?;
-        self.value(until(deadline_ms)?)
+        self.read_answer(until(deadline_ms)?)
     }
     pub fn revalidate(
         mut self,
@@ -543,10 +543,35 @@ impl Client {
     /// closed, or the frame was not a well-formed answer. The inner result is
     /// the owner's own answer, a success or its definite `Failed` reply.
     fn answer(&mut self, deadline: Instant) -> std::result::Result<Result<Value>, Error> {
+        self.answer_within(deadline, channel::DEPTH)
+    }
+    /// A read's answer: the provider result, which the adapter child held to
+    /// [`channel::DEPTH`], one level under the answer's own scalar members. The
+    /// answer is held to one level more and every member but `result` to a
+    /// scalar, so each result the child admits arrives and nothing else may nest
+    /// deeper than in any other answer.
+    fn read_answer(&mut self, deadline: Instant) -> Result<Value> {
+        let answer = self
+            .answer_within(deadline, channel::DEPTH + 1)
+            .unwrap_or_else(Err)?;
+        let members = answer.as_object().ok_or(Code::Unavailable)?;
+        if members
+            .iter()
+            .any(|(name, value)| name != "result" && (value.is_array() || value.is_object()))
+        {
+            return Err(Code::Unavailable.into());
+        }
+        Ok(answer)
+    }
+    fn answer_within(
+        &mut self,
+        deadline: Instant,
+        depth: usize,
+    ) -> std::result::Result<Result<Value>, Error> {
         let frame = read_reply(&mut self.stream, deadline, runtime::RESULT_LIMIT)?;
         match frame.control {
             Reply::Success => {
-                channel::depth(&frame.document)?;
+                channel::depth_within(&frame.document, depth)?;
                 connectors_core::read_json(&frame.document)
                     .map(Ok)
                     .map_err(|_| Code::Unavailable.into())
@@ -1603,6 +1628,56 @@ fn launch(
     registry.release_read(dispatched, connectors_sdk::now_ms())?;
     delivered?;
     Ok(json!({}))
+}
+
+#[cfg(test)]
+mod read_answer_depth_tests {
+    use super::*;
+
+    /// `levels` arrays nested in one another.
+    fn nested(levels: usize) -> Value {
+        serde_json::from_str(&format!("{}{}", "[".repeat(levels), "]".repeat(levels))).unwrap()
+    }
+
+    /// What a client reading `answer` as a read's answer, and as any other owner answer, accepts.
+    fn received(answer: &Value) -> (Result<Value>, Result<Value>) {
+        let reply = |answer: &Value| {
+            let (client, mut owner) = UnixStream::pair().unwrap();
+            let until = Instant::now() + Duration::from_secs(5);
+            let document = serde_json::to_vec(answer).unwrap();
+            channel::write(&mut owner, &Reply::Success, None, &document, until).unwrap();
+            Client {
+                stream: client,
+                host_incarnation: "fixture-host".into(),
+                owner_build: None,
+            }
+        };
+        let until = Instant::now() + Duration::from_secs(5);
+        (reply(answer).read_answer(until), reply(answer).value(until))
+    }
+
+    /// story:owner-read-answers-json-value: the adapter child admits a read result 64 levels
+    /// deep (`runtime/process.rs`, `channel::depth`), and the owner nests it one level under its
+    /// answer. A read's answer is held to one level more and every member but `result` to a
+    /// scalar, so that result arrives; every other answer keeps the 64-level bound.
+    #[test]
+    fn a_read_answer_carries_every_result_depth_the_child_admits_and_no_more() {
+        let answer = |result: Value| json!({"adapter":"forge","operation":"item.read","revision":"desc-1","result":result});
+        let (read, other) = received(&answer(nested(64)));
+        assert_eq!(read.unwrap()["result"], nested(64));
+        assert!(other.is_err(), "the bound on other answers moved");
+        let (read, _) = received(&answer(nested(65)));
+        assert!(
+            read.is_err(),
+            "a result deeper than the child admits arrived"
+        );
+        let mut deeper = answer(nested(2));
+        deeper["adapter"] = nested(64);
+        let (read, _) = received(&deeper);
+        assert_eq!(read.unwrap_err().code, Code::Unavailable);
+        let (read, _) = received(&nested(65));
+        assert!(read.is_err(), "an answer that is not an object arrived");
+    }
 }
 
 #[cfg(test)]

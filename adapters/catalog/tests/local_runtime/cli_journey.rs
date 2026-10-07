@@ -1208,3 +1208,109 @@ fn oauth_repair_journey() {
     );
     journey.assert_no_material_at_rest();
 }
+
+/// Adversary, wave 20261007a U3: the deepest array or object nesting of `value`.
+fn adversary_u23_depth(value: &Value) -> usize {
+    match value {
+        Value::Array(values) => 1 + values.iter().map(adversary_u23_depth).max().unwrap_or(0),
+        Value::Object(map) => 1 + map.values().map(adversary_u23_depth).max().unwrap_or(0),
+        _ => 0,
+    }
+}
+
+/// Adversary, wave 20261007a U3 (story:owner-read-answers-json-value): the bound a read result
+/// is held to where the host reads it from the adapter child (`runtime/process.rs`,
+/// `channel::depth`): 64 levels pass, 65 are refused. The generic read's result is the body plus
+/// one level.
+#[test]
+fn adversary_u23_the_child_admits_a_read_result_64_levels_deep_and_refuses_65() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    child
+        .validate("gitlab.pat", &token(true), deadline())
+        .unwrap();
+    let admitted = invoke(
+        &mut child,
+        "project.get",
+        "one",
+        &token(true),
+        json!({"id": "fixture-deep-63"}),
+    )
+    .unwrap_or_else(|failure| panic!("a 64-level result is refused: {failure:?}"));
+    assert_eq!(adversary_u23_depth(&admitted), 64);
+    assert!(
+        invoke(
+            &mut child,
+            "project.get",
+            "one",
+            &token(true),
+            json!({"id": "fixture-deep-64"}),
+        )
+        .is_err(),
+        "a 65-level result is admitted"
+    );
+}
+
+/// F2 story:owner-read-answers-json-value: a read result the adapter child admitted (64 levels,
+/// the child's bound; see the case above) is answered through the owner. Before this unit the
+/// owner carried it as one string, one level deep; now it nests the value in its answer
+/// (`supervisor.rs` `read_answer`), and the CLI holds the whole owner answer to the same 64-level
+/// bound (`owner/transport.rs` `answer`, `channel::depth`), so the read the child admitted never
+/// reaches stdout. 63 levels, the control, pass.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn adversary_u23_a_read_result_the_child_admitted_reaches_the_cli_through_the_owner() {
+    let provider = Provider::new();
+    let custody = Custody::new(provider.root.path());
+    let cli = Cli::new(provider.root.path());
+    configure(&cli, &provider, &custody);
+    let credential = provider.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let reference = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "gitlab",
+        "--profile",
+        "gitlab.pat",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    fs::remove_file(&credential).unwrap();
+    let control = cli.operation_result(&reference, "project.get", json!({"id": "fixture-deep-62"}));
+    assert_eq!(adversary_u23_depth(&control["result"]), 63, "{control}");
+    let description = success(cli.run(&[
+        "operations",
+        "describe",
+        "--adapter",
+        "gitlab",
+        "--operation",
+        "project.get",
+    ]));
+    let deep = cli.run(&[
+        "operations",
+        "invoke",
+        "--adapter",
+        "gitlab",
+        "--connection",
+        &reference,
+        "--operation",
+        "project.get",
+        "--schema",
+        description["schema"].as_str().unwrap(),
+        "--revision",
+        description["revision"].as_str().unwrap(),
+        "--input-json",
+        r#"{"id":"fixture-deep-63"}"#,
+    ]);
+    assert!(
+        deep.status.success(),
+        "a 64-level result the child admits is refused: {}",
+        String::from_utf8_lossy(&deep.stderr)
+    );
+    let answer: Value = serde_json::from_slice(&deep.stdout).unwrap();
+    assert_eq!(adversary_u23_depth(&answer["result"]["result"]), 64);
+}

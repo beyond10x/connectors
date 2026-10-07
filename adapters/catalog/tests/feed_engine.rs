@@ -324,6 +324,86 @@ impl connectors_sdk::AuthenticatedHttp for Rooms {
     }
 }
 
+/// A room the lookup answers, then the item listing answered by `listing`.
+struct Refusing {
+    listing: fn() -> connectors_core::Result<connectors_sdk::HttpResponse>,
+}
+
+#[async_trait::async_trait]
+impl connectors_sdk::AuthenticatedHttp for Refusing {
+    async fn get(
+        &self,
+        path: &[&str],
+        _query: &[(&str, String)],
+    ) -> connectors_core::Result<connectors_sdk::HttpResponse> {
+        match path {
+            ["rooms", "room"] => Ok(connectors_sdk::HttpResponse {
+                status: 200,
+                headers: Default::default(),
+                body: serde_json::to_vec(&json!({"room": {"id": "room", "access": "invite"}}))
+                    .unwrap(),
+            }),
+            ["rooms", "room", _] => (self.listing)(),
+            other => panic!("unexpected read {other:?}"),
+        }
+    }
+}
+
+/// Once the lookup answered the container, the provider's own 403 on its item listing is a
+/// container the connection cannot read: `not_found`, with the message an unknown container gets.
+/// A quota refusal is not that, and neither is a refusal the host raised before any answer.
+#[tokio::test]
+async fn a_provider_refusal_of_a_visible_containers_items_is_not_found() {
+    for name in ["time.operations.json", "cursor.operations.json"] {
+        let engine = build(&declaration(name), &[]).unwrap();
+        let read = |listing| {
+            let engine = &engine;
+            async move {
+                engine
+                    .read(
+                        &Refusing { listing },
+                        "feed-instance",
+                        ITEMS,
+                        json!({"container": "room", "limit": 10}),
+                    )
+                    .await
+                    .unwrap_err()
+            }
+        };
+        let forbidden = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 403,
+                headers: Default::default(),
+                body: br#"{"message":"403 Forbidden"}"#.to_vec(),
+            })
+        })
+        .await;
+        assert_eq!(
+            forbidden.code,
+            connectors_core::ErrorCode::NotFound,
+            "{name}"
+        );
+        assert_eq!(forbidden.message, "container not found", "{name}");
+        let busy = read(|| {
+            Ok(connectors_sdk::HttpResponse {
+                status: 429,
+                headers: Default::default(),
+                body: b"{}".to_vec(),
+            })
+        })
+        .await;
+        assert_eq!(busy.code, connectors_core::ErrorCode::RateLimited, "{name}");
+        let host = read(|| {
+            Err(connectors_core::Error::new(
+                connectors_core::ErrorCode::Forbidden,
+                "the host refused the read",
+            ))
+        })
+        .await;
+        assert_eq!(host.code, connectors_core::ErrorCode::Forbidden, "{name}");
+    }
+}
+
 /// A listing declared with `cursor.last` continues after the key of a full page's last record,
 /// a direct one included; a shorter page is the end; a full page whose last record has no key is
 /// `unavailable`, never complete. A fixed `kind_word` is every listed container's `kind`.

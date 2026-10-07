@@ -350,6 +350,15 @@ impl Provider {
                         (403, json!({"message":"403 Forbidden"}))
                     } else if route.contains("/projects/fixture-missing/") {
                         (404, json!({"message":"404 Project Not Found"}))
+                    } else if let Some(levels) = route
+                        .strip_prefix("/api/v4/projects/fixture-deep-")
+                        .and_then(|levels| levels.parse::<usize>().ok())
+                    {
+                        // Adversary, wave 20261007a U3: a body that is `levels`
+                        // arrays nested in one another, so the generic read's
+                        // result (`{"status","body","provenance"}`) is one deeper.
+                        let nested = format!("{}{}", "[".repeat(levels), "]".repeat(levels));
+                        (200, serde_json::from_str::<Value>(&nested).unwrap())
                     } else if let Some(page) = feed_page(route, &path) {
                         (200, page)
                     } else if let Some(page) = repository_page(route, &path) {

@@ -115,8 +115,12 @@ or more merge requests changed within one millisecond answer `unavailable`.
 
 As the engine maps them: GitLab 400, 409, 412 and 422 are `invalid_input`; 404 and 410
 `not_found`; 401, 403, 429 and 5xx as the generic read table; any other status or a body that is
-not JSON `unavailable`. Whatever GitLab answers for a project whose merge requests feature is
-disabled or closed to the token is classified the same way.
+not JSON `unavailable`. One exception: when GitLab shows the project (`GET /projects/:id`
+answers) but refuses its merge requests with 403, as it does for a project whose merge requests
+feature is disabled or kept to members, `feed.items` answers `not_found`, exactly as for a
+project the token cannot see; the family answers a container the connection cannot read so. A
+403 on the project itself, or on the project listing, stays `forbidden`: it does not tell a
+credential that can read nothing from one project it cannot read.
 
 ## Merge requests only, not issues
 
