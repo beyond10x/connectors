@@ -69,18 +69,22 @@ fn admitted(
 /// `pending` and no status change is pending for it, so it names the step that
 /// clears it, never the plain `Conflict` a retry would repeat. A revalidation
 /// follows a configuration upgrade only when it can: the authentication is
-/// unchanged, revalidation admits the credential (`usable`: material that is
-/// neither known invalid nor expired, as `admitted` requires), and the new
-/// provider has not already refused it under the configured revision. Anything
-/// else needs a new connection: repair refuses a changed binding.
-pub(super) fn changed(row: &ConnectionRow, configured: &Binding, usable: bool) -> Failure {
-    if usable
-        && upgradable(&row.binding, configured)
-        && row.refused.as_deref() != Some(configured.configuration_revision.as_str())
+/// unchanged, the new provider has not already refused it under the configured
+/// revision, and revalidation admits the credential (`usable`, asked last:
+/// material that is neither known invalid nor expired, as `admitted` requires).
+/// Anything else needs a new connection: repair refuses a changed binding.
+pub(super) fn changed(
+    row: &ConnectionRow,
+    configured: &Binding,
+    usable: impl FnOnce() -> Result<bool>,
+) -> Result<Failure> {
+    if upgradable(&row.binding, configured)
+        && row.kept.refused.as_deref() != Some(configured.configuration_revision.as_str())
+        && usable()?
     {
-        Failure::UpgradeRequired
+        Ok(Failure::UpgradeRequired)
     } else {
-        Failure::BindingChanged
+        Ok(Failure::BindingChanged)
     }
 }
 
@@ -139,8 +143,8 @@ pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &s
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(db)?;
     for (reference, binding) in revoked {
-        let (mut binding, refused) = decode_binding(&binding)?;
-        if binding.configuration_revision != revision || refused.is_some() {
+        let (mut binding, kept) = decode_stored(&binding)?;
+        if binding.configuration_revision != revision || kept != Kept::default() {
             binding.configuration_revision = revision.to_owned();
             tx.execute(
                 "UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
@@ -157,14 +161,20 @@ pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &s
 /// It invalidates nothing under the connection's own revision; a read under
 /// that configured revision then names a new connection (`changed`).
 fn refuse_upgrade(tx: &Transaction<'_>, row: &ConnectionRow, upgrade: &Binding) -> Result<()> {
-    if row.refused.as_deref() == Some(upgrade.configuration_revision.as_str()) {
+    if row.kept.refused.as_deref() == Some(upgrade.configuration_revision.as_str()) {
         return Ok(());
     }
     tx.execute(
         "UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
         params![
             row.reference,
-            encode_binding(&row.binding, Some(&upgrade.configuration_revision))?
+            encode_stored(
+                &row.binding,
+                &Kept {
+                    refused: Some(upgrade.configuration_revision.clone()),
+                    ..row.kept.clone()
+                }
+            )?
         ],
     )
     .map_err(db)?;

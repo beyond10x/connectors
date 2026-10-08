@@ -43,10 +43,11 @@ pub struct ObservedAcquisition {
 }
 
 impl Registry {
-    /// Resolve a retained approval target without sampling time, updating the
-    /// registry clock, checking custody or granting a provider call. Expired
-    /// validation evidence can identify this binding; known invalid material
-    /// cannot. Invocation must independently establish current readiness.
+    /// Resolve a retained approval target without updating the registry clock,
+    /// checking custody or granting a provider call. Expired validation
+    /// evidence can identify this binding; known invalid material cannot.
+    /// Invocation must independently establish current readiness. Time is read
+    /// only to name the refusal of a stale connection (`changed`).
     pub fn approval_target(
         &self,
         binding: &Binding,
@@ -65,19 +66,30 @@ impl Registry {
             return Err(Failure::Revoked);
         }
         if row.binding != *binding {
-            // Without sampling time: material known invalid or deleted is not
-            // one a revalidation admits. Expiry is the invocation's to observe.
-            let usable = match &row.material {
-                None => false,
-                Some(version) => tx
+            // Whether a revalidation admits this credential is the read path's
+            // readiness rule, expiry included. Only this refusal looks at
+            // time, and only when the binding could otherwise follow an
+            // upgrade: the wall clock, never below the recorded floor so a
+            // regressed clock cannot revive an expired credential. Nothing is
+            // recorded; the registry clock is not advanced.
+            let usable = || {
+                if row.material.is_none() {
+                    return Ok(false);
+                }
+                let floor: i64 = tx
                     .query_row(
-                        "SELECT deleted=0 AND invalid_reason IS NULL FROM registry_materials WHERE version_id=?1",
-                        [version],
-                        |r| r.get::<_, bool>(0),
+                        "SELECT last_seen_ms FROM registry_clock WHERE singleton=1",
+                        [],
+                        |r| r.get(0),
                     )
-                    .map_err(db)?,
+                    .map_err(db)?;
+                let now = connectors_sdk::now_ms().max(u64::try_from(floor).unwrap_or(0));
+                Ok(matches!(
+                    readiness(&tx, &row, now, true)?,
+                    State::Ready | State::Pending
+                ))
             };
-            return Err(super::revalidation::changed(&row, binding, usable));
+            return Err(super::revalidation::changed(&row, binding, usable)?);
         }
         let version = row.material.as_ref().ok_or(Failure::NotReady)?;
         let (ack, deleted, invalid, retired): (bool, bool, Option<String>, bool) = tx.query_row(

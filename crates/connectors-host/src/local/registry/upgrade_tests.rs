@@ -437,8 +437,20 @@ fn a_stale_connection_names_the_step_that_clears_it() {
         registry.capture_read(&upgraded(), &reference, &none, LATER, LATER + 1000),
         Err(Failure::UpgradeRequired)
     ));
+    // An approval reads the wall clock to see expiry: this fixture's
+    // credential (connected at NOW, expiring an hour later) has expired, so
+    // a revalidation would refuse it and only a new connection helps.
     assert_eq!(
         registry.approval_target(&upgraded(), &reference, &none),
+        Err(Failure::BindingChanged)
+    );
+    // A credential current at the wall clock still follows the upgrade.
+    let (_current_root, current) = fixture();
+    let wall = connectors_sdk::now_ms();
+    let (_, candidate) = prepared(&current, "one", wall);
+    let fresh = publish_fixture(&current, candidate, wall);
+    assert_eq!(
+        current.approval_target(&upgraded(), &fresh, &none),
         Err(Failure::UpgradeRequired)
     );
     let mut changed = upgraded();

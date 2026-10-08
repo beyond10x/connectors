@@ -771,12 +771,16 @@ and records the refusal against the configured revision
 (`Connection.refused_configuration_revision`), so the next read names
 `create_connection` too; the refusal invalidates nothing under the connection's
 own revision, revalidation stays admitted, and a later upgrade that succeeds
-removes it. `connections connect` under the configured revision is admitted
-while older connections of the instance stay saved under theirs. The instance's
+or a repair that replaces the credential removes it. An approval reads the
+wall clock for this classification only, as the read path does, without
+advancing the registry clock. `connections connect` under the configured
+revision is admitted while older connections of the instance stay saved under theirs. The instance's
 own recorded configuration revision moves to the configured one only when a
 connection is published under it: a revalidation that upgrades one, or a new
-connection whose publication succeeds. A connect that fails or is abandoned
-moves nothing. Until it moves, the instance's approval keys (`approvals
+connection whose publication succeeds while the instance still records the
+revision it had when that connect began. A connect that fails or is abandoned
+moves nothing, and a connect begun under an older configuration never moves
+the instance back. Until it moves, the instance's approval keys (`approvals
 key-status` and the other key commands) and its approval policy commands
 refuse as `code = lifecycle_conflict` with `next_action = create_connection`.
 
