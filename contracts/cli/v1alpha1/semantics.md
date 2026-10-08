@@ -358,7 +358,10 @@ checkpoints verifies the persisted checkpoint and the suffix after it, and on
 its own does not detect raw edits of the database file that bypass SQLite while
 no handle is open (Entity Runtime 0.29.0). Every fresh open the host makes, in
 a command run directly, a second process, the owner when it starts and recovery
-alike, therefore reads and verifies the whole store before it answers anything,
+alike, is that tracked open followed by a complete read of the store before it
+answers anything; Entity Runtime 0.29.0 treats a complete read as a complete
+verification, and no open uses the separate `FullVerification` policy. So it
+verifies the whole store,
 so such an edit is refused as `metadata_unavailable` by the first command or
 owner start after it. Only a handle a process already verified and keeps for
 later opens in that process reads just what was appended since; the owner keeps

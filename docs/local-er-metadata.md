@@ -250,8 +250,8 @@ returns the handle to its process pool.
 
 | Open | What the provider verifies | What the host verifies before the handle answers |
 |---|---|---|
-| Any fresh open in any process: a command, a second process, the owner when it starts, recovery after a refused handle | the checkpoint and the suffix after it, or the whole store when there is no usable checkpoint | the whole store: a complete snapshot, which reads and verifies every event, bound blob and index row |
-| A pooled handle reused in the process that verified it | — | the events appended since its head, by subject, or a complete snapshot when one cannot be attributed |; the physical page scan (`quick_check`, foreign keys) of its fresh open is not repeated |
+| Any fresh open in any process: a command, a second process, the owner when it starts, recovery after a refused handle | a `ProviderTracked` open: the checkpoint and the suffix after it, or the whole store when there is no usable checkpoint | the whole store: a complete snapshot, which reads and verifies every event, bound blob and index row; Entity Runtime 0.29.0 treats a complete read as a complete verification (its CHANGELOG, and `CapturePolicy::ProviderTracked` in `entity-eventlog` `adapter/tracked.rs`), so no open uses a separate `FullVerification` policy |
+| A pooled handle reused in the process that verified it | — | the events appended since its head, by subject, or a complete snapshot when one cannot be attributed; the physical page scan (`quick_check`, foreign keys) of its fresh open is not repeated |
 | A live `ProviderTracked` handle reading after another connection appended | the appended suffix, proven continuous by Eventlog's journal | — |
 
 So the checkpoint shortens the provider's own open, and every fresh open still
@@ -262,6 +262,9 @@ it verifies the whole store once per start; no open, the owner's included,
 answers from a checkpoint without that complete read. A command run while an
 owner of its own build runs reads through it ([owner transport](../contracts/cli/v1alpha1/owner.md))
 and does not open the store; without one it opens the store directly.
+Page damage written to the file by something other than SQLite while a process
+holds a verified handle for it is accepted by that process's later opens, which
+do not repeat the page scan, until its next fresh open, which refuses it.
 
 Owner start, measured on stores grown by read invokes (release build,
 `owner_start_of_a_grown_store`, 2026-10-08): 763–834 ms at 600 events,
