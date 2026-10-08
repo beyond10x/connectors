@@ -1,6 +1,9 @@
 # Grafana adapter design
 
-**Status:** proposed independent service `connectors.grafana`, not implemented.
+**Status:** native executable `connectors-grafana` (2026-10-09, unreleased). It serves
+`datasources.list` (records / `grafana-datasources`) through the local host under the profile
+`grafana.service_account`; see [README.md](README.md). Dashboards, datasource discovery and
+the parent route below are not implemented.
 
 Bounded dashboards/datasource metadata, [native discovery](contracts/discovery/v1alpha1/semantics.md),
 [parent routing](contracts/routes/v1alpha1/semantics.md) and
@@ -44,6 +47,11 @@ static_entry/versioned custody with protected durable entry publication.
 Both need credential/identity checks and declared datasources.list verification.
 The parent credential grants no child application authority.
 
+Implemented (2026-10-09): `grafana.service_account` only, entered through the local host's
+protected entry into keyring custody, verified by `GET /api/datasources` with the configured
+`instance` as identity subject (`spec/ess/domains/connection.yaml`).
+`grafana.service_account_configured` is not implemented.
+
 
 ```json
 { "adapter": {
@@ -58,6 +66,12 @@ One exact admitted origin and closed type/UID-digest allowlist bind visibility a
 routing. Missing/changed type or semantic target degrades children; title-only
 rename alone preserves target identity. Backend origins, UIDs, secure config,
 credentials, headers and raw dashboard/query objects stay private.
+
+Implemented exception (2026-10-09): the records read `datasources.list` returns each data
+source's `uid`, with its name, type, access mode and default flag, and nothing else. Until the
+mediated route exists, an operator reaches a child through Grafana by naming that uid in the
+child's own `base_url` (`api/datasources/proxy/uid/<uid>/`), so the record must carry it.
+Discovery observations and the route keep the uid sealed as above.
 
 ## Sources and verification
 

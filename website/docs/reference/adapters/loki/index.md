@@ -1,7 +1,7 @@
 ---
 title: Loki
 sidebar_position: 6
-description: Bounded LogQL range, metric and label reads through a saved bearer connection; on main, not yet in a release.
+description: Bounded LogQL range, metric and label reads through a saved bearer connection, directly or through Grafana.
 ---
 
 # Loki
@@ -25,6 +25,15 @@ one GET through a saved connection:
 A connection uses the bearer profile `loki.bearer`. Connect, repair and `connections revalidate`
 prove the token with `GET /loki/api/v1/labels`; Loki names no account, so the identity is the
 configured connection. The configuration is HTTPS-only, with an optional private CA file.
+
+## Through Grafana
+
+A Loki data source behind Grafana is read with the same three operations. The connection's
+`base_url` is the data source's Grafana proxy path,
+`https://<grafana>/api/datasources/proxy/uid/<uid>/`, and its `loki.bearer` token is a Grafana
+service-account token. The probe and every read go below that prefix. The uid comes from the
+[Grafana adapter's](../grafana/index.md) `datasources.list`. Recent logs are
+`logs.query_range` with a start and no end, which ends the window at the receiver clock.
 
 ## Limits
 

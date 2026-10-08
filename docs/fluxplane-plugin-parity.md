@@ -37,7 +37,7 @@ Sources:
   | jira | 1,415 | covered |
   | slack | 710 | covered |
   | sql | 663 | partial only |
-  | grafana | 394 | missing |
+  | grafana | 394 | covered |
   | loki | 334 | covered |
   | kubernetes | 81 | covered |
   | homer | 33 | missing |
@@ -51,9 +51,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 37 | 3,389 | 28 | 3,389 |
+| covered | 42 | 3,747 | 32 | 3,747 |
 | partial | 23 | 1,273 | 16 | 1,273 |
-| missing | 241 | 1,694 | 65 | 1,694 |
+| missing | 236 | 1,336 | 61 | 1,336 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -70,7 +70,7 @@ Per plugin (operations / calls):
 | jira | 21 | 13 | 1,364 | 3 / 440 | 1 / 354 | 17 / 570 |
 | slack | 30 | 16 | 704 | 4 / 360 | 0 / 0 | 26 / 344 |
 | sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
-| grafana | 20 | 7 | 425 | 0 / 0 | 0 / 0 | 20 / 425 |
+| grafana | 20 | 7 | 425 | 5 / 358 | 0 / 0 | 15 / 67 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
 | kubernetes | 24 | 14 | 72 | 6 / 31 | 6 / 10 | 12 / 31 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
@@ -91,16 +91,16 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **37 / 3,389** | **23 / 1,273** | **241 / 1,694** |
+| **total** | **301** | **109** | **6,356** | **42 / 3,747** | **23 / 1,273** | **236 / 1,336** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
 
 | verdict | plugins | count |
 |---|---|---:|
-| covered | gitlab, jira, confluence, kubernetes, loki, slack, tavily | 7 |
+| covered | gitlab, jira, confluence, grafana, kubernetes, loki, slack, tavily | 8 |
 | partial only | sql, websearch | 2 |
-| missing | grafana, homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 15 |
+| missing | homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 14 |
 | no operations declared | clock | 1 |
 
 ## Verdict rules
@@ -308,19 +308,29 @@ this is inference and was not verified:
 
 Source: fluxplane inventory §2 grafana.
 
-Connectors has no Grafana runtime. `adapters/grafana` holds only `design.md` and an ESS model.
-That design makes Grafana a mediated route: `grafana-datasource-proxy`
-(`adapters/grafana/design.md:16`) forwards a child adapter's GET for Loki, Prometheus or
-Alertmanager. So a Grafana-proxied query needs both the Grafana route and the child adapter.
+Connectors runs Grafana as the native executable `connectors-grafana` since 2026-10-09, on
+`main` and not yet released (`adapters/grafana/README.md`). A saved connection uses the profile
+`grafana.service_account`: a service-account token, proved by `GET /api/datasources`, with the
+configured instance as its identity (`adapters/grafana/spec/ess/domains/connection.yaml`).
+
+Loki through Grafana needs no Grafana route: a Loki connection whose `base_url` is the data
+source's proxy path, `https://<grafana>/api/datasources/proxy/uid/<uid>/`, with the Grafana
+token as its `loki.bearer` token, sends its probe and every read below that prefix
+(`adapters/loki/tests/local_runtime.rs`,
+`a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). The uid
+comes from `datasources.list`. The mediated route of the design, `grafana-datasource-proxy`
+(`adapters/grafana/design.md:19`), which would seal the uid and allowlist targets, is not
+built; Prometheus and Alertmanager through Grafana still need their own adapters. Each read is
+tested against fixture answers in Grafana and Loki API shapes, not a live Grafana.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `grafana.loki.query` | 320 | 12 | 2026-09-28 | — | missing | A LogQL range query through the datasource proxy. Needs the Grafana route and a Loki adapter. |
+| `grafana.loki.query` | 320 | 12 | 2026-09-28 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) on a Loki connection through the Grafana proxy | covered | Unpaged: at most 1,000 lines per call over at most 24 hours. A metric expression is `logs.query_metric` (`adapters/loki/spec/adapter.json:259`). The connection names the data source uid in its `base_url`. |
 | `grafana.prometheus.query` | 49 | 7 | 2026-10-06 | — | missing | An instant PromQL query through the proxy. Needs the Grafana route and a Prometheus adapter. |
-| `grafana.datasource.list` | 31 | 12 | 2026-10-06 | — | missing | Datasource discovery is designed but not implemented. |
+| `grafana.datasource.list` | 31 | 12 | 2026-10-06 | `datasources.list` (`adapters/grafana/spec/adapter.json:45`) | covered | uid, name, type, access mode and default flag only; backend URLs and settings are withheld. Unpaged, at most 1,000 records. |
 | `grafana.prometheus.range` | 17 | 3 | 2026-10-06 | — | missing | A range PromQL query through the proxy. |
-| `grafana.loki.labels` | 6 | 4 | 2026-09-22 | — | missing | Loki label discovery through the proxy. |
-| `grafana.loki.recent_logs` | 1 | 1 | 2026-09-15 | — | missing | Recent Loki logs through the proxy. |
+| `grafana.loki.labels` | 6 | 4 | 2026-09-22 | `logs.labels` (`adapters/loki/spec/adapter.json:429`) on a Loki connection through the Grafana proxy | covered | Label names, or one label's values. |
+| `grafana.loki.recent_logs` | 1 | 1 | 2026-09-15 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) with a start and no end, on a Loki connection through the Grafana proxy | covered | The caller computes the start (now minus N minutes); an omitted `end_unix_ns` is the receiver clock (`adapters/loki/tests/protocol.rs`, `recent_logs_through_the_grafana_proxy_end_at_the_receiver_clock_below_the_prefix`). |
 | `grafana.prometheus.rules` | 1 | 1 | 2026-09-23 | — | missing | Prometheus rules through the proxy. |
 | `grafana.alerts.active` | 0 | 0 | - | — | missing | Alertmanager through the proxy. |
 | `grafana.alerts.silences.create` | 0 | 0 | - | — | missing | An Alertmanager write through the proxy. |
@@ -334,7 +344,7 @@ Alertmanager. So a Grafana-proxied query needs both the Grafana route and the ch
 | `grafana.folder.list` | 0 | 0 | - | — | missing | No Grafana runtime. |
 | `grafana.tempo.search` | 0 | 0 | - | — | missing | No Tempo adapter. |
 | `grafana.tempo.trace.get` | 0 | 0 | - | — | missing | No Tempo adapter. |
-| `grafana.test` | 0 | 0 | - | — | missing | No Grafana connection. |
+| `grafana.test` | 0 | 0 | - | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/datasources` probe with the saved token. |
 
 ## loki
 
@@ -767,7 +777,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `job.list` (gitlab) | 1 | 1 | `gitlab.job.list` | covered | — |
 | `mr.create` (gitlab) | 1 | 1 | `gitlab.mr.create` | covered | — |
 | `project.show` (gitlab) | 1 | 1 | `gitlab.project.show` | covered | — |
-| `grafana.loki.metric` (grafana) | 1 | 1 | `grafana.loki.query` (a metric LogQL query) | missing | U05 |
+| `grafana.loki.metric` (grafana) | 1 | 1 | `grafana.loki.query` (a metric LogQL query) | covered (`logs.query_metric` through the Grafana proxy) | — |
 | `call.list` (homer) | 1 | 1 | `homer.call.list` | missing | U17 |
 | `get_issue` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
 | `issue.get` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
@@ -868,15 +878,15 @@ waits for any unit it depends on: U05 after U04, U12 after U05, U08 and U13 afte
 
 ## Not planned until used
 
-183 operations with 0 calls are partial or missing: 176 missing and 7 partial. They belong to
-no unit until a session uses them. The other 9 operations with 0 calls are already covered.
+182 operations with 0 calls are partial or missing: 175 missing and 7 partial. They belong to
+no unit until a session uses them. The other 10 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
 | gitlab | 24 | `branch.delete_merged`, `ci.variable.create`, `ci.variable.delete`, `ci.variable.update`, `index.build`, `issue.list` (partial), `issue.note.create`, `issue.note.list`, `issue.show` (partial), `issue.update`, `mr.approve`, `mr.diff.lines`, `mr.discussion.create`, `release.delete`, `release.link.create`, `release.link.delete`, `release.link.update`, `repository.archive`, `repository.changelog.add`, `repository.changelog.generate`, `repository.file.create`, `repository.file.delete`, `snippet.create`, `snippet.delete` |
 | jira | 7 | `index.build`, `issue.attachment.add`, `issue.attachment.delete`, `issue.attachment.list`, `issue.comment.delete`, `issue.comment.edit`, `issue.edit_meta` |
 | slack | 14 | `bookmark.add`, `bookmark.delete`, `bookmark.edit`, `bookmark.list`, `channel.join`, `channel.mark-read`, `download`, `index.build`, `mentions`, `presence.get`, `presence.set`, `reaction.add`, `reaction.remove`, `unreads` |
-| grafana | 13 | `alerts.active`, `alerts.silences.create`, `alerts.silences.delete`, `alerts.silences.list`, `annotation.add`, `annotation.list`, `dashboard.get`, `dashboard.list`, `datasource.health`, `folder.list`, `tempo.search`, `tempo.trace.get`, `test` |
+| grafana | 12 | `alerts.active`, `alerts.silences.create`, `alerts.silences.delete`, `alerts.silences.list`, `annotation.add`, `annotation.list`, `dashboard.get`, `dashboard.list`, `datasource.health`, `folder.list`, `tempo.search`, `tempo.trace.get` |
 | loki | 1 | `recent_logs` |
 | kubernetes | 7 | `container.show` (partial), `deployment.restart`, `deployment.scale`, `ingress.list`, `node.list` (partial), `portforward.list`, `service.show` (partial) |
 | homer | 3 | `alias.list`, `call.analyze`, `pcap.export` |

@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `connectors-grafana`, a native Grafana adapter executable for the local CLI with one read,
+  `datasources.list`: the data sources a service account can read, each as its `uid`, `name`,
+  plugin `type`, `access` mode and `is_default`, from one `GET /api/datasources`, unpaged and
+  at most 1,000 records. Backend URLs, users, databases, `jsonData` and secure fields never
+  reach a result. A connection uses the profile `grafana.service_account`: connect, repair and
+  `connections revalidate` prove the token with `GET /api/datasources`, and the identity is the
+  configured connection (`grafana.connection`, subject the configuration's `instance`). The
+  configuration is HTTPS-only, may carry the sub-path Grafana is served under, and takes an
+  optional private CA file. Modeled in `adapters/grafana/spec/ess`; the operator guide is
+  `adapters/grafana/README.md`.
+- Loki through Grafana: a Loki connection whose `base_url` is a data source's Grafana proxy
+  path (`https://<grafana>/api/datasources/proxy/uid/<uid>/`), with a Grafana service-account
+  token as its `loki.bearer` token, answers `logs.query_range`, `logs.query_metric` and
+  `logs.labels` through Grafana. No code change: the tests now hold it, and
+  `adapters/loki/README.md` documents it.
+- Limits: verified against hand-written fixtures in the Grafana and Loki API shapes only, not a
+  live Grafana. Grafana decides which data sources a token reaches; the design's mediated route
+  (sealed uid, type allowlist), dashboards and datasource discovery are not built.
+
 ## 0.38.0 — 2026-10-09
 
 ### Added
