@@ -7,6 +7,7 @@ title: Per-invoke metadata cost does not grow with the store
 relations:
 - serves: vision:independent-contract-adapters
 - decomposes: epic:connector-probe-20261006
+- informed_by: upstream-blocker:er-batch-cost-superlinear
 scope:
 - confidence: cited
   path: Cargo.lock
