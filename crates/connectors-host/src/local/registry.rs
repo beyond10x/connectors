@@ -238,6 +238,9 @@ struct ConnectionRow {
     generation: Option<String>,
     material: Option<String>,
     baseline: Option<EvidenceSnapshot>,
+    /// The configured revision whose upgrade the new provider refused for this
+    /// connection's credential (`Connection.refused_configuration_revision`).
+    refused: Option<String>,
 }
 
 impl Registry {
@@ -398,9 +401,10 @@ impl Registry {
             "SELECT connection_ref,binding,profile_key,scope_id,semantic_revision,publication_fence,state,public,identity,active_generation,active_material,baseline FROM registry_connections WHERE connection_ref=?1",
             [reference], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get::<_,String>(6)?,r.get::<_,bool>(7)?,r.get::<_,Option<String>>(8)?,r.get::<_,Option<String>>(9)?,r.get::<_,Option<String>>(10)?,r.get::<_,Option<String>>(11)?)))
             .optional().map_err(db)?.ok_or(Failure::NotFound)?;
+        let (binding, refused) = decode_binding(&raw.1)?;
         let row = ConnectionRow {
             reference: raw.0,
-            binding: decode(&raw.1)?,
+            binding,
             profile_key: raw.2,
             scope_id: raw.3,
             revision: raw.4,
@@ -411,6 +415,7 @@ impl Registry {
             generation: raw.9,
             material: raw.10,
             baseline: raw.11.as_deref().map(decode).transpose()?,
+            refused,
         };
         row.binding
             .validate()
@@ -650,4 +655,33 @@ fn host_failure(error: super::Failure) -> Failure {
         super::Failure::ConcurrentRevision => Failure::ConcurrentRevision,
         _ => Failure::MetadataUnavailable,
     }
+}
+
+/// The binding column's key for `Connection.refused_configuration_revision`:
+/// the column carries the binding and, while one is recorded, the configured
+/// revision whose upgrade the new provider refused.
+const REFUSED: &str = "refused_configuration_revision";
+
+fn decode_binding(text: &str) -> Result<(Binding, Option<String>)> {
+    let mut value: serde_json::Value = decode(text)?;
+    let object = value.as_object_mut().ok_or(Failure::MetadataUnavailable)?;
+    let refused = match object.remove(REFUSED) {
+        None => None,
+        Some(serde_json::Value::String(revision)) if !revision.is_empty() => Some(revision),
+        Some(_) => return Err(Failure::MetadataUnavailable),
+    };
+    let binding = serde_json::from_value(value).map_err(|_| Failure::MetadataUnavailable)?;
+    Ok((binding, refused))
+}
+
+fn encode_binding(binding: &Binding, refused: Option<&str>) -> Result<String> {
+    let Some(revision) = refused else {
+        return encode(binding);
+    };
+    let mut value = serde_json::to_value(binding).map_err(|_| Failure::MetadataUnavailable)?;
+    value
+        .as_object_mut()
+        .ok_or(Failure::MetadataUnavailable)?
+        .insert(REFUSED.into(), revision.into());
+    encode(&value)
 }

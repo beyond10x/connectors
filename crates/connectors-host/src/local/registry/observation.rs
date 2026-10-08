@@ -65,7 +65,19 @@ impl Registry {
             return Err(Failure::Revoked);
         }
         if row.binding != *binding {
-            return Err(super::revalidation::changed(&row.binding, binding));
+            // Without sampling time: material known invalid or deleted is not
+            // one a revalidation admits. Expiry is the invocation's to observe.
+            let usable = match &row.material {
+                None => false,
+                Some(version) => tx
+                    .query_row(
+                        "SELECT deleted=0 AND invalid_reason IS NULL FROM registry_materials WHERE version_id=?1",
+                        [version],
+                        |r| r.get::<_, bool>(0),
+                    )
+                    .map_err(db)?,
+            };
+            return Err(super::revalidation::changed(&row, binding, usable));
         }
         let version = row.material.as_ref().ok_or(Failure::NotReady)?;
         let (ack, deleted, invalid, retired): (bool, bool, Option<String>, bool) = tx.query_row(
