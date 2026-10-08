@@ -1,6 +1,6 @@
 # loki adapter design
 
-**Status:** proposed independent service `connectors.loki`, not implemented.
+**Status:** proposed independent service `connectors.loki`. The library binding of `logs.query_range`, `logs.query_metric` and `logs.labels` is implemented (`contracts/logs/v1alpha1/semantics.md` §11.3); no executable composition or auth profile is.
 
 ## Scope and dependencies
 

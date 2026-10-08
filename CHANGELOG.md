@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `connectors-loki`, a library binding of Loki's HTTP API: `logs.query_range` (a LogQL log
+  query over at most 24 hours, unpaged, at most 1,000 lines), `logs.query_metric` (a LogQL
+  metric query, instant or with a step) and `logs.labels` (label names, or one label's
+  values). The metric and label profiles are new in
+  `adapters/loki/contracts/logs/v1alpha1/semantics.md` §11 and modeled in
+  `adapters/loki/spec/ess`. There is no executable yet, so no connection and no
+  `operations invoke`: the local host admits no credential-less profile, and a bearer
+  profile awaits a reviewed identity check.
+
 ## 0.36.0 — 2026-10-08
 
 ### Added
