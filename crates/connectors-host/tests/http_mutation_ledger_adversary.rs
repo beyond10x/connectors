@@ -120,7 +120,10 @@ fn request(operation: &str, request_id: &str) -> Value {
 }
 async fn invoke(host: &Host, body: Value) -> (u16, InvokeResponse) {
     let _ = rustls::crypto::ring::default_provider().install_default();
-    let response = reqwest::Client::new()
+    let response = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .unwrap()
         .post(&host.endpoint)
         .bearer_auth(TOKEN)
         .body(serde_json::to_vec(&body).unwrap())
@@ -198,6 +201,14 @@ async fn a_dispatched_write_whose_adapter_panics_is_outcome_unknown_with_its_att
 async fn a_failed_link_is_not_attempted_and_the_final_observation_records_the_refusal() {
     let host = host().await;
     let stop = Arc::new(AtomicBool::new(false));
+    // A request that fails the test still stops the flipper.
+    struct Stop(Arc<AtomicBool>);
+    impl Drop for Stop {
+        fn drop(&mut self) {
+            self.0.store(true, Ordering::SeqCst);
+        }
+    }
+    let _stop = Stop(stop.clone());
     let flipper = {
         let stop = stop.clone();
         let path = host.path.clone();
@@ -222,7 +233,13 @@ async fn a_failed_link_is_not_attempted_and_the_final_observation_records_the_re
 
     let mut dispatched = 0;
     let mut found = None;
+    // A hard bound besides the count: the search gives up (and the test
+    // fails below) after two minutes, whatever each request costs.
+    let deadline = std::time::Instant::now() + Duration::from_secs(120);
     for index in 0..1_500 {
+        if std::time::Instant::now() > deadline {
+            break;
+        }
         let (status, response) = invoke(&host, request("write", &format!("w-{index}"))).await;
         let Some(mutation) = &response.mutation else {
             continue;
@@ -241,7 +258,8 @@ async fn a_failed_link_is_not_attempted_and_the_final_observation_records_the_re
     stop.store(true, Ordering::SeqCst);
     flipper.join().unwrap();
     private(&host.path, true);
-    let (status, response) = found.expect("no write met a refused link in 1,500 tries");
+    let (status, response) =
+        found.expect("no write met a refused link in 1,500 tries or two minutes");
 
     assert_eq!(status, 503);
     assert_eq!(response.status, ResponseStatus::Error);
