@@ -208,6 +208,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "oauth2_refresh::oauth_connect_refusal_does_not_say_repair"
             | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
+        (
+            "connectors-loki",
+            "local_runtime",
+            "cli_journey::loki_cli_connects_with_a_bearer_token_and_answers_each_read_on_the_saved_connection",
+        ) => Some((Disposable, vec![CUSTODY, CLI])),
         ("connectors-kubernetes", "local_runtime", name) => match name {
             "cli_journey::persistent_kubernetes_cli_owner_and_keyring_restart"
             | "cli_journey::kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_credential"
