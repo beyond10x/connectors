@@ -7,7 +7,16 @@ title: Loki LogQL range and metric queries and label discovery
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: inferred
+  path: Cargo.lock
+- confidence: inferred
+  path: Cargo.toml
+- confidence: inferred
+  path: adapters/loki
+- confidence: inferred
+  path: docs/fluxplane-plugin-parity.md
+revision: 2
 ---
 ## Outcome
 
