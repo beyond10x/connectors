@@ -315,7 +315,7 @@ impl Projection {
 /// goes through serde_json's float parser, whose result depends on which of its
 /// features the crate graph enables, so one document would project to different
 /// bytes in different builds (adversary pass 1, F2).
-fn canonical(value: &Value) -> Vec<u8> {
+pub(crate) fn canonical(value: &Value) -> Vec<u8> {
     fn sorted(value: &Value) -> Value {
         match value {
             Value::Object(map) => {
@@ -350,7 +350,7 @@ fn invalid<T>(pointer: &str, what: impl Into<String>) -> Result<T> {
 }
 
 /// A child pointer, escaped per RFC 6901.
-fn child(pointer: &str, key: &str) -> String {
+pub(crate) fn child(pointer: &str, key: &str) -> String {
     format!("{pointer}/{}", key.replace('~', "~0").replace('/', "~1"))
 }
 
@@ -929,7 +929,7 @@ fn schema(
 
 /// `host[:port]`: one or more dot-separated labels, each non-empty, of ASCII
 /// letters, digits and inner hyphens, then optionally `:` and one or more digits.
-fn authority(text: &str) -> bool {
+pub(crate) fn authority(text: &str) -> bool {
     let (host, port) = match text.split_once(':') {
         Some((host, port)) => (host, Some(port)),
         None => (text, None),

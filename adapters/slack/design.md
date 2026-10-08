@@ -4,8 +4,8 @@ The provider records are typed in the [adapter-owned ESS model](spec/ess/domains
 Conversation, Message, User, File and Emoji. No relation is declared: every edge is an
 `UNMAPPED:` marker there, with a census at the foot of the file.
 
-- **Status:** proposed; not implemented. This page and the ESS model are the only files here:
-  no `upstream/`, bundle, selection set, fixture or runtime exists.
+- **Status:** proposed; not implemented. Beside this page and the ESS model, `upstream/` holds
+  the pinned Swagger 2.0 document; no bundle, selection set, fixture or runtime exists.
 - **Serves:** parity units U02, U08 and U13 of
   [the parity page](../../docs/fluxplane-plugin-parity.md#gap-units) (`:777`, `:783`, `:788`);
   stories `story:catalog-slack-reads`, `story:parity-slack-discovery-reads`,

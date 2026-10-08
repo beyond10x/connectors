@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The catalog ingests Swagger 2.0 through an exact, recorded projection to OpenAPI 3.1.0
+  (`swagger2-openapi/1`). `connectors-build catalog --derived-from` accepts a Swagger 2.0
+  document as it accepts a Google Discovery document, telling them apart by content; the
+  source must equal the recomputed projection byte for byte, and the bundle's derivation
+  records `format` `swagger/2.0`. Any construct the projection has no exact row for is
+  refused naming its JSON pointer. The Slack Web API document is pinned under
+  `adapters/slack/upstream/` (`slackapi/slack-api-specs` at `bc08db49`, SHA-256
+  `8b92da26…936bc3a`); it projects and ingests all 174 operations. A derivation's
+  `discovery_revision` is now optional and omitted when absent; Discovery-derived bundles
+  keep their bytes.
+
 ## 0.36.0 — 2026-10-08
 
 ### Added
