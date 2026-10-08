@@ -6,7 +6,7 @@ status: active
 title: 'Release 0.33.0: store cost flat in its size, owner memory bounded'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-08T06:30:15Z", actor: "human:timo", revision: 2}
 ---
@@ -39,3 +39,10 @@ Evidence: PR 131 repository gate https://github.com/beyond10x/connectors/actions
 - Peak memory was measured in the store-cost test process, not in a long-running owner.
 - The read-only CLI audit findings of 2026-10-07 (completion, help routing, admission
   timeouts, lifecycle conflicts, revalidation `outcome_unknown`) are the next wave.
+
+## Entity Runtime 0.30.2
+
+The release pull request (#132) also moves Entity Runtime from 0.30.1 to 0.30.2, released
+2026-10-08: a recorded batch on SQLite costs time linear in its members. Eventlog stays 0.8.1.
+The measurements above were taken on 0.30.1; the 32-member expiry batch bound is unchanged and
+is lifted, measured on this store, in the next wave (`story:lift-expiry-batch-bound`).

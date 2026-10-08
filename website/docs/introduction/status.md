@@ -79,7 +79,7 @@ command run without an owner, a second process, the owner when it starts, recove
 verifies the whole store, so a raw edit of the database file is refused by the first command
 after it. Peak resident memory in the same test was 329 MB at 601 events and 560 MB at 1,201
 ([#103](https://github.com/beyond10x/connectors/issues/103)). Due expiries are recorded in
-batches of at most 32. Entity Runtime is 0.30.1, Eventlog 0.8.1 and ESS 0.56.0.
+batches of at most 32. Entity Runtime is 0.30.2, Eventlog 0.8.1 and ESS 0.56.0.
 
 ## Available runtime
 

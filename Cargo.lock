@@ -577,7 +577,7 @@ dependencies = [
  "connectors-core",
  "connectors-sdk",
  "connectors-spec",
- "entity-core 0.30.1",
+ "entity-core 0.30.2",
  "ess-compiler",
  "ess-conformance",
  "ess-domain",
@@ -621,7 +621,7 @@ dependencies = [
  "connectors-core",
  "connectors-host",
  "connectors-sdk",
- "entity-core 0.30.1",
+ "entity-core 0.30.2",
  "entity-eventlog",
  "entity-store",
  "eventlog-core",
@@ -710,7 +710,7 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-sdk",
- "entity-core 0.30.1",
+ "entity-core 0.30.2",
  "entity-eventlog",
  "entity-executor",
  "entity-store",
@@ -1049,8 +1049,8 @@ dependencies = [
 
 [[package]]
 name = "entity-core"
-version = "0.30.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.1#6954ba29d4debba1f37a925ac1d6f355fb51a2c5"
+version = "0.30.2"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.2#cc976faca4c6b61b8efbff1182c07f922fcc5c26"
 dependencies = [
  "serde",
  "serde_json",
@@ -1058,10 +1058,10 @@ dependencies = [
 
 [[package]]
 name = "entity-eventlog"
-version = "0.30.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.1#6954ba29d4debba1f37a925ac1d6f355fb51a2c5"
+version = "0.30.2"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.2#cc976faca4c6b61b8efbff1182c07f922fcc5c26"
 dependencies = [
- "entity-core 0.30.1",
+ "entity-core 0.30.2",
  "entity-executor",
  "entity-query",
  "entity-store",
@@ -1076,20 +1076,20 @@ dependencies = [
 
 [[package]]
 name = "entity-executor"
-version = "0.30.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.1#6954ba29d4debba1f37a925ac1d6f355fb51a2c5"
+version = "0.30.2"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.2#cc976faca4c6b61b8efbff1182c07f922fcc5c26"
 dependencies = [
- "entity-core 0.30.1",
+ "entity-core 0.30.2",
  "entity-store",
  "serde_json",
 ]
 
 [[package]]
 name = "entity-query"
-version = "0.30.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.1#6954ba29d4debba1f37a925ac1d6f355fb51a2c5"
+version = "0.30.2"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.2#cc976faca4c6b61b8efbff1182c07f922fcc5c26"
 dependencies = [
- "entity-core 0.30.1",
+ "entity-core 0.30.2",
  "entity-store",
  "serde",
  "serde_json",
@@ -1097,10 +1097,10 @@ dependencies = [
 
 [[package]]
 name = "entity-store"
-version = "0.30.1"
-source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.1#6954ba29d4debba1f37a925ac1d6f355fb51a2c5"
+version = "0.30.2"
+source = "git+https://github.com/beyond10x/entity-runtime?tag=0.30.2#cc976faca4c6b61b8efbff1182c07f922fcc5c26"
 dependencies = [
- "entity-core 0.30.1",
+ "entity-core 0.30.2",
  "fs2",
  "serde",
  "serde_json",
@@ -1140,7 +1140,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2721,7 +2721,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2777,7 +2777,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3277,7 +3277,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3961,7 +3961,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
