@@ -65,7 +65,7 @@ impl Registry {
             return Err(Failure::Revoked);
         }
         if row.binding != *binding {
-            return Err(Failure::Conflict);
+            return Err(super::revalidation::changed(&row.binding, binding));
         }
         let version = row.material.as_ref().ok_or(Failure::NotReady)?;
         let (ack, deleted, invalid, retired): (bool, bool, Option<String>, bool) = tx.query_row(

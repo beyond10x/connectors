@@ -756,6 +756,22 @@ credential expired or is known invalid (`reauthorization_required`), and a
 credential below the operation's scopes, keep `code = not_granted` with
 `next_action = repair_connection`.
 
+A connection saved under another configuration revision of its instance also
+reports `pending` (`stale = true`), and no status change is pending for it: a
+read on `operations invoke`, an approval naming it and a consumer launch refuse
+it as `code = lifecycle_conflict` at `stage = admission`, never with
+`next_action = retry_status`. When its provider authority and profile
+declaration are unchanged, `next_action = revalidate_connection`: revalidation
+follows the configuration upgrade. When either changed,
+`next_action = create_connection`, as `connections revalidate` answers for it.
+A revalidation the new provider refuses also names `create_connection`. The
+instance's own recorded configuration revision moves to the configured one when
+a revalidation upgrades a connection or a new connection is made under it, so
+`connections connect` under the configured revision is admitted while older
+connections of the instance stay saved under theirs. Until it moves, the
+instance's approval keys (`approvals key-status` and the other key commands)
+refuse as `code = lifecycle_conflict` with `next_action = create_connection`.
+
 A provider's timeout or capacity answer is the provider's too: a request the
 provider transport sent whose deadline then passed (a connection probe's
 included, and one that passes while the provider's answer is still being

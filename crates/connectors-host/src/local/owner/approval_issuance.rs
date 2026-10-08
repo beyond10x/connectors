@@ -516,11 +516,11 @@ pub(super) fn policy_error(error: approval_policy::Failure) -> Error {
     }
     .into()
 }
-pub(super) fn key_error(error: approval_keys::Failure) -> Error {
+pub(super) fn key_error(failure: approval_keys::Failure) -> Error {
     use approval_keys::Failure::*;
-    match error {
+    let mut error: Error = match failure {
         InvalidInput => Code::InvalidInput,
-        Conflict => Code::LifecycleConflict,
+        Conflict | BindingChanged => Code::LifecycleConflict,
         NotFound => Code::NotFound,
         MetadataUnavailable => Code::MetadataUnavailable,
         RevisionConflict => Code::RevisionConflict,
@@ -528,7 +528,11 @@ pub(super) fn key_error(error: approval_keys::Failure) -> Error {
         OutcomeUnknown => Code::OutcomeUnknown,
         Capacity => Code::Capacity,
     }
-    .into()
+    .into();
+    // The instance's recorded configuration revision is not the configured
+    // one: a new connection under the configured revision moves it.
+    error.reconnect = failure == BindingChanged;
+    error
 }
 fn proof_error(error: approvals::Failure) -> Error {
     use approvals::Failure::*;
