@@ -1,9 +1,10 @@
 # Jira Cloud through the catalog provider
 
-The catalog provider reads Jira Cloud issues, their comments and their changelog
-from the pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
+The catalog provider reads Jira Cloud issues by JQL or one by key, their comments
+and their changelog, the issue types a project can create, and users, from the
+pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
 Jira-specific code: the pinned document is compiled into a bundle, a reviewed
-selection set exposes three reads, and the engine described in
+selection set exposes six reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work exactly as described
 there; this page covers what differs for Jira.
@@ -32,7 +33,7 @@ fresh run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/jira/operations.json`](../adapters/catalog/providers/jira/operations.json)
-exposes three reads and nothing else. Each is `effect: read`; there are no
+exposes six reads and nothing else. Each is `effect: read`; there are no
 writes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
 `operationId` and path in the pinned document, so a renamed or dropped id, or a
 source operation that moved, fails the gate. The bundle refuses at load any
@@ -47,6 +48,9 @@ the end of a walk are in it.
 | `issues.search` | `searchAndReconsileIssuesUsingJql` | `GET /rest/api/3/search/jql` | `nextPageToken`, `maxResults` | `nextPageToken` absent or null in the response | JQL `updated >= "<t>"`, e.g. `project = FIX AND updated >= "2026-09-01 00:00" ORDER BY updated ASC` |
 | `issue.comments` | `getComments` | `GET /rest/api/3/issue/{issueIdOrKey}/comment` | `startAt`, `maxResults` | `startAt + len(comments) >= total` | none; deltas come from `issues.search` |
 | `issue.changelog` | `getChangeLogs` | `GET /rest/api/3/issue/{issueIdOrKey}/changelog` | `startAt`, `maxResults` | `isLast: true` | none; deltas come from `issues.search` |
+| `issue.get` | `getIssue` | `GET /rest/api/3/issue/{issueIdOrKey}` | none | one issue per call | none; deltas come from `issues.search` |
+| `issue.create_meta` | `getCreateIssueMetaIssueTypes` | `GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes` | `startAt`, `maxResults` | `startAt + len(issueTypes) >= total` | none |
+| `users.search` | `findUsers` | `GET /rest/api/3/user/search` | `startAt`, `maxResults` | an empty page | none |
 
 - **`issues.search`** replaces the deprecated `GET /rest/api/3/search`. Send the
   first page without `nextPageToken`; for each following page, send the
@@ -67,6 +71,33 @@ the end of a walk are in it.
   page starts at `startAt` plus the number of `values` on this page; the walk
   ends on the page whose `isLast` is `true`. The pinned default `maxResults`
   is 100.
+- **`issue.get`** takes `issueIdOrKey`, such as `FIX-1`, and returns the one
+  issue. Without `fields` Jira returns all fields; `fields` takes a JSON array or
+  one comma-separated string, as on `issues.search`, and the field `attachment`
+  carries the issue's attachment metadata (the content itself is a binary read
+  this provider does not serve). `expand` is one comma-separated string, such as
+  `renderedFields,names`: `renderedFields` adds the HTML rendering of rich-text
+  fields beside their Atlassian Document Format value, and `names` the display
+  name of each field. An issue Jira does not find, or that the account may not
+  see, is refused as the provider's not-found. The pinned document also declares
+  `updateHistory`, which adds the issue's project to the account's recently
+  viewed list; it is accepted by name like every declared parameter, so leave it
+  out for a read with no such effect.
+- **`issue.create_meta`** takes `projectIdOrKey` and lists the issue types the
+  account can create in that project, the input a create request needs. The next
+  page starts at `startAt` plus the number of `issueTypes`; the walk ends when
+  that reaches `total`. The pinned default `maxResults` is 50 and its maximum
+  200. The fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not
+  selected.
+- **`users.search`** takes `query`, matched against the start of a user's
+  display name or email address, or `accountId` for an exact match; the pinned
+  document requires one of `query`, `accountId` or `property` without marking
+  any of them required, so Jira, not the provider, refuses a call without one.
+  The body is a bare array of users. The pinned document pages the first 1,000
+  matches by `startAt` and `maxResults` (default 50) and states no total, so a
+  walk sends `startAt` plus the number of users returned and ends on an empty
+  page. Privacy controls may withhold a user's email address, and a caller
+  without the *Browse users and groups* permission gets an empty array.
 
 Neither comments nor changelog offers a time filter. To take deltas, search for
 issues with `updated >= "<t>"` and re-read the comments and changelog of each
@@ -178,14 +209,17 @@ An OAuth 2.0 (3LO) access token is sent as a bearer token. **Not verified live.*
 The credential document is `{"token": "<access token>"}`, sent as
 `Authorization: Bearer <access token>`. The provider does not refresh an OAuth
 token; connect again when it expires. The token must carry the read scopes the
-three reads and `myself` need; Atlassian names them per operation.
+six reads and `myself` need; Atlassian names them per operation.
 
 ## Limits
 
 - Verified against a local HTTPS fixture (`adapters/catalog/tests/jira.rs`):
   the exact request of each read, including the JQL time filter and the basic
-  header, the returned body as JSON, and a two-page walk of each list to the
-  end condition above. Live, only the basic gateway form has been run: a
+  header, the returned body as JSON, and a walk of each list to the end
+  condition above. The fixture answers of `issue.get`, `issue.create_meta` and
+  `users.search` are written by hand in the shapes the pinned document gives
+  (`IssueBean`, `PageOfCreateMetaIssueTypes`, an array of `User`), not recorded
+  from a site. Live, only the basic gateway form has been run: a
   service-account API token connected and `issues.search` returned issues
   (2026-09-30). The site form, the other reads and the OAuth form have not been
   run against a live site.

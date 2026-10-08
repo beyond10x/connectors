@@ -43,7 +43,7 @@ is sent once as approved; the same input approved and sent again creates a secon
 | Provider | Source | Operations | Verified against |
 |---|---|---|---|
 | GitLab | pinned OpenAPI v4 document | reads across projects, repositories, pipelines and merge requests; issue and merge-request writes; the merge-request feed | a live GitLab |
-| Jira Cloud | pinned platform REST v3 | issue search by JQL, comments, changelogs | a live Jira, through the API gateway |
+| Jira Cloud | pinned platform REST v3 | issue search by JQL, one issue, comments, changelogs, a project's creatable issue types, user search | a live Jira through the API gateway (search); local fixtures (the rest) |
 | Confluence Cloud | pinned REST v2 | changed pages, a space's pages, one page, comments | local fixtures |
 | HubSpot CRM | pinned CRM Objects `2026-09` | records of one object type, one record | local fixtures |
 | Zendesk Support | pinned Support API, redacted | tickets, users and organizations changed since a time, one of each, comments | a live account |

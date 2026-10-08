@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.38.0 — 2026-10-09
+## Unreleased
+
+### Added
+
+- The catalog provider's Jira selection gains three reads from the pinned platform REST v3
+  document: `issue.get` (`getIssue`, one issue by id or key with `fields` and `expand`; its
+  `attachment` field lists the issue's attachments), `issue.create_meta`
+  (`getCreateIssueMetaIssueTypes`, the issue types a project can create, paged by `startAt`
+  to `total`) and `users.search` (`findUsers`, by `query` or `accountId`, paged by `startAt`
+  to an empty page). The bundle already carried all three; no bundle changes. Limits:
+  verified against hand-written fixtures in the pinned document's shapes only; `getIssue`'s
+  `updateHistory` parameter, which records a project view, is accepted like every declared
+  parameter; the fields of one issue type are not selected. See `docs/catalog-jira.md`.
 
 ### Added
 
