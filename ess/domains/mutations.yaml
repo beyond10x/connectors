@@ -120,6 +120,14 @@ entities:
     # docs/local-er-metadata.md:102: only a known settlement (Aborted, Completed,
     # Failed) has a settled timestamp; an unknown result has none.
     # contracts/operations/v1alpha1/semantics.md:113: the recorded canonicalization.
+    # The connection the attempt records is the one its fingerprint names: both
+    # present (local owner) or both absent (HTTP host).
+    # ESS-LIMIT: declared as an invariant, this co-presence disjunction over
+    # nested optional members makes ESS 0.56 conformance synthesis refuse the
+    # invariant-after-AbortPrepared scenario while still emitting it
+    # (connectors-build emitted_manifest_is_admitted_by_the_pinned_ess). The
+    # ledger (local/mutations/types.rs Candidate::encode) and the Entity
+    # Runtime capture (local/metadata/er.rs fingerprint_value) enforce it.
     invariants:
       - request_fingerprint.canonicalization_version == "adapter-v1-canonical-json"
       - any: [state == Aborted, state == Completed, state == Failed, "missing(settled_at)"]

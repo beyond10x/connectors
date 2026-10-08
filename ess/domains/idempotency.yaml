@@ -39,8 +39,14 @@ types:
     kind: struct
     fields:
       - {name: operation_ref, type: String}
-      - {name: connection_ref, type: String}
-      - {name: connection_revision, type: String}
+      # Absent together with AttemptRecord.connection_ref, exactly for an
+      # attempt the HTTP host records (contracts/service/compatibility.md § 2.1:
+      # POST /v1alpha2/invoke has no connection member and the host resolves no
+      # Connection). Present for every local-owner attempt and every keyed
+      # reservation (KeyReservation invariant below; the HTTP host refuses
+      # `idempotency_key`).
+      - {name: connection_ref, type: "Optional<String>"}
+      - {name: connection_revision, type: "Optional<String>"}
       - {name: contract_ref, type: String}
       - {name: profile, type: String}
       - {name: descriptor_revision, type: String}
@@ -69,6 +75,8 @@ entities:
     invariants:
       - caller_key != ""
       - fingerprint.canonicalization_version == "adapter-v1-canonical-json"
+      - "defined(fingerprint.connection_ref)"
+      - "defined(fingerprint.connection_revision)"
       - any: [namespace.origin.kind != direct, namespace.origin.authority_ref == namespace.receiver_instance]
       - any: [namespace.origin.kind != direct, {not: "defined(fingerprint.route.gateway_instance)"}]
       - any: [namespace.origin.kind != federated, "defined(fingerprint.route.gateway_instance)"]

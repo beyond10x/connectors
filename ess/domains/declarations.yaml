@@ -210,6 +210,8 @@ entities:
       terminal: [Declared]
       transitions:
         - {name: advance_registry_epoch, from: [Declared], to: Declared}
+        # A move to another configuration revision (UpgradeServiceConfiguration).
+        - {name: upgrade_configuration, from: [Declared], to: Declared}
 
 commands:
   # HTTP host start (compatibility.md § 2.1, Service configuration): a host with
@@ -219,13 +221,10 @@ commands:
   # instance; absent, it sends RecordServiceConfiguration (adapter_id and
   # revision from its adapter's descriptor, registry_epoch 1); present with the
   # same adapter_id and revision, it sends nothing; present with the same
-  # adapter_id and another revision, it sends AdvanceRegistryEpoch with the
-  # next epoch, as a local configuration upgrade does; present with another
-  # adapter_id, start is refused and nothing is served on /v1alpha2/invoke.
-  # UNMAPPED: AdvanceRegistryEpoch `advanced` sets only registry_epoch, while
-  # its own comment says a configuration upgrade moves `revision` with the
-  # epoch advance. Which command records the new revision is open for the
-  # owner; the HTTP host start inherits that answer.
+  # adapter_id and another revision, it sends UpgradeServiceConfiguration with
+  # that revision and the next epoch, as a local configuration upgrade does;
+  # present with another adapter_id, start is refused and nothing is served on
+  # /v1alpha2/invoke.
   # ESS-LIMIT: the start sequence spans a view read and several commands; ESS
   # has no host-procedure construct, so the sequence is a host obligation.
   - name: connectors.declarations.RecordServiceConfiguration
@@ -254,8 +253,8 @@ commands:
       # The host only ever writes `epoch=epoch+1` (registry/lifecycle.rs `bump`),
       # so a lower epoch is refused. An equal one is accepted: a row whose other
       # columns change keeps its epoch and is recorded through this command.
-      # A connection's configuration upgrade (registry/revalidation.rs) moves
-      # `revision` to the configured one with its epoch advance.
+      # It never moves `revision`: a change of revision is
+      # UpgradeServiceConfiguration.
       - name: regressed
         when_subject:
           predicate: registry_epoch > input.registry_epoch
@@ -270,6 +269,33 @@ commands:
             registry_epoch: input.registry_epoch
         sets:
           registry_epoch: input.registry_epoch
+  # Moves an instance to another configuration revision and its registry epoch
+  # together. The local owner's configuration upgrade
+  # (registry/revalidation.rs, registry/lifecycle.rs) and the HTTP host start
+  # (above) both record a revision change through it; the same epoch rule as
+  # AdvanceRegistryEpoch applies, so a lower epoch is refused.
+  - name: connectors.declarations.UpgradeServiceConfiguration
+    input:
+      - {name: instance_id, type: String}
+      - {name: revision, type: String}
+      - {name: registry_epoch, type: Integer}
+    outcomes:
+      - name: regressed
+        when_subject:
+          predicate: registry_epoch > input.registry_epoch
+        error: connectors.declarations.RegistryEpochRegressed
+      - name: upgraded
+        moves: connectors.declarations.ServiceConfiguration.upgrade_configuration
+        instance: instance_id
+        emits: [connectors.declarations.ServiceConfigurationUpgraded]
+        payload:
+          connectors.declarations.ServiceConfigurationUpgraded:
+            instance_id: input.instance_id
+            revision: input.revision
+            registry_epoch: input.registry_epoch
+        sets:
+          revision: input.revision
+          registry_epoch: input.registry_epoch
 
 events:
   - name: connectors.declarations.ServiceConfigurationRecorded
@@ -277,6 +303,11 @@ events:
   - name: connectors.declarations.RegistryEpochAdvanced
     fields:
       - {name: instance_id, type: String}
+      - {name: registry_epoch, type: Integer}
+  - name: connectors.declarations.ServiceConfigurationUpgraded
+    fields:
+      - {name: instance_id, type: String}
+      - {name: revision, type: String}
       - {name: registry_epoch, type: Integer}
 
 errors:
@@ -304,3 +335,9 @@ actors:
     may:
       - connectors.declarations.AdvanceRegistryEpoch
       - connectors.declarations.RecordServiceConfiguration
+      - connectors.declarations.UpgradeServiceConfiguration
+  # The HTTP service host (crates/connectors-host/src/server.rs) at start.
+  - name: connectors.declarations.ServiceHost
+    may:
+      - connectors.declarations.RecordServiceConfiguration
+      - connectors.declarations.UpgradeServiceConfiguration

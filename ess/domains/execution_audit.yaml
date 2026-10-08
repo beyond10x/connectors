@@ -239,7 +239,9 @@ commands:
       - name: read-anchor
         when_subject:
           predicate:
-            not: {access: write}
+            # An access-less anchor is refused too; the guard names its
+            # absence so it never reads a missing field.
+            any: ["missing(access)", {not: {access: write}}]
         error: connectors.execution_audit.AttemptLinkRefused
       - name: linked-elsewhere
         when_subject:
@@ -254,7 +256,10 @@ commands:
       # AppendFinalObservation's repeat below).
       - name: already-linked
         when_subject:
-          predicate: attempt_id == input.attempt_id
+          # `defined` first: a guard over the absent field is unobservable
+          # and would refuse the first link (Entity Runtime OutcomeUnobservable).
+          predicate:
+            all: ["defined(attempt_id)", attempt_id == input.attempt_id]
         error: connectors.execution_audit.AttemptLinkRepeated
       - name: linked
         moves: connectors.execution_audit.AuditRecord.link_attempt
