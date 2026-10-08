@@ -1,5 +1,6 @@
 [package]
 name = "connectors-conformance"
+description = "Live acceptance runner against independently started adapter services."
 version.workspace = true
 edition.workspace = true
 rust-version = "1.91"

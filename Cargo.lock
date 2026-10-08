@@ -705,6 +705,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-docs"
+version = "0.37.0"
+dependencies = [
+ "clap",
+ "connectors",
+ "connectors-cli-contract",
+ "connectors-spec",
+ "pulldown-cmark",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "connectors-host"
 version = "0.37.0"
 dependencies = [
@@ -762,6 +777,28 @@ dependencies = [
  "hex",
  "rcgen",
  "reqwest",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "zeroize",
+]
+
+[[package]]
+name = "connectors-loki"
+version = "0.37.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "connectors-core",
+ "connectors-host",
+ "connectors-sdk",
+ "connectors-spec",
+ "hex",
+ "jsonschema",
+ "rcgen",
  "serde",
  "serde_json",
  "sha2 0.11.0",

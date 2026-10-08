@@ -93,6 +93,12 @@ explicitly selected public inputs, adapter-owned native content, and distinct
 specification, example and runtime support claims. Use [website checks](website/README.md#build-and-verify)
 for presentation, reference tooling or example changes. Browser examples are
 bounded teaching implementations; they do not authorize production runtime work.
+`crates/connectors-docs` generates the CLI and crate reference, the contract and model
+reference and the status page with its data; never edit them. A change to the CLI, a crate
+description, a selected contract or model, or a shipped capability regenerates them with
+`cargo run --locked -p connectors-docs -- generate`, and the gate fails on drift. A shipped
+status item names the test that holds it (`crates/connectors-docs/src/status.rs`). Every
+command a page shows is run in the tree and its output pasted from that run.
 
 ## Cutting a release
 
@@ -136,8 +142,11 @@ earlier local-only Connectors publication boundary for these releases.
    and verification result, and clean up task-owned managed worktrees through
    `worktree`.
 7. Publish the hosted release page for that exact tag through
-   `b10x-gates gh -- release create v<version> --verify-tag --notes-file <file>`,
+   `b10x-gates gh --policy <policy> --repository beyond10x/connectors -- release create v<version> --verify-tag --notes-file <file>`,
    so the page is authored by `b10x-bot[bot]` like every commit and tag before it.
+   `--policy` names the private Gates policy file and `--repository` the GitHub
+   repository; without them the command is refused with `protected file
+   unavailable` wherever the default policy path does not exist.
    A page created with a personal `gh` login is the same defect as a commit
    authored by a person, and is corrected the same way: delete it and recreate it
    under the bot, never leave it. Take the notes from the annotated tag with

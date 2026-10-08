@@ -1,0 +1,651 @@
+{
+  "excluded_media_types": [
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_apps_approve",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_apps_restrict",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_archive",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_convertToPrivate",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_create",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_delete",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_disconnectShared",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_invite",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_rename",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_setConversationPrefs",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_setTeams",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_conversations_unarchive",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_inviteRequests_approve",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_inviteRequests_deny",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_teams_create",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_teams_settings_setDescription",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_teams_settings_setDiscoverability",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_teams_settings_setName",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_usergroups_addChannels",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_usergroups_addTeams",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_usergroups_removeChannels",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_assign",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_invite",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_remove",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_session_invalidate",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_session_reset",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_setAdmin",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_setExpiration",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_setOwner",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "admin_users_setRegular",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "calls_add",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "calls_end",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "calls_participants_add",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "calls_participants_remove",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "calls_update",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_delete",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_deleteScheduledMessage",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_meMessage",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_postEphemeral",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_postMessage",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_scheduleMessage",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_unfurl",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "chat_update",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_archive",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_close",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_create",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_invite",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_join",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_kick",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_leave",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_mark",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_open",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_rename",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_setPurpose",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_setTopic",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "conversations_unarchive",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "files_comments_delete",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "files_delete",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "files_revokePublicURL",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "files_sharedPublicURL",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "pins_add",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "pins_remove",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "reactions_add",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "reactions_remove",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "reminders_add",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "reminders_complete",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "reminders_delete",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "stars_add",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "stars_remove",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "usergroups_create",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "usergroups_disable",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "usergroups_enable",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "usergroups_update",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "usergroups_users_update",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "users_profile_set",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    },
+    {
+      "media_type": "application/json",
+      "operation_id": "users_setPresence",
+      "reason": "formData parameters are defined only for application/x-www-form-urlencoded and multipart/form-data"
+    }
+  ],
+  "ignored_keys": [
+    "/paths/~1admin.apps.approved.list/get/consumes",
+    "/paths/~1admin.apps.requests.list/get/consumes",
+    "/paths/~1admin.apps.restricted.list/get/consumes",
+    "/paths/~1admin.conversations.ekm.listOriginalConnectedChannelInfo/get/consumes",
+    "/paths/~1admin.conversations.getConversationPrefs/get/consumes",
+    "/paths/~1admin.conversations.getTeams/get/consumes",
+    "/paths/~1admin.conversations.restrictAccess.listGroups/get/consumes",
+    "/paths/~1admin.conversations.search/get/consumes",
+    "/paths/~1admin.emoji.list/get/consumes",
+    "/paths/~1admin.inviteRequests.approved.list/get/consumes",
+    "/paths/~1admin.inviteRequests.denied.list/get/consumes",
+    "/paths/~1admin.inviteRequests.list/get/consumes",
+    "/paths/~1admin.teams.admins.list/get/consumes",
+    "/paths/~1admin.teams.list/get/consumes",
+    "/paths/~1admin.teams.owners.list/get/consumes",
+    "/paths/~1admin.teams.settings.info/get/consumes",
+    "/paths/~1admin.usergroups.listChannels/get/consumes",
+    "/paths/~1admin.users.list/get/consumes",
+    "/paths/~1api.test/get/consumes",
+    "/paths/~1apps.event.authorizations.list/get/consumes",
+    "/paths/~1apps.permissions.info/get/consumes",
+    "/paths/~1apps.permissions.request/get/consumes",
+    "/paths/~1apps.permissions.resources.list/get/consumes",
+    "/paths/~1apps.permissions.scopes.list/get/consumes",
+    "/paths/~1apps.permissions.users.list/get/consumes",
+    "/paths/~1apps.permissions.users.request/get/consumes",
+    "/paths/~1apps.uninstall/get/consumes",
+    "/paths/~1auth.revoke/get/consumes",
+    "/paths/~1auth.test/get/consumes",
+    "/paths/~1bots.info/get/consumes",
+    "/paths/~1calls.info/get/consumes",
+    "/paths/~1chat.getPermalink/get/consumes",
+    "/paths/~1chat.scheduledMessages.list/get/consumes",
+    "/paths/~1conversations.history/get/consumes",
+    "/paths/~1conversations.info/get/consumes",
+    "/paths/~1conversations.list/get/consumes",
+    "/paths/~1conversations.members/get/consumes",
+    "/paths/~1conversations.replies/get/consumes",
+    "/paths/~1dialog.open/get/consumes",
+    "/paths/~1dnd.endDnd/post/consumes",
+    "/paths/~1dnd.endSnooze/post/consumes",
+    "/paths/~1dnd.info/get/consumes",
+    "/paths/~1dnd.teamInfo/get/consumes",
+    "/paths/~1emoji.list/get/consumes",
+    "/paths/~1files.info/get/consumes",
+    "/paths/~1files.list/get/consumes",
+    "/paths/~1files.remote.info/get/consumes",
+    "/paths/~1files.remote.list/get/consumes",
+    "/paths/~1files.remote.share/get/consumes",
+    "/paths/~1migration.exchange/get/consumes",
+    "/paths/~1oauth.access/get/consumes",
+    "/paths/~1oauth.token/get/consumes",
+    "/paths/~1oauth.v2.access/get/consumes",
+    "/paths/~1pins.list/get/consumes",
+    "/paths/~1reactions.get/get/consumes",
+    "/paths/~1reactions.list/get/consumes",
+    "/paths/~1reminders.info/get/consumes",
+    "/paths/~1reminders.list/get/consumes",
+    "/paths/~1rtm.connect/get/consumes",
+    "/paths/~1search.messages/get/consumes",
+    "/paths/~1stars.list/get/consumes",
+    "/paths/~1team.accessLogs/get/consumes",
+    "/paths/~1team.billableInfo/get/consumes",
+    "/paths/~1team.info/get/consumes",
+    "/paths/~1team.integrationLogs/get/consumes",
+    "/paths/~1team.profile.get/get/consumes",
+    "/paths/~1usergroups.list/get/consumes",
+    "/paths/~1usergroups.users.list/get/consumes",
+    "/paths/~1users.conversations/get/consumes",
+    "/paths/~1users.getPresence/get/consumes",
+    "/paths/~1users.identity/get/consumes",
+    "/paths/~1users.info/get/consumes",
+    "/paths/~1users.list/get/consumes",
+    "/paths/~1users.lookupByEmail/get/consumes",
+    "/paths/~1users.profile.get/get/consumes",
+    "/paths/~1users.setActive/post/consumes",
+    "/paths/~1views.open/get/consumes",
+    "/paths/~1views.publish/get/consumes",
+    "/paths/~1views.push/get/consumes",
+    "/paths/~1views.update/get/consumes",
+    "/paths/~1workflows.stepCompleted/get/consumes",
+    "/paths/~1workflows.stepFailed/get/consumes",
+    "/paths/~1workflows.updateStep/get/consumes",
+    "/securityDefinitions"
+  ],
+  "info_version": "1.7.0",
+  "operation_count": 174,
+  "operations": [
+    "admin_apps_approve",
+    "admin_apps_approved_list",
+    "admin_apps_requests_list",
+    "admin_apps_restrict",
+    "admin_apps_restricted_list",
+    "admin_conversations_archive",
+    "admin_conversations_convertToPrivate",
+    "admin_conversations_create",
+    "admin_conversations_delete",
+    "admin_conversations_disconnectShared",
+    "admin_conversations_ekm_listOriginalConnectedChannelInfo",
+    "admin_conversations_getConversationPrefs",
+    "admin_conversations_getTeams",
+    "admin_conversations_invite",
+    "admin_conversations_rename",
+    "admin_conversations_restrictAccess_addGroup",
+    "admin_conversations_restrictAccess_listGroups",
+    "admin_conversations_restrictAccess_removeGroup",
+    "admin_conversations_search",
+    "admin_conversations_setConversationPrefs",
+    "admin_conversations_setTeams",
+    "admin_conversations_unarchive",
+    "admin_emoji_add",
+    "admin_emoji_addAlias",
+    "admin_emoji_list",
+    "admin_emoji_remove",
+    "admin_emoji_rename",
+    "admin_inviteRequests_approve",
+    "admin_inviteRequests_approved_list",
+    "admin_inviteRequests_denied_list",
+    "admin_inviteRequests_deny",
+    "admin_inviteRequests_list",
+    "admin_teams_admins_list",
+    "admin_teams_create",
+    "admin_teams_list",
+    "admin_teams_owners_list",
+    "admin_teams_settings_info",
+    "admin_teams_settings_setDefaultChannels",
+    "admin_teams_settings_setDescription",
+    "admin_teams_settings_setDiscoverability",
+    "admin_teams_settings_setIcon",
+    "admin_teams_settings_setName",
+    "admin_usergroups_addChannels",
+    "admin_usergroups_addTeams",
+    "admin_usergroups_listChannels",
+    "admin_usergroups_removeChannels",
+    "admin_users_assign",
+    "admin_users_invite",
+    "admin_users_list",
+    "admin_users_remove",
+    "admin_users_session_invalidate",
+    "admin_users_session_reset",
+    "admin_users_setAdmin",
+    "admin_users_setExpiration",
+    "admin_users_setOwner",
+    "admin_users_setRegular",
+    "api_test",
+    "apps_event_authorizations_list",
+    "apps_permissions_info",
+    "apps_permissions_request",
+    "apps_permissions_resources_list",
+    "apps_permissions_scopes_list",
+    "apps_permissions_users_list",
+    "apps_permissions_users_request",
+    "apps_uninstall",
+    "auth_revoke",
+    "auth_test",
+    "bots_info",
+    "calls_add",
+    "calls_end",
+    "calls_info",
+    "calls_participants_add",
+    "calls_participants_remove",
+    "calls_update",
+    "chat_delete",
+    "chat_deleteScheduledMessage",
+    "chat_getPermalink",
+    "chat_meMessage",
+    "chat_postEphemeral",
+    "chat_postMessage",
+    "chat_scheduleMessage",
+    "chat_scheduledMessages_list",
+    "chat_unfurl",
+    "chat_update",
+    "conversations_archive",
+    "conversations_close",
+    "conversations_create",
+    "conversations_history",
+    "conversations_info",
+    "conversations_invite",
+    "conversations_join",
+    "conversations_kick",
+    "conversations_leave",
+    "conversations_list",
+    "conversations_mark",
+    "conversations_members",
+    "conversations_open",
+    "conversations_rename",
+    "conversations_replies",
+    "conversations_setPurpose",
+    "conversations_setTopic",
+    "conversations_unarchive",
+    "dialog_open",
+    "dnd_endDnd",
+    "dnd_endSnooze",
+    "dnd_info",
+    "dnd_setSnooze",
+    "dnd_teamInfo",
+    "emoji_list",
+    "files_comments_delete",
+    "files_delete",
+    "files_info",
+    "files_list",
+    "files_remote_add",
+    "files_remote_info",
+    "files_remote_list",
+    "files_remote_remove",
+    "files_remote_share",
+    "files_remote_update",
+    "files_revokePublicURL",
+    "files_sharedPublicURL",
+    "files_upload",
+    "migration_exchange",
+    "oauth_access",
+    "oauth_token",
+    "oauth_v2_access",
+    "pins_add",
+    "pins_list",
+    "pins_remove",
+    "reactions_add",
+    "reactions_get",
+    "reactions_list",
+    "reactions_remove",
+    "reminders_add",
+    "reminders_complete",
+    "reminders_delete",
+    "reminders_info",
+    "reminders_list",
+    "rtm_connect",
+    "search_messages",
+    "stars_add",
+    "stars_list",
+    "stars_remove",
+    "team_accessLogs",
+    "team_billableInfo",
+    "team_info",
+    "team_integrationLogs",
+    "team_profile_get",
+    "usergroups_create",
+    "usergroups_disable",
+    "usergroups_enable",
+    "usergroups_list",
+    "usergroups_update",
+    "usergroups_users_list",
+    "usergroups_users_update",
+    "users_conversations",
+    "users_deletePhoto",
+    "users_getPresence",
+    "users_identity",
+    "users_info",
+    "users_list",
+    "users_lookupByEmail",
+    "users_profile_get",
+    "users_profile_set",
+    "users_setActive",
+    "users_setPhoto",
+    "users_setPresence",
+    "views_open",
+    "views_publish",
+    "views_push",
+    "views_update",
+    "workflows_stepCompleted",
+    "workflows_stepFailed",
+    "workflows_updateStep"
+  ],
+  "projector": "swagger2-openapi/1",
+  "source_bytes": 1039581,
+  "source_sha256": "8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471babb68b91936bc3a"
+}

@@ -1,0 +1,38 @@
+---
+title: Adapters
+sidebar_position: 4
+description: Every adapter the repository documents, what runs today and what is a design or a typed specification only.
+---
+
+# Adapters
+
+Each adapter owns its provider's behaviour, native contracts, specification and fixtures
+([Adapters and ownership](../../concepts/adapters.md)). A native contract or a typed model is not
+an installed capability: the runtime column says what runs.
+
+## Runtime available
+
+| Adapter | Runs as | Operations |
+|---|---|---|
+| [GitLab](./gitlab/index.md) | catalog provider | 18 reads and 4 approved writes from the pinned OpenAPI document, and the two merge-request feed reads |
+| [Catalog provider](./catalog/index.md) | `connectors-catalog-provider` | Jira, Confluence, HubSpot, Zendesk, Google, Runpod and, unreleased, Slack, from pinned API documents |
+| [Kubernetes](./kubernetes/index.md) | `connectors-kubernetes` | `resources.list`, `endpoints.discover`, optionally `hosts.discover` and the Helm release reads |
+| [SQL / PostgreSQL](./sql/index.md) | `connectors-sql` | `schema.list`, `query.read` |
+| [Tavily](./tavily/index.md) | `connectors-tavily` | `websearch.search`, `websearch.fetch`, `websearch.crawl` |
+| [Loki](./loki/index.md) (unreleased) | `connectors-loki` | `logs.query_range`, `logs.query_metric`, `logs.labels` |
+
+## Specification or design only
+
+| Adapter | What exists |
+|---|---|
+| [Atlassian](./atlassian/index.md) | native document contracts and an ESS model for Jira and Confluence; Jira and Confluence reads run through the catalog provider instead |
+| [Docker](./docker/index.md) | native log and mutation contracts and an ESS model |
+| [Grafana](./grafana/index.md) | native discovery and mediated-route contracts and an ESS model |
+| [Prometheus](./prometheus/index.md) | a native PromQL series contract |
+| [Alertmanager](./alertmanager/index.md) | a design |
+| [SIP](./sip/index.md) | a native dial contract |
+| [RTVBP](./rtvbp/index.md) | a native session contract |
+
+MCP has specified invocation, projection, auth lifecycle, mutation replay and composition
+contracts in the repository's `adapters/mcp/` directory and no runtime. Slack and WebRTC have no
+native adapter documentation; Slack conversations are read through the catalog provider.

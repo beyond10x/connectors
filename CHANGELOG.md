@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `connectors-loki`, a native Loki adapter executable for the local CLI: `logs.query_range`
+  (a LogQL log query over at most 24 hours, unpaged, at most 1,000 lines), `logs.query_metric`
+  (a LogQL metric query, instant or with a step) and `logs.labels` (label names, or one
+  label's values), each one GET and each answered through `operations invoke` on a saved
+  connection. A connection uses the bearer profile `loki.bearer`: connect, repair and
+  `connections revalidate` prove the token with `GET /loki/api/v1/labels`, and since Loki
+  names no account, the identity is the configured connection (`loki.connection`, subject the
+  configuration's `instance`). The configuration is HTTPS-only, with an optional private CA
+  file. The metric and label profiles and the connection are new in
+  `adapters/loki/contracts/logs/v1alpha1/semantics.md` §11 and modeled in
+  `adapters/loki/spec/ess`; the operator guide is `adapters/loki/README.md`. Limits: no
+  `X-Scope-OrgID` tenant header is sent, and a Loki without authentication cannot be
+  connected, because the local host admits no credential-less profile.
+- The catalog provider reads Slack conversations: `conversations.list`,
+  `conversations.history` and `conversations.replies`, from the pinned Slack Web API
+  Swagger 2.0 document (`adapters/slack/upstream/`, SHA-256 `8b92da26…936bc3a`) projected
+  to `adapters/slack/generated/slack-web.openapi.json` by the new
+  `connectors-build swagger` subcommand. A bot token travels as `Authorization: Bearer`
+  under profile `slack.bot`; connecting reads `auth.test` and records its `user_id`.
+  Each list returns one page per call and ends on an empty
+  `response_metadata.next_cursor`; the two message reads take `oldest` and `latest`. The
+  document's `token` query parameter is withheld. Limits: Slack answers most failures
+  `200` with `"ok": false`, which is returned as a successful invocation; verified against
+  a local fixture only. See `docs/catalog-slack.md`.
+
+### Changed
+
+- The documentation website moves to the shared `@beyond10x/docs-system` shell and builds
+  for its own address, `https://beyond10x.github.io/connectors/` (`baseUrl: '/connectors/'`),
+  with a product landing page and the shared page set: overview, getting started, concepts,
+  guides, examples, reference and status. Every command a page shows was run in the
+  repository and its output pasted from that run. The `Documentation validation` workflow
+  (`.github/workflows/pages.yml`) builds and checks it on every pull request and push and
+  uploads the built site from `main`; it is not yet served at that address, and the unified
+  site's `/docs/connectors/` pages stay until the organization side moves the repository.
+- The new crate `connectors-docs` generates the CLI reference from the clap definitions the
+  `connectors` binary parses, the crate list from `cargo metadata`, the contract and ESS model
+  reference from `website/publication.json` and the pinned `ess generate --kind docs`, and the
+  status page and `website/data/status.json`, where every shipped item names the test that
+  holds it. `connectors-docs generate --check` is a repository gate step. It replaces
+  `connectors-build docs`, which is removed with the site's local reference renderer, theme
+  wrappers and Pagefind search. Every workspace package now has a Cargo `description`, and
+  `connectors` has a library target holding the explicit service commands' arguments.
+
 ## 0.37.0 — 2026-10-08
 
 ### Added

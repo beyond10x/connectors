@@ -1,5 +1,6 @@
 [package]
 name = "connectors-catalog"
+description = "Catalog ingest: a pinned OpenAPI source document compiled into a bundle with the provenance every later artifact cites; never reaches the network."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
