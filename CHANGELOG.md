@@ -2,7 +2,26 @@
 
 ## Unreleased
 
+### Fixed
+
+- A connection saved under another configuration revision no longer refuses with
+  `lifecycle_conflict` and `next_action = retry_status`, which no status change clears. Reads,
+  approval targets, consumer launches and approval key and policy commands answer
+  `revalidate_connection` when an upgrade can succeed (only the configuration revision
+  changed, the credential is neither invalid nor expired, and no upgrade to the configured
+  revision was refused), and `create_connection` otherwise. A refused upgrade is recorded on
+  the connection; a repair clears it. Creating a connection under the configured revision is
+  admitted again and moves the instance to that revision when it publishes, never back to an
+  older one. Found by a read-only CLI audit: a Confluence connection saved before 0.30.0 added
+  the profile's access read refused every read with `retry_status`.
+- `connectors help describe`, `help invoke` and `help serve` print that command's usage, and
+  `connectors completions bash` completes the three explicit service commands at the root with
+  their own flags.
+
 ### Changed
+
+- The repository plans with AEP 0.69.1 (from 0.68.0). A missing or mismatched `aep` names the
+  pinned release's download, checksum and `CONNECTORS_AEP` steps.
 
 - Due expiries of transient subjects are recorded in batches of at most 128 members (from 32)
   before the batch carrying a command's own change. Every store the host opens is SQLite,
