@@ -8,12 +8,6 @@ description: Bounded LogQL range, metric and label reads through a saved bearer 
 
 Bounded LogQL reads with explicit stream and cursor semantics.
 
-:::note[Unreleased]
-
-The Loki runtime is on `main` and is not yet in a tagged release.
-
-:::
-
 The native log profile preserves Loki query semantics, stream identity and declared time, count
 and byte bounds. It specializes the shared [log datasource contract](../../contracts/data/logs.md).
 

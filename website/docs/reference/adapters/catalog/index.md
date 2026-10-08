@@ -27,7 +27,7 @@ approval, audit and attempt controls, with an optional guard declared as data.
 | Google Calendar | calendar lists and events; guarded event writes | OAuth refresh token | local fixtures | [Calendar guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-calendar.md) |
 | Gmail | messages, threads, history and labels; guarded drafts, no direct `messages.send` | OAuth refresh token | local fixtures | [Gmail guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-gmail.md) |
 | Runpod | `pod.create`, `pods.list`, `pod.terminate` | API key as a bearer token; the identity is the configured connection | a local fixture | [Runpod guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-runpod.md) |
-| Slack (unreleased) | `conversations.list`, `conversations.history`, `conversations.replies` | bot token as a bearer token, identity from `auth.test` | a local fixture | `docs/catalog-slack.md` in the repository |
+| Slack | `conversations.list`, `conversations.history`, `conversations.replies` | bot token as a bearer token, identity from `auth.test` | a local fixture | `docs/catalog-slack.md` in the repository |
 
 Google consent and the shared OAuth client setup are in the
 [Google OAuth guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-oauth.md).

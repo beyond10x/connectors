@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-08: 31 capabilities are shipped, 3 are decided and 4 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-09: 31 capabilities are shipped, 3 are decided and 4 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -51,7 +51,7 @@ As of 2026-10-08: 31 capabilities are shipped, 3 are decided and 4 are planned. 
 | [Google Drive, Slides, Calendar and Gmail](./reference/adapters/catalog/index.md) | ● shipped | Reads and guarded writes from Discovery documents projected to OpenAPI, with a refresh token from browser consent; exercised against local fixtures only. |
 | [Runpod pods](./reference/adapters/catalog/index.md) | ● shipped | pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again; verified against a local fixture only (since 0.36.0). |
 | [Swagger 2.0 sources](./guides/build-a-catalog-bundle.md) | ● shipped | A Swagger 2.0 document is ingested through an exact, recorded projection to OpenAPI 3.1.0; a construct without an exact row is refused by name (since 0.37.0). |
-| [Slack conversations (unreleased)](./reference/adapters/catalog/index.md) | ● shipped | conversations.list, conversations.history and conversations.replies with a bot token; on main, not yet in a release; verified against a local fixture only. |
+| [Slack conversations](./reference/adapters/catalog/index.md) | ● shipped | conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0); verified against a local fixture only. |
 | [Catalog index service](./reference/contracts/catalog.md) | ◐ decided | Listing and locating precompiled bundles with provenance is specified; directly configured adapters need no index. |
 
 ## Native adapters
@@ -62,7 +62,7 @@ As of 2026-10-08: 31 capabilities are shipped, 3 are decided and 4 are planned. 
 | [Helm release reads](./reference/adapters/kubernetes/index.md) | ● shipped | History, status, values and manifest of a named release, values and manifests disclosed only as redacted projections. |
 | [PostgreSQL reads](./reference/adapters/sql/index.md) | ● shipped | schema.list and query.read in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query. |
 | [Tavily web search](./reference/adapters/tavily/index.md) | ● shipped | websearch.search, websearch.fetch and websearch.crawl through the shared websearch family; the key is checked without spending a search. |
-| [Loki LogQL reads (unreleased)](./reference/adapters/loki/index.md) | ● shipped | logs.query_range, logs.query_metric and logs.labels through a saved bearer connection; on main, not yet in a release. |
+| [Loki LogQL reads](./reference/adapters/loki/index.md) | ● shipped | logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0). |
 | [Kubernetes permission checks](./reference/adapters/kubernetes/index.md) | ○ planned | Per-operation SelfSubjectAccessReview checks and the remaining Kubernetes and Helm workflows. |
 | [Loki tenants and other authentication](./reference/adapters/loki/index.md) | ○ planned | An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected. |
 | [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Atlassian native documents, Docker, Grafana, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime. |

@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-08",
+  "asOf": "2026-10-09",
   "format": "b10x-status/1",
   "items": [
     {
@@ -186,9 +186,9 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "conversations.list, conversations.history and conversations.replies with a bot token; on main, not yet in a release; verified against a local fixture only.",
+      "detail": "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0); verified against a local fixture only.",
       "href": "/docs/reference/adapters/catalog",
-      "label": "Slack conversations (unreleased)",
+      "label": "Slack conversations",
       "status": "shipped"
     },
     {
@@ -228,9 +228,9 @@
     },
     {
       "area": "Native adapters",
-      "detail": "logs.query_range, logs.query_metric and logs.labels through a saved bearer connection; on main, not yet in a release.",
+      "detail": "logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0).",
       "href": "/docs/reference/adapters/loki",
-      "label": "Loki LogQL reads (unreleased)",
+      "label": "Loki LogQL reads",
       "status": "shipped"
     },
     {

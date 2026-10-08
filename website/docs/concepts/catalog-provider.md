@@ -49,7 +49,7 @@ is sent once as approved; the same input approved and sent again creates a secon
 | Zendesk Support | pinned Support API, redacted | tickets, users and organizations changed since a time, one of each, comments | a live account |
 | Google Drive, Slides, Calendar, Gmail | Discovery documents projected to OpenAPI | reads and guarded writes; no direct message send | local fixtures |
 | Runpod | pinned REST API v1 | create, list and terminate pods | a local fixture |
-| Slack (unreleased) | Swagger 2.0 projected to OpenAPI 3.1.0 | conversation list, history and replies | a local fixture |
+| Slack | Swagger 2.0 projected to OpenAPI 3.1.0 | conversation list, history and replies | a local fixture |
 
 Each provider's page in the repository gives its configuration, authentication profile and
 limits; [Adapters](../reference/adapters/catalog/index.md) links them.

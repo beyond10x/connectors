@@ -3,13 +3,13 @@
 title: "Loki LogQL"
 sidebar_label: "Loki LogQL"
 sidebar_position: 43
-description: "Implemented by the loki adapter on main, unreleased: range, metric and label reads. Contract owner: loki."
+description: "Implemented by the loki adapter since 0.38.0: range, metric and label reads. Contract owner: loki."
 custom_edit_url: null
 ---
 
 # Loki logql-range/v1alpha1
 
-:::info[Implemented by the loki adapter on main, unreleased: range, metric and label reads]
+:::info[Implemented by the loki adapter since 0.38.0: range, metric and label reads]
 
 Rendered from [`adapters/loki/contracts/logs/v1alpha1/semantics.md`](https://github.com/beyond10x/connectors/blob/main/adapters/loki/contracts/logs/v1alpha1/semantics.md) by `connectors-docs`; the source owns every rule on this page.
 
