@@ -70,6 +70,11 @@ callables:
     input: null
     result: connectors.cli.SetupCheckResult
     errors: {failure: connectors.cli.Failure}
+  setup-checkpoints-enable:
+    target: {kind: local, owner: connectors.cli, action: setup-checkpoints-enable}
+    input: connectors.cli.SetupCheckpointsEnableInput
+    result: connectors.cli.SetupCheckpointsEnableResult
+    errors: {failure: connectors.cli.Failure}
   adapters-list:
     target: {kind: local, owner: connectors.cli, action: adapters-list}
     input: connectors.cli.AdapterListInput
@@ -281,6 +286,13 @@ commands:
     callable: setup-check
     about: Check local configuration and prerequisites without authentication
     arguments: []
+  - path: [setup, checkpoints-enable]
+    aliases: []
+    callable: setup-checkpoints-enable
+    about: Enable durable open checkpoints on the existing store; one-way, connectors 0.32.0 and earlier can no longer open it
+    arguments:
+      - field: confirm
+        source: {kind: option, long: confirm}
   - path: [adapters, list]
     aliases: []
     callable: adapters-list

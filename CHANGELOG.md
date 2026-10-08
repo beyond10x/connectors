@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased
+
+### Breaking
+
+- `setup init` creates every new metadata database with Entity Runtime 0.29.0 durable open
+  checkpoints enabled. Enabling installs Eventlog's continuity tables and triggers, and is
+  one-way for older releases: connectors 0.32.0 and earlier (Entity Runtime 0.28.0 and
+  earlier) refuse to open such a store. Upgrade every installed `connectors` binary and any
+  other tool that opens the store before using a store this release created. No command
+  removes them.
+
+### Migration
+
+- `setup checkpoints-enable --confirm one-way` enables durable open checkpoints on an existing
+  store; nothing else does, so an existing store keeps working with older releases until its
+  owner runs it. Without `--confirm one-way` it refuses `confirmation_required` (exit 2)
+  before it takes a lock or opens the store. It holds the owner lifetime lock without
+  waiting, so while an owner runs it refuses `lifecycle_conflict` with `next_action =
+  stop_owner` and the store unchanged. A store that already has checkpoints, including every
+  store `setup init` creates, answers `disposition = already_enabled`. Every result states
+  `change = one-way` and `newest_incompatible_release = "0.32.0"`.
+
+### Changed
+
+- Which open verifies what (`docs/local-er-metadata.md`, `contracts/cli/v1alpha1/semantics.md`
+  §3): the provider's open of a store with checkpoints starts from the persisted checkpoint,
+  and every fresh open the host makes (a command run directly, a second process, the owner
+  when it starts, recovery) still reads and verifies the whole store before it answers, so a
+  raw edit of the database file made while no handle was open is refused by the first command
+  or owner start after it. A handle a process keeps reads only what was appended since. The
+  host persists each pooled handle's verified observation as the store's checkpoint.
+- A command run while an owner of its own build runs reads the metadata store through it
+  instead of opening the store: a new owner `cached` request answers cached-description
+  reads from the owner's held handle, and `operations invoke` leaves its admission to the
+  owner's admission of the `invoke` request. The owner greeting's authority is read from
+  the database without replaying the store. Without such an owner a command opens and
+  verifies the store directly, as before. On stores grown by read invokes (release build,
+  `read_invoke_cost_by_store_size`), the median per-invoke metadata time is 229 ms at 601
+  events, 341 ms at 1,201 and 255 ms at 6,000; a direct open costs 0.9 s, 1.5 s and 6.9 s.
+- Due expiries of transient subjects are recorded in batches of at most 32 before the batch
+  carrying a write's own change. One batch holding every due expiry ran past the 30-second
+  bridge deadline from about 1,200 recorded events (396 expiries took 101.9 s), answered
+  `outcome_unknown`, and left the store `metadata_unavailable` until the batch finished.
+- A process that keeps a verified handle for the store no longer repeats the physical page
+  scan (`quick_check`, foreign keys) on each later open of the same file; every fresh open
+  still runs it. Page damage written to the file outside SQLite while a process holds a
+  verified handle is therefore accepted by that process until its next fresh open refuses it.
+- ESS 0.56.0 (from 0.55.0): the seven ESS crates and the pinned toolchain; it brings Entity
+  Runtime Core 0.28.0 through `ess-entity-runtime`.
+- Entity Runtime 0.30.1 (from 0.29.0) and Eventlog 0.8.1 (from 0.8.0). One Eventlog is
+  linked. The 0.8.1 release notes list changes to its file backend only
+  (https://github.com/beyond10x/eventlog/issues/42); this repository uses the SQLite backend. A
+  store written by 0.32.0 opens and reads under the new pins (`metadata_store_previous_pin`).
+
 ## 0.32.0 — 2026-10-07
 
 ### Added

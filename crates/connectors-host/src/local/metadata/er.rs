@@ -5,7 +5,7 @@ use super::{
 };
 use entity_core::{EntityDefinition, EntityInstance, OperationFieldAction, Registry};
 use entity_eventlog::{
-    Authority, CapturePolicy, EventlogOperationContext, RecordedProviderFacade,
+    Authority, CapturePolicy, EventlogOperationContext, OpenVerification, RecordedProviderFacade,
     sync::{
         BridgeConfig, CallWait, EventlogRecordedStoreOwner, EventlogRecordedStoreProvisioner,
         ProvisionAuthority, ShutdownMode, ShutdownOutcome,
@@ -461,6 +461,9 @@ pub(super) struct ErAuthority {
     /// Device and inode of the file this authority's provider opened. A store
     /// replaced at the same path is a different file and is opened afresh.
     file: Option<(u64, u64)>,
+    /// How the provider's open verified the store. Whatever it says, the host
+    /// read the store completely before this handle answered anything.
+    opened: OpenVerification,
 }
 
 /// Highest global position and number of the tenant's events. Eventlog
@@ -543,6 +546,14 @@ pub(super) fn release(er: ErAuthority) {
     if !er.reusable {
         return;
     }
+    // Persist what this handle last verified as the store's open checkpoint,
+    // so the next open's suffix holds only what follows it. A store without
+    // durable open checkpoints, an unchanged observation or a handle not opened
+    // `ProviderTracked` writes nothing; a failed write leaves the previous
+    // checkpoint, which only lengthens the next open's suffix.
+    let _ = timed("er.write_checkpoint", || {
+        er.facade.write_open_checkpoint(call_wait())
+    });
     let evicted = {
         let Ok(mut idle) = IDLE.lock() else {
             return;
@@ -573,6 +584,102 @@ pub(super) fn release(er: ErAuthority) {
     // Dropping a verified idle bridge closes admission and detaches its worker;
     // no unacknowledged write remains on this path. Keep it outside the pool.
     drop(evicted);
+}
+
+/// Whether this process keeps a verified idle handle for the store file at
+/// `path`, the same file its provider opened.
+pub(super) fn holds(path: &Path) -> bool {
+    let file = file_identity(path);
+    file.is_some()
+        && IDLE.lock().is_ok_and(|idle| {
+            idle.iter().any(|held| {
+                held.durable_path == path && held.process == process() && held.file == file
+            })
+        })
+}
+
+/// Eventlog's durable capture continuity table, which enabling durable open
+/// checkpoints installs (Eventlog 0.8.0) and only disabling them removes.
+const CONTINUITY: &str = "connectors_er_capture_continuity";
+
+/// Whether durable open checkpoints are enabled on the store `connection`
+/// reads: Eventlog's continuity table exists.
+pub(super) fn checkpoints_enabled(connection: &Connection) -> Result<bool> {
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name=?1)",
+            [CONTINUITY],
+            |row| row.get(0),
+        )
+        .map_err(unavailable)
+}
+
+/// Enables Entity Runtime durable open checkpoints on `er`'s store and
+/// persists the observation the enable verified as its first checkpoint.
+/// One-way for older releases: Entity Runtime 0.28.0 and earlier refuse to
+/// open the store afterwards. Enabling an enabled store changes nothing.
+pub(super) fn enable_checkpoints(er: &mut ErAuthority) -> Result<()> {
+    use entity_eventlog::sync::SyncReadError;
+    let failure = |error: SyncReadError| match error {
+        SyncReadError::AfterDispatch(_) => Failure::OutcomeUnknown,
+        SyncReadError::Rejected(_) | SyncReadError::Store(_) => Failure::MetadataUnavailable,
+    };
+    // A refused or unknown enable leaves this handle out of the pool.
+    er.reusable = false;
+    timed("er.enable_checkpoints", || {
+        er.facade.enable_durable_open_checkpoints(call_wait())
+    })
+    .map_err(failure)?;
+    // Enabling re-verified the whole store under this handle. A handle opened
+    // `FullVerification` (provisioning) writes no checkpoint: the next
+    // `ProviderTracked` open then verifies completely and its release writes one.
+    timed("er.write_checkpoint", || {
+        er.facade.write_open_checkpoint(call_wait())
+    })
+    .map_err(failure)?;
+    er.reusable = true;
+    Ok(())
+}
+
+/// Whether the provider's open of `er` started from a persisted open
+/// checkpoint. The host's complete read verified the whole store regardless.
+pub(super) fn opened_from_checkpoint(er: &ErAuthority) -> bool {
+    !matches!(er.opened, OpenVerification::Complete)
+}
+
+/// The provider's `ProviderTracked` open of the store at `path` on its own,
+/// without the complete read every host open follows it with: what it
+/// verified, or its refusal.
+#[cfg(test)]
+pub(super) fn provider_open(path: &Path) -> Result<OpenVerification> {
+    let (logical_scope, tenant, stream_identity): (String, String, String) =
+        Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(unavailable)?
+            .query_row(
+                "SELECT logical_scope,tenant,stream_identity FROM connectors_er_authority WHERE singleton=1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(unavailable)?;
+    let mut facade = RecordedProviderFacade::start_with_read_policy(
+        registry()?,
+        EventlogRecordedStoreOwner::Sqlite {
+            path: utf8_path(path)?,
+            prefix: PREFIX.into(),
+            authority: Authority {
+                logical_scope,
+                tenant,
+                stream_identity,
+            },
+            limits: LIMITS,
+        },
+        bridge_config(),
+        CapturePolicy::ProviderTracked,
+    )
+    .map_err(|_| Failure::MetadataUnavailable)?;
+    let opened = facade.open_verification();
+    facade.shutdown(ShutdownMode::CancelQueued, CallWait::Forever);
+    Ok(opened)
 }
 
 fn file_identity(path: &Path) -> Option<(u64, u64)> {
@@ -1747,7 +1854,6 @@ impl ErAuthority {
         projection_level: i64,
     ) -> Self {
         Self {
-            facade,
             source_level,
             projection_level,
             durable_path: path.to_owned(),
@@ -1758,6 +1864,8 @@ impl ErAuthority {
             reusable: true,
             process: process(),
             file: file_identity(path),
+            opened: facade.open_verification(),
+            facade,
         }
     }
 }
@@ -3255,6 +3363,8 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         .collect::<BTreeMap<_, _>>();
     let runtime_registry = registry()?;
     let mut actions = Vec::new();
+    // Recorded expiries of transient subjects whose SQL rows disappeared.
+    let mut expiries = Vec::new();
     for (key, current) in reference {
         match desired.get(key) {
             Some(next)
@@ -3273,7 +3383,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             }
             None => {
                 if let Some((command, next)) = removal_command(current)? {
-                    actions.push(command_action(
+                    expiries.push(command_action(
                         &runtime_registry,
                         &commands,
                         &desired,
@@ -3318,6 +3428,26 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
     }
     if prepared_observation && !reference.keys().any(registry_clock_key) {
         return Err(Failure::MetadataUnavailable);
+    }
+    // More expiries than one bounded batch holds are recorded first, in
+    // batches of at most `EXPIRY_BATCH` members; the caller's own actions
+    // follow in their own batch only once every expiry batch committed.
+    // With nothing else to record, the last expiry batch is the final batch
+    // and carries the post-commit checks below.
+    if expiries.len() > expiry_batch() {
+        let last = if actions.is_empty() {
+            (expiries.len() - 1) / expiry_batch() * expiry_batch()
+        } else {
+            expiries.len()
+        };
+        let mut tail = expiries.split_off(last);
+        let mut pending = expiries.into_iter().peekable();
+        while pending.peek().is_some() {
+            record_expiries(er, pending.by_ref().take(expiry_batch()).collect())?;
+        }
+        actions.append(&mut tail);
+    } else {
+        actions.append(&mut expiries);
     }
     // An unchanged floor is not recorded again. A change another handle made
     // since this baseline was refused above, before this batch; each action
@@ -3428,6 +3558,101 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         return Err(Failure::MetadataUnavailable);
     }
     Ok(())
+}
+
+/// The most expiries one batch records when more are due than fit in it.
+/// Entity Runtime 0.29.0's batch execution grows faster than linearly with its
+/// member count: on the stores `read_invoke_cost_by_store_size` grows, a batch of
+/// 196 expiries took 21.4 s at 601 events and one of 396 took 101.9 s at 1,201,
+/// past the 30-second bridge deadline. 32 is the largest size, up to 32, whose batch
+/// stays under 2 s at 6,000 events (`first_owner_open_of_a_grown_store`, release,
+/// 2026-10-08): 996 due expiries took 32 batches of at most 32, median 762 ms,
+/// max 1,215 ms; batches of 16 took median 286 ms, max 560 ms.
+const EXPIRY_BATCH: usize = 32;
+
+#[cfg(test)]
+thread_local! {
+    static EXPIRY_BATCH_OVERRIDE: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    /// Counts the expiry batches this thread executed; the one numbered
+    /// `FAIL_EXPIRY_BATCH` (1-based) is refused before dispatch.
+    static EXPIRY_BATCHES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static FAIL_EXPIRY_BATCH: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    /// Wall time of each expiry batch this thread executed, for measurements.
+    pub(super) static EXPIRY_TIMES: std::cell::RefCell<Vec<Duration>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn expiry_batch() -> usize {
+    #[cfg(test)]
+    if let Some(size) = EXPIRY_BATCH_OVERRIDE.with(std::cell::Cell::get) {
+        return size;
+    }
+    EXPIRY_BATCH
+}
+
+/// Runs `call` with expiry batches of at most `size` members; with `fail`, the
+/// expiry batch of that 1-based number is refused before dispatch. Returns the
+/// value and how many expiry batches ran.
+#[cfg(test)]
+pub(super) fn with_expiry_batches<T>(
+    size: usize,
+    fail: Option<usize>,
+    call: impl FnOnce() -> T,
+) -> (T, usize) {
+    EXPIRY_BATCH_OVERRIDE.with(|slot| slot.set(Some(size)));
+    FAIL_EXPIRY_BATCH.with(|slot| slot.set(fail));
+    EXPIRY_BATCHES.with(|slot| slot.set(0));
+    let value = call();
+    EXPIRY_BATCH_OVERRIDE.with(|slot| slot.set(None));
+    FAIL_EXPIRY_BATCH.with(|slot| slot.set(None));
+    (value, EXPIRY_BATCHES.with(std::cell::Cell::get))
+}
+
+/// Records one bounded batch of expiries ahead of the caller's batch and folds
+/// it into `er`'s baseline. Its receipt must read back like any own batch; the
+/// projection check of `persist_batch` runs once, after the caller's batch,
+/// because only then does the store hold everything the projection asks for.
+/// A refused or uncertain batch returns its failure: earlier expiry batches
+/// stay committed, the caller's batch is not executed, and the next write
+/// records the expiries still due.
+fn record_expiries(er: &mut ErAuthority, expiries: Vec<BatchAction>) -> Result<()> {
+    #[cfg(test)]
+    {
+        let number = EXPIRY_BATCHES.with(|slot| {
+            slot.set(slot.get() + 1);
+            slot.get()
+        });
+        if FAIL_EXPIRY_BATCH.with(std::cell::Cell::get) == Some(number) {
+            return Err(Failure::MetadataUnavailable);
+        }
+    }
+    let batch = BatchKey::Named(format!(
+        "connectors-metadata-expiry-{}",
+        uuid::Uuid::new_v4()
+    ));
+    #[cfg(test)]
+    let started = Instant::now();
+    let outcome = timed("er.execute_expiry_batch", || {
+        er.facade.execute_batch(
+            context("metadata-expiry"),
+            batch.clone(),
+            expiries,
+            batch_wait(),
+        )
+    })
+    .map_err(map_execution_failure)?;
+    #[cfg(test)]
+    EXPIRY_TIMES.with(|times| times.borrow_mut().push(started.elapsed()));
+    let receipt = outcome.receipt().ok_or(Failure::MetadataUnavailable)?;
+    let observed = catch_up(er, Some(&batch))?;
+    if receipt.members().iter().all(|member| {
+        observed
+            .get(&(member.subject.entity.clone(), member.subject.id.clone()))
+            .is_some_and(|records| records.iter().any(|record| record.receipt == *member))
+    }) {
+        Ok(())
+    } else {
+        Err(Failure::MetadataUnavailable)
+    }
 }
 
 fn postcommit_projection_matches(
