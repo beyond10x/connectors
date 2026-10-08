@@ -6,7 +6,7 @@ status: active
 title: A successful invoke names the attempt it produced
 relations:
 - serves: vision:independent-contract-adapters
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T10:59:14Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-08T10:59:14Z", actor: "human:timo", revision: 4}
@@ -55,3 +55,7 @@ The legacy `/v1/invoke` binding and its v1alpha1 envelope stay as frozen
 - A read operation on v1alpha2 carries no `mutation`.
 - `/v1/invoke` answers byte-identical to the previous release on the existing wire vectors.
 - The CHANGELOG names the new route, the client entry point and the unchanged legacy binding.
+
+## Release note
+
+- The 0.35.0 CHANGELOG lists `connectors.mutations.AttemptRecord.connection_ref` becoming optional (absent for attempts the HTTP host records) as a breaking change for `connectors-client` callers, with its migration.
