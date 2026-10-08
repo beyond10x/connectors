@@ -793,7 +793,13 @@ report `timeout` / `capacity` at `stage = dispatch` with
 `next_action = retry_explicitly`. A connection that never opened sent nothing
 and is not one of them. The host's own deadline and limits, and an adapter's
 own connect or work deadline and result bounds, keep `stage = admission`
-(`retry_explicitly`). An HTTP 429 stays `service_failure` with
+(`retry_explicitly`). An `operations invoke` read whose deadline passes after
+the owner dispatched it (its read use recorded dispatched) is the provider's
+`timeout` at `stage = dispatch`; one whose deadline passes before is the host's
+at `stage = admission`, and the owner dispatches nothing for it afterwards. The
+owner answers by the deadline; an invoke the CLI sent whose answer it never
+receives may have been dispatched and reports `outcome_unknown`.
+An HTTP 429 stays `service_failure` with
 `service_code = rate_limited`, and with `retry_after_seconds` when the provider
 named a delay. `unsupported` is always `admission`: every
 source of it is raised before dispatch.
