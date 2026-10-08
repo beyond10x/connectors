@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.34.0
+# Source release v0.35.0
 
-Version **0.34.0** specifies at ESS source format `ess/15` with the released
+Version **0.35.0** specifies at ESS source format `ess/15` with the released
 ESS 0.56.0 and plans with the released AEP 0.69.1; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -90,6 +90,14 @@ there when it publishes; a changed provider authority or profile declaration sti
 new instance id. `connectors help describe`, `help invoke` and `help serve` print their
 usage, and bash completion covers those three commands. Due expiries are recorded in batches
 of at most 128. The repository plans with AEP 0.69.1.
+
+Since 0.35.0 the HTTP host serves `POST /v1alpha2/invoke` when its service configuration names
+a `state` directory. Every admitted invocation is anchored in the execution audit before
+dispatch and answers `audit_ref` and `audit_status`; an admitted write records an attempt
+before its one dispatch and answers `mutation` naming it, or `outcome_unknown` with that
+attempt when its answer is lost. `connectors_client::Client::invoke_v1alpha2` returns the
+attempt. `AttemptRecord.connection_ref` is optional, which breaks `connectors-client` callers
+that read it. Retained audit observations are held in memory and lost on restart.
 
 ## Available runtime
 

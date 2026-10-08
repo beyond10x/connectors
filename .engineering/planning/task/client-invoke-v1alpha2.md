@@ -2,13 +2,17 @@
 format: aep.planning-md/3
 id: task:client-invoke-v1alpha2
 kind: task
-status: draft
+status: implemented
 title: The client invokes over v1alpha2 and returns the attempt it produced
 relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:http-host-mutation-ledger
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T14:14:26Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-08T14:14:26Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-08T14:14:26Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
