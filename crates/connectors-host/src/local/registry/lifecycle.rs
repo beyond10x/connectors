@@ -286,10 +286,26 @@ fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
         .optional()
         .map_err(db)?;
     match existing {
-        Some((adapter, revision))
-            if adapter != binding.adapter_id || revision != binding.configuration_revision =>
-        {
+        Some((adapter, _)) if adapter != binding.adapter_id => {
             return Err(Failure::Conflict);
+        }
+        // A new connection under the configured revision moves its instance
+        // there, as an upgrading revalidation does; older connections of the
+        // instance keep theirs and can still follow on revalidation. Without
+        // this, an instance whose connections never followed an upgrade (the
+        // new provider refused the credential) admits no connection at all.
+        Some((_, revision)) if revision != binding.configuration_revision => {
+            tx.execute(
+                "UPDATE registry_instances SET configuration_revision=?2 WHERE instance_id=?1",
+                params![binding.instance_id, binding.configuration_revision],
+            )
+            .map_err(db)?;
+            super::revalidation::follow_instance(
+                tx,
+                &binding.instance_id,
+                &binding.configuration_revision,
+            )?;
+            bump(tx, &binding.instance_id)?;
         }
         Some(_) => {}
         None => {

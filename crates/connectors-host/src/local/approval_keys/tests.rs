@@ -631,3 +631,41 @@ fn uncertain_deletion_keeps_retirement_fence_and_exact_retry() {
         .with_signer(|_| Ok(()))
         .unwrap();
 }
+
+/// story:pending-connection-refusal-names-its-remedy: an instance whose
+/// recorded configuration revision is not the configured one refuses its
+/// passive key status by name, as a changed binding a new connection clears;
+/// another adapter on the instance stays a plain conflict. A new connection
+/// under the configured revision moves the instance, and status then answers.
+#[test]
+fn a_changed_configuration_refuses_key_status_as_a_changed_binding() {
+    use crate::local::registry::{Registry, fixture_binding};
+    let root = tempfile::tempdir_in(std::env::var_os("TMPDIR").unwrap()).unwrap();
+    let state = root.path().join("state");
+    fs::directory(&state, true, true).unwrap();
+    drop(Metadata::initialize(&state).unwrap());
+    let registry = Registry::new(&state);
+    registry
+        .begin(&fixture_binding("instance"), 1_788_998_400_000)
+        .unwrap();
+    let store = |adapter: &str, configuration: &str| {
+        Store::new(&state, None, "instance", adapter, configuration).unwrap()
+    };
+    assert!(store("adapter", "config").status().unwrap().is_none());
+    assert_eq!(
+        store("adapter", "config-2").status().unwrap_err(),
+        Failure::BindingChanged
+    );
+    assert_eq!(
+        store("other-adapter", "config").status().unwrap_err(),
+        Failure::Conflict
+    );
+    let mut configured = fixture_binding("instance");
+    configured.configuration_revision = "config-2".into();
+    registry.begin(&configured, 1_788_998_400_001).unwrap();
+    assert!(store("adapter", "config-2").status().unwrap().is_none());
+    assert_eq!(
+        store("adapter", "config").status().unwrap_err(),
+        Failure::BindingChanged
+    );
+}

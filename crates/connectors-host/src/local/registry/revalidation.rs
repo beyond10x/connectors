@@ -65,6 +65,18 @@ fn admitted(
     }
 }
 
+/// The refusal of a connection whose binding is not the configured one. It is
+/// `pending` and no status change is pending for it: a revalidation follows a
+/// configuration upgrade of its instance, any other change needs a new
+/// connection. Never the plain `Conflict` a retry would repeat.
+pub(super) fn changed(recorded: &Binding, configured: &Binding) -> Failure {
+    if upgradable(recorded, configured) {
+        Failure::UpgradeRequired
+    } else {
+        Failure::BindingChanged
+    }
+}
+
 /// The profile declaration's revision digests its scheme, capability, entry
 /// fields, scopes and evidence lifetime, so an equal declaration is unchanged
 /// authentication. Only the configuration revision may differ.

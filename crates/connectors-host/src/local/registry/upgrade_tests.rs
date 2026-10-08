@@ -183,7 +183,7 @@ fn invocation_is_admitted_under_the_upgraded_revision_and_not_the_old_one() {
     // Before the upgrade only the admitted revision reads.
     assert_eq!(
         registry.admit_read(&upgraded(), &reference, &none, LATER),
-        Err(Failure::Conflict)
+        Err(Failure::UpgradeRequired)
     );
     let captured = registry
         .capture_revalidation(&upgraded(), &reference, &revision, LATER, LATER + 1000)
@@ -203,11 +203,11 @@ fn invocation_is_admitted_under_the_upgraded_revision_and_not_the_old_one() {
     registry.dispatch_read(read, LATER).unwrap();
     assert_eq!(
         registry.admit_read(&binding(), &reference, &none, LATER),
-        Err(Failure::Conflict)
+        Err(Failure::UpgradeRequired)
     );
     assert!(matches!(
         registry.capture_read(&binding(), &reference, &none, LATER, LATER + 1000),
-        Err(Failure::Conflict)
+        Err(Failure::UpgradeRequired)
     ));
 }
 
@@ -347,7 +347,7 @@ fn other_connections_of_the_instance_keep_their_revision_until_revalidated() {
     assert_eq!(stale.state, State::Pending);
     assert_eq!(
         registry.admit_read(&upgraded(), &second, &BTreeSet::new(), LATER),
-        Err(Failure::Conflict)
+        Err(Failure::UpgradeRequired)
     );
     // The kept revision replays from the record in a fresh handle.
     drop(registry);
@@ -405,4 +405,97 @@ fn adversary_a_revoked_sibling_does_not_block_the_upgrade_of_a_live_connection()
         observe(&reopened, "config-2", &live, LATER).state,
         State::Ready
     );
+}
+
+/// story:pending-connection-refusal-names-its-remedy: a connection saved under
+/// another configuration revision is `pending` and no status change is pending
+/// for it, so its read and approval refusals name the step that clears it:
+/// revalidation while only the revision differs, a new connection when the
+/// authentication changed too. Never the plain conflict a retry repeats.
+#[test]
+fn a_stale_connection_names_the_step_that_clears_it() {
+    let (_root, registry) = fixture();
+    let (reference, _, _) = connected(&registry, "one");
+    let none = BTreeSet::new();
+    let stale = observe(&registry, "config-2", &reference, LATER);
+    assert!(stale.stale);
+    assert_eq!(stale.state, State::Pending);
+    assert_eq!(
+        registry.admit_read(&upgraded(), &reference, &none, LATER),
+        Err(Failure::UpgradeRequired)
+    );
+    assert!(matches!(
+        registry.capture_read(&upgraded(), &reference, &none, LATER, LATER + 1000),
+        Err(Failure::UpgradeRequired)
+    ));
+    assert_eq!(
+        registry.approval_target(&upgraded(), &reference, &none),
+        Err(Failure::UpgradeRequired)
+    );
+    let mut changed = upgraded();
+    changed.profile.revision = "profile-2".into();
+    assert_eq!(
+        registry.admit_read(&changed, &reference, &none, LATER),
+        Err(Failure::BindingChanged)
+    );
+    assert!(matches!(
+        registry.capture_read(&changed, &reference, &none, LATER, LATER + 1000),
+        Err(Failure::BindingChanged)
+    ));
+    assert_eq!(
+        registry.approval_target(&changed, &reference, &none),
+        Err(Failure::BindingChanged)
+    );
+}
+
+/// story:pending-connection-refusal-names-its-remedy: `create_connection` is a
+/// remedy only if a connection can be made under the configured revision while
+/// an older connection of the instance has not followed it, as after an upgrade
+/// the new provider refused. The new connection moves the instance; the older
+/// connection keeps its own revision and can still follow the upgrade.
+#[test]
+fn a_new_connection_under_the_configured_revision_moves_the_instance() {
+    let (root, registry) = fixture();
+    let (old, old_revision, _) = connected(&registry, "one");
+    let before = recorded(root.path(), &old);
+    // The new provider refuses the credential: nothing changes.
+    let captured = registry
+        .capture_revalidation(&upgraded(), &old, &old_revision, LATER, LATER + 1000)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
+    registry
+        .finish_revalidation(
+            dispatched,
+            Err(Some(InvalidCredential::Insufficient)),
+            LATER,
+        )
+        .unwrap();
+    assert_eq!(recorded(root.path(), &old), before);
+
+    let acquisition = registry.begin(&upgraded(), LATER).unwrap();
+    let claim = registry.consume(acquisition, LATER).unwrap();
+    let candidate = registry
+        .prepare(&claim, validated("two", LATER), 12, LATER)
+        .unwrap();
+    let new = publish_fixture(&registry, candidate, LATER);
+    assert_eq!(recorded(root.path(), &new).instance_revision, "config-2");
+    assert_eq!(
+        observe(&registry, "config-2", &new, LATER).state,
+        State::Ready
+    );
+    let kept = recorded(root.path(), &old);
+    assert_eq!(kept.binding, binding());
+    assert!(observe(&registry, "config-2", &old, LATER).stale);
+    // The record replays to the same projection in a fresh handle.
+    drop(registry);
+    let registry = Registry::new(root.path());
+    assert_eq!(recorded(root.path(), &old), kept);
+    let captured = registry
+        .capture_revalidation(&upgraded(), &old, &old_revision, LATER, LATER + 1000)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
+    registry
+        .finish_revalidation(dispatched, Ok(validated("one", LATER)), LATER)
+        .unwrap();
+    assert_eq!(recorded(root.path(), &old).binding, upgraded());
 }

@@ -19,7 +19,7 @@ fn admitted_read(
         return Err(Failure::Revoked);
     }
     if row.binding != *binding {
-        return Err(Failure::Conflict);
+        return Err(super::revalidation::changed(&row.binding, binding));
     }
     // Custody is only a bounded observation here. The captured material and
     // current fence are checked separately at the final dispatch boundary.

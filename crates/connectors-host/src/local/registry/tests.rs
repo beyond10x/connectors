@@ -42,7 +42,7 @@ fn approval_target_is_passive_but_requires_exact_retained_admission() {
     changed.provider_authority.push_str("/other");
     assert_eq!(
         passive.approval_target(&changed, &reference, &BTreeSet::new()),
-        Err(Failure::Conflict)
+        Err(Failure::BindingChanged)
     );
     assert_eq!(
         passive.approval_target(&binding(), &reference, &BTreeSet::from(["write".into()])),

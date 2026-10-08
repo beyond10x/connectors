@@ -62,6 +62,10 @@ pub enum Failure {
     /// refuses the changed binding, a new connection can help. Public code
     /// `identity_mismatch`.
     UpgradeIdentityMismatch,
+    /// The connection's binding names another configuration revision of its
+    /// instance under an unchanged provider authority and profile declaration:
+    /// a revalidation follows the upgrade. Public code `lifecycle_conflict`.
+    UpgradeRequired,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
