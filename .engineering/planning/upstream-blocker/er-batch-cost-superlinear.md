@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: upstream-blocker:er-batch-cost-superlinear
 kind: upstream-blocker
-status: open
+status: cleared
 title: Entity Runtime batch execution time grows faster than its members (0.29.0)
 relations:
 - blocks: story:lift-expiry-batch-bound
-revision: 2
+revision: 4
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-08T07:53:30Z", actor: "human:timo", revision: 4}
 ---
 ## What blocks
 
@@ -42,3 +44,9 @@ Entity Runtime tracks the fix as `story:batch-cost-grows-linearly-with-members` 
 https://github.com/beyond10x/entity-runtime, after its 0.30.1 release (Eventlog 0.8.1,
 https://github.com/beyond10x/entity-runtime/pull/71). story:lift-expiry-batch-bound lifts the
 bound when that release is pinned.
+
+## Cleared
+
+Cleared by Entity Runtime 0.30.2 (released 2026-10-08, `story:batch-cost-grows-linearly-with-members`),
+pinned by connectors 0.33.0. It holds for SQLite stores; the File and PostgreSQL providers remain
+superlinear.

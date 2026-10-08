@@ -239,7 +239,16 @@ successful results stay raw JSON. `--config` and `--state-dir` are not accepted
 before them (`serve --config` is that command's own argument). Their parse
 errors, including unknown, missing or malformed arguments, follow the output
 contract above: exit 2, empty stdout, and the fixed `cli_parse` code with empty
-data on stderr, never an argv echo. `COMMAND --help` prints that command's usage.
+data on stderr, never an argv echo. `COMMAND --help` prints that command's usage,
+and exactly `help COMMAND` prints the same usage with the same exit status;
+`help COMMAND` with a leading global or followed by anything else stays a parse
+refusal. `completions bash` emits the
+generated completion function unchanged, followed by a completion for these
+three commands built from their own parser and a routing function registered
+for `connectors`: a command line whose command word, after any leading
+`--output` selections, is one of them completes that command's own options;
+any other line is completed by the generated function, with the three command
+words added at the root and as the word after a leading `help`.
 Root `--help` or `-h`, alone or after leading process globals, prints the
 generated grouped help (the short form of the long help
 in `apps/connectors-cli-contract/help.txt`), one blank line and then this block,
@@ -371,7 +380,7 @@ admission of `invoke`, [local owner transport](owner.md)) and does not open it;
 without such an owner it opens the store directly and verifies it completely.
 A write through any SQLite connection is proven or makes the next read verify
 completely, as before. Due expiries of transient subjects are recorded in
-batches of at most 32 before the batch carrying the command's own change; a
+batches of at most 128 before the batch carrying the command's own change; a
 refused expiry batch leaves earlier ones committed and the command's change
 unapplied, with its failure unchanged.
 
@@ -746,6 +755,34 @@ on its own: a business read runs no implicit identity probe. A connection whose
 credential expired or is known invalid (`reauthorization_required`), and a
 credential below the operation's scopes, keep `code = not_granted` with
 `next_action = repair_connection`.
+
+A connection saved under another configuration revision of its instance also
+reports `pending` (`stale = true`), and no status change is pending for it: a
+read on `operations invoke`, an approval naming it and a consumer launch refuse
+it as `code = lifecycle_conflict` at `stage = admission`, never with
+`next_action = retry_status`. The next action is `revalidate_connection` only
+when a revalidation can follow the configuration upgrade: its provider
+authority and profile declaration are unchanged, its credential is neither
+known invalid nor expired, and the new provider has not already refused it
+under the configured revision. Otherwise it is `create_connection`, because
+repair refuses a changed binding. A revalidation the new provider refuses (the
+credential invalid, below scope or another identity) answers `create_connection`
+and records the refusal against the configured revision
+(`Connection.refused_configuration_revision`), so the next read names
+`create_connection` too; the refusal invalidates nothing under the connection's
+own revision, revalidation stays admitted, and a later upgrade that succeeds
+or a repair that replaces the credential removes it. An approval reads the
+wall clock for this classification only, as the read path does, without
+advancing the registry clock. `connections connect` under the configured
+revision is admitted while older connections of the instance stay saved under theirs. The instance's
+own recorded configuration revision moves to the configured one only when a
+connection is published under it: a revalidation that upgrades one, or a new
+connection whose publication succeeds while the instance still records the
+revision it had when that connect began. A connect that fails or is abandoned
+moves nothing, and a connect begun under an older configuration never moves
+the instance back. Until it moves, the instance's approval keys (`approvals
+key-status` and the other key commands) and its approval policy commands
+refuse as `code = lifecycle_conflict` with `next_action = create_connection`.
 
 A provider's timeout or capacity answer is the provider's too: a request the
 provider transport sent whose deadline then passed (a connection probe's

@@ -1,5 +1,49 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A connection saved under another configuration revision no longer refuses with
+  `lifecycle_conflict` and `next_action = retry_status`, which no status change clears. Reads,
+  approval targets, consumer launches and approval key and policy commands answer
+  `revalidate_connection` when an upgrade can succeed (only the configuration revision
+  changed, the credential is neither invalid nor expired, and no upgrade to the configured
+  revision was refused), and `create_connection` otherwise. A refused upgrade is recorded on
+  the connection; a repair clears it. Creating a connection under the configured revision is
+  admitted again and moves the instance to that revision when it publishes, never back to an
+  older one. Found by a read-only CLI audit: a Confluence connection saved before 0.30.0 added
+  the profile's access read refused every read with `retry_status`.
+- `connectors help describe`, `help invoke` and `help serve` print that command's usage, and
+  `connectors completions bash` completes the three explicit service commands at the root with
+  their own flags.
+
+### Changed
+
+- The repository plans with AEP 0.69.1 (from 0.68.0). A missing or mismatched `aep` names the
+  pinned release's download, checksum and `CONNECTORS_AEP` steps.
+
+- Due expiries of transient subjects are recorded in batches of at most 128 members (from 32)
+  before the batch carrying a command's own change. Every store the host opens is SQLite,
+  where Entity Runtime 0.30.2 no longer shows 0.29.0's superlinear batch cost. Measured on
+  the release build of `first_owner_open_of_a_grown_store`, 2026-10-08, the catch-up of a
+  fresh owner's first write:
+
+  | store | bound | expiry batches | largest batch | catch-up |
+  |---|---|---|---|---|
+  | 1,201 events (396 expiries) | none | one, with the write | 4.0 s | 6.5 s |
+  | 1,201 events | 128 | 4 | 1.4 s | 5.8 s |
+  | 6,000 events | none | one, with the write | 14.4 s | 20.9 s |
+  | 6,000 events | 32 (3 runs) | 32 | 0.5–1.3 s | 14.7–17.6 s |
+  | 6,000 events | 128 (4 runs) | 8 | 1.5–2.5 s | 13.2–20.0 s |
+  | 6,000 events | 256 | 4 | 2.8 s | 13.9 s |
+
+  On Entity Runtime 0.29.0 one batch of 396 expiries took 101.9 s, past the 30-second bridge
+  deadline. Unbounded batches now finish inside it at both sizes, but still grow with the
+  backlog, so a bound stays: 128 keeps each batch more than ten times inside the deadline in
+  a quarter of the batches 32 needs. The machine was loaded (load average about 21 on 20
+  cores), so single runs vary by up to 40 %.
+
 ## 0.33.0 — 2026-10-08
 
 ### Breaking

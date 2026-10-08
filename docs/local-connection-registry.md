@@ -128,8 +128,18 @@ it differs from its instance's (`configuration_revision` on
 with the revision it keeps. A revoked connection is terminal: it records no
 revision of its own and follows its instance, so an upgrade never re-records it.
 A new connection of the instance is admitted under
-the instance's current revision. Changing the provider authority or the profile
-declaration still needs a new instance id.
+the instance's current revision, or under the configured revision when the two
+differ. A connection published under the configured revision moves the instance
+to it in the same metadata commit, as an upgrading revalidation does; a
+connection begun under an older revision never moves the instance back. Changing
+the provider authority or the profile declaration still needs a new instance id.
+
+A refused upgrade (a credential the new provider refuses, or another identity)
+is recorded on the connection, so reads, approval targets and launches answer
+`next_action = create_connection` instead of sending the caller back to
+revalidation; a repair or a successful upgrade clears the record. A stale
+connection whose credential is known invalid or has expired is answered the same
+way, since revalidation cannot move it.
 
 ## Read use and retirement
 
