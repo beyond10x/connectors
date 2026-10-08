@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.33.0 — 2026-10-08
 
 ### Breaking
 
@@ -49,10 +49,12 @@
   verified handle is therefore accepted by that process until its next fresh open refuses it.
 - ESS 0.56.0 (from 0.55.0): the seven ESS crates and the pinned toolchain; it brings Entity
   Runtime Core 0.28.0 through `ess-entity-runtime`.
-- Entity Runtime 0.30.1 (from 0.29.0) and Eventlog 0.8.1 (from 0.8.0). One Eventlog is
+- Entity Runtime 0.30.2 (from 0.29.0) and Eventlog 0.8.1 (from 0.8.0). One Eventlog is
   linked. The 0.8.1 release notes list changes to its file backend only
   (https://github.com/beyond10x/eventlog/issues/42); this repository uses the SQLite backend. A
   store written by 0.32.0 opens and reads under the new pins (`metadata_store_previous_pin`).
+  Entity Runtime 0.30.2 records a batch in time linear in its members on SQLite stores; the
+  measurements above were taken on 0.30.1, and the 32-member expiry batch bound is unchanged.
 
 ## 0.32.0 — 2026-10-07
 
