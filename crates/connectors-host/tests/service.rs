@@ -127,6 +127,7 @@ async fn federation_preserves_result_and_reports_downstream_failure() {
             instance: "gateway".into(),
             listen: "127.0.0.1:0".parse().unwrap(),
             service_credential: credential.clone(),
+            state: None,
         },
         downstreams: vec![DownstreamConfig {
             name: "source".into(),
@@ -281,6 +282,7 @@ async fn federation_refreshes_atomically_without_replaying_and_rotates_credentia
                 instance: "gateway".into(),
                 listen: "127.0.0.1:0".parse().unwrap(),
                 service_credential: credential.clone(),
+                state: None,
             },
             downstreams: vec![DownstreamConfig {
                 name: "source".into(),

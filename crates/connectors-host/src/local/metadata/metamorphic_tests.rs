@@ -298,8 +298,8 @@ impl World {
                     adapter: ADAPTER.into(),
                     operation: "item.write".into(),
                 },
-                connection_ref: reference.clone(),
-                connection_revision: revision.clone(),
+                connection_ref: Some(reference.clone()),
+                connection_revision: Some(revision.clone()),
                 contract_ref: "operations/v1alpha1".into(),
                 profile: "mutation".into(),
                 descriptor_revision: "descriptor".into(),
@@ -336,6 +336,7 @@ impl World {
             instance_id: INSTANCE.into(),
             kind: audit::Kind::AdmittedExecution,
             activity: Some(audit::Activity::Invoke),
+            access: None,
             hop: audit::Hop::Execution,
             stage: audit::Stage::Admission,
             request_id: Some(request.into()),
@@ -1121,7 +1122,7 @@ fn mr13_refused_mutation_commands_leave_every_view_unchanged() {
     );
     // Stale connection revision at preparation.
     let mut stale = world.candidate(0, "stale", None);
-    stale.fingerprint.connection_revision = "stale-revision".into();
+    stale.fingerprint.connection_revision = Some("stale-revision".into());
     assert!(world.mutations.prepare(&stale).is_err());
     // A clock below the recorded floor during known settlement.
     *world.clock.0.lock().unwrap() -= 10_000;

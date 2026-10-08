@@ -47,8 +47,12 @@ pub struct Route {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Fingerprint {
     pub operation: OperationRef,
-    pub connection_ref: String,
-    pub connection_revision: String,
+    /// Both present for a local-owner attempt, both absent for one the HTTP
+    /// host records: `POST /v1alpha2/invoke` resolves no Connection
+    /// (`ess/domains/idempotency.yaml`, RequestFingerprint). A keyed
+    /// candidate needs both.
+    pub connection_ref: Option<String>,
+    pub connection_revision: Option<String>,
     pub contract_ref: String,
     pub profile: String,
     pub descriptor_revision: String,
@@ -203,8 +207,6 @@ impl Candidate {
             &f.operation.instance,
             &f.operation.adapter,
             &f.operation.operation,
-            &f.connection_ref,
-            &f.connection_revision,
             &f.contract_ref,
             &f.profile,
             &f.descriptor_revision,
@@ -213,8 +215,22 @@ impl Candidate {
         ] {
             identifier(value)?;
         }
-        for value in [&n.tenant, &n.realm, &n.executor].into_iter().flatten() {
+        for value in [
+            &n.tenant,
+            &n.realm,
+            &n.executor,
+            &f.connection_ref,
+            &f.connection_revision,
+        ]
+        .into_iter()
+        .flatten()
+        {
             identifier(value)?;
+        }
+        if f.connection_ref.is_some() != f.connection_revision.is_some()
+            || (self.caller_key.is_some() && f.connection_ref.is_none())
+        {
+            return Err(Failure::InvalidInput);
         }
         if f.operation.instance != n.receiver_instance
             || f.canonicalization_version != "adapter-v1-canonical-json"
