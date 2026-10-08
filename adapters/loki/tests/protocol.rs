@@ -630,3 +630,35 @@ fn a_nonempty_query_scope_is_not_admitted_without_a_parser() {
     scoped["query_scope"]["required_equalities"] = json!([{"label": "job", "value": "api"}]);
     assert!(Loki::new("l", &scoped, Arc::new(http)).is_err());
 }
+
+/// Recent logs through Grafana: the last fifteen minutes is `logs.query_range` with
+/// `start_unix_ns` fifteen minutes before now and no `end_unix_ns`, so the window ends at
+/// the receiver clock. Behind Grafana's data-source proxy the request goes below the
+/// proxy prefix the connection's `base_url` carries.
+#[tokio::test]
+async fn recent_logs_through_the_grafana_proxy_end_at_the_receiver_clock_below_the_prefix() {
+    const PROXY: &str = "api/datasources/proxy/uid/P8E80F9AEF21F6940/";
+    let (base, seen) = server(vec![(200, fixture("query_range_streams.json"))]).await;
+    let base = format!("{base}{PROXY}");
+    let fifteen_minutes_ago = (NOW_MS - 15 * 60 * 1000) * 1_000_000;
+    let out = loki(&base)
+        .invoke(
+            "logs.query_range",
+            json!({"query": "{app=\"api\"}", "start_unix_ns": fifteen_minutes_ago.to_string()}),
+        )
+        .await
+        .unwrap();
+    let seen = seen.lock().unwrap()[0].clone();
+    assert_eq!(seen.path, format!("/{PROXY}loki/api/v1/query_range"));
+    let sent = query(&seen);
+    assert_eq!(sent["start"], fifteen_minutes_ago.to_string());
+    assert_eq!(sent["end"], END);
+    assert_eq!(sent["direction"], "backward");
+    assert_eq!(out["order"], "timestamp-backward");
+    assert_eq!(out["lines"][0]["line"], "boom");
+    assert_eq!(
+        out["selection"],
+        json!({"kind": "loki-range", "start_unix_ns": fifteen_minutes_ago.to_string(),
+               "end_unix_ns": END, "direction": "backward"})
+    );
+}

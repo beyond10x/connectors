@@ -91,6 +91,34 @@ accepts is the same identity, so a repair cannot detect a token of another tenan
 **No tenant header is sent.** A multi-tenant Loki that requires `X-Scope-OrgID` from the client
 is not reachable; a gateway that derives the tenant from the token is.
 
+## Through Grafana
+
+Grafana's data-source proxy serves a Loki data source's HTTP API below
+`/api/datasources/proxy/uid/<uid>/` and authenticates the request with a Grafana
+service-account token. A Loki connection reads through it unchanged: set `base_url` to that
+path and connect with the Grafana token as the `loki.bearer` token.
+
+```json
+{
+  "format": "connectors-loki-local/1",
+  "instance": "grafana-prod-loki",
+  "base_url": "https://grafana.example.internal/api/datasources/proxy/uid/P8E80F9AEF21F6940/",
+  "query_scope": {"required_equalities": []}
+}
+```
+
+The uid is the `uid` member of the [Grafana adapter's](../grafana/README.md) `datasources.list`
+record whose `type` is `loki` and `access` is `proxy`. The probe and every read then go to
+`<base_url>loki/api/v1/...` with `Authorization: Bearer <Grafana token>`
+(`tests/local_runtime.rs`,
+`a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). Grafana,
+not Connectors, decides which data sources the token reaches and which credentials Grafana
+adds toward Loki. The identity is still the configured `instance`: use one per Grafana and
+data source.
+
+Recent logs, such as the last fifteen minutes, are `logs.query_range` with `start_unix_ns`
+fifteen minutes before now and no `end_unix_ns`, which ends the window at the receiver clock.
+
 ## Evidence lifetime
 
 Validation evidence lasts 60 seconds. After it the connection lists as `pending` and a read is

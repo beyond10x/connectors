@@ -1,6 +1,6 @@
-//! The Loki executable through the host's private runtime, against a local TLS
-//! fixture serving the recorded answers in `tests/fixtures` (Loki v3.7.0 HTTP
-//! API shapes). No real Loki is contacted and no real credential is used.
+//! The Grafana executable through the host's private runtime, against a local TLS fixture
+//! serving the recorded answer in `tests/fixtures` (Grafana `GET /api/datasources` shape).
+//! No real Grafana is contacted and no real credential is used.
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
@@ -32,13 +32,9 @@ use tokio_rustls::{
 mod cli_journey;
 
 /// Fictional fixture material only.
-const TOKEN_ONE: &str = "fixture-loki-token-one";
-const TOKEN_TWO: &str = "fixture-loki-token-two";
-const INSTANCE: &str = "fixture-loki";
-const START: &str = "1788822000000000000";
-const END: &str = "1788825600000000000";
-const LOGQL: &str = r#"{app="api"} |= "error""#;
-const METRIC: &str = r#"sum by (app) (count_over_time({app="api"}[1m]))"#;
+const TOKEN_ONE: &str = "fixture-grafana-token-one";
+const TOKEN_TWO: &str = "fixture-grafana-token-two";
+const INSTANCE: &str = "fixture-grafana";
 
 fn fixture(name: &str) -> Vec<u8> {
     fs::read(format!(
@@ -62,49 +58,26 @@ struct Provider {
     root: tempfile::TempDir,
     config: PathBuf,
     calls: Arc<Mutex<Vec<Call>>>,
-    /// Non-zero forces this status on the identity probe only.
+    /// Non-zero forces this status on `GET /api/datasources`.
     probe_status: Arc<AtomicU16>,
 }
 
-/// The answer to one request: the recorded fixture its route and query select. Loki is
-/// served below `prefix` (`/` for a direct Loki); a request outside it is not found.
-fn answer(
-    method: &str,
-    target: &str,
-    authorization: &str,
-    probe: u16,
-    prefix: &str,
-) -> (u16, Vec<u8>) {
+/// The answer to one request: the recorded fixture its route selects.
+fn answer(method: &str, target: &str, authorization: &str, probe: u16) -> (u16, Vec<u8>) {
     if authorization != format!("Bearer {TOKEN_ONE}")
         && authorization != format!("Bearer {TOKEN_TWO}")
     {
-        return (401, b"authentication failure\n".to_vec());
+        return (401, br#"{"message":"Unauthorized"}"#.to_vec());
     }
-    let Some(target) = target.strip_prefix(prefix).map(|rest| format!("/{rest}")) else {
-        return (404, b"404 page not found\n".to_vec());
-    };
-    let (route, query) = target.split_once('?').unwrap_or((&target, ""));
-    match (method, route) {
-        ("GET", "/loki/api/v1/labels") if probe != 0 => (probe, b"{}".to_vec()),
-        ("GET", "/loki/api/v1/labels") => (200, fixture("labels.json")),
-        ("GET", "/loki/api/v1/label/app/values") => (200, fixture("label_values.json")),
-        ("GET", "/loki/api/v1/query") => (200, fixture("query_vector.json")),
-        // A metric expression answers a matrix, a log selector streams.
-        ("GET", "/loki/api/v1/query_range") if query.contains("count_over_time") => {
-            (200, fixture("query_range_matrix.json"))
-        }
-        ("GET", "/loki/api/v1/query_range") => (200, fixture("query_range_streams.json")),
-        _ => (404, b"404 page not found\n".to_vec()),
+    match (method, target) {
+        ("GET", "/api/datasources") if probe != 0 => (probe, b"{}".to_vec()),
+        ("GET", "/api/datasources") => (200, fixture("datasources.json")),
+        _ => (404, br#"{"message":"Not found"}"#.to_vec()),
     }
 }
 
 impl Provider {
     fn new() -> Self {
-        Self::under("/")
-    }
-    /// A Loki whose HTTP API is served below `prefix`, as Grafana's data-source proxy
-    /// serves it; `base_url` carries the prefix.
-    fn under(prefix: &'static str) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -161,13 +134,7 @@ impl Provider {
                         .map(|(_, value)| value.trim().to_owned())
                         .unwrap_or_default();
                     let (status, body) =
-                        answer(
-                        &method,
-                        &target,
-                        &authorization,
-                        forced.load(Ordering::SeqCst),
-                        prefix,
-                    );
+                        answer(&method, &target, &authorization, forced.load(Ordering::SeqCst));
                     observed.lock().unwrap().push(Call {
                         method,
                         target,
@@ -184,15 +151,14 @@ impl Provider {
             });
         });
         let port = address_rx.recv().unwrap().port();
-        let config = directory.join("loki.json");
+        let config = directory.join("grafana.json");
         private(
             &config,
             &serde_json::to_vec(&json!({
-                "format": "connectors-loki-local/1",
+                "format": "connectors-grafana-local/1",
                 "instance": INSTANCE,
-                "base_url": format!("https://localhost:{port}{prefix}"),
+                "base_url": format!("https://localhost:{port}/"),
                 "ca_file": ca,
-                "query_scope": {"required_equalities": []},
             }))
             .unwrap(),
         );
@@ -206,7 +172,7 @@ impl Provider {
         }
     }
     fn selection(&self) -> Adapter {
-        let output = Command::new(env!("CARGO_BIN_EXE_connectors-loki"))
+        let output = Command::new(env!("CARGO_BIN_EXE_connectors-grafana"))
             .arg("--local-config")
             .arg(&self.config)
             .arg("--print-local-bootstrap")
@@ -220,14 +186,14 @@ impl Provider {
         assert!(output.stderr.is_empty());
         let bootstrap: Bootstrap = serde_json::from_slice(&output.stdout).unwrap();
         bootstrap.validate().unwrap();
-        let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-loki"))
+        let binary = PathBuf::from(env!("CARGO_BIN_EXE_connectors-grafana"))
             .canonicalize()
             .unwrap();
         Adapter {
             private_protocol: None,
             permissions: Default::default(),
             instance_id: INSTANCE.into(),
-            adapter_id: "loki".into(),
+            adapter_id: "grafana".into(),
             configuration_revision: bootstrap.configuration_revision,
             protocol: "v1alpha1".into(),
             startup: Startup::OnDemand,
@@ -245,13 +211,13 @@ impl Provider {
     fn count(&self) -> usize {
         self.calls.lock().unwrap().len()
     }
-    /// Observed paths without their query string.
+    /// Observed targets.
     fn routes(&self) -> Vec<String> {
         self.calls
             .lock()
             .unwrap()
             .iter()
-            .map(|c| c.target.split('?').next().unwrap_or_default().to_owned())
+            .map(|c| c.target.clone())
             .collect()
     }
 }
@@ -286,68 +252,65 @@ fn invoke(child: &mut Child, operation: &str, input: Value) -> Result<Value, Fai
 }
 
 #[test]
-fn the_bootstrap_advertises_the_bearer_profile_and_three_reads() {
+fn the_bootstrap_advertises_the_service_account_profile_and_one_read() {
     let provider = Provider::new();
     let child = Child::spawn(&provider.selection()).unwrap();
     let bootstrap = child.bootstrap();
-    assert_eq!(bootstrap.adapter, "loki");
+    assert_eq!(bootstrap.adapter, "grafana");
     assert_eq!(bootstrap.instance, INSTANCE);
     let profiles: Vec<&str> = bootstrap.profiles.iter().map(|p| p.id.as_str()).collect();
-    assert_eq!(profiles, ["loki.bearer"]);
-    let mut operations: Vec<(&str, bool)> = bootstrap
+    assert_eq!(profiles, ["grafana.service_account"]);
+    let operations: Vec<(&str, bool)> = bootstrap
         .requirements
         .iter()
         .map(|r| (r.operation.as_str(), r.effect == Effect::Read))
         .collect();
-    operations.sort();
-    assert_eq!(
-        operations,
-        [
-            ("logs.labels", true),
-            ("logs.query_metric", true),
-            ("logs.query_range", true)
-        ]
-    );
+    assert_eq!(operations, [("datasources.list", true)]);
     // Spawning and describing perform no provider work.
     assert_eq!(provider.count(), 0);
 }
 
 #[test]
-fn a_bearer_token_is_proved_by_the_labels_probe_and_named_by_the_configured_instance() {
+fn a_service_account_token_is_proved_by_the_datasources_probe_and_named_by_the_configured_instance()
+{
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
     let baseline = child
-        .validate("loki.bearer", &token(TOKEN_ONE), deadline())
+        .validate("grafana.service_account", &token(TOKEN_ONE), deadline())
         .unwrap_or_else(|f| {
             panic!(
                 "validation {f:?}; calls {:?}",
                 provider.calls.lock().unwrap()
             )
         });
-    assert_eq!(baseline.identity.kind, "loki.connection");
+    assert_eq!(baseline.identity.kind, "grafana.connection");
     assert_eq!(baseline.identity.subject, INSTANCE);
     assert!(baseline.granted_scopes.is_none());
     assert!(baseline.credential_expires_at_ms.is_none());
     assert_eq!(baseline.valid_until_ms - baseline.collected_at_ms, 60_000);
-    assert_eq!(provider.routes(), ["/loki/api/v1/labels"]);
+    assert_eq!(provider.routes(), ["/api/datasources"]);
     {
         let calls = provider.calls.lock().unwrap();
         assert_eq!(calls[0].method, "GET");
         assert_eq!(calls[0].authorization, format!("Bearer {TOKEN_ONE}"));
     }
-    // Another accepted token is the same identity: the subject is the
-    // configured connection, not a Loki account.
+    // Another accepted token is the same identity: the subject is the configured
+    // connection, not a Grafana account.
     assert_eq!(
         child
-            .validate("loki.bearer", &token(TOKEN_TWO), deadline())
+            .validate("grafana.service_account", &token(TOKEN_TWO), deadline())
             .unwrap()
             .identity
             .subject,
         INSTANCE
     );
-    // An unaccepted token is an invalid credential, with no business read.
+    // An unaccepted token is an invalid credential.
     assert!(matches!(
-        child.validate("loki.bearer", &token("fixture-unaccepted"), deadline()),
+        child.validate(
+            "grafana.service_account",
+            &token("fixture-unaccepted"),
+            deadline()
+        ),
         Err(Failure::InvalidCredential)
     ));
     for (status, expected) in [
@@ -357,7 +320,7 @@ fn a_bearer_token_is_proved_by_the_labels_probe_and_named_by_the_configured_inst
         (404, Failure::Protocol),
     ] {
         provider.probe_status.store(status, Ordering::SeqCst);
-        let result = child.validate("loki.bearer", &token(TOKEN_ONE), deadline());
+        let result = child.validate("grafana.service_account", &token(TOKEN_ONE), deadline());
         assert!(
             matches!(&result, Err(failure) if *failure == expected),
             "status {status}: {:?}",
@@ -365,11 +328,11 @@ fn a_bearer_token_is_proved_by_the_labels_probe_and_named_by_the_configured_inst
         );
     }
     provider.probe_status.store(0, Ordering::SeqCst);
-    assert!(provider.routes().iter().all(|r| r == "/loki/api/v1/labels"));
+    assert!(provider.routes().iter().all(|r| r == "/api/datasources"));
     // An undeclared profile and a malformed entry refuse before provider work.
     let before = provider.count();
     assert!(matches!(
-        child.validate("loki.anonymous", &token(TOKEN_ONE), deadline()),
+        child.validate("grafana.anonymous", &token(TOKEN_ONE), deadline()),
         Err(Failure::Unsupported)
     ));
     for entry in [
@@ -379,7 +342,11 @@ fn a_bearer_token_is_proved_by_the_labels_probe_and_named_by_the_configured_inst
         b"not json",
     ] {
         assert!(matches!(
-            child.validate("loki.bearer", &Secret(entry.to_vec()), deadline()),
+            child.validate(
+                "grafana.service_account",
+                &Secret(entry.to_vec()),
+                deadline()
+            ),
             Err(Failure::InvalidInput)
         ));
     }
@@ -387,64 +354,24 @@ fn a_bearer_token_is_proved_by_the_labels_probe_and_named_by_the_configured_inst
 }
 
 #[test]
-fn each_read_answers_through_the_private_runtime_from_the_recorded_answers() {
+fn the_datasource_list_answers_through_the_private_runtime_from_the_recorded_answer() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
 
-    let logs = invoke(
-        &mut child,
-        "logs.query_range",
-        json!({"query": LOGQL, "start_unix_ns": START, "end_unix_ns": END, "limit": 100}),
-    )
-    .unwrap();
-    assert_eq!(logs["provenance"]["instance"], INSTANCE);
-    assert_eq!(logs["provenance"]["resource"], "loki:query_range");
-    assert_eq!(logs["lines"][0]["line"], "boom", "{logs}");
-    assert_eq!(logs["lines"].as_array().unwrap().len(), 4);
-    assert_eq!(logs["complete"], true);
-    assert!(logs["next_cursor"].is_null());
-
-    let metric = invoke(
-        &mut child,
-        "logs.query_metric",
-        json!({"query": METRIC, "start_unix_ns": START, "end_unix_ns": END, "step_seconds": 60}),
-    )
-    .unwrap();
-    assert_eq!(metric["result_type"], "matrix");
-    assert_eq!(metric["series"][0]["labels"], json!({"app": "api"}));
-    assert_eq!(metric["series"][0]["samples"][0]["value"], "3");
-
-    let instant = invoke(
-        &mut child,
-        "logs.query_metric",
-        json!({"query": METRIC, "time_unix_ns": END}),
-    )
-    .unwrap();
-    assert_eq!(instant["result_type"], "vector");
-    assert_eq!(instant["series"][0]["labels"], json!({"level": "error"}));
-    assert_eq!(instant["series"][0]["samples"][0]["value"], "7");
-
-    let names = invoke(&mut child, "logs.labels", json!({})).unwrap();
-    assert_eq!(names["values"], json!(["app", "level", "namespace"]));
-    let values = invoke(
-        &mut child,
-        "logs.labels",
-        json!({"label": "app", "start_unix_ns": START, "end_unix_ns": END}),
-    )
-    .unwrap();
-    assert_eq!(values["label"], "app");
-    assert_eq!(values["values"], json!(["api", "web"]));
-
+    let listed = invoke(&mut child, "datasources.list", json!({})).unwrap();
+    assert_eq!(listed["provenance"]["instance"], INSTANCE);
+    assert_eq!(listed["provenance"]["resource"], "grafana:datasources");
+    assert_eq!(listed["complete"], true);
+    assert!(listed["next_cursor"].is_null());
     assert_eq!(
-        provider.routes(),
-        [
-            "/loki/api/v1/query_range",
-            "/loki/api/v1/query_range",
-            "/loki/api/v1/query",
-            "/loki/api/v1/labels",
-            "/loki/api/v1/label/app/values"
-        ]
+        listed["items"][0],
+        json!({"uid": "P8E80F9AEF21F6940", "name": "Loki", "type": "loki",
+               "access": "proxy", "is_default": false})
     );
+    assert_eq!(listed["items"].as_array().unwrap().len(), 3);
+    assert!(!listed.to_string().contains("monitoring.svc"));
+
+    assert_eq!(provider.routes(), ["/api/datasources"]);
     assert!(
         provider
             .calls
@@ -453,14 +380,10 @@ fn each_read_answers_through_the_private_runtime_from_the_recorded_answers() {
             .iter()
             .all(|c| c.method == "GET" && c.authorization == format!("Bearer {TOKEN_ONE}"))
     );
-    // An input the profile does not admit refuses before provider work.
+    // An input the operation does not admit refuses before provider work.
     let before = provider.count();
     assert_eq!(
-        invoke(
-            &mut child,
-            "logs.query_range",
-            json!({"query": LOGQL, "start_unix_ns": START, "end_unix_ns": END, "limit": 1001}),
-        ),
+        invoke(&mut child, "datasources.list", json!({"type": "loki"})),
         Err(Failure::InvalidInput)
     );
     assert_eq!(provider.count(), before);
@@ -491,55 +414,4 @@ fn a_changed_configuration_refuses_the_cached_selection_before_provider_work() {
         Err(Failure::ReadinessMismatch)
     ));
     assert_eq!(provider.count(), 0);
-}
-
-/// Loki through Grafana: Grafana's data-source proxy serves a Loki data source's HTTP API
-/// below `/api/datasources/proxy/uid/<uid>/` and authenticates the Grafana
-/// service-account token itself. A Loki connection whose `base_url` is that proxy path
-/// sends its probe and every read below the prefix, with the token as its bearer.
-#[test]
-fn a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix() {
-    const PROXY: &str = "/api/datasources/proxy/uid/P8E80F9AEF21F6940/";
-    let provider = Provider::under(PROXY);
-    let mut child = Child::spawn(&provider.selection()).unwrap();
-    let baseline = child
-        .validate("loki.bearer", &token(TOKEN_ONE), deadline())
-        .unwrap();
-    assert_eq!(baseline.identity.kind, "loki.connection");
-    assert_eq!(baseline.identity.subject, INSTANCE);
-
-    let logs = invoke(
-        &mut child,
-        "logs.query_range",
-        json!({"query": LOGQL, "start_unix_ns": START, "end_unix_ns": END, "limit": 100}),
-    )
-    .unwrap();
-    assert_eq!(logs["lines"][0]["line"], "boom", "{logs}");
-    let names = invoke(&mut child, "logs.labels", json!({})).unwrap();
-    assert_eq!(names["values"], json!(["app", "level", "namespace"]));
-    let values = invoke(
-        &mut child,
-        "logs.labels",
-        json!({"label": "app", "start_unix_ns": START, "end_unix_ns": END}),
-    )
-    .unwrap();
-    assert_eq!(values["values"], json!(["api", "web"]));
-
-    assert_eq!(
-        provider.routes(),
-        [
-            format!("{PROXY}loki/api/v1/labels"),
-            format!("{PROXY}loki/api/v1/query_range"),
-            format!("{PROXY}loki/api/v1/labels"),
-            format!("{PROXY}loki/api/v1/label/app/values"),
-        ]
-    );
-    assert!(
-        provider
-            .calls
-            .lock()
-            .unwrap()
-            .iter()
-            .all(|c| c.method == "GET" && c.authorization == format!("Bearer {TOKEN_ONE}"))
-    );
 }
