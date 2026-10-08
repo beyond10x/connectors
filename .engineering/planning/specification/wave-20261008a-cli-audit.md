@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: specification:wave-20261008a-cli-audit
 kind: specification
-status: approved
+status: implemented
 title: 'Wave 20261008a: CLI audit findings and the expiry batch bound'
 relations:
 - serves: vision:independent-contract-adapters
@@ -10,10 +10,11 @@ relations:
 - informed_by: story:pending-connection-refusal-names-its-remedy
 - informed_by: story:aep-pin-0690
 - informed_by: story:lift-expiry-batch-bound
-revision: 4
+revision: 6
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-08T07:54:09Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-08T07:54:09Z", actor: "human:timo", revision: 3}
+- {from: "approved", to: "implemented", at: "2026-10-08T10:57:30Z", actor: "human:timo", revision: 6}
 ---
 ## Selection
 
@@ -70,3 +71,9 @@ Before the re-run every saved connection was `pending` with lapsed validation; r
 
   An unbounded batch still grows with the backlog (14.4 s at 6,000 events), so the bound is raised,
   not removed. Every store this host opens is SQLite.
+
+## Integration
+
+- Before the second push, package gates of every crate depending on `connectors-host` found two more failures on 7a4a764e40: an unused import in `engine_adversary_pass2` and `google_gmail` `the_documented_write_instance_starts_a_fresh_acquisition`. U2 had dropped the only check refusing a new connection under an existing instance id with a changed profile declaration. Fixed in f0a174016f: `register` refuses it as `Conflict` when any connection of the instance (revoked included) holds another provider authority or another declaration of the same profile id; a host case covers five changes for a begun and a revoked connection.
+- Package gates on f0a174016f: 8 crates, clippy `-D warnings` and tests, 123 test binaries ok; `connectors-build` 234 passed.
+- PR https://github.com/beyond10x/connectors/pull/133 repository gate green on f0a174016f (run 37763487263, 26m50s); merged as 55bfe18133.

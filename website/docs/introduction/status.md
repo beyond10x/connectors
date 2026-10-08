@@ -4,10 +4,10 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.33.0
+# Source release v0.34.0
 
-Version **0.33.0** specifies at ESS source format `ess/15` with the released
-ESS 0.56.0 and plans with the released AEP 0.68.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
+Version **0.34.0** specifies at ESS source format `ess/15` with the released
+ESS 0.56.0 and plans with the released AEP 0.69.1; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
 provider, as in 0.11.0, which retired the native GitLab adapter. The earlier **v0.1.0
@@ -80,6 +80,16 @@ verifies the whole store, so a raw edit of the database file is refused by the f
 after it. Peak resident memory in the same test was 329 MB at 601 events and 560 MB at 1,201
 ([#103](https://github.com/beyond10x/connectors/issues/103)). Due expiries are recorded in
 batches of at most 32. Entity Runtime is 0.30.2, Eventlog 0.8.1 and ESS 0.56.0.
+
+Since 0.34.0 a connection saved under another configuration revision of its instance is
+answered with the step that clears it: `revalidate_connection` when only the configuration
+revision changed and the credential can follow, `create_connection` otherwise, instead of a
+`lifecycle_conflict` with `retry_status` that no status change cleared. A new connection
+under the configured revision is admitted under the same instance id and moves the instance
+there when it publishes; a changed provider authority or profile declaration still needs a
+new instance id. `connectors help describe`, `help invoke` and `help serve` print their
+usage, and bash completion covers those three commands. Due expiries are recorded in batches
+of at most 128. The repository plans with AEP 0.69.1.
 
 ## Available runtime
 

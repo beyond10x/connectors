@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0330-store-cost-memory
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.33.0: store cost flat in its size, owner memory bounded'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "active", at: "2026-10-08T06:30:15Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-08T10:58:26Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome and authorization
 

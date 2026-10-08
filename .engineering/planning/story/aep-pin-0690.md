@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:aep-pin-0690
 kind: story
-status: active
+status: implemented
 title: Plan with AEP 0.69.0
 relations:
 - serves: vision:independent-contract-adapters
@@ -13,10 +13,11 @@ scope:
   path: crates/connectors-build/src/aep_toolchain.rs
 - confidence: cited
   path: docs/development.md
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T07:53:31Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-08T07:53:31Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-08T10:57:18Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

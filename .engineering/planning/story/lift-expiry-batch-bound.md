@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:lift-expiry-batch-bound
 kind: story
-status: active
+status: implemented
 title: Lift the 32-member expiry batch bound once Entity Runtime batches scale linearly
 relations:
 - serves: vision:independent-contract-adapters
@@ -11,10 +11,11 @@ scope:
   path: crates/connectors-host/src/local/metadata/er.rs
 - confidence: cited
   path: crates/connectors-host/src/local/registry/store_cost_tests.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T07:53:31Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-08T07:53:32Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-08T10:57:18Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
