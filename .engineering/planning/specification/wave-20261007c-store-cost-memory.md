@@ -8,7 +8,8 @@ relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:owner-memory-bounded
 - informed_by: story:metadata-invoke-cost-flat-in-store-size
-revision: 4
+- informed_by: story:entity-runtime-eventlog-081-pin
+revision: 5
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T17:16:09Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T17:16:10Z", actor: "human:timo", revision: 3}
@@ -64,3 +65,11 @@ Dispatch: `aep:implementor` per unit; `aep:adversary` per unit (storage and memo
 The planning commits on `wave/20261007c`; one or more commits per unit through `b10x-gates bot`;
 their merges into `wave/20261007c`; the closing planning commit; one pull request into `main`
 and its merge. Not a release.
+
+## U3: Entity Runtime 0.30.1
+
+Added 2026-10-08: `story:entity-runtime-eventlog-081-pin` (#101 and #103 context), Entity Runtime
+0.29.0 → 0.30.1 and Eventlog 0.8.0 → 0.8.1. It changes `Cargo.toml` and `Cargo.lock`, which U2
+also changes (ESS 0.56.0), so it runs on the integration branch after U2 merges, in
+`conn-w20261007c`, by the coordinator. Acceptance as in the story; its cost measurement runs on
+the same machine as U2's.
