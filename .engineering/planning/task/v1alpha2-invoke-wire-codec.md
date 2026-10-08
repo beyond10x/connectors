@@ -7,6 +7,7 @@ title: Decode and encode the v1alpha2 invoke envelope in connectors-core
 relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:v1alpha2-invoke-wire-spec
+- serves: vision:independent-contract-adapters
 revision: 1
 ---
 ## Outcome

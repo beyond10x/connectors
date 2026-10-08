@@ -7,6 +7,7 @@ title: The client invokes over v1alpha2 and returns the attempt it produced
 relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:http-host-mutation-ledger
+- serves: vision:independent-contract-adapters
 revision: 1
 ---
 ## Outcome

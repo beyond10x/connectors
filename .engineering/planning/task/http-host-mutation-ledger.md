@@ -7,6 +7,7 @@ title: The HTTP host records an attempt for every admitted write and serves /v1a
 relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:v1alpha2-invoke-wire-codec
+- serves: vision:independent-contract-adapters
 revision: 1
 ---
 ## Outcome
