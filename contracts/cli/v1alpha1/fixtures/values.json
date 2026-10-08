@@ -214,6 +214,127 @@
       }
     },
     {
+      "id": "checkpoints-enable-confirmed-input",
+      "type": "connectors.cli.SetupCheckpointsEnableInput",
+      "valid": true,
+      "value": {"confirm": "one-way"}
+    },
+    {
+      "id": "checkpoints-enable-unconfirmed-input-reaches-the-handler",
+      "type": "connectors.cli.SetupCheckpointsEnableInput",
+      "valid": true,
+      "value": {}
+    },
+    {
+      "id": "checkpoints-enable-confirmation-is-a-closed-value",
+      "type": "connectors.cli.SetupCheckpointsEnableInput",
+      "valid": false,
+      "value": {"confirm": "yes"}
+    },
+    {
+      "id": "checkpoints-enable-confirmation-is-not-a-boolean",
+      "type": "connectors.cli.SetupCheckpointsEnableInput",
+      "valid": false,
+      "value": {"confirm": true}
+    },
+    {
+      "id": "checkpoints-enable-enabled",
+      "type": "connectors.cli.SetupCheckpointsEnableResult",
+      "valid": true,
+      "value": {
+        "disposition": "enabled",
+        "state_path": "/fixture/.local/state/connectors",
+        "change": "one-way",
+        "newest_incompatible_release": "0.32.0"
+      }
+    },
+    {
+      "id": "checkpoints-enable-already-enabled",
+      "type": "connectors.cli.SetupCheckpointsEnableResult",
+      "valid": true,
+      "value": {
+        "disposition": "already_enabled",
+        "state_path": "/fixture/.local/state/connectors",
+        "change": "one-way",
+        "newest_incompatible_release": "0.32.0"
+      }
+    },
+    {
+      "id": "checkpoints-enable-result-states-the-one-way-change",
+      "type": "connectors.cli.SetupCheckpointsEnableResult",
+      "valid": false,
+      "value": {
+        "disposition": "enabled",
+        "state_path": "/fixture/.local/state/connectors",
+        "newest_incompatible_release": "0.32.0"
+      }
+    },
+    {
+      "id": "checkpoints-enable-result-names-the-incompatible-release",
+      "type": "connectors.cli.SetupCheckpointsEnableResult",
+      "valid": false,
+      "value": {
+        "disposition": "enabled",
+        "state_path": "/fixture/.local/state/connectors",
+        "change": "one-way"
+      }
+    },
+    {
+      "id": "checkpoints-enable-disposition-is-closed",
+      "type": "connectors.cli.SetupCheckpointsEnableResult",
+      "valid": false,
+      "value": {
+        "disposition": "disabled",
+        "state_path": "/fixture/.local/state/connectors",
+        "change": "one-way",
+        "newest_incompatible_release": "0.32.0"
+      }
+    },
+    {
+      "id": "checkpoints-enable-unconfirmed-is-refused",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "usage",
+        "code": "confirmation_required",
+        "stage": "arguments",
+        "next_action": "retry_explicitly"
+      }
+    },
+    {
+      "id": "checkpoints-enable-refused-while-an-owner-runs",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "lifecycle_conflict",
+        "stage": "admission",
+        "next_action": "stop_owner"
+      }
+    },
+    {
+      "id": "checkpoints-enable-store-cannot-be-opened",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "metadata_unavailable",
+        "stage": "observation",
+        "next_action": "retry_status"
+      }
+    },
+    {
+      "id": "checkpoints-enable-outcome-unknown",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "outcome_unknown",
+        "stage": "publication",
+        "next_action": "retry_explicitly"
+      }
+    },
+    {
       "id": "valid-AdapterListInput-3",
       "type": "connectors.cli.AdapterListInput",
       "valid": true,
