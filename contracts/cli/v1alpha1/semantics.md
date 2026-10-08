@@ -239,7 +239,16 @@ successful results stay raw JSON. `--config` and `--state-dir` are not accepted
 before them (`serve --config` is that command's own argument). Their parse
 errors, including unknown, missing or malformed arguments, follow the output
 contract above: exit 2, empty stdout, and the fixed `cli_parse` code with empty
-data on stderr, never an argv echo. `COMMAND --help` prints that command's usage.
+data on stderr, never an argv echo. `COMMAND --help` prints that command's usage,
+and exactly `help COMMAND` prints the same usage with the same exit status;
+`help COMMAND` with a leading global or followed by anything else stays a parse
+refusal. `completions bash` emits the
+generated completion function unchanged, followed by a completion for these
+three commands built from their own parser and a routing function registered
+for `connectors`: a command line whose command word, after any leading
+`--output` selections, is one of them completes that command's own options;
+any other line is completed by the generated function, with the three command
+words added at the root and as the word after a leading `help`.
 Root `--help` or `-h`, alone or after leading process globals, prints the
 generated grouped help (the short form of the long help
 in `apps/connectors-cli-contract/help.txt`), one blank line and then this block,
