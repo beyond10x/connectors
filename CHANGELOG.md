@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The catalog provider reads Slack users: `users.list` (`users_list` in the pinned Slack Web
+  API document), one page per call under `members`, ending on an empty
+  `response_metadata.next_cursor`, with the optional `include_locale`. It needs the bot
+  token's `users:read` scope. The document's `token` query parameter is withheld, as for the
+  conversation reads, and `limit` carries no bound because the document states none. The
+  Slack ESS model (`adapters/slack/spec/ess`) now cites the pinned document for `User` and
+  declares `Workspace` from `team.info`'s `objs_team`. Limits: verified against a local
+  fixture only; no lookup by id or e-mail. `auth.test`, `team.info`, `emoji.list` and
+  `search.messages` are not selected: the pinned document marks their `token` parameter
+  required, and the catalog engine withholds only a parameter nothing requires.
+  `docs/catalog-slack.md` names the engine change that would admit them, and how search
+  would then run on a second connection with a user token. See `docs/catalog-slack.md`.
+
 ## 0.38.0 — 2026-10-09
 
 ### Added

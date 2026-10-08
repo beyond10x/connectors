@@ -13,6 +13,9 @@
     {"id": "conversations.replies", "operation_id": "conversations_replies", "effect": "read",
      "description": "Read one thread, the parent message identified by channel and ts followed by its replies, one page per call, optionally within oldest and latest (Slack ts); each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Slack reports a failed read as status 200 with ok false",
      "required": ["channel", "ts"],
+     "withhold": ["token"]},
+    {"id": "users.list", "operation_id": "users_list", "effect": "read",
+     "description": "List the workspace's users, one page per call; each later call sends the previous page's response_metadata.next_cursor as cursor, and the walk ends on a page whose next_cursor is empty. Send limit: without it Slack tries to answer the whole list at once. Slack reports a failed read as status 200 with ok false",
      "withhold": ["token"]}
   ]
 }
