@@ -45,6 +45,26 @@ fn cargo(root: &Path, temp: &Path, ess: &Path, toolchain: Option<&str>) -> Resul
     Ok(cmd)
 }
 
+/// The gate step that fails when a page the documentation site generates (CLI, crates, contract
+/// and model reference, status) differs from what its sources generate now.
+fn docs_check(root: &Path, temp: &Path, ess: &Path) -> Result<Command> {
+    let mut cmd = cargo(root, temp, ess, None)?;
+    cmd.args([
+        "run",
+        "--locked",
+        "--offline",
+        "-q",
+        "-p",
+        "connectors-docs",
+        "--",
+        "generate",
+        "--check",
+        "--ess",
+    ])
+    .arg(ess);
+    Ok(cmd)
+}
+
 pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
     connectors_spec::v2::check_ess(ess)?;
     super::metadata_entities::run(root, true)?;
@@ -130,6 +150,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "-D",
         "warnings",
     ]))?;
+    execute(&mut docs_check(root, temp.path(), ess)?)?;
     for adapter in ["kubernetes", "loki", "sql", "tavily", "catalog-provider"] {
         let package = format!("connectors-{adapter}");
         execute(command(None)?.args([
@@ -339,7 +360,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::cargo;
+    use super::{cargo, docs_check};
     use std::{ffi::OsStr, path::Path};
 
     const ROOT: &str = "/checkout/.local/tmp/gate-AbCdEf";
@@ -419,6 +440,33 @@ mod tests {
             config.starts_with(&format!(r#"target."{host}".runner="#)),
             "runner key is not the host triple {host}: {config}"
         );
+    }
+
+    /// The gate checks the generated documentation pages with the pinned ess it was given.
+    #[test]
+    fn gate_checks_the_generated_documentation_pages_for_drift() {
+        let command = docs_check(Path::new("/checkout"), Path::new(ROOT), Path::new("/ess"))
+            .expect("documentation check command");
+        let args: Vec<_> = command.get_args().skip(2).collect();
+        assert_eq!(
+            args,
+            [
+                "run",
+                "--locked",
+                "--offline",
+                "-q",
+                "-p",
+                "connectors-docs",
+                "--",
+                "generate",
+                "--check",
+                "--ess",
+                "/ess"
+            ]
+            .map(OsStr::new),
+            "documentation check arguments"
+        );
+        assert_eq!(command.get_current_dir(), Some(Path::new("/checkout")));
     }
 
     /// A rustup toolchain selector must stay the first argument for the proxy to see it.

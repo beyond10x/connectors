@@ -1,0 +1,20 @@
+---
+title: Advanced contract exercises
+sidebar_position: 2
+description: Three executable exercises over the contract model, discovery versus access, readiness for one operation, and an uncertain mutation outcome.
+hide_table_of_contents: true
+---
+
+import ContractLab from '@site/src/components/ContractLab';
+
+# Advanced contract exercises
+
+These exercises examine individual rules: discovery does not grant access, a connection can be
+ready while one operation is not, and a lost response leaves a mutation uncertain. For the
+practical picture first, [follow a request from your laptop to GitLab](/docs/examples/follow-a-request).
+
+Each exercise runs bounded Rust/WASM behaviour built from ESS-generated ports over the canonical
+model, with fictional in-memory bindings and a deterministic clock. They demonstrate selected
+rules; they do not contact a provider, persist anything or establish production conformance.
+
+<ContractLab />

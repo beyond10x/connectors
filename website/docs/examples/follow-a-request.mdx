@@ -1,0 +1,24 @@
+---
+title: Follow a request to GitLab
+sidebar_position: 1
+description: An illustrated journey of one issue read from a laptop through a federation gateway and the catalog provider to GitLab and back.
+hide_table_of_contents: true
+---
+
+import RequestWalkthrough from '@site/src/components/RequestWalkthrough';
+
+# Follow a request to GitLab
+
+Your application needs the first 20 issues from **acme/website**. It calls a remote Connectors
+host, which reaches GitLab through an adapter. What travels between them, and who checks access?
+
+Follow the request and its answer. Start with **configured access**, which is federation
+behaviour available today, then explore how the specified architecture adds **user
+authorization**, which has no runtime yet. Both are illustrated journeys with fictional data:
+a Rust/WASM module supplies their deterministic steps, and no real service is contacted.
+
+<RequestWalkthrough />
+
+For a closer look at individual rules, explore the
+[advanced contract exercises](/docs/examples/contract-exercises). To run an actual service, follow
+[Getting started](../getting-started.md).

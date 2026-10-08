@@ -5,6 +5,12 @@ integrations. Independent adapter services expose typed operations through share
 versioned contracts. An application can call an adapter directly or reach several
 adapters through an optional federation host.
 
+Documentation: [Connectors on the beyond10x site](https://beyond10x.github.io/docs/connectors/).
+The documentation website in [website/](website/README.md) (concepts, guides, the CLI, crate,
+contract and model reference, and the status of every capability, each held by a test) is built
+for its own address, `beyond10x.github.io/connectors/`, and is served there once the
+organization's site moves it.
+
 The aim is to make an integration useful on its own and predictable when combined
 with others. Provider behavior stays with its adapter; shared contracts define
 what callers can expect from access, results and failures.
@@ -110,13 +116,16 @@ The current services provide:
 | GitLab (catalog provider) | `projects.list`, `project.get`, `project.events`, `issues.list`, `file.get`, `branch.get`, `tags.list`, `releases.list`, `commits.list`, `repository.compare`, `deployments.list`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `issue.create`, `merge_request.create`, `merge_request.update`, `merge_request.merge` | GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks, issue creation unguarded; the host's permitted operation ids are the scope |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, and optionally the `helm_releases.*` release reads | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
+| Tavily | `websearch.search`, `websearch.fetch`, `websearch.crawl` | Tavily API from the pinned OpenAPI source, profile `tavily/2026-10`; API key from keyring custody, checked with `GET /usage`; every operation is a read Tavily serves as a POST; see [the Tavily guide](docs/local-tavily.md) |
+| Loki (unreleased) | `logs.query_range`, `logs.query_metric`, `logs.labels` | Loki HTTP API, one GET each; bearer token from keyring custody, proved with `GET /loki/api/v1/labels`; no tenant header is sent; see [the Loki guide](adapters/loki/README.md) |
 | Runpod (catalog provider) | `pod.create`, `pods.list`, `pod.terminate` | Runpod REST API v1 from the pinned OpenAPI source; API key as `Authorization: Bearer` from keyring custody; both writes are unguarded required-approval mutations, a create without a definite answer is `unknown`; verified against a local fixture only, see [the Runpod guide](docs/catalog-runpod.md) |
 | Slack (catalog provider, unreleased) | `conversations.list`, `conversations.history`, `conversations.replies` | Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; bot token as `Authorization: Bearer` from keyring custody; reads only, one page per call; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md) |
 
-They can run as separate Rust services, with a generic CLI and one-hop federation.
-This slice does not advertise writes, managed OAuth acquisition, durable events,
-process execution or media sessions. Other adapters have designs and, in some
-cases, authored native models; their presence does not mean they can run.
+Kubernetes and SQL also run as separate Rust services, with a generic CLI and one-hop
+federation; those services advertise no writes. Writes run only through the local CLI under
+approval. Apart from the catalog provider's Google consent, no adapter runs an OAuth consent
+flow, and none offers durable events, process execution or media sessions. Other adapters have
+designs and, in some cases, authored native models; their presence does not mean they can run.
 
 The local CLI is specified under [CLI contracts](contracts/cli/v1alpha1/semantics.md):
 `setup`, `adapters`, `connections` and `operations`, with per-adapter TOML startup
@@ -171,12 +180,13 @@ generation tools and embedding adapter libraries.
 - [Contracts](contracts/README.md): shared guarantees, versions and support status.
 - [Adapters](adapters/README.md): native contracts, provider ownership and extraction boundaries.
 - [Architecture and design](docs/design.md): decisions, rationale and implementation boundaries.
-- [Documentation website](website/README.md): authored guides, generated contract/model views
-  and executable examples; [design and boundaries](docs/website-design.md).
+- [Documentation website](website/README.md): concepts, guides, generated CLI, crate, contract and
+  model reference, status and executable examples; [design and boundaries](docs/website-design.md).
 
 Run the local website with `npm ci --allow-git=root` and `npm start` from `website/` after its
 [toolchain setup](website/README.md#start-the-preview). The preview is served at
-http://127.0.0.1:3100/; public hosting remains deferred. Follow a practical GitLab
+http://127.0.0.1:3100/connectors/. The `Documentation validation` workflow builds the site on
+every pull request and push; it is not yet deployed to its own address. Follow a practical GitLab
 request walkthrough or inspect the advanced contract exercises. Both use fictional
 Rust/WASM behavior, separately from the adapter runtime; specified user authorization
 is labeled separately from configured federation available today.

@@ -41,7 +41,12 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
         };
     }
     if root_help && output.exit_code == 0 {
-        output.stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n  describe  Read a complete service descriptor\n  invoke    Invoke an explicit service operation\n  serve     Run the configured federation service\n");
+        output
+            .stdout
+            .push_str("\nExplicit service commands (use COMMAND --help for options):\n");
+        for (name, summary) in connectors::compat::SUMMARIES {
+            output.stdout.push_str(&format!("  {name:<8}  {summary}\n"));
+        }
     }
     output
 }

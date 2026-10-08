@@ -148,6 +148,13 @@
       "status": "Implemented by the tavily adapter"
     },
     {
+      "route": "/contracts/data/feed",
+      "title": "Feeds",
+      "source": "contracts/datasources/feed/v1alpha1/semantics.md",
+      "owner": "shared",
+      "status": "Proposed; GitLab binding implemented"
+    },
+    {
       "route": "/contracts/discovery/resources",
       "title": "Resource discovery",
       "source": "contracts/discovery/resources/v1alpha1/semantics.md",
@@ -187,7 +194,7 @@
       "title": "Optional catalog",
       "source": "contracts/catalog/v1alpha1/semantics.md",
       "owner": "shared",
-      "status": "Specified; runtime pending"
+      "status": "Provider realization implemented; index service specified"
     },
     {
       "route": "/adapters/sql/contracts/reads",
@@ -292,7 +299,7 @@
       "title": "Loki LogQL",
       "source": "adapters/loki/contracts/logs/v1alpha1/semantics.md",
       "owner": "loki",
-      "status": "Specified; runtime pending"
+      "status": "Implemented by the loki adapter on main, unreleased: range, metric and label reads"
     },
     {
       "route": "/adapters/prometheus/contracts/series",
@@ -314,6 +321,13 @@
       "source": "adapters/rtvbp/contracts/session/v1alpha1/semantics.md",
       "owner": "rtvbp",
       "status": "Specified; runtime pending"
+    },
+    {
+      "route": "/adapters/catalog/contracts/feed",
+      "title": "GitLab merge-request feed",
+      "source": "adapters/catalog/contracts/feed/v1alpha1/gitlab.md",
+      "owner": "catalog",
+      "status": "Implemented by the catalog provider; checked against recorded GitLab answers"
     }
   ],
   "models": [

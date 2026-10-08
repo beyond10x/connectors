@@ -1,5 +1,6 @@
 [package]
 name = "connectors-kubernetes"
+description = "Kubernetes adapter: resource inventory, endpoint and host discovery, and Helm release reads."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

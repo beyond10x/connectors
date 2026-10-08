@@ -1,5 +1,6 @@
 [package]
 name = "connectors-catalog-provider"
+description = "The catalog provider: one verified bundle, a declarative selection of its operations, and one engine that binds, sends and classifies them."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
