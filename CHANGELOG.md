@@ -4,14 +4,19 @@
 
 ### Added
 
-- `connectors-loki`, a library binding of Loki's HTTP API: `logs.query_range` (a LogQL log
-  query over at most 24 hours, unpaged, at most 1,000 lines), `logs.query_metric` (a LogQL
-  metric query, instant or with a step) and `logs.labels` (label names, or one label's
-  values). The metric and label profiles are new in
+- `connectors-loki`, a native Loki adapter executable for the local CLI: `logs.query_range`
+  (a LogQL log query over at most 24 hours, unpaged, at most 1,000 lines), `logs.query_metric`
+  (a LogQL metric query, instant or with a step) and `logs.labels` (label names, or one
+  label's values), each one GET and each answered through `operations invoke` on a saved
+  connection. A connection uses the bearer profile `loki.bearer`: connect, repair and
+  `connections revalidate` prove the token with `GET /loki/api/v1/labels`, and since Loki
+  names no account, the identity is the configured connection (`loki.connection`, subject the
+  configuration's `instance`). The configuration is HTTPS-only, with an optional private CA
+  file. The metric and label profiles and the connection are new in
   `adapters/loki/contracts/logs/v1alpha1/semantics.md` §11 and modeled in
-  `adapters/loki/spec/ess`. There is no executable yet, so no connection and no
-  `operations invoke`: the local host admits no credential-less profile, and a bearer
-  profile awaits a reviewed identity check.
+  `adapters/loki/spec/ess`; the operator guide is `adapters/loki/README.md`. Limits: no
+  `X-Scope-OrgID` tenant header is sent, and a Loki without authentication cannot be
+  connected, because the local host admits no credential-less profile.
 
 ## 0.37.0 — 2026-10-08
 

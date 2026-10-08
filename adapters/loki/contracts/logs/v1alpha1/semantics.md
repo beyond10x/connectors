@@ -315,8 +315,35 @@ final page"):
   whose proxy lowers the limit silently is not detected.
 - **Redaction** is not applied; `redacted` is always false.
 
-Executable composition (`connections connect` and `operations invoke`) is not part of
-this binding. `loki.anonymous` declares no credential, and the local host admits only
-profiles with at least one entry field and a bearer, basic, mTLS or session scheme.
-`loki.bearer` needs the reviewed identity-validation mechanism `design.md` requires
-before advertisement.
+The executable composition that serves this binding through `connections connect` and
+`operations invoke` is §11.4.
+
+### 11.4 The bearer connection (2026-10-08)
+
+The executable `connectors-loki` (`adapters/loki/src/local.rs`) advertises one profile,
+`loki.bearer`, and serves the three operations of §11.3 through the local host. Its
+configuration, profile, entry and identity probe are modelled in
+`spec/ess/domains/connection.yaml`; `tests/ess_model.rs` checks the executable against the
+schemas and invariants that model generates.
+
+- **Profile.** Scheme `http_bearer`, capability `http-bearer`, purpose `service_account`,
+  subject `app`. The protected entry is `{"token": "..."}` (1–8,192 visible ASCII bytes, no spaces),
+  sent as `Authorization: Bearer <token>`. Loki grants no scopes, so the profile requires
+  none and every operation is a read.
+- **Identity probe.** Connect, repair and revalidate send `GET /loki/api/v1/labels` with the
+  token. `200` admits it; `401` and `403` refuse it as an invalid credential; `429` and
+  `5xx` are unavailable; any other status is a protocol failure. The answer's body is not
+  read. Validation evidence lasts 60 seconds.
+- **Identity.** Loki has no user or account read, so the identity is the configured
+  connection (identity source `configuration`): kind `loki.connection`, subject the
+  configuration's `instance`. Any token the deployment accepts is the same identity, and a
+  repair cannot detect a token of another tenant or deployment. Use one `instance` per
+  deployment and tenant.
+- **Configuration.** The owner-only file `connectors-loki-local/1` names `instance`,
+  an HTTPS `base_url`, an optional owner-only PEM `ca_file` that replaces the system roots,
+  and the explicit `query_scope` of §11.3. Plaintext HTTP is refused. The configuration
+  revision covers the canonical base URL and the CA file's digest, so a changed CA refuses
+  the cached launch.
+- **Not served.** `loki.anonymous`: the local host admits only profiles with at least one
+  entry field and a bearer, basic, mTLS or session scheme, and this binding does not widen
+  that. `loki.basic` and `loki.via_parent` are not implemented.

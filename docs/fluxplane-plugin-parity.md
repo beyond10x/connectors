@@ -38,7 +38,7 @@ Sources:
   | slack | 710 | missing |
   | sql | 663 | partial only |
   | grafana | 394 | missing |
-  | loki | 334 | missing |
+  | loki | 334 | covered |
   | kubernetes | 81 | covered |
   | homer | 33 | missing |
   | confluence | 13 | covered |
@@ -71,7 +71,7 @@ Per plugin (operations / calls):
 | slack | 30 | 16 | 704 | 0 / 0 | 0 / 0 | 30 / 704 |
 | sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 0 / 0 | 0 / 0 | 20 / 425 |
-| loki | 5 | 4 | 370 | 0 / 0 | 0 / 0 | 5 / 370 |
+| loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
 | kubernetes | 24 | 14 | 72 | 6 / 31 | 6 / 10 | 12 / 31 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
 | confluence | 15 | 3 | 13 | 4 / 5 | 0 / 0 | 11 / 8 |
@@ -337,22 +337,23 @@ Alertmanager. So a Grafana-proxied query needs both the Grafana route and the ch
 
 Source: fluxplane inventory §2 loki.
 
-Connectors has no Loki executable. `adapters/loki` holds `design.md`, an ESS model, the
-`logql-range` contract and, since 2026-10-08, a library binding of three operations tested
-against recorded provider answers (`adapters/loki/contracts/logs/v1alpha1/semantics.md` §11).
-The baseline's two limits of the contract (`docs/recent-adapter-usage-20260909.md`, U07),
-no metric expressions and no label discovery, are closed by §11. No operation is reachable
-through `operations invoke` yet: the local host admits no profile without a credential
-(`loki.anonymous`), and `loki.bearer` needs the identity-validation mechanism
-`adapters/loki/design.md` leaves open.
+Connectors runs Loki as the native executable `connectors-loki` since 2026-10-08
+(`adapters/loki/README.md`). A saved connection uses the profile `loki.bearer`: a bearer token,
+proved by `GET /loki/api/v1/labels`, with the configured instance as its identity
+(`adapters/loki/contracts/logs/v1alpha1/semantics.md` §11.4). Each read below answers through
+`operations invoke` on that connection, tested against fixture answers in Loki v3.7.0 API shapes
+(`adapters/loki/tests/local_runtime/cli_journey.rs`). The baseline's two limits of the contract
+(`docs/recent-adapter-usage-20260909.md`, U07), no metric expressions and no label discovery, are
+closed by §11. No `X-Scope-OrgID` tenant header is sent (§11.3), and a Loki that admits no
+credential cannot be connected: the local host admits no profile without one.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `loki.query` | 313 | 8 | 2026-09-30 | — | missing | No connection. The library binds `logs.query_range` (`adapters/loki/spec/adapter.json:52`), unpaged, at most 1,000 lines. |
-| `loki.metric` | 40 | 3 | 2026-09-24 | — | missing | No connection. The library binds `logs.query_metric` (`adapters/loki/spec/adapter.json:251`), instant and range. |
-| `loki.labels` | 11 | 4 | 2026-09-24 | — | missing | No connection. The library binds `logs.labels` (`adapters/loki/spec/adapter.json:421`), names and values. |
-| `loki.test` | 6 | 4 | 2026-09-28 | — | missing | No Loki connection, so no `connections revalidate`. |
-| `loki.recent_logs` | 0 | 0 | - | — | missing | No runtime. |
+| `loki.query` | 313 | 8 | 2026-09-30 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) | covered | Unpaged: at most 1,000 lines per call over at most 24 hours; a longer read is several calls. |
+| `loki.metric` | 40 | 3 | 2026-09-24 | `logs.query_metric` (`adapters/loki/spec/adapter.json:259`) | covered | Instant and range queries. |
+| `loki.labels` | 11 | 4 | 2026-09-24 | `logs.labels` (`adapters/loki/spec/adapter.json:429`) | covered | Label names, or one label's values. |
+| `loki.test` | 6 | 4 | 2026-09-28 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /loki/api/v1/labels` probe with the saved token. |
+| `loki.recent_logs` | 0 | 0 | - | — | missing | No "most recent lines" read; `logs.query_range` with no `end_unix_ns` ends at the receiver clock. |
 
 ## kubernetes
 
@@ -770,7 +771,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `jira.issue.comment.create` (jira) | 1 | 1 | `jira.issue.comment.add` | missing | U06 |
 | `jira.issue.view` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
 | `k8s.pod.list` (kubernetes) | 1 | 1 | `kubernetes.pod.list` | covered | — |
-| `loki.query_range` (loki) | 1 | 1 | `loki.query` | missing | U04 |
+| `loki.query_range` (loki) | 1 | 1 | `loki.query` | covered | — |
 | `slack.conversation.list` (slack) | 1 | 1 | `slack.channel.list` | missing | U02 |
 | `slack.conversations.history` (slack) | 1 | 1 | `slack.message.list` | missing | U02 |
 | `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | missing | U02 |

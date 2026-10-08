@@ -17,8 +17,8 @@ adapters/loki/
 └── src/, tests/       # Add only when implementation is authorized
 ```
 
-Only the authored documents/model currently exist for Loki. The example does not
-claim its runtime, fixtures, upstream package or release tooling has been built.
+Loki now has its runtime, tests, fixtures and generated descriptor beside these documents.
+It has no upstream/ package and no release tooling of its own.
 
 ## Shared dependency and independent versioning
 
@@ -54,7 +54,7 @@ result envelope does not make native query/continuation semantics shared.
 | [Docker](docker/design.md) | [Container logs](docker/contracts/logs/v1alpha1/semantics.md), lifecycle intent and [ESS](docker/spec/ess/system.yaml) |
 | [Kubernetes](kubernetes/design.md) | [Discovery](kubernetes/contracts/discovery/v1alpha1/semantics.md), [permissions](kubernetes/contracts/auth/v1alpha1/semantics.md), [routes](kubernetes/contracts/routes/v1alpha1/semantics.md), [logs](kubernetes/contracts/logs/v1alpha1/semantics.md), restart intent and [ESS](kubernetes/spec/ess/system.yaml) |
 | [Grafana](grafana/design.md) | [Datasource discovery](grafana/contracts/discovery/v1alpha1/semantics.md), [proxy route](grafana/contracts/routes/v1alpha1/semantics.md), [ESS](grafana/spec/ess/system.yaml) |
-| [Loki](loki/design.md) | [LogQL profile](loki/contracts/logs/v1alpha1/semantics.md), tenant binding and [ESS](loki/spec/ess/system.yaml) |
+| [Loki](loki/design.md) | [LogQL profile](loki/contracts/logs/v1alpha1/semantics.md), tenant binding and [ESS](loki/spec/ess/system.yaml); native runtime and tests in loki/; see [the Loki guide](loki/README.md) |
 | [Prometheus](prometheus/design.md) | [PromQL series profile](prometheus/contracts/series/v1alpha1/semantics.md), native configuration and future model obligations |
 | [Alertmanager](alertmanager/design.md) | Native alert records, configuration and future model obligations |
 | HubSpot | Served by the catalog provider: pinned CRM Objects `2026-09` document in hubspot/upstream/, bundle and shipped read-only selection set under catalog/; see [the HubSpot guide](../docs/catalog-hubspot.md) |

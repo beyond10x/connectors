@@ -8,7 +8,7 @@
   ],
   "configuration_schema": {
     "title": "effective local configuration",
-    "description": "The document the adapter composition builds and validates. See adapters/loki/contracts/logs/v1alpha1/semantics.md §11.3.",
+    "description": "The document the adapter composition builds and validates at bootstrap, not the file an operator writes. The file (connectors_loki.connection.LocalConfiguration in spec/ess) carries ca_file; this resolved form reduces the CA to ca_digest and carries the canonical base_url. See adapters/loki/contracts/logs/v1alpha1/semantics.md §§11.3–11.4.",
     "type": "object",
     "properties": {
       "format": {
@@ -24,6 +24,13 @@
         "type": "string",
         "minLength": 8,
         "maxLength": 512
+      },
+      "ca_digest": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^[a-f0-9]{64}$"
       },
       "query_scope": {
         "type": "object",
@@ -43,6 +50,7 @@
       "format",
       "instance",
       "base_url",
+      "ca_digest",
       "query_scope"
     ],
     "additionalProperties": false

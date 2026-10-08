@@ -11,7 +11,7 @@ Bounded LogQL reads with explicit stream and cursor semantics.
 
 The native log profile preserves Loki query semantics, stream identity and declared time, count and byte bounds. It specializes the shared log datasource contract.
 
-Authentication and tenant selection require an explicitly admitted binding. Native contracts and an authored ESS model exist; no Loki runtime is implemented in this repository.
+Loki runs as the native executable `connectors-loki`: `logs.query_range`, `logs.query_metric` and `logs.labels`, each one GET, through a saved `loki.bearer` connection. Connecting proves the bearer token with `GET /loki/api/v1/labels`; Loki names no account, so the identity is the configured connection. No tenant header is sent, and a Loki without authentication cannot be connected. The other authentication profiles and tenant selection remain proposals.
 
 ## Native contract reference
 

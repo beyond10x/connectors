@@ -95,7 +95,7 @@ async fn server(answers: Vec<(u16, Value)>) -> (String, Arc<Mutex<Vec<Seen>>>) {
 }
 
 fn effective(base: &str) -> Value {
-    json!({"format": "connectors-loki-local/1", "instance": "l", "base_url": base,
+    json!({"format": "connectors-loki-local/1", "instance": "l", "base_url": base, "ca_digest": null,
            "query_scope": {"required_equalities": []}})
 }
 

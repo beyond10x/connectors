@@ -2,6 +2,8 @@
 //! (`contracts/logs/v1alpha1/semantics.md` beside this adapter, §§3–5 and 11).
 //! Every operation is one GET through `AuthenticatedHttp`; the binding is
 //! unpaged and retains nothing between calls (§11.3).
+pub mod auth;
+
 use async_trait::async_trait;
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_sdk::{Adapter, AuthenticatedHttp, HttpResponse};

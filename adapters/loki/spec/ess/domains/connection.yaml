@@ -1,0 +1,94 @@
+domain: connectors_loki.connection
+summary: The Loki local connection — its native configuration, the `loki.bearer` profile and the configured identity probe that proves a credential.
+
+# Normative owner: adapters/loki/contracts/logs/v1alpha1/semantics.md §11.4. The executable
+# composition (adapters/loki/src/local.rs) reads `LocalConfiguration` from its owner-only file and
+# advertises exactly one `BearerProfile`; tests/ess_model.rs checks both against the schemas this
+# model generates.
+types:
+  # The query scope the configuration selects. Only the explicit entire tenant (an empty
+  # list) is admitted: no reviewed LogQL parser exists to enforce a nonempty one (§11.3).
+  - name: connectors_loki.connection.QueryScope
+    kind: struct
+    fields:
+      - {name: required_equalities, type: "List<connectors_loki.reads.LogScopeEquality>"}
+    invariants:
+      - required_equalities.count == 0
+
+  # The owner-only native file named by `--local-config`. No credential is a member.
+  # `base_url` is an HTTPS origin, optionally with a path prefix; `ca_file` is an absolute
+  # path to an owner-only PEM bundle that replaces the system roots for this connection.
+  - name: connectors_loki.connection.LocalConfiguration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: instance, type: String}
+      - {name: base_url, type: String}
+      - {name: ca_file, type: "Optional<String>"}
+      - {name: query_scope, type: connectors_loki.connection.QueryScope}
+    invariants:
+      - format == "connectors-loki-local/1"
+      - instance.count: {gte: 1, lte: 128}
+      - base_url.count: {gte: 8, lte: 512}
+      - base_url: {starts_with: "https://"}
+      - ca_file.count: {gte: 1, lte: 4096}
+
+  # The protected entry of `loki.bearer`: the token sent as `Authorization: Bearer <token>`.
+  # It enters through the host's protected entry and custody, never the configuration.
+  - name: connectors_loki.connection.BearerEntry
+    kind: struct
+    fields:
+      - {name: token, type: String}
+    invariants:
+      - token.count: {gte: 1, lte: 8192}
+
+  # Where the identity subject comes from. Loki has no user or account read, so the only
+  # source is `configuration`: the probe's 200 proves the credential, its body is not used,
+  # and the subject is the configured `instance`.
+  - name: connectors_loki.connection.IdentitySource
+    kind: enum
+    variants: [configuration]
+
+  # The identity probe: one GET of `path` relative to `base_url`. 200 admits the credential;
+  # 401 and 403 refuse it as invalid; 429 and 5xx are unavailable; anything else is a
+  # protocol failure.
+  - name: connectors_loki.connection.IdentityProbe
+    kind: struct
+    fields:
+      - {name: method, type: String}
+      - {name: path, type: String}
+      - {name: source, type: connectors_loki.connection.IdentitySource}
+      - {name: kind, type: String}
+    invariants:
+      - method == "GET"
+      - path == "loki/api/v1/labels"
+      - kind == "loki.connection"
+
+  # The one authentication profile the executable advertises. A static bearer token held
+  # by a service account of the deployment: Loki grants no scopes, so `minimum_scopes` is
+  # empty, and validation evidence lasts 60 seconds.
+  - name: connectors_loki.connection.BearerProfile
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: scheme, type: String}
+      - {name: capability, type: String}
+      - {name: purpose, type: String}
+      - {name: subject, type: String}
+      - {name: minimum_scopes, type: "List<String>"}
+      - {name: evidence_lifetime_ms, type: Integer}
+      - {name: entry, type: String}
+      - {name: identity, type: connectors_loki.connection.IdentityProbe}
+    invariants:
+      - id == "loki.bearer"
+      - scheme == "http_bearer"
+      - capability == "http-bearer"
+      - purpose == "service_account"
+      - subject == "app"
+      - minimum_scopes.count == 0
+      - evidence_lifetime_ms == 60000
+      - entry == "connectors_loki.connection.BearerEntry"
+
+# ESS-LIMIT: that `ca_file` is absolute and owner-only, that `base_url` is a canonical
+# origin without credentials, query or fragment, and that the subject equals the sibling
+# `instance` are checked by the composition, not expressible as invariants here.
