@@ -21,7 +21,7 @@ use std::path::Path;
 /// parameters this pass does not expand, each sent as one value as given: 34
 /// `page` parameters that also accept an offset page number, and one nested
 /// `filter`; no shipped read is among them.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 10] = [
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 11] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -83,6 +83,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 10] = [
         "../runpod/upstream/runpod-rest-v1.json",
         None,
         "runpod.api-key",
+        0,
+    ),
+    (
+        "slack",
+        "../slack/generated/slack-web.openapi.json",
+        Some("../slack/upstream/slack_web_openapi_v2_without_examples.json"),
+        "slack.bot",
         0,
     ),
     (

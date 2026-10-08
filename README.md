@@ -111,6 +111,7 @@ The current services provide:
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, and optionally the `helm_releases.*` release reads | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections |
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
 | Runpod (catalog provider) | `pod.create`, `pods.list`, `pod.terminate` | Runpod REST API v1 from the pinned OpenAPI source; API key as `Authorization: Bearer` from keyring custody; both writes are unguarded required-approval mutations, a create without a definite answer is `unknown`; verified against a local fixture only, see [the Runpod guide](docs/catalog-runpod.md) |
+| Slack (catalog provider, unreleased) | `conversations.list`, `conversations.history`, `conversations.replies` | Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; bot token as `Authorization: Bearer` from keyring custody; reads only, one page per call; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md) |
 
 They can run as separate Rust services, with a generic CLI and one-hop federation.
 This slice does not advertise writes, managed OAuth acquisition, durable events,
