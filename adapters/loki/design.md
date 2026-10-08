@@ -1,6 +1,6 @@
 # loki adapter design
 
-**Status:** proposed independent service `connectors.loki`, not implemented.
+**Status:** native executable `connectors-loki` (2026-10-08). It serves `logs.query_range`, `logs.query_metric` and `logs.labels` (`contracts/logs/v1alpha1/semantics.md` §11.3) through the local host under the profile `loki.bearer` (§11.4); see [README.md](README.md). The other profiles below remain proposals.
 
 ## Scope and dependencies
 
@@ -19,7 +19,7 @@ integration suites belong to [composition](../../docs/compositions/monitoring.md
 | Profile | Scheme / purpose / subject | Acquisition | Capability |
 |---|---|---|---|
 | `loki.anonymous` | none / anonymous / none | static_config | http-anonymous, no credential placement |
-| `loki.bearer` | http_bearer / service_account / app | static_config | http-bearer, pinned material |
+| `loki.bearer` | http_bearer / service_account / app | static_config | http-bearer, pinned material; **implemented** (§11.4) |
 | `loki.basic` | http_basic / service_account / app | static_config | http-basic, pinned user/password |
 | `loki.via_parent` | parent / mediated_access / none | static_config route materialization | mediated-http, parent authenticates fixed hop |
 
@@ -29,7 +29,7 @@ binding and declared child verification through that route. Verification is an
 explicitly admitted bounded native read under the same native scope as ordinary
 work; a trivial query must not bypass containment.
 
-The old ambiguous `loki.none` label is descriptive history, not an accepted alias. The selected profile fixes credential placement and applicable evidence under [auth.profile §4.2](../../contracts/auth/profile/v1alpha1/semantics.md#42-explicit-access-bindings-without-child-credentials). Missing bearer/basic material cannot select anonymous. A parent-mediated child has no local credential generation or provider account; it neither inherits the parent's grant nor receives the parent's secret. Direct bearer/basic profiles require a reviewed identity-validation mechanism for that deployment before advertisement; a successful query alone cannot invent a stable account identity. These are proposed profiles, not implemented auth support.
+The old ambiguous `loki.none` label is descriptive history, not an accepted alias. The selected profile fixes credential placement and applicable evidence under [auth.profile §4.2](../../contracts/auth/profile/v1alpha1/semantics.md#42-explicit-access-bindings-without-child-credentials). Missing bearer/basic material cannot select anonymous. A parent-mediated child has no local credential generation or provider account; it neither inherits the parent's grant nor receives the parent's secret. Direct bearer/basic profiles require a reviewed identity-validation mechanism for that deployment before advertisement; a successful query alone cannot invent a stable account identity. `loki.bearer` meets this with the configured identity probe of §11.4: the subject is the configured connection, not an account. The other profiles are proposals, not implemented auth support.
 
 
 Proposed direct example, requiring a new strict configuration reader:

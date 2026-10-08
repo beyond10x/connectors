@@ -1,6 +1,6 @@
 # Loki logql-range/v1alpha1
 
-- **Status:** proposed, not implemented.
+- **Status:** proposed; the unpaged library binding of §11.3 is implemented, without executable composition.
 - **Family:** datasources. Siblings: [records](../../../../../contracts/datasources/records/v1alpha1/semantics.md), [series](../../../../../contracts/datasources/series/v1alpha1/semantics.md), relational (in [service v1alpha1](../../../../../contracts/service/v1alpha1/semantics.md)).
 - **Recorded:** 2026-09-08; ownership relocated 2026-09-09.
 - **Shared dependency:** [datasource.logs/v1alpha1](../../../../../contracts/datasources/logs/v1alpha1/semantics.md). This file owns all Loki-specific semantics.
@@ -222,3 +222,130 @@ Proposed provider-independent collection/page facts and completeness decisions b
 | Redaction | host filter, opt-in, flagged per line; not a contract guarantee |
 | Window maximum | 24 h |
 | Durable/archival continuation and live follow | separate unselected profiles; finite native queries and retained Loki paging remain selected |
+
+## 11. Metric queries, label discovery and the unpaged binding
+
+**Recorded:** 2026-10-08. These profiles close the two limits the 2026-09-09 baseline
+recorded: §4.2 refuses metric expressions as log queries, and no label discovery was
+selected. They are typed in the [Loki-owned model](../../../spec/ess/domains/reads.yaml)
+(`MetricSelection`, `MetricResultType`, `LabelSelection`) and declared in
+[the adapter specification](../../../spec/adapter.json).
+
+| Operation | Contract | Profile | Native request |
+|---|---|---|---|
+| `logs.query_range` | `datasource.logs/v1alpha1` | `logql-range` | `GET loki/api/v1/query_range` |
+| `logs.query_metric` | `datasource.series/v1alpha1` | `logql-metric` | `GET loki/api/v1/query` (instant) or `GET loki/api/v1/query_range` (range) |
+| `logs.labels` | `datasource.logs/v1alpha1` | `loki-labels` | `GET loki/api/v1/labels` or `GET loki/api/v1/label/<name>/values` |
+
+Paths are relative to the configured base URL. Every operation is one GET with no retry,
+under the shared provider bounds of §5: at most 4 MiB of provider body and the existing
+transport deadline. A body over that bound, a transport failure or a malformed answer is
+Unavailable; a deadline is Timeout. Provider 400 and 422 are InvalidInput, 401 is
+Unauthorized, 403 is Forbidden, 429 is RateLimited and any other non-200 status is
+Unavailable. No provider text, query text, origin or credential enters an error.
+
+Every success envelope must be exactly `{"status":"success","data":…}`; any other
+top-level member, including a `warnings` extension, is Unavailable (§4.3).
+
+### 11.1 `logql-metric`
+
+Input is an instant query `{query, time_unix_ns?}` or a range query
+`{query, start_unix_ns, end_unix_ns, step_seconds}`; the two forms do not mix. `query` is
+1–16,384 bytes. Omitted `time_unix_ns` is the receiver clock. Timestamps follow §4.3
+(canonical decimal nanoseconds); a range requires start < end, end − start ≤ 24 h,
+`step_seconds` in 1–86,400 and at most 11,000 points per series
+(`(end − start) / step + 1`). A violation is InvalidInput before dispatch. The range
+request sends start, end and `step=<n>s` exactly; the instant request sends `time`.
+
+`data.resultType` must be `vector`, `matrix` or `scalar`. A `streams` answer means the
+query was a log query: InvalidInput, never log lines. Result:
+
+```json
+{ "result_type": "matrix", "series": [ { "labels": { "app": "api" }, "samples": [ { "timestamp_unix_ns": "1788825600000000000", "value": "42" } ] } ], "complete": true, "truncation": [], "provenance": { "instance": "…", "profile": "logql-metric", "observed_at_unix_ms": 0 } }
+```
+
+A sample timestamp is the provider's decimal seconds converted exactly to canonical
+nanoseconds; an exponent form or more than nine fractional digits is Unavailable. A
+value stays the provider's string (`NaN`, `+Inf` included), never reparsed. A scalar is
+one series with empty labels. Series keep provider order; samples keep provider order
+within a series. Labels follow the §5 label bounds; a violation is Unavailable.
+
+At most 500 series and 50,000 samples in total are returned. Series past 500 are
+omitted with cause `series_limit`; samples past 50,000 are omitted with cause
+`sample_limit`, from the first series that reaches it. `complete` is false exactly when a
+cause is present. Loki's own series limit answers an error, not a partial result, so a
+complete answer is exhaustive for the query.
+
+### 11.2 `loki-labels`
+
+Input `{label?, start_unix_ns?, end_unix_ns?, query?}`. Without `label` the operation
+lists label names; with `label` it lists that label's values. `label` is a Loki label
+name (`[A-Za-z_][A-Za-z0-9_]*`, at most 128 bytes) and is sent as one encoded path
+segment. `query` is an optional stream selector of 1–16,384 bytes, forwarded unchanged.
+Omitted end is the receiver clock; omitted start is end minus six hours, Loki's own
+default made explicit. The window follows §4.3 and is at most 24 h.
+
+`data` must be an array of strings, each at most 4 KiB; anything else is Unavailable.
+Result `{label, values, complete, truncation, provenance}` keeps provider order and
+returns at most 10,000 values; past that, cause `value_limit` and `complete: false`.
+
+### 11.3 The implemented binding (2026-10-08)
+
+The library binding in `adapters/loki/src` implements these three operations with this
+narrower selection, which the shared logs contract admits ("an unpaged result is its
+final page"):
+
+- **Unpaged.** `logs.query_range` takes `limit` (1–1,000, default 1,000) as both the
+  public page size and the provider entry cap; `collection_limit` and `cursor` are not
+  accepted. `next_cursor` is always null and no observation is retained (§4.4 is not
+  implemented). The emitted result is bounded to 4 MiB serialized; lines past it are
+  omitted with cause `response_bytes`.
+- **Scope.** Configuration requires `query_scope.required_equalities` and admits only the
+  explicit empty array (§4.2: the entire configured tenant). No reviewed LogQL parser
+  exists, so the scoped form is not advertised and a nonempty array is an invalid
+  configuration.
+- **Root classification without a parser.** A log query sent to `logs.query_metric`, or a
+  metric query sent to `logs.query_range`, is recognised from the provider's
+  `resultType` after dispatch and refused as InvalidInput. §4.2's pre-dispatch refusal
+  needs the parser.
+- **Tenant header.** `X-Scope-OrgID` placement (§4.1) needs the shared HTTP header
+  extension, which the host HTTP port does not carry; the binding sends no tenant header.
+- **Exhaustion proof.** §4.3 requires a provider binding verified to honour the effective
+  limit. The binding treats a validated answer below `limit` as exhausted; a deployment
+  whose proxy lowers the limit silently is not detected.
+- **Redaction** is not applied; `redacted` is always false.
+
+The executable composition that serves this binding through `connections connect` and
+`operations invoke` is §11.4.
+
+### 11.4 The bearer connection (2026-10-08)
+
+The executable `connectors-loki` (`adapters/loki/src/local.rs`) advertises one profile,
+`loki.bearer`, and serves the three operations of §11.3 through the local host. Its
+configuration, profile, entry and identity probe are modelled in
+`spec/ess/domains/connection.yaml`; `tests/ess_model.rs` checks the executable against the
+schemas and invariants that model generates.
+
+- **Profile.** Scheme `http_bearer`, capability `http-bearer`, purpose `service_account`,
+  subject `app`. The protected entry is `{"token": "..."}` (1–8,192 visible ASCII bytes, no spaces),
+  sent as `Authorization: Bearer <token>`. Loki grants no scopes, so the profile requires
+  none and every operation is a read.
+- **Identity probe.** Connect, repair and revalidate send `GET /loki/api/v1/labels` with the
+  token. `200` admits it; `401` and `403` refuse it as an invalid credential; `429` and
+  `5xx` are unavailable; any other status is a protocol failure. The answer's body is not
+  read. Validation evidence lasts 60 seconds.
+- **Identity.** Loki has no user or account read, so the identity is the configured
+  connection (identity source `configuration`): kind `loki.connection`, subject the
+  configuration's `instance`. Any token the deployment accepts is the same identity, and a
+  repair cannot detect a token of another tenant or deployment. Use one `instance` per
+  deployment and tenant.
+- **Configuration.** The owner-only file `connectors-loki-local/1` names `instance` (1–128
+  characters of `A–Z a–z 0–9 _ . -`), an HTTPS `base_url` of at most 512 characters written
+  in its canonical form (lowercase `https://` and host, a path ending in `/`, no credentials,
+  query or fragment), an optional owner-only PEM `ca_file` at an absolute path that replaces
+  the system roots (absent, never `null`), and the explicit `query_scope` of §11.3.
+  Plaintext HTTP is refused. The configuration revision covers the base URL and the CA
+  file's digest, so a changed CA refuses the cached launch.
+- **Not served.** `loki.anonymous`: the local host admits only profiles with at least one
+  entry field and a bearer, basic, mTLS or session scheme, and this binding does not widen
+  that. `loki.basic` and `loki.via_parent` are not implemented.

@@ -1,0 +1,1 @@
+{"status":"success","data":{"resultType":"streams","result":[{"stream":{"app":"api","level":"error"},"values":[["1788825500000000000","dup"],["1788825599000000000","boom"]]},{"stream":{"app":"api","level":"info"},"values":[["1788825000000000000","early"],["1788825599000000000","tie"]]}],"stats":{"summary":{"totalEntriesReturned":4}}}}

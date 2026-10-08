@@ -1,5 +1,5 @@
 domain: connectors_loki.reads
-summary: Loki-owned LogQL range selection and mandatory selector equalities.
+summary: Loki-owned LogQL range, metric and label selections and mandatory selector equalities.
 
 # Normative owner: adapters/loki/contracts/logs/v1alpha1/semantics.md §§3–4.
 types:
@@ -45,3 +45,41 @@ types:
 # between sibling fields of a type.
 # This profile's native query selection is not a universal input for pod or
 # container streams. Shared collection/page facts do not execute this binding.
+  - name: connectors_loki.reads.MetricResultType
+    kind: enum
+    variants: [vector, matrix, scalar]
+  - name: connectors_loki.reads.MetricSelection
+    kind: struct
+    # adapters/loki/contracts/logs/v1alpha1/semantics.md §11.1: an instant query names
+    # at most `time_unix_ns` (omitted: the receiver clock); a range query names start,
+    # end and step instead.
+    fields:
+      - {name: query, type: String}
+      - {name: time_unix_ns, type: "Optional<String>"}
+      - {name: start_unix_ns, type: "Optional<String>"}
+      - {name: end_unix_ns, type: "Optional<String>"}
+      - {name: step_seconds, type: "Optional<Integer>"}
+    invariants:
+      - query.count: {gte: 1, lte: 16384}
+      - any:
+          - all:
+              - not defined(start_unix_ns)
+              - not defined(end_unix_ns)
+              - not defined(step_seconds)
+          - all:
+              - not defined(time_unix_ns)
+              - defined(start_unix_ns)
+              - defined(end_unix_ns)
+              - defined(step_seconds)
+  - name: connectors_loki.reads.LabelSelection
+    kind: struct
+    # §11.2: no label lists the label names; a label lists that label's values.
+    # Omitted end is the receiver clock; omitted start is end minus six hours.
+    fields:
+      - {name: label, type: "Optional<String>"}
+      - {name: start_unix_ns, type: "Optional<String>"}
+      - {name: end_unix_ns, type: "Optional<String>"}
+      - {name: query, type: "Optional<String>"}
+    invariants:
+      - label.count: {gte: 1, lte: 128}
+      - query.count: {gte: 1, lte: 16384}
