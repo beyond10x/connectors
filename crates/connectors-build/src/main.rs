@@ -106,7 +106,8 @@ enum Action {
         /// Replace a bundle the index already carries for this provider.
         #[arg(long)]
         replace: bool,
-        /// The pinned Google Discovery document `--source` was projected from.
+        /// The pinned Google Discovery or Swagger 2.0 document `--source` was
+        /// projected from (told apart by content).
         /// The projection is recomputed and must equal `--source` byte for byte;
         /// the bundle then records the derivation.
         #[arg(long)]
