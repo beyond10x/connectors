@@ -19,7 +19,8 @@ pub fn expand(value: &mut Value) -> Result<()> {
         && reference.starts_with("urn:connectors:config:")
     {
         let imported = match reference {
-            "urn:connectors:config:v1:service" => schema::<crate::server::ServiceConfig>()?,
+            "urn:connectors:config:v1:service" => schema::<crate::server::ServiceConfigV1>()?,
+            "urn:connectors:config:v2:service" => schema::<crate::server::ServiceConfig>()?,
             "urn:connectors:config:v1:http" => schema::<crate::http::HttpConfig>()?,
             "urn:connectors:config:v1:credential" => schema::<crate::credentials::CredentialRef>()?,
             _ => return Err(Error::invalid("unknown shared configuration schema")),

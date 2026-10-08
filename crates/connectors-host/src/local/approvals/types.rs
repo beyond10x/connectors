@@ -171,13 +171,19 @@ impl VerifiedApproval {
                 authority_ref: gateway_instance.clone(),
             },
         };
+        // An approval names a connection; a candidate without one never matches.
+        let (Some(connection), Some(connection_revision)) =
+            (f.connection_ref.clone(), f.connection_revision.clone())
+        else {
+            return Err(Failure::Refused);
+        };
         if !matches!(&candidate.approval, crate::local::mutations::Approval::Required { reference } if reference == &self.binding.reference)
             || s.target
                 != (Target {
                     instance: f.operation.instance.clone(),
                     operation: f.operation.operation.clone(),
-                    connection: f.connection_ref.clone(),
-                    connection_revision: f.connection_revision.clone(),
+                    connection,
+                    connection_revision,
                     contract: f.contract_ref.clone(),
                     profile: f.profile.clone(),
                     descriptor_revision: f.descriptor_revision.clone(),

@@ -52,8 +52,9 @@ struct GateBinding {
     instance: String,
     adapter: String,
     configuration: String,
-    connection: String,
-    revision: String,
+    /// The selected connection and its revision; absent for an HTTP-host
+    /// attempt, whose gate is the instance's adapter and configuration alone.
+    connection: Option<(String, String)>,
     fence: String,
 }
 
@@ -563,25 +564,33 @@ fn binding(tx: &Transaction<'_>, f: &Fingerprint) -> Result<GateBinding> {
         instance: f.operation.instance.clone(),
         adapter: f.operation.adapter.clone(),
         configuration: f.configuration_revision.clone(),
-        connection: f.connection_ref.clone(),
-        revision: f.connection_revision.clone(),
+        connection: f.connection_ref.clone().zip(f.connection_revision.clone()),
         fence: String::new(),
     };
-    result.fence = tx
-        .query_row(
-            "SELECT publication_fence FROM registry_connections WHERE connection_ref=?1",
-            [&result.connection],
-            |r| r.get(0),
-        )
-        .optional()
-        .map_err(db)?
-        .ok_or(Failure::BindingChanged)?;
+    result.fence = match &result.connection {
+        Some((connection, _)) => tx
+            .query_row(
+                "SELECT publication_fence FROM registry_connections WHERE connection_ref=?1",
+                [connection],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(db)?
+            .ok_or(Failure::BindingChanged)?,
+        // No connection publication exists to fence; the instance's
+        // configuration revision is the coordinate the gate rechecks.
+        None => result.configuration.clone(),
+    };
     check_binding(tx, &result)?;
     Ok(result)
 }
 fn check_binding(tx: &Transaction<'_>, b: &GateBinding) -> Result<()> {
-    let matches: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM registry_connections c JOIN registry_instances i ON i.instance_id=c.instance_id WHERE c.connection_ref=?1 AND c.instance_id=?2 AND c.semantic_revision=?3 AND c.publication_fence=?4 AND c.state='live' AND c.public=1 AND i.adapter_id=?5 AND i.configuration_revision=?6)",
-        params![b.connection,b.instance,b.revision,b.fence,b.adapter,b.configuration], |r| r.get(0)).map_err(db)?;
+    let matches: bool = match &b.connection {
+        Some((connection, revision)) => tx.query_row("SELECT EXISTS(SELECT 1 FROM registry_connections c JOIN registry_instances i ON i.instance_id=c.instance_id WHERE c.connection_ref=?1 AND c.instance_id=?2 AND c.semantic_revision=?3 AND c.publication_fence=?4 AND c.state='live' AND c.public=1 AND i.adapter_id=?5 AND i.configuration_revision=?6)",
+            params![connection,b.instance,revision,b.fence,b.adapter,b.configuration], |r| r.get(0)).map_err(db)?,
+        None => b.fence == b.configuration && tx.query_row("SELECT EXISTS(SELECT 1 FROM registry_instances WHERE instance_id=?1 AND adapter_id=?2 AND configuration_revision=?3)",
+            params![b.instance,b.adapter,b.configuration], |r| r.get(0)).map_err(db)?,
+    };
     if matches {
         Ok(())
     } else {
