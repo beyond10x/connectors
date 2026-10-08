@@ -629,3 +629,126 @@ fn adversary_after_a_refused_upgrade_the_read_does_not_name_revalidation_again()
         "the read names the revalidation the new provider already refused"
     );
 }
+
+/// Adversary pass 2 (semantics.md: the instance's recorded revision "moves to
+/// the configured one only when a connection is published under it"). A
+/// connect begun under revision 1 before the configuration moved, published
+/// after a connection under revision 2 moved the instance, moves the instance
+/// back to revision 1: the configured revision's approval keys then refuse
+/// again although a connection under it is published.
+#[test]
+fn adversary_a_connect_published_under_an_older_revision_does_not_move_the_instance_back() {
+    use crate::local::approval_keys;
+    let (root, registry) = fixture();
+    let _ = connected(&registry, "one");
+    // A connect under revision 1 is in progress when the instance is
+    // reconfigured at revision 2.
+    let acquisition = registry.begin(&binding(), LATER).unwrap();
+    let old_claim = registry.consume(acquisition, LATER).unwrap();
+    let old_prepared = registry
+        .prepare(&old_claim, validated("two", LATER), 12, LATER)
+        .unwrap();
+    // A connect under revision 2 publishes and moves the instance.
+    let acquisition = registry.begin(&upgraded(), LATER).unwrap();
+    let claim = registry.consume(acquisition, LATER).unwrap();
+    let prepared = registry
+        .prepare(&claim, validated("three", LATER), 12, LATER)
+        .unwrap();
+    let new = publish_fixture(&registry, prepared, LATER);
+    assert_eq!(recorded(root.path(), &new).instance_revision, "config-2");
+    // The older connect completes afterwards.
+    let _ = publish_fixture(&registry, old_prepared, LATER);
+    let keys = approval_keys::Store::new(
+        root.path(),
+        None,
+        "fixture-instance",
+        "fixture-adapter",
+        "config-2",
+    )
+    .unwrap()
+    .status();
+    assert_eq!(
+        recorded(root.path(), &new).instance_revision,
+        "config-2",
+        "a connection published under an older revision moved the instance back ({keys:?})"
+    );
+}
+
+/// Adversary pass 2 (ESS auth_bindings: "An upgrade that succeeds removes it;
+/// a refusal under another revision replaces it"). The refusal is recorded for
+/// the credential the provider refused; a repair under the connection's own
+/// revision replaces that credential and keeps the refusal. When the
+/// configuration moves to the refused revision again, the read names a new
+/// connection, while a revalidation of the repaired credential upgrades it.
+#[test]
+fn adversary_a_repair_clears_the_refusal_recorded_for_the_replaced_credential() {
+    let (root, registry) = fixture();
+    let (reference, revision, _) = connected(&registry, "one");
+    let none = BTreeSet::new();
+    // The new provider refuses the credential's scope under revision 2.
+    let captured = registry
+        .capture_revalidation(&upgraded(), &reference, &revision, LATER, LATER + 1000)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
+    registry
+        .finish_revalidation(
+            dispatched,
+            Err(Some(InvalidCredential::Insufficient)),
+            LATER,
+        )
+        .unwrap();
+    assert_eq!(
+        recorded(root.path(), &reference).refused.as_deref(),
+        Some("config-2")
+    );
+    // The configuration is rolled back to revision 1, the credential repaired
+    // with a broader one for the same identity.
+    let at = LATER + 10;
+    let acquisition = registry
+        .begin_repair(&binding(), &reference, &revision, at)
+        .unwrap();
+    let claim = registry.consume(acquisition, at).unwrap();
+    let prepared = registry
+        .prepare(&claim, validated("one", at), 12, at)
+        .unwrap();
+    publish_fixture(&registry, prepared, at);
+    // Revision 2 is configured again.
+    let at = at + 10;
+    let read = registry.admit_read(&upgraded(), &reference, &none, at);
+    let revision = observe(&registry, "config-2", &reference, at).revision;
+    let captured = registry
+        .capture_revalidation(&upgraded(), &reference, &revision, at, at + 1000)
+        .unwrap();
+    let dispatched = registry.dispatch_revalidation(captured, at).unwrap();
+    let revalidation = registry.finish_revalidation(dispatched, Ok(validated("one", at)), at);
+    assert!(
+        read == Err(Failure::UpgradeRequired) || revalidation.is_err(),
+        "the read names a new connection ({read:?}) for a repaired credential the \
+         new provider never refused; revalidation upgrades it ({revalidation:?})"
+    );
+}
+
+/// Adversary pass 2 (semantics.md: `revalidate_connection` "only when ... its
+/// credential is neither known invalid nor expired"; otherwise
+/// `create_connection` for reads, approvals and launches). An approval target
+/// for a stale connection whose credential has expired names revalidation;
+/// revalidation refuses it `NotReady` (`repair_connection`) and repair refuses
+/// the changed binding (`IdentityMismatch`, `repair_connection` again).
+#[test]
+fn adversary_an_approval_for_a_stale_expired_connection_does_not_name_revalidation() {
+    let (_root, registry) = fixture();
+    let (reference, revision, _) = connected(&registry, "one");
+    let none = BTreeSet::new();
+    // Past the credential's expiry (validated: NOW + 3_600_000).
+    let expired = NOW + 3_600_000;
+    let approval = registry.approval_target(&upgraded(), &reference, &none);
+    let revalidation = registry.admit_revalidation(&upgraded(), &reference, &revision, expired);
+    let repair = registry
+        .begin_repair(&upgraded(), &reference, &revision, expired)
+        .map(|_| ());
+    assert!(
+        approval != Err(Failure::UpgradeRequired) || revalidation.is_ok(),
+        "approval names revalidation ({approval:?}), revalidation refuses \
+         ({revalidation:?}), repair refuses ({repair:?})"
+    );
+}
