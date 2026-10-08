@@ -764,6 +764,24 @@ fn a_created_pod_is_applied_and_returned() {
     }
 }
 
+/// A pod started with its own command and arguments, an entrypoint override
+/// and a network volume: the three keys reach Runpod as the caller wrote them.
+#[test]
+fn a_create_sends_its_start_command_entrypoint_and_network_volume() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection(Some(PrivateProtocol::V2))).unwrap();
+    let mut body = create_body("created-201");
+    body["dockerStartCmd"] = json!(["--model", "fixture/model", "--port", "8000"]);
+    body["dockerEntrypoint"] = json!(["python3", "-m", "fixture.server"]);
+    body["networkVolumeId"] = json!("fixturevolume");
+    let result = write(&mut child, "pod.create", &json!({"body": body}))
+        .unwrap_or_else(|failure| panic!("`pod.create` refused in prepare: {failure:?}"));
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1, "one request, no preflight");
+    assert_eq!(requests[0].3, body);
+}
+
 /// A 400 is Runpod's documented definite refusal: nothing was created.
 #[test]
 fn a_create_answered_400_is_refused() {

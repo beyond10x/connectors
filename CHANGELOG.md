@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Runpod `pod.create` admits three more `PodCreateInput` body keys: `dockerStartCmd`,
+  `dockerEntrypoint` and `networkVolumeId`, so a pod can start its image with its own
+  arguments and attach a network volume. Every other key outside the fifteen is still refused
+  as `invalid_input` before any request. See `docs/catalog-runpod.md`.
+
 - Entity Runtime 0.30.3 on Eventlog 0.8.3 (from 0.30.2 on 0.8.1). With the `file` and
   PostgreSQL eventlog providers a recorded batch now costs time linear in its members. Every
   store this host opens is SQLite, which was already linear; no API or on-disk format change,

@@ -81,9 +81,12 @@ the document declares no paging. `pod.terminate` takes `podId` only.
 | `cloudType` | `SECURE` (default) or `COMMUNITY` |
 | `dataCenterIds` | the data centers to place the pod in |
 | `interruptible` | `true` for a spot pod |
+| `dockerStartCmd` | overrides the image's start command, an array of strings (`[]` keeps the image's) |
+| `dockerEntrypoint` | overrides the image's entrypoint, an array of strings (`[]` keeps the image's) |
+| `networkVolumeId` | the network volume to attach; it replaces the pod volume |
 
-A body carrying any other key, such as `templateId`, `networkVolumeId` or
-`dockerStartCmd`, is refused as `invalid_input` before any request. The values
+A body carrying any other key, such as `templateId` or `minRAMPerGPU`, is
+refused as `invalid_input` before any request. The values
 are not checked by the provider; Runpod validates them and answers `400` for
 one it does not accept.
 
