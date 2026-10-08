@@ -102,19 +102,16 @@ fn bootstrap(bundles: &Path, scratch: &Path) -> Bootstrap {
 /// tells an operator what the rebuilt bundles require of an existing GitLab,
 /// Jira or Confluence instance.
 ///
-/// The host binds an instance id to the configuration revision it was first
-/// connected under (`registry/lifecycle.rs` `register`), and the connection
-/// binding is the bootstrap's (`runtime.rs` `Bootstrap::binding`). So an
-/// instance connected before the rebuild, following the guide's own
-/// configuration, is refused when it connects again after it under the same
-/// instance id — and the adapter entry's `configuration_revision` must first be
-/// copied from the bootstrap again, or the adapter does not start
-/// (`runtime/process.rs` readiness check). Correction round 2 made this the
-/// documented upgrade path: the guide says so, and this case holds today's
-/// refusal as what the guide describes. Configuration upgrades are
-/// unimplemented (`docs/local-connection-registry.md:121`).
+/// The rebuild moves the configuration revision the host binds. An instance
+/// connected before it can be revalidated onto the new revision, or connected
+/// again under the same instance id: a new connection is admitted under the
+/// configured revision and moves the instance to it when it publishes
+/// (`registry/lifecycle.rs` `register` and publication;
+/// `docs/local-connection-registry.md`, "Configuration upgrades"). The adapter
+/// entry's `configuration_revision` must still be copied from the bootstrap
+/// again, or the adapter does not start (`runtime/process.rs` readiness check).
 #[test]
-fn adversary2_an_instance_connected_before_the_rebuild_is_refused_under_the_same_id_after_it() {
+fn adversary2_an_instance_connected_before_the_rebuild_connects_again_under_the_same_id_after_it() {
     let scratch = tempfile::tempdir().unwrap();
     let base: PathBuf = scratch.path().join("base-bundles");
     base_gitlab(&base);
@@ -138,22 +135,15 @@ fn adversary2_an_instance_connected_before_the_rebuild_is_refused_under_the_same
         .unwrap();
     registry.consume(connected, NOW).unwrap();
 
-    // Today's behaviour, decided in correction round 2: the registry keeps an
-    // instance id bound to the revision it first connected under, so the same
-    // id is refused under the rebuilt binding. The guide tells operators to
-    // connect again under a new instance id or fresh state.
     let again = registry.begin(&after.binding("gitlab.pat").unwrap(), NOW + 1);
-    assert_eq!(
-        again.as_ref().err(),
-        Some(&Failure::Conflict),
-        "instance `{}` connected under configuration revision {} and reconnecting under {} \
-         after the bundle rebuild: docs/local-catalog-provider.md (\"Array and required \
-         query parameters\") says this is refused and the instance connects again under a \
-         new instance id or fresh state, because configuration upgrades are unimplemented \
-         (docs/local-connection-registry.md:121). If the registry now accepts it, that \
-         paragraph is wrong",
+    assert!(
+        again.is_ok(),
+        "instance `{}` connected under configuration revision {} is refused a new connection \
+         under {} after the bundle rebuild ({:?}); docs/local-catalog-provider.md (\"Array and \
+         required query parameters\") says it connects again under the same instance id",
         after.instance,
         before.configuration_revision,
         after.configuration_revision,
+        again.err(),
     );
 }
