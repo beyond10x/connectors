@@ -21,7 +21,7 @@ scope:
   path: crates/connectors-host/src/local/registry.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 15
+revision: 16
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
@@ -142,13 +142,13 @@ state what is built:
   read; it does one complete read at its start (`Metadata::start_owner`). Every other open (a
   command run without the owner, a second process, recovery) is a provider open followed by a
   complete read (`complete_snapshot`), which Entity Runtime 0.29.0 treats as complete
-  verification (`entity-eventlog` `tracked.rs:376`). A command run with the owner reads through
+  verification (Entity Runtime 0.29.0 CHANGELOG and the `CapturePolicy::ProviderTracked` doc comment, `entity-eventlog` `adapter/tracked.rs:19-20`). A command run with the owner reads through
   it (`LocalOwnerCachedRequest`).
 - Tests: an offline raw edit of the SQLite file is refused before the first command after it, on
   the owner path (edited while the owner is stopped, then started) and on the direct path.
 - Accepted: inside a process that already holds a verified handle, a later open of the same file
   skips `PRAGMA quick_check`, so page damage written by a non-SQLite writer while that process
-  runs is seen at the next fresh open, not before. This matches the provider-tracked posture
+  runs is seen at the next fresh open, not before; damage in the `connectors_er_*` tables is still refused by the catch-up read (`crates/connectors-host/tests/pooled_open_scan_adversary.rs`). This matches the provider-tracked posture
   recorded on 2026-10-05.
 - `CHANGELOG.md` and the store contract (`docs/local-er-metadata.md`,
   `contracts/cli/v1alpha1/semantics.md` §3) say which open verifies what.
