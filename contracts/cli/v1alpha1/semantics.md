@@ -380,7 +380,7 @@ admission of `invoke`, [local owner transport](owner.md)) and does not open it;
 without such an owner it opens the store directly and verifies it completely.
 A write through any SQLite connection is proven or makes the next read verify
 completely, as before. Due expiries of transient subjects are recorded in
-batches of at most 32 before the batch carrying the command's own change; a
+batches of at most 128 before the batch carrying the command's own change; a
 refused expiry batch leaves earlier ones committed and the command's change
 unapplied, with its failure unchanged.
 
