@@ -17,14 +17,14 @@ impl Registry {
     pub fn begin(&self, binding: &Binding, now: u64) -> Result<Acquisition> {
         binding.validate()?;
         self.transaction(now, true, |tx, authority, now| {
-            register(tx, binding)?;
+            let begun_at = register(tx, binding)?;
             let per_instance: i64 = tx.query_row("SELECT count(*) FROM registry_connections WHERE instance_id=?1", [&binding.instance_id], |r| r.get(0)).map_err(db)?;
             let total: i64 = tx.query_row("SELECT count(*) FROM registry_connections", [], |r| r.get(0)).map_err(db)?;
             if per_instance>=1000 || total>=10_000 { return Err(Failure::Capacity); }
             let connection = qualified("conn", authority);
             let fence = new_id();
             tx.execute("INSERT INTO registry_connections (connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,created_at_ms) VALUES (?1,?2,?3,?4,?5,?6,?7,'live',?8)",
-                params![connection,binding.instance_id,profile_key(binding)?,encode(binding)?,new_id(),new_id(),fence,timestamp(now)?]).map_err(db)?;
+                params![connection,binding.instance_id,profile_key(binding)?,encode_stored(binding, &Kept { begun_at, ..Kept::default() })?,new_id(),new_id(),fence,timestamp(now)?]).map_err(db)?;
             create_acquisition(tx, authority, connection, fence, now)
         })
     }
@@ -173,7 +173,7 @@ impl Registry {
                 params![row.reference,encode(&prepared.baseline.identity)?,prepared.generation,prepared.version_id,encode(&snapshot)?,new_id()]).map_err(db)?;
             tx.execute("UPDATE registry_acquisitions SET state='completed' WHERE acquisition_ref=?1", [&prepared.acquisition]).map_err(db)?;
             tx.execute("UPDATE registry_uses SET released=1 WHERE connection_ref=?1 AND dispatched=0", [&row.reference]).map_err(db)?;
-            follow(tx, &row.binding)?;
+            follow(tx, &row)?;
             bump(tx, &row.binding.instance_id)?;
             Ok(row.reference)
         })
@@ -277,7 +277,9 @@ impl Registry {
     }
 }
 
-fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
+/// Registers the instance and profile; answers the instance's recorded
+/// revision when the binding names another one (`Kept::begun_at`).
+fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<Option<String>> {
     let existing = tx
         .query_row(
             "SELECT adapter_id,configuration_revision FROM registry_instances WHERE instance_id=?1",
@@ -286,7 +288,7 @@ fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
         )
         .optional()
         .map_err(db)?;
-    match existing {
+    let begun_at = match existing {
         Some((adapter, _)) if adapter != binding.adapter_id => {
             return Err(Failure::Conflict);
         }
@@ -295,11 +297,13 @@ fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
         // after an upgrading revalidation. Refusing it here left an instance
         // whose connections never followed an upgrade (the new provider
         // refused the credential) admitting no connection at all.
-        Some(_) => {}
+        Some((_, revision)) if revision != binding.configuration_revision => Some(revision),
+        Some(_) => None,
         None => {
             tx.execute("INSERT INTO registry_instances (instance_id,adapter_id,configuration_revision) VALUES (?1,?2,?3)", params![binding.instance_id,binding.adapter_id,binding.configuration_revision]).map_err(db)?;
+            None
         }
-    }
+    };
     let declaration = encode(&binding.profile)?;
     let existing: Option<String> = tx.query_row("SELECT declaration FROM registry_profiles WHERE adapter_id=?1 AND profile_ref=?2 AND revision=?3", params![binding.adapter_id,binding.profile.id,binding.profile.revision], |r| r.get(0)).optional().map_err(db)?;
     if let Some(existing) = existing {
@@ -319,7 +323,7 @@ fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
         )
         .map_err(db)?;
     }
-    Ok(())
+    Ok(begun_at)
 }
 fn profile_key(binding: &Binding) -> Result<String> {
     Ok(connectors_core::digest(&serde_json::json!([
@@ -483,10 +487,27 @@ pub(super) fn recollected_snapshot(
     })
 }
 
-/// A published connection moves its instance to the revision it was made
-/// under, as an upgrading revalidation does: older connections of the
-/// instance keep theirs and can still follow on revalidation.
-fn follow(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
+/// A publication clears what the binding column kept for the connection. A
+/// refused upgrade was recorded for the credential this publication replaces
+/// (a repair), and the begin-time revision is spent. A new connection begun
+/// under another revision of its instance moves the instance to its own
+/// revision, as an upgrading revalidation does, but only if the instance still
+/// records the revision it had when the connection was begun: a connection
+/// begun under an older configuration never moves the instance back, and a
+/// repair never moves it. Older connections keep their revision and can
+/// still follow on revalidation.
+fn follow(tx: &Transaction<'_>, row: &ConnectionRow) -> Result<()> {
+    if row.kept != Kept::default() {
+        tx.execute(
+            "UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
+            params![row.reference, encode(&row.binding)?],
+        )
+        .map_err(db)?;
+    }
+    let Some(begun_at) = &row.kept.begun_at else {
+        return Ok(());
+    };
+    let binding = &row.binding;
     let revision: String = tx
         .query_row(
             "SELECT configuration_revision FROM registry_instances WHERE instance_id=?1",
@@ -494,7 +515,7 @@ fn follow(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
             |r| r.get(0),
         )
         .map_err(db)?;
-    if revision == binding.configuration_revision {
+    if revision != *begun_at {
         return Ok(());
     }
     tx.execute(

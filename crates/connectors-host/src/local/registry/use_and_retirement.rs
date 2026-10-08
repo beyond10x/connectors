@@ -20,12 +20,14 @@ fn admitted_read(
     }
     if row.binding != *binding {
         // Revalidation admits only material whose readiness it can recollect.
-        let usable = row.material.is_some()
-            && matches!(
-                observation::readiness(tx, &row, now, true)?,
-                State::Ready | State::Pending
-            );
-        return Err(super::revalidation::changed(&row, binding, usable));
+        let usable = || {
+            Ok(row.material.is_some()
+                && matches!(
+                    observation::readiness(tx, &row, now, true)?,
+                    State::Ready | State::Pending
+                ))
+        };
+        return Err(super::revalidation::changed(&row, binding, usable)?);
     }
     // Custody is only a bounded observation here. The captured material and
     // current fence are checked separately at the final dispatch boundary.

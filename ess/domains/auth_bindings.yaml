@@ -114,6 +114,7 @@ entities:
       - {name: revoked_at, type: "Optional<Timestamp>"}
       - {name: configuration_revision, type: "Optional<String>"}
       - {name: refused_configuration_revision, type: "Optional<String>"}
+      - {name: begun_at_instance_revision, type: "Optional<String>"}
     relations:
       - {name: instance, kind: references, target: connectors.declarations.ServiceConfiguration, cardinality: one, via: instance_id}
       - {name: auth_profile, kind: references, target: connectors.auth_bindings.AuthProfile, cardinality: one, via: profile_record_ref}
@@ -158,6 +159,13 @@ entities:
     # that configured revision names a new connection instead of a revalidation
     # the provider already refused; revalidation stays admitted. An upgrade
     # that succeeds removes it; a refusal under another revision replaces it.
+    # A publication also removes it: a repair replaces the refused credential.
+    # begun_at_instance_revision is the instance's recorded configuration
+    # revision when this connection, not yet published, was begun under another
+    # one. Its publication moves the instance to the connection's revision only
+    # if the instance still records this revision, so a connection begun under
+    # an older configuration never moves the instance back; publication
+    # removes it.
     # Fixed mediated route and parent are present together only for a via binding;
     # parent identity is this field, not duplicated route authority. Historical
     # observation coordinates impose no live observation FK or retention pin.

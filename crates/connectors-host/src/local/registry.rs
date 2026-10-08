@@ -238,9 +238,8 @@ struct ConnectionRow {
     generation: Option<String>,
     material: Option<String>,
     baseline: Option<EvidenceSnapshot>,
-    /// The configured revision whose upgrade the new provider refused for this
-    /// connection's credential (`Connection.refused_configuration_revision`).
-    refused: Option<String>,
+    /// What the binding column keeps beside the binding (`Kept`).
+    kept: Kept,
 }
 
 impl Registry {
@@ -401,7 +400,7 @@ impl Registry {
             "SELECT connection_ref,binding,profile_key,scope_id,semantic_revision,publication_fence,state,public,identity,active_generation,active_material,baseline FROM registry_connections WHERE connection_ref=?1",
             [reference], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get::<_,String>(6)?,r.get::<_,bool>(7)?,r.get::<_,Option<String>>(8)?,r.get::<_,Option<String>>(9)?,r.get::<_,Option<String>>(10)?,r.get::<_,Option<String>>(11)?)))
             .optional().map_err(db)?.ok_or(Failure::NotFound)?;
-        let (binding, refused) = decode_binding(&raw.1)?;
+        let (binding, kept) = decode_stored(&raw.1)?;
         let row = ConnectionRow {
             reference: raw.0,
             binding,
@@ -415,7 +414,7 @@ impl Registry {
             generation: raw.9,
             material: raw.10,
             baseline: raw.11.as_deref().map(decode).transpose()?,
-            refused,
+            kept,
         };
         row.binding
             .validate()
@@ -657,31 +656,51 @@ fn host_failure(error: super::Failure) -> Failure {
     }
 }
 
-/// The binding column's key for `Connection.refused_configuration_revision`:
-/// the column carries the binding and, while one is recorded, the configured
-/// revision whose upgrade the new provider refused.
+/// What the binding column keeps beside the binding, each key only while it
+/// is recorded: `Connection.refused_configuration_revision`, the configured
+/// revision whose upgrade the new provider refused for the current credential,
+/// and `Connection.begun_at_instance_revision`, the instance's recorded
+/// revision when this unpublished connection was begun under another one.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct Kept {
+    refused: Option<String>,
+    begun_at: Option<String>,
+}
 const REFUSED: &str = "refused_configuration_revision";
+const BEGUN_AT: &str = "begun_at_instance_revision";
 
-fn decode_binding(text: &str) -> Result<(Binding, Option<String>)> {
+fn decode_stored(text: &str) -> Result<(Binding, Kept)> {
     let mut value: serde_json::Value = decode(text)?;
     let object = value.as_object_mut().ok_or(Failure::MetadataUnavailable)?;
-    let refused = match object.remove(REFUSED) {
-        None => None,
-        Some(serde_json::Value::String(revision)) if !revision.is_empty() => Some(revision),
-        Some(_) => return Err(Failure::MetadataUnavailable),
+    let mut take = |key: &str| match object.remove(key) {
+        None => Ok(None),
+        Some(serde_json::Value::String(revision)) if !revision.is_empty() => Ok(Some(revision)),
+        Some(_) => Err(Failure::MetadataUnavailable),
+    };
+    let kept = Kept {
+        refused: take(REFUSED)?,
+        begun_at: take(BEGUN_AT)?,
     };
     let binding = serde_json::from_value(value).map_err(|_| Failure::MetadataUnavailable)?;
-    Ok((binding, refused))
+    Ok((binding, kept))
 }
 
-fn encode_binding(binding: &Binding, refused: Option<&str>) -> Result<String> {
-    let Some(revision) = refused else {
+/// The binding and its recorded refusal, as the upgrade tests read them.
+#[cfg(test)]
+fn decode_binding(text: &str) -> Result<(Binding, Option<String>)> {
+    decode_stored(text).map(|(binding, kept)| (binding, kept.refused))
+}
+
+fn encode_stored(binding: &Binding, kept: &Kept) -> Result<String> {
+    if *kept == Kept::default() {
         return encode(binding);
-    };
+    }
     let mut value = serde_json::to_value(binding).map_err(|_| Failure::MetadataUnavailable)?;
-    value
-        .as_object_mut()
-        .ok_or(Failure::MetadataUnavailable)?
-        .insert(REFUSED.into(), revision.into());
+    let object = value.as_object_mut().ok_or(Failure::MetadataUnavailable)?;
+    for (key, kept) in [(REFUSED, &kept.refused), (BEGUN_AT, &kept.begun_at)] {
+        if let Some(revision) = kept {
+            object.insert(key.into(), revision.as_str().into());
+        }
+    }
     encode(&value)
 }
