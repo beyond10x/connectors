@@ -265,6 +265,67 @@ fn a_changed_authority_or_profile_refuses_the_upgrade_and_publishes_nothing() {
     }
 }
 
+/// A new connection under another revision of its instance is refused when it
+/// changes the provider authority or the declaration of a profile the instance
+/// already holds: both still need a new instance id. A connection only begun
+/// counts, and so does a revoked one. Another profile id is admitted.
+#[test]
+fn a_new_connection_that_changes_authority_or_profile_needs_a_new_instance_id() {
+    let refused: [(&str, Change); 5] = [
+        ("provider authority", |b| {
+            b.provider_authority.push_str("/other")
+        }),
+        ("profile revision", |b| {
+            b.profile.revision = "profile-2".into()
+        }),
+        ("purpose and subject", |b| {
+            b.profile.purpose = Purpose::AppLevel;
+            b.profile.subject = Subject::App;
+        }),
+        ("minimum scopes", |b| {
+            b.profile.minimum_scopes.insert("write".into());
+        }),
+        ("evidence lifetime", |b| {
+            b.profile.evidence_lifetime_ms = 30_000
+        }),
+    ];
+    for (name, change) in refused {
+        let (_root, registry) = fixture();
+        registry.begin(&binding(), NOW).unwrap();
+        let mut target = upgraded();
+        change(&mut target);
+        assert_eq!(
+            registry.begin(&target, LATER).err(),
+            Some(Failure::Conflict),
+            "begun: {name}"
+        );
+
+        let (_root, registry) = fixture();
+        let (reference, revision, _) = connected(&registry, "one");
+        registry
+            .revoke(
+                "fixture-instance",
+                "fixture-adapter",
+                &reference,
+                &revision,
+                LATER,
+            )
+            .unwrap();
+        assert_eq!(
+            registry.begin(&target, LATER + 1).err(),
+            Some(Failure::Conflict),
+            "revoked: {name}"
+        );
+    }
+    let (_root, registry) = fixture();
+    registry.begin(&binding(), NOW).unwrap();
+    let mut other = upgraded();
+    other.profile.id = "fixture-other".into();
+    other.profile.revision = "profile-2".into();
+    registry.begin(&other, LATER).unwrap();
+    registry.begin(&upgraded(), LATER).unwrap();
+}
+
 #[test]
 fn a_different_identity_refuses_the_upgrade_and_keeps_the_credential() {
     let (root, registry) = fixture();

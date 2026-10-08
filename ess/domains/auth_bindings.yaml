@@ -166,6 +166,10 @@ entities:
     # if the instance still records this revision, so a connection begun under
     # an older configuration never moves the instance back; publication
     # removes it.
+    # A connection begun under another revision of its instance is refused when
+    # the instance holds a connection, revoked ones included, under another
+    # provider authority or another declaration of the same profile: those
+    # still need a new instance id.
     # Fixed mediated route and parent are present together only for a via binding;
     # parent identity is this field, not duplicated route authority. Historical
     # observation coordinates impose no live observation FK or retention pin.

@@ -4,10 +4,7 @@
 //! its configuration revision.
 use connectors_catalog::bundle;
 use connectors_host::local::{
-    filesystem,
-    metadata::Metadata,
-    registry::{Failure, Registry},
-    runtime::Bootstrap,
+    filesystem, metadata::Metadata, registry::Registry, runtime::Bootstrap,
 };
 use serde_json::{Value, json};
 use std::{
