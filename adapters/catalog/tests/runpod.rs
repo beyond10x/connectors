@@ -612,6 +612,75 @@ fn a_configured_identity_needs_a_path_and_no_pointer() {
     assert!(provider.requests().is_empty());
 }
 
+/// `connectors_catalog.identity.Profile`: a configured subject names the
+/// connection, not the credential's holder, so it is for a static credential
+/// only. Under either OAuth scheme it is refused at load, while the same
+/// profile with an API identity loads, so the refusal is the source's.
+#[test]
+fn a_configured_identity_is_refused_for_an_oauth_profile() {
+    let provider = Provider::new();
+    let documented: Value = serde_json::from_slice(&fs::read(&provider.config).unwrap()).unwrap();
+    let loads = |auth: Value| {
+        let mut config = documented.clone();
+        config["auth"] = auth;
+        private(&provider.config, &serde_json::to_vec(&config).unwrap());
+        Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
+            .arg("--local-config")
+            .arg(&provider.config)
+            .arg("--print-local-bootstrap")
+            .output()
+            .unwrap()
+            .status
+            .success()
+    };
+    let configured =
+        json!({"source": "configuration", "path": "pods", "kind": "runpod.connection"});
+    let api = json!({"path": "user", "kind": "runpod.user", "subject_pointer": "/id"});
+    let refresh = |identity: &Value| {
+        json!({"profile": PROFILE, "scheme": "oauth2_refresh", "header": "Authorization",
+               "bearer": true, "label": "Runpod OAuth", "identity": identity,
+               "token_url": "https://auth.example.com/token",
+               "authorize_url": "https://auth.example.com/authorize",
+               "requested_scopes": ["pods"]})
+    };
+    let client = |identity: &Value| {
+        json!({"profile": PROFILE, "scheme": "oauth2_client_credentials",
+               "header": "Authorization", "bearer": true, "label": "Runpod OAuth",
+               "identity": identity, "token_url": "https://auth.example.com/token",
+               "requested_scopes": ["pods"]})
+    };
+    let basic = |identity: &Value| {
+        json!({"profile": PROFILE, "scheme": "basic", "header": "Authorization",
+               "bearer": false, "label": "Runpod key", "account_label": "Account",
+               "identity": identity})
+    };
+    assert!(
+        loads(refresh(&api)),
+        "the OAuth refresh profile itself is valid"
+    );
+    assert!(
+        loads(client(&api)),
+        "the client-credentials profile itself is valid"
+    );
+    assert!(
+        !loads(refresh(&configured)),
+        "oauth2_refresh with a configured subject"
+    );
+    assert!(
+        !loads(client(&configured)),
+        "oauth2_client_credentials with a configured subject"
+    );
+    assert!(
+        loads(basic(&configured)),
+        "a static basic credential may be configured"
+    );
+    assert!(
+        loads(documented["auth"].clone()),
+        "the documented token profile"
+    );
+    assert!(provider.requests().is_empty());
+}
+
 #[test]
 fn connecting_proves_the_key_with_the_pod_list_and_names_the_connection() {
     let provider = Provider::new();

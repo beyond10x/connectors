@@ -17,8 +17,9 @@
 - `auth.identity.source` `configuration`: the read at `path` must answer 200 and its body is
   not read; the subject is the configuration's `instance` id. Runpod has no user or account
   read, so its identity is the configured connection (`runpod.connection`), not an account.
-  The probe's shape is modeled as `connectors_catalog.identity.Probe` in
-  `adapters/catalog/spec/ess`, and every identity the guides document is checked against it.
+  Only a static credential (`token` or `basic`) may use it; an OAuth profile with it is refused
+  at load. The rules are modeled as `connectors_catalog.identity.Probe` and `Profile` in
+  `adapters/catalog/spec/ess`, and every identity the guides document is checked against them.
 
 ### Changed
 

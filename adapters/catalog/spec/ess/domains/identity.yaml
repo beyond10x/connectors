@@ -5,9 +5,9 @@ summary: The identity probe of a catalog provider's authentication profile, the 
 # document as `auth.identity`; the subject it yields is the `ExternalIdentity.subject` of the
 # shared credential model (connectors.credentials), and `kind` is its `kind`.
 #
-# The profile, not the probe, constrains which source a scheme may use: `id_token` belongs to an
-# `oauth2_refresh` profile only, and a profile with `minimum_scopes` and an `api` source also
-# declares a scope read. Those checks stay with the profile.
+# The profile, not the probe, constrains which source a scheme may use (`Profile` below for
+# `configuration`): `id_token` belongs to an `oauth2_refresh` profile only, and a profile with
+# `minimum_scopes` and an `api` source also declares a scope read.
 
 types:
   # Where the subject comes from. An absent `source` is `api`, so configurations written before
@@ -38,3 +38,22 @@ types:
       - any: [{not: {source: id_token}}, {not: defined(path)}]
       - any: [{not: {source: id_token}}, {not: defined(subject_pointer)}]
       - any: [{not: {source: configuration}}, {not: defined(subject_pointer)}]
+
+  # How the profile's credential is sent; an absent `scheme` is `token`.
+  - name: connectors_catalog.identity.Scheme
+    kind: enum
+    variants: [token, basic, oauth2_refresh, oauth2_client_credentials]
+
+  # The part of an authentication profile (`auth`) that decides what its identity may be.
+  # A `configuration` subject names the connection, not the credential's holder, so it is only
+  # for a static credential (`token` or `basic`): an OAuth profile's credential belongs to a
+  # user or client its provider can name, and a configured subject would let repair accept
+  # another holder's credential as the same identity.
+  - name: connectors_catalog.identity.Profile
+    kind: struct
+    fields:
+      - {name: scheme, type: "Optional<connectors_catalog.identity.Scheme>"}
+      - {name: identity, type: connectors_catalog.identity.Probe}
+    invariants:
+      - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_refresh}}]
+      - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_client_credentials}}]
