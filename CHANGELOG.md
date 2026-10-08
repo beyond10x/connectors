@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.34.0 — 2026-10-08
 
 ### Fixed
 
@@ -12,7 +12,8 @@
   revision was refused), and `create_connection` otherwise. A refused upgrade is recorded on
   the connection; a repair clears it. Creating a connection under the configured revision is
   admitted again and moves the instance to that revision when it publishes, never back to an
-  older one. Found by a read-only CLI audit: a Confluence connection saved before 0.30.0 added
+  older one. A changed provider authority or profile declaration still needs a new
+  instance id. Found by a read-only CLI audit: a Confluence connection saved before 0.30.0 added
   the profile's access read refused every read with `retry_status`.
 - `connectors help describe`, `help invoke` and `help serve` print that command's usage, and
   `connectors completions bash` completes the three explicit service commands at the root with
