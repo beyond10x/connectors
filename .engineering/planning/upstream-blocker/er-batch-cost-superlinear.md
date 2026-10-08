@@ -4,7 +4,9 @@ id: upstream-blocker:er-batch-cost-superlinear
 kind: upstream-blocker
 status: open
 title: Entity Runtime batch execution time grows faster than its members (0.29.0)
-revision: 1
+relations:
+- blocks: story:lift-expiry-batch-bound
+revision: 2
 ---
 ## What blocks
 
@@ -33,3 +35,10 @@ story:metadata-invoke-cost-flat-in-store-size applies expiries in bounded batche
 
 An Entity Runtime release executes a batch in time linear in its members, and connectors pins it;
 the bound may then be raised or removed.
+
+## Upstream
+
+Entity Runtime tracks the fix as `story:batch-cost-grows-linearly-with-members` (draft) in
+https://github.com/beyond10x/entity-runtime, after its 0.30.1 release (Eventlog 0.8.1,
+https://github.com/beyond10x/entity-runtime/pull/71). story:lift-expiry-batch-bound lifts the
+bound when that release is pinned.
