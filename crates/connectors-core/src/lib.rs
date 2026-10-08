@@ -177,6 +177,10 @@ impl<'de> Deserialize<'de> for Response {
     }
 }
 
+/// The first v1alpha2 binding's invoke request and Response, beside the
+/// frozen v1alpha1 envelope above.
+pub mod v1alpha2;
+
 /// Keys serde_json's own `Value` reader reinterprets as a number or raw JSON
 /// under its `arbitrary_precision` and `raw_value` features.
 const NUMBER_TOKEN: &str = "$serde_json::private::Number";
