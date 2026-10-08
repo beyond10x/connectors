@@ -1,14 +1,17 @@
 # Connectors documentation website
 
-A local Docusaurus site with the shared b10x visual system, authored guides,
-selected canonical contract views, ESS model reference, local full-text search
-and bounded Rust/WASM examples.
+The Docusaurus site for Connectors, built on the shared `@beyond10x/docs-system` product shell:
+a product landing page, hand-written concepts, guides and adapter pages, generated reference
+pages and status, and two bounded Rust/WASM examples. It builds for
+`https://beyond10x.github.io/connectors/` (`baseUrl: '/connectors/'`). Until the organisation
+side moves the repository off the unified site, the public documentation is still the unified
+site's `/docs/connectors/` pages, built from the files `b10x.docs.yaml` declares.
 
 ## Start the preview
 
-Use Node 22 or later, Rust 1.88 or later, and the repository's exact ESS pin. Follow
-[toolchain setup](../docs/development.md) if the pin is not
-already available. The examples also need Rust's browser target:
+Use Node 22 or later, Rust 1.91 or later and the repository's exact ESS pin. Follow
+[toolchain setup](../docs/development.md) if the pin is not already available. The examples also
+need Rust's browser target:
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -17,114 +20,107 @@ npm ci --allow-git=root
 npm start
 ```
 
-Run the target-install command only when the target is missing. `npm start` generates
-reference data, validates the example composition, builds its WASM and prepares search before
-starting Docusaurus at **http://127.0.0.1:3100/**. It binds loopback and opens no
-browser automatically. No production deployment is configured.
+Run the target-install command only when the target is missing. `npm start` builds the example
+WASM, then starts Docusaurus at **http://127.0.0.1:3100/connectors/**. It binds loopback and
+opens no browser. Ordinary page edits hot reload. After changing a contract, an ESS model, the
+CLI, a crate description or the status list, regenerate the derived pages from the repository
+root:
 
-The example build uses Cargo's offline mode. On a fresh machine, after the first
-reference/example generation has created the declared path dependencies, populate
-missing registry dependencies explicitly with:
+```sh
+cargo run --locked -p connectors-docs -- generate
+```
+
+The example build uses Cargo's offline mode. On a fresh machine, after the first example
+generation has created the declared path dependencies, populate missing registry dependencies
+explicitly with:
 
 ```sh
 cargo fetch --locked --manifest-path examples/realization/Cargo.toml
 npm start
 ```
 
-Ordinary website edits hot reload. After changing a contract, ESS model or Rust
-example, run `npm run reference` or `npm run examples` as appropriate. Refresh an
-open example to load rebuilt WASM. Reset restarts the current in-memory exercise.
-
-Search reflects the latest completed build. After content changes, refresh it
-without stopping the development server:
-
-```sh
-npm run search:refresh
-```
-
-For changed contract/model sources, run `npm run reference` first. The refresh uses
-isolated build directories under `.cache/`; ordinary `npm run build` also isolates
-its Docusaurus generation so it can run alongside the preview. Both audit public
-HTML, run Pagefind, audit the complete output and update the development search
-cache. A fresh `npm start` prepares this index automatically.
-
-The Git install flag permits only dependencies declared by this package. The
-shared `@beyond10x/docs-system` dependency uses the exact commit pinned by the main
-b10x website; it is distributed through Git rather than npm. This repository does
-not link to or mutate the neighboring checkout.
+The Git install flag permits only dependencies declared by this package.
+`@beyond10x/docs-system` is pinned to the commit the other independent beyond10x sites pin; it is
+distributed through Git rather than npm.
 
 ## Build and verify
+
+From the repository root, the generated pages must be current:
+
+```sh
+cargo run --locked -p connectors-docs -- generate --check
+cargo test --locked -p connectors-docs
+```
+
+From `website/`:
 
 ```sh
 npm run typecheck
 npm run build
-npm run reference:check
 npm run test:examples
+npm run serve &
 npm run test:browser
 npm run test:ui
 ```
 
-`test:browser` expects the preview to be running; `CONNECTORS_WEBSITE_URL` selects
-another local server. Install the matching Playwright Chromium with
-`npx playwright install chromium` if it is unavailable. The production build
-checks routes and anchors, then audits all emitted files, including WASM, for local
-and private path markers. Browser tests exercise both practical walkthroughs,
-their six failure variants, deliberate invocation after connection setup, playback,
-navigation, generated references, a lifecycle diagram, all three advanced exercises,
-replay refusal, mobile layout and reduced motion.
-The UI checks cover shared navigation and active state, adapter filtering, search
-results/filters/deep links and missing indexes, mobile menus, responsive layouts,
-light/dark themes, keyboard focus and zoom. They also check that one-state and
-branching lifecycles fit their initial viewport without enlarging small diagrams
-or requiring nested scrolling.
+`npm run build` builds the example WASM, then the site with broken links, broken anchors and raw
+admonition titles as errors, and finally runs the Rust public-output audit
+(`connectors-build docs-audit`) over every emitted file, WASM included, for workstation,
+`.local/` and `.engineering/` paths. The repository gate runs `generate --check`; the site build
+is separate and needs Node.
 
-The Rust repository gate remains a separate check; the website does not add Node
-to ordinary Cargo builds. See [development](../docs/development.md).
+`test:browser` and `test:ui` expect a server at `http://127.0.0.1:3100`, serving the site under
+`/connectors/`; `CONNECTORS_WEBSITE_URL` selects another origin. Install the matching Playwright
+Chromium with `npx playwright install chromium` if it is unavailable. The browser smoke test
+exercises both walkthroughs, their six failure variants, the deliberate read after connection
+setup, playback, the three advanced exercises, a contract page and a model page with its
+diagram, themes, reduced motion, the mobile layout and an unavailable example module. The layout
+checks visit the main routes in both colour modes at four widths and check one visible primary
+heading, no horizontal overflow, the sidebar's active page and the mobile menu.
+
+For a built site, `cargo run --locked -p connectors-docs -- provenance --site website/build
+--commit <full revision>` writes `.well-known/b10x-site.json` and the route inventory
+`.well-known/b10x-routes.json`, as the `Documentation validation` workflow does before it uploads
+the site.
 
 ## Edit the owning source
 
-- `docs/` contains authored explanations and adapter guides. MDX may embed reviewed
-  presentation components.
-- `publication.json` explicitly selects canonical shared/native contract sources
-  and model roots. The Rust `connectors-build docs` command validates ownership,
-  renders imported Markdown safely and invokes pinned ESS for `ess-docs/1`.
-- `plugins/reference.ts` creates routes from that output; `src/components/Reference.tsx`
-  renders ESS blocks without reconstructing semantics.
-- `src/components/DocumentationFrame.tsx` and the authored-doc theme wrappers share
-  navigation and page context. `documentation.ts` holds curated adapter summaries
-  and navigation presentation; it does not define runtime capabilities.
-- `plugins/search.ts` indexes only built public HTML through pinned Pagefind.
-  `src/pages/search.tsx` supplies search presentation and route normalization.
-- `src/css/` separates shell tokens, documentation layout, homepage and exercises.
-  Import shared tokens before local mappings; do not introduce another theme palette.
-- `examples/components.yaml` selects canonical mutation commands for an example
-  component. The Rust realization uses generated ports and typestate transitions.
-  Discovery/readiness exercises evaluate generated value types against authored,
-  cited predicates and fictional host facts.
-- `examples/realization/src/walkthrough.rs` supplies deterministic illustrated
-  request journeys independently of the advanced labs. `walkthrough-fixtures.json`
-  contains the issue input/result; the Rust build tool validates these against the
-  checked-in GitLab descriptor before building WASM. It does not import provider
-  implementation into the example engine.
-- `.cache/`, `static/examples/`, `.docusaurus/` and `build/` are generated. Do not
-  edit or commit them. Canonical contract and ESS inputs stay in their existing
-  owners; the example model is assembled in disposable storage from the domains the
-  realization reads and every domain they reference (`EXAMPLE_DOMAINS` in
-  `crates/connectors-build/src/docs.rs`). The repository gate synthesizes it.
+- `docs/index.md`, `docs/getting-started.md`, `docs/concepts/`, `docs/guides/` and
+  `docs/reference/adapters/*/index.md` are written by hand. Every command on a page has been run
+  in this repository and its output is pasted from that run. Concept and guide pages carry `lede`
+  and `source` front matter. Pages are plain Markdown: no `{`, import line or capitalised tag
+  outside code, and admonition titles in brackets (`:::note[Title]`); `connectors-docs` checks
+  this.
+- `docs/examples/*.mdx` embed the example components and are the only MDX pages.
+- `docs/reference/cli.md`, `docs/reference/crates.md`, `docs/reference/contracts/`, each
+  adapter's `docs/reference/adapters/<owner>/contracts/` and `…/model/`, `docs/status.md` and
+  `data/status.json` are generated by `crates/connectors-docs`. Do not edit them; change the
+  source and regenerate:
+  - the CLI reference walks the clap definitions the `connectors` binary parses;
+  - the crate list reads each package's Cargo `description`, which is public text;
+  - `publication.json` selects which contract sources and ESS models are published, with each
+    page's route, title, owner and support status. Contract pages render their owner's Markdown;
+    links to unselected files keep only their label, and private paths are refused. Model pages
+    come from the pinned `ess generate --kind docs`;
+  - the status list is `crates/connectors-docs/src/status.rs`; every shipped item names the test
+    that holds it, and generation fails when that test is gone.
+- `product.json` is the landing page, and `data/terminal.json` its recorded terminal session,
+  pasted from a run of the federation guide.
+- `src/components/` holds the two example components and their WASM bridge; `src/css/examples.css`
+  styles them on the shared tokens, and `src/css/tables.css` lets wide reference tables scroll.
+  Everything else (navigation, theme, typography, landing) is Docs System's.
+- `examples/components.yaml` selects canonical mutation commands for the example component. The
+  Rust realization uses generated ports and typestate transitions. `examples/realization/src/walkthrough.rs`
+  supplies the deterministic request journeys; `walkthrough-fixtures.json` holds the issue
+  input and result, which `connectors-build examples` validates against the shipped GitLab
+  selection before building WASM.
+- `.docusaurus/`, `build/`, `.cache/` and `static/examples/` are generated. Do not edit or commit
+  them.
 
-The three examples use a fixed namespace/principal, one mutation key, deterministic
-injected time bounded to the first fictional hour, fictional observations and
-in-memory behavior. They demonstrate
-selected rules. Audit persistence, distributed atomicity, real cryptographic
-verification, retention cleanup and provider I/O are not implemented by the lab.
-It is not a production binding or a general-purpose model interpreter.
+The examples use a fixed namespace and principal, one mutation key, deterministic injected time,
+fictional observations and in-memory behaviour. They demonstrate selected rules; audit
+persistence, distributed atomicity, real cryptographic verification, retention cleanup and
+provider I/O are not implemented by them.
 
-The introductory route `/introduction/examples` follows one issue read through a
-laptop, federation gateway, GitLab adapter and provider. Its second walkthrough
-illustrates specified user authorization, with a deliberate pause between connection
-setup and the read. `/contracts/examples` retains the original advanced exercises.
-The walkthroughs perform no authentication, OAuth, cryptographic verification or
-provider requests. Credential symbols explain ownership; they carry no token values.
-
-The [website design](../docs/website-design.md) records audience, ownership,
-publication decisions, implementation boundaries and future ideas.
+The [website design](../docs/website-design.md) records audience, ownership and publication
+decisions.

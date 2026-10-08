@@ -1,5 +1,6 @@
 [package]
 name = "connectors-host"
+description = "Adapter service host: HTTP serving, credential references, one-hop federation, and the local owner, custody and metadata runtime."
 version.workspace = true
 edition.workspace = true
 rust-version = "1.91"

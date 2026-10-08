@@ -1,0 +1,273 @@
+{
+  "asOf": "2026-10-08",
+  "format": "b10x-status/1",
+  "items": [
+    {
+      "area": "Service boundary",
+      "detail": "An adapter service answers a typed descriptor and invokes its operations over HTTP; admission and freshness are checked before dispatch.",
+      "href": "/docs/getting-started",
+      "label": "Describe and invoke",
+      "status": "shipped"
+    },
+    {
+      "area": "Service boundary",
+      "detail": "connectors serve puts one gateway in front of several adapter services, prefixes their operations and reports a downstream failure without retrying it.",
+      "href": "/docs/guides/federate-adapter-services",
+      "label": "One-hop federation",
+      "status": "shipped"
+    },
+    {
+      "area": "Service boundary",
+      "detail": "A host whose service configuration names a state directory serves POST /v1alpha2/invoke: every admitted invocation is anchored in the execution audit before dispatch (since 0.35.0).",
+      "href": "/docs/concepts/governed-invocation",
+      "label": "Audited v1alpha2 invoke",
+      "status": "shipped"
+    },
+    {
+      "area": "Service boundary",
+      "detail": "An admitted write records its attempt before its one dispatch and answers it as mutation; a lost answer is outcome_unknown and is never sent again (since 0.35.0).",
+      "href": "/docs/concepts/governed-invocation",
+      "label": "The attempt a write produced",
+      "status": "shipped"
+    },
+    {
+      "area": "Service boundary",
+      "detail": "connectors_client::Client::invoke_v1alpha2 returns the attempt the host recorded and reports an older host as unsupported instead of falling back.",
+      "href": "/docs/concepts/governed-invocation",
+      "label": "Rust client for v1alpha2",
+      "status": "shipped"
+    },
+    {
+      "area": "Service boundary",
+      "detail": "Principal, tenant, grant and delegated approval on the service wire are specified; the runtime implements only the first v1alpha2 invoke binding.",
+      "href": "/docs/reference/contracts/governed-service",
+      "label": "Governed service admission",
+      "status": "decided"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "setup init creates a private configuration and an Entity Runtime metadata store over Eventlog SQLite, with durable open checkpoints (since 0.33.0).",
+      "href": "/docs/guides/set-up-the-local-cli",
+      "label": "Setup and metadata store",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "A local owner starts the configured adapter executables, refuses a changed executable or configuration before provider work, and stops exact incarnations.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Supervised adapters",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Saved connections",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "approvals policy-set, prepare and issue bind a write's whole input to a protected proof before the host dispatches it once.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Approved writes",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "Approval-signing keys are initialized, rotated, recovered, revoked and retired through the CLI; status reads never touch custody.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Approval-signing keys",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "approvals clock-check verifies one configured Roughtime source without starting the owner or reading metadata.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Approval clock check",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "connections launch hands one connection's protected document to a pinned consumer and refuses a launch its configuration does not admit (since 0.31.0).",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Consumer launch",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "operations list --family names the operations of one contract family, such as datasource.feed/v1alpha1, with their contract and profile.",
+      "href": "/docs/reference/cli",
+      "label": "Operations by family",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "With --output json, invoke results and operation schemas are JSON values, not JSON text (breaking since 0.32.0).",
+      "href": "/docs/reference/cli",
+      "label": "JSON values in JSON answers",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "connectors-build catalog compiles a pinned OpenAPI document into a digest-verified bundle; every committed bundle matches a fresh run byte for byte.",
+      "href": "/docs/guides/build-a-catalog-bundle",
+      "label": "Bundles from pinned sources",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "A selection's guard reads before the one request and refuses unless every check holds; after it, a failed check leaves the outcome uncertain, never refused.",
+      "href": "/docs/concepts/catalog-provider",
+      "label": "Guarded writes as data",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "Projects, issues, files, branches, tags, releases, commits, compares, deployments, pipelines, jobs, traces and merge requests as reads; issue and merge-request writes under approval.",
+      "href": "/docs/reference/adapters/gitlab",
+      "label": "GitLab",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "GitLab binds datasource.feed/v1alpha1 as profile gitlab-merge-requests/1, checked against recorded GitLab answers (since 0.32.0).",
+      "href": "/docs/reference/adapters/catalog/contracts/feed",
+      "label": "GitLab merge-request feed",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "Issue search by JQL, comments and changelogs over HTTP basic authentication.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Jira Cloud",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "Changed pages, a space's pages, one page with its body and a page's comments; exercised against local fixtures only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Confluence Cloud",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "One object type's records, paged, and one record by id; exercised against local fixtures only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "HubSpot CRM",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Zendesk Support",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "Reads and guarded writes from Discovery documents projected to OpenAPI, with a refresh token from browser consent; exercised against local fixtures only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Google Drive, Slides, Calendar and Gmail",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again; verified against a local fixture only (since 0.36.0).",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Runpod pods",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "A Swagger 2.0 document is ingested through an exact, recorded projection to OpenAPI 3.1.0; a construct without an exact row is refused by name (since 0.37.0).",
+      "href": "/docs/guides/build-a-catalog-bundle",
+      "label": "Swagger 2.0 sources",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "conversations.list, conversations.history and conversations.replies with a bot token; on main, not yet in a release; verified against a local fixture only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Slack conversations (unreleased)",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "Listing and locating precompiled bundles with provenance is specified; directly configured adapters need no index.",
+      "href": "/docs/reference/contracts/catalog",
+      "label": "Catalog index service",
+      "status": "decided"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "resources.list, endpoints.discover and optionally hosts.discover, scoped to configured namespaces and kinds, with a saved bearer token.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes reads and discovery",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "History, status, values and manifest of a named release, values and manifests disclosed only as redacted projections.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Helm release reads",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "schema.list and query.read in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query.",
+      "href": "/docs/reference/adapters/sql",
+      "label": "PostgreSQL reads",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "websearch.search, websearch.fetch and websearch.crawl through the shared websearch family; the key is checked without spending a search.",
+      "href": "/docs/reference/adapters/tavily",
+      "label": "Tavily web search",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "logs.query_range, logs.query_metric and logs.labels through a saved bearer connection; on main, not yet in a release.",
+      "href": "/docs/reference/adapters/loki",
+      "label": "Loki LogQL reads (unreleased)",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "Per-operation SelfSubjectAccessReview checks and the remaining Kubernetes and Helm workflows.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes permission checks",
+      "status": "planned"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected.",
+      "href": "/docs/reference/adapters/loki",
+      "label": "Loki tenants and other authentication",
+      "status": "planned"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "Atlassian native documents, Docker, Grafana, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime.",
+      "href": "/docs/reference/adapters",
+      "label": "Specification-only adapters",
+      "status": "decided"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime.",
+      "href": "/docs/reference/adapters",
+      "label": "MCP",
+      "status": "planned"
+    },
+    {
+      "area": "Distribution",
+      "detail": "Every release is a source release for Linux x86_64; build it from the checkout.",
+      "href": "/docs/getting-started",
+      "label": "Binary and package distribution",
+      "status": "planned"
+    }
+  ],
+  "source": "connectors-docs, from its capability list; every shipped item names the test that holds it"
+}

@@ -1,5 +1,6 @@
 [package]
 name = "connectors-spec"
+description = "The adapter specification kind: compiles adapter specifications to descriptors and pins the ESS release used for generation."
 version.workspace = true
 edition.workspace = true
 rust-version = "1.91"

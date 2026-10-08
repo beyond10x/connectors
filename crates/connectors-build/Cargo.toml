@@ -1,5 +1,6 @@
 [package]
 name = "connectors-build"
+description = "Repository build tool: the gate, generation and drift checks, catalog bundles, source projections and the website examples."
 version.workspace = true
 edition.workspace = true
 rust-version = "1.91"

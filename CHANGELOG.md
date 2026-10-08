@@ -29,6 +29,25 @@
   `200` with `"ok": false`, which is returned as a successful invocation; verified against
   a local fixture only. See `docs/catalog-slack.md`.
 
+### Changed
+
+- The documentation website moves to the shared `@beyond10x/docs-system` shell and builds
+  for its own address, `https://beyond10x.github.io/connectors/` (`baseUrl: '/connectors/'`),
+  with a product landing page and the shared page set: overview, getting started, concepts,
+  guides, examples, reference and status. Every command a page shows was run in the
+  repository and its output pasted from that run. The `Documentation validation` workflow
+  (`.github/workflows/pages.yml`) builds and checks it on every pull request and push and
+  uploads the built site from `main`; it is not yet served at that address, and the unified
+  site's `/docs/connectors/` pages stay until the organization side moves the repository.
+- The new crate `connectors-docs` generates the CLI reference from the clap definitions the
+  `connectors` binary parses, the crate list from `cargo metadata`, the contract and ESS model
+  reference from `website/publication.json` and the pinned `ess generate --kind docs`, and the
+  status page and `website/data/status.json`, where every shipped item names the test that
+  holds it. `connectors-docs generate --check` is a repository gate step. It replaces
+  `connectors-build docs`, which is removed with the site's local reference renderer, theme
+  wrappers and Pagefind search. Every workspace package now has a Cargo `description`, and
+  `connectors` has a library target holding the explicit service commands' arguments.
+
 ## 0.37.0 — 2026-10-08
 
 ### Added

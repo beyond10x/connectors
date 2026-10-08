@@ -1,0 +1,78 @@
+name: Documentation validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One group per ref: two pull requests opened together must not cancel each other's build.
+concurrency:
+  group: docs-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - name: Install Rust 1.98.1 with the browser target
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --target wasm32-unknown-unknown
+          rustup default 1.98.1
+          rustc --version
+      - name: Install the pinned ess release
+        working-directory: ${{ runner.temp }}
+        run: |
+          version="$(jq -r .ess "$GITHUB_WORKSPACE/crates/connectors-spec/toolchain.json")"
+          archive="ess-$version-x86_64-unknown-linux-gnu.tar.gz"
+          base="https://github.com/beyond10x/ess/releases/download/$version"
+          curl -fsSLO "$base/$archive"
+          curl -fsSL -o ess-SHA256SUMS "$base/SHA256SUMS"
+          grep " $archive\$" ess-SHA256SUMS | sha256sum -c -
+          tar -xzf "$archive"
+          echo "$PWD/ess-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked
+      - name: Check the generated pages
+        run: |
+          cargo run --locked -p connectors-docs -- generate --check
+          cargo test --locked -p connectors-docs
+      # The example build is offline. Its path dependencies exist only after the first
+      # generation, so a fresh runner generates, fetches the example's registry
+      # dependencies, and generates again.
+      - name: Build the examples
+        run: |
+          cargo run --locked -p connectors-build -- examples || {
+            cargo fetch --locked --manifest-path website/examples/realization/Cargo.toml
+            cargo run --locked -p connectors-build -- examples
+          }
+      - name: Install the website's locked dependencies
+        run: npm --prefix website ci --ignore-scripts
+      - name: Type-check and build the site
+        run: |
+          npm --prefix website run typecheck
+          npm --prefix website run build
+      - name: Bind the built site to its source commit
+        run: cargo run --locked -p connectors-docs -- provenance --site website/build --commit "$GITHUB_SHA"
+      - name: Upload the exact built site
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: b10x-project-site
+          path: website/build
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: error

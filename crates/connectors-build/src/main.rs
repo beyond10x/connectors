@@ -62,12 +62,6 @@ enum Action {
         #[arg(long)]
         directory: Option<PathBuf>,
     },
-    /// Assemble selected public contract and ESS documentation for the website.
-    Docs {
-        /// Compare the current projection without overwriting it.
-        #[arg(long)]
-        check: bool,
-    },
     /// Check shared ESS ownership and compile shared and adapter semantic models.
     EssBoundary,
     /// Re-derive every recorded upstream source digest from its archived bytes, and
@@ -268,11 +262,6 @@ fn execute(args: Args) -> Result<()> {
     if let Action::Examples = args.command {
         check_ess(&ess)?;
         return docs::examples(&root, &ess);
-    }
-    if let Action::Docs { check } = args.command {
-        check_ess(&ess)?;
-        std::fs::create_dir_all(root.join(".local/tmp"))?;
-        return docs::run(&root, &ess, check);
     }
     if let Action::EssBoundary = args.command {
         check_ess(&ess)?;

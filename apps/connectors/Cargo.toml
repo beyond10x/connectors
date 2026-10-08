@@ -1,5 +1,6 @@
 [package]
 name = "connectors"
+description = "The connectors command: local setup, adapters, connections, operations and approvals through a local owner, and the describe, invoke and serve service commands."
 version.workspace = true
 edition.workspace = true
 rust-version = "1.91"

@@ -1,25 +1,24 @@
 {
   "name": "connectors-website",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "start": "docusaurus start --host 127.0.0.1 --port 3100 --no-open",
-    "build": "DOCUSAURUS_GENERATED_FILES_DIR_NAME=.cache/build-docusaurus docusaurus build",
+    "build": "docusaurus build",
     "serve": "docusaurus serve --host 127.0.0.1 --port 3100 --no-open",
     "typecheck": "tsc --noEmit",
-    "reference": "cd .. && cargo run --locked -p connectors-build -- docs",
-    "reference:check": "cd .. && cargo run --locked -p connectors-build -- docs --check",
-    "prestart": "npm run reference && npm run examples && npm run search:refresh",
-    "prebuild": "npm run reference && npm run examples",
+    "docs": "cd .. && cargo run --locked -p connectors-docs -- generate",
+    "docs:check": "cd .. && cargo run --locked -p connectors-docs -- generate --check",
+    "prestart": "npm run examples",
+    "prebuild": "npm run examples",
     "examples": "cd .. && cargo run --locked -p connectors-build -- examples",
     "test:examples": "cd .. && cargo test --locked --offline --manifest-path website/examples/realization/Cargo.toml --target-dir website/.cache/demo/target",
     "test:browser": "node tests/smoke.mjs",
-    "audit:public": "cd .. && cargo run --locked -p connectors-build -- docs-audit",
-    "search:refresh": "DOCUSAURUS_GENERATED_FILES_DIR_NAME=.cache/search-docusaurus docusaurus build --out-dir .cache/search-build",
-    "test:ui": "node tests/overhaul.mjs"
+    "test:ui": "node tests/overhaul.mjs",
+    "audit:public": "cd .. && cargo run --locked -p connectors-build -- docs-audit"
   },
   "dependencies": {
-    "@beyond10x/docs-system": "git+https://github.com/beyond10x/docs-system.git#1ef1890272ce308eb6fec5446091f93afd14046f",
+    "@beyond10x/docs-system": "git+https://github.com/beyond10x/docs-system.git#9d35e6324653d659e6ab3d46b761ee4b3bf8405c",
     "@docusaurus/core": "3.10.2",
     "@docusaurus/preset-classic": "3.10.2",
     "@docusaurus/theme-mermaid": "3.10.2",
@@ -35,7 +34,6 @@
     "@docusaurus/tsconfig": "3.10.2",
     "@docusaurus/types": "3.10.2",
     "@types/react": "19.2.14",
-    "pagefind": "1.5.2",
     "playwright": "1.62.1",
     "typescript": "5.9.3"
   },

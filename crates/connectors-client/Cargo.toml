@@ -1,5 +1,6 @@
 [package]
 name = "connectors-client"
+description = "Generic client that describes an adapter service and invokes its operations over the service wire."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,0 +1,141 @@
+{
+  "format": "b10x-product-landing/1",
+  "product": {
+    "name": "Connectors",
+    "mark": "C",
+    "eyebrow": "Governed integrations · Rust",
+    "promise": [
+      "Independent integrations.",
+      "Shared guarantees."
+    ],
+    "lede": "Connectors lets applications and agents discover and use integrations through typed, versioned contracts. Each adapter owns its provider's behaviour; a catalog provider serves ordinary HTTP APIs straight from their pinned OpenAPI documents. Credentials stay in custody, writes need an approval, and an uncertain outcome is never sent twice.",
+    "actions": [
+      {
+        "label": "Get started",
+        "href": "/docs/getting-started",
+        "kind": "primary"
+      },
+      {
+        "label": "Read the documentation",
+        "href": "/docs/"
+      },
+      {
+        "label": "What runs today",
+        "href": "/docs/status"
+      }
+    ],
+    "meta": "Rust services, a local CLI and shared contracts · Linux x86_64 source release · MIT OR Apache-2.0",
+    "art": {
+      "kind": "terminal",
+      "session": "data/terminal.json"
+    },
+    "kpis": [
+      "shipped",
+      "decided",
+      "planned"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "features",
+      "eyebrow": "What it does",
+      "title": "One boundary between an application and every provider it calls.",
+      "lede": "A caller learns what an adapter offers from its descriptor and invokes it the same way everywhere. What a provider means stays with that provider's adapter.",
+      "items": [
+        {
+          "title": "Contracts describe guarantees",
+          "description": "Inputs, outputs, access, lifecycle, partial results and failures are part of a versioned contract, not of one provider's habits.",
+          "status": "shipped",
+          "href": "/docs/concepts/contracts"
+        },
+        {
+          "title": "Adapters own their provider",
+          "description": "Kubernetes selectors, PostgreSQL query rules and Loki's LogQL stay in their adapter. Shared contracts never import a provider.",
+          "status": "shipped",
+          "href": "/docs/concepts/adapters"
+        },
+        {
+          "title": "HTTP APIs without adapter code",
+          "description": "The catalog provider binds operations from a pinned OpenAPI document: GitLab, Jira, Confluence, HubSpot, Zendesk, Google and Runpod.",
+          "status": "shipped",
+          "href": "/docs/concepts/catalog-provider"
+        },
+        {
+          "title": "Credentials in custody",
+          "description": "A saved connection keeps its credential in the Secret Service keyring. It never travels in operation input or through a federation gateway.",
+          "status": "shipped",
+          "href": "/docs/concepts/local-runtime"
+        },
+        {
+          "title": "Writes under approval",
+          "description": "A write is admitted against a policy and a protected proof bound to its whole input, and a guard declared as data can check the provider before and after.",
+          "status": "shipped",
+          "href": "/docs/concepts/catalog-provider"
+        },
+        {
+          "title": "Uncertain is not failed",
+          "description": "A write whose answer is lost is outcome_unknown with its recorded attempt. Nothing resends it.",
+          "status": "shipped",
+          "href": "/docs/concepts/governed-invocation"
+        }
+      ]
+    },
+    {
+      "kind": "flow",
+      "eyebrow": "How a call travels",
+      "title": "Discover, select access, invoke, interpret.",
+      "steps": [
+        {
+          "label": "01",
+          "title": "Describe",
+          "description": "The client reads the adapter's descriptor: operations, schemas, contract and profile, and a revision."
+        },
+        {
+          "label": "02",
+          "title": "Select access",
+          "description": "A connection binds a chosen target and credential. Discovering an endpoint grants nothing."
+        },
+        {
+          "label": "03",
+          "title": "Invoke",
+          "description": "The request names the operation and the descriptor revision it was built against. The host admits it or refuses it before dispatch."
+        },
+        {
+          "label": "04",
+          "title": "Interpret",
+          "description": "The result carries provenance and completeness, or a typed refusal, or an explicitly unknown outcome."
+        }
+      ]
+    },
+    {
+      "kind": "status",
+      "eyebrow": "Status",
+      "title": "What runs, and the test that holds it.",
+      "lede": "Shipped means it runs on main and a named test holds it. Decided means specified with no runtime. Planned means not built.",
+      "items": "data/status.json"
+    },
+    {
+      "kind": "related",
+      "eyebrow": "Related tools",
+      "title": "Where Connectors sits.",
+      "tools": [
+        {
+          "id": "ess",
+          "relation": "specifies"
+        },
+        {
+          "name": "Entity Runtime",
+          "description": "Deterministic decisions over recorded state. The local CLI keeps connection metadata, approvals and audit as Entity Runtime records.",
+          "href": "https://beyond10x.github.io/ecosystem/entity-runtime/",
+          "mark": "ER"
+        },
+        {
+          "name": "Eventlog",
+          "description": "Append-only event storage. Entity Runtime keeps the local metadata store on its SQLite provider.",
+          "href": "https://beyond10x.github.io/ecosystem/eventlog/",
+          "mark": "Ev"
+        }
+      ]
+    }
+  ]
+}
