@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0340-stale-connections
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.34.0: stale connections name their remedy, service help and completion'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "active", at: "2026-10-08T10:58:26Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-08T13:22:00Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome and authorization
 
@@ -40,3 +41,10 @@ Evidence: PR 133 repository gate https://github.com/beyond10x/connectors/actions
 - Parse errors still carry only `cli_parse`: the declared-argument detail waits for an ESS
   release.
 - The attempt id on the HTTP invoke path (`story:invoke-returns-attempt-id`) is the next wave.
+
+## Released
+
+- Tag `v0.34.0` (annotated, tagger `b10x-bot[bot]`) peels to `ca688db14d`, the merge of PR 134 on `main`; its tree equals the gated release commit `3bcea59dfd`.
+- PR checks on `3bcea59dfd`: repository gate (27m22s), planning validate, b10x-docs-check, common / Security and privacy: all pass.
+- Package gates on `3bcea59dfd`: clippy `-D warnings` and tests of all 14 workspace crates, 1473 passed, 0 failed.
+- GitHub Release `v0.34.0` authored by `b10x-bot[bot]`, Latest, source archives only.
