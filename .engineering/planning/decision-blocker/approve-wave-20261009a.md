@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: decision-blocker:approve-wave-20261009a
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has approved wave 20261009a (Grafana, Jira issue reads, Slack discovery)
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-08T23:35:18Z", actor: "human:timo", revision: 2}
 ---
 ## Question
 
@@ -37,3 +39,12 @@ One wave tree with one `target/`; units run one after the other in it, so the wa
 Recommended: A. If search cannot be served by a second Slack catalog connection without a host change, the unit ships the other four operations and search stays partial in its story.
 
 Not in this wave: story:parity-mysql-reads (704 calls). It adds a MySQL wire-protocol dependency and a new binding in `adapters/sql`, and it gets a wave of its own next.
+
+## Decided
+
+Option A, 2026-10-09: story:parity-grafana-datasource-loki, story:parity-jira-issue-reads and story:parity-slack-discovery-reads in wave 20261009a, one pull request, released when it merges.
+
+- Spec first in each unit.
+- The mediated parent route of `adapters/grafana/design.md` becomes a draft story; Loki through Grafana is a Loki connection on Grafana's data-source proxy.
+- `search.messages` stays partial if serving it needs a host change; the pull request says so.
+- Builds wait until other repositories' builds have released the disk (or / is at 50G free or more); until then the units are written and planned without cargo. The wave's build stays under 10G `du`, with `CARGO_BUILD_JOBS=8` while the 1-minute load is over 30.
