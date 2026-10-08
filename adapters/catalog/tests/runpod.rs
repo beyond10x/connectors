@@ -67,7 +67,7 @@ const SHIPPED: [(&str, &str, &str, &str, Effect); 3] = [
 
 /// The create body keys the selection admits, in the order the guide lists
 /// them.
-const BODY_KEYS: [&str; 12] = [
+const BODY_KEYS: [&str; 15] = [
     "name",
     "imageName",
     "gpuTypeIds",
@@ -80,6 +80,9 @@ const BODY_KEYS: [&str; 12] = [
     "cloudType",
     "dataCenterIds",
     "interruptible",
+    "dockerStartCmd",
+    "dockerEntrypoint",
+    "networkVolumeId",
 ];
 
 fn root() -> &'static Path {
@@ -770,16 +773,25 @@ fn a_created_pod_is_applied_and_returned() {
 fn a_create_sends_its_start_command_entrypoint_and_network_volume() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection(Some(PrivateProtocol::V2))).unwrap();
-    let mut body = create_body("created-201");
-    body["dockerStartCmd"] = json!(["--model", "fixture/model", "--port", "8000"]);
-    body["dockerEntrypoint"] = json!(["python3", "-m", "fixture.server"]);
-    body["networkVolumeId"] = json!("fixturevolume");
-    let result = write(&mut child, "pod.create", &json!({"body": body}))
-        .unwrap_or_else(|failure| panic!("`pod.create` refused in prepare: {failure:?}"));
-    assert_eq!(result.effect, WriteEffect::Applied);
+    // Arguments after the image's entrypoint, and the full argv as the
+    // entrypoint with an empty start command so the image's CMD is not appended.
+    let mut with_args = create_body("created-201");
+    with_args["dockerStartCmd"] = json!(["--model", "fixture/model", "--port", "8000"]);
+    with_args["dockerEntrypoint"] = json!(["python3", "-m", "fixture.server"]);
+    with_args["networkVolumeId"] = json!("fixturevolume");
+    let mut full_argv = create_body("created-200");
+    full_argv["dockerEntrypoint"] = json!(["python3", "-m", "fixture.server", "--port", "8000"]);
+    full_argv["dockerStartCmd"] = json!([]);
+    full_argv["networkVolumeId"] = json!("fixturevolume");
+    for body in [&with_args, &full_argv] {
+        let result = write(&mut child, "pod.create", &json!({"body": body}))
+            .unwrap_or_else(|failure| panic!("`pod.create` refused in prepare: {failure:?}"));
+        assert_eq!(result.effect, WriteEffect::Applied);
+    }
     let requests = provider.requests();
-    assert_eq!(requests.len(), 1, "one request, no preflight");
-    assert_eq!(requests[0].3, body);
+    assert_eq!(requests.len(), 2, "one request per create, no preflight");
+    assert_eq!(requests[0].3, with_args);
+    assert_eq!(requests[1].3, full_argv);
 }
 
 /// A 400 is Runpod's documented definite refusal: nothing was created.
