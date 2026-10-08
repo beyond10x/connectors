@@ -1,5 +1,5 @@
 domain: connectors.service_wire
-summary: Proposed public service envelope and observation values; no codec, runtime or persisted entity.
+summary: Public service envelope and observation values; the first v1alpha2 binding is served and read, no persisted entity.
 
 # Normative owner: contracts/service/compatibility.md §§4–5.
 # These are values, not audit/approval/connection storage or a second attempt ledger.
@@ -129,7 +129,11 @@ types:
 # InvokeRequest rejects as an unknown member while the codec answers `unsupported`;
 # numeric/string bounds and canonical encoding; error/status/effect combinations;
 # co-presence of original attempt/request references, safe lookup disclosure and
-# replay admission; actual schema/profile support and legacy projection admission.
+# replay admission; actual schema/profile support and legacy projection admission;
+# the reader's binding selection (compatibility.md §2): a client selects
+# `/v1alpha2/invoke` by configuration, reads every answer as InvokeResponse,
+# reports a route failure without an envelope as `unsupported` and never
+# resends on another route or version.
 # No ESS relation is implied by these public correlation VALUES. AttemptReference
 # names an existing private attempt but neither owns it nor creates a lookup API.
 # AuditRecord persistence is declared by connectors.execution_audit. SourceAudit
