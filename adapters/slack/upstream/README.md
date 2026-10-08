@@ -22,7 +22,8 @@ projects it to OpenAPI 3.1.0 under `swagger2-openapi/1` (rule table in
 `src/swagger.rs`), and `crates/connectors-catalog/tests/swagger.rs` asserts the
 digest above, that the projection ingests all 174 operations with none
 unsupported, and that `conversations.list`, `conversations.history` and
-`conversations.replies` are present with their query parameters. No Slack
-bundle, selection set or runtime exists yet. Slack does not endorse this
+`conversations.replies` are present with their query parameters. The catalog
+provider's Slack bundle and selection are in `adapters/catalog`
+(`docs/catalog-slack.md`). Slack does not endorse this
 adapter. Refreshing the source means replacing this file and the digest the
 test asserts together.
