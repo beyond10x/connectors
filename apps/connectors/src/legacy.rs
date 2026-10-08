@@ -43,6 +43,63 @@ enum Command {
     },
 }
 
+/// Bash completion for the explicit service commands, appended to the generated
+/// script. The generated function `_connectors` stays verbatim; a routing
+/// function registered for `connectors` sends a command line whose command word,
+/// after any leading `--output` selections, is `describe`, `invoke` or `serve` to
+/// `_connectors_explicit`, built from this parser, and otherwise calls
+/// `_connectors` and adds those words where they may stand: at the root and
+/// as the word after a leading `help`.
+pub fn completion() -> String {
+    let mut bytes = Vec::new();
+    clap_complete::generate(
+        clap_complete::Shell::Bash,
+        &mut <Args as clap::CommandFactory>::command(),
+        "connectors_explicit",
+        &mut bytes,
+    );
+    let script = String::from_utf8(bytes).expect("bash completion is UTF-8");
+    let function = script
+        .find(REGISTRATION)
+        .map_or(script.as_str(), |end| &script[..end]);
+    format!("{function}\n{ROUTE}")
+}
+
+const REGISTRATION: &str = "\nif [[ \"${BASH_VERSINFO[0]}\" -eq 4";
+
+const ROUTE: &str = r#"_connectors_route() {
+    local i word="" cur="${COMP_WORDS[COMP_CWORD]}"
+    for (( i = 1; i < COMP_CWORD; i++ )); do
+        case "${COMP_WORDS[i]}" in
+            --output) (( i++ )) ;;
+            --output=*) ;;
+            *) word="${COMP_WORDS[i]}"; break ;;
+        esac
+    done
+    case "${word}" in
+        describe|invoke|serve)
+            _connectors_explicit "$@"
+            return
+            ;;
+    esac
+    _connectors "$@"
+    if [[ ${cur} == -* ]]; then
+        return 0
+    fi
+    if [[ -z ${word} && ${COMP_WORDS[COMP_CWORD-1]} != --output ]] \
+        || [[ ${word} == help && ${i} -eq 1 && ${COMP_CWORD} -eq 2 ]]; then
+        COMPREPLY+=( $(compgen -W "describe invoke serve" -- "${cur}") )
+    fi
+    return 0
+}
+
+if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then
+    complete -F _connectors_route -o nosort -o bashdefault -o default connectors
+else
+    complete -F _connectors_route -o bashdefault -o default connectors
+fi
+"#;
+
 pub async fn main(argv: Vec<OsString>) {
     let args = match Args::try_parse_from(&argv) {
         Ok(args) => args,
