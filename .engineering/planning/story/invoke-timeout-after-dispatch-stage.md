@@ -2,11 +2,15 @@
 format: aep.planning-md/3
 id: story:invoke-timeout-after-dispatch-stage
 kind: story
-status: draft
+status: implemented
 title: A read that times out after dispatch reports dispatch, not admission
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T16:02:35Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-08T16:02:36Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-08T17:07:09Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

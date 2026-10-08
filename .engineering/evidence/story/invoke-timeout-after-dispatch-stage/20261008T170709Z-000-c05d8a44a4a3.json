@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T17:07:09Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-timeout-after-dispatch-stage",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates on 55640ad21 (connectors-host, -build, -catalog-provider, -spec, -conformance, -kubernetes, -sql, -tavily, connectors): fmt, clippy -D warnings and test exit 0; 1312 passed, 0 failed, 79 ignored",
+    "reference": "55640ad21712c80f263d2b507d7960679005f095"
+  }
+}

@@ -40,6 +40,11 @@ enum IdentitySource {
     /// An `oauth2_refresh` profile's token response: its `id_token`, or the
     /// token host's `tokeninfo` when the token endpoint returns none.
     IdToken,
+    /// A read against the provider API at `path` whose `200` proves the
+    /// credential; its body is not read, and the subject is the configured
+    /// instance id. For a provider whose API names no account or user, so the
+    /// subject is the configured connection (`connectors_catalog.identity`).
+    Configuration,
 }
 impl IdentitySource {
     fn is_api(&self) -> bool {
@@ -664,6 +669,21 @@ impl Local {
                         || identity.subject_pointer.is_some()
                         || config.auth.scopes.is_some()
                 }
+                // The read proves the credential and names nobody: a pointer
+                // into it would be read by nobody. Only a static credential may
+                // be named by its connection: an OAuth credential belongs to a
+                // holder the provider names, and a configured subject would let
+                // repair accept another holder's credential as the same identity
+                // (`connectors_catalog.identity.Profile`).
+                IdentitySource::Configuration => {
+                    config.auth.scheme.is_oauth()
+                        || identity
+                            .path
+                            .as_deref()
+                            .is_none_or(|p| segments(p).is_empty())
+                        || identity.subject_pointer.is_some()
+                        || (config.auth.scopes.is_none() && !config.auth.minimum_scopes.is_empty())
+                }
             }
             || config
                 .auth
@@ -1077,12 +1097,6 @@ impl Local {
             .path
             .as_deref()
             .ok_or(Failure::InvalidConfiguration)?;
-        let subject_pointer = self
-            .auth
-            .identity
-            .subject_pointer
-            .as_deref()
-            .ok_or(Failure::InvalidConfiguration)?;
         let response = http
             .get(&segments(identity_path), &[])
             .await
@@ -1090,15 +1104,28 @@ impl Local {
         if response.status != 200 {
             return Err(probe_failure(response.status));
         }
-        if response.body.len() > DOCUMENT_LIMIT {
-            return Err(Failure::Protocol);
-        }
-        let identity: Value =
-            connectors_core::read_json(&response.body).map_err(|_| Failure::Protocol)?;
-        let subject = match identity.pointer(subject_pointer) {
-            Some(Value::String(text)) if !text.is_empty() && text.len() <= 256 => text.clone(),
-            Some(Value::Number(number)) => number.to_string(),
-            _ => return Err(Failure::Protocol),
+        // A configured subject is the instance id: the answer proved the
+        // credential and is not read, so its size and shape do not matter.
+        let subject = match (
+            &self.auth.identity.subject_pointer,
+            self.auth.identity.source,
+        ) {
+            (None, IdentitySource::Configuration) => self.instance.clone(),
+            (Some(subject_pointer), IdentitySource::Api) => {
+                if response.body.len() > DOCUMENT_LIMIT {
+                    return Err(Failure::Protocol);
+                }
+                let identity: Value =
+                    connectors_core::read_json(&response.body).map_err(|_| Failure::Protocol)?;
+                match identity.pointer(subject_pointer) {
+                    Some(Value::String(text)) if !text.is_empty() && text.len() <= 256 => {
+                        text.clone()
+                    }
+                    Some(Value::Number(number)) => number.to_string(),
+                    _ => return Err(Failure::Protocol),
+                }
+            }
+            _ => return Err(Failure::InvalidConfiguration),
         };
         let granted_scopes = match &self.auth.scopes {
             None => None,
@@ -1300,6 +1327,10 @@ impl runtime::Adapter for Local {
                     self.baseline(subject, Some(granted), collected_at_ms)?
                 }
                 (IdentitySource::IdToken, Grant::ClientCredentials(_)) => {
+                    return Err(Failure::InvalidConfiguration);
+                }
+                // Refused at load; never reached.
+                (IdentitySource::Configuration, _) => {
                     return Err(Failure::InvalidConfiguration);
                 }
                 (IdentitySource::Api, _) => {
