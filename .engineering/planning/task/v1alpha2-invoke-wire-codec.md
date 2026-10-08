@@ -2,12 +2,17 @@
 format: aep.planning-md/3
 id: task:v1alpha2-invoke-wire-codec
 kind: task
-status: draft
+status: implemented
 title: Decode and encode the v1alpha2 invoke envelope in connectors-core
 relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:v1alpha2-invoke-wire-spec
-revision: 1
+- serves: vision:independent-contract-adapters
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T11:44:35Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-08T11:44:36Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-08T14:14:23Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 

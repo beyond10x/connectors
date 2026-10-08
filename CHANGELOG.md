@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.35.0 — 2026-10-08
+
+### Breaking
+
+- `connectors.mutations.AttemptRecord.connection_ref` is now optional: an attempt the HTTP
+  host records names no connection, so the member is absent for it. This is a breaking change
+  for `connectors-client` callers that read `connection_ref` from an attempt record; treat an
+  absent value as an HTTP-host attempt and correlate it through the attempt id instead. Attempts
+  the local owner records keep naming their connection.
+
+### Added
+
+- The HTTP host serves the first v1alpha2 binding, `POST /v1alpha2/invoke`
+  (`contracts/service/compatibility.md` § 2.1), when its service configuration names a
+  private `state` directory (`urn:connectors:config:v2:service`; `urn:connectors:config:v1:service`
+  is read unchanged). Without `state` the route answers `unavailable` (HTTP 503) before decoding.
+  The request is the five v1alpha1 members with `version: v1alpha2`; `connection`,
+  `idempotency_key`, `approval` and `executor` are refused as `unsupported`. Describe stays on
+  `GET /v1/describe`.
+- Audit anchor: every admitted invocation on the route, read or write, is anchored in the
+  host's execution audit before dispatch. The Response carries `audit_ref` and `audit_status`
+  (`complete` when the final observation is recorded, `incomplete` when only its append
+  failed, `unavailable` with a null `audit_ref` for a refusal before the anchor). A running
+  host retries a retained final observation by itself.
+- Attempt record: an admitted `external_write` records a `connectors.mutations.AttemptRecord`
+  after the anchor and before its one dispatch. Its Response carries `mutation`
+  (`classification`, `attempt: {instance, id}`, `original_request_id`, `replayed: false`,
+  `cause`). A write whose answer is lost after dispatch is `outcome_unknown` with
+  `classification: unknown` and its attempt, and is not dispatched again. Reads and refusals
+  before the record carry no `mutation`.
+- Client entry point: `connectors_client::Client::invoke_v1alpha2` invokes on
+  `POST /v1alpha2/invoke` with a descriptor from `GET /v1/describe` and returns `Invoked`
+  (the result value, the optional `MutationObservation`, `audit_ref`, `audit_status`) or a
+  boxed `Failure` that keeps the host's `mutation` when one was recorded. It checks request
+  correlation and the § 5 HTTP mapping, never falls back to `/v1/invoke` and never resends;
+  an endpoint answering HTTP 404 without a v1alpha2 envelope is reported as `unsupported`.
+  `Client::invoke` keeps its signature and the legacy `/v1/invoke` binding, whose wire is
+  unchanged.
+- The repository gate generates the JSON Schema of the v1alpha2 request and Response and
+  checks every wire vector against it; raw-byte refusal vectors are excluded by a named rule.
+- The ESS specification declares `UpgradeServiceConfiguration`, which moves an instance's
+  configuration revision and registry epoch together.
+
+### Fixed
+
+- The browser realization example builds again with the optional attempt connection; the
+  website production build failed with E0277.
+
+### Limitations
+
+- Final audit observations the host retains for retry are held in memory: a restart loses
+  them and those audit records stay `Anchored`. With 10,000 retained the host refuses new
+  invocations on the route and evicts none.
+- A write whose completion cannot be stored stays `Dispatching`; its Response says `applied`
+  with cause `{unavailable, attempt_store}`, and nothing retries the settlement.
+- An HTTP host must not share its `state` directory with a local owner; nothing checks it.
+- HTTP-host attempts carry no idempotency key and are stamped with the system clock under the
+  anti-regression floor.
+
 ## 0.34.0 — 2026-10-08
 
 ### Fixed

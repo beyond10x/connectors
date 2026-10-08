@@ -2,11 +2,15 @@
 format: aep.planning-md/3
 id: story:invoke-returns-attempt-id
 kind: story
-status: draft
+status: implemented
 title: A successful invoke names the attempt it produced
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T10:59:14Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T10:59:14Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-08T14:50:00Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
@@ -52,3 +56,18 @@ The legacy `/v1/invoke` binding and its v1alpha1 envelope stay as frozen
 - A read operation on v1alpha2 carries no `mutation`.
 - `/v1/invoke` answers byte-identical to the previous release on the existing wire vectors.
 - The CHANGELOG names the new route, the client entry point and the unchanged legacy binding.
+
+## Release note
+
+- The 0.35.0 CHANGELOG lists `connectors.mutations.AttemptRecord.connection_ref` becoming optional (absent for attempts the HTTP host records) as a breaking change for `connectors-client` callers, with its migration.
+
+## Delivered and known limits (wave 20261008b)
+
+- Units: wire spec, codec, vector schema check in the repository gate, audit anchor (HTTP host), attempt ledger, client `invoke_v1alpha2`, one conformance write scenario. Two adversary passes; their 7 findings are fixed with their red tests kept (`http_audit_anchor_adversary.rs`, `http_mutation_ledger_adversary.rs`).
+- Retained final observations are held in memory: a host restart loses them and those audit records stay `Anchored`. When 10,000 are held the host refuses new invocations; none is evicted.
+- A write whose completion cannot be stored stays `Dispatching`; its response says `applied` with cause `{unavailable, attempt_store}` and nothing retries the settlement.
+- A panic inside the audit store's own `finish` loses that observation; a panic during a recovery append keeps admission closed until restart.
+- Nothing checks that an HTTP host does not share its `state` directory with a local owner.
+- HTTP-host attempts are stamped with the system clock under the anti-regression floor; they never carry an idempotency key.
+- `contracts/service/compatibility.md` § 2 says a raw 404 is not proof of an unsupported version; the client reports a 404 without a v1alpha2 envelope as `unsupported` as this story asks. The contract does not yet say so.
+- The § 5 status-to-code table exists twice, in the client and in the host.

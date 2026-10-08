@@ -1,5 +1,5 @@
 domain: connectors.service_wire
-summary: Proposed public service observation values; no codec, runtime or persisted entity.
+summary: Public service envelope and observation values; the first v1alpha2 binding is served and read, no persisted entity.
 
 # Normative owner: contracts/service/compatibility.md §§4–5.
 # These are values, not audit/approval/connection storage or a second attempt ledger.
@@ -27,14 +27,16 @@ types:
     fields:
       - {name: instance, type: String}
       - {name: id, type: connectors.mutations.AttemptId}
+  # compatibility.md §5: all five members are required when `mutation` is
+  # present; attempt, original_request_id and cause are null, never omitted.
   - name: connectors.service_wire.MutationObservation
     kind: struct
     fields:
       - {name: classification, type: connectors.mutations.EffectKnowledge}
-      - {name: attempt, type: "Optional<connectors.service_wire.AttemptReference>"}
-      - {name: original_request_id, type: "Optional<String>"}
+      - {name: attempt, type: "Optional<connectors.service_wire.AttemptReference>", presence: null_when_absent}
+      - {name: original_request_id, type: "Optional<String>", presence: null_when_absent}
       - {name: replayed, type: Boolean}
-      - {name: cause, type: "Optional<connectors.service_wire.DiagnosticCause>"}
+      - {name: cause, type: "Optional<connectors.service_wire.DiagnosticCause>", presence: null_when_absent}
   - name: connectors.service_wire.AuditStatus
     kind: enum
     variants: [complete, incomplete, unavailable, not_required]
@@ -42,8 +44,64 @@ types:
     kind: struct
     fields:
       - {name: instance, type: String}
-      - {name: audit_ref, type: "Optional<String>"}
+      - {name: audit_ref, type: "Optional<String>", presence: null_when_absent}
       - {name: audit_status, type: connectors.service_wire.AuditStatus}
+  # First v1alpha2 binding: POST /v1alpha2/invoke only (compatibility.md §2.1).
+  # The closed request admits the five original v1alpha1 members and none of
+  # the §4 invocation additions. `version` is a String so the codec decodes a
+  # wrong version and answers `unsupported` (§2) instead of a decode refusal.
+  # `input` is the operation-local payload, checked against the selected
+  # operation's own input schema, not by this envelope.
+  - name: connectors.service_wire.InvokeRequest
+    kind: struct
+    fields:
+      - {name: version, type: String}
+      - {name: request_id, type: String}
+      - {name: operation, type: String}
+      - {name: revision, type: String}
+      - {name: input, type: Json}
+  # compatibility.md §5: Error remains {code, message, retry_after_seconds?}.
+  # ESS-LIMIT: the 512 UTF-8 byte message ceiling and the positive retry value
+  # are codec obligations of this binding.
+  - name: connectors.service_wire.Error
+    kind: struct
+    fields:
+      - {name: code, type: connectors.service_wire.ErrorCode}
+      - {name: message, type: String}
+      - {name: retry_after_seconds, type: "Optional<Integer>", presence: omitted_when_absent}
+  - name: connectors.service_wire.ResponseStatus
+    kind: enum
+    variants: [success, error]
+  # compatibility.md §5: the extended application Response. request_id and
+  # audit_ref are required and nullable; result/error/source_audit/mutation are
+  # omitted when absent.
+  - name: connectors.service_wire.InvokeResponse
+    kind: struct
+    fields:
+      - {name: version, type: connectors.service_wire.Version}
+      - {name: request_id, type: "Optional<String>", presence: null_when_absent}
+      - {name: status, type: connectors.service_wire.ResponseStatus}
+      - {name: result, type: "Optional<Json>"}
+      - {name: error, type: "Optional<connectors.service_wire.Error>", presence: omitted_when_absent}
+      - {name: audit_ref, type: "Optional<String>", presence: null_when_absent}
+      - {name: audit_status, type: connectors.service_wire.AuditStatus}
+      - {name: source_audit, type: "Optional<connectors.service_wire.SourceAudit>", presence: omitted_when_absent}
+      - {name: mutation, type: "Optional<connectors.service_wire.MutationObservation>", presence: omitted_when_absent}
+    invariants:
+      - version == v1alpha2
+      - any:
+          - all: [status == success, defined(result), missing(error)]
+          - all: [status == error, defined(error), missing(result)]
+      - any:
+          - all: [audit_status == complete, defined(audit_ref)]
+          - all: [audit_status == incomplete, defined(audit_ref)]
+          - all: [audit_status == unavailable, missing(audit_ref)]
+          - all: [audit_status == not_required, missing(audit_ref)]
+      # §5: success with mutation metadata requires applied.
+      - any:
+          - status != success
+          - missing(mutation)
+          - mutation.classification == applied
   - name: connectors.service_wire.AuthAlternative
     kind: struct
     fields:
@@ -58,14 +116,24 @@ types:
       - {name: provider_ms, type: Integer}
       - {name: connect_ms, type: Integer}
 
-# ESS-LIMIT codec obligations (ESS 0.36 has no wire-codec construct: Optional
-# projects to omission, not a required-null rule; no byte-length or canonical
-# encoding predicate; no cross-record read): exact selected route/version; mandatory-null versus
-# omitted fields (ESS Optional captures values, not this codec's emission rule);
-# closed outer request/response and arbitrary operation-local schema payloads;
+# Required-null versus omitted members are now declared with `presence:` on the
+# observation, audit and InvokeResponse fields above. The InvokeResponse
+# invariants project as `x-ess-invariants` annotations, which a JSON Schema
+# validator does not evaluate.
+# ESS-LIMIT codec obligations (no route construct, no byte-length or canonical
+# encoding predicate, no cross-record read): exact selected route/version;
+# the status/result/error and audit_status/audit_ref combinations as checked
+# rules rather than annotations; a `result` that is JSON null under success;
+# arbitrary operation-local schema payloads; the refusal of a §4 invocation
+# member on the first binding (compatibility.md §2.1), which the closed
+# InvokeRequest rejects as an unknown member while the codec answers `unsupported`;
 # numeric/string bounds and canonical encoding; error/status/effect combinations;
 # co-presence of original attempt/request references, safe lookup disclosure and
-# replay admission; actual schema/profile support and legacy projection admission.
+# replay admission; actual schema/profile support and legacy projection admission;
+# the reader's binding selection (compatibility.md §2): a client selects
+# `/v1alpha2/invoke` by configuration, reads every answer as InvokeResponse,
+# reports a route failure without an envelope as `unsupported` and never
+# resends on another route or version.
 # No ESS relation is implied by these public correlation VALUES. AttemptReference
 # names an existing private attempt but neither owns it nor creates a lookup API.
 # AuditRecord persistence is declared by connectors.execution_audit. SourceAudit

@@ -14,12 +14,34 @@ use connectors_core::{
 use connectors_sdk::{Adapter, Credential, validate};
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc, time::Instant};
+mod v1alpha2;
 use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 
+pub use crate::local::service::ServiceState;
+
+/// `urn:connectors:config:v2:service` (`connectors.declarations.ServiceHostConfiguration`):
+/// the v1 members plus the optional `state` directory, which `POST
+/// /v1alpha2/invoke` requires (contracts/service/compatibility.md § 2.1).
 #[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ServiceConfig {
+    #[schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
+    pub instance: String,
+    #[schemars(with = "String", length(min = 1, max = 512))]
+    pub listen: SocketAddr,
+    pub service_credential: CredentialRef,
+    /// The directory of the host's local metadata authority: its audit anchors
+    /// and attempt records. Without it the host serves only `/v1/*`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>", length(min = 1, max = 4096))]
+    pub state: Option<std::path::PathBuf>,
+}
+
+/// `urn:connectors:config:v1:service`, unchanged and closed: it has no `state`.
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ServiceConfigV1 {
     #[schemars(length(min = 1, max = 128), regex(pattern = "^[A-Za-z0-9_.-]+$"))]
     pub instance: String,
     #[schemars(with = "String", length(min = 1, max = 512))]
@@ -32,18 +54,34 @@ struct Service {
     adapter: Arc<dyn Adapter>,
     credential: Arc<dyn Credential>,
     slots: Arc<Semaphore>,
+    state: Option<Arc<ServiceState>>,
 }
 
+/// A host without `state`: `/v1alpha2/invoke` answers 503 `unavailable`.
 pub fn router(adapter: Arc<dyn Adapter>, credential: Arc<dyn Credential>) -> Router {
+    router_with_state(adapter, credential, None)
+}
+
+pub fn router_with_state(
+    adapter: Arc<dyn Adapter>,
+    credential: Arc<dyn Credential>,
+    state: Option<Arc<ServiceState>>,
+) -> Router {
+    // The running host retries its retained final observations (audit.md § 3).
+    if let Some(state) = &state {
+        ServiceState::spawn_recovery(state);
+    }
     Router::new()
         .route("/healthz", get(|| async { StatusCode::NO_CONTENT }))
         .route("/v1/describe", get(describe))
         .route("/v1/invoke", post(invoke))
+        .route("/v1alpha2/invoke", post(v1alpha2::invoke))
         .layer(DefaultBodyLimit::max(REQUEST_LIMIT))
         .with_state(Service {
             adapter,
             credential,
             slots: Arc::new(Semaphore::new(32)),
+            state,
         })
 }
 
@@ -176,13 +214,29 @@ fn error_http(error: Error) -> HttpResponse {
 
 pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<()> {
     config.service_credential.resolve().await?;
+    // Host start records the instance before /v1alpha2/invoke is served; a
+    // refusal refuses start (compatibility.md § 2.1, Host start).
+    let state = match config.state.clone() {
+        None => None,
+        Some(path) => {
+            let descriptor = adapter.descriptor();
+            let instance = config.instance.clone();
+            let state = tokio::task::spawn_blocking(move || {
+                ServiceState::open(&path, &instance, &descriptor.adapter, &descriptor.revision)
+            })
+            .await
+            .map_err(|_| Error::internal())?
+            .map_err(|_| Error::invalid("service state cannot be opened for this instance"))?;
+            Some(Arc::new(state))
+        }
+    };
     let listener = tokio::net::TcpListener::bind(config.listen)
         .await
         .map_err(|_| Error::invalid("service listener cannot be bound"))?;
     tracing::info!(instance=%config.instance, listen=%listener.local_addr().map_err(|_|Error::internal())?, "adapter service listening");
     axum::serve(
         listener,
-        router(adapter, Arc::new(config.service_credential)),
+        router_with_state(adapter, Arc::new(config.service_credential), state),
     )
     .with_graceful_shutdown(async {
         match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
@@ -246,6 +300,7 @@ mod tests {
                     name: "UNUSED".into(),
                 }),
                 slots: Arc::new(Semaphore::new(32)),
+                state: None,
             },
             entered,
         )

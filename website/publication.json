@@ -33,7 +33,7 @@
       "title": "Service compatibility",
       "source": "contracts/service/compatibility.md",
       "owner": "shared",
-      "status": "Specified; runtime pending"
+      "status": "Specified; first v1alpha2 invoke binding implemented"
     },
     {
       "route": "/contracts/delegation",

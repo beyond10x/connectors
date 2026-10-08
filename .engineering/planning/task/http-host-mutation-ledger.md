@@ -2,12 +2,18 @@
 format: aep.planning-md/3
 id: task:http-host-mutation-ledger
 kind: task
-status: draft
+status: implemented
 title: The HTTP host records an attempt for every admitted write and serves /v1alpha2/invoke
 relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:v1alpha2-invoke-wire-codec
-revision: 1
+- serves: vision:independent-contract-adapters
+- depends_on: task:http-host-audit-anchor
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T14:14:25Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-08T14:14:26Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-08T14:14:26Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
