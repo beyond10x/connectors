@@ -8,7 +8,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:owner-memory-bounded
 - informed_by: story:metadata-invoke-cost-flat-in-store-size
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T17:16:09Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T17:16:10Z", actor: "human:timo", revision: 3}
@@ -28,19 +28,28 @@ waves and the delivery shape set on 2026-10-07: one integration branch, one pull
 
 ## Units
 
-They run one after the other: both change `crates/connectors-host/src/local/metadata/er.rs` and
-`crates/connectors-host/src/local/registry/store_cost_tests.rs` (both stories' `## Scope`).
+They were planned one after the other: both stories' `## Scope` name
+`crates/connectors-host/src/local/metadata/er.rs` and
+`crates/connectors-host/src/local/registry/store_cost_tests.rs`.
 
-| unit | story | issue | branch | worktree | stage |
-|---|---|---|---|---|---|
-| U1 | `story:owner-memory-bounded` | #103 | `unit/owner-memory-bounded-20261007` | `conn-u1-mem` | brief written; release build waits for a build slot |
-| U2 | `story:metadata-invoke-cost-flat-in-store-size` | #101 | `unit/store-checkpoints` | `conn-u2-ckpt` | specification being drafted (no build); implementation after U1 merges |
+Resumed 2026-10-08 by a new coordinator session. Entity Runtime 0.29.0 (in `main` since 0.32.0)
+carries the upstream fixes U1 waited on (entity-runtime#59 in 0.28.0, entity-runtime#55 in
+0.29.0), so U1 starts with a measurement on the wave base. U2 is dispatched at the same time;
+U1 changes, if any, are expected in the peak-RSS reporting of `store_cost_tests.rs`, and the
+coordinator resolves any overlap at merge. U2 also moves the ESS pin from 0.55.0 to 0.56.0
+(newest release), because its specification is validated and regenerated with the newest `ess`.
 
-U2 follows `decision-blocker:store-checkpoints-one-way` (cleared): new stores with checkpoints, an
-existing store by an explicit, confirmed command.
+| unit | story | issue | branch | worktree | build dir | scratch | stage |
+|---|---|---|---|---|---|---|---|
+| U1 | `story:owner-memory-bounded` | #103 | `unit/owner-memory-bounded-20261007` | managed `conn-u1-mem` | `conn-u1-mem/target` | `conn-u1-mem/.local` | baseline measurement on `91e6baae33` |
+| U2 | `story:metadata-invoke-cost-flat-in-store-size` | #101 | `unit/store-checkpoints` (head `b0f9d7632a`, specification) | managed `conn-u2-ckpt` | `conn-u2-ckpt/target` | `conn-u2-ckpt/.local` | implementor dispatched (`aep:implementor`) |
 
-Dispatch: `ess:author` for U2's specification; `aep:implementor` per unit; `aep:adversary` per
-unit (storage and memory changes).
+Briefs: `conn-w20261007c/.local/wave/<unit>/brief.md` (git-ignored).
+
+U2 follows `decision-blocker:store-checkpoints-one-way` (cleared, option C) and
+`decision-blocker:checkpoint-offline-edit-detection` (cleared, option B).
+
+Dispatch: `aep:implementor` per unit; `aep:adversary` per unit (storage and memory changes).
 
 ## Pre-flight
 
