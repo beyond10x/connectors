@@ -1,0 +1,157 @@
+{
+  "format": "connectors-service-wire-vectors/1",
+  "type": "connectors.service_wire.InvokeRequest",
+  "cases": [
+    {
+      "id": "request-object-input",
+      "schema_valid": true,
+      "expect": "round_trip",
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{"name":"a","count":2}}
+    },
+    {
+      "id": "request-null-input",
+      "schema_valid": true,
+      "expect": "round_trip",
+      "value": {"version":"v1alpha2","request_id":"read-1","operation":"item.read","revision":"rev-1","input":null}
+    },
+    {
+      "id": "request-array-input",
+      "schema_valid": true,
+      "expect": "round_trip",
+      "value": {"version":"v1alpha2","request_id":"read-2","operation":"item.list","revision":"rev-1","input":[1,"two",{"three":3}]}
+    },
+    {
+      "id": "v1alpha2-invoke-wrong-version-unsupported",
+      "schema_valid": true,
+      "expect": "refuse",
+      "code": "unsupported",
+      "request_id": "write-1",
+      "value": {"version":"v1alpha1","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{}}
+    },
+    {
+      "id": "request-unknown-version-unsupported",
+      "schema_valid": true,
+      "expect": "refuse",
+      "code": "unsupported",
+      "request_id": "write-2",
+      "value": {"version":"v99","request_id":"write-2","operation":"item.write","revision":"rev-1","input":{}}
+    },
+    {
+      "id": "v1alpha2-invoke-refuses-connection",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "unsupported",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"connection":"c1"}
+    },
+    {
+      "id": "v1alpha2-invoke-refuses-idempotency-key",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "unsupported",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"idempotency_key":"k1"}
+    },
+    {
+      "id": "v1alpha2-invoke-refuses-approval",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "unsupported",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"approval":{"token":"t"}}
+    },
+    {
+      "id": "v1alpha2-invoke-refuses-executor",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "unsupported",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"executor":null}
+    },
+    {
+      "id": "request-section4-member-refused-before-version",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "unsupported",
+      "request_id": null,
+      "value": {"version":"v1alpha1","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"connection":"c1"}
+    },
+    {
+      "id": "v1alpha2-invoke-unknown-member-invalid-input",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"extra":true}
+    },
+    {
+      "id": "request-section4-member-with-other-unknown-invalid-input",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1","input":{},"connection":"c1","extra":true}
+    },
+    {
+      "id": "request-missing-input",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":"write-1","operation":"item.write","revision":"rev-1"}
+    },
+    {
+      "id": "request-missing-request-id",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "value": {"version":"v1alpha2","operation":"item.write","revision":"rev-1","input":{}}
+    },
+    {
+      "id": "request-null-request-id",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "value": {"version":"v1alpha2","request_id":null,"operation":"item.write","revision":"rev-1","input":{}}
+    },
+    {
+      "id": "request-numeric-version",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "value": {"version":2,"request_id":"write-1","operation":"item.write","revision":"rev-1","input":{}}
+    },
+    {
+      "id": "request-not-an-object",
+      "schema_valid": false,
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "value": ["v1alpha2","write-1"]
+    },
+    {
+      "id": "request-duplicate-member",
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "raw": "{\"version\":\"v1alpha2\",\"request_id\":\"write-1\",\"request_id\":\"write-2\",\"operation\":\"item.write\",\"revision\":\"rev-1\",\"input\":{}}"
+    },
+    {
+      "id": "request-duplicate-nested-member",
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "raw": "{\"version\":\"v1alpha2\",\"request_id\":\"write-1\",\"operation\":\"item.write\",\"revision\":\"rev-1\",\"input\":{\"a\":1,\"a\":2}}"
+    },
+    {
+      "id": "request-not-json",
+      "expect": "refuse",
+      "code": "invalid_input",
+      "request_id": null,
+      "raw": "{\"version\":\"v1alpha2\","
+    }
+  ]
+}
