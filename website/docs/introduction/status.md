@@ -4,9 +4,9 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.36.0
+# Source release v0.37.0
 
-Version **0.36.0** specifies at ESS source format `ess/15` with the released
+Version **0.37.0** specifies at ESS source format `ess/15` with the released
 ESS 0.56.0 and plans with the released AEP 0.69.1; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
@@ -90,6 +90,12 @@ there when it publishes; a changed provider authority or profile declaration sti
 new instance id. `connectors help describe`, `help invoke` and `help serve` print their
 usage, and bash completion covers those three commands. Due expiries are recorded in batches
 of at most 128. The repository plans with AEP 0.69.1.
+
+Since 0.37.0 Runpod `pod.create` admits `dockerStartCmd`, `dockerEntrypoint` and
+`networkVolumeId`, so a pod can run its image with its own argv and attach a network volume.
+The catalog ingests a Swagger 2.0 document through a recorded projection to OpenAPI 3.1.0;
+the Slack Web API document is pinned and projects, and no Slack operation is selected yet.
+Entity Runtime is 0.30.3 on Eventlog 0.8.3.
 
 Since 0.36.0 the catalog provider creates, lists and terminates Runpod pods (`pod.create`,
 `pods.list`, `pod.terminate`) with the API key in keyring custody; a create without a definite
