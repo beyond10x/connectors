@@ -3561,14 +3561,19 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
 }
 
 /// The most expiries one batch records when more are due than fit in it.
-/// Entity Runtime 0.29.0's batch execution grows faster than linearly with its
-/// member count: on the stores `read_invoke_cost_by_store_size` grows, a batch of
-/// 196 expiries took 21.4 s at 601 events and one of 396 took 101.9 s at 1,201,
-/// past the 30-second bridge deadline. 32 is the largest size, up to 32, whose batch
-/// stays under 2 s at 6,000 events (`first_owner_open_of_a_grown_store`, release,
-/// 2026-10-08): 996 due expiries took 32 batches of at most 32, median 762 ms,
-/// max 1,215 ms; batches of 16 took median 286 ms, max 560 ms.
-const EXPIRY_BATCH: usize = 32;
+/// Every store this host opens is SQLite (`EventlogRecordedStoreOwner::Sqlite`,
+/// `EventlogRecordedStoreProvisioner::Sqlite`), where Entity Runtime 0.30.2 no
+/// longer shows 0.29.0's superlinear batch cost (396 expiries in one batch took
+/// 101.9 s at 1,201 events). Measured on 0.30.2 with
+/// `first_owner_open_of_a_grown_store` (release, 2026-10-08): one unbounded batch
+/// took 4.0 s for 396 expiries at 1,201 events and 14.4 s for every due expiry at
+/// 6,000, so an unbounded batch still grows with the backlog towards the 30-second
+/// bridge deadline. At 6,000 events, in repeated runs on a loaded machine, batches
+/// of 128 took at most 1.5–2.5 s each and 6.8–10.4 s in total; batches of 32 took
+/// at most 0.5–1.3 s and 7.5–9.7 s in total; 256 took at most 2.8 s, 512 at most
+/// 4.1 s. 128 keeps each batch more than ten times inside the deadline in a
+/// quarter of the batches 32 needs, at no measurable cost in total.
+const EXPIRY_BATCH: usize = 128;
 
 #[cfg(test)]
 thread_local! {

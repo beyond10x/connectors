@@ -272,9 +272,12 @@ Owner start, measured on stores grown by read invokes (release build,
 within the 10-second spawn deadline the CLI waits for a starting owner.
 
 Due expiries of transient subjects (`ExpireReadUse`, `ExpireConnectionListCursor`)
-are recorded in batches of at most 32 before the batch carrying the caller's own
-change, because an Entity Runtime 0.29.0 batch costs more than linearly in its
-members (396 expiries in one batch took 101.9 s at 1,201 events). Each expiry
+are recorded in batches of at most 128 before the batch carrying the caller's own
+change, because one batch's time grows with its members: on Entity Runtime 0.30.2
+every due expiry in one batch took 14.4 s at 6,000 events, and batches of 128
+took at most 1.5–2.5 s each (release build, `first_owner_open_of_a_grown_store`,
+2026-10-08; on 0.29.0, 396 expiries in one batch took 101.9 s at 1,201 events,
+and the bound was 32). Each expiry
 batch's receipt is read back; the projection check runs once, after the
 caller's batch. A refused or uncertain expiry batch leaves earlier ones
 committed and the caller's change unapplied; the next write records the rest.
