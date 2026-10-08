@@ -115,7 +115,7 @@ Each write sends exactly one request and is never sent again by the provider.
 | `pod.create` | a documented definite refusal (`400`, `401`, `403`, `404`, `409`, `422`, …) | `refused` | no pod was created; fix the input or the key |
 | `pod.create` | a `5xx`, a timeout, or a connection lost after the request was sent | `unknown` | the pod may exist and may be billed. Do not create again blindly: list by the same `name` with `pods.list`, and create only if none is there |
 | `pod.terminate` | `204` (documented) or `200` | `applied` | the pod is terminated |
-| `pod.terminate` | `404` | `refused`, code `not_found` | Runpod has no pod with that id: it was already terminated or never existed. This call terminated nothing, and nothing with that id is still running or billed |
+| `pod.terminate` | `404` | `refused`, code `not_found` | Runpod has no pod with that id under the connection's current key: under that key it was already terminated or never existed, and this call terminated nothing. It does not prove the pod is gone: if the connection now holds a key from another Runpod account (see [Authentication](#authentication)), the first account's pods answer `404` while they are still running and billed |
 | `pod.terminate` | a `5xx`, a timeout, or a lost connection | `unknown` | the pod may or may not be terminated; check `pods.list` with `id` before terminating again |
 
 Give every pod a unique `name` so that an `unknown` create can be resolved by
@@ -137,7 +137,10 @@ account: its kind is `runpod.connection` and its subject is the configuration's
 `instance` id (identity `source` `configuration`, see
 [the catalog provider guide](local-catalog-provider.md#configure-the-provider)).
 Repair and revalidate cannot tell two Runpod accounts apart: any key that lists
-pods is accepted as the same identity. Use one `instance` per Runpod account.
+pods is accepted as the same identity. After a repair with another account's
+key, every pod the first account still runs answers `pod.terminate` with `404`
+and stays billed. Use one `instance` per Runpod account, and repair it only with
+a key of that account.
 
 ```json
 {

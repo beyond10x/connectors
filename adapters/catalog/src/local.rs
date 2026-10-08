@@ -670,12 +670,17 @@ impl Local {
                         || config.auth.scopes.is_some()
                 }
                 // The read proves the credential and names nobody: a pointer
-                // into it would be read by nobody.
+                // into it would be read by nobody. Only a static credential may
+                // be named by its connection: an OAuth credential belongs to a
+                // holder the provider names, and a configured subject would let
+                // repair accept another holder's credential as the same identity
+                // (`connectors_catalog.identity.Profile`).
                 IdentitySource::Configuration => {
-                    identity
-                        .path
-                        .as_deref()
-                        .is_none_or(|p| segments(p).is_empty())
+                    config.auth.scheme.is_oauth()
+                        || identity
+                            .path
+                            .as_deref()
+                            .is_none_or(|p| segments(p).is_empty())
                         || identity.subject_pointer.is_some()
                         || (config.auth.scopes.is_none() && !config.auth.minimum_scopes.is_empty())
                 }
@@ -1324,7 +1329,11 @@ impl runtime::Adapter for Local {
                 (IdentitySource::IdToken, Grant::ClientCredentials(_)) => {
                     return Err(Failure::InvalidConfiguration);
                 }
-                (IdentitySource::Api | IdentitySource::Configuration, _) => {
+                // Refused at load; never reached.
+                (IdentitySource::Configuration, _) => {
+                    return Err(Failure::InvalidConfiguration);
+                }
+                (IdentitySource::Api, _) => {
                     let http = self.with(Secret(exchanged.access.as_bytes().to_vec()));
                     self.probe_identity(&http, collected_at_ms).await?
                 }

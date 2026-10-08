@@ -257,8 +257,12 @@ The complete configuration used against the sandbox is
   is not read; the subject is the configuration's `instance` id, so the identity
   is the configured connection, not a provider account, and repair or revalidate
   accepts any credential the read admits. It names a `path` and no
-  `subject_pointer`; anything else is refused at load. The probe's shape is
-  modeled as `connectors_catalog.identity.Probe` in `adapters/catalog/spec/ess`.
+  `subject_pointer`, and is only for a static credential (`token` or `basic`):
+  under `oauth2_refresh` or `oauth2_client_credentials` it is refused at load,
+  because repair would then accept another holder's OAuth credential as the same
+  identity. Anything else is refused at load too. The rules are modeled as
+  `connectors_catalog.identity.Probe` and `connectors_catalog.identity.Profile`
+  in `adapters/catalog/spec/ess`.
 
 ```json
 "auth": {
