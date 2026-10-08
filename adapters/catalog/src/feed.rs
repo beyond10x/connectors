@@ -302,12 +302,21 @@ fn bind(
     sometimes: &[&str],
     constants: Option<&BTreeMap<String, String>>,
 ) -> Result<Template> {
-    let operation: &Operation = bundle
+    // As for a selection: an `operationId` the source declares twice names no
+    // single request and is refused.
+    let mut matching = bundle
         .inventory
         .operations
         .iter()
-        .find(|o| o.operation_id.as_deref() == Some(id))
+        .filter(|o| o.operation_id.as_deref() == Some(id));
+    let operation: &Operation = matching
+        .next()
         .ok_or_else(|| refuse(format!("bundle carries no operation `{id}`")))?;
+    if matching.next().is_some() {
+        return Err(refuse(format!(
+            "bundle carries more than one operation `{id}`"
+        )));
+    }
     if operation.method != "get" || !path_within(&operation.path, base) {
         return Err(refuse(format!(
             "feed operation `{id}` must be a GET under the base path"

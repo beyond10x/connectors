@@ -307,13 +307,25 @@ impl Engine {
         if (selections.is_empty() && feed.is_none()) || selections.len() > 256 {
             return Err(refuse("select between one and 256 operations"));
         }
+        // A source may declare one `operationId` on more than one operation
+        // (Runpod's `UpdatePod` is both a PATCH and a POST). The id alone then
+        // names no single request, so it is refused rather than resolved to
+        // whichever the inventory lists first.
         let find = |operation_id: &str| -> Result<&Operation> {
-            bundle
+            let mut matching = bundle
                 .inventory
                 .operations
                 .iter()
-                .find(|o| o.operation_id.as_deref() == Some(operation_id))
-                .ok_or_else(|| refuse(format!("bundle carries no operation `{operation_id}`")))
+                .filter(|o| o.operation_id.as_deref() == Some(operation_id));
+            let operation = matching
+                .next()
+                .ok_or_else(|| refuse(format!("bundle carries no operation `{operation_id}`")))?;
+            if matching.next().is_some() {
+                return Err(refuse(format!(
+                    "bundle carries more than one operation `{operation_id}`"
+                )));
+            }
+            Ok(operation)
         };
         let mut exposed = Vec::new();
         let mut probes = BTreeMap::new();
