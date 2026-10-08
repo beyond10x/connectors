@@ -45,6 +45,7 @@ components:
         - connectors.idempotency.QuarantineKey
         - connectors.idempotency.ExpireResult
         - connectors.execution_audit.AcknowledgeAnchor
+        - connectors.execution_audit.LinkAnchorAttempt
         - connectors.execution_audit.AppendFinalObservation
         - connectors.approval_issuers.PublishKey
         - connectors.approval_issuers.BindIssuer

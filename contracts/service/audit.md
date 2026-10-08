@@ -63,14 +63,19 @@ before dispatch, the owner links it with `LinkAnchorAttempt`
    stays unchanged.
 2. A record with no `attempt_id` stores the supplied one; this is the only
    change the link makes.
-3. Repeating the link with the same `attempt_id` changes nothing and answers as
-   already linked; a different `attempt_id` refuses (`AttemptLinkConflict`) and
-   the first link stays. A record is linked to at most one attempt.
+3. Repeating the link with the same `attempt_id` changes nothing and answers
+   `AttemptLinkRepeated`, which the owner treats as the original link
+   acknowledgement; a different `attempt_id` refuses (`AttemptLinkConflict`)
+   and the first link stays. A record is linked to at most one attempt.
 4. A `FinalObserved` record refuses (`AuditStateConflict`). A store that fails
    or does not answer refuses (`AttemptLinkUnavailable`) without a change.
 5. The linked attempt must agree with the anchor's instance and connection as
    the paragraph above says. A link grants no dispatch, approval or replay
    authority.
+6. A link that fails after the attempt is prepared grants no dispatch. The
+   owner aborts that attempt as `not_attempted`, answers `unavailable` with
+   zero provider calls, and keeps the anchor: its final observation records
+   the refusal, and the response carries that record's reference and status.
 
 The lifecycle is `Anchored -> FinalObserved`; the attempt link stays in
 `Anchored`. `Anchored` means the anchor write has a definite durable
@@ -181,7 +186,8 @@ export, search, retention-management or backend-selection API.
 - `audit-link-attempt-once`: a write anchor is acknowledged, its attempt is
   recorded and linked → the record's `attempt_id` names that attempt; the
   record stays `Anchored` until its final observation.
-- `audit-link-attempt-repeat-unchanged`: the same link is repeated → no change
+- `audit-link-attempt-repeat-unchanged`: the same link is repeated →
+  `AttemptLinkRepeated`, no change
   and no second link.
 - `audit-link-attempt-conflict`: a link to another attempt after the first →
   `AttemptLinkConflict`, the first `attempt_id` unchanged.
@@ -191,6 +197,9 @@ export, search, retention-management or backend-selection API.
   `AuditStateConflict`, the record unchanged.
 - `audit-link-store-unavailable`: the store fails the link →
   `AttemptLinkUnavailable`, the record unchanged.
+- `audit-link-failed-aborts-attempt`: the link fails after the write's attempt
+  is prepared → the attempt is aborted as `not_attempted`, no provider dispatch
+  occurs, the anchor stays and its final observation records the refusal.
 
 ## 6. ESS and implementation boundary
 

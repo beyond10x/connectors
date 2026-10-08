@@ -139,6 +139,9 @@ errors:
   - name: connectors.execution_audit.AttemptLinkConflict
     fields:
       - {name: reason, type: String}
+  - name: connectors.execution_audit.AttemptLinkRepeated
+    fields:
+      - {name: reason, type: String}
   - name: connectors.execution_audit.AttemptLinkUnavailable
     fields:
       - {name: reason, type: String}
@@ -222,8 +225,9 @@ commands:
     # `attempt_id` cannot be set by AcknowledgeAnchor. After the attempt is
     # recorded and before dispatch, the host links it here: once per anchor,
     # only on a write anchor, only while no final observation exists. Repeating
-    # the link with the same attempt sets the same value and changes nothing
-    # (idempotent); another attempt is refused and the first link stays.
+    # the link with the same attempt changes nothing and is answered as the
+    # original link (idempotent); another attempt is refused and the first
+    # link stays.
     input:
       - {name: decision, type: connectors.execution_audit.LinkDecision}
       - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
@@ -242,11 +246,16 @@ commands:
           predicate:
             all: [defined(attempt_id), attempt_id != input.attempt_id]
         error: connectors.execution_audit.AttemptLinkConflict
+      # The same attempt again changes nothing. It is declared as a refusal
+      # that leaves the record unchanged, which the host answers as the original
+      # link acknowledgement, rather than as a `preserves:` branch: this command
+      # is lowered to Entity Runtime (components.yaml local-metadata-authority),
+      # and no lowered command here uses `preserves:` (see the ESS-LIMIT on
+      # AppendFinalObservation's repeat below).
       - name: already-linked
         when_subject:
           predicate: attempt_id == input.attempt_id
-        preserves: connectors.execution_audit.AuditRecord
-        instance: audit_record_ref
+        error: connectors.execution_audit.AttemptLinkRepeated
       - name: linked
         moves: connectors.execution_audit.AuditRecord.link_attempt
         instance: audit_record_ref
@@ -381,37 +390,25 @@ views:
 # then AppendFinalObservation. `capacity` and `unavailable` from
 # AcknowledgeAnchor both answer HTTP 503 `unavailable`, `audit_ref: null`, no
 # attempt, zero adapter calls.
-# UNMAPPED: principal_ref on the HTTP host. v1alpha2 semantics § 3.1 says the
-# static-bearer principal is a "receiver-configured static service identity"
-# that does not change when credential bytes rotate (§ 4 rule 3); the HTTP
-# host's configuration (crates/connectors-host/src/server.rs:22-28
-# ServiceConfig: instance, listen, service_credential) carries no principal,
-# and connectors.declarations.ServiceConfiguration (instance_id, adapter_id,
-# revision, registry_epoch) carries none either. Proposed derivation, not yet
-# confirmed by the owner: the fixed text `static-bearer`, qualified by the
-# anchor's instance_id (one configured principal per instance, § 3.2). No
-# configuration field is added: ServiceConfig is the closed reader
-# `urn:connectors:config:v1:service` (crates/connectors-host/src/schema.rs:22),
-# and compatibility.md § 1 gives configuration formats their own decision.
-# UNMAPPED: where the HTTP host persists anchors. The HTTP host holds no store
-# (server.rs:30-35 Service: adapter, credential, slots; serve() at
-# server.rs:177-199 opens nothing). The only AuditRecord store is the local
-# owner's metadata authority: SQLite tables projected through Entity Runtime
-# over Eventlog at the owner's state path (crates/connectors-host/src/local/
-# audit.rs:25-52, local/owner/mutation.rs:356-357, local/metadata.rs:896-905),
-# whose execution_audits rows require a registry_instances row
-# (local/metadata/audit.sql:3, local/audit.rs:290-300). This declaration
-# assumes the HTTP host writes the same AuditRecord through some durable store
-# that keeps audit.md § 4 (100,000 records per instance, no expiry, no audit
-# deletion, capacity refused before dispatch, never evicting). Which store,
-# where it is configured, and whether its instance is a recorded
-# ServiceConfiguration (the `instance` relation above) are open questions for
-# the owner; LinkAnchorAttempt is not accepted by local-metadata-authority
-# (components.yaml) until that is answered.
-# UNMAPPED: what the HTTP host does when LinkAnchorAttempt answers
-# `unavailable` after the attempt is recorded and before dispatch. No contract
-# says whether the write still dispatches with an unlinked anchor or is
-# aborted as not_attempted. Open question for the owner.
+# Principal: on the HTTP host `principal_ref` is the fixed text
+# `static-bearer`, qualified by the anchor's `instance_id`. A static-bearer
+# credential authenticates one receiver-configured service principal, not the
+# people sharing its bytes (compatibility.md § 4, last paragraph; v1alpha2
+# semantics § 3.1, § 3.2); rotating the credential bytes or moving the
+# credential reference does not change it (v1alpha2 semantics § 4 rule 3).
+# Store: the HTTP host keeps its anchors and its attempt records in the local
+# metadata authority (Entity Runtime over Eventlog, SQLite) in the configured
+# state directory (connectors.declarations.ServiceHostConfiguration `state`),
+# the same component as the local owner (components.yaml
+# local-metadata-authority), under audit.md § 4: at most 100,000 records per
+# instance, capacity refused before dispatch and never evicting, no expiry, no
+# audit deletion. Its instance is the ServiceConfiguration it records at start
+# (declarations.yaml, HTTP host start), which the `instance` relation names.
+# Failed link: when LinkAnchorAttempt answers `unavailable` after the attempt is
+# prepared, the host aborts that attempt (connectors.mutations.AbortPrepared,
+# `not_attempted`), answers 503 `unavailable` with zero adapter calls, and keeps
+# the anchor: its final observation (AppendFinalObservation) records the
+# refusal, and the response carries that record's `audit_ref` and status.
 
 actors:
   - name: connectors.execution_audit.LocalHost
