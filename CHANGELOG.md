@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.35.0 — 2026-10-08
 
 ### Breaking
 
@@ -38,6 +38,26 @@
   an endpoint answering HTTP 404 without a v1alpha2 envelope is reported as `unsupported`.
   `Client::invoke` keeps its signature and the legacy `/v1/invoke` binding, whose wire is
   unchanged.
+- The repository gate generates the JSON Schema of the v1alpha2 request and Response and
+  checks every wire vector against it; raw-byte refusal vectors are excluded by a named rule.
+- The ESS specification declares `UpgradeServiceConfiguration`, which moves an instance's
+  configuration revision and registry epoch together.
+
+### Fixed
+
+- The browser realization example builds again with the optional attempt connection; the
+  website production build failed with E0277.
+
+### Limitations
+
+- Final audit observations the host retains for retry are held in memory: a restart loses
+  them and those audit records stay `Anchored`. With 10,000 retained the host refuses new
+  invocations on the route and evicts none.
+- A write whose completion cannot be stored stays `Dispatching`; its Response says `applied`
+  with cause `{unavailable, attempt_store}`, and nothing retries the settlement.
+- An HTTP host must not share its `state` directory with a local owner; nothing checks it.
+- HTTP-host attempts carry no idempotency key and are stamped with the system clock under the
+  anti-regression floor.
 
 ## 0.34.0 — 2026-10-08
 
