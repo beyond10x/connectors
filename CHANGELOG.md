@@ -17,6 +17,17 @@
   `adapters/loki/spec/ess`; the operator guide is `adapters/loki/README.md`. Limits: no
   `X-Scope-OrgID` tenant header is sent, and a Loki without authentication cannot be
   connected, because the local host admits no credential-less profile.
+- The catalog provider reads Slack conversations: `conversations.list`,
+  `conversations.history` and `conversations.replies`, from the pinned Slack Web API
+  Swagger 2.0 document (`adapters/slack/upstream/`, SHA-256 `8b92da26…936bc3a`) projected
+  to `adapters/slack/generated/slack-web.openapi.json` by the new
+  `connectors-build swagger` subcommand. A bot token travels as `Authorization: Bearer`
+  under profile `slack.bot`; connecting reads `auth.test` and records its `user_id`.
+  Each list returns one page per call and ends on an empty
+  `response_metadata.next_cursor`; the two message reads take `oldest` and `latest`. The
+  document's `token` query parameter is withheld. Limits: Slack answers most failures
+  `200` with `"ok": false`, which is returned as a successful invocation; verified against
+  a local fixture only. See `docs/catalog-slack.md`.
 
 ## 0.37.0 — 2026-10-08
 

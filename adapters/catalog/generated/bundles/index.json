@@ -73,6 +73,14 @@
       "unsupported": 0
     },
     {
+      "provider": "slack",
+      "file_name": "slack.bundle.json",
+      "bundle_sha256": "abe8fd7a08b722a4940501aa7bd4f96cee90fb8c2a2e694eb2548e5217264401",
+      "source_sha256": "f010337d9d8aa99ae1dc905cd46f68fecc66e42ce6868379f040b9149789128b",
+      "operations": 174,
+      "unsupported": 0
+    },
+    {
       "provider": "zendesk",
       "file_name": "zendesk.bundle.json",
       "bundle_sha256": "8a728057098f07f07f0ae5bdee9ece331ac5b8fc8c1e0a28e6060653496ef273",

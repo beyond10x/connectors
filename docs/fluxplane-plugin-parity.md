@@ -35,7 +35,7 @@ Sources:
   |---|---:|---|
   | gitlab | 2,541 | covered |
   | jira | 1,415 | covered |
-  | slack | 710 | missing |
+  | slack | 710 | covered |
   | sql | 663 | partial only |
   | grafana | 394 | missing |
   | loki | 334 | covered |
@@ -51,16 +51,16 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 29 | 2,659 | 20 | 2,659 |
+| covered | 37 | 3,389 | 28 | 3,389 |
 | partial | 23 | 1,273 | 16 | 1,273 |
-| missing | 249 | 2,424 | 73 | 2,424 |
+| missing | 241 | 1,694 | 65 | 1,694 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
 are mapped to the operation they most likely meant in [Used but not declared](#used-but-not-declared):
 
 - 122 calls are mapped from §4a and §4b, and 2 more from §4d.
-- 33 of them land on covered capabilities. The other 91 are added to the gap units.
+- 50 of them land on covered capabilities. The other 74 are added to the gap units.
 
 Per plugin (operations / calls):
 
@@ -68,7 +68,7 @@ Per plugin (operations / calls):
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 15 / 2,183 | 8 / 206 | 41 / 281 |
 | jira | 21 | 13 | 1,364 | 3 / 440 | 1 / 354 | 17 / 570 |
-| slack | 30 | 16 | 704 | 0 / 0 | 0 / 0 | 30 / 704 |
+| slack | 30 | 16 | 704 | 4 / 360 | 0 / 0 | 26 / 344 |
 | sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 0 / 0 | 0 / 0 | 20 / 425 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
@@ -91,16 +91,16 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **29 / 2,659** | **23 / 1,273** | **249 / 2,424** |
+| **total** | **301** | **109** | **6,356** | **37 / 3,389** | **23 / 1,273** | **241 / 1,694** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
 
 | verdict | plugins | count |
 |---|---|---:|
-| covered | gitlab, jira, confluence, kubernetes, tavily | 5 |
+| covered | gitlab, jira, confluence, kubernetes, loki, slack, tavily | 7 |
 | partial only | sql, websearch | 2 |
-| missing | slack, grafana, loki, homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 17 |
+| missing | grafana, homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 15 |
 | no operations declared | clock | 1 |
 
 ## Verdict rules
@@ -235,19 +235,22 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 
 Source: fluxplane inventory §2 slack.
 
-Connectors has no Slack provider: there is no `adapters/slack` directory and no catalog
-selection. The 2026-09-09 baseline already lists Slack as uncovered
-(`docs/recent-adapter-usage-20260909.md`, U12). The gap column names the Slack Web API method
-that would back each operation.
+Connectors serves Slack through the catalog provider since 2026-10-08,
+`adapters/catalog/providers/slack/operations.json` (line numbers below), from the pinned Slack
+Web API document (`docs/catalog-slack.md`). A saved connection uses the profile `slack.bot`: a
+bot token as `Authorization: Bearer`, proved by `GET /api/auth.test`. The three conversation
+reads are selected; every other row is still missing. The 2026-09-09 baseline listed Slack as
+uncovered (`docs/recent-adapter-usage-20260909.md`, U12). The gap column of a missing row names
+the Slack Web API method that would back it.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `slack.thread` | 225 | 50 | 2026-10-06 | — | missing | No provider. Would be backed by `conversations.replies`. |
+| `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13) | covered | One page per call; the caller follows `response_metadata.next_cursor`. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.message.send` | 132 | 30 | 2026-10-05 | — | missing | No provider. Would be backed by `chat.postMessage`, plus `conversations.open` for a direct message. |
-| `slack.message.list` | 92 | 34 | 2026-10-05 | — | missing | No provider. Would be backed by `conversations.history`. |
+| `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9) | covered | One page per call, windowed by `oldest` and `latest`. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.search` | 73 | 19 | 2026-10-05 | — | missing | No provider. Would be backed by `search.messages`, which needs a user token. |
 | `slack.user.list` | 41 | 17 | 2026-10-05 | — | missing | No provider. Would be backed by `users.list`. |
-| `slack.channel.list` | 40 | 20 | 2026-10-05 | — | missing | No provider. Would be backed by `conversations.list`. |
+| `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5) | covered | One page of at most 1,000 per call; no lookup by channel name. |
 | `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | No provider. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload. |
 | `slack.message.edit` | 20 | 8 | 2026-10-03 | — | missing | No provider. Would be backed by `chat.update`. |
 | `slack.info` | 15 | 8 | 2026-09-25 | — | missing | No provider. Would be backed by `auth.test` and `team.info`. |
@@ -256,7 +259,7 @@ that would back each operation.
 | `slack.file.delete` | 7 | 4 | 2026-09-29 | — | missing | No provider. Would be backed by `files.delete`. |
 | `slack.file.info` | 7 | 2 | 2026-09-29 | — | missing | No provider. Would be backed by `files.info`. |
 | `slack.file.list` | 3 | 1 | 2026-09-29 | — | missing | No provider. Would be backed by `files.list`. |
-| `slack.test` | 3 | 3 | 2026-09-26 | — | missing | No provider. Would be backed by `auth.test`. |
+| `slack.test` | 3 | 3 | 2026-09-26 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/auth.test` probe with the saved bot token. |
 | `slack.emoji.list` | 1 | 1 | 2026-09-28 | — | missing | No provider. Would be backed by `emoji.list`. |
 | `slack.bookmark.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.add`. |
 | `slack.bookmark.delete` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.remove`. |
@@ -743,7 +746,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.mr.note.list` (gitlab) | 3 | 2 | `gitlab.mr.discussion.list` | missing | U11 |
 | `gitlab.pipeline.show` (gitlab) | 3 | 3 | none declared (a single-pipeline read) | covered by `pipeline.get` (`adapters/catalog/providers/gitlab/operations.json:22`) | — |
 | `jira.search` (jira) | 3 | 1 | `jira.issue.search` | covered | — |
-| `slack.thread.replies` (slack) | 3 | 3 | `slack.thread` | missing | U02 |
+| `slack.thread.replies` (slack) | 3 | 3 | `slack.thread` | covered | — |
 | `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | missing | U02 |
 | `jira.issue.show` (atlassian) | 2 | 1 | `jira.issue.show` | partial | U03 |
 | `gitlab.commit.list` (gitlab) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
@@ -751,7 +754,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.pipeline.jobs` (gitlab) | 2 | 1 | `gitlab.job.list` | covered | — |
 | `gitlab.repository.compare` (gitlab) | 2 | 1 | `gitlab.compare` | covered | — |
 | `jira.issue.transition` (jira) | 2 | 2 | `jira.issue.transition.run` | missing | U07 |
-| `slack.auth.test` (slack) | 2 | 2 | `slack.test` | missing | U02 |
+| `slack.auth.test` (slack) | 2 | 2 | `slack.test` | covered | — |
 | `alertmanager.alerts.list` (alertmanager) | 1 | 1 | `alertmanager.alerts` | missing | U24 |
 | `sql` (fluxplane-plugin) | 1 | 1 | `sql.query` (inferred) | partial | U01 |
 | `gitlab.file.show` (gitlab) | 1 | 1 | `gitlab.repository.file.show` | covered | — |
@@ -772,13 +775,13 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `jira.issue.view` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
 | `k8s.pod.list` (kubernetes) | 1 | 1 | `kubernetes.pod.list` | covered | — |
 | `loki.query_range` (loki) | 1 | 1 | `loki.query` | covered | — |
-| `slack.conversation.list` (slack) | 1 | 1 | `slack.channel.list` | missing | U02 |
-| `slack.conversations.history` (slack) | 1 | 1 | `slack.message.list` | missing | U02 |
+| `slack.conversation.list` (slack) | 1 | 1 | `slack.channel.list` | covered | — |
+| `slack.conversations.history` (slack) | 1 | 1 | `slack.message.list` | covered | — |
 | `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | missing | U02 |
 | `slack.user.show` (slack) | 1 | 1 | `slack.user.list` | missing | U02 |
 | `sql.endpoints` (sql) | 1 | 1 | the `endpoint list` verb | covered (`adapters list`, `connections list`) | — |
-| `slack.message.list` (operation id in the plugin position, §4b) | 6 | 2 | `slack.message.list` | missing | U02 |
-| `slack.thread` (§4b) | 4 | 3 | `slack.thread` | missing | U02 |
+| `slack.message.list` (operation id in the plugin position, §4b) | 6 | 2 | `slack.message.list` | covered | — |
+| `slack.thread` (§4b) | 4 | 3 | `slack.thread` | covered | — |
 | `gitlab.repository.commit.list` (§4b) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
 | `jira.issue.show` (§4b) | 2 | 2 | `jira.issue.show` | partial | U03 |
 | `jira.issue.get` (§4b) | 1 | 1 | `jira.issue.show` | partial | U03 |
@@ -787,7 +790,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | missing | U10 |
 | `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | partial | U03 |
 
-In total, 124 calls are mapped: 33 covered and 91 to gap units. The rest of §4 is not
+In total, 124 calls are mapped: 50 covered and 74 to gap units. The rest of §4 is not
 attributed:
 
 - **§4c:** 55 calls whose operation sat in a variable with no literal id in the same command.
