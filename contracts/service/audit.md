@@ -35,7 +35,7 @@ one logical final observation:
 
 | Part | Safe fields | Meaning |
 |---|---|---|
-| Anchor | private `audit_record_ref`, public `audit_ref`, `instance_id`, `anchor_kind`, optional `activity`, `hop_role`, optional `request_id`, optional verified `principal_ref`, optional `operation_id`, optional `connection_ref`, optional `descriptor_revision`, `recorded_at`, optional `attempt_id` | Immutable facts known at the acknowledging hop. `attempt_id`, when present for a mutation, references the existing `AttemptRecord`; neither record owns or deletes the other. |
+| Anchor | private `audit_record_ref`, public `audit_ref`, `instance_id`, `anchor_kind`, optional `activity`, optional `access` (`read` or `write`), `hop_role`, optional `request_id`, optional verified `principal_ref`, optional `operation_id`, optional `connection_ref`, optional `descriptor_revision`, `recorded_at`, optional `attempt_id` | Immutable facts known at the acknowledging hop, except that an absent `attempt_id` may be set once by the attempt link below. `access` is `write` exactly when the admitted operation's host declaration includes `external_write`; a describe has none. `attempt_id`, when present for a mutation, references the existing `AttemptRecord`; neither record owns or deletes the other. |
 | Final observation | owner-allocated `observation_id`, `outcome`, optional safe `code`, `recorded_at` | Exactly one logical observation of the local hop's result. It contains no result body, provider message, secret, native target, input, credential, protected correlation or audit-export state. |
 
 `anchor_kind` is `admitted_execution` or `early_refusal`. An admitted invocation
@@ -52,8 +52,34 @@ deletion ownership. The independently retained Connection identity survives
 local revocation. Optional attempt and connection references must agree with
 the anchor's instance and, when both are present, with the attempt's connection.
 
-The lifecycle is `Anchored -> FinalObserved`. `Anchored` means the anchor write
-has a definite durable acknowledgement. It does not grant dispatch by itself;
+**Attempt link.** Where the anchor is acknowledged before the mutation's
+attempt exists ([v1alpha2 §4](v1alpha2/semantics.md#4-admission-and-execution-rules),
+rule 4), the anchor carries no `attempt_id`. After the attempt is recorded and
+before dispatch, the owner links it with `LinkAnchorAttempt`
+(`connectors.execution_audit`):
+
+1. Only an `Anchored` record with `access: write` can be linked. A read anchor,
+   a describe anchor or one without `access` refuses (`AttemptLinkRefused`) and
+   stays unchanged.
+2. A record with no `attempt_id` stores the supplied one; this is the only
+   change the link makes.
+3. Repeating the link with the same `attempt_id` changes nothing and answers
+   `AttemptLinkRepeated`, which the owner treats as the original link
+   acknowledgement; a different `attempt_id` refuses (`AttemptLinkConflict`)
+   and the first link stays. A record is linked to at most one attempt.
+4. A `FinalObserved` record refuses (`AuditStateConflict`). A store that fails
+   or does not answer refuses (`AttemptLinkUnavailable`) without a change.
+5. The linked attempt must agree with the anchor's instance and connection as
+   the paragraph above says. A link grants no dispatch, approval or replay
+   authority.
+6. A link that fails after the attempt is prepared grants no dispatch. The
+   owner aborts that attempt as `not_attempted`, answers `unavailable` with
+   zero provider calls, and keeps the anchor: its final observation records
+   the refusal, and the response carries that record's reference and status.
+
+The lifecycle is `Anchored -> FinalObserved`; the attempt link stays in
+`Anchored`. `Anchored` means the anchor write has a definite durable
+acknowledgement. It does not grant dispatch by itself;
 the current admission, attempt and dispatch owners retain their separate gates.
 `FinalObserved` means the one final observation was durably acknowledged. An
 unknown business outcome can still have a complete audit observation.
@@ -62,7 +88,12 @@ unknown business outcome can still have a complete audit observation.
 
 Every audited read, including successful describe, and every mutation requires
 an acknowledged `admitted_execution` anchor before provider or delegated-leaf
-dispatch. A failed or ambiguous anchor write grants no dispatch. The response
+dispatch. A failed or ambiguous anchor write grants no dispatch: the owner's
+decision is `capacity` (§4) or `unavailable` (the store fails or does not
+answer), and neither creates a record or placeholder. A write that was never
+answered may still have committed a record; no response references it, and it
+cannot satisfy a later gate. For a mutation the order is anchor, attempt,
+attempt link, dispatch, final observation. The response
 uses `audit_status: unavailable` and null `audit_ref` unless transport failure
 prevents a response. Unavailable is absence of an acknowledged anchor; no empty,
 placeholder or caller-proposed `AuditRecord` represents it.
@@ -148,13 +179,36 @@ export, search, retention-management or backend-selection API.
 - An early malformed/authentication refusal may record its known stage, but
   unverified request, principal, operation and connection coordinates remain
   absent and the record cannot satisfy an execution audit gate.
+- `audit-anchor-store-unavailable`: the store fails or does not answer the
+  anchor write, for a read and for a write → no record is referenced, no attempt
+  is recorded and no provider dispatch occurs; the response has `unavailable`
+  and a null reference.
+- `audit-link-attempt-once`: a write anchor is acknowledged, its attempt is
+  recorded and linked → the record's `attempt_id` names that attempt; the
+  record stays `Anchored` until its final observation.
+- `audit-link-attempt-repeat-unchanged`: the same link is repeated →
+  `AttemptLinkRepeated`, no change
+  and no second link.
+- `audit-link-attempt-conflict`: a link to another attempt after the first →
+  `AttemptLinkConflict`, the first `attempt_id` unchanged.
+- `audit-link-read-anchor-refused`: a link on a read, describe or
+  `access`-less anchor → `AttemptLinkRefused`, the record unchanged.
+- `audit-link-after-final-refused`: a link on a `FinalObserved` record →
+  `AuditStateConflict`, the record unchanged.
+- `audit-link-store-unavailable`: the store fails the link →
+  `AttemptLinkUnavailable`, the record unchanged.
+- `audit-link-failed-aborts-attempt`: the link fails after the write's attempt
+  is prepared → the attempt is aborted as `not_attempted`, no provider dispatch
+  occurs, the anchor stays and its final observation records the refusal.
 
 ## 6. ESS and implementation boundary
 
 `connectors.execution_audit.AuditRecord` models the private qualified identity,
 separate public ref, optional attempt/connection references, one-way lifecycle and bounded
-semantic values. ESS validates declared types, the instance/attempt references
-and state-transition causation. Cross-record instance/connection equality remains
+semantic values. `LinkAnchorAttempt` models the attempt link, and
+`AnchorDecision` the `allow`, `capacity` and `unavailable` answers. ESS
+validates declared types, the instance/attempt references, state-transition
+causation and the link's read-anchor, conflict, repeat and state answers. Cross-record instance/connection equality remains
 an owner predicate.
 It does not enforce optional-field co-presence, byte/count bounds, trusted fact
 provenance, durable acknowledgement, atomic uniqueness, exact-once append,

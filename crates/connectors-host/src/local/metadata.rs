@@ -23,6 +23,12 @@ const APPROVAL_POLICY_MIGRATION: &str = include_str!("metadata/approval_policy.s
 const REGISTRY_MIGRATION: &str = include_str!("metadata/registry.sql");
 const RUNTIME_MIGRATION: &str = include_str!("metadata/runtime.sql");
 const MUTATION_MIGRATION: &str = include_str!("metadata/mutations.sql");
+/// The level-4 schema before `mutation_attempts.connection_ref` became optional
+/// (an HTTP-host attempt names no connection). A physical store installed with
+/// it stays valid; every projection and every new installation uses the current
+/// text.
+const MUTATION_MIGRATION_CONNECTION_REQUIRED: &str =
+    include_str!("metadata/mutations-connection-required.sql");
 const AUDIT_MIGRATION: &str = include_str!("metadata/audit.sql");
 /// How long opening local metadata waits for another handle to release the
 /// lifecycle lock, or SQLite its write lock, before refusing with
@@ -1023,11 +1029,19 @@ impl Metadata {
         } else {
             version
         };
+        let earlier_mutations = migrations.iter().any(|(level, digest)| {
+            *level == 4
+                && *digest
+                    == hex::encode(Sha256::digest(
+                        MUTATION_MIGRATION_CONNECTION_REQUIRED.as_bytes(),
+                    ))
+        });
         validate_schema(
             &self.connection,
             expected_level,
             !recorded && version == er::LEVEL,
             recorded || !self.pooled,
+            earlier_mutations,
         )?;
         let mut expected = vec![(1, migration_digest())];
         if expected_level >= 2 {
@@ -1042,7 +1056,14 @@ impl Metadata {
         if expected_level >= 4 {
             expected.push((
                 4,
-                hex::encode(Sha256::digest(MUTATION_MIGRATION.as_bytes())),
+                hex::encode(Sha256::digest(
+                    if earlier_mutations {
+                        MUTATION_MIGRATION_CONNECTION_REQUIRED
+                    } else {
+                        MUTATION_MIGRATION
+                    }
+                    .as_bytes(),
+                )),
             ));
         }
         if expected_level >= 5 {
@@ -1076,7 +1097,13 @@ impl Metadata {
     }
 }
 
-fn validate_schema(connection: &Connection, level: i64, marker: bool, scan: bool) -> Result<()> {
+fn validate_schema(
+    connection: &Connection,
+    level: i64,
+    marker: bool,
+    scan: bool,
+    earlier_mutations: bool,
+) -> Result<()> {
     if scan {
         let integrity: String = connection
             .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
@@ -1100,6 +1127,11 @@ fn validate_schema(connection: &Connection, level: i64, marker: bool, scan: bool
         if next > level {
             break;
         }
+        let source = if next == 4 && earlier_mutations {
+            MUTATION_MIGRATION_CONNECTION_REQUIRED
+        } else {
+            source
+        };
         expected.execute_batch(source).map_err(unavailable)?;
     }
     if marker {
@@ -1660,6 +1692,7 @@ mod tests {
                     instance_id: "instance".into(),
                     kind: crate::local::audit::Kind::AdmittedExecution,
                     activity: Some(crate::local::audit::Activity::Invoke),
+                    access: None,
                     hop: crate::local::audit::Hop::Execution,
                     stage: crate::local::audit::Stage::Admission,
                     request_id: Some("request".into()),

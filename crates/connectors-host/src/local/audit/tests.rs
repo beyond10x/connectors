@@ -44,6 +44,7 @@ pub(crate) fn anchor() -> Anchor {
         instance_id: "alpha".into(),
         kind: Kind::AdmittedExecution,
         activity: Some(Activity::Invoke),
+        access: None,
         hop: Hop::Execution,
         stage: Stage::Admission,
         request_id: Some("request".into()),
@@ -226,6 +227,7 @@ fn early_refusal_and_malformed_or_mismatched_facts_cannot_satisfy_the_gate() {
         kind: Kind::EarlyRefusal,
         stage: Stage::Decoding,
         activity: None,
+        access: None,
         principal_ref: None,
         request_id: None,
         operation_id: None,
@@ -521,8 +523,8 @@ fn candidate() -> mutations::Candidate {
                 adapter: "adapter".into(),
                 operation: "operation".into(),
             },
-            connection_ref: "connection".into(),
-            connection_revision: "revision".into(),
+            connection_ref: Some("connection".into()),
+            connection_revision: Some("revision".into()),
             contract_ref: "operations/v1alpha1".into(),
             profile: "mutation".into(),
             descriptor_revision: "descriptor".into(),
@@ -1021,4 +1023,78 @@ fn recovery_budget_expiring_after_first_read_prevents_retry() {
             .final_observation
             .is_none()
     );
+}
+
+fn prepared_attempt(ledger: &mutations::Store<TestClock>, request_id: &str) -> mutations::Prepared {
+    let mut keyless = candidate();
+    keyless.caller_key = None;
+    keyless.request_id = request_id.into();
+    match ledger.prepare(&keyless).unwrap() {
+        mutations::Preparation::Prepared(value) => value,
+        _ => panic!("a keyless candidate prepares a new attempt"),
+    }
+}
+
+/// contracts/service/audit.md § 1, Attempt link; scenarios
+/// `audit-link-attempt-once`, `-repeat-unchanged`, `-conflict`,
+/// `audit-link-read-anchor-refused`, `audit-link-after-final-refused` and
+/// `audit-link-store-unavailable`.
+#[test]
+fn attempt_link_is_once_per_write_anchor_and_refuses_everything_else() {
+    let (root, store) = fixture();
+    let ledger =
+        mutations::Store::new(root.path(), TestClock, mutations::Limits::default()).unwrap();
+    let first = prepared_attempt(&ledger, "first").reference().attempt_id;
+    let second = prepared_attempt(&ledger, "second").reference().attempt_id;
+    let mut write = anchor();
+    write.access = Some(Access::Write);
+    let linked = store
+        .confirm(receipt(store.anchor(&write).unwrap()), &write)
+        .unwrap();
+    assert_eq!(store.link(&linked, first).unwrap(), Linked::Linked);
+    let once = store.observe(&linked).unwrap().unwrap();
+    assert_eq!(once.anchor.attempt_id, Some(first));
+    assert_eq!(once.final_observation, None);
+    assert_eq!(store.link(&linked, first).unwrap(), Linked::Repeated);
+    assert_eq!(store.link(&linked, second), Err(Failure::Conflict));
+    assert_eq!(store.observe(&linked).unwrap().unwrap(), once);
+
+    // Only a write anchor links; a read or an access-less anchor stays as it was.
+    for access in [Some(Access::Read), None] {
+        let mut other = anchor();
+        other.access = access;
+        let reference = store
+            .confirm(receipt(store.anchor(&other).unwrap()), &other)
+            .unwrap();
+        let before = store.observe(&reference).unwrap().unwrap();
+        assert_eq!(store.link(&reference, second), Err(Failure::Refused));
+        assert_eq!(store.observe(&reference).unwrap().unwrap(), before);
+    }
+
+    // A record with its final observation is never linked.
+    let finished = store
+        .confirm(receipt(store.anchor(&write).unwrap()), &write)
+        .unwrap();
+    store.append(&finished, &final_value()).unwrap();
+    let before = store.observe(&finished).unwrap().unwrap();
+    assert_eq!(store.link(&finished, second), Err(Failure::StateConflict));
+    assert_eq!(store.observe(&finished).unwrap().unwrap(), before);
+
+    // A store that fails leaves the record unlinked.
+    let unlinked = store
+        .confirm(receipt(store.anchor(&write).unwrap()), &write)
+        .unwrap();
+    store.fault.store(1, Ordering::SeqCst);
+    assert_eq!(
+        store.link(&unlinked, second),
+        Err(Failure::MetadataUnavailable)
+    );
+    assert_eq!(
+        store.observe(&unlinked).unwrap().unwrap().anchor.attempt_id,
+        None
+    );
+    // The linked attempt survives a reopen of the recorded authority.
+    drop(store);
+    let reopened = Store::new(root.path(), 100_000).unwrap();
+    assert_eq!(reopened.observe(&linked).unwrap().unwrap(), once);
 }

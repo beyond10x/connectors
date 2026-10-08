@@ -6,7 +6,7 @@ INSERT INTO mutation_clock VALUES (1,0);
 CREATE TABLE mutation_attempts (
   attempt_id TEXT PRIMARY KEY,
   instance_id TEXT NOT NULL REFERENCES registry_instances(instance_id),
-  connection_ref TEXT NOT NULL REFERENCES registry_connections(connection_ref),
+  connection_ref TEXT REFERENCES registry_connections(connection_ref),
   request_id TEXT NOT NULL CHECK(length(CAST(request_id AS BLOB)) BETWEEN 1 AND 256),
   fingerprint TEXT NOT NULL CHECK(length(CAST(fingerprint AS BLOB))<=16384),
   approval_mode TEXT NOT NULL CHECK(approval_mode IN ('not_required','required','event_claim')),

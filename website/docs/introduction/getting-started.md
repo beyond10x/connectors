@@ -64,6 +64,29 @@ The client discovers the current descriptor before invoking. Through the example
 
 Read the [service contract](/contracts/service) for exact limits and result semantics. Choose an [adapter](/adapters) for provider-specific boundaries. Local reproduction and full-gate instructions remain in the source checkout’s development guides.
 
+## Learn which attempt a write produced
+
+A service host whose `service` configuration names a private `state` directory
+(`urn:connectors:config:v2:service`) also serves `POST /v1alpha2/invoke`, the first
+v1alpha2 binding. Without `state` that route answers `unavailable` and only `/v1/*` is
+served. Describe stays on `GET /v1/describe`; the request carries that descriptor's
+`revision`.
+
+Every admitted invocation on this route is anchored in the host's execution audit before
+dispatch, and the answer carries `audit_ref` and `audit_status`. An operation that writes
+also gets an attempt record before its one dispatch, and the answer's `mutation` names it:
+`attempt: {instance, id}`, the `original_request_id`, `replayed: false` and the
+`classification` (`applied` on success). A write whose answer is lost after dispatch is
+`outcome_unknown` with its attempt, and is not dispatched again. Reads carry no `mutation`.
+
+From Rust, `connectors_client::Client::invoke_v1alpha2` selects this binding and returns the
+result value with the optional `MutationObservation`; a failure keeps the `mutation` when the
+host recorded an attempt. The client never retries on `/v1/invoke`: an older service that
+does not serve the route is reported as `unsupported`. `Client::invoke` and the `connectors
+invoke` command stay on the unchanged `/v1/invoke` binding. The Kubernetes and PostgreSQL
+operations above are reads, so they carry no `mutation`. See
+[service compatibility](/contracts/compatibility) for the binding's exact rules.
+
 ## Check the local approval clock
 
 For an existing local CLI configuration with adapter alias `forge`, the optional
