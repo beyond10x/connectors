@@ -15,32 +15,47 @@ types:
     invariants:
       - required_equalities.count == 0
 
+  # A connection instance id: the host's identifier alphabet, 1–128 characters.
+  - name: connectors_loki.connection.InstanceId
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"
+    invariants:
+      - value.count: {gte: 1, lte: 128}
+
   # The owner-only native file named by `--local-config`. No credential is a member.
-  # `base_url` is an HTTPS origin, optionally with a path prefix; `ca_file` is an absolute
-  # path to an owner-only PEM bundle that replaces the system roots for this connection.
+  # `base_url` is an HTTPS origin, optionally with a path prefix, written in its canonical
+  # form; `ca_file`, when present, is an absolute path to an owner-only PEM bundle that
+  # replaces the system roots for this connection (absent, never null).
   - name: connectors_loki.connection.LocalConfiguration
     kind: struct
     fields:
       - {name: format, type: String}
-      - {name: instance, type: String}
+      - {name: instance, type: connectors_loki.connection.InstanceId}
       - {name: base_url, type: String}
       - {name: ca_file, type: "Optional<String>"}
       - {name: query_scope, type: connectors_loki.connection.QueryScope}
     invariants:
       - format == "connectors-loki-local/1"
-      - instance.count: {gte: 1, lte: 128}
       - base_url.count: {gte: 8, lte: 512}
       - base_url: {starts_with: "https://"}
       - ca_file.count: {gte: 1, lte: 4096}
+
+  # A bearer token: 1–8,192 visible ASCII characters (0x21–0x7E), so no space, control
+  # or non-ASCII character.
+  - name: connectors_loki.connection.BearerToken
+    kind: newtype
+    of: String
+    alphabet: '!"#$%&''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~'
+    invariants:
+      - value.count: {gte: 1, lte: 8192}
 
   # The protected entry of `loki.bearer`: the token sent as `Authorization: Bearer <token>`.
   # It enters through the host's protected entry and custody, never the configuration.
   - name: connectors_loki.connection.BearerEntry
     kind: struct
     fields:
-      - {name: token, type: String}
-    invariants:
-      - token.count: {gte: 1, lte: 8192}
+      - {name: token, type: connectors_loki.connection.BearerToken}
 
   # Where the identity subject comes from. Loki has no user or account read, so the only
   # source is `configuration`: the probe's 200 proves the credential, its body is not used,
@@ -89,6 +104,11 @@ types:
       - evidence_lifetime_ms == 60000
       - entry == "connectors_loki.connection.BearerEntry"
 
-# ESS-LIMIT: that `ca_file` is absolute and owner-only, that `base_url` is a canonical
-# origin without credentials, query or fragment, and that the subject equals the sibling
-# `instance` are checked by the composition, not expressible as invariants here.
+# ESS-LIMIT: these are checked by the composition, not expressible as invariants here, and
+# the composition only ever refuses more than the model on them (tests/ess_model.rs asserts
+# each): that `ca_file` names an existing absolute owner-only file; that `base_url` is
+# already its own canonical form (WHATWG URL serialization: lowercase scheme and host, a
+# path ending in `/`, no credentials, query or fragment); and that the subject equals the
+# sibling `instance`. `alphabet:` is carried into the generated schemas as
+# `x-ess-alphabet`, not as a JSON Schema keyword, so a JSON Schema validator alone does not
+# enforce it.

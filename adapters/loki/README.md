@@ -26,7 +26,7 @@ Create an owner-only native JSON file, in an admitted directory without symlinks
 }
 ```
 
-`base_url` must be HTTPS; a path prefix, for a gateway that serves Loki below one, is kept.
+`base_url` must be HTTPS and written in canonical form: lowercase `https://` and host, ending in `/`, at most 512 characters; a path prefix, for a gateway that serves Loki below one, is kept.
 `ca_file` may name an owner-only PEM bundle that replaces the system roots, for a deployment
 with a private CA. `query_scope` is required and admits only the empty list: every query
 reads the whole tenant the token reaches. The token is never part of this file, of the TOML

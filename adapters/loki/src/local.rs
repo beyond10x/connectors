@@ -33,8 +33,16 @@ struct Configuration {
     format: String,
     instance: String,
     base_url: String,
+    /// Absent or a path; an explicit `null` is refused, as the model's
+    /// `Optional<String>` refuses it.
+    #[serde(default, deserialize_with = "present")]
     ca_file: Option<PathBuf>,
     query_scope: QueryScope,
+}
+fn present<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> std::result::Result<Option<PathBuf>, D::Error> {
+    PathBuf::deserialize(deserializer).map(Some)
 }
 
 pub struct Local {
@@ -59,9 +67,15 @@ impl Local {
         if !config.query_scope.required_equalities.is_empty() {
             return Err(Failure::InvalidConfiguration);
         }
+        // The model (`LocalConfiguration`) admits only a literal `https://` URL of at most 512
+        // characters; this composition further requires it to be written in its canonical
+        // form (ESS-LIMIT in connection.yaml), so nothing the model refuses is admitted here.
         let base = connectors_host::http::canonical_base(&config.base_url)
             .map_err(Failure::from_service)?;
-        if !base.starts_with("https://") {
+        if !config.base_url.starts_with("https://")
+            || config.base_url.chars().count() > 512
+            || base != config.base_url
+        {
             return Err(Failure::InvalidConfiguration);
         }
         let ca = config

@@ -339,11 +339,13 @@ schemas and invariants that model generates.
   configuration's `instance`. Any token the deployment accepts is the same identity, and a
   repair cannot detect a token of another tenant or deployment. Use one `instance` per
   deployment and tenant.
-- **Configuration.** The owner-only file `connectors-loki-local/1` names `instance`,
-  an HTTPS `base_url`, an optional owner-only PEM `ca_file` that replaces the system roots,
-  and the explicit `query_scope` of §11.3. Plaintext HTTP is refused. The configuration
-  revision covers the canonical base URL and the CA file's digest, so a changed CA refuses
-  the cached launch.
+- **Configuration.** The owner-only file `connectors-loki-local/1` names `instance` (1–128
+  characters of `A–Z a–z 0–9 _ . -`), an HTTPS `base_url` of at most 512 characters written
+  in its canonical form (lowercase `https://` and host, a path ending in `/`, no credentials,
+  query or fragment), an optional owner-only PEM `ca_file` at an absolute path that replaces
+  the system roots (absent, never `null`), and the explicit `query_scope` of §11.3.
+  Plaintext HTTP is refused. The configuration revision covers the base URL and the CA
+  file's digest, so a changed CA refuses the cached launch.
 - **Not served.** `loki.anonymous`: the local host admits only profiles with at least one
   entry field and a bearer, basic, mTLS or session scheme, and this binding does not widen
   that. `loki.basic` and `loki.via_parent` are not implemented.

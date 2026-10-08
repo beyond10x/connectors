@@ -99,14 +99,30 @@ fn conforms(schema: &Value, document: &Value) -> Result<(), String> {
 
 fn check(schema: &Value, name: &str, document: &Value) -> Result<(), String> {
     let definition = &schema["$defs"][name];
+    // A newtype's invariants read `value`, the representation it wraps.
+    let subject = if definition["x-ess-kind"] == "newtype" {
+        json!({ "value": document })
+    } else {
+        document.clone()
+    };
     for invariant in definition["x-ess-invariants"]
         .as_array()
         .into_iter()
         .flatten()
     {
         let invariant = invariant.as_str().unwrap();
-        if !holds(document, invariant) {
+        if !holds(&subject, invariant) {
             return Err(format!("{name}: {invariant}"));
+        }
+    }
+    // `alphabet:` reaches the schema only as this annotation, which no JSON
+    // Schema validator enforces.
+    if let Some(alphabet) = definition["x-ess-alphabet"].as_str() {
+        let text = document
+            .as_str()
+            .ok_or_else(|| format!("{name}: not text"))?;
+        if let Some(c) = text.chars().find(|c| !alphabet.contains(*c)) {
+            return Err(format!("{name}: {c:?} is outside its alphabet"));
         }
     }
     for (key, property) in definition["properties"].as_object().into_iter().flatten() {
@@ -139,7 +155,7 @@ fn bootstrap(directory: &Path, configuration: &Value) -> Option<Bootstrap> {
 }
 
 #[test]
-fn the_executable_admits_exactly_the_configurations_the_model_admits() {
+fn the_executable_refuses_what_the_model_refuses_and_more_only_at_the_recorded_limit() {
     let root = tempfile::tempdir().unwrap();
     let schema = schema(root.path(), "LocalConfiguration");
     let ca = root.path().join("ca.pem");
@@ -182,12 +198,63 @@ fn the_executable_admits_exactly_the_configurations_the_model_admits() {
         // No credential is ever a configuration member.
         json!({"format": "connectors-loki-local/1", "instance": "loki-prod", "token": "fixture",
             "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
+        // The instance alphabet and length.
+        json!({"format": "connectors-loki-local/1", "instance": "loki prod",
+            "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "lökì",
+            "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "a".repeat(129),
+            "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
+        // The literal lowercase scheme, and at most 512 characters.
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod",
+            "base_url": "HTTPS://loki.example/", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod",
+            "base_url": format!("https://loki.example/{}/", "a".repeat(491)),
+            "query_scope": {"required_equalities": []}}),
+        // `ca_file` is absent or a path, never null or empty.
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod", "ca_file": null,
+            "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod", "ca_file": "",
+            "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
     ];
     for document in &refused {
         assert!(
             conforms(&schema, document).is_err(),
             "model admits {document}"
         );
+        assert!(
+            bootstrap(root.path(), document).is_none(),
+            "executable admits {document}"
+        );
+    }
+    // The 512-character edge is admitted by both.
+    let mut longest = base.clone();
+    longest["base_url"] = json!(format!("https://loki.example/{}/", "a".repeat(490)));
+    assert_eq!(longest["base_url"].as_str().unwrap().chars().count(), 512);
+    conforms(&schema, &longest).unwrap();
+    assert!(bootstrap(root.path(), &longest).is_some());
+
+    // The model's ESS-LIMIT, asserted: on these the model cannot speak, and only
+    // the executable refuses. Never the other way round.
+    let limit: Vec<Value> = vec![
+        // Not the canonical form: the trailing `/` and lowercase host are missing.
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod",
+            "base_url": "https://loki.example", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod",
+            "base_url": "https://Loki.example/", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod",
+            "base_url": "https://user@loki.example/", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod",
+            "base_url": "https://loki.example/?tenant=a", "query_scope": {"required_equalities": []}}),
+        // `ca_file` relative, or absent from disk.
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod", "ca_file": "ca.pem",
+            "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
+        json!({"format": "connectors-loki-local/1", "instance": "loki-prod",
+            "ca_file": root.path().join("missing.pem").to_str().unwrap(),
+            "base_url": "https://loki.example/", "query_scope": {"required_equalities": []}}),
+    ];
+    for document in &limit {
+        conforms(&schema, document).unwrap_or_else(|e| panic!("{document}: {e}"));
         assert!(
             bootstrap(root.path(), document).is_none(),
             "executable admits {document}"
@@ -261,4 +328,28 @@ fn the_advertised_profile_and_its_identity_probe_are_the_modelled_ones() {
     );
     assert!(auth::ProtectedEntry::parse(br#"{"token":""}"#.to_vec()).is_err());
     assert!(auth::ProtectedEntry::parse(br#"{"token":"a","extra":1}"#.to_vec()).is_err());
+
+    // The modelled token alphabet is the parser's: visible ASCII, 0x21–0x7E.
+    let every_visible: String = (0x21u8..=0x7e).map(char::from).collect();
+    for (token, admitted) in [
+        (every_visible.as_str(), true),
+        ("~", true),
+        ("fixture token", false),
+        ("fixture\ttoken", false),
+        ("fixture\u{7f}", false),
+        ("fïxture", false),
+        ("fixture\n", false),
+    ] {
+        let document = json!({ "token": token });
+        assert_eq!(
+            conforms(&entry_schema, &document).is_ok(),
+            admitted,
+            "model on {document}"
+        );
+        assert_eq!(
+            auth::ProtectedEntry::parse(serde_json::to_vec(&document).unwrap()).is_ok(),
+            admitted,
+            "parser on {document}"
+        );
+    }
 }
