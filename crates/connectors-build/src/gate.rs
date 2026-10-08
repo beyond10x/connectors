@@ -127,7 +127,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         return Err("incomplete Cargo formatting selection".into());
     }
     execute(format.args(["--", "--check"]))?;
-    for adapter in ["kubernetes", "loki", "sql", "tavily"] {
+    for adapter in ["grafana", "kubernetes", "loki", "sql", "tavily"] {
         let source = root.join(format!("adapters/{adapter}/spec/adapter.json"));
         let descriptor = connectors_spec::compile(&std::fs::read(source)?)?;
         if connectors_spec::descriptor_bytes(&descriptor)?
@@ -151,7 +151,14 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "warnings",
     ]))?;
     execute(&mut docs_check(root, temp.path(), ess)?)?;
-    for adapter in ["kubernetes", "loki", "sql", "tavily", "catalog-provider"] {
+    for adapter in [
+        "grafana",
+        "kubernetes",
+        "loki",
+        "sql",
+        "tavily",
+        "catalog-provider",
+    ] {
         let package = format!("connectors-{adapter}");
         execute(command(None)?.args([
             "build",
@@ -178,6 +185,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         for name in [
             "connectors-host",
             "connectors-client",
+            "connectors-grafana",
             "connectors-kubernetes",
             "connectors-loki",
             "connectors-sql",
@@ -209,7 +217,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         matches!(
             line.split_whitespace().next(),
             Some(
-                "connectors-kubernetes"
+                "connectors-grafana"
+                    | "connectors-kubernetes"
                     | "connectors-loki"
                     | "connectors-sql"
                     | "connectors-tavily"
@@ -248,6 +257,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         }
         for package in [
             "connectors-catalog-provider",
+            "connectors-grafana",
             "connectors-kubernetes",
             "connectors-loki",
             "connectors-sql",

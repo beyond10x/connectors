@@ -316,6 +316,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "adapters/loki/tests/local_runtime.rs::each_read_answers_through_the_private_runtime_from_the_recorded_answers",
         "/docs/reference/adapters/loki",
     ),
+    shipped(
+        "Native adapters",
+        "Grafana data sources",
+        "datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (unreleased).",
+        "adapters/grafana/tests/local_runtime.rs::the_datasource_list_answers_through_the_private_runtime_from_the_recorded_answer",
+        "/docs/reference/adapters/grafana",
+    ),
     planned(
         "Native adapters",
         "Kubernetes permission checks",
@@ -331,7 +338,7 @@ pub const CAPABILITIES: &[Capability] = &[
     decided(
         "Native adapters",
         "Specification-only adapters",
-        "Atlassian native documents, Docker, Grafana, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime.",
+        "Atlassian native documents, Docker, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
         "/docs/reference/adapters",
     ),
     planned(
