@@ -337,19 +337,21 @@ Alertmanager. So a Grafana-proxied query needs both the Grafana route and the ch
 
 Source: fluxplane inventory §2 loki.
 
-Connectors has no Loki runtime. `adapters/loki` holds `design.md`, an ESS model and the
-`logql-range` contract. The baseline records two limits of that contract
-(`docs/recent-adapter-usage-20260909.md`, U07):
-
-- It excludes metric (sample) expressions.
-- It has no label discovery.
+Connectors has no Loki executable. `adapters/loki` holds `design.md`, an ESS model, the
+`logql-range` contract and, since 2026-10-08, a library binding of three operations tested
+against recorded provider answers (`adapters/loki/contracts/logs/v1alpha1/semantics.md` §11).
+The baseline's two limits of the contract (`docs/recent-adapter-usage-20260909.md`, U07),
+no metric expressions and no label discovery, are closed by §11. No operation is reachable
+through `operations invoke` yet: the local host admits no profile without a credential
+(`loki.anonymous`), and `loki.bearer` needs the identity-validation mechanism
+`adapters/loki/design.md` leaves open.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `loki.query` | 313 | 8 | 2026-09-30 | — | missing | No runtime. A LogQL log-range query is specified but not implemented. |
-| `loki.metric` | 40 | 3 | 2026-09-24 | — | missing | No runtime. The specified contract excludes metric queries. |
-| `loki.labels` | 11 | 4 | 2026-09-24 | — | missing | No runtime. Label discovery is not specified. |
-| `loki.test` | 6 | 4 | 2026-09-28 | — | missing | No Loki connection. |
+| `loki.query` | 313 | 8 | 2026-09-30 | — | missing | No connection. The library binds `logs.query_range` (`adapters/loki/spec/adapter.json:52`), unpaged, at most 1,000 lines. |
+| `loki.metric` | 40 | 3 | 2026-09-24 | — | missing | No connection. The library binds `logs.query_metric` (`adapters/loki/spec/adapter.json:251`), instant and range. |
+| `loki.labels` | 11 | 4 | 2026-09-24 | — | missing | No connection. The library binds `logs.labels` (`adapters/loki/spec/adapter.json:421`), names and values. |
+| `loki.test` | 6 | 4 | 2026-09-28 | — | missing | No Loki connection, so no `connections revalidate`. |
 | `loki.recent_logs` | 0 | 0 | - | — | missing | No runtime. |
 
 ## kubernetes
