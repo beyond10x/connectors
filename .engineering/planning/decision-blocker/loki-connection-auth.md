@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:loki-connection-auth
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided how the local host serves a Loki connection
 relations:
 - blocks: story:parity-loki-query
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-08T19:36:57Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -29,3 +31,16 @@ on branch `unit/loki-query-20261008d` (28d72d124: ESS additions, contract sectio
 
 Recommended: B first. It reuses the identity source 0.36.0 shipped for Runpod and needs no host
 change; A follows when an anonymous deployment is in use.
+
+## Decision
+
+Decided 2026-10-08: option B.
+
+- Loki connects through the admitted `http_bearer` scheme.
+- Its adapter answers the configured identity probe: `GET /loki/api/v1/labels` must return 200;
+  the subject is the configuration's instance id.
+- No host admission change.
+
+Option A (a credential-free scheme, which would widen host admission at
+`crates/connectors-host/src/local/runtime.rs:589-596`) is drafted as
+`story:loki-credential-free-connection`, not planned.
