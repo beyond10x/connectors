@@ -1,47 +1,11 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
+use connectors::compat::{Args, Command};
 use connectors_host::{
     credentials::CredentialRef,
     federation::{Federation, FederationConfig},
 };
 use connectors_sdk::Credential;
 use std::{ffi::OsString, path::PathBuf, sync::Arc};
-
-#[derive(Parser)]
-#[command(about = "Discover and invoke independently hosted connector contracts")]
-struct Args {
-    /// Output for parse refusals; successful results stay raw JSON.
-    #[arg(long, global = true, value_parser = ["human", "json"], default_value = "human")]
-    output: String,
-    #[command(subcommand)]
-    command: Command,
-}
-#[derive(Subcommand)]
-enum Command {
-    Describe {
-        #[arg(long)]
-        endpoint: String,
-        #[arg(long)]
-        token_file: PathBuf,
-        #[arg(long)]
-        allow_plaintext: bool,
-    },
-    Invoke {
-        #[arg(long)]
-        endpoint: String,
-        #[arg(long)]
-        token_file: PathBuf,
-        #[arg(long)]
-        allow_plaintext: bool,
-        #[arg(long)]
-        operation: String,
-        #[arg(long)]
-        input: PathBuf,
-    },
-    Serve {
-        #[arg(long)]
-        config: PathBuf,
-    },
-}
 
 /// Bash completion for the explicit service commands, appended to the generated
 /// script. The generated function `_connectors` stays verbatim; a routing

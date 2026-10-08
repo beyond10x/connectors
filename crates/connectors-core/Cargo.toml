@@ -1,5 +1,6 @@
 [package]
 name = "connectors-core"
+description = "Provider-independent operation and service wire contracts: descriptors, requests, results, errors and limits."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

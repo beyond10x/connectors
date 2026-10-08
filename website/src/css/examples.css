@@ -1,3 +1,12 @@
+/* The example components' local names for the shared docs-system tokens. */
+:root {
+  --site-line: var(--b10x-color-line);
+  --site-muted: var(--b10x-color-muted);
+  --site-card: var(--b10x-color-surface);
+  --site-soft: var(--b10x-color-surface-muted);
+  --site-on-primary: var(--b10x-color-on-accent);
+}
+
 .contract-lab {
   border: 1px solid var(--site-line);
   border-radius: 12px;
@@ -1154,4 +1163,10 @@
 .journey-tabs {
   border-radius: 13px 13px 0 0;
   overflow: hidden
+}
+
+.contract-lab .eyebrow {
+  font: 700 .75rem/1.5 var(--b10x-font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
 }

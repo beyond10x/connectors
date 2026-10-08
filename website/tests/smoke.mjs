@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 
-const base=process.env.CONNECTORS_WEBSITE_URL??'http://127.0.0.1:3100';
+const base=(process.env.CONNECTORS_WEBSITE_URL??'http://127.0.0.1:3100').replace(/\/$/,'')+'/connectors';
 const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});
 const errors=[];
@@ -13,24 +13,20 @@ function state(label){return page.locator('.lab-state').filter({has:page.locator
 try{
   await visit('/');
   assert.match(await page.locator('h1').innerText(),/Independent integrations/);
-  for(const label of ['Home / Introduction','Contracts','Adapters'])assert.equal(await page.locator('.navbar').getByRole('link',{name:label,exact:true}).count(),1);
+  for(const label of ['Documentation','Contracts','Adapters','Status'])assert.equal(await page.locator('.navbar').getByRole('link',{name:label,exact:true}).count(),1);
   // With system preference enabled the switch cycles system → light → dark.
   for(let i=0;i<3&&await page.locator('html').getAttribute('data-theme')!=='dark';i++)await page.getByRole('button',{name:/Switch between dark and light mode/}).click();
   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
   await page.getByRole('button',{name:/Switch between dark and light mode/}).click();
-  await visit('/contracts/auth/connection#41-connection-viability-and-operation-eligibility');
+  await visit('/docs/reference/contracts/auth/connection#41-connection-viability-and-operation-eligibility');
   assert.equal(await page.locator('[id="41-connection-viability-and-operation-eligibility"]').count(),1);
-  assert.match(await page.locator('.canonical-contract').innerText(),/Unknown and unavailable never become positive evidence/);
-  assert.doesNotMatch(await page.locator('.reference-article').innerText(),/\/home\/|\.local\/|\.engineering\//);
-  await visit('/contracts/model/domains/connectors-mutations');
-  const link=page.getByRole('link',{name:'Connection',exact:true});
-  if(await link.count())assert.match(await link.first().getAttribute('href'),/connectors-auth_bindings#connection$/);
-  const diagram=page.locator('.model-diagram').first();
-  if(await diagram.count()){
-    if(await diagram.getAttribute('open')===null)await diagram.locator('summary').first().click();
-    await diagram.locator('svg').first().waitFor({state:'visible'});
-  }
-  await visit('/introduction/examples');
+  const article=await page.locator('article').innerText();
+  assert.match(article,/Unknown and unavailable never become positive evidence/);
+  assert.doesNotMatch(article,/\/home\/|\.local\/|\.engineering\//);
+  await visit('/docs/reference/contracts/model/domains/connectors-mutations');
+  assert(await page.locator('article a[href$="connectors-auth_bindings#connection"]').count()>0,'model pages link the declarations they reference');
+  await page.locator('.docusaurus-mermaid-container svg').first().waitFor({state:'visible'});
+  await visit('/docs/examples/follow-a-request');
   await page.getByRole('button',{name:'Play',exact:true}).waitFor();
   const progress=()=>page.locator('.journey-progress').innerText();
   const heading=()=>page.locator('.journey-explanation h2').innerText();
@@ -68,7 +64,7 @@ try{
   assert(await page.locator('.journey-explanation>p').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=16));
   assert(await page.locator('[data-node="client"]>strong').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=14));
   await page.emulateMedia({reducedMotion:'no-preference'});
-  await visit('/contracts/examples');
+  await visit('/docs/examples/contract-exercises');
   await page.getByRole('button',{name:/Next guided step/}).waitFor({state:'visible'});
   await guided(8);
   assert.equal(await state('OPERATION ELIGIBILITY').innerText(),'eligible');
@@ -94,21 +90,21 @@ try{
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'home horizontal overflow');
   await page.getByRole('button',{name:/Toggle navigation bar/}).click();
   await page.locator('.navbar-sidebar').getByRole('link',{name:'Contracts',exact:true}).click();
-  await page.waitForURL(base+'/contracts');
-  await visit('/contracts/examples');
+  await page.waitForURL(base+'/docs/reference/contracts');
+  await visit('/docs/examples/contract-exercises');
   await page.getByRole('button',{name:/Next guided step/}).waitFor({state:'visible'});
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'lab horizontal overflow');
   await page.route('**/examples/contracts.wasm',route=>route.fulfill({status:404,body:'Missing module'}));
-  await visit('/contracts/examples');
+  await visit('/docs/examples/contract-exercises');
   await page.getByRole('alert').filter({hasText:'could not be loaded'}).waitFor();
   await click('02 · Readiness');
   assert.match(await page.getByRole('alert').innerText(),/could not be loaded/);
   assert.equal(await page.getByRole('button',{name:/Next guided step/}).count(),0,'unavailable module must not fabricate execution');
-  await visit('/introduction/examples');
+  await visit('/docs/examples/follow-a-request');
   await page.getByRole('alert').filter({hasText:'walkthrough could not be loaded'}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Play',exact:true}).count(),0);
   await page.unroute('**/examples/contracts.wasm');
-  await visit('/introduction/examples');await page.getByRole('button',{name:'Play',exact:true}).waitFor();
+  await visit('/docs/examples/follow-a-request');await page.getByRole('button',{name:'Play',exact:true}).waitFor();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'walkthrough horizontal overflow');
   await page.getByRole('button',{name:'Next',exact:true}).focus();await page.keyboard.press('Enter');assert.match(await page.locator('.journey-progress').innerText(),/Step 1 /);
   assert.deepEqual(errors,[],'browser runtime errors');

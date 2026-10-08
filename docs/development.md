@@ -16,7 +16,8 @@ and the Eventlog-backed runtime roots on installed Rust 1.91.0. The Rust gate ru
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
 independent adapter-model compilation, the website examples model synthesis
-(`connectors-build examples` without its WASM build) and AEP validation. It uses a task-owned temporary directory under
+(`connectors-build examples` without its WASM build), the drift check of the documentation
+site's generated pages (`connectors-docs generate --check`) and AEP validation. It uses a task-owned temporary directory under
 `.local/tmp`. The owner tests bind and connect Unix sockets inside it through a descriptor
 on the state directory (`/proc/self/fd/<fd>/owner.sock`), as the host does, so a long
 checkout path, such as a managed worktree under `~/.local/state/worktree/trees/…`, does not
@@ -212,20 +213,31 @@ its own subdirectory there; the supplied directory, reports and logs remain.
 
 ## Documentation website
 
-The local Docusaurus site combines authored guides, canonical contract views, ESS
-model reference and Rust/WASM examples. Node is needed for the site, not ordinary
-Cargo builds. Follow [website setup and checks](../website/README.md).
+The Docusaurus site under `website/` builds Connectors' own documentation site on the shared
+Docs System shell: hand-written concepts, guides and adapter pages, generated reference pages
+and status, and Rust/WASM examples. Node is needed for the site, not for ordinary Cargo builds.
+Follow [website setup and checks](../website/README.md).
 
-The Rust build tool owns its generation and public-output audit:
+`connectors-docs` generates the derived pages (the CLI reference, the crate list, the contract
+and ESS model reference that `website/publication.json` selects, and the status page with its
+data) and checks them; `connectors-build` builds the examples and audits a production build:
 
 ```sh
-cargo run --locked -p connectors-build -- docs
+cargo run --locked -p connectors-docs -- generate
+cargo run --locked -p connectors-docs -- generate --check
 cargo run --locked -p connectors-build -- examples
-cargo run --locked -p connectors-build -- docs --check
 cargo run --locked -p connectors-build -- docs-audit
 ```
 
-`examples` requires the installed `wasm32-unknown-unknown` Rust target and the
-example workspace's locked dependencies in the Cargo cache. `docs-audit` checks an
-existing website production build. Neither command contacts a provider or deploys
-anything. The live preview starts with `npm start` from `website/`.
+`generate` needs the pinned ESS release, selected like the gate's (`--ess`, then
+`CONNECTORS_ESS`, then `ess` on PATH). `--check` writes nothing and fails on a missing, stale,
+hand-edited or orphaned generated file and on a page that breaks the page rules. `examples`
+requires the installed `wasm32-unknown-unknown` Rust target and the example workspace's locked
+dependencies in the Cargo cache. `docs-audit` checks an existing website production build. None
+of them contacts a provider or deploys anything. The live preview starts with `npm start` from
+`website/`.
+
+The `Documentation validation` workflow (`.github/workflows/pages.yml`) runs the generated-page
+check, the docs crate's tests and the site build on every pull request and push, binds the built
+site to its commit with `connectors-docs provenance`, and on a push to `main` uploads it as the
+artifact `b10x-project-site`. It deploys nothing.

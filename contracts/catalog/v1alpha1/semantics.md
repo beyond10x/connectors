@@ -233,7 +233,7 @@ The [service compatibility limits](../../service/compatibility.md#7-limits-and-c
 - `connectors-catalog-operations/1` gains the optional `feed` (section 3.3). A selection file without it loads, and its configuration revision is computed, exactly as before; one with it is refused by a reader older than this section, which denies unknown fields.
 - [Service compatibility](../../service/compatibility.md) owns the extended descriptor fields, singular profile, auth alternatives and generic limits. These require the proposed `v1alpha2` codec. Index, adapter-kind, bundle and configuration readers retain their own independent version decisions; a service-wire bump does not extend them.
 - Old `catalog/<id>.catalog.json` documents and `catalog.pack` bytes are not preserved (`docs/design.md:911`). Old operation ids are preserved only where the migration contract selects them (`docs/design.md:1095`).
-- The published `codewandler-connector-catalog-reader` crate has no successor in this design; its consumers need an explicit migration decision (`docs/design.md:151`).
+- The predecessor's published catalog-reader crate has no successor in this design; its consumers need an explicit migration decision (`docs/design.md:151`).
 
 ## 8. SDK and host obligations
 

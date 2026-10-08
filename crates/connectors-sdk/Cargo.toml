@@ -1,5 +1,6 @@
 [package]
 name = "connectors-sdk"
+description = "The adapter interface and shared semantic mechanisms (descriptors, handler verification, cursors); concrete infrastructure stays with the host."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

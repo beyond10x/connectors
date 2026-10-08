@@ -62,12 +62,6 @@ enum Action {
         #[arg(long)]
         directory: Option<PathBuf>,
     },
-    /// Assemble selected public contract and ESS documentation for the website.
-    Docs {
-        /// Compare the current projection without overwriting it.
-        #[arg(long)]
-        check: bool,
-    },
     /// Check shared ESS ownership and compile shared and adapter semantic models.
     EssBoundary,
     /// Re-derive every recorded upstream source digest from its archived bytes, and
@@ -121,6 +115,16 @@ enum Action {
     /// its projection record beside it as `<name>.projection.json`.
     /// Deterministic; never touches the network.
     Discovery {
+        #[arg(long)]
+        source: PathBuf,
+        /// The OpenAPI document to write; its name ends in `.json`.
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Project a pinned Swagger 2.0 document into OpenAPI 3.1.0 under
+    /// `swagger2-openapi/1`, and write its projection record beside it as
+    /// `<name>.projection.json`. Deterministic; never touches the network.
+    Swagger {
         #[arg(long)]
         source: PathBuf,
         /// The OpenAPI document to write; its name ends in `.json`.
@@ -248,6 +252,9 @@ fn execute(args: Args) -> Result<()> {
     if let Action::Discovery { source, out } = &args.command {
         return discovery(&root, source, out);
     }
+    if let Action::Swagger { source, out } = &args.command {
+        return swagger(&root, source, out);
+    }
     let ess = connectors_spec::toolchain::resolve(args.ess.as_deref())?;
     if let Action::Cli { check } = args.command {
         return cli::run(&root, &ess, check);
@@ -255,11 +262,6 @@ fn execute(args: Args) -> Result<()> {
     if let Action::Examples = args.command {
         check_ess(&ess)?;
         return docs::examples(&root, &ess);
-    }
-    if let Action::Docs { check } = args.command {
-        check_ess(&ess)?;
-        std::fs::create_dir_all(root.join(".local/tmp"))?;
-        return docs::run(&root, &ess, check);
     }
     if let Action::EssBoundary = args.command {
         check_ess(&ess)?;
@@ -466,6 +468,44 @@ fn execute(args: Args) -> Result<()> {
 fn discovery(root: &Path, source: &Path, out: &Path) -> Result<()> {
     let bytes = std::fs::read(inside(root, source)?)?;
     let projection = connectors_catalog::discovery::project(&bytes)?;
+    let (document, record) =
+        write_projection(root, out, &projection.openapi, &projection.record_bytes())?;
+    let record_value = &projection.record;
+    println!(
+        "discovery: {} methods, {} projected, {} excluded; wrote {} and {}",
+        record_value.method_count,
+        record_value.operations.len(),
+        record_value.excluded_methods.len(),
+        document.display(),
+        record.display()
+    );
+    Ok(())
+}
+/// Project the Swagger 2.0 document at `source` and write the OpenAPI document
+/// to `out` and its record beside it as `<name>.projection.json`. Nothing is
+/// written unless the projection succeeds.
+fn swagger(root: &Path, source: &Path, out: &Path) -> Result<()> {
+    let bytes = std::fs::read(inside(root, source)?)?;
+    let projection = connectors_catalog::swagger::project(&bytes)?;
+    let (document, record) =
+        write_projection(root, out, &projection.openapi, &projection.record_bytes())?;
+    println!(
+        "swagger: {} operations, {} projected; wrote {} and {}",
+        projection.record.operation_count,
+        projection.record.operations.len(),
+        document.display(),
+        record.display()
+    );
+    Ok(())
+}
+/// Write a projected document to `out`, a `.json` file inside the repository,
+/// and its record beside it as `<name>.projection.json`; returns both paths.
+fn write_projection(
+    root: &Path,
+    out: &Path,
+    openapi: &[u8],
+    record_bytes: &[u8],
+) -> Result<(PathBuf, PathBuf)> {
     let name = out
         .file_name()
         .and_then(|name| name.to_str())
@@ -479,18 +519,9 @@ fn discovery(root: &Path, source: &Path, out: &Path) -> Result<()> {
     let directory = inside(root, parent)?;
     let document = directory.join(format!("{name}.json"));
     let record = directory.join(format!("{name}.projection.json"));
-    write(&document, &projection.openapi)?;
-    write(&record, &projection.record_bytes())?;
-    let record_value = &projection.record;
-    println!(
-        "discovery: {} methods, {} projected, {} excluded; wrote {} and {}",
-        record_value.method_count,
-        record_value.operations.len(),
-        record_value.excluded_methods.len(),
-        document.display(),
-        record.display()
-    );
-    Ok(())
+    write(&document, openapi)?;
+    write(&record, record_bytes)?;
+    Ok((document, record))
 }
 fn copy_file(source: &Path, destination: &Path) -> Result<()> {
     std::fs::create_dir_all(destination.parent().ok_or("missing destination parent")?)?;
@@ -659,6 +690,62 @@ mod tests {
             entries, 2,
             "the subcommand writes the document and its record only"
         );
+    }
+
+    /// The pinned Slack Swagger 2.0 document is projected by the `swagger`
+    /// subcommand into exactly the bytes and record the library computes, and
+    /// the Discovery subcommand still refuses it rather than guessing.
+    #[test]
+    fn swagger_writes_the_projection_and_its_record() {
+        let pinned = std::fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../adapters/slack/upstream/slack_web_openapi_v2_without_examples.json"),
+        )
+        .expect("the pinned Slack document");
+        let temp = workspace();
+        std::fs::write(temp.path().join("upstream/slack.json"), &pinned).unwrap();
+        cli(
+            temp.path(),
+            &[
+                "swagger",
+                "--source",
+                "upstream/slack.json",
+                "--out",
+                "projected/slack.openapi.json",
+            ],
+        )
+        .expect("swagger subcommand");
+        let expected = connectors_catalog::swagger::project(&pinned).expect("projection");
+        let written = std::fs::read(temp.path().join("projected/slack.openapi.json")).unwrap();
+        assert!(
+            written == expected.openapi,
+            "the written document is the projection"
+        );
+        let record =
+            std::fs::read(temp.path().join("projected/slack.openapi.projection.json")).unwrap();
+        assert!(
+            record == expected.record_bytes(),
+            "the written record is the projection's"
+        );
+        let entries = std::fs::read_dir(temp.path().join("projected"))
+            .unwrap()
+            .count();
+        assert_eq!(
+            entries, 2,
+            "the subcommand writes the document and its record only"
+        );
+        let refused = cli(
+            temp.path(),
+            &[
+                "swagger",
+                "--source",
+                "upstream/drive-api.json",
+                "--out",
+                "projected/drive.openapi.json",
+            ],
+        );
+        assert!(refused.is_err(), "a Discovery document is not Swagger 2.0");
+        assert!(!temp.path().join("projected/drive.openapi.json").exists());
     }
 
     #[test]
