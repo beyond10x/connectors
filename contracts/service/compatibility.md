@@ -1,6 +1,6 @@
 # Service and family compatibility
 
-**Status: proposed specification; no new runtime codec or route is implemented.** This is the compatibility owner for `story:contracts-wire-compatibility` (E02), reviewed against `3ba2d29`. It supersedes local “optional/additive/no wire change” and version/projection defaults in the family documents. [Configured service v1alpha1](v1alpha1/semantics.md) records the existing implementation; [governed service v1alpha2](v1alpha2/semantics.md) supplies the proposed admission semantics subject to this binding. Individual stories still own family behavior. A compatibility disposition is not implementation support.
+**Status: proposed specification; the first v1alpha2 invoke binding (§2.1) is implemented, and no other new runtime codec or route is.** This is the compatibility owner for `story:contracts-wire-compatibility` (E02), reviewed against `3ba2d29`. It supersedes local “optional/additive/no wire change” and version/projection defaults in the family documents. [Configured service v1alpha1](v1alpha1/semantics.md) records the existing implementation; [governed service v1alpha2](v1alpha2/semantics.md) supplies the proposed admission semantics subject to this binding. Individual stories still own family behavior. A compatibility disposition is not implementation support.
 
 ## 1. Independent version axes
 
@@ -42,7 +42,7 @@ The proposed [read-refresh-once/v1alpha1 binding](../auth/capability/v1alpha1/re
 
 ### 2.1 First binding: `POST /v1alpha2/invoke`
 
-**Status: specified, not implemented.** The first v1alpha2 binding a host serves is invoke alone, under the `static-bearer` admission profile. It exists so that an admitted write names the attempt the host recorded for it. The request and Response are `connectors.service_wire.InvokeRequest` and `connectors.service_wire.InvokeResponse` in [service_wire.yaml](../../ess/domains/service_wire.yaml); this section owns their rules on this binding, and the rest of this document applies wherever it does not narrow it.
+**Status: implemented.** The host serves it and `connectors-client` reads it (`Client::invoke_v1alpha2`). The first v1alpha2 binding a host serves is invoke alone, under the `static-bearer` admission profile. It exists so that an admitted write names the attempt the host recorded for it. The request and Response are `connectors.service_wire.InvokeRequest` and `connectors.service_wire.InvokeResponse` in [service_wire.yaml](../../ess/domains/service_wire.yaml); this section owns their rules on this binding, and the rest of this document applies wherever it does not narrow it.
 
 | Concern | Rule on the first binding |
 |---|---|
