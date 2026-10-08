@@ -744,3 +744,23 @@ fn production_cli_approval_issuance_and_restart() {
         0
     );
 }
+
+/// story:pending-connection-refusal-names-its-remedy: the instance's approval
+/// keys and approval policy refuse a configuration whose revision the instance
+/// has not followed as `lifecycle_conflict` naming a new connection; every
+/// other conflict stays plain (`retry_status`).
+#[test]
+fn a_changed_configuration_names_a_new_connection_for_keys_and_policy() {
+    let keys = key_error(approval_keys::Failure::BindingChanged);
+    let policy = policy_error(approval_policy::Failure::BindingChanged);
+    for error in [keys, policy] {
+        assert_eq!(error.code, Code::LifecycleConflict);
+        assert!(error.reconnect);
+    }
+    let keys = key_error(approval_keys::Failure::Conflict);
+    let policy = policy_error(approval_policy::Failure::Conflict);
+    for error in [keys, policy] {
+        assert_eq!(error.code, Code::LifecycleConflict);
+        assert!(!error.reconnect);
+    }
+}

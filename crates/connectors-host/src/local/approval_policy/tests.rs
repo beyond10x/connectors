@@ -120,10 +120,16 @@ fn exact_selections_and_operations_are_required_for_use() {
             2 => changed.executable_selection = "c".repeat(64),
             _ => changed.clock_configuration_sha256 = "c".repeat(64),
         }
-        assert!(matches!(
-            s.acquire(&changed, "item.write"),
-            Err(Failure::Conflict | Failure::NotAdmitted)
-        ));
+        let refused = s.acquire(&changed, "item.write");
+        if change == 0 {
+            // The instance has not followed the configured revision.
+            assert!(matches!(refused, Err(Failure::BindingChanged)));
+        } else {
+            assert!(matches!(
+                refused,
+                Err(Failure::Conflict | Failure::NotAdmitted)
+            ));
+        }
     }
     assert!(matches!(
         s.acquire(&selection(), "another.write"),
@@ -179,7 +185,7 @@ fn invalid_publication_cannot_replace_a_valid_policy() {
     changed.configuration_revision = "changed".into();
     assert_eq!(
         s.set_admitted(&changed, vec![], Some(1)),
-        Err(Failure::Conflict)
+        Err(Failure::BindingChanged)
     );
     assert_eq!(s.status().unwrap(), Some(first));
 }

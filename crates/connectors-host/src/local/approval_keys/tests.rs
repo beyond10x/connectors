@@ -635,8 +635,9 @@ fn uncertain_deletion_keeps_retirement_fence_and_exact_retry() {
 /// story:pending-connection-refusal-names-its-remedy: an instance whose
 /// recorded configuration revision is not the configured one refuses its
 /// passive key status by name, as a changed binding a new connection clears;
-/// another adapter on the instance stays a plain conflict. A new connection
-/// under the configured revision moves the instance, and status then answers.
+/// another adapter on the instance stays a plain conflict. A connection only
+/// begun under the configured revision does not move the instance; its
+/// publication does (registry/upgrade_tests.rs).
 #[test]
 fn a_changed_configuration_refuses_key_status_as_a_changed_binding() {
     use crate::local::registry::{Registry, fixture_binding};
@@ -663,9 +664,9 @@ fn a_changed_configuration_refuses_key_status_as_a_changed_binding() {
     let mut configured = fixture_binding("instance");
     configured.configuration_revision = "config-2".into();
     registry.begin(&configured, 1_788_998_400_001).unwrap();
-    assert!(store("adapter", "config-2").status().unwrap().is_none());
     assert_eq!(
-        store("adapter", "config").status().unwrap_err(),
+        store("adapter", "config-2").status().unwrap_err(),
         Failure::BindingChanged
     );
+    assert!(store("adapter", "config").status().unwrap().is_none());
 }

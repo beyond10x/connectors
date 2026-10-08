@@ -173,6 +173,7 @@ impl Registry {
                 params![row.reference,encode(&prepared.baseline.identity)?,prepared.generation,prepared.version_id,encode(&snapshot)?,new_id()]).map_err(db)?;
             tx.execute("UPDATE registry_acquisitions SET state='completed' WHERE acquisition_ref=?1", [&prepared.acquisition]).map_err(db)?;
             tx.execute("UPDATE registry_uses SET released=1 WHERE connection_ref=?1 AND dispatched=0", [&row.reference]).map_err(db)?;
+            follow(tx, &row.binding)?;
             bump(tx, &row.binding.instance_id)?;
             Ok(row.reference)
         })
@@ -289,24 +290,11 @@ fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
         Some((adapter, _)) if adapter != binding.adapter_id => {
             return Err(Failure::Conflict);
         }
-        // A new connection under the configured revision moves its instance
-        // there, as an upgrading revalidation does; older connections of the
-        // instance keep theirs and can still follow on revalidation. Without
-        // this, an instance whose connections never followed an upgrade (the
-        // new provider refused the credential) admits no connection at all.
-        Some((_, revision)) if revision != binding.configuration_revision => {
-            tx.execute(
-                "UPDATE registry_instances SET configuration_revision=?2 WHERE instance_id=?1",
-                params![binding.instance_id, binding.configuration_revision],
-            )
-            .map_err(db)?;
-            super::revalidation::follow_instance(
-                tx,
-                &binding.instance_id,
-                &binding.configuration_revision,
-            )?;
-            bump(tx, &binding.instance_id)?;
-        }
+        // A connection begun under another revision of its instance is admitted:
+        // its instance moves there only when it is published (`follow`), as
+        // after an upgrading revalidation. Refusing it here left an instance
+        // whose connections never followed an upgrade (the new provider
+        // refused the credential) admitting no connection at all.
         Some(_) => {}
         None => {
             tx.execute("INSERT INTO registry_instances (instance_id,adapter_id,configuration_revision) VALUES (?1,?2,?3)", params![binding.instance_id,binding.adapter_id,binding.configuration_revision]).map_err(db)?;
@@ -493,4 +481,26 @@ pub(super) fn recollected_snapshot(
         credential_expires_at: native.credential_expires_at_ms,
         checks,
     })
+}
+
+/// A published connection moves its instance to the revision it was made
+/// under, as an upgrading revalidation does: older connections of the
+/// instance keep theirs and can still follow on revalidation.
+fn follow(tx: &Transaction<'_>, binding: &Binding) -> Result<()> {
+    let revision: String = tx
+        .query_row(
+            "SELECT configuration_revision FROM registry_instances WHERE instance_id=?1",
+            [&binding.instance_id],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    if revision == binding.configuration_revision {
+        return Ok(());
+    }
+    tx.execute(
+        "UPDATE registry_instances SET configuration_revision=?2 WHERE instance_id=?1",
+        params![binding.instance_id, binding.configuration_revision],
+    )
+    .map_err(db)?;
+    super::revalidation::follow_instance(tx, &binding.instance_id, &binding.configuration_revision)
 }
