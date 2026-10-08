@@ -4,10 +4,10 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.32.0
+# Source release v0.33.0
 
-Version **0.32.0** specifies at ESS source format `ess/15` with the released
-ESS 0.55.0 and plans with the released AEP 0.68.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
+Version **0.33.0** specifies at ESS source format `ess/15` with the released
+ESS 0.56.0 and plans with the released AEP 0.68.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
 provider, as in 0.11.0, which retired the native GitLab adapter. The earlier **v0.1.0
@@ -66,6 +66,20 @@ Runtime 0.29.0 and Eventlog 0.8.0, which keep each committed record once instead
 times; their durable open checkpoints are not enabled yet, so every command still verifies
 the whole store ([#101](https://github.com/beyond10x/connectors/issues/101)). Stores this
 version writes stay readable by 0.31.0. ESS is 0.55.0.
+
+Since 0.33.0 the per-invoke metadata cost no longer grows with the store
+([#101](https://github.com/beyond10x/connectors/issues/101)): a command run while an owner
+runs reads the store through the owner's held handle, and a store `setup init` creates
+carries Entity Runtime durable open checkpoints. In the store-cost test the median read
+invoke took 229 ms at 601 recorded events, 341 ms at 1,201 and 255 ms at 6,000; 0.32.0 took
+1,211 ms at 601 and failed 3 of 5 invokes at 1,201. Checkpoints are one-way: 0.32.0 and
+earlier refuse a store that has them. An existing store keeps working with older releases
+until its owner runs `setup checkpoints-enable --confirm one-way`. Every fresh open (a
+command run without an owner, a second process, the owner when it starts, recovery) still
+verifies the whole store, so a raw edit of the database file is refused by the first command
+after it. Peak resident memory in the same test was 329 MB at 601 events and 560 MB at 1,201
+([#103](https://github.com/beyond10x/connectors/issues/103)). Due expiries are recorded in
+batches of at most 32. Entity Runtime is 0.30.1, Eventlog 0.8.1 and ESS 0.56.0.
 
 ## Available runtime
 
