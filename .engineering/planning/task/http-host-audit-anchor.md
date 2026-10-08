@@ -2,13 +2,16 @@
 format: aep.planning-md/3
 id: task:http-host-audit-anchor
 kind: task
-status: draft
+status: active
 title: The HTTP host anchors an audit record before it dispatches a v1alpha2 write
 relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:v1alpha2-invoke-wire-codec
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T12:03:59Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T12:03:59Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
