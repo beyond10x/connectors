@@ -420,7 +420,11 @@ views:
 # Indeterminate / `unknown` and is never redispatched; so is a value the host
 # cannot deliver (byte limit), because the port gives no evidence about what
 # that value means (contracts/service/v1alpha2/semantics.md § 6: an invalid
-# response after a sent mutation yields uncertainty). The anchor, the attempt,
+# response after a sent mutation yields uncertainty). An adapter that panics
+# after OpenDispatch has lost its answer the same way: the attempt is
+# Indeterminate / `unknown`, the response is `outcome_unknown` naming it and
+# its audit anchor, and the anchor's final observation is `unknown`, retained
+# for recovery when not acknowledged. The anchor, the attempt,
 # the dispatch, its settlement and the audit final observation run in a host
 # task the request awaits, so a caller hanging up never cancels any of them.
 # Store: the local metadata authority in the configured state directory

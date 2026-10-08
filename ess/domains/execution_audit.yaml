@@ -413,7 +413,13 @@ views:
 # prepared, the host aborts that attempt (connectors.mutations.AbortPrepared,
 # `not_attempted`), answers 503 `unavailable` with zero adapter calls, and keeps
 # the anchor: its final observation (AppendFinalObservation) records the
-# refusal, and the response carries that record's `audit_ref` and status.
+# refusal (FinalOutcome `refused`), and the response carries that record's
+# `audit_ref` and status. Every anchored write the host refuses before
+# dispatch records `refused` the same way: an attempt it could not record
+# (`capacity`, `unavailable`) and an attempt aborted as `not_attempted`. A
+# dispatched invocation records `success`, `error` (a read) or `unknown` (a
+# write); an adapter that panics after dispatch is an answer lost after
+# dispatch, never an invocation without its final observation.
 # Final-observation recovery (audit.md § 3): a final observation whose append
 # is not acknowledged (`incomplete`) is retained exactly, in the host process,
 # and the running host retries AppendFinalObservation with it every second
@@ -422,7 +428,11 @@ views:
 # plus the invocations already admitted (at most 32 in flight). While the
 # retained set is full the host refuses every new v1alpha2
 # invocation before its anchor (503 `unavailable`, `audit_ref: null`, zero
-# adapter calls); it never evicts a retained observation. A host restart ends
+# adapter calls); it never evicts a retained observation. An observation counts
+# against the bound from the moment it is retained until a recovery pass has
+# its acknowledgement (or its identical or conflicting record): a pass that is
+# retrying it still holds it, so recovery never reopens admission while the
+# retained set is full. A host restart ends
 # the retry of what it retained: those records stay `Anchored`, as their
 # `incomplete` answer already said, and no later process appends a final
 # observation it did not observe.

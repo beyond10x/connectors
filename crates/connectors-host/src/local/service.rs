@@ -84,7 +84,22 @@ pub struct ServiceState {
     pending_limit: usize,
     /// Exact final observations whose append was not acknowledged, retained
     /// unchanged for idempotent recovery (audit.md § 3).
-    pending: Mutex<Vec<(audit::Reference, audit::FinalObservation)>>,
+    pending: Mutex<Retained>,
+}
+
+/// The retained final observations: those waiting for a recovery pass and
+/// those a pass has taken out and not yet resolved. Both count against the
+/// bound (execution_audit.yaml, Final-observation recovery).
+#[derive(Default)]
+struct Retained {
+    waiting: Vec<(audit::Reference, audit::FinalObservation)>,
+    in_recovery: usize,
+}
+
+impl Retained {
+    fn len(&self) -> usize {
+        self.waiting.len() + self.in_recovery
+    }
 }
 
 impl ServiceState {
@@ -129,7 +144,7 @@ impl ServiceState {
             )
             .map_err(|_| Failure::InvalidConfiguration)?,
             pending_limit,
-            pending: Mutex::new(Vec::new()),
+            pending: Mutex::new(Retained::default()),
         })
     }
 
@@ -292,36 +307,50 @@ impl ServiceState {
         {
             return true;
         }
-        self.pending
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
+        self.retained()
+            .waiting
             .push((reference.clone(), observation));
         false
     }
 
-    /// Final observations retained for recovery.
+    fn retained(&self) -> std::sync::MutexGuard<'_, Retained> {
+        self.pending.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Final observations retained for recovery, including those a running
+    /// recovery pass is retrying.
     pub fn pending_observations(&self) -> usize {
-        self.pending.lock().unwrap_or_else(|e| e.into_inner()).len()
+        self.retained().len()
     }
 
     /// Retries each retained final observation with its exact original fields
     /// (audit.md § 3): an acknowledged or already-identical append completes
     /// it, a different final observation leaves the original and is dropped,
-    /// and an unavailable store keeps it. Never dispatches anything. Returns
+    /// and an unavailable store keeps it. Never dispatches anything. An
+    /// observation the pass is retrying still counts against the bound until
+    /// it is resolved, so a pass never reopens admission by itself. Returns
     /// how many remain.
     pub fn recover_observations(&self) -> usize {
-        let retained = std::mem::take(&mut *self.pending.lock().unwrap_or_else(|e| e.into_inner()));
+        let taken = {
+            let mut retained = self.retained();
+            let taken = std::mem::take(&mut retained.waiting);
+            retained.in_recovery += taken.len();
+            taken
+        };
         let mut remaining = Vec::new();
-        for (reference, observation) in retained {
+        for (reference, observation) in taken {
             match self.audit.append(&reference, &observation) {
-                Ok(_) | Err(audit::Failure::Conflict | audit::Failure::NotFound) => {}
+                Ok(_) | Err(audit::Failure::Conflict | audit::Failure::NotFound) => {
+                    self.retained().in_recovery -= 1;
+                }
                 Err(_) => remaining.push((reference, observation)),
             }
         }
-        let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
-        remaining.append(&mut pending);
-        *pending = remaining;
-        pending.len()
+        let mut retained = self.retained();
+        retained.in_recovery -= remaining.len();
+        remaining.append(&mut retained.waiting);
+        retained.waiting = remaining;
+        retained.len()
     }
 
     /// The running host's recovery: every [`RECOVERY_INTERVAL`] it retries the
