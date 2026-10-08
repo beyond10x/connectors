@@ -299,7 +299,7 @@
       "title": "Loki LogQL",
       "source": "adapters/loki/contracts/logs/v1alpha1/semantics.md",
       "owner": "loki",
-      "status": "Implemented by the loki adapter on main, unreleased: range, metric and label reads"
+      "status": "Implemented by the loki adapter since 0.38.0: range, metric and label reads"
     },
     {
       "route": "/adapters/prometheus/contracts/series",

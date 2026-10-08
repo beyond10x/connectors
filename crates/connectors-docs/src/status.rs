@@ -18,7 +18,7 @@ pub const DATA: &str = "website/data/status.json";
 pub const PAGE: &str = "website/docs/status.md";
 
 /// The date the list below was last checked against the repository.
-const AS_OF: &str = "2026-10-08";
+const AS_OF: &str = "2026-10-09";
 
 /// One capability on the status page.
 pub struct Capability {
@@ -270,8 +270,8 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
-        "Slack conversations (unreleased)",
-        "conversations.list, conversations.history and conversations.replies with a bot token; on main, not yet in a release; verified against a local fixture only.",
+        "Slack conversations",
+        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0); verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_three_conversation_reads",
         "/docs/reference/adapters/catalog",
     ),
@@ -311,8 +311,8 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Native adapters",
-        "Loki LogQL reads (unreleased)",
-        "logs.query_range, logs.query_metric and logs.labels through a saved bearer connection; on main, not yet in a release.",
+        "Loki LogQL reads",
+        "logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0).",
         "adapters/loki/tests/local_runtime.rs::each_read_answers_through_the_private_runtime_from_the_recorded_answers",
         "/docs/reference/adapters/loki",
     ),

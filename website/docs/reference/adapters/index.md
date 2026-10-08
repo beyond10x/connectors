@@ -15,11 +15,11 @@ an installed capability: the runtime column says what runs.
 | Adapter | Runs as | Operations |
 |---|---|---|
 | [GitLab](./gitlab/index.md) | catalog provider | 18 reads and 4 approved writes from the pinned OpenAPI document, and the two merge-request feed reads |
-| [Catalog provider](./catalog/index.md) | `connectors-catalog-provider` | Jira, Confluence, HubSpot, Zendesk, Google, Runpod and, unreleased, Slack, from pinned API documents |
+| [Catalog provider](./catalog/index.md) | `connectors-catalog-provider` | Jira, Confluence, HubSpot, Zendesk, Google, Runpod and Slack, from pinned API documents |
 | [Kubernetes](./kubernetes/index.md) | `connectors-kubernetes` | `resources.list`, `endpoints.discover`, optionally `hosts.discover` and the Helm release reads |
 | [SQL / PostgreSQL](./sql/index.md) | `connectors-sql` | `schema.list`, `query.read` |
 | [Tavily](./tavily/index.md) | `connectors-tavily` | `websearch.search`, `websearch.fetch`, `websearch.crawl` |
-| [Loki](./loki/index.md) (unreleased) | `connectors-loki` | `logs.query_range`, `logs.query_metric`, `logs.labels` |
+| [Loki](./loki/index.md) | `connectors-loki` | `logs.query_range`, `logs.query_metric`, `logs.labels` |
 
 ## Specification or design only
 

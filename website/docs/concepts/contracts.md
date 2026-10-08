@@ -71,7 +71,7 @@ predicates remain obligations each implementation discharges and its tests hold.
 |---|---|---|
 | Service and execution | describe and invoke, the governed v1alpha2 binding, mutations and idempotency, execution audit, delegated approval, the local clock | describe and invoke; the first v1alpha2 invoke binding with audit and attempts |
 | Authentication and access | connections, profiles, acquisition, custody, capabilities, readiness evidence | in part, through the local CLI's saved connections; the full contracts are specified |
-| Data reads | records, logs, series, web search, feeds | records, web search (Tavily), feeds (GitLab), logs (Loki, unreleased) |
+| Data reads | records, logs, series, web search, feeds | records, web search (Tavily), feeds (GitLab), logs (Loki) |
 | Discovery and composition | resource discovery, mediated routes, composition | endpoint and host discovery (Kubernetes) |
 | Sessions and media | bidirectional sessions, negotiated media | specified only |
 

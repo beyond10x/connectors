@@ -82,7 +82,7 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 | docker | [Docker mutations](../adapters/docker/contracts/mutations.md) | Specified; runtime pending |
 | grafana | [Grafana datasource discovery](../adapters/grafana/contracts/discovery.md) | Specified; runtime pending |
 | grafana | [Grafana mediated routes](../adapters/grafana/contracts/routes.md) | Specified; runtime pending |
-| loki | [Loki LogQL](../adapters/loki/contracts/logs.md) | Implemented by the loki adapter on main, unreleased: range, metric and label reads |
+| loki | [Loki LogQL](../adapters/loki/contracts/logs.md) | Implemented by the loki adapter since 0.38.0: range, metric and label reads |
 | prometheus | [Prometheus PromQL](../adapters/prometheus/contracts/series.md) | Specified; runtime pending |
 | sip | [SIP dial](../adapters/sip/contracts/dial.md) | Specified; runtime pending |
 | rtvbp | [RTVBP sessions](../adapters/rtvbp/contracts/session.md) | Specified; runtime pending |
