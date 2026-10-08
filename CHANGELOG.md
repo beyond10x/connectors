@@ -21,6 +21,11 @@
   at load. The rules are modeled as `connectors_catalog.identity.Probe` and `Profile` in
   `adapters/catalog/spec/ess`, and every identity the guides document is checked against them.
 
+- The local metadata store records the release version of the build that wrote each local
+  runtime bootstrap (`connectors.cli.LocalRuntimeRecord.build_version`). It is kept beside the
+  bootstrap in its cached column; a store written before this release opens unchanged, its
+  records carry no version, and the next bootstrap a build remembers records that build's.
+
 ### Changed
 
 - A selection, guard preflight or feed declaration that names an `operationId` the bundle
@@ -28,6 +33,15 @@
   operation listed. No shipped selection changes: only the Runpod document declares an id
   twice (`UpdatePod`, `UpdateEndpoint`, `UpdateNetworkVolume`, `UpdateTemplate`), and none
   of them is selected.
+
+### Fixed
+
+- A local `connectors operations invoke` read whose deadline passes after the owner dispatched
+  it (its read use recorded `DispatchReadUse`) reports `code = timeout` at `stage = dispatch`
+  instead of `stage = admission`. A deadline that passes before dispatch keeps
+  `stage = admission`, and the owner no longer dispatches that read afterwards. The CLI waits
+  up to 2 s past the deadline for the owner's answer; an invoke it sent whose answer never
+  arrives reports `outcome_unknown` instead of the host's admission timeout.
 
 ### Limits
 
