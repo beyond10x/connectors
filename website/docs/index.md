@@ -40,7 +40,8 @@ capability with the test that holds it. In short:
   Support, Google Drive, Slides, Calendar and Gmail, and Runpod from their pinned API documents,
   with no Rust per endpoint ([catalog provider](./concepts/catalog-provider.md)).
 - **Native adapters** run Kubernetes resource reads and discovery, PostgreSQL reads and Tavily web
-  search; Loki LogQL reads are on `main`, not yet released ([adapters](./reference/adapters/index.md)).
+  search and Loki LogQL reads; Grafana data-source records and Loki reads through Grafana are on
+  `main`, not yet released ([adapters](./reference/adapters/index.md)).
 - The **local `connectors` CLI** keeps connection metadata in Entity Runtime over an Eventlog SQLite
   store and credentials in the Secret Service keyring, supervises adapter processes and runs
   approved writes ([local runtime](./concepts/local-runtime.md)).

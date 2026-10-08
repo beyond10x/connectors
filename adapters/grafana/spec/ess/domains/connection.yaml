@@ -1,0 +1,108 @@
+domain: connectors_grafana.connection
+summary: The Grafana local connection — its native configuration, the `grafana.service_account` profile and the configured identity probe that proves a service-account token.
+
+# Normative owner: adapters/grafana/design.md (Authentication and configuration) and
+# adapters/grafana/README.md. The executable composition (adapters/grafana/src/local.rs)
+# reads `LocalConfiguration` from its owner-only file and advertises exactly one
+# `ServiceAccountProfile`; tests/ess_model.rs checks both against the schemas this model
+# generates.
+types:
+  # A connection instance id: the host's identifier alphabet, 1–128 characters.
+  - name: connectors_grafana.connection.InstanceId
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"
+    invariants:
+      - value.count: {gte: 1, lte: 128}
+
+  # The owner-only native file named by `--local-config`. No credential is a member.
+  # `base_url` is the Grafana HTTPS origin, optionally with the path prefix Grafana is served
+  # under (its `root_url` sub-path), written in its canonical form; `ca_file`, when present,
+  # is an absolute path to an owner-only PEM bundle that replaces the system roots for this
+  # connection (absent, never null).
+  - name: connectors_grafana.connection.LocalConfiguration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: instance, type: connectors_grafana.connection.InstanceId}
+      - {name: base_url, type: String}
+      - {name: ca_file, type: "Optional<String>"}
+    invariants:
+      - format == "connectors-grafana-local/1"
+      - base_url.count: {gte: 8, lte: 512}
+      - base_url: {starts_with: "https://"}
+      - ca_file.count: {gte: 1, lte: 4096}
+
+  # A service-account token: 1–8,192 visible ASCII characters (0x21–0x7E), so no space,
+  # control or non-ASCII character.
+  - name: connectors_grafana.connection.ServiceAccountToken
+    kind: newtype
+    of: String
+    alphabet: '!"#$%&''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~'
+    invariants:
+      - value.count: {gte: 1, lte: 8192}
+
+  # The protected entry of `grafana.service_account`: the token sent as
+  # `Authorization: Bearer <token>`. It enters through the host's protected entry and
+  # custody, never the configuration.
+  - name: connectors_grafana.connection.ServiceAccountEntry
+    kind: struct
+    fields:
+      - {name: token, type: connectors_grafana.connection.ServiceAccountToken}
+
+  # Where the identity subject comes from. The probe's 200 proves the token reaches the
+  # data-source read the profile is for; its body is not used, and the subject is the
+  # configured `instance`.
+  - name: connectors_grafana.connection.IdentitySource
+    kind: enum
+    variants: [configuration]
+
+  # The identity probe: one GET of `path` relative to `base_url`, the declared
+  # `datasources.list` verification of the design. 200 admits the token; 401 and 403
+  # refuse it as invalid; 429 and 5xx are unavailable; anything else is a protocol failure.
+  - name: connectors_grafana.connection.IdentityProbe
+    kind: struct
+    fields:
+      - {name: method, type: String}
+      - {name: path, type: String}
+      - {name: source, type: connectors_grafana.connection.IdentitySource}
+      - {name: kind, type: String}
+    invariants:
+      - method == "GET"
+      - path == "api/datasources"
+      - kind == "grafana.connection"
+
+  # The one authentication profile the executable advertises: a static bearer token of a
+  # Grafana service account, entered once through the host's protected entry. Grafana's
+  # role and permissions decide what the token reaches, so `minimum_scopes` is empty, and
+  # validation evidence lasts 60 seconds.
+  - name: connectors_grafana.connection.ServiceAccountProfile
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: scheme, type: String}
+      - {name: capability, type: String}
+      - {name: purpose, type: String}
+      - {name: subject, type: String}
+      - {name: minimum_scopes, type: "List<String>"}
+      - {name: evidence_lifetime_ms, type: Integer}
+      - {name: entry, type: String}
+      - {name: identity, type: connectors_grafana.connection.IdentityProbe}
+    invariants:
+      - id == "grafana.service_account"
+      - scheme == "http_bearer"
+      - capability == "http-bearer"
+      - purpose == "service_account"
+      - subject == "app"
+      - minimum_scopes.count == 0
+      - evidence_lifetime_ms == 60000
+      - entry == "connectors_grafana.connection.ServiceAccountEntry"
+
+# ESS-LIMIT: these are checked by the composition, not expressible as invariants here, and
+# the composition only ever refuses more than the model on them (tests/ess_model.rs asserts
+# each): that `ca_file` names an existing absolute owner-only file; that `base_url` is
+# already its own canonical form (WHATWG URL serialization: lowercase scheme and host, a
+# path ending in `/`, no credentials, query or fragment); and that the subject equals the
+# sibling `instance`. `alphabet:` is carried into the generated schemas as
+# `x-ess-alphabet`, not as a JSON Schema keyword, so a JSON Schema validator alone does not
+# enforce it.

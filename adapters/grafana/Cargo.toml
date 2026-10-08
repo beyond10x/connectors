@@ -1,0 +1,38 @@
+[package]
+name = "connectors-grafana"
+description = "Grafana adapter: bounded data-source records from the Grafana HTTP API, one GET."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = ["service"]
+service = ["dep:connectors-host", "dep:clap", "dep:tokio"]
+
+[[bin]]
+name = "connectors-grafana"
+path = "src/main.rs"
+required-features = ["service"]
+
+[dependencies]
+connectors-core.workspace = true
+connectors-sdk.workspace = true
+connectors-host = { workspace = true, optional = true }
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+zeroize.workspace = true
+clap = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+connectors-host.workspace = true
+connectors-spec = { path = "../../crates/connectors-spec" }
+hex.workspace = true
+jsonschema.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+rcgen = "0.14"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
