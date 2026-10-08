@@ -2,14 +2,15 @@
 //! source. One fresh run over every indexed provider reproduces each bundle and
 //! the whole index byte for byte, and an indexed provider with no pinned source
 //! named here fails rather than going unchecked. A source projected from a
-//! pinned Google Discovery document is itself regenerated from that document
-//! first, with its projection record, and must match byte for byte too.
-use connectors_catalog::{bundle, discovery, pipeline};
+//! pinned Google Discovery or Swagger 2.0 document is itself regenerated from
+//! that document first, with its projection record, and must match byte for
+//! byte too.
+use connectors_catalog::{bundle, derived, pipeline};
 use std::path::Path;
 
-/// The pinned source, the Discovery document it is projected from (if any),
-/// auth profile and unsupported-operation count of each indexed provider,
-/// relative to this crate. The profile and the count are literals, so a bundle
+/// The pinned source, the Discovery or Swagger 2.0 document it is projected
+/// from (if any), auth profile and unsupported-operation count of each indexed
+/// provider, relative to this crate. The profile and the count are literals, so a bundle
 /// rebuilt with another profile, or one that gains or loses a gap, fails here
 /// instead of being read back as correct. Confluence's 30 are writes whose
 /// request body is a `$ref`; no shipped read is among them. GitLab's 67 are
@@ -101,12 +102,14 @@ const AMENDMENTS: [(&str, &str); 1] = [(
 )];
 
 /// The committed projection at `source` and its record beside it are exactly
-/// what projecting the pinned Discovery document at `from` produces now.
+/// what projecting the pinned document at `from` produces now, with the
+/// projector its content names (Discovery or Swagger 2.0).
 fn assert_projection_is_fresh(provider: &str, source: &Path, from: &Path) {
-    let projection = discovery::project(&std::fs::read(from).unwrap()).unwrap();
+    let projection = derived::project(&std::fs::read(from).unwrap()).unwrap();
     assert!(
-        std::fs::read(source).unwrap() == projection.openapi,
-        "committed `{provider}` projection drifted from its pinned Discovery document"
+        std::fs::read(source).unwrap() == projection.openapi(),
+        "committed `{provider}` projection drifted from its pinned {} document",
+        projection.format()
     );
     let stem = source
         .file_name()
