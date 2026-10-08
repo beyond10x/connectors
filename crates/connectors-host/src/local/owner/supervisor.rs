@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     sync::{
         Arc, Condvar, Mutex,
-        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicU8, AtomicU64, AtomicUsize, Ordering},
         mpsc,
     },
 };
@@ -77,6 +77,44 @@ struct Job {
     reply: mpsc::Sender<Result<Output>>,
     epoch: u64,
     queued: Option<JobQueued>,
+    dispatch: Dispatch,
+}
+/// Whether a read job's worker dispatched it, decided once between the worker
+/// and the pool waiting on it: the worker marks it immediately before it
+/// records the read use dispatched, and a waiter whose deadline passed first
+/// marks it abandoned, after which the worker dispatches nothing. A timeout
+/// after dispatch is the provider's (`stage = dispatch`); one before stays
+/// the host's own admission (contracts/cli/v1alpha1/semantics.md).
+#[derive(Clone, Default)]
+struct Dispatch(Arc<AtomicU8>);
+impl Dispatch {
+    const PENDING: u8 = 0;
+    const DISPATCHED: u8 = 1;
+    const ABANDONED: u8 = 2;
+    /// The worker, before it dispatches: refused once the waiter gave up.
+    fn begin(&self) -> Result<()> {
+        self.0
+            .compare_exchange(
+                Self::PENDING,
+                Self::DISPATCHED,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .map(|_| ())
+            .map_err(|_| Code::Timeout.into())
+    }
+    /// The waiter, once its deadline passed: whether the worker had already
+    /// dispatched. Either way the worker dispatches nothing after this.
+    fn abandon(&self) -> bool {
+        self.0
+            .compare_exchange(
+                Self::PENDING,
+                Self::ABANDONED,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_err_and(|state| state == Self::DISPATCHED)
+    }
 }
 /// Counts a sent job until the worker takes it up, after which the worker's
 /// `busy` covers it, or until it is dropped unsent, so an owner never reads a
@@ -186,7 +224,7 @@ impl Pool {
         adapter: &Adapter,
         task: Task,
         deadline: u64,
-    ) -> Result<mpsc::Receiver<Result<Output>>> {
+    ) -> Result<(mpsc::Receiver<Result<Output>>, Dispatch)> {
         until(deadline)?;
         let mut workers = self.workers.lock().map_err(|_| Code::Unavailable)?;
         if self.stopped.load(Ordering::SeqCst) {
@@ -245,6 +283,7 @@ impl Pool {
         }
         control.check(control.epoch)?;
         let (reply, receiver) = mpsc::channel();
+        let dispatch = Dispatch::default();
         worker
             .sender
             .try_send(Work::Invoke(Box::new(Job {
@@ -255,22 +294,30 @@ impl Pool {
                 reply,
                 epoch: control.epoch,
                 queued: Some(JobQueued::new(&worker.queued)),
+                dispatch: dispatch.clone(),
             })))
             .map_err(|e| match e {
                 mpsc::TrySendError::Full(_) => Code::Capacity,
                 mpsc::TrySendError::Disconnected(_) => Code::Unavailable,
             })?;
-        Ok(receiver)
+        Ok((receiver, dispatch))
     }
     pub fn run(&self, alias: &str, adapter: &Adapter, task: Task, deadline: u64) -> Result<Output> {
         // The worker may still commit a revalidation after this wait ends.
         let committing = matches!(task, Task::Revalidate { .. });
-        self.send(alias, adapter, task, deadline)?
+        let (receiver, dispatch) = self.send(alias, adapter, task, deadline)?;
+        receiver
             .recv_timeout(until(deadline)?.saturating_duration_since(Instant::now()))
             .map_err(|e| match e {
-                _ if committing => Code::OutcomeUnknown,
-                mpsc::RecvTimeoutError::Timeout => Code::Timeout,
-                _ => Code::Unavailable,
+                _ if committing => Code::OutcomeUnknown.into(),
+                // A read its worker already dispatched: the request may have
+                // reached the provider, so its deadline is the provider's.
+                mpsc::RecvTimeoutError::Timeout if dispatch.abandon() => Error {
+                    origin: Origin::Provider,
+                    ..Error::from(Code::Timeout)
+                },
+                mpsc::RecvTimeoutError::Timeout => Code::Timeout.into(),
+                _ => Error::from(Code::Unavailable),
             })?
     }
     pub(super) fn recover(&self, batch: maintenance::Batch) -> Result<()> {
@@ -892,6 +939,12 @@ fn worker(
                         registry.cancel_read(captured, connectors_sdk::now_ms())?;
                         return Err(error);
                     }
+                    // Refused once the pool stopped waiting and reported the
+                    // host's own timeout: nothing is dispatched after that.
+                    if let Err(error) = job.dispatch.begin() {
+                        registry.cancel_read(captured, connectors_sdk::now_ms())?;
+                        return Err(error);
+                    }
                     let dispatched = registry.dispatch_read(captured, connectors_sdk::now_ms())?;
                     drop(guard);
                     let result = active.invoke_explained(
@@ -1260,5 +1313,120 @@ mod read_answer_tests {
                 Code::Unavailable
             );
         }
+    }
+}
+
+/// story:invoke-timeout-after-dispatch-stage: a read whose deadline passes
+/// after its worker dispatched it is the provider's timeout (`stage =
+/// dispatch`); one whose deadline passes before dispatch stays the host's
+/// own (`stage = admission`), and its worker can no longer dispatch it.
+#[cfg(test)]
+mod dispatch_wait_tests {
+    use super::*;
+    use crate::local::config::{Executable, Startup};
+
+    fn adapter() -> Adapter {
+        Adapter {
+            instance_id: "instance".into(),
+            adapter_id: "adapter".into(),
+            configuration_revision: "config".into(),
+            protocol: "v1alpha1".into(),
+            private_protocol: None,
+            startup: Startup::OnDemand,
+            restart: Default::default(),
+            permissions: Default::default(),
+            executable: Executable {
+                path: "/not-launched".into(),
+                sha256: "a".repeat(64),
+                args: Vec::new(),
+            },
+        }
+    }
+
+    fn read() -> Task {
+        Task::Invoke {
+            connection: "connection".into(),
+            operation: "read".into(),
+            schema: "schema".into(),
+            revision: "revision".into(),
+            document: b"{}".to_vec(),
+        }
+    }
+
+    /// A pool whose one stand-in worker takes every job, dispatches it when
+    /// `dispatch` is set, reports what its dispatch attempt answered, and
+    /// keeps the job unanswered until shutdown.
+    fn pool(dispatch: bool) -> (Pool, mpsc::Receiver<Dispatch>, tempfile::TempDir) {
+        let root = tempfile::tempdir().unwrap();
+        let pool = Pool::new(
+            Arc::new(Paths {
+                config: root.path().join("unread-config"),
+                state: root.path().join("unopened-state"),
+            }),
+            uuid::Uuid::new_v4().to_string(),
+        );
+        let (sender, receiver) = mpsc::sync_channel::<Work>(16);
+        let (taken, jobs) = mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let mut held = Vec::new();
+            while let Ok(work) = receiver.recv() {
+                if let Work::Invoke(job) = &work {
+                    if dispatch {
+                        job.dispatch.begin().unwrap();
+                    }
+                    let _ = taken.send(job.dispatch.clone());
+                }
+                held.push(work);
+            }
+        });
+        pool.workers.lock().unwrap().insert(
+            "instance".into(),
+            Worker {
+                sender,
+                thread,
+                control: Arc::new(Mutex::new(lifecycle::Control::default())),
+                busy: Arc::new(AtomicBool::new(false)),
+                recovering: Arc::new(AtomicBool::new(false)),
+                recovery_pending: Arc::new(AtomicBool::new(false)),
+                queued: Arc::new(AtomicUsize::new(0)),
+            },
+        );
+        (pool, jobs, root)
+    }
+
+    fn timed_out(pool: &Pool) -> Error {
+        match pool.run("alias", &adapter(), read(), connectors_sdk::now_ms() + 300) {
+            Err(error) => error,
+            Ok(_) => panic!("the stand-in worker never answers"),
+        }
+    }
+
+    #[test]
+    fn a_read_whose_deadline_passes_after_dispatch_is_the_providers_timeout() {
+        let (pool, _jobs, _root) = pool(true);
+        let error = timed_out(&pool);
+        assert_eq!(error.code, Code::Timeout);
+        assert_eq!(
+            error.origin,
+            Origin::Provider,
+            "a dispatched read's timeout reported as the host's admission"
+        );
+        pool.shutdown().unwrap();
+    }
+
+    #[test]
+    fn a_read_whose_deadline_passes_before_dispatch_stays_admission_and_never_dispatches() {
+        let (pool, jobs, _root) = pool(false);
+        let error = timed_out(&pool);
+        assert_eq!(error.code, Code::Timeout);
+        assert_eq!(error.origin, Origin::Host);
+        // The waiter answered admission, so the worker may not dispatch it now.
+        let dispatch = jobs.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert_eq!(
+            dispatch.begin().map_err(|error| error.code),
+            Err(Code::Timeout),
+            "a read the waiter reported as not dispatched was dispatched after all"
+        );
+        pool.shutdown().unwrap();
     }
 }

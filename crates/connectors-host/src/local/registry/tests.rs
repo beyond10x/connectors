@@ -1617,7 +1617,9 @@ fn seed_recorded_events(root: &Path, events: i64) {
         "requirements":[{"operation":"read", "profile":"pat", "scopes":[], "effect":"read"}]
     }))
     .unwrap();
-    let description = serde_json::to_string(&bootstrap).unwrap();
+    // A remembered bootstrap names the build that wrote it (ess/domains/cli.yaml).
+    let description =
+        crate::local::runtime::state::encode_cached(&bootstrap, Some("0.0.0-fixture")).unwrap();
     // Ten members a batch keeps each batch well inside the bridge deadline on
     // a loaded host.
     const BATCH: i64 = 10;

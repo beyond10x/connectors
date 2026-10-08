@@ -931,9 +931,10 @@ fn domain_row(connection: &Connection, table: &Table, raw: RawRow) -> Result<Row
             fields.insert("suppressed".into(), boolean_field(&raw, "suppressed")?);
             copy_optional_text(&raw, &mut fields, "selection", "selection", false)?;
             if optional_present(&raw, "bootstrap")? {
-                let encoded = text_field(&raw, "bootstrap")?;
-                let bootstrap: crate::local::runtime::Bootstrap =
-                    serde_json::from_str(encoded).map_err(|_| Failure::MetadataUnavailable)?;
+                // The writing build's version is kept in the bootstrap column
+                // beside the bootstrap's members (runtime/state.rs `Recorded`).
+                let (bootstrap, build_version) =
+                    crate::local::runtime::state::decode_cached(text_field(&raw, "bootstrap")?)?;
                 bootstrap
                     .validate()
                     .map_err(|_| Failure::MetadataUnavailable)?;
@@ -941,6 +942,9 @@ fn domain_row(connection: &Connection, table: &Table, raw: RawRow) -> Result<Row
                     "bootstrap".into(),
                     serde_json::to_value(bootstrap).map_err(|_| Failure::MetadataUnavailable)?,
                 );
+                if let Some(build_version) = build_version {
+                    fields.insert("build_version".into(), json!(build_version));
+                }
             }
             copy_optional_timestamp(&raw, &mut fields, "observed_at_ms", "observed_at")?;
             (id.to_owned(), "Retained")
@@ -2723,9 +2727,13 @@ fn projection_fields(
                     bootstrap
                         .validate()
                         .map_err(|_| Failure::MetadataUnavailable)?;
-                    serde_json::to_string(&bootstrap)
+                    let build_version = row
+                        .fields
+                        .get("build_version")
+                        .map(|value| value.as_str().ok_or(Failure::MetadataUnavailable))
+                        .transpose()?;
+                    crate::local::runtime::state::encode_cached(&bootstrap, build_version)
                         .map(Value::String)
-                        .map_err(|_| Failure::MetadataUnavailable)
                 })
                 .transpose()?;
             put_optional(&mut raw, "bootstrap", bootstrap);
@@ -3991,6 +3999,7 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
                 && current.fields.get("selection") == next.fields.get("selection")
                 && current.fields.get("bootstrap") == next.fields.get("bootstrap")
                 && current.fields.get("observed_at") == next.fields.get("observed_at")
+                && current.fields.get("build_version") == next.fields.get("build_version")
             {
                 Ok("connectors.cli.SetLocalRuntimeSuppression")
             } else {
@@ -6799,6 +6808,10 @@ mod tests {
         remembered
             .fields
             .insert("observed_at".into(), json!("2026-09-18T00:00:00Z"));
+        // Remembering a bootstrap records the build that wrote it (ess/domains/cli.yaml).
+        remembered
+            .fields
+            .insert("build_version".into(), json!("0.0.0-fixture"));
         let command = update_command(&runtime, &remembered).unwrap();
         assert_eq!(command, "connectors.cli.RememberLocalRuntimeBootstrap");
         transition(&authority, &runtime, &remembered, command)
