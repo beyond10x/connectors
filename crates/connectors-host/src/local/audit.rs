@@ -19,6 +19,10 @@ pub enum Failure {
     NotFound,
     Conflict,
     Capacity,
+    /// `AttemptLinkRefused`: a read, describe or access-less anchor.
+    Refused,
+    /// `AuditStateConflict`: the record already has its final observation.
+    StateConflict,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -149,6 +153,47 @@ impl Store {
         let metadata = Metadata::inspect(&self.path).map_err(host_error)?;
         require_schema(&metadata.connection)?;
         load(&metadata.connection, reference)
+    }
+
+    /// `LinkAnchorAttempt` (audit.md § 1, Attempt link): sets the absent
+    /// `attempt_id` of an `Anchored` write anchor to the attempt recorded after
+    /// it, once. The same attempt again changes nothing (`Linked::Repeated`);
+    /// another attempt is `Conflict`, a read or access-less anchor `Refused`, a
+    /// record with its final observation `StateConflict`. The attempt must be
+    /// recorded under the anchor's instance and agree with its connection. A
+    /// link grants no dispatch, approval or replay authority.
+    pub fn link(&self, reference: &Reference, attempt_id: Uuid) -> Result<Linked> {
+        reference.encode_private()?;
+        if attempt_id.is_nil() {
+            return Err(Failure::InvalidInput);
+        }
+        self.transaction(false, |tx, _| {
+            let mut record = load(tx, reference)?.ok_or(Failure::NotFound)?;
+            if record.final_observation.is_some() {
+                return Err(Failure::StateConflict);
+            }
+            if record.anchor.access != Some(Access::Write) {
+                return Err(Failure::Refused);
+            }
+            match record.anchor.attempt_id {
+                Some(linked) if linked == attempt_id => return Ok(Linked::Repeated),
+                Some(_) => return Err(Failure::Conflict),
+                None => {}
+            }
+            record.anchor.attempt_id = Some(attempt_id);
+            references(tx, &record.anchor)?;
+            let encoded = record.encode()?;
+            let changed = tx
+                .execute(
+                    "UPDATE execution_audits SET attempt_id=?2,record_json=?3 WHERE audit_record_ref=?1 AND attempt_id IS NULL",
+                    params![reference.encode_private()?, attempt_id.to_string(), encoded],
+                )
+                .map_err(db)?;
+            if changed != 1 {
+                return Err(Failure::MetadataUnavailable);
+            }
+            Ok(Linked::Linked)
+        })
     }
 
     /// Separate final append, borrowing the owner's retained exact observation.
@@ -305,7 +350,9 @@ fn references(connection: &Connection, anchor: &Anchor) -> Result<()> {
         }
     }
     if let Some(attempt) = anchor.attempt_id {
-        let selected: Option<(String, String)> = connection
+        // An HTTP-host attempt records no connection (mutations.yaml,
+        // AttemptRecord.connection_ref); an anchor naming one cannot link it.
+        let selected: Option<(String, Option<String>)> = connection
             .query_row(
                 "SELECT instance_id,connection_ref FROM mutation_attempts WHERE attempt_id=?1",
                 [attempt.to_string()],
@@ -320,7 +367,7 @@ fn references(connection: &Connection, anchor: &Anchor) -> Result<()> {
             || anchor
                 .connection_ref
                 .as_ref()
-                .is_some_and(|value| value != &selected)
+                .is_some_and(|value| Some(value) != selected.as_ref())
         {
             return Err(Failure::InvalidInput);
         }

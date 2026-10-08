@@ -291,7 +291,7 @@ const TABLES: &[Table] = &[
         columns: &[
             text!("attempt_id"),
             text!("instance_id"),
-            text!("connection_ref"),
+            text!("connection_ref", nullable),
             text!("request_id"),
             text!("fingerprint"),
             text!("approval_mode"),
@@ -1229,7 +1229,7 @@ fn attempt_row(
     copy_text(row, fields, "instance_id", "instance_id")?;
     copy_text(row, fields, "request_id", "request_id")?;
     fields.insert("operation_id".into(), json!(operation_id));
-    copy_text(row, fields, "connection_ref", "connection_ref")?;
+    copy_optional_text(row, fields, "connection_ref", "connection_ref", false)?;
     fields.insert("input_digest".into(), json!(input_digest));
     fields.insert("request_fingerprint".into(), fingerprint.clone());
     copy_text(row, fields, "approval_mode", "approval_mode")?;
@@ -1325,10 +1325,13 @@ fn fingerprint_value(encoded: &str) -> Result<Value> {
     operation[3].as_str().ok_or(Failure::MetadataUnavailable)?;
     let operation_ref =
         serde_json::to_string(&items[1]).map_err(|_| Failure::MetadataUnavailable)?;
+    // An HTTP-host attempt names no connection: both coordinates are null in
+    // the encoding and absent in `RequestFingerprint` (idempotency.yaml).
+    if items[2].is_null() != items[3].is_null() {
+        return Err(Failure::MetadataUnavailable);
+    }
     let mut fingerprint = json!({
         "operation_ref": operation_ref,
-        "connection_ref": items[2],
-        "connection_revision": items[3],
         "contract_ref": items[4],
         "profile": items[5],
         "descriptor_revision": items[6],
@@ -1336,6 +1339,10 @@ fn fingerprint_value(encoded: &str) -> Result<Value> {
         "canonicalization_version": items[8],
         "input_digest": items[9],
     });
+    if !items[2].is_null() {
+        fingerprint["connection_ref"] = items[2].clone();
+        fingerprint["connection_revision"] = items[3].clone();
+    }
     if !items[10].is_null() {
         fingerprint["route"] = items[10].clone();
     }
@@ -1389,6 +1396,7 @@ fn audit_row(row: &RawRow, fields: &mut Map<String, Value>) -> Result<(String, &
     copy_text(row, fields, "audit_ref", "audit_ref")?;
     copy_json_field(anchor, fields, "kind", "anchor_kind")?;
     copy_optional_json_field(anchor, fields, "activity", "activity")?;
+    copy_optional_json_field(anchor, fields, "access", "access")?;
     copy_json_field(anchor, fields, "hop", "hop_role")?;
     copy_json_field(anchor, fields, "stage", "stage")?;
     for name in [
@@ -3089,7 +3097,7 @@ fn read_use_projection(row: &RowImage, raw: &mut Map<String, Value>) -> Result<(
 fn attempt_projection(row: &RowImage, raw: &mut Map<String, Value>) -> Result<()> {
     copy_domain(row, raw, "attempt_id", "attempt_id")?;
     copy_domain(row, raw, "instance_id", "instance_id")?;
-    copy_domain(row, raw, "connection_ref", "connection_ref")?;
+    copy_optional_domain(row, raw, "connection_ref", "connection_ref", false)?;
     copy_domain(row, raw, "request_id", "request_id")?;
     put_json_text(
         raw,
@@ -3193,12 +3201,8 @@ fn fingerprint_from_value(value: &Value) -> Result<Value> {
     Ok(json!([
         "mutation-request/v2",
         operation,
-        value
-            .get("connection_ref")
-            .ok_or(Failure::MetadataUnavailable)?,
-        value
-            .get("connection_revision")
-            .ok_or(Failure::MetadataUnavailable)?,
+        value.get("connection_ref").unwrap_or(&absent),
+        value.get("connection_revision").unwrap_or(&absent),
         value
             .get("contract_ref")
             .ok_or(Failure::MetadataUnavailable)?,
@@ -3247,6 +3251,10 @@ fn audit_projection(row: &RowImage, raw: &mut Map<String, Value>) -> Result<()> 
             name.into(),
             row.fields.get(name).cloned().unwrap_or(Value::Null),
         );
+    }
+    // Absent on every record written before it existed; omitted, not null.
+    if let Some(access) = row.fields.get("access") {
+        anchor.insert("access".into(), access.clone());
     }
     anchor.insert(
         "recorded_at_ms".into(),
@@ -3911,6 +3919,13 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
         ("connectors.clock.LocalClockFloor", ("Recorded", "Recorded")) => {
             Ok("connectors.clock.AdvanceLocalClockFloor")
         }
+        // A move to another configuration revision sets the revision and the
+        // epoch together; every other change only advances the epoch.
+        ("connectors.declarations.ServiceConfiguration", ("Declared", "Declared"))
+            if current.fields.get("revision") != next.fields.get("revision") =>
+        {
+            Ok("connectors.declarations.UpgradeServiceConfiguration")
+        }
         ("connectors.declarations.ServiceConfiguration", ("Declared", "Declared")) => {
             Ok("connectors.declarations.AdvanceRegistryEpoch")
         }
@@ -4008,6 +4023,10 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
         }
         ("connectors.execution_audit.AuditRecord", ("Anchored", "FinalObserved")) => {
             Ok("connectors.execution_audit.AppendFinalObservation")
+        }
+        // audit.md § 1, Attempt link: the only change an Anchored record admits.
+        ("connectors.execution_audit.AuditRecord", ("Anchored", "Anchored")) => {
+            Ok("connectors.execution_audit.LinkAnchorAttempt")
         }
         ("connectors.approval_issuers.ApprovalIssuer", ("Bound", "Bound")) => {
             Ok("connectors.approval_issuers.AdvanceIssuerRevision")
@@ -4126,6 +4145,7 @@ fn command_arguments(
                 | "connectors.auth_bindings.AcknowledgeCustodyWrite"
                 | "connectors.auth_bindings.AcknowledgeCustodyDeletion"
                 | "connectors.execution_audit.AcknowledgeAnchor"
+                | "connectors.execution_audit.LinkAnchorAttempt"
                 | "connectors.execution_audit.AppendFinalObservation"
         );
         if !records_successful_owner_decision {
@@ -6013,6 +6033,115 @@ mod tests {
         next.revision = 3;
         next.fields.insert("registry_epoch".into(), json!(8));
         transition(&authority, &same, &next, command).unwrap();
+    }
+
+    // `LinkAnchorAttempt`'s guards over the optional `access` and `attempt_id`
+    // lower to refusals Entity Runtime can evaluate on a record without them
+    // (`ess/domains/execution_audit.yaml`): an access-less or read anchor is
+    // `AttemptLinkRefused`, never an unobservable outcome.
+    #[test]
+    fn attempt_link_refusals_over_absent_fields_are_observable() {
+        for access in [None, Some("read")] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("metadata.sqlite3");
+            let mut fields = json!({
+                "audit_record_ref": "anchor",
+                "instance_id": "instance",
+                "audit_ref": "reference",
+                "anchor_kind": "admitted_execution",
+                "activity": "invoke",
+                "hop_role": "execution",
+                "stage": "admission",
+                "principal_ref": "static-bearer",
+                "operation_id": "operation",
+                "recorded_at": "2026-10-08T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone();
+            if let Some(access) = access {
+                fields.insert("access".into(), json!(access));
+            }
+            let anchored = RowImage {
+                entity: "connectors.execution_audit.AuditRecord".into(),
+                id: "s:anchor".into(),
+                revision: 1,
+                lifecycle_state: "Anchored".into(),
+                fields,
+            };
+            let (authority, _, _) =
+                provision(&path, uuid::Uuid::new_v4(), 8, vec![anchored.clone()]).unwrap();
+            let mut linked = anchored.clone();
+            linked.revision = 2;
+            linked.fields.insert(
+                "attempt_id".into(),
+                json!("7a3b9d2e-4f5c-4b6d-8e8f-2a3b4c5d6e7f"),
+            );
+            let refusal = transition(
+                &authority,
+                &anchored,
+                &linked,
+                "connectors.execution_audit.LinkAnchorAttempt",
+            )
+            .unwrap_err();
+            let refusal = format!("{refusal:?}");
+            assert!(
+                refusal.contains("AttemptLinkRefused"),
+                "{access:?}: {refusal}"
+            );
+        }
+    }
+
+    // A move to another configuration revision is recorded through
+    // `UpgradeServiceConfiguration`, which sets the revision and the epoch
+    // together; an unchanged revision stays `AdvanceRegistryEpoch`
+    // (`ess/domains/declarations.yaml`).
+    #[test]
+    fn a_configuration_revision_change_is_recorded_as_an_upgrade() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let declared = RowImage {
+            entity: "connectors.declarations.ServiceConfiguration".into(),
+            id: "s:instance".into(),
+            revision: 1,
+            lifecycle_state: "Declared".into(),
+            fields: json!({
+                "instance_id": "instance",
+                "adapter_id": "adapter",
+                "revision": "configuration",
+                "registry_epoch": 7,
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![declared.clone()]).unwrap();
+        let mut upgraded = declared.clone();
+        upgraded.revision = 2;
+        upgraded
+            .fields
+            .insert("revision".into(), json!("configuration-2"));
+        upgraded.fields.insert("registry_epoch".into(), json!(8));
+        let command = update_command(&declared, &upgraded).unwrap();
+        assert_eq!(
+            command,
+            "connectors.declarations.UpgradeServiceConfiguration"
+        );
+        let mut epoch_only = declared.clone();
+        epoch_only.revision = 2;
+        epoch_only.fields.insert("registry_epoch".into(), json!(8));
+        assert_eq!(
+            update_command(&declared, &epoch_only).unwrap(),
+            "connectors.declarations.AdvanceRegistryEpoch"
+        );
+        let mut lower = upgraded.clone();
+        lower.fields.insert("registry_epoch".into(), json!(6));
+        assert!(
+            transition(&authority, &declared, &lower, command).is_err(),
+            "a lower registry epoch was recorded"
+        );
+        transition(&authority, &declared, &upgraded, command).unwrap();
     }
 
     // `ConnectionListCursor.page_limit` is bounded to 1..=500
