@@ -395,10 +395,15 @@ parameter. After upgrading:
    with the credential already in custody, and asks for no credential, when the
    provider host and the profile are unchanged and the provider still answers
    the same identity. Until then the connection reports `pending` and reads
-   refuse. When the provider host or the profile changed, revalidate refuses
-   with `lifecycle_conflict` and `next_action = create_connection`; when the
-   provider answers another identity, with `identity_mismatch` and the same
-   `next_action`. Either changes nothing. Connect that one again under a new `instance` id. See [Configuration
+   refuse with `lifecycle_conflict` and `next_action = revalidate_connection`.
+   When the provider host or the profile changed, revalidate refuses with
+   `lifecycle_conflict` and `next_action = create_connection`; when the provider
+   answers another identity, or refuses the credential, with its own code and
+   the same `next_action`. The credential is not invalidated; the refusal is
+   recorded, and reads then name `create_connection` too. Connect again: under
+   the same `instance` id a new connection is admitted under the configured
+   revision and moves the instance to it when it publishes; a changed provider
+   host or profile still needs a new `instance` id. See [Configuration
    upgrades](local-connection-registry.md#configuration-upgrades).
 3. Issue every write approval policy bound to the instance again.
 

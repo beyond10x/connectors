@@ -749,4 +749,51 @@ mod tests {
             repair
         );
     }
+
+    /// story:pending-connection-refusal-names-its-remedy: a connection saved
+    /// under another configuration revision is `pending` with no status change
+    /// pending, so its refusal keeps `lifecycle_conflict` at admission and
+    /// names the step that clears it: revalidation while only the revision
+    /// differs, a new connection when the authentication changed too. The
+    /// instance's approval keys refuse the changed configuration naming a new
+    /// connection. None of these names `retry_status`, also as the CLI
+    /// receives them across the owner transport.
+    #[test]
+    fn a_stale_connection_never_names_retry_status() {
+        use connectors_host::local::{approval_keys::Failure as KeyFailure, registry};
+        let conflict = |action: &str| {
+            (
+                json!("lifecycle_conflict"),
+                json!("admission"),
+                json!(action),
+            )
+        };
+        for (failure, action) in [
+            (registry::Failure::UpgradeRequired, "revalidate_connection"),
+            (registry::Failure::BindingChanged, "create_connection"),
+        ] {
+            let error = owner::Error::from(failure);
+            assert_eq!(error.code, owner::Code::LifecycleConflict, "{failure:?}");
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+            for error in [error, received] {
+                assert_eq!(
+                    reply(invoke_failure(error)),
+                    conflict(action),
+                    "{failure:?}"
+                );
+            }
+            assert_eq!(
+                reply(connections::registry_failure(failure)),
+                conflict(action),
+                "{failure:?}"
+            );
+        }
+        let keys = approval_keys::error(KeyFailure::BindingChanged);
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&keys).unwrap()).unwrap();
+        for error in [keys, received] {
+            assert_eq!(reply(owner_failure(error)), conflict("create_connection"));
+        }
+    }
 }
