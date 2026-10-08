@@ -7,9 +7,11 @@ pub mod amendment;
 pub mod authored;
 pub mod bundle;
 pub mod coverage;
+pub mod derived;
 pub mod discovery;
 pub mod inventory;
 pub mod pipeline;
+pub mod swagger;
 pub mod template;
 
 use connectors_core::{Error, ErrorCode, Result};
@@ -111,11 +113,14 @@ pub struct Derivation {
     pub from_file: String,
     pub from_sha256: String,
     pub from_bytes: usize,
-    /// `google-discovery/v1`.
+    /// `google-discovery/v1` or `swagger/2.0`.
     pub format: String,
-    /// The Discovery document's own `revision`.
-    pub discovery_revision: String,
-    /// `discovery-openapi/1`.
+    /// The Discovery document's own `revision`. Absent for a format that has
+    /// none, and then absent from the serialised record too, so every bundle
+    /// derived from a Discovery document keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery_revision: Option<String>,
+    /// `discovery-openapi/1` or `swagger2-openapi/1`.
     pub projector: String,
 }
 

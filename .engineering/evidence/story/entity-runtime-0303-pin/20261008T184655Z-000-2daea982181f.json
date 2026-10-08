@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T18:46:55Z",
+  "actor": "human:timo",
+  "artifact": "story:entity-runtime-0303-pin",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates (fmt, clippy -D warnings, test) on cdb264c34",
+    "reference": "connectors-host 434 passed, connectors 128 passed, 0 failed; eventlog-core 0.8.3 only in Cargo.lock"
+  }
+}

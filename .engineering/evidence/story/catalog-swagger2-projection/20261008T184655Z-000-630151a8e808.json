@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T18:46:55Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-swagger2-projection",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates (fmt, clippy -D warnings, test) on cdb264c34",
+    "reference": "connectors-catalog 202 passed (tests/swagger.rs 6), connectors-catalog-provider 415, connectors-build 236, 0 failed"
+  }
+}

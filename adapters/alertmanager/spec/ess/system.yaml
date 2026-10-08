@@ -1,0 +1,7 @@
+# Alertmanager-owned native records model for adapters/alertmanager/design.md.
+# Proposed; not implemented. System naming follows adapters/loki/spec/ess/system.yaml.
+format: ess/23
+system: connectors_alertmanager
+version: v1
+domains:
+  - connectors_alertmanager.alerts

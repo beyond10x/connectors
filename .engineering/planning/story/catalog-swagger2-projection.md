@@ -2,17 +2,31 @@
 format: aep.planning-md/3
 id: story:catalog-swagger2-projection
 kind: story
-status: draft
+status: implemented
 title: The catalog ingests Swagger 2.0 through an exact recorded projection
 relations:
 - decomposes: epic:generic-datasource-feeds
 - serves: vision:independent-contract-adapters
 scope:
+- confidence: cited
+  path: adapters/catalog/design.md
+- confidence: cited
+  path: adapters/catalog/tests/bundle_drift.rs
+- confidence: cited
+  path: adapters/slack/design.md
+- confidence: cited
+  path: adapters/slack/upstream
+- confidence: cited
+  path: crates/connectors-build/src/main.rs
 - confidence: inferred
   path: crates/connectors-catalog/src
 - confidence: inferred
   path: crates/connectors-catalog/tests
-revision: 2
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-08T18:46:56Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

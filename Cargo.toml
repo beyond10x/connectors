@@ -5,7 +5,7 @@ members = ["crates/*", "adapters/catalog", "adapters/kubernetes", "adapters/sql"
 exclude = ["apps/connectors-cli-contract"]
 
 [workspace.package]
-version = "0.36.0"
+version = "0.37.0"
 edition = "2024"
 rust-version = "1.88"
 license = "MIT OR Apache-2.0"
@@ -17,11 +17,11 @@ connectors-contracts = { path = "crates/connectors-contracts" }
 connectors-sdk = { path = "crates/connectors-sdk" }
 connectors-client = { path = "crates/connectors-client" }
 connectors-host = { path = "crates/connectors-host" }
-entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.2" }
-entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.2", features = ["sqlite", "sync-bridge"] }
-entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.2" }
-entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.2" }
-eventlog-core = { git = "https://github.com/beyond10x/eventlog", tag = "0.8.1" }
+entity-core = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
+entity-eventlog = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3", features = ["sqlite", "sync-bridge"] }
+entity-executor = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
+entity-store = { git = "https://github.com/beyond10x/entity-runtime", tag = "0.30.3" }
+eventlog-core = { git = "https://github.com/beyond10x/eventlog", tag = "0.8.3" }
 ess-conformance = { git = "https://github.com/beyond10x/ess", tag = "0.56.0" }
 ess-compiler = { git = "https://github.com/beyond10x/ess", tag = "0.56.0" }
 ess-domain = { git = "https://github.com/beyond10x/ess", tag = "0.56.0" }

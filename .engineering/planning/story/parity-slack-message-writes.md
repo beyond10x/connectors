@@ -8,7 +8,7 @@ relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-slack-reads
-revision: 1
+revision: 2
 ---
 ## Outcome
 
@@ -29,3 +29,7 @@ the Slack catalog provider.
 - Spec first: what the unit adds is modelled in the ESS specification it belongs to (adapter model, or pinned OpenAPI source and selection) and validated with the newest `ess` before implementation.
 - Each operation above answers through `connectors operations invoke` on a saved connection, against a recorded provider fixture, with the same capability the fluxplane operation gives (the parity page names the gap per operation).
 - The parity page row of each operation moves to covered, with the Connectors operation named.
+
+## Domain draft
+
+Drafted 2026-10-07 with `adapters/slack/spec/ess`. Decision needed before scheduling: `slack.message.send` can open a direct message, and an earlier Slack integration dropped direct-message scopes and access on purpose (`CHANGELOG.md:1606-1607`).

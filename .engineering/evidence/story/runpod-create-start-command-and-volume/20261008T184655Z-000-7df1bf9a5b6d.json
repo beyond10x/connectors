@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T18:46:55Z",
+  "actor": "human:timo",
+  "artifact": "story:runpod-create-start-command-and-volume",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates (fmt, clippy -D warnings, test) on cdb264c34",
+    "reference": "red at 73626a3d8 (refused in prepare: InvalidInput); connectors-catalog-provider 415 passed, 0 failed at cdb264c34"
+  }
+}
