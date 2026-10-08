@@ -131,9 +131,9 @@ fn a_feed_binding_naming_a_twice_declared_operation_is_refused() {
         duplicate(&mut bundle, id);
         let refused = Engine::with_feed(&bundle, "/v1", &[], Some(&feed)).err();
         assert!(
-            refused
-                .as_ref()
-                .is_some_and(|e| e.message.contains(&format!("more than one operation `{id}`"))),
+            refused.as_ref().is_some_and(|e| e
+                .message
+                .contains(&format!("more than one operation `{id}`"))),
             "a feed over the twice-declared `{id}` loaded: {:?}",
             refused.map(|e| e.message)
         );
@@ -149,7 +149,13 @@ fn every_shipped_selection_set_still_loads() {
     for entry in fs::read_dir(root().join("providers")).unwrap() {
         let provider = entry.unwrap().file_name().to_string_lossy().into_owned();
         let file: Value = serde_json::from_slice(
-            &fs::read(root().join("providers").join(&provider).join("operations.json")).unwrap(),
+            &fs::read(
+                root()
+                    .join("providers")
+                    .join(&provider)
+                    .join("operations.json"),
+            )
+            .unwrap(),
         )
         .unwrap();
         let selections: Vec<Selection> =
@@ -158,7 +164,10 @@ fn every_shipped_selection_set_still_loads() {
             .get("feed")
             .map(|f| serde_json::from_value(f.clone()).unwrap());
         let bundle = bundle::load(&root().join("generated/bundles"), &provider).unwrap();
-        assert!(index.find(&provider).is_some(), "`{provider}` is not indexed");
+        assert!(
+            index.find(&provider).is_some(),
+            "`{provider}` is not indexed"
+        );
         // The document base is every shipped selection's longest common leading path.
         let paths: Vec<Vec<String>> = selections
             .iter()
@@ -168,7 +177,13 @@ fn every_shipped_selection_set_still_loads() {
                     .operations
                     .iter()
                     .find(|o| o.operation_id.as_deref() == Some(&s.operation_id))
-                    .map(|o| o.path.split('/').filter(|x| !x.is_empty()).map(str::to_owned).collect())
+                    .map(|o| {
+                        o.path
+                            .split('/')
+                            .filter(|x| !x.is_empty())
+                            .map(str::to_owned)
+                            .collect()
+                    })
                     .unwrap_or_default()
             })
             .collect();
@@ -188,7 +203,10 @@ fn every_shipped_selection_set_still_loads() {
         }
         loaded += 1;
     }
-    assert!(loaded >= 10, "only {loaded} shipped selection sets were read");
+    assert!(
+        loaded >= 10,
+        "only {loaded} shipped selection sets were read"
+    );
 }
 
 // ---- the provider child against a fixed-answer fixture -------------------------------------
@@ -443,10 +461,18 @@ fn create_answer(method: &str, route: &str, body: &[u8]) -> Reply {
     match (method, route) {
         ("GET", "/v1/probe/204") => return Reply::Answer(204, "", Vec::new()),
         ("GET", "/v1/probe/202") => return Reply::Answer(202, "", b"[]".to_vec()),
-        ("GET", "/v1/probe/301") => return Reply::Answer(301, "Location: /v1/pods\r\n", Vec::new()),
-        ("GET", "/v1/probe/307") => return Reply::Answer(307, "Location: /v1/pods\r\n", Vec::new()),
+        ("GET", "/v1/probe/301") => {
+            return Reply::Answer(301, "Location: /v1/pods\r\n", Vec::new());
+        }
+        ("GET", "/v1/probe/307") => {
+            return Reply::Answer(307, "Location: /v1/pods\r\n", Vec::new());
+        }
         ("GET", "/v1/probe/302") => {
-            return Reply::Answer(302, "Location: https://example.invalid/v1/pods\r\n", Vec::new());
+            return Reply::Answer(
+                302,
+                "Location: https://example.invalid/v1/pods\r\n",
+                Vec::new(),
+            );
         }
         _ => {}
     }
@@ -515,9 +541,16 @@ fn a_create_the_provider_may_have_acted_on_is_never_refused_and_never_resent() {
         .iter()
         .filter(|(_, effect)| *effect == WriteEffect::Refused)
         .collect();
-    assert!(refused.is_empty(), "refused after reaching the provider: {refused:?}");
+    assert!(
+        refused.is_empty(),
+        "refused after reaching the provider: {refused:?}"
+    );
     let writes = provider.writes();
-    assert_eq!(writes.len(), cases.len(), "a create was sent other than once");
+    assert_eq!(
+        writes.len(),
+        cases.len(),
+        "a create was sent other than once"
+    );
     for ((method, target, _), name) in writes.iter().zip(cases) {
         assert_eq!(method, "POST", "`{name}`");
         assert!(target.starts_with("/v1/pods"), "`{name}`: {target}");
@@ -578,7 +611,11 @@ fn the_configured_identity_admits_only_a_200() {
         // Exactly one request, to the configured probe: the refusal is the answer's,
         // not a load failure, and the redirect was not followed.
         let requests = provider.requests.lock().unwrap().clone();
-        assert_eq!(requests.len(), 1, "the probe answered {status}: {requests:?}");
+        assert_eq!(
+            requests.len(),
+            1,
+            "the probe answered {status}: {requests:?}"
+        );
         assert_eq!(requests[0].1, format!("/v1/probe/{status}?"));
     }
 }
@@ -603,11 +640,18 @@ fn a_terminate_without_a_definite_answer_is_not_refused() {
     let mut child = provider.child();
     let result = write(&mut child, "pod.terminate", &json!({"podId": "gone"})).unwrap();
     assert_eq!(result.effect, WriteEffect::Refused);
-    assert!(matches!(result.result, Err(Failure::NotFound | Failure::ProviderNotFound)));
+    assert!(matches!(
+        result.result,
+        Err(Failure::NotFound | Failure::ProviderNotFound)
+    ));
     for pod in ["failed", "dropped", "redirected", "truncated"] {
         let mut child = provider.child();
         let result = write(&mut child, "pod.terminate", &json!({"podId": pod})).unwrap();
         assert_eq!(result.effect, WriteEffect::Unknown, "`{pod}`");
     }
-    assert_eq!(provider.writes().len(), 5, "a terminate was sent other than once");
+    assert_eq!(
+        provider.writes().len(),
+        5,
+        "a terminate was sent other than once"
+    );
 }
