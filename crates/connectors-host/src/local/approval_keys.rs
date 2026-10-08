@@ -26,6 +26,10 @@ const MAX_TIME: i64 = 9_007_199_254_740_991;
 pub enum Failure {
     InvalidInput,
     Conflict,
+    /// The instance's recorded configuration revision is not the configured
+    /// one: a new connection under the configured revision, or a revalidation
+    /// that upgrades one, moves it.
+    BindingChanged,
     NotFound,
     MetadataUnavailable,
     /// The metadata store changed under the write; nothing was written.
@@ -481,6 +485,7 @@ impl Store {
             {
                 Ok(())
             }
+            Some((adapter, _)) if adapter == self.adapter => Err(Failure::BindingChanged),
             Some(_) => Err(Failure::Conflict),
             None if create => {
                 connection.execute("INSERT INTO registry_instances(instance_id,adapter_id,configuration_revision) VALUES (?1,?2,?3)",params![self.instance,self.adapter,self.configuration]).map_err(db)?;

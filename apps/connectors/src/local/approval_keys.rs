@@ -80,10 +80,10 @@ pub(super) fn execute(
     }
     Ok(result)
 }
-fn error(failure: Failure) -> Error {
-    match failure {
+pub(super) fn error(failure: Failure) -> Error {
+    let mut error: Error = match failure {
         Failure::InvalidInput => Code::InvalidInput,
-        Failure::Conflict => Code::LifecycleConflict,
+        Failure::Conflict | Failure::BindingChanged => Code::LifecycleConflict,
         Failure::NotFound => Code::NotFound,
         Failure::MetadataUnavailable => Code::MetadataUnavailable,
         Failure::RevisionConflict => Code::RevisionConflict,
@@ -91,5 +91,9 @@ fn error(failure: Failure) -> Error {
         Failure::OutcomeUnknown => Code::OutcomeUnknown,
         Failure::Capacity => Code::Capacity,
     }
-    .into()
+    .into();
+    // The instance's recorded configuration revision is not the configured
+    // one: a new connection under the configured revision moves it.
+    error.reconnect = failure == Failure::BindingChanged;
+    error
 }

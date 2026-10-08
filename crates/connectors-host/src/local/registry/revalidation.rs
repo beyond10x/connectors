@@ -65,6 +65,29 @@ fn admitted(
     }
 }
 
+/// The refusal of a connection whose binding is not the configured one. It is
+/// `pending` and no status change is pending for it, so it names the step that
+/// clears it, never the plain `Conflict` a retry would repeat. A revalidation
+/// follows a configuration upgrade only when it can: the authentication is
+/// unchanged, the new provider has not already refused it under the configured
+/// revision, and revalidation admits the credential (`usable`, asked last:
+/// material that is neither known invalid nor expired, as `admitted` requires).
+/// Anything else needs a new connection: repair refuses a changed binding.
+pub(super) fn changed(
+    row: &ConnectionRow,
+    configured: &Binding,
+    usable: impl FnOnce() -> Result<bool>,
+) -> Result<Failure> {
+    if upgradable(&row.binding, configured)
+        && row.kept.refused.as_deref() != Some(configured.configuration_revision.as_str())
+        && usable()?
+    {
+        Ok(Failure::UpgradeRequired)
+    } else {
+        Ok(Failure::BindingChanged)
+    }
+}
+
 /// The profile declaration's revision digests its scheme, capability, entry
 /// fields, scopes and evidence lifetime, so an equal declaration is unchanged
 /// authentication. Only the configuration revision may differ.
@@ -109,7 +132,8 @@ fn current(
 }
 
 /// A revoked connection is a terminal record: it records no configuration
-/// revision of its own and follows its instance's (metadata/er.rs).
+/// revision of its own and follows its instance's (metadata/er.rs), and no
+/// refused upgrade.
 pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &str) -> Result<()> {
     let revoked = tx
         .prepare("SELECT connection_ref,binding FROM registry_connections WHERE instance_id=?1 AND state='revoked'")
@@ -119,8 +143,8 @@ pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &s
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(db)?;
     for (reference, binding) in revoked {
-        let mut binding: Binding = decode(&binding)?;
-        if binding.configuration_revision != revision {
+        let (mut binding, kept) = decode_stored(&binding)?;
+        if binding.configuration_revision != revision || kept != Kept::default() {
             binding.configuration_revision = revision.to_owned();
             tx.execute(
                 "UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
@@ -129,6 +153,31 @@ pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &s
             .map_err(db)?;
         }
     }
+    Ok(())
+}
+
+/// Record that the new provider refused this connection's credential under
+/// the upgrade's configured revision (`Connection.refused_configuration_revision`).
+/// It invalidates nothing under the connection's own revision; a read under
+/// that configured revision then names a new connection (`changed`).
+fn refuse_upgrade(tx: &Transaction<'_>, row: &ConnectionRow, upgrade: &Binding) -> Result<()> {
+    if row.kept.refused.as_deref() == Some(upgrade.configuration_revision.as_str()) {
+        return Ok(());
+    }
+    tx.execute(
+        "UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
+        params![
+            row.reference,
+            encode_stored(
+                &row.binding,
+                &Kept {
+                    refused: Some(upgrade.configuration_revision.clone()),
+                    ..row.kept.clone()
+                }
+            )?
+        ],
+    )
+    .map_err(db)?;
     Ok(())
 }
 
@@ -283,7 +332,7 @@ impl Registry {
                     // its identity as a proved mismatch in the current material.
                     native.validate(binding,dispatched.consumed,now)?;
                     if row.identity.as_ref() != Some(&native.identity) {
-                        if upgrade.is_none() { invalidate(tx,&row,InvalidCredential::Invalid)?; }
+                        match upgrade { None => invalidate(tx,&row,InvalidCredential::Invalid)?, Some(upgrade) => refuse_upgrade(tx,&row,upgrade)? }
                         Err(if upgrade.is_some() { Failure::UpgradeIdentityMismatch } else { Failure::IdentityMismatch })
                     } else {
                         // Recollection cannot erase a known expiry for these
@@ -311,7 +360,11 @@ impl Registry {
                     }
                 }
                 Err(reason) => {
-                    if let Some(reason) = reason.filter(|_| upgrade.is_none()) { invalidate(tx,&row,reason)?; }
+                    match (reason, upgrade) {
+                        (Some(reason), None) => invalidate(tx,&row,reason)?,
+                        (Some(_), Some(upgrade)) => refuse_upgrade(tx,&row,upgrade)?,
+                        (None, _) => {}
+                    }
                     Ok(())
                 }
             };

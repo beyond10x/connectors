@@ -1552,6 +1552,15 @@ fn connection_row(
     if revision != instance_revision {
         fields.insert("configuration_revision".into(), json!(revision));
     }
+    // Kept in the binding column beside the binding (registry.rs `Kept`): the
+    // configured revision whose upgrade the new provider refused, and the
+    // instance's revision when an unpublished connection was begun under another.
+    for kept in [
+        "refused_configuration_revision",
+        "begun_at_instance_revision",
+    ] {
+        copy_optional_json_field(binding, fields, kept, kept)?;
+    }
     Ok((
         id.to_owned(),
         match text_field(row, "state")? {
@@ -2895,13 +2904,24 @@ fn connection_projection(
         Some(_) => return Err(Failure::MetadataUnavailable),
         None => domain(instance, "revision")?,
     };
-    let binding = json!({
+    let mut binding = json!({
         "instance_id": domain(row, "instance_id")?,
         "adapter_id": domain(instance, "adapter_id")?,
         "configuration_revision": configuration_revision,
         "provider_authority": domain(row, "provider_authority")?,
         "profile": static_profile,
     });
+    for kept in [
+        "refused_configuration_revision",
+        "begun_at_instance_revision",
+    ] {
+        if let Some(value) = row.fields.get(kept) {
+            binding
+                .as_object_mut()
+                .ok_or(Failure::MetadataUnavailable)?
+                .insert(kept.into(), value.clone());
+        }
+    }
     put_json_text(raw, "binding", binding)?;
     copy_domain(row, raw, "owner_scope", "scope_id")?;
     copy_domain(row, raw, "semantic_revision", "semantic_revision")?;

@@ -756,6 +756,34 @@ credential expired or is known invalid (`reauthorization_required`), and a
 credential below the operation's scopes, keep `code = not_granted` with
 `next_action = repair_connection`.
 
+A connection saved under another configuration revision of its instance also
+reports `pending` (`stale = true`), and no status change is pending for it: a
+read on `operations invoke`, an approval naming it and a consumer launch refuse
+it as `code = lifecycle_conflict` at `stage = admission`, never with
+`next_action = retry_status`. The next action is `revalidate_connection` only
+when a revalidation can follow the configuration upgrade: its provider
+authority and profile declaration are unchanged, its credential is neither
+known invalid nor expired, and the new provider has not already refused it
+under the configured revision. Otherwise it is `create_connection`, because
+repair refuses a changed binding. A revalidation the new provider refuses (the
+credential invalid, below scope or another identity) answers `create_connection`
+and records the refusal against the configured revision
+(`Connection.refused_configuration_revision`), so the next read names
+`create_connection` too; the refusal invalidates nothing under the connection's
+own revision, revalidation stays admitted, and a later upgrade that succeeds
+or a repair that replaces the credential removes it. An approval reads the
+wall clock for this classification only, as the read path does, without
+advancing the registry clock. `connections connect` under the configured
+revision is admitted while older connections of the instance stay saved under theirs. The instance's
+own recorded configuration revision moves to the configured one only when a
+connection is published under it: a revalidation that upgrades one, or a new
+connection whose publication succeeds while the instance still records the
+revision it had when that connect began. A connect that fails or is abandoned
+moves nothing, and a connect begun under an older configuration never moves
+the instance back. Until it moves, the instance's approval keys (`approvals
+key-status` and the other key commands) and its approval policy commands
+refuse as `code = lifecycle_conflict` with `next_action = create_connection`.
+
 A provider's timeout or capacity answer is the provider's too: a request the
 provider transport sent whose deadline then passed (a connection probe's
 included, and one that passes while the provider's answer is still being
