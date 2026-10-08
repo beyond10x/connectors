@@ -89,8 +89,8 @@ fn candidate() -> Candidate {
                 adapter: "adapter".into(),
                 operation: "operation".into(),
             },
-            connection_ref: "connection".into(),
-            connection_revision: "revision".into(),
+            connection_ref: Some("connection".into()),
+            connection_revision: Some("revision".into()),
             contract_ref: "operations/v1alpha1".into(),
             profile: "mutation".into(),
             descriptor_revision: "descriptor".into(),
@@ -168,7 +168,7 @@ fn pending_scan_pages_existing_instances_and_keyed_or_unkeyed_attempts() {
         if index >= 4 {
             candidate.namespace.receiver_instance = "second".into();
             candidate.fingerprint.operation.instance = "second".into();
-            candidate.fingerprint.connection_ref = "second-connection".into();
+            candidate.fingerprint.connection_ref = Some("second-connection".into());
         }
         let prepared = prepared(&store, &candidate);
         let reference = prepared.reference();
@@ -339,8 +339,8 @@ fn every_fingerprint_coordinate_conflicts_including_exact_route_revisions() {
     let changes: [fn(&mut Fingerprint); 11] = [
         |f| f.operation.adapter.push('2'),
         |f| f.operation.operation.push('2'),
-        |f| f.connection_ref.push('2'),
-        |f| f.connection_revision.push('2'),
+        |f| f.connection_ref.as_mut().unwrap().push('2'),
+        |f| f.connection_revision.as_mut().unwrap().push('2'),
         |f| f.contract_ref.push('2'),
         |f| f.profile.push('2'),
         |f| f.descriptor_revision.push('2'),
@@ -394,7 +394,7 @@ fn namespace_is_injective_with_explicit_nulls_origin_and_opaque_keys() {
             "receiver" => {
                 changed.namespace.receiver_instance = "second".into();
                 changed.fingerprint.operation.instance = "second".into();
-                changed.fingerprint.connection_ref = "second-connection".into();
+                changed.fingerprint.connection_ref = Some("second-connection".into());
             }
             _ => changed.caller_key = Some(" key\0\n".into()),
         }

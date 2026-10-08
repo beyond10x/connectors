@@ -1,0 +1,9 @@
+[
+  {
+    "file": "runpod-rest-v1.json",
+    "url": "https://rest.runpod.io/v1/openapi.json",
+    "sha256": "9500a8989878d53d8731f27bf8dbbd57801b328c760bdb32c38ba36d5cb580db",
+    "bytes": 154609,
+    "archive": "vendor/runpod-rest-v1.json.gz"
+  }
+]

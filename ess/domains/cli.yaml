@@ -192,6 +192,26 @@ types:
     kind: struct
     fields:
       - {name: build, type: connectors.cli.BuildDigest}
+  # Request::Cached: a CLI's read of an adapter's cached description through the
+  # running owner, answered from the owner's held metadata handle instead of a
+  # direct open of the store (contracts/cli/v1alpha1/owner.md). Sent only to an
+  # owner of the CLI's own build; without a reachable owner, or after an exchange that
+  # failed past the greeting, the CLI reads directly.
+  - name: connectors.cli.LocalOwnerCachedKind
+    kind: enum
+    variants: [cached]
+  - name: connectors.cli.LocalOwnerCachedRequest
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerCachedKind}
+      - {name: adapter, type: String}
+  # The answer: the cached bootstrap the owner holds for the adapter's configured
+  # instance and selection. Refusals keep the codes of a direct read
+  # (not_found, description_unavailable, metadata_unavailable).
+  - name: connectors.cli.LocalOwnerCached
+    kind: struct
+    fields:
+      - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
   - name: connectors.cli.LocalCaptureAdmission
     kind: struct
     fields:
@@ -294,7 +314,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
@@ -322,6 +342,13 @@ types:
     fields:
       - {name: kind, type: "connectors.cli.FailureKind"}
       - {name: code, type: "connectors.cli.FailureCode"}
+      # ESS-LIMIT: a read's `timeout` is at `stage = dispatch` once its
+      # connectors.credential_evidence.ReadUse took `dispatch` (DispatchReadUse), and at
+      # `stage = admission` before; a host that stops waiting first dispatches nothing more.
+      # A sent read whose answer never arrives is `outcome_unknown`
+      # (contracts/cli/v1alpha1/semantics.md). ESS 0.56 `specify cli` refuses any invariant
+      # on a CLI type ("unsupported invariants or union semantics"), and this type carries no
+      # dispatch fact to guard on, so the host enforces the rule and tests pin it.
       - {name: stage, type: "connectors.cli.FailureStage"}
       - {name: next_action, type: "connectors.cli.NextAction"}
       - {name: service_code, type: "Optional<connectors.service_wire.ErrorCode>"}
@@ -444,6 +471,10 @@ types:
       - {name: revision, type: "String"}
       - {name: operations, type: "List<connectors.cli.OperationDescription>"}
       - {name: configuration_schema, type: "String"}
+  # On both dispositions the metadata store setup init creates has Entity Runtime
+  # durable open checkpoints enabled before it returns; a database that already
+  # exists is never enabled by setup init (decision-blocker:store-checkpoints-one-way,
+  # option C; contracts/cli/v1alpha1/semantics.md §3).
   - name: connectors.cli.SetupInitResult
     kind: struct
     fields:
@@ -459,6 +490,38 @@ types:
       - {name: os, type: "connectors.cli.OperatingSystem"}
       - {name: keyring, type: "connectors.cli.KeyringState"}
       - {name: prerequisites, type: "List<connectors.cli.Prerequisite>"}
+  # Enabling durable open checkpoints installs Eventlog's triggers and continuity
+  # tables. Entity Runtime 0.28.0 and earlier, and so connectors 0.32.0 and earlier,
+  # refuse to open a store carrying them (Entity Runtime 0.29.0 CHANGELOG). One value
+  # is both the caller's confirmation and the result's statement of that change.
+  # UNMAPPED: Entity Runtime 0.29.0 also offers disable_durable_open_checkpoints,
+  # which makes the store openable by older releases again. The decision names no
+  # disable command for connectors; none is modelled. Open question for the owner.
+  - name: connectors.cli.CheckpointsChange
+    kind: enum
+    variants: [one-way]
+  - name: connectors.cli.CheckpointsDisposition
+    kind: enum
+    variants: [enabled, already_enabled]
+  # confirm is Optional so that its absence reaches the handler, which refuses it
+  # as confirmation_required before the store is opened. ess-cli/1 has no valueless
+  # switch source, so the confirming flag carries its value: `--confirm one-way`.
+  - name: connectors.cli.SetupCheckpointsEnableInput
+    kind: struct
+    fields:
+      - {name: confirm, type: "Optional<connectors.cli.CheckpointsChange>"}
+  # already_enabled is a success: the store already carried checkpoints and
+  # nothing was changed. Both dispositions state the one-way change.
+  - name: connectors.cli.SetupCheckpointsEnableResult
+    kind: struct
+    fields:
+      - {name: disposition, type: "connectors.cli.CheckpointsDisposition"}
+      - {name: state_path, type: "String"}
+      - {name: change, type: "connectors.cli.CheckpointsChange"}
+      # ESS-LIMIT: always "0.32.0", the newest connectors release that cannot open a
+      # store carrying checkpoints. As for Failure.instance_id, ESS declares no
+      # invariant on a CLI type, so the host pins the value and tests hold it.
+      - {name: newest_incompatible_release, type: "String"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:
@@ -734,7 +797,12 @@ types:
 # permission and no-symlink checks, terminal echo restoration, secret redaction,
 # immutable durable keyring versions, publication/revoke/final-dispatch fences,
 # same-identity repair and restart recovery, launch coalescing, exact owned
-# incarnation stop and durable suppression, readiness/deadlines/autostart isolation.
+# incarnation stop and durable suppression, readiness/deadlines/autostart isolation,
+# durable open checkpoints on every store setup init creates and through
+# `setup checkpoints-enable` (its confirmation refusal, owner lifetime-lock refusal,
+# idempotent already_enabled answer and one-way statement). Checkpoint installation
+# is Eventlog provider bookkeeping, like local_authority (docs/local-er-metadata.md),
+# so it is no entity, command or lifecycle state here.
 # All are required by the contract; this model does not claim to execute them.
 # Safe management request values omit credential_document. Only the separately
 # bound local protected action receives that ephemeral document, and it must
@@ -749,6 +817,7 @@ entities:
       - {name: selection, type: "Optional<String>"}
       - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
       - {name: observed_at, type: "Optional<Timestamp>"}
+      - {name: build_version, type: "Optional<String>"}
     lifecycle:
       initial: Retained
       states: [Retained]
@@ -758,6 +827,11 @@ entities:
         - {name: remember_bootstrap, from: [Retained], to: Retained}
     # Durable stop suppression and the bounded cached bootstrap owned by local
     # configuration. A cached bootstrap never establishes live readiness.
+    # build_version is the release version of the build that wrote the cached
+    # bootstrap, so a refusal can be traced to the build that produced it. A record
+    # written before it was recorded has none, and the next bootstrap a build
+    # remembers records that build's; a suppression change keeps it. Remembering a
+    # bootstrap always records one.
 
   - name: connectors.cli.ConnectionListCursor
     identity: {name: cursor_id, type: Uuid}
@@ -769,7 +843,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:370, docs/local-connection-registry.md:105-106;
+    # contracts/cli/v1alpha1/semantics.md:452, docs/local-connection-registry.md:105-106;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -806,6 +880,7 @@ commands:
       - {name: selection, type: "Optional<String>"}
       - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
       - {name: observed_at, type: "Optional<Timestamp>"}
+      - {name: build_version, type: "Optional<String>"}
     outcomes:
       - name: recorded
         creates: connectors.cli.LocalRuntimeRecord
@@ -819,6 +894,7 @@ commands:
           selection: input.selection
           bootstrap: input.bootstrap
           observed_at: input.observed_at
+          build_version: input.build_version
   - name: connectors.cli.SetLocalRuntimeSuppression
     input:
       - {name: instance_id, type: String}
@@ -839,6 +915,7 @@ commands:
       - {name: selection, type: String}
       - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
       - {name: observed_at, type: Timestamp}
+      - {name: build_version, type: String}
     outcomes:
       - name: remembered
         moves: connectors.cli.LocalRuntimeRecord.remember_bootstrap
@@ -851,6 +928,7 @@ commands:
           selection: input.selection
           bootstrap: input.bootstrap
           observed_at: input.observed_at
+          build_version: input.build_version
   - name: connectors.cli.RecordConnectionListCursor
     input:
       - {name: cursor_id, type: Uuid}
@@ -891,8 +969,8 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:374) and the host
-    # removal path (er.rs:3797-3799) only expires Active cursors. The error name is
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:456) and the host
+    # removal path (er.rs:4075-4077) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

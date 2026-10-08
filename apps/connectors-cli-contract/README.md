@@ -222,6 +222,14 @@ Callable: `setup-check`. Input: `null (inputless)`. Result: `connectors.cli.Setu
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `setup checkpoints-enable`
+
+Enable durable open checkpoints on the existing store; one-way, connectors 0.32.0 and earlier can no longer open it
+
+Callable: `setup-checkpoints-enable`. Input: `connectors.cli.SetupCheckpointsEnableInput`. Result: `connectors.cli.SetupCheckpointsEnableResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `setup init`
 
 Create private local configuration without starting services
@@ -260,4 +268,5 @@ Error `failure`: `connectors.cli.Failure`.
 - dynamic-validator:operations-invoke: resolve operation/schema identity and validate native input, result and errors; absent validator refuses
 - handler:operations-list: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-check: implement the owner-qualified callable and its declared result/error contract
+- handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-init: implement the owner-qualified callable and its declared result/error contract

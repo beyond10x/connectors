@@ -37,9 +37,20 @@ types:
       - {name: outcome, type: connectors.execution_audit.FinalOutcome}
       - {name: code, type: "Optional<String>"}
       - {name: recorded_at, type: Timestamp}
+  # contracts/service/audit.md § 1: whether the admitted invocation is a read or
+  # a write (its operation's host declaration includes `external_write`). Only a
+  # write anchor can be linked to an attempt (LinkAnchorAttempt).
+  - name: connectors.execution_audit.AnchorAccess
+    kind: enum
+    variants: [read, write]
+  # audit.md § 2: `unavailable` is the store that fails or does not answer. It
+  # creates no record and grants no dispatch, exactly as `capacity` does.
   - name: connectors.execution_audit.AnchorDecision
     kind: enum
-    variants: [allow, capacity]
+    variants: [allow, capacity, unavailable]
+  - name: connectors.execution_audit.LinkDecision
+    kind: enum
+    variants: [allow, unavailable]
   - name: connectors.execution_audit.AppendDecision
     kind: enum
     variants: [allow, unavailable]
@@ -54,6 +65,7 @@ entities:
       - {name: audit_ref, type: connectors.execution_audit.AuditRef}
       - {name: anchor_kind, type: connectors.execution_audit.AnchorKind}
       - {name: activity, type: "Optional<connectors.execution_audit.Activity>"}
+      - {name: access, type: "Optional<connectors.execution_audit.AnchorAccess>"}
       - {name: hop_role, type: connectors.execution_audit.HopRole}
       - {name: stage, type: connectors.execution_audit.AnchorStage}
       - {name: request_id, type: "Optional<String>"}
@@ -96,18 +108,41 @@ entities:
       - any:
           - not: {activity: describe}
           - all: [missing(operation_id), missing(attempt_id)]
+      # audit.md § 1: a describe admits no operation, so it is neither a read
+      # nor a write of one.
+      - any:
+          - not: {activity: describe}
+          - missing(access)
     lifecycle:
       initial: Anchored
       states: [Anchored, FinalObserved]
       terminal: [FinalObserved]
       transitions:
         - {name: append_final, from: [Anchored], to: FinalObserved}
+        # audit.md § 1, Attempt link: the write's attempt, recorded after the
+        # anchor (v1alpha2 semantics § 4 rule 4), is linked before dispatch.
+        - {name: link_attempt, from: [Anchored], to: Anchored}
 
 errors:
   - name: connectors.execution_audit.AuditCapacity
     fields:
       - {name: reason, type: String}
   - name: connectors.execution_audit.AppendUnavailable
+    fields:
+      - {name: reason, type: String}
+  - name: connectors.execution_audit.AnchorUnavailable
+    fields:
+      - {name: reason, type: String}
+  - name: connectors.execution_audit.AttemptLinkRefused
+    fields:
+      - {name: reason, type: String}
+  - name: connectors.execution_audit.AttemptLinkConflict
+    fields:
+      - {name: reason, type: String}
+  - name: connectors.execution_audit.AttemptLinkRepeated
+    fields:
+      - {name: reason, type: String}
+  - name: connectors.execution_audit.AttemptLinkUnavailable
     fields:
       - {name: reason, type: String}
   - name: connectors.execution_audit.AuditStateConflict
@@ -117,13 +152,17 @@ errors:
 commands:
   - name: connectors.execution_audit.AcknowledgeAnchor
     # Decision is produced by the trusted audit owner. Only acknowledged allow
-    # creates a record; capacity creates no placeholder and grants no dispatch.
+    # creates a record; capacity and unavailable create no placeholder and grant
+    # no dispatch. `access` is the admitted operation's read/write fact
+    # (compatibility.md § 2.1, `mutation`: its host declaration includes
+    # `external_write`); absent for describe and for anchors written before it.
     input:
       - {name: decision, type: connectors.execution_audit.AnchorDecision}
       - {name: instance_id, type: String}
       - {name: audit_ref, type: connectors.execution_audit.AuditRef}
       - {name: anchor_kind, type: connectors.execution_audit.AnchorKind}
       - {name: activity, type: "Optional<connectors.execution_audit.Activity>"}
+      - {name: access, type: "Optional<connectors.execution_audit.AnchorAccess>"}
       - {name: hop_role, type: connectors.execution_audit.HopRole}
       - {name: stage, type: connectors.execution_audit.AnchorStage}
       - {name: request_id, type: "Optional<String>"}
@@ -154,6 +193,7 @@ commands:
           audit_ref: input.audit_ref
           anchor_kind: input.anchor_kind
           activity: input.activity
+          access: input.access
           hop_role: input.hop_role
           stage: input.stage
           request_id: input.request_id
@@ -164,8 +204,76 @@ commands:
           recorded_at: input.recorded_at
           attempt_id: input.attempt_id
           final_observation: {cleared: true}
+      # audit.md § 2: a store that fails or does not answer. No record and no
+      # placeholder is created and no dispatch is granted; the HTTP host answers
+      # 503 `unavailable`, `audit_status: unavailable`, `audit_ref: null`, zero
+      # adapter calls (compatibility.md § 2.1, Audit anchor).
+      # ESS-LIMIT: a write that was never answered may still have committed a
+      # record the host never learned of (audit.md § 2, compatibility.md § 5:
+      # "Lost/ambiguous acknowledgement is not proof of no record"). This outcome
+      # declares the host's answer; it cannot declare that possible orphan, which
+      # no response ever references.
+      - name: unavailable
+        when: decision == unavailable
+        error: connectors.execution_audit.AnchorUnavailable
       - name: capacity
         error: connectors.execution_audit.AuditCapacity
+
+  - name: connectors.execution_audit.LinkAnchorAttempt
+    # contracts/service/audit.md § 1, Attempt link. The anchor is acknowledged
+    # before the write's attempt exists (v1alpha2 semantics § 4 rule 4), so its
+    # `attempt_id` cannot be set by AcknowledgeAnchor. After the attempt is
+    # recorded and before dispatch, the host links it here: once per anchor,
+    # only on a write anchor, only while no final observation exists. Repeating
+    # the link with the same attempt changes nothing and is answered as the
+    # original link (idempotent); another attempt is refused and the first
+    # link stays.
+    input:
+      - {name: decision, type: connectors.execution_audit.LinkDecision}
+      - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
+    outcomes:
+      - name: unavailable
+        when: decision == unavailable
+        error: connectors.execution_audit.AttemptLinkUnavailable
+      - name: read-anchor
+        when_subject:
+          predicate:
+            # An access-less anchor is refused too; the guard names its
+            # absence so it never reads a missing field.
+            any: ["missing(access)", {not: {access: write}}]
+        error: connectors.execution_audit.AttemptLinkRefused
+      - name: linked-elsewhere
+        when_subject:
+          predicate:
+            all: [defined(attempt_id), attempt_id != input.attempt_id]
+        error: connectors.execution_audit.AttemptLinkConflict
+      # The same attempt again changes nothing. It is declared as a refusal
+      # that leaves the record unchanged, which the host answers as the original
+      # link acknowledgement, rather than as a `preserves:` branch: this command
+      # is lowered to Entity Runtime (components.yaml local-metadata-authority),
+      # and no lowered command here uses `preserves:` (see the ESS-LIMIT on
+      # AppendFinalObservation's repeat below).
+      - name: already-linked
+        when_subject:
+          # `defined` first: a guard over the absent field is unobservable
+          # and would refuse the first link (Entity Runtime OutcomeUnobservable).
+          predicate:
+            all: ["defined(attempt_id)", attempt_id == input.attempt_id]
+        error: connectors.execution_audit.AttemptLinkRepeated
+      - name: linked
+        moves: connectors.execution_audit.AuditRecord.link_attempt
+        instance: audit_record_ref
+        emits: [connectors.execution_audit.AttemptLinked]
+        payload:
+          connectors.execution_audit.AttemptLinked:
+            audit_record_ref: input.audit_record_ref
+            attempt_id: input.attempt_id
+        sets:
+          attempt_id: input.attempt_id
+      - name: wrong-state
+        wrong_state: true
+        error: connectors.execution_audit.AuditStateConflict
 
   - name: connectors.execution_audit.AppendFinalObservation
     # contracts/service/audit.md:84-94. The owner allocates observation_id before
@@ -206,6 +314,10 @@ events:
       - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
       - {name: instance_id, type: String}
       - {name: audit_ref, type: connectors.execution_audit.AuditRef}
+  - name: connectors.execution_audit.AttemptLinked
+    fields:
+      - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
+      - {name: attempt_id, type: connectors.mutations.AttemptId}
   - name: connectors.execution_audit.FinalObservationRecorded
     fields:
       - {name: audit_record_ref, type: connectors.execution_audit.AuditRecordRef}
@@ -223,6 +335,7 @@ views:
       - {name: state, type: connectors.execution_audit.AuditRecord.State}
       - {name: anchor_kind, type: connectors.execution_audit.AnchorKind}
       - {name: activity, type: "Optional<connectors.execution_audit.Activity>"}
+      - {name: access, type: "Optional<connectors.execution_audit.AnchorAccess>"}
       - {name: hop_role, type: connectors.execution_audit.HopRole}
       - {name: stage, type: connectors.execution_audit.AnchorStage}
       - {name: request_id, type: "Optional<String>"}
@@ -271,9 +384,70 @@ views:
 # still cannot dispatch. No delete transition is selected. Audit outlives
 # replay/index payload cleanup, approval/nonce compaction and any other owner that
 # merely references it.
+#
+# The HTTP host's v1alpha2 invoke (contracts/service/compatibility.md § 2.1,
+# Audit anchor; audit.md § 1 Attempt link, § 2). Order per admitted
+# invocation, read or write:
+# AcknowledgeAnchor (`admitted_execution`, `hop_role: execution`,
+# `activity: invoke`, `access` from the operation's host declaration,
+# `attempt_id` absent), then for a write the attempt
+# (connectors.mutations.PrepareAttempt) and LinkAnchorAttempt, then dispatch,
+# then AppendFinalObservation. `capacity` and `unavailable` from
+# AcknowledgeAnchor both answer HTTP 503 `unavailable`, `audit_ref: null`, no
+# attempt, zero adapter calls.
+# Principal: on the HTTP host `principal_ref` is the fixed text
+# `static-bearer`, qualified by the anchor's `instance_id`. A static-bearer
+# credential authenticates one receiver-configured service principal, not the
+# people sharing its bytes (compatibility.md § 4, last paragraph; v1alpha2
+# semantics § 3.1, § 3.2); rotating the credential bytes or moving the
+# credential reference does not change it (v1alpha2 semantics § 4 rule 3).
+# Store: the HTTP host keeps its anchors and its attempt records in the local
+# metadata authority (Entity Runtime over Eventlog) in the configured
+# state directory (connectors.declarations.ServiceHostConfiguration `state`),
+# the same component as the local owner (components.yaml
+# local-metadata-authority), under audit.md § 4: at most 100,000 records per
+# instance, capacity refused before dispatch and never evicting, no expiry, no
+# audit deletion. Its instance is the ServiceConfiguration it records at start
+# (declarations.yaml, HTTP host start), which the `instance` relation names.
+# Failed link: when LinkAnchorAttempt answers `unavailable` after the attempt is
+# prepared, the host aborts that attempt (connectors.mutations.AbortPrepared,
+# `not_attempted`), answers 503 `unavailable` with zero adapter calls, and keeps
+# the anchor: its final observation (AppendFinalObservation) records the
+# refusal (FinalOutcome `refused`), and the response carries that record's
+# `audit_ref` and status. Every anchored write the host refuses before
+# dispatch records `refused` the same way: an attempt it could not record
+# (`capacity`, `unavailable`) and an attempt aborted as `not_attempted`. A
+# dispatched invocation records `success`, `error` (a read) or `unknown` (a
+# write); an adapter that panics after dispatch is an answer lost after
+# dispatch, never an invocation without its final observation.
+# Final-observation recovery (audit.md § 3): a final observation whose append
+# is not acknowledged (`incomplete`) is retained exactly, in the host process,
+# and the running host retries AppendFinalObservation with it every second
+# until it is acknowledged, already identical, or conflicts; it never
+# dispatches anything. Bound: at most 10,000 retained observations per host,
+# plus the invocations already admitted (at most 32 in flight). While the
+# retained set is full the host refuses every new v1alpha2
+# invocation before its anchor (503 `unavailable`, `audit_ref: null`, zero
+# adapter calls); it never evicts a retained observation. An observation counts
+# against the bound from the moment it is retained until a recovery pass has
+# its acknowledgement (or its identical or conflicting record): a pass that is
+# retrying it still holds it, so recovery never reopens admission while the
+# retained set is full. A host restart ends
+# the retry of what it retained: those records stay `Anchored`, as their
+# `incomplete` answer already said, and no later process appends a final
+# observation it did not observe.
+# ESS-LIMIT: the retained set is host process state, not a recorded entity;
+# ESS 0.56 has no retry-schedule, process-memory or cross-record count
+# construct, so the bound, the interval and the refusal are host obligations.
 
 actors:
   - name: connectors.execution_audit.LocalHost
     may:
       - connectors.execution_audit.AcknowledgeAnchor
+      - connectors.execution_audit.AppendFinalObservation
+  # The HTTP service host (crates/connectors-host/src/server.rs).
+  - name: connectors.execution_audit.ServiceHost
+    may:
+      - connectors.execution_audit.AcknowledgeAnchor
+      - connectors.execution_audit.LinkAnchorAttempt
       - connectors.execution_audit.AppendFinalObservation

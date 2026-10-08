@@ -19,6 +19,7 @@ components:
       commands:
         - connectors.declarations.RecordServiceConfiguration
         - connectors.declarations.AdvanceRegistryEpoch
+        - connectors.declarations.UpgradeServiceConfiguration
         - connectors.auth_bindings.RecordProfile
         - connectors.auth_bindings.AllocateConnection
         - connectors.auth_bindings.RevokeConnection
@@ -45,6 +46,7 @@ components:
         - connectors.idempotency.QuarantineKey
         - connectors.idempotency.ExpireResult
         - connectors.execution_audit.AcknowledgeAnchor
+        - connectors.execution_audit.LinkAnchorAttempt
         - connectors.execution_audit.AppendFinalObservation
         - connectors.approval_issuers.PublishKey
         - connectors.approval_issuers.BindIssuer

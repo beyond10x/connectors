@@ -5,7 +5,7 @@ use super::{
 };
 use entity_core::{EntityDefinition, EntityInstance, OperationFieldAction, Registry};
 use entity_eventlog::{
-    Authority, CapturePolicy, EventlogOperationContext, RecordedProviderFacade,
+    Authority, CapturePolicy, EventlogOperationContext, OpenVerification, RecordedProviderFacade,
     sync::{
         BridgeConfig, CallWait, EventlogRecordedStoreOwner, EventlogRecordedStoreProvisioner,
         ProvisionAuthority, ShutdownMode, ShutdownOutcome,
@@ -291,7 +291,7 @@ const TABLES: &[Table] = &[
         columns: &[
             text!("attempt_id"),
             text!("instance_id"),
-            text!("connection_ref"),
+            text!("connection_ref", nullable),
             text!("request_id"),
             text!("fingerprint"),
             text!("approval_mode"),
@@ -461,6 +461,9 @@ pub(super) struct ErAuthority {
     /// Device and inode of the file this authority's provider opened. A store
     /// replaced at the same path is a different file and is opened afresh.
     file: Option<(u64, u64)>,
+    /// How the provider's open verified the store. Whatever it says, the host
+    /// read the store completely before this handle answered anything.
+    opened: OpenVerification,
 }
 
 /// Highest global position and number of the tenant's events. Eventlog
@@ -543,6 +546,14 @@ pub(super) fn release(er: ErAuthority) {
     if !er.reusable {
         return;
     }
+    // Persist what this handle last verified as the store's open checkpoint,
+    // so the next open's suffix holds only what follows it. A store without
+    // durable open checkpoints, an unchanged observation or a handle not opened
+    // `ProviderTracked` writes nothing; a failed write leaves the previous
+    // checkpoint, which only lengthens the next open's suffix.
+    let _ = timed("er.write_checkpoint", || {
+        er.facade.write_open_checkpoint(call_wait())
+    });
     let evicted = {
         let Ok(mut idle) = IDLE.lock() else {
             return;
@@ -573,6 +584,102 @@ pub(super) fn release(er: ErAuthority) {
     // Dropping a verified idle bridge closes admission and detaches its worker;
     // no unacknowledged write remains on this path. Keep it outside the pool.
     drop(evicted);
+}
+
+/// Whether this process keeps a verified idle handle for the store file at
+/// `path`, the same file its provider opened.
+pub(super) fn holds(path: &Path) -> bool {
+    let file = file_identity(path);
+    file.is_some()
+        && IDLE.lock().is_ok_and(|idle| {
+            idle.iter().any(|held| {
+                held.durable_path == path && held.process == process() && held.file == file
+            })
+        })
+}
+
+/// Eventlog's durable capture continuity table, which enabling durable open
+/// checkpoints installs (Eventlog 0.8.0) and only disabling them removes.
+const CONTINUITY: &str = "connectors_er_capture_continuity";
+
+/// Whether durable open checkpoints are enabled on the store `connection`
+/// reads: Eventlog's continuity table exists.
+pub(super) fn checkpoints_enabled(connection: &Connection) -> Result<bool> {
+    connection
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name=?1)",
+            [CONTINUITY],
+            |row| row.get(0),
+        )
+        .map_err(unavailable)
+}
+
+/// Enables Entity Runtime durable open checkpoints on `er`'s store and
+/// persists the observation the enable verified as its first checkpoint.
+/// One-way for older releases: Entity Runtime 0.28.0 and earlier refuse to
+/// open the store afterwards. Enabling an enabled store changes nothing.
+pub(super) fn enable_checkpoints(er: &mut ErAuthority) -> Result<()> {
+    use entity_eventlog::sync::SyncReadError;
+    let failure = |error: SyncReadError| match error {
+        SyncReadError::AfterDispatch(_) => Failure::OutcomeUnknown,
+        SyncReadError::Rejected(_) | SyncReadError::Store(_) => Failure::MetadataUnavailable,
+    };
+    // A refused or unknown enable leaves this handle out of the pool.
+    er.reusable = false;
+    timed("er.enable_checkpoints", || {
+        er.facade.enable_durable_open_checkpoints(call_wait())
+    })
+    .map_err(failure)?;
+    // Enabling re-verified the whole store under this handle. A handle opened
+    // `FullVerification` (provisioning) writes no checkpoint: the next
+    // `ProviderTracked` open then verifies completely and its release writes one.
+    timed("er.write_checkpoint", || {
+        er.facade.write_open_checkpoint(call_wait())
+    })
+    .map_err(failure)?;
+    er.reusable = true;
+    Ok(())
+}
+
+/// Whether the provider's open of `er` started from a persisted open
+/// checkpoint. The host's complete read verified the whole store regardless.
+pub(super) fn opened_from_checkpoint(er: &ErAuthority) -> bool {
+    !matches!(er.opened, OpenVerification::Complete)
+}
+
+/// The provider's `ProviderTracked` open of the store at `path` on its own,
+/// without the complete read every host open follows it with: what it
+/// verified, or its refusal.
+#[cfg(test)]
+pub(super) fn provider_open(path: &Path) -> Result<OpenVerification> {
+    let (logical_scope, tenant, stream_identity): (String, String, String) =
+        Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(unavailable)?
+            .query_row(
+                "SELECT logical_scope,tenant,stream_identity FROM connectors_er_authority WHERE singleton=1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .map_err(unavailable)?;
+    let mut facade = RecordedProviderFacade::start_with_read_policy(
+        registry()?,
+        EventlogRecordedStoreOwner::Sqlite {
+            path: utf8_path(path)?,
+            prefix: PREFIX.into(),
+            authority: Authority {
+                logical_scope,
+                tenant,
+                stream_identity,
+            },
+            limits: LIMITS,
+        },
+        bridge_config(),
+        CapturePolicy::ProviderTracked,
+    )
+    .map_err(|_| Failure::MetadataUnavailable)?;
+    let opened = facade.open_verification();
+    facade.shutdown(ShutdownMode::CancelQueued, CallWait::Forever);
+    Ok(opened)
 }
 
 fn file_identity(path: &Path) -> Option<(u64, u64)> {
@@ -824,9 +931,10 @@ fn domain_row(connection: &Connection, table: &Table, raw: RawRow) -> Result<Row
             fields.insert("suppressed".into(), boolean_field(&raw, "suppressed")?);
             copy_optional_text(&raw, &mut fields, "selection", "selection", false)?;
             if optional_present(&raw, "bootstrap")? {
-                let encoded = text_field(&raw, "bootstrap")?;
-                let bootstrap: crate::local::runtime::Bootstrap =
-                    serde_json::from_str(encoded).map_err(|_| Failure::MetadataUnavailable)?;
+                // The writing build's version is kept in the bootstrap column
+                // beside the bootstrap's members (runtime/state.rs `Recorded`).
+                let (bootstrap, build_version) =
+                    crate::local::runtime::state::decode_cached(text_field(&raw, "bootstrap")?)?;
                 bootstrap
                     .validate()
                     .map_err(|_| Failure::MetadataUnavailable)?;
@@ -834,6 +942,9 @@ fn domain_row(connection: &Connection, table: &Table, raw: RawRow) -> Result<Row
                     "bootstrap".into(),
                     serde_json::to_value(bootstrap).map_err(|_| Failure::MetadataUnavailable)?,
                 );
+                if let Some(build_version) = build_version {
+                    fields.insert("build_version".into(), json!(build_version));
+                }
             }
             copy_optional_timestamp(&raw, &mut fields, "observed_at_ms", "observed_at")?;
             (id.to_owned(), "Retained")
@@ -1122,7 +1233,7 @@ fn attempt_row(
     copy_text(row, fields, "instance_id", "instance_id")?;
     copy_text(row, fields, "request_id", "request_id")?;
     fields.insert("operation_id".into(), json!(operation_id));
-    copy_text(row, fields, "connection_ref", "connection_ref")?;
+    copy_optional_text(row, fields, "connection_ref", "connection_ref", false)?;
     fields.insert("input_digest".into(), json!(input_digest));
     fields.insert("request_fingerprint".into(), fingerprint.clone());
     copy_text(row, fields, "approval_mode", "approval_mode")?;
@@ -1218,10 +1329,13 @@ fn fingerprint_value(encoded: &str) -> Result<Value> {
     operation[3].as_str().ok_or(Failure::MetadataUnavailable)?;
     let operation_ref =
         serde_json::to_string(&items[1]).map_err(|_| Failure::MetadataUnavailable)?;
+    // An HTTP-host attempt names no connection: both coordinates are null in
+    // the encoding and absent in `RequestFingerprint` (idempotency.yaml).
+    if items[2].is_null() != items[3].is_null() {
+        return Err(Failure::MetadataUnavailable);
+    }
     let mut fingerprint = json!({
         "operation_ref": operation_ref,
-        "connection_ref": items[2],
-        "connection_revision": items[3],
         "contract_ref": items[4],
         "profile": items[5],
         "descriptor_revision": items[6],
@@ -1229,6 +1343,10 @@ fn fingerprint_value(encoded: &str) -> Result<Value> {
         "canonicalization_version": items[8],
         "input_digest": items[9],
     });
+    if !items[2].is_null() {
+        fingerprint["connection_ref"] = items[2].clone();
+        fingerprint["connection_revision"] = items[3].clone();
+    }
     if !items[10].is_null() {
         fingerprint["route"] = items[10].clone();
     }
@@ -1282,6 +1400,7 @@ fn audit_row(row: &RawRow, fields: &mut Map<String, Value>) -> Result<(String, &
     copy_text(row, fields, "audit_ref", "audit_ref")?;
     copy_json_field(anchor, fields, "kind", "anchor_kind")?;
     copy_optional_json_field(anchor, fields, "activity", "activity")?;
+    copy_optional_json_field(anchor, fields, "access", "access")?;
     copy_json_field(anchor, fields, "hop", "hop_role")?;
     copy_json_field(anchor, fields, "stage", "stage")?;
     for name in [
@@ -1444,6 +1563,15 @@ fn connection_row(
         .map_err(unavailable)?;
     if revision != instance_revision {
         fields.insert("configuration_revision".into(), json!(revision));
+    }
+    // Kept in the binding column beside the binding (registry.rs `Kept`): the
+    // configured revision whose upgrade the new provider refused, and the
+    // instance's revision when an unpublished connection was begun under another.
+    for kept in [
+        "refused_configuration_revision",
+        "begun_at_instance_revision",
+    ] {
+        copy_optional_json_field(binding, fields, kept, kept)?;
     }
     Ok((
         id.to_owned(),
@@ -1747,7 +1875,6 @@ impl ErAuthority {
         projection_level: i64,
     ) -> Self {
         Self {
-            facade,
             source_level,
             projection_level,
             durable_path: path.to_owned(),
@@ -1758,6 +1885,8 @@ impl ErAuthority {
             reusable: true,
             process: process(),
             file: file_identity(path),
+            opened: facade.open_verification(),
+            facade,
         }
     }
 }
@@ -2598,9 +2727,13 @@ fn projection_fields(
                     bootstrap
                         .validate()
                         .map_err(|_| Failure::MetadataUnavailable)?;
-                    serde_json::to_string(&bootstrap)
+                    let build_version = row
+                        .fields
+                        .get("build_version")
+                        .map(|value| value.as_str().ok_or(Failure::MetadataUnavailable))
+                        .transpose()?;
+                    crate::local::runtime::state::encode_cached(&bootstrap, build_version)
                         .map(Value::String)
-                        .map_err(|_| Failure::MetadataUnavailable)
                 })
                 .transpose()?;
             put_optional(&mut raw, "bootstrap", bootstrap);
@@ -2787,13 +2920,24 @@ fn connection_projection(
         Some(_) => return Err(Failure::MetadataUnavailable),
         None => domain(instance, "revision")?,
     };
-    let binding = json!({
+    let mut binding = json!({
         "instance_id": domain(row, "instance_id")?,
         "adapter_id": domain(instance, "adapter_id")?,
         "configuration_revision": configuration_revision,
         "provider_authority": domain(row, "provider_authority")?,
         "profile": static_profile,
     });
+    for kept in [
+        "refused_configuration_revision",
+        "begun_at_instance_revision",
+    ] {
+        if let Some(value) = row.fields.get(kept) {
+            binding
+                .as_object_mut()
+                .ok_or(Failure::MetadataUnavailable)?
+                .insert(kept.into(), value.clone());
+        }
+    }
     put_json_text(raw, "binding", binding)?;
     copy_domain(row, raw, "owner_scope", "scope_id")?;
     copy_domain(row, raw, "semantic_revision", "semantic_revision")?;
@@ -2961,7 +3105,7 @@ fn read_use_projection(row: &RowImage, raw: &mut Map<String, Value>) -> Result<(
 fn attempt_projection(row: &RowImage, raw: &mut Map<String, Value>) -> Result<()> {
     copy_domain(row, raw, "attempt_id", "attempt_id")?;
     copy_domain(row, raw, "instance_id", "instance_id")?;
-    copy_domain(row, raw, "connection_ref", "connection_ref")?;
+    copy_optional_domain(row, raw, "connection_ref", "connection_ref", false)?;
     copy_domain(row, raw, "request_id", "request_id")?;
     put_json_text(
         raw,
@@ -3065,12 +3209,8 @@ fn fingerprint_from_value(value: &Value) -> Result<Value> {
     Ok(json!([
         "mutation-request/v2",
         operation,
-        value
-            .get("connection_ref")
-            .ok_or(Failure::MetadataUnavailable)?,
-        value
-            .get("connection_revision")
-            .ok_or(Failure::MetadataUnavailable)?,
+        value.get("connection_ref").unwrap_or(&absent),
+        value.get("connection_revision").unwrap_or(&absent),
         value
             .get("contract_ref")
             .ok_or(Failure::MetadataUnavailable)?,
@@ -3119,6 +3259,10 @@ fn audit_projection(row: &RowImage, raw: &mut Map<String, Value>) -> Result<()> 
             name.into(),
             row.fields.get(name).cloned().unwrap_or(Value::Null),
         );
+    }
+    // Absent on every record written before it existed; omitted, not null.
+    if let Some(access) = row.fields.get("access") {
+        anchor.insert("access".into(), access.clone());
     }
     anchor.insert(
         "recorded_at_ms".into(),
@@ -3255,6 +3399,8 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         .collect::<BTreeMap<_, _>>();
     let runtime_registry = registry()?;
     let mut actions = Vec::new();
+    // Recorded expiries of transient subjects whose SQL rows disappeared.
+    let mut expiries = Vec::new();
     for (key, current) in reference {
         match desired.get(key) {
             Some(next)
@@ -3273,7 +3419,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             }
             None => {
                 if let Some((command, next)) = removal_command(current)? {
-                    actions.push(command_action(
+                    expiries.push(command_action(
                         &runtime_registry,
                         &commands,
                         &desired,
@@ -3318,6 +3464,26 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
     }
     if prepared_observation && !reference.keys().any(registry_clock_key) {
         return Err(Failure::MetadataUnavailable);
+    }
+    // More expiries than one bounded batch holds are recorded first, in
+    // batches of at most `EXPIRY_BATCH` members; the caller's own actions
+    // follow in their own batch only once every expiry batch committed.
+    // With nothing else to record, the last expiry batch is the final batch
+    // and carries the post-commit checks below.
+    if expiries.len() > expiry_batch() {
+        let last = if actions.is_empty() {
+            (expiries.len() - 1) / expiry_batch() * expiry_batch()
+        } else {
+            expiries.len()
+        };
+        let mut tail = expiries.split_off(last);
+        let mut pending = expiries.into_iter().peekable();
+        while pending.peek().is_some() {
+            record_expiries(er, pending.by_ref().take(expiry_batch()).collect())?;
+        }
+        actions.append(&mut tail);
+    } else {
+        actions.append(&mut expiries);
     }
     // An unchanged floor is not recorded again. A change another handle made
     // since this baseline was refused above, before this batch; each action
@@ -3428,6 +3594,106 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         return Err(Failure::MetadataUnavailable);
     }
     Ok(())
+}
+
+/// The most expiries one batch records when more are due than fit in it.
+/// Every store this host opens is SQLite (`EventlogRecordedStoreOwner::Sqlite`,
+/// `EventlogRecordedStoreProvisioner::Sqlite`), where Entity Runtime 0.30.2 no
+/// longer shows 0.29.0's superlinear batch cost (396 expiries in one batch took
+/// 101.9 s at 1,201 events). Measured on 0.30.2 with
+/// `first_owner_open_of_a_grown_store` (release, 2026-10-08): one unbounded batch
+/// took 4.0 s for 396 expiries at 1,201 events and 14.4 s for every due expiry at
+/// 6,000, so an unbounded batch still grows with the backlog towards the 30-second
+/// bridge deadline. At 6,000 events, in repeated runs on a loaded machine, batches
+/// of 128 took at most 1.5–2.5 s each and 6.8–10.4 s in total; batches of 32 took
+/// at most 0.5–1.3 s and 7.5–9.7 s in total; 256 took at most 2.8 s, 512 at most
+/// 4.1 s. 128 keeps each batch more than ten times inside the deadline in a
+/// quarter of the batches 32 needs, at no measurable cost in total.
+const EXPIRY_BATCH: usize = 128;
+
+#[cfg(test)]
+thread_local! {
+    static EXPIRY_BATCH_OVERRIDE: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    /// Counts the expiry batches this thread executed; the one numbered
+    /// `FAIL_EXPIRY_BATCH` (1-based) is refused before dispatch.
+    static EXPIRY_BATCHES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static FAIL_EXPIRY_BATCH: std::cell::Cell<Option<usize>> = const { std::cell::Cell::new(None) };
+    /// Wall time of each expiry batch this thread executed, for measurements.
+    pub(super) static EXPIRY_TIMES: std::cell::RefCell<Vec<Duration>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+fn expiry_batch() -> usize {
+    #[cfg(test)]
+    if let Some(size) = EXPIRY_BATCH_OVERRIDE.with(std::cell::Cell::get) {
+        return size;
+    }
+    EXPIRY_BATCH
+}
+
+/// Runs `call` with expiry batches of at most `size` members; with `fail`, the
+/// expiry batch of that 1-based number is refused before dispatch. Returns the
+/// value and how many expiry batches ran.
+#[cfg(test)]
+pub(super) fn with_expiry_batches<T>(
+    size: usize,
+    fail: Option<usize>,
+    call: impl FnOnce() -> T,
+) -> (T, usize) {
+    EXPIRY_BATCH_OVERRIDE.with(|slot| slot.set(Some(size)));
+    FAIL_EXPIRY_BATCH.with(|slot| slot.set(fail));
+    EXPIRY_BATCHES.with(|slot| slot.set(0));
+    let value = call();
+    EXPIRY_BATCH_OVERRIDE.with(|slot| slot.set(None));
+    FAIL_EXPIRY_BATCH.with(|slot| slot.set(None));
+    (value, EXPIRY_BATCHES.with(std::cell::Cell::get))
+}
+
+/// Records one bounded batch of expiries ahead of the caller's batch and folds
+/// it into `er`'s baseline. Its receipt must read back like any own batch; the
+/// projection check of `persist_batch` runs once, after the caller's batch,
+/// because only then does the store hold everything the projection asks for.
+/// A refused or uncertain batch returns its failure: earlier expiry batches
+/// stay committed, the caller's batch is not executed, and the next write
+/// records the expiries still due.
+fn record_expiries(er: &mut ErAuthority, expiries: Vec<BatchAction>) -> Result<()> {
+    #[cfg(test)]
+    {
+        let number = EXPIRY_BATCHES.with(|slot| {
+            slot.set(slot.get() + 1);
+            slot.get()
+        });
+        if FAIL_EXPIRY_BATCH.with(std::cell::Cell::get) == Some(number) {
+            return Err(Failure::MetadataUnavailable);
+        }
+    }
+    let batch = BatchKey::Named(format!(
+        "connectors-metadata-expiry-{}",
+        uuid::Uuid::new_v4()
+    ));
+    #[cfg(test)]
+    let started = Instant::now();
+    let outcome = timed("er.execute_expiry_batch", || {
+        er.facade.execute_batch(
+            context("metadata-expiry"),
+            batch.clone(),
+            expiries,
+            batch_wait(),
+        )
+    })
+    .map_err(map_execution_failure)?;
+    #[cfg(test)]
+    EXPIRY_TIMES.with(|times| times.borrow_mut().push(started.elapsed()));
+    let receipt = outcome.receipt().ok_or(Failure::MetadataUnavailable)?;
+    let observed = catch_up(er, Some(&batch))?;
+    if receipt.members().iter().all(|member| {
+        observed
+            .get(&(member.subject.entity.clone(), member.subject.id.clone()))
+            .is_some_and(|records| records.iter().any(|record| record.receipt == *member))
+    }) {
+        Ok(())
+    } else {
+        Err(Failure::MetadataUnavailable)
+    }
 }
 
 fn postcommit_projection_matches(
@@ -3661,6 +3927,13 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
         ("connectors.clock.LocalClockFloor", ("Recorded", "Recorded")) => {
             Ok("connectors.clock.AdvanceLocalClockFloor")
         }
+        // A move to another configuration revision sets the revision and the
+        // epoch together; every other change only advances the epoch.
+        ("connectors.declarations.ServiceConfiguration", ("Declared", "Declared"))
+            if current.fields.get("revision") != next.fields.get("revision") =>
+        {
+            Ok("connectors.declarations.UpgradeServiceConfiguration")
+        }
         ("connectors.declarations.ServiceConfiguration", ("Declared", "Declared")) => {
             Ok("connectors.declarations.AdvanceRegistryEpoch")
         }
@@ -3726,6 +3999,7 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
                 && current.fields.get("selection") == next.fields.get("selection")
                 && current.fields.get("bootstrap") == next.fields.get("bootstrap")
                 && current.fields.get("observed_at") == next.fields.get("observed_at")
+                && current.fields.get("build_version") == next.fields.get("build_version")
             {
                 Ok("connectors.cli.SetLocalRuntimeSuppression")
             } else {
@@ -3758,6 +4032,10 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
         }
         ("connectors.execution_audit.AuditRecord", ("Anchored", "FinalObserved")) => {
             Ok("connectors.execution_audit.AppendFinalObservation")
+        }
+        // audit.md § 1, Attempt link: the only change an Anchored record admits.
+        ("connectors.execution_audit.AuditRecord", ("Anchored", "Anchored")) => {
+            Ok("connectors.execution_audit.LinkAnchorAttempt")
         }
         ("connectors.approval_issuers.ApprovalIssuer", ("Bound", "Bound")) => {
             Ok("connectors.approval_issuers.AdvanceIssuerRevision")
@@ -3876,6 +4154,7 @@ fn command_arguments(
                 | "connectors.auth_bindings.AcknowledgeCustodyWrite"
                 | "connectors.auth_bindings.AcknowledgeCustodyDeletion"
                 | "connectors.execution_audit.AcknowledgeAnchor"
+                | "connectors.execution_audit.LinkAnchorAttempt"
                 | "connectors.execution_audit.AppendFinalObservation"
         );
         if !records_successful_owner_decision {
@@ -5765,6 +6044,115 @@ mod tests {
         transition(&authority, &same, &next, command).unwrap();
     }
 
+    // `LinkAnchorAttempt`'s guards over the optional `access` and `attempt_id`
+    // lower to refusals Entity Runtime can evaluate on a record without them
+    // (`ess/domains/execution_audit.yaml`): an access-less or read anchor is
+    // `AttemptLinkRefused`, never an unobservable outcome.
+    #[test]
+    fn attempt_link_refusals_over_absent_fields_are_observable() {
+        for access in [None, Some("read")] {
+            let directory = tempfile::tempdir().unwrap();
+            let path = directory.path().join("metadata.sqlite3");
+            let mut fields = json!({
+                "audit_record_ref": "anchor",
+                "instance_id": "instance",
+                "audit_ref": "reference",
+                "anchor_kind": "admitted_execution",
+                "activity": "invoke",
+                "hop_role": "execution",
+                "stage": "admission",
+                "principal_ref": "static-bearer",
+                "operation_id": "operation",
+                "recorded_at": "2026-10-08T00:00:00Z",
+            })
+            .as_object()
+            .unwrap()
+            .clone();
+            if let Some(access) = access {
+                fields.insert("access".into(), json!(access));
+            }
+            let anchored = RowImage {
+                entity: "connectors.execution_audit.AuditRecord".into(),
+                id: "s:anchor".into(),
+                revision: 1,
+                lifecycle_state: "Anchored".into(),
+                fields,
+            };
+            let (authority, _, _) =
+                provision(&path, uuid::Uuid::new_v4(), 8, vec![anchored.clone()]).unwrap();
+            let mut linked = anchored.clone();
+            linked.revision = 2;
+            linked.fields.insert(
+                "attempt_id".into(),
+                json!("7a3b9d2e-4f5c-4b6d-8e8f-2a3b4c5d6e7f"),
+            );
+            let refusal = transition(
+                &authority,
+                &anchored,
+                &linked,
+                "connectors.execution_audit.LinkAnchorAttempt",
+            )
+            .unwrap_err();
+            let refusal = format!("{refusal:?}");
+            assert!(
+                refusal.contains("AttemptLinkRefused"),
+                "{access:?}: {refusal}"
+            );
+        }
+    }
+
+    // A move to another configuration revision is recorded through
+    // `UpgradeServiceConfiguration`, which sets the revision and the epoch
+    // together; an unchanged revision stays `AdvanceRegistryEpoch`
+    // (`ess/domains/declarations.yaml`).
+    #[test]
+    fn a_configuration_revision_change_is_recorded_as_an_upgrade() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let declared = RowImage {
+            entity: "connectors.declarations.ServiceConfiguration".into(),
+            id: "s:instance".into(),
+            revision: 1,
+            lifecycle_state: "Declared".into(),
+            fields: json!({
+                "instance_id": "instance",
+                "adapter_id": "adapter",
+                "revision": "configuration",
+                "registry_epoch": 7,
+            })
+            .as_object()
+            .unwrap()
+            .clone(),
+        };
+        let (authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![declared.clone()]).unwrap();
+        let mut upgraded = declared.clone();
+        upgraded.revision = 2;
+        upgraded
+            .fields
+            .insert("revision".into(), json!("configuration-2"));
+        upgraded.fields.insert("registry_epoch".into(), json!(8));
+        let command = update_command(&declared, &upgraded).unwrap();
+        assert_eq!(
+            command,
+            "connectors.declarations.UpgradeServiceConfiguration"
+        );
+        let mut epoch_only = declared.clone();
+        epoch_only.revision = 2;
+        epoch_only.fields.insert("registry_epoch".into(), json!(8));
+        assert_eq!(
+            update_command(&declared, &epoch_only).unwrap(),
+            "connectors.declarations.AdvanceRegistryEpoch"
+        );
+        let mut lower = upgraded.clone();
+        lower.fields.insert("registry_epoch".into(), json!(6));
+        assert!(
+            transition(&authority, &declared, &lower, command).is_err(),
+            "a lower registry epoch was recorded"
+        );
+        transition(&authority, &declared, &upgraded, command).unwrap();
+    }
+
     // `ConnectionListCursor.page_limit` is bounded to 1..=500
     // (`ess/domains/cli.yaml` invariants), the bounds `Registry::list` refuses
     // outside of before it records a cursor.
@@ -6420,6 +6808,10 @@ mod tests {
         remembered
             .fields
             .insert("observed_at".into(), json!("2026-09-18T00:00:00Z"));
+        // Remembering a bootstrap records the build that wrote it (ess/domains/cli.yaml).
+        remembered
+            .fields
+            .insert("build_version".into(), json!("0.0.0-fixture"));
         let command = update_command(&runtime, &remembered).unwrap();
         assert_eq!(command, "connectors.cli.RememberLocalRuntimeBootstrap");
         transition(&authority, &runtime, &remembered, command)

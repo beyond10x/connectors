@@ -51,8 +51,9 @@ The repository reviews and ships one selection set per provider under
 `adapters/catalog/providers/<provider>/operations.json`; Jira Cloud is described
 in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Confluence guide](catalog-confluence.md), HubSpot CRM in
-[the HubSpot guide](catalog-hubspot.md) and Zendesk Support in
-[the Zendesk guide](catalog-zendesk.md). The GitLab set,
+[the HubSpot guide](catalog-hubspot.md), Zendesk Support in
+[the Zendesk guide](catalog-zendesk.md) and Runpod pods in
+[the Runpod guide](catalog-runpod.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
 serves the provider from the pinned source alone, plus seven repository reads
@@ -250,6 +251,18 @@ The complete configuration used against the sandbox is
   same `sub`, `aud` and `scope` there. A wrong issuer or audience, or an expired
   `id_token`, is refused as a protocol failure. An `id_token` identity names no `path`,
   `subject_pointer` or `scopes` read.
+- `identity.source` `configuration` is for a provider whose API has no user or
+  account read, such as Runpod ([Runpod guide](catalog-runpod.md#authentication)).
+  The read at `path` must answer `200`, which proves the credential, and its body
+  is not read; the subject is the configuration's `instance` id, so the identity
+  is the configured connection, not a provider account, and repair or revalidate
+  accepts any credential the read admits. It names a `path` and no
+  `subject_pointer`, and is only for a static credential (`token` or `basic`):
+  under `oauth2_refresh` or `oauth2_client_credentials` it is refused at load,
+  because repair would then accept another holder's OAuth credential as the same
+  identity. Anything else is refused at load too. The rules are modeled as
+  `connectors_catalog.identity.Probe` and `connectors_catalog.identity.Profile`
+  in `adapters/catalog/spec/ess`.
 
 ```json
 "auth": {
@@ -395,10 +408,15 @@ parameter. After upgrading:
    with the credential already in custody, and asks for no credential, when the
    provider host and the profile are unchanged and the provider still answers
    the same identity. Until then the connection reports `pending` and reads
-   refuse. When the provider host or the profile changed, revalidate refuses
-   with `lifecycle_conflict` and `next_action = create_connection`; when the
-   provider answers another identity, with `identity_mismatch` and the same
-   `next_action`. Either changes nothing. Connect that one again under a new `instance` id. See [Configuration
+   refuse with `lifecycle_conflict` and `next_action = revalidate_connection`.
+   When the provider host or the profile changed, revalidate refuses with
+   `lifecycle_conflict` and `next_action = create_connection`; when the provider
+   answers another identity, or refuses the credential, with its own code and
+   the same `next_action`. The credential is not invalidated; the refusal is
+   recorded, and reads then name `create_connection` too. Connect again: under
+   the same `instance` id a new connection is admitted under the configured
+   revision and moves the instance to it when it publishes; a changed provider
+   host or profile still needs a new `instance` id. See [Configuration
    upgrades](local-connection-registry.md#configuration-upgrades).
 3. Issue every write approval policy bound to the instance again.
 

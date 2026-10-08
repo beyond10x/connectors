@@ -6,11 +6,13 @@ use super::tests::{
 use super::*;
 use std::{collections::BTreeMap, os::unix::fs::PermissionsExt, time::Duration};
 
-/// The transactions of one `operations invoke` of a read operation, in the
-/// process that performs each, as `tests::read_invoke` runs them: the CLI's
-/// cached-description reads, admission and owner handshake in a fresh
-/// process, then the owner's capture, dispatch and release. Returns each
-/// step's wall time and the metadata work it did.
+/// The transactions of one `operations invoke` of a read operation with an
+/// owner running, in the process that performs each: the CLI reads the
+/// store's authority for its greeting in a fresh process, and its
+/// cached-description reads and the admission are answered by the owner from
+/// its held handle, followed by the owner's capture, dispatch and release.
+/// Returns each step's wall time and the metadata work it did. The direct
+/// path, a command opening the store itself, is measured once per size as `direct_open_ms`.
 fn measured_invoke(root: &Path, registry: &Registry, reference: &str, now: u64) -> Vec<Step> {
     use super::super::metadata::{exit_process, simulate_process, take_costs};
     let mut steps = Vec::new();
@@ -27,23 +29,25 @@ fn measured_invoke(root: &Path, registry: &Registry, reference: &str, now: u64) 
         });
     };
     simulate_process(now);
-    step("cli.inspect", &mut || {
-        drop(Metadata::inspect(root).unwrap())
-    });
-    step("cli.inspect", &mut || {
-        drop(Metadata::inspect(root).unwrap())
-    });
-    step("cli.admit_read", &mut || {
-        registry
-            .admit_read(&binding(), reference, &BTreeSet::new(), now)
-            .unwrap();
-    });
-    step("cli.inspect", &mut || {
-        drop(Metadata::inspect(root).unwrap())
+    step("cli.authority", &mut || {
+        Metadata::authority_at(root).unwrap();
     });
     // The CLI exits; its handles do not outlive it.
     exit_process();
     simulate_process(1);
+    // The CLI's input validation and the owner's admission read the cached
+    // description through the owner.
+    step("owner.cached", &mut || {
+        drop(Metadata::inspect(root).unwrap())
+    });
+    step("owner.cached", &mut || {
+        drop(Metadata::inspect(root).unwrap())
+    });
+    step("owner.admit_read", &mut || {
+        registry
+            .admit_read(&binding(), reference, &BTreeSet::new(), now)
+            .unwrap();
+    });
     let mut captured = None;
     step("owner.capture_read", &mut || {
         captured = Some(
@@ -118,9 +122,12 @@ fn grown_stores(sizes: &[i64], saved: Option<&Path>) -> Vec<(tempfile::TempDir, 
         return sizes
             .iter()
             .map(|events| load(&stored(*events).unwrap()))
+            .inspect(|(root, _, _)| assert_checkpoints(root.path()))
             .collect();
     }
     let (root, registry) = fixture();
+    // Measured on stores with durable open checkpoints, as `setup init` creates.
+    assert_checkpoints(root.path());
     let (_, candidate) = prepared(&registry, "one", NOW);
     let reference = publish_fixture(&registry, candidate, NOW);
     let mut grown = Vec::new();
@@ -140,6 +147,25 @@ fn grown_stores(sizes: &[i64], saved: Option<&Path>) -> Vec<(tempfile::TempDir, 
         grown.push(load(copy.path()));
     }
     grown
+}
+
+/// The store in `root` has Entity Runtime durable open checkpoints enabled.
+fn assert_checkpoints(root: &Path) {
+    let enabled: bool = rusqlite::Connection::open_with_flags(
+        root.join("metadata.sqlite3"),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap()
+    .query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='connectors_er_capture_continuity')",
+        [],
+        |row| row.get(0),
+    )
+    .unwrap();
+    assert!(
+        enabled,
+        "the measured store has no durable open checkpoints"
+    );
 }
 
 fn save(root: &Path, stored: &Path, reference: &str) {
@@ -238,6 +264,20 @@ fn read_invoke_cost_by_store_size() {
         let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             measured_invoke(root.path(), registry, reference, NOW + 10_000)
         }));
+        // The direct path: a command run without the owner opens the store in a
+        // fresh process and verifies it completely. Measured once, not counted
+        // in the per-invoke figures.
+        {
+            use super::super::metadata::{exit_process, simulate_process};
+            simulate_process(77_000);
+            let started = std::time::Instant::now();
+            let opened = Metadata::inspect(root.path()).map(drop);
+            println!(
+                "events={recorded} direct_open_ms={:.0} outcome={opened:?}",
+                ms(started.elapsed())
+            );
+            exit_process();
+        }
         let before = recorded_events(root.path());
         let floors_before = recorded_clock_floor_events(root.path());
         let mut totals = Vec::new();
@@ -485,5 +525,114 @@ fn batch_cost_by_subject() {
         println!(
             "events={recorded} runtime_record_batch_ms={runtime:.0?} registry_clock_batch_ms={clock:.0?}"
         );
+    }
+}
+
+/// Reproduces the first owner open of a grown store, step by step, with the
+/// metadata work and wall time of each step and the error it returns:
+/// `CONNECTORS_STORE_COST_STORES=<dir> CONNECTORS_STORE_COST_EVENTS=1200 cargo test --release -p connectors-host --lib first_owner_open_of_a_grown_store -- --ignored --nocapture`.
+#[test]
+#[ignore = "diagnosis; run explicitly"]
+fn first_owner_open_of_a_grown_store() {
+    use super::super::metadata::{exit_process, simulate_process, take_costs};
+    let saved = std::path::PathBuf::from(std::env::var_os("CONNECTORS_STORE_COST_STORES").unwrap());
+    let events: i64 = std::env::var("CONNECTORS_STORE_COST_EVENTS")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let (root, registry, reference) = load(&saved.join(format!("read-invokes-{events}")));
+    let now = NOW + 10_000;
+    let report = |name: &str, started: std::time::Instant, outcome: String| {
+        println!("{name}: {:.0} ms -> {outcome}", ms(started.elapsed()));
+        for (kind, (calls, spent)) in take_costs() {
+            println!("    {kind:<24} calls={calls} ms={:.0}", ms(spent));
+        }
+    };
+    take_costs();
+    simulate_process(now);
+    let started = std::time::Instant::now();
+    let outcome = format!("{:?}", Metadata::inspect(root.path()).map(drop));
+    report("cli.inspect", started, outcome);
+    let started = std::time::Instant::now();
+    let outcome = format!(
+        "{:?}",
+        registry
+            .admit_read(&binding(), &reference, &BTreeSet::new(), now)
+            .map(drop)
+    );
+    report("cli.admit_read", started, outcome);
+    // `CONNECTORS_DIAG_SAME_PROCESS`: capture in the CLI's process, on the
+    // handle its complete open verified, instead of a fresh owner process.
+    if std::env::var_os("CONNECTORS_DIAG_SAME_PROCESS").is_none() {
+        exit_process();
+        simulate_process(1);
+    }
+    let wait = std::env::var("CONNECTORS_DIAG_BATCH_WAIT_S")
+        .map_or(30, |seconds| seconds.parse().unwrap());
+    let started = std::time::Instant::now();
+    // `CONNECTORS_DIAG_EXPIRY_BATCH`: expiry batches of at most this many members.
+    let capture = || {
+        super::super::metadata::with_batch_wait(Duration::from_secs(wait), || {
+            format!(
+                "{:?}",
+                registry
+                    .capture_read(&binding(), &reference, &BTreeSet::new(), now, now + 1000)
+                    .map(drop)
+            )
+        })
+    };
+    let outcome = match std::env::var("CONNECTORS_DIAG_EXPIRY_BATCH") {
+        Ok(size) => {
+            super::super::metadata::with_expiry_batches(size.parse().unwrap(), None, capture).0
+        }
+        Err(_) => capture(),
+    };
+    let times = super::super::metadata::take_expiry_times();
+    report("owner.capture_read", started, outcome);
+    if !times.is_empty() {
+        let mut sorted = times.iter().map(|time| ms(*time)).collect::<Vec<_>>();
+        sorted.sort_by(f64::total_cmp);
+        println!(
+            "    expiry batches={} median_ms={:.0} max_ms={:.0} total_ms={:.0}",
+            sorted.len(),
+            sorted[sorted.len() / 2],
+            sorted[sorted.len() - 1],
+            sorted.iter().sum::<f64>()
+        );
+    }
+    simulate_process(now + 1);
+    let started = std::time::Instant::now();
+    let outcome = format!("{:?}", Metadata::inspect(root.path()).map(drop));
+    report("cli.inspect after", started, outcome);
+}
+
+/// The owner's start verification of a grown store, in a fresh process:
+/// `CONNECTORS_STORE_COST_STORES=<dir> CONNECTORS_STORE_COST_EVENTS=600,1200,6000 cargo test --release -p connectors-host --lib owner_start_of_a_grown_store -- --ignored --nocapture`.
+#[test]
+#[ignore = "timing measurement; run explicitly"]
+fn owner_start_of_a_grown_store() {
+    use super::super::metadata::{exit_process, simulate_process, take_costs};
+    let saved = std::path::PathBuf::from(std::env::var_os("CONNECTORS_STORE_COST_STORES").unwrap());
+    for events in std::env::var("CONNECTORS_STORE_COST_EVENTS")
+        .unwrap()
+        .split(',')
+    {
+        let (root, _, _) = load(&saved.join(format!("read-invokes-{events}")));
+        for (round, process) in [(1, 9_001), (2, 9_002)] {
+            simulate_process(process);
+            take_costs();
+            let started = std::time::Instant::now();
+            let opened =
+                Metadata::start_owner(root.path()).map(|owner| owner.opened_from_checkpoint());
+            println!(
+                "events={events} owner_start round={round} ms={:.0} from_checkpoint={opened:?} costs={:?}",
+                ms(started.elapsed()),
+                take_costs()
+                    .into_iter()
+                    .map(|(kind, (_, spent))| format!("{kind}={:.0}", ms(spent)))
+                    .collect::<Vec<_>>()
+            );
+            exit_process();
+        }
     }
 }
