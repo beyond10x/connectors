@@ -4,7 +4,7 @@
   "operations": [
     {"id": "pod.create", "operation_id": "CreatePod", "effect": "write",
      "description": "Create and deploy one pod from body; a definite 4xx refusal created nothing, while a lost connection or a 5xx after the request was sent leaves the pod possibly created, so check pods.list by name before creating again",
-     "body_keys": ["name", "imageName", "gpuTypeIds", "gpuCount", "containerDiskInGb", "volumeInGb", "volumeMountPath", "ports", "env", "cloudType", "dataCenterIds", "interruptible"]},
+     "body_keys": ["name", "imageName", "gpuTypeIds", "gpuCount", "containerDiskInGb", "volumeInGb", "volumeMountPath", "ports", "env", "cloudType", "dataCenterIds", "interruptible", "dockerStartCmd", "dockerEntrypoint", "networkVolumeId"]},
     {"id": "pods.list", "operation_id": "ListPods", "effect": "read",
      "description": "List the account's pods in one answer, filtered by the declared query parameters such as name, desiredStatus or id"},
     {"id": "pod.terminate", "operation_id": "DeletePod", "effect": "write",

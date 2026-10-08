@@ -1,0 +1,78 @@
+domain: connectors_alertmanager.alerts
+summary: Alertmanager-owned alert-list profile and selection for the proposed alerts.list read.
+
+# Normative owner: adapters/alertmanager/design.md (Scope and dependencies, Records model).
+# Operation source: the fluxplane-plugin skill reference for alertmanager 0.1.0,
+# operation `alertmanager.alerts`, and docs/fluxplane-plugin-parity.md § alertmanager
+# and gap unit U24. These are private selection values; nothing here is implemented.
+types:
+  # adapters/alertmanager/design.md:7-8: alerts.list selects datasource.records/v1alpha1
+  # profile `alertmanager-alerts`. Profile identifiers are adapter-owned and open
+  # (contracts/datasources/records/v1alpha1/semantics.md:9-11).
+  - name: connectors_alertmanager.alerts.RecordsProfile
+    kind: enum
+    variants: [alertmanager-alerts]
+
+  # fluxplane reference, `alertmanager.alerts`: alerts are selected by "label matchers";
+  # its example passes each matcher as one string of the form name="value". The
+  # Prometheus adapter uses the same string spelling for configured matchers
+  # (adapters/prometheus/design.md:50-52, `query_scope.allowed_matchers`).
+  # UNMAPPED: the matcher grammar. The sources show only the equality form; whether
+  # other match operators are admitted, how values are quoted and escaped, and
+  # whether a configured scope narrows them before dispatch (as the Prometheus
+  # query scope does) are not stated. Open question for the owner.
+  - name: connectors_alertmanager.alerts.LabelMatcher
+    kind: newtype
+    of: String
+
+  # The alerts.list input. fluxplane reference, `alertmanager.alerts`: the only required
+  # input is endpoint_ref, so every member here is optional. endpoint_ref is not a
+  # member: the saved Connectors connection selects the instance
+  # (adapters/alertmanager/design.md, Authentication and configuration).
+  - name: connectors_alertmanager.alerts.AlertSelection
+    kind: struct
+    fields:
+      # fluxplane example: "filter" is a list of matcher strings.
+      - name: filter
+        type: Optional<List<connectors_alertmanager.alerts.LabelMatcher>>
+      # fluxplane example: "silenced": false.
+      - name: silenced
+        type: Optional<Boolean>
+      # fluxplane description names `active` as a state filter;
+      # contracts/catalog/v1alpha1/semantics.md:97-101 gives alerts.list an `active`
+      # boolean input (an illustrative descriptor).
+      - name: active
+        type: Optional<Boolean>
+      # UNMAPPED: the `inhibited` state filter. The fluxplane description names it
+      # ("state filters (active/silenced/inhibited)") but no example or contract states
+      # its input name or type. Open question for the owner.
+      # UNMAPPED: what an absent state filter means (include or exclude those alerts).
+      # No source states the default.
+      # UNMAPPED: page and collection limits and continuation. The records contract
+      # requires finite bounds for every binding
+      # (contracts/datasources/records/v1alpha1/semantics.md:68); the fluxplane input
+      # has no limit or cursor, and design.md:9 leaves filters and safe projection open.
+
+# The alert record, the `alertmanager-alerts` item, is not declared: no source states
+# enough of it to declare without guessing. The fluxplane reference says only that
+# `alertmanager.alerts` returns JSON listing "alerts currently known to Alertmanager";
+# design.md:9 leaves the item schema an authoring obligation; the parity page (U24)
+# says "the alert record schema is still unauthored".
+# UNMAPPED: the alert identity. No source names an alert identifier, so the alert
+# cannot be an entity yet, and a list item cannot be keyed or deduplicated.
+# UNMAPPED: the alert's labels. Alerts are selected by label matchers, so an alert
+# carries labels, but no source states their shape (a map, or a list of name/value
+# pairs as the silence matchers in `alertmanager.silence.create` are).
+# UNMAPPED: the alert's state. active, silenced and inhibited are named as filters;
+# no source says whether they are the values of one state field, independent flags,
+# or neither. No other alert field is stated.
+# UNMAPPED: relation alert -> silence. Silences carry label matchers (fluxplane
+# `alertmanager.silence.list`, `alertmanager.silence.create`) and an alert can be
+# silenced; no source says whether an alert record names the silences that mute it,
+# the cardinality, or whether the link is owns or references. Silence is not
+# modelled here (design.md, Out of scope).
+# UNMAPPED: relation alert -> whatever inhibits it. No source states what inhibits an
+# alert, whether a record names it, or the cardinality.
+# UNMAPPED: the routing outcome. The fluxplane description says the list is "what is
+# firing right now, after routing"; no source states whether a record names where it
+# was routed.

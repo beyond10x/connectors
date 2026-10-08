@@ -8,7 +8,7 @@ relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-slack-reads
-revision: 1
+revision: 2
 ---
 ## Outcome
 
@@ -33,3 +33,7 @@ catalog provider after `story:catalog-slack-reads` (threads and history); a user
 ## Note
 
 The 512 calls include the 2 operations `story:catalog-slack-reads` delivers.
+
+## Domain draft
+
+Drafted 2026-10-07: `adapters/slack/spec/ess` (`connectors_slack`, 5 nouns: conversation, message, user, file, emoji; every relation UNMAPPED) and `adapters/slack/design.md`. Route: the catalog provider over Slack's pinned Swagger 2.0 document, after `story:catalog-swagger2-projection`. Open before scheduling: the UNMAPPED markers; search needs a user token while a catalog connection holds one auth profile; the planned document comes from an archived upstream repository. `slack.channel.list` is served by `conversations.list`, which `story:catalog-slack-reads` already selects.

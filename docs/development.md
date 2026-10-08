@@ -58,8 +58,8 @@ The repository pins released tool versions, not source builds: ESS 0.56.0 in
 [`crates/connectors-spec/toolchain.json`](../crates/connectors-spec/toolchain.json)
 and AEP 0.69.1 in [`crates/connectors-build/aep-toolchain.json`](../crates/connectors-build/aep-toolchain.json).
 Use the `ess` and `aep` executables the Beyond10x plugins install (`b10x upgrade`
-keeps them current). The Cargo dependencies select Entity Runtime 0.30.2 and the
-Eventlog release it builds on (0.8.1); ESS 0.56.0 additionally brings Entity
+keeps them current). The Cargo dependencies select Entity Runtime 0.30.3 and the
+Eventlog release it builds on (0.8.3); ESS 0.56.0 additionally brings Entity
 Runtime Core 0.28.0 through `ess-entity-runtime`.
 
 Since ESS 0.53.0, `ess generate cli` writes only into output it owns, recorded in a

@@ -3598,7 +3598,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
 
 /// The most expiries one batch records when more are due than fit in it.
 /// Every store this host opens is SQLite (`EventlogRecordedStoreOwner::Sqlite`,
-/// `EventlogRecordedStoreProvisioner::Sqlite`), where Entity Runtime 0.30.2 no
+/// `EventlogRecordedStoreProvisioner::Sqlite`), where Entity Runtime 0.30.2 (and 0.30.3) no
 /// longer shows 0.29.0's superlinear batch cost (396 expiries in one batch took
 /// 101.9 s at 1,201 events). Measured on 0.30.2 with
 /// `first_owner_open_of_a_grown_store` (release, 2026-10-08): one unbounded batch
