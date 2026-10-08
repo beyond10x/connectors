@@ -19,5 +19,9 @@ uuid.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
+hex.workspace = true
+libc = "0.2"
+rusqlite = { version = "=0.40.2", features = ["bundled"] }
+sha2.workspace = true
 ring = "=0.17.14"
 tempfile.workspace = true

@@ -1,6 +1,8 @@
 //! A single local SQLite authority. Schema installation grants no connection,
 //! credential custody, approval or business dispatch authority.
 use super::{Failure, Result, filesystem as fs};
+#[cfg(test)]
+mod checkpoint_tests;
 mod er;
 #[cfg(test)]
 mod metamorphic_tests;
@@ -104,6 +106,26 @@ pub(super) fn simulate_process(id: u64) {
 #[cfg(test)]
 pub(super) fn exit_process() {
     er::exit_process();
+}
+
+#[cfg(test)]
+pub(super) fn with_expiry_batches<T>(
+    size: usize,
+    fail: Option<usize>,
+    call: impl FnOnce() -> T,
+) -> (T, usize) {
+    er::with_expiry_batches(size, fail, call)
+}
+
+/// Wall time of each expiry batch this thread executed since the last take.
+#[cfg(test)]
+pub(super) fn take_expiry_times() -> Vec<Duration> {
+    er::EXPIRY_TIMES.with(|times| std::mem::take(&mut *times.borrow_mut()))
+}
+
+#[cfg(test)]
+pub(super) fn with_batch_wait<T>(wait: Duration, call: impl FnOnce() -> T) -> T {
+    er::with_batch_wait(wait, call)
 }
 
 /// Calls and wall time per kind of metadata work on this thread since the
@@ -231,6 +253,15 @@ fn take_migration_fault(point: u8) -> bool {
     })
 }
 
+/// What [`Metadata::enable_checkpoints`] did to a store.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Checkpoints {
+    /// Durable open checkpoints are now enabled.
+    Enabled,
+    /// The store already had them; nothing changed.
+    AlreadyEnabled,
+}
+
 pub struct Metadata {
     // Field drop order matters: this physical connection closes while the
     // lifecycle lock is still held. Releasing at open/validate left a race with
@@ -247,6 +278,10 @@ pub struct Metadata {
     /// The flock on `_lifecycle_lock` was released before an ER replay (passive
     /// inspection and an observation's unlocked replay); only a relock clears it.
     lock_released: bool,
+    /// This process keeps a verified handle for this exact store file, so the
+    /// physical page scan (`quick_check`, foreign keys) its fresh open ran is
+    /// not repeated; a fresh open of the file scans it.
+    pooled: bool,
 }
 
 impl Drop for Metadata {
@@ -335,7 +370,8 @@ impl Metadata {
         let app: i64 = tx
             .pragma_query_value(None, "application_id", |row| row.get(0))
             .map_err(unavailable)?;
-        if version == 0 && app == 0 {
+        let created = version == 0 && app == 0;
+        if created {
             let count: i64 = tx
                 .query_row(
                     "SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'",
@@ -370,7 +406,102 @@ impl Metadata {
         metadata.validate()?;
         metadata.adopt_er()?;
         metadata.migrate(3)?;
+        if created {
+            // Only a database this call created: an existing one is enabled by
+            // `setup checkpoints-enable` alone (decision C, semantics.md §3).
+            metadata.enable_checkpoints_now()?;
+        }
         Ok(metadata)
+    }
+
+    /// Enables Entity Runtime durable open checkpoints on the existing store at
+    /// `path`, as `setup checkpoints-enable` does: an admitted mutating open
+    /// (which migrates a level 1–8 database first and never creates one), then
+    /// the enable, in one provider transaction, and the first checkpoint.
+    ///
+    /// **One-way for older releases**: Entity Runtime 0.28.0 and earlier, and so
+    /// connectors 0.32.0 and earlier, refuse to open the store afterwards. No
+    /// command here removes them. A store that already has them is unchanged.
+    ///
+    /// The caller excludes a running owner; this takes only the metadata lock.
+    ///
+    /// # Errors
+    /// [`Failure::MetadataUnavailable`] for a missing, unreadable or refused
+    /// store and for Eventlog's refusal to enable; [`Failure::OutcomeUnknown`]
+    /// when the enable's acknowledgement was lost.
+    pub fn enable_checkpoints(path: &Path) -> Result<Checkpoints> {
+        let mut metadata = Self::update(path, true)?;
+        let durable = Connection::open_with_flags(
+            &metadata.durable_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+                | OpenFlags::SQLITE_OPEN_NO_MUTEX
+                | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        )
+        .map_err(unavailable)?;
+        durable.busy_timeout(WAIT_BOUND).map_err(unavailable)?;
+        let enabled = er::checkpoints_enabled(&durable)?;
+        durable.close().map_err(|_| Failure::MetadataUnavailable)?;
+        if enabled {
+            return Ok(Checkpoints::AlreadyEnabled);
+        }
+        metadata.enable_checkpoints_now()?;
+        Ok(Checkpoints::Enabled)
+    }
+
+    /// The store's authority id, read from the physical database under the
+    /// metadata lock without replaying the recorded store: what a CLI names
+    /// in its owner greeting. The store must exist, be private, belong to this
+    /// user and carry a recognised level; nothing is created or migrated.
+    pub fn authority_at(path: &Path) -> Result<uuid::Uuid> {
+        let dir = fs::directory(path, false, true).map_err(|_| Failure::MetadataUnavailable)?;
+        let lock = lifecycle_lock(&dir)?;
+        let metadata = Self::open_connection(path, dir, lock, true)?;
+        let app: i64 = metadata
+            .connection
+            .pragma_query_value(None, "application_id", |row| row.get(0))
+            .map_err(unavailable)?;
+        let version: i64 = metadata
+            .connection
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .map_err(unavailable)?;
+        let owner: u32 = metadata
+            .connection
+            .query_row(
+                "SELECT owner_uid FROM local_authority WHERE singleton=1",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(unavailable)?;
+        if app != APPLICATION_ID || !(1..=er::LEVEL).contains(&version) || owner != fs::uid() {
+            return Err(Failure::MetadataUnavailable);
+        }
+        let authority = metadata.authority()?;
+        if authority.is_nil() {
+            return Err(Failure::MetadataUnavailable);
+        }
+        Ok(authority)
+    }
+
+    /// The owner's open when it starts: an admitted mutating open (migrating a
+    /// level 1–8 database) that verifies the whole store before the owner
+    /// serves anything, whether or not the provider opened from a checkpoint.
+    /// A raw edit of the file made while no owner ran is refused here.
+    pub fn start_owner(path: &Path) -> Result<Self> {
+        Self::update(path, true)
+    }
+
+    fn enable_checkpoints_now(&mut self) -> Result<()> {
+        self.require_lifecycle_lock()?;
+        er::enable_checkpoints(self.er.as_mut().ok_or(Failure::MetadataUnavailable)?)
+    }
+
+    /// Whether the Entity Runtime provider opened this handle's store from a
+    /// persisted open checkpoint rather than by verifying it completely. Either
+    /// way the host read and verified the whole store before the handle
+    /// answered; a handle this process reused reports its original open.
+    #[must_use]
+    pub fn opened_from_checkpoint(&self) -> bool {
+        self.er.as_ref().is_some_and(er::opened_from_checkpoint)
     }
 
     /// Inspection never creates a database, migrates it, or interprets absence
@@ -829,6 +960,7 @@ impl Metadata {
             _lifecycle_lock: Some(lock),
             concurrent_observation: false,
             lock_released: false,
+            pooled: er::holds(&path.join(NAME)),
         })
     }
 
@@ -895,6 +1027,7 @@ impl Metadata {
             &self.connection,
             expected_level,
             !recorded && version == er::LEVEL,
+            recorded || !self.pooled,
         )?;
         let mut expected = vec![(1, migration_digest())];
         if expected_level >= 2 {
@@ -943,20 +1076,22 @@ impl Metadata {
     }
 }
 
-fn validate_schema(connection: &Connection, level: i64, marker: bool) -> Result<()> {
-    let integrity: String = connection
-        .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
-        .map_err(unavailable)?;
-    if integrity != "ok" {
-        return Err(Failure::MetadataUnavailable);
-    }
-    let foreign_key_errors: i64 = connection
-        .query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
-            row.get(0)
-        })
-        .map_err(unavailable)?;
-    if foreign_key_errors != 0 {
-        return Err(Failure::MetadataUnavailable);
+fn validate_schema(connection: &Connection, level: i64, marker: bool, scan: bool) -> Result<()> {
+    if scan {
+        let integrity: String = connection
+            .query_row("PRAGMA quick_check(1)", [], |row| row.get(0))
+            .map_err(unavailable)?;
+        if integrity != "ok" {
+            return Err(Failure::MetadataUnavailable);
+        }
+        let foreign_key_errors: i64 = connection
+            .query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |row| {
+                row.get(0)
+            })
+            .map_err(unavailable)?;
+        if foreign_key_errors != 0 {
+            return Err(Failure::MetadataUnavailable);
+        }
     }
 
     let expected = Connection::open_in_memory().map_err(unavailable)?;

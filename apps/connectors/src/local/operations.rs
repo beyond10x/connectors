@@ -96,11 +96,23 @@ pub(super) fn invoke(call: &Invocation<'_>, deadline: u64) -> owner::Result<Valu
         .as_str()
         .ok_or(Code::InvalidInput)?
         .as_bytes();
-    owner::admit_invoke(&paths, alias, &call.input, document)?;
+    // A running owner of this build admits the invoke itself, from its held
+    // metadata handle, before it dispatches. Without one the CLI admits it
+    // directly, which verifies the whole store, and only then starts an owner.
+    let client = match owner::Client::connect(&paths, false) {
+        Ok(client) if client.is_same_build() => client,
+        _ => {
+            owner::admit_invoke(&paths, alias, &call.input, document)?;
+            if connectors_sdk::now_ms() >= deadline {
+                return Err(Code::Timeout.into());
+            }
+            owner::Client::connect(&paths, true)?
+        }
+    };
     if connectors_sdk::now_ms() >= deadline {
         return Err(Code::Timeout.into());
     }
-    owner::Client::connect(&paths, true)?.invoke(alias, &call.input, document, deadline)
+    client.invoke(alias, &call.input, document, deadline)
 }
 
 pub(super) fn dispatch(

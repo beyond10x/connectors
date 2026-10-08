@@ -66,6 +66,20 @@ validates the separately transferred document through the exact adapter, and the
 uses the existing guarded custody/publication coordinator. Lost acknowledgement
 is unknown and can be resolved only through status, without replay.
 
+A command run while an owner of its own build runs for the state directory reads
+the store through that owner instead of opening it. The owner answers a `cached`
+request (`connectors.cli.LocalOwnerCachedRequest`, `{"kind":"cached","adapter":…}`)
+with `connectors.cli.LocalOwnerCached`, the adapter's cached bootstrap read from
+the owner's held metadata handle, and refuses with the codes a direct read gives
+(`not_found`, `description_unavailable`, `metadata_unavailable`). `operations
+invoke` with such an owner running sends no admission of its own: the owner's
+admission of the `invoke` request decides it, before dispatch, from the same held
+handle. The authority a greeting names is read from the database's authority row
+without replaying the store. Without a reachable owner of the same build a
+command reads the store directly, which verifies it completely, and `operations
+invoke` admits directly before it starts an owner. The owner itself never routes
+its reads through an owner.
+
 The generated parser's protected Sources hook retains one clearing buffer and
 one admitted live owner channel, and supplies only a nonsecret marker to the
 generated String/JSON carrier. The paired handler checks the original selectors

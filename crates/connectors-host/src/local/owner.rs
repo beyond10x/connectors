@@ -19,7 +19,7 @@ use std::{
 };
 #[cfg(test)]
 pub(crate) use transport::bound_allocator;
-pub use transport::{Capture, Client, WriteClient, serve};
+pub use transport::{Capture, Client, WriteClient, enable_checkpoints, serve};
 
 const VERSION: &str = "connectors-owner/1";
 pub type Result<T> = std::result::Result<T, Error>;
@@ -250,7 +250,20 @@ fn selected(paths: &Paths, alias: &str) -> Result<(Config, Adapter)> {
     let adapter = config.adapters.get(alias).cloned().ok_or(Code::NotFound)?;
     Ok((config, adapter))
 }
+/// The adapter's cached description. Outside the owner, a running owner of
+/// this build answers it from its held metadata handle; without one the store
+/// is read directly, which verifies it completely (`docs/local-er-metadata.md`).
 pub fn cached(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
+    if !transport::in_owner()
+        && let Ok(client) = Client::connect(paths, false)
+        && client.is_same_build()
+    {
+        return client.cached(alias);
+    }
+    cached_direct(paths, alias)
+}
+/// The adapter's cached description, read from this process's metadata handle.
+fn cached_direct(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
     let (_, adapter) = selected(paths, alias)?;
     let bootstrap = runtime::state::State::new(&paths.state)
         .cached(&adapter.instance_id, &adapter.selection())?
@@ -540,6 +553,11 @@ enum Request {
         deadline_ms: u64,
     },
     Status {
+        adapter: String,
+    },
+    /// A CLI's read of the adapter's cached description, answered from the
+    /// owner's held metadata handle (`connectors.cli.LocalOwnerCachedRequest`).
+    Cached {
         adapter: String,
     },
     /// A consumer launch. Answered by `Reply::Launch`, then the consumer image

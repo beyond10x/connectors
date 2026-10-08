@@ -8,7 +8,7 @@ generated parser nor a recording handler proves keyring durability, process
 ownership, provider authentication or restart recovery. The existing runtime
 continues to support the [documented three-adapter slice](../../../README.md#where-the-project-stands).
 Setup, configured inventory and passive connection management have production
-handlers; `setup checkpoints-enable` (§3) is specified ahead of its handler. The [private adapter transport](private-adapter.md) has process/TLS
+handlers, `setup checkpoints-enable` (§3) included. The [private adapter transport](private-adapter.md) has process/TLS
 fixtures. Protected GitLab acquisition and restart reuse pass disposable runtime
 journeys; dedicated provider sandbox acceptance and the other adapters' persistent
 lifecycle bindings remain open. [Approval-key management](../../service/approval-issuers.md)
@@ -351,11 +351,26 @@ starts no local host or adapter and runs in this order:
 
 The command sees only running owners. A second installed `connectors` binary or
 another tool built on Entity Runtime 0.28.0 or earlier that is not running cannot
-be detected; it fails to open the store once enabled. A tracked open from a
-checkpoint does not detect raw edits of the database file that bypass SQLite
-while no handle is open; a write through any SQLite connection still makes the
-next open verify completely, and a read of an edited blob refuses it (Entity
-Runtime 0.29.0).
+be detected; it fails to open the store once enabled.
+
+Which open verifies what: the provider's tracked open of a store with
+checkpoints verifies the persisted checkpoint and the suffix after it, and on
+its own does not detect raw edits of the database file that bypass SQLite while
+no handle is open (Entity Runtime 0.29.0). Every fresh open the host makes, in
+a command run directly, a second process, the owner when it starts and recovery
+alike, therefore reads and verifies the whole store before it answers anything,
+so such an edit is refused as `metadata_unavailable` by the first command or
+owner start after it. Only a handle a process already verified and keeps for
+later opens in that process reads just what was appended since; the owner keeps
+its handles for its whole run. A command run while an owner of its own build
+runs reads the store through that owner (its `cached` request and the owner's
+admission of `invoke`, [local owner transport](owner.md)) and does not open it;
+without such an owner it opens the store directly and verifies it completely.
+A write through any SQLite connection is proven or makes the next read verify
+completely, as before. Due expiries of transient subjects are recorded in
+batches of at most 32 before the batch carrying the command's own change; a
+refused expiry batch leaves earlier ones committed and the command's change
+unapplied, with its failure unchanged.
 
 ## 4. Lifecycle and bounded startup
 

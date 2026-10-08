@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use std::ffi::OsString;
 mod approval_keys;
 mod approvals;
+mod checkpoints;
 mod connections;
 mod cursor;
 mod operations;
@@ -252,7 +253,7 @@ fn host_failure(error: Failure) -> HandlerReply {
     }
 }
 
-/// Every command but `setup init` loads the configuration somewhere in this
+/// Every command but `setup init` and `setup checkpoints-enable` loads the configuration somewhere in this
 /// process: in the handler, a protected source, the dynamic validator or an
 /// owner helper. Those later sites keep the owner's payload-free failure, so a
 /// file refused by a rule that can name its entry is refused here first, before
@@ -263,7 +264,9 @@ fn configuration_preflight(
 ) -> Option<connectors_cli_contract::ProcessOutput> {
     use connectors_cli_contract::OutputMode;
     let (callable, context) = session.selected()?;
-    if callable == "setup-init" {
+    // Neither reads the configuration: `setup init` writes it, and
+    // `setup checkpoints-enable` acts on the state directory alone.
+    if callable == "setup-init" || callable == "setup-checkpoints-enable" {
         return None;
     }
     let paths = Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()).ok()?;
@@ -320,6 +323,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         call.context.state_dir.as_deref(),
     )
     .map_err(host_failure)?;
+    if call.callable == "setup-checkpoints-enable" {
+        return checkpoints::execute(call, &paths);
+    }
     if call.callable == "setup-init" {
         let initialized = Config::initialize(&paths).map_err(host_failure)?;
         return Ok(
