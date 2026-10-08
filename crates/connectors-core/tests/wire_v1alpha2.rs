@@ -113,7 +113,7 @@ fn request_vectors_round_trip_or_refuse_with_the_contract_code() {
                     "{}",
                     case.id
                 );
-                let written = request.encode();
+                let written = request.encode().unwrap();
                 let reread: Value = serde_json::from_slice(&written).unwrap();
                 assert_eq!(
                     canonical(&reread),

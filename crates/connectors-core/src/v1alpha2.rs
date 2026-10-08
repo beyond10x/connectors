@@ -345,8 +345,11 @@ impl InvokeRequest {
         Ok(request)
     }
 
-    pub fn encode(&self) -> Vec<u8> {
-        serde_json::to_vec(self).expect("an invocation envelope is serializable")
+    /// Encode the envelope, refusing an `input` [`decode`](Self::decode) could
+    /// not read back (`readable_payload`). The version is written as held.
+    pub fn encode(&self) -> std::result::Result<Vec<u8>, Violation> {
+        readable_payload(&self.input)?;
+        Ok(serde_json::to_vec(self).expect("an invocation envelope is serializable"))
     }
 }
 
@@ -542,8 +545,13 @@ impl InvokeResponse {
     }
 
     /// Encode a Response that passes [`check`](Self::check).
+    /// A `result` [`decode`](Self::decode) could not read back
+    /// (`readable_payload`) is refused too.
     pub fn encode(&self) -> std::result::Result<Vec<u8>, Violation> {
         self.check()?;
+        if let Some(result) = &self.result {
+            readable_payload(result)?;
+        }
         Ok(serde_json::to_vec(self).expect("an invoke response is serializable"))
     }
 }
@@ -565,4 +573,38 @@ fn omittable<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     deserializer: D,
 ) -> std::result::Result<Option<T>, D::Error> {
     T::deserialize(deserializer).map(Some)
+}
+
+/// Deepest container nesting [`crate::read_json`] reads: serde_json's
+/// recursion limit refuses the 128th nested array or object.
+const READ_DEPTH: usize = 127;
+
+/// A payload the envelope carries one level below its own object, which
+/// `decode` can read back: no serde_json private-token key at any depth
+/// (`read_json` refuses those) and no nesting past [`READ_DEPTH`] once the
+/// envelope adds its level.
+fn readable_payload(payload: &Value) -> std::result::Result<(), Violation> {
+    fn walk(value: &Value, level: usize) -> std::result::Result<(), Violation> {
+        let children: Vec<&Value> = match value {
+            Value::Array(items) => items.iter().collect(),
+            Value::Object(members) => {
+                if members
+                    .keys()
+                    .any(|key| crate::PRIVATE_TOKENS.contains(&key.as_str()))
+                {
+                    return Err(Violation("payload holds a reserved serde_json key"));
+                }
+                members.values().collect()
+            }
+            _ => return Ok(()),
+        };
+        if level > READ_DEPTH {
+            return Err(Violation("payload nesting exceeds what decode reads"));
+        }
+        children
+            .into_iter()
+            .try_for_each(|child| walk(child, level + 1))
+    }
+    // Level 1 is the envelope object itself.
+    walk(payload, 2)
 }
