@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:entity-runtime-0303-pin
 kind: story
-status: draft
+status: active
 title: Entity Runtime 0.30.3 and Eventlog 0.8.3
 relations:
 - serves: vision:independent-contract-adapters
@@ -15,7 +15,10 @@ scope:
   path: crates/connectors-host/src/local/metadata/er.rs
 - confidence: cited
   path: docs/development.md
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 

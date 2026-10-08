@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:catalog-swagger2-projection
 kind: story
-status: draft
+status: active
 title: The catalog ingests Swagger 2.0 through an exact recorded projection
 relations:
 - decomposes: epic:generic-datasource-feeds
@@ -12,7 +12,10 @@ scope:
   path: crates/connectors-catalog/src
 - confidence: inferred
   path: crates/connectors-catalog/tests
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 

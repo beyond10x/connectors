@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:parity-loki-query
 kind: story
-status: draft
+status: active
 title: Loki LogQL range and metric queries and label discovery
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -16,7 +16,10 @@ scope:
   path: adapters/loki
 - confidence: inferred
   path: docs/fluxplane-plugin-parity.md
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T18:06:45Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
