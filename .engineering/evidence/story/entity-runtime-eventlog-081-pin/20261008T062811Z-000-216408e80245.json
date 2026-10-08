@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T06:28:11Z",
+  "actor": "human:timo",
+  "artifact": "story:entity-runtime-eventlog-081-pin",
+  "kind": "story",
+  "revision": 5,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "PR 131 repository gate, head 907668c532",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/37734860304"
+  }
+}

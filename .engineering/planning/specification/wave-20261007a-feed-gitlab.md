@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: specification:wave-20261007a-feed-gitlab
 kind: specification
-status: approved
+status: implemented
 title: 'Wave 20261007a: feed profile capabilities and the GitLab feed binding'
 relations:
 - informed_by: epic:generic-datasource-feeds
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T00:10:05Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T00:10:06Z", actor: "human:timo", revision: 3}
+- {from: "approved", to: "implemented", at: "2026-10-08T06:30:15Z", actor: "human:timo", revision: 6}
 ---
 ## Wave 20261007a: feed profile capabilities and the GitLab feed binding
 

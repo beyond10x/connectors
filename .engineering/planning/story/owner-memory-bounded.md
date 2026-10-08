@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:owner-memory-bounded
 kind: story
-status: active
+status: implemented
 title: The owner's memory is bounded by the store it holds
 relations:
 - decomposes: epic:connector-probe-20261006
@@ -18,10 +18,11 @@ scope:
   path: crates/connectors-host/src/local/owner/transport.rs
 - confidence: cited
   path: crates/connectors-host/src/local/registry/store_cost_tests.rs
-revision: 12
+revision: 13
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-06T14:57:11Z", actor: "human:timo", revision: 11, decided_on: {"recorded":{"review_outcome":3}}}
 - {from: "proposed", to: "active", at: "2026-10-06T14:57:11Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"review_outcome":3}}}
+- {from: "active", to: "implemented", at: "2026-10-08T06:29:54Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"test_result":3,"review_outcome":3,"verification":1}}}
 ---
 ## Observed
 

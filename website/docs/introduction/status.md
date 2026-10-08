@@ -4,10 +4,10 @@ slug: /introduction/status
 sidebar_position: 2
 ---
 
-# Source release v0.31.0
+# Source release v0.36.0
 
-Version **0.31.0** specifies at ESS source format `ess/15` with the released
-ESS 0.53.0 and plans with the released AEP 0.68.0; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
+Version **0.36.0** specifies at ESS source format `ess/15` with the released
+ESS 0.56.0 and plans with the released AEP 0.69.1; `connectors --version` answers. Like 0.12.0, it keeps connection metadata (identities, credential references,
 fences, revisions and audit history) in Entity Runtime over an Eventlog SQLite
 store. GitLab is served from its pinned OpenAPI document through the catalog
 provider, as in 0.11.0, which retired the native GitLab adapter. The earlier **v0.1.0
@@ -18,7 +18,7 @@ Since 0.28.0 the CLI's generated decoder refuses `operations invoke` business in
 with a duplicate object key itself, as `cli_dynamic_input`, before the owner sees it;
 exit code 2, empty stdout and no dispatch are as before.
 
-Since 0.29.0 local metadata runs on Entity Runtime 0.26.0 with provider-tracked capture:
+Since 0.29.0 local metadata runs with provider-tracked capture (Entity Runtime 0.26.0 then):
 a read invoke takes 2.3 s at 1,203 recorded events instead of 40.2 s. Every command still
 opens and verifies the whole store, and about 8 events are recorded per read, so the cost
 keeps growing with use: on 2026-10-06 an operator store of 2,800 events took 4 s per
@@ -51,6 +51,61 @@ pinned consumer, and the `datasource.feed/v1alpha1` contract family is specified
 catalog feed engine that `operations list --family` discovers; no real provider binds a
 feed yet, and a feed is not yet read through a saved connection.
 
+Since 0.32.0 `--output json` answers carry JSON values where they carried JSON text:
+`operations invoke` answers the provider result as a JSON value on every path, reads through
+the owner included, and `operations describe`, the `adapters describe` descriptor and the
+compatibility `describe` answer operation schemas as JSON objects. This is breaking for a
+caller that decoded those fields a second time. GitLab is the first provider that binds the
+`datasource.feed/v1alpha1` family (profile `gitlab-merge-requests/1`): member projects as
+containers and merge requests as items, read through a saved connection with
+`operations invoke` and resumed from a watermark. The binding is checked against recorded
+GitLab shapes and a stand-in provider; it has not yet been read from a running GitLab. A feed
+profile now declares what its provider can observe (deletions, kind, revision, visibility),
+and the feed suite holds a binding to what it declares. Local metadata runs on Entity
+Runtime 0.29.0 and Eventlog 0.8.0, which keep each committed record once instead of three
+times; their durable open checkpoints are not enabled yet, so every command still verifies
+the whole store ([#101](https://github.com/beyond10x/connectors/issues/101)). Stores this
+version writes stay readable by 0.31.0. ESS is 0.55.0.
+
+Since 0.33.0 the per-invoke metadata cost no longer grows with the store
+([#101](https://github.com/beyond10x/connectors/issues/101)): a command run while an owner
+runs reads the store through the owner's held handle, and a store `setup init` creates
+carries Entity Runtime durable open checkpoints. In the store-cost test the median read
+invoke took 229 ms at 601 recorded events, 341 ms at 1,201 and 255 ms at 6,000; 0.32.0 took
+1,211 ms at 601 and failed 3 of 5 invokes at 1,201. Checkpoints are one-way: 0.32.0 and
+earlier refuse a store that has them. An existing store keeps working with older releases
+until its owner runs `setup checkpoints-enable --confirm one-way`. Every fresh open (a
+command run without an owner, a second process, the owner when it starts, recovery) still
+verifies the whole store, so a raw edit of the database file is refused by the first command
+after it. Peak resident memory in the same test was 329 MB at 601 events and 560 MB at 1,201
+([#103](https://github.com/beyond10x/connectors/issues/103)). Due expiries are recorded in
+batches of at most 32. Entity Runtime is 0.30.2, Eventlog 0.8.1 and ESS 0.56.0.
+
+Since 0.34.0 a connection saved under another configuration revision of its instance is
+answered with the step that clears it: `revalidate_connection` when only the configuration
+revision changed and the credential can follow, `create_connection` otherwise, instead of a
+`lifecycle_conflict` with `retry_status` that no status change cleared. A new connection
+under the configured revision is admitted under the same instance id and moves the instance
+there when it publishes; a changed provider authority or profile declaration still needs a
+new instance id. `connectors help describe`, `help invoke` and `help serve` print their
+usage, and bash completion covers those three commands. Due expiries are recorded in batches
+of at most 128. The repository plans with AEP 0.69.1.
+
+Since 0.36.0 the catalog provider creates, lists and terminates Runpod pods (`pod.create`,
+`pods.list`, `pod.terminate`) with the API key in keyring custody; a create without a definite
+answer is `unknown` and never sent again. It has been verified against a local fixture only. A
+local `operations invoke` read whose deadline passes after dispatch reports `stage = dispatch`
+or `outcome_unknown` instead of `stage = admission`, and the metadata store records the build
+version that wrote each local runtime bootstrap.
+
+Since 0.35.0 the HTTP host serves `POST /v1alpha2/invoke` when its service configuration names
+a `state` directory. Every admitted invocation is anchored in the execution audit before
+dispatch and answers `audit_ref` and `audit_status`; an admitted write records an attempt
+before its one dispatch and answers `mutation` naming it, or `outcome_unknown` with that
+attempt when its answer is lost. `connectors_client::Client::invoke_v1alpha2` returns the
+attempt. `AttemptRecord.connection_ref` is optional, which breaks `connectors-client` callers
+that read it. Retained audit observations are held in memory and lost on restart.
+
 ## Available runtime
 
 [GitLab](/adapters/gitlab) runs through the [catalog provider](/adapters/catalog):
@@ -65,7 +120,7 @@ returned HTTP 200 for all eighteen current reads, each within its requested page
 bounds, and reused saved credentials across an owner restart. Tags, releases and
 deployments returned empty lists. An initial revalidation refusal remains
 unexplained; later explicit retries succeeded. The replay made no provider writes;
-the live mutation evidence above comes from earlier runs.
+the live mutation evidence above comes from earlier runs. Since 0.32.0 GitLab also binds the feed family as data: `feed.containers` lists the projects the token's user is a member of and `feed.items` reads a project's merge requests, every project listed `private` ([GitLab feed profile](https://github.com/beyond10x/connectors/blob/main/adapters/catalog/contracts/feed/v1alpha1/gitlab.md)).
 
 [Jira Cloud](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) runs
 through the same catalog provider with HTTP basic authentication: issue search by

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T14:50:00Z",
+  "actor": "human:timo",
+  "artifact": "story:invoke-returns-attempt-id",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates on wave/20261008b 3f2badc05 (14 crates, 1501 passed) and 558d01727 (build, spec, host, kubernetes, sql, connectors: 867 passed, 0 failed); http_audit_anchor, http_mutation_ledger_adversary, service, client_v1alpha2, v1alpha2_write_scenario green",
+    "reference": "558d01727"
+  }
+}

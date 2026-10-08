@@ -57,12 +57,21 @@ pub fn resolve(requested: Option<&Path>) -> Result<PathBuf> {
             Err(error) => errors.push(format!("{}: {error}", path.display())),
         }
     }
-    Err(format!(
-        "AEP {} is required; install that release (`b10x upgrade`). Searched: {}",
-        pin.aep,
-        errors.join("; ")
+    Err(format!("{} Searched: {}", install_hint(&pin.aep), errors.join("; ")).into())
+}
+
+/// The exact steps that install the pinned release; `b10x upgrade` installs the newest one,
+/// which is not the pin when a newer AEP has shipped.
+fn install_hint(version: &str) -> String {
+    let archive = format!("aep-{version}-x86_64-unknown-linux-gnu.tar.gz");
+    let base = format!("https://github.com/beyond10x/aep/releases/download/{version}");
+    format!(
+        "AEP {version} is required. Install that release: \
+         curl -fsSLO {base}/{archive} && curl -fsSLO {base}/SHA256SUMS && \
+         grep ' {archive}$' SHA256SUMS | sha256sum -c - && tar -xzf {archive}, \
+         then set CONNECTORS_AEP=$PWD/aep-{version}-x86_64-unknown-linux-gnu/aep \
+         or put that directory first on PATH."
     )
-    .into())
 }
 
 #[cfg(test)]
@@ -75,5 +84,17 @@ mod tests {
         assert!(parse(br#"{"aep":"0.65"}"#).is_err());
         assert!(parse(br#"{"aep":"0.65.x"}"#).is_err());
         assert!(parse(br#"{"aep":"0.65.0","patch_sha256":"00"}"#).is_err());
+    }
+
+    #[test]
+    fn the_refusal_names_the_pinned_release_and_how_to_install_it() {
+        let hint = install_hint("0.69.0");
+        assert!(hint.starts_with("AEP 0.69.0 is required."));
+        assert!(hint.contains(
+            "https://github.com/beyond10x/aep/releases/download/0.69.0/aep-0.69.0-x86_64-unknown-linux-gnu.tar.gz"
+        ));
+        assert!(hint.contains("sha256sum -c -"));
+        assert!(hint.contains("CONNECTORS_AEP="));
+        assert!(!hint.contains("b10x upgrade"));
     }
 }

@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T10:53:28Z",
+  "actor": "human:timo",
+  "artifact": "story:aep-pin-0690",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "PR 133 repository gate, head f0a174016f",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/37763487263"
+  }
+}

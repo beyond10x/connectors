@@ -83,6 +83,24 @@ fn read_reply(
     )
     .map_err(Error::from)
 }
+/// How long past an invoke's deadline its client waits for the owner's answer,
+/// which the owner sends by that deadline.
+const ANSWER_GRACE: Duration = Duration::from_secs(2);
+/// A read's answer: the provider result, which the adapter child held to
+/// [`channel::DEPTH`], one level under the answer's own scalar members. The
+/// answer is held to one level more and every member but `result` to a
+/// scalar, so each result the child admits arrives and nothing else may nest
+/// deeper than in any other answer.
+fn read_shape(answer: Value) -> Result<Value> {
+    let members = answer.as_object().ok_or(Code::Unavailable)?;
+    if members
+        .iter()
+        .any(|(name, value)| name != "result" && (value.is_array() || value.is_object()))
+    {
+        return Err(Code::Unavailable.into());
+    }
+    Ok(answer)
+}
 /// A request without a well-formed reply may have been carried out: its
 /// outcome is unknown, whatever failed while sending or while reading and
 /// decoding the reply. An interruption stays one (C03 "or interruption as
@@ -130,7 +148,10 @@ impl Client {
         version: &str,
         deadline: Instant,
     ) -> Result<Self> {
-        let authority = Metadata::inspect(&paths.state)?.authority()?.to_string();
+        // The authority the greeting names, read without replaying the store: an
+        // owner verified the whole store when it started, and one this call
+        // starts does so before it answers.
+        let authority = Metadata::authority_at(&paths.state)?.to_string();
         let directory = fs::directory(&paths.state, false, true)?;
         let socket = socket_path(&directory);
         loop {
@@ -407,14 +428,16 @@ impl Client {
             revision: input(call, "revision")?,
             deadline_ms,
         };
-        channel::write(
-            &mut self.stream,
-            &request,
-            None,
-            document,
-            until(deadline_ms)?,
-        )?;
-        self.read_answer(until(deadline_ms)?)
+        let deadline = until(deadline_ms)?;
+        channel::write(&mut self.stream, &request, None, document, deadline)?;
+        // The owner answers by the deadline, its own timeout included, and that
+        // answer decides the failure's stage; wait a bounded grace beyond it for
+        // the answer. A sent invoke whose answer never arrives may have been
+        // dispatched, so its outcome is unknown, not the host's admission.
+        match self.answer_within(deadline + ANSWER_GRACE, channel::DEPTH + 1) {
+            Ok(answer) => read_shape(answer?),
+            Err(error) => Err(lost(error)),
+        }
     }
     pub fn revalidate(
         mut self,
@@ -483,6 +506,25 @@ impl Client {
             executable, credential, args, pass_env,
         ))
     }
+    /// Whether this owner runs the caller's own build, so it may answer a
+    /// request in its place.
+    pub fn is_same_build(&self) -> bool {
+        self.same_build().is_ok()
+    }
+    /// The adapter's cached description, answered from the owner's held
+    /// metadata handle.
+    pub(super) fn cached(mut self, adapter: &str) -> Result<runtime::Bootstrap> {
+        self.same_build()?;
+        let mut answer = self.simple(
+            Request::Cached {
+                adapter: adapter.into(),
+            },
+            Duration::from_secs(30),
+        )?;
+        let bootstrap: runtime::Bootstrap =
+            serde_json::from_value(answer["bootstrap"].take()).map_err(|_| Code::Unavailable)?;
+        Ok(bootstrap)
+    }
     pub fn status(mut self, adapter: &str) -> Result<Value> {
         self.same_build()?;
         self.simple(
@@ -545,23 +587,13 @@ impl Client {
     fn answer(&mut self, deadline: Instant) -> std::result::Result<Result<Value>, Error> {
         self.answer_within(deadline, channel::DEPTH)
     }
-    /// A read's answer: the provider result, which the adapter child held to
-    /// [`channel::DEPTH`], one level under the answer's own scalar members. The
-    /// answer is held to one level more and every member but `result` to a
-    /// scalar, so each result the child admits arrives and nothing else may nest
-    /// deeper than in any other answer.
+    /// A read's answer as `invoke` reads it ([`read_shape`]).
+    #[cfg(test)]
     fn read_answer(&mut self, deadline: Instant) -> Result<Value> {
-        let answer = self
-            .answer_within(deadline, channel::DEPTH + 1)
-            .unwrap_or_else(Err)?;
-        let members = answer.as_object().ok_or(Code::Unavailable)?;
-        if members
-            .iter()
-            .any(|(name, value)| name != "result" && (value.is_array() || value.is_object()))
-        {
-            return Err(Code::Unavailable.into());
-        }
-        Ok(answer)
+        read_shape(
+            self.answer_within(deadline, channel::DEPTH + 1)
+                .unwrap_or_else(Err)?,
+        )
     }
     fn answer_within(
         &mut self,
@@ -682,6 +714,33 @@ fn socket_identity(path: &std::path::Path) -> Option<(u64, u64)> {
         .ok()
         .map(|info| (info.dev(), info.ino()))
 }
+/// `setup checkpoints-enable`: enables durable open checkpoints on the store in
+/// `paths.state` while holding the owner lifetime lock, taken without waiting,
+/// so no owner runs or starts meanwhile. A lock another process holds (a
+/// running owner, or a CLI starting one) is `LifecycleConflict` with the store
+/// unchanged; the running owner is never signalled. A missing state directory
+/// or store is `MetadataUnavailable`, and no database is created.
+pub fn enable_checkpoints(paths: &Paths) -> Result<super::super::metadata::Checkpoints> {
+    let directory =
+        fs::directory(&paths.state, false, true).map_err(|_| Code::MetadataUnavailable)?;
+    let lock = lock(&directory).map_err(|_| Code::MetadataUnavailable)?;
+    // SAFETY: `lock` owns the live owner-only lifetime lock descriptor; dropping
+    // it on return releases the lock.
+    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+        return Err(
+            if std::io::Error::last_os_error().kind() == std::io::ErrorKind::WouldBlock {
+                Code::LifecycleConflict
+            } else {
+                Code::MetadataUnavailable
+            }
+            .into(),
+        );
+    }
+    let enabled = Metadata::enable_checkpoints(&paths.state)?;
+    drop(lock);
+    Ok(enabled)
+}
+
 fn lock(directory: &File) -> Result<File> {
     match fs::publish_new(directory, std::ffi::OsStr::new("owner.lock"), &[]) {
         Ok(()) | Err(crate::local::Failure::ConfigurationExists) => {}
@@ -775,15 +834,25 @@ pub(crate) fn bound_allocator() {
     }
 }
 
+/// Set once this process serves as the owner: its own reads never go through
+/// an owner.
+static IN_OWNER: AtomicBool = AtomicBool::new(false);
+
+/// Whether this process is the owner.
+pub(super) fn in_owner() -> bool {
+    IN_OWNER.load(Ordering::SeqCst)
+}
+
 pub fn serve(paths: Paths) -> Result<()> {
     bound_allocator();
+    IN_OWNER.store(true, Ordering::SeqCst);
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
     let (startup, lifetime) = inherited()?;
     let build = own_build()?;
     let config = Config::load(&paths.config)?;
     let directory = fs::directory(&paths.state, false, true)?;
-    let metadata = Metadata::update(&paths.state, true)?;
+    let metadata = Metadata::start_owner(&paths.state)?;
     let authority = metadata.authority()?.to_string();
     drop(metadata);
     fs::check_private_file(&lifetime)?;
@@ -1272,6 +1341,7 @@ fn action(
         | Request::Revalidate { adapter, .. }
         | Request::Invoke { adapter, .. }
         | Request::Status { adapter }
+        | Request::Cached { adapter }
         | Request::Launch { adapter, .. }
         | Request::Stop { adapter, .. } => adapter.clone(),
         _ => return Err(Code::InvalidInput.into()),
@@ -1522,6 +1592,9 @@ fn action(
             )
         }
         Request::Status { .. } if document.is_empty() => owner.pool.status(&alias, &adapter),
+        Request::Cached { .. } if document.is_empty() => {
+            Ok(json!({ "bootstrap": super::cached_direct(&owner.paths, &alias)? }))
+        }
         Request::Stop {
             configuration_revision,
             host_incarnation,
@@ -1628,6 +1701,71 @@ fn launch(
     registry.release_read(dispatched, connectors_sdk::now_ms())?;
     delivered?;
     Ok(json!({}))
+}
+
+/// story:invoke-timeout-after-dispatch-stage: the owner answers an invoke by
+/// its deadline, its own timeout included, and that answer decides the
+/// failure. A sent invoke whose answer never arrives may have been
+/// dispatched, so its outcome is unknown, never the host's admission.
+#[cfg(test)]
+mod invoke_answer_tests {
+    use super::*;
+
+    fn client() -> (Client, UnixStream) {
+        let (client, owner) = UnixStream::pair().unwrap();
+        (
+            Client {
+                stream: client,
+                host_incarnation: "fixture-host".into(),
+                owner_build: Some(own_build().unwrap().into()),
+            },
+            owner,
+        )
+    }
+
+    fn call() -> Value {
+        json!({"connection":"connection","operation":"read","schema":"schema","revision":"revision"})
+    }
+
+    #[test]
+    fn an_owner_answer_sent_at_the_deadline_decides_the_invoke_failure() {
+        let (client, mut owner) = client();
+        let deadline = connectors_sdk::now_ms() + 200;
+        let answered = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let mut error = Error::from(Code::Timeout);
+            error.origin = Origin::Provider;
+            channel::write(
+                &mut owner,
+                &Reply::Failed { error },
+                None,
+                &[],
+                Instant::now() + Duration::from_secs(5),
+            )
+            .unwrap();
+            owner
+        });
+        let error = client
+            .invoke("alias", &call(), b"{}", deadline)
+            .unwrap_err();
+        drop(answered.join().unwrap());
+        assert_eq!(error.code, Code::Timeout);
+        assert_eq!(
+            error.origin,
+            Origin::Provider,
+            "the client's own read expiry replaced the owner's answer"
+        );
+    }
+
+    #[test]
+    fn an_invoke_whose_answer_never_arrives_is_outcome_unknown() {
+        let (client, owner) = client();
+        let error = client
+            .invoke("alias", &call(), b"{}", connectors_sdk::now_ms() + 200)
+            .unwrap_err();
+        drop(owner);
+        assert_eq!(error.code, Code::OutcomeUnknown);
+    }
 }
 
 #[cfg(test)]
@@ -1984,8 +2122,8 @@ mod idle_sweep_tests {
                     adapter: "adapter".into(),
                     operation: "operation".into(),
                 },
-                connection_ref: "connection".into(),
-                connection_revision: "revision".into(),
+                connection_ref: Some("connection".into()),
+                connection_revision: Some("revision".into()),
                 contract_ref: "operations/v1alpha1".into(),
                 profile: "mutation".into(),
                 descriptor_revision: "descriptor".into(),

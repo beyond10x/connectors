@@ -200,6 +200,12 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
         OutcomeUnknown => ("outcome_unknown", "publication", "retry_status", false),
         NotFound => ("not_found", "observation", "check_configuration", false),
         Conflict => ("lifecycle_conflict", "admission", "retry_status", false),
+        UpgradeRequired => (
+            "lifecycle_conflict",
+            "admission",
+            "revalidate_connection",
+            false,
+        ),
         BindingChanged => (
             "lifecycle_conflict",
             "admission",

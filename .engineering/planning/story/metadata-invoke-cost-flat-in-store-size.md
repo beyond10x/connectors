@@ -2,11 +2,12 @@
 format: aep.planning-md/3
 id: story:metadata-invoke-cost-flat-in-store-size
 kind: story
-status: active
+status: implemented
 title: Per-invoke metadata cost does not grow with the store
 relations:
 - serves: vision:independent-contract-adapters
 - decomposes: epic:connector-probe-20261006
+- informed_by: upstream-blocker:er-batch-cost-superlinear
 scope:
 - confidence: cited
   path: Cargo.lock
@@ -20,10 +21,11 @@ scope:
   path: crates/connectors-host/src/local/registry.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 12
+revision: 17
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-08T06:29:54Z", actor: "human:timo", revision: 17, decided_on: {"recorded":{"test_result":1,"review_outcome":3,"verification":1}}}
 ---
 ## Source
 
@@ -43,16 +45,25 @@ So the consumer's ~700-invoke workload will still reach the admission bound, lat
 
 ## Acceptance
 
-Revised 2026-10-06. Entity Runtime 0.26.0 is adopted (#96) and batch execution is flat; what grows
-is the complete verification every open performs (`er.start`), blocked on
-upstream-blocker:entity-runtime-open-verifies-whole-store (beyond10x/entity-runtime#55).
+Revised 2026-10-07: Entity Runtime 0.29.0 is pinned (`story:entity-runtime-029-pin`); its durable
+open checkpoints are adopted as decided in `decision-blocker:store-checkpoints-one-way` (option C).
 
-- The host adopts the Entity Runtime release that closes beyond10x/entity-runtime#55.
-- `read_invoke_cost_by_store_size`, release build, same command at 600 and 6,000 events: the median
-  per-invoke time at 6,000 events is at most twice the median at 600.
-- Separately: a workload of 700 consecutive read invokes against one store completes with no
-  admission `timeout` and no `outcome_unknown`, run by a 700-invoke mode this story adds to
-  `read_invoke_cost_by_store_size` (`CONNECTORS_STORE_COST_INVOKES=700`).
+- Spec first: the store-creation behaviour and the new command are modelled in the CLI
+  specification (`ess/domains/cli.yaml` and `apps/connectors/spec/cli.yaml`) and validated before
+  the handler exists.
+- `setup init` (and any path that creates a new metadata store) creates it with durable open
+  checkpoints enabled.
+- An explicit command enables checkpoints on an existing store. It states that the change is
+  one-way (connectors 0.32.0 and earlier can no longer open the store) and refuses to run
+  without a confirming flag; run twice it answers that the store is already enabled.
+- Tests: a new store is created with checkpoints; an existing store (the 0.26.0 fixture of
+  `tests/metadata_store_previous_pin.rs` restored) is enabled by the command and then opens from
+  its checkpoint; a store without the flag is refused unchanged.
+- `read_invoke_cost_by_store_size`, release build, on stores with checkpoints: the median
+  per-invoke time at 6,000 events is at most twice the median at 600; a 700-invoke run
+  (`CONNECTORS_STORE_COST_INVOKES=700`) completes with no admission `timeout` and no
+  `outcome_unknown`.
+- `CHANGELOG.md` names the command under Migration and the one-way change under Breaking.
 
 ## Not taken
 
@@ -121,3 +132,25 @@ connection, still verifies.
 Operator observation the same day: on the default store (1,022 events, 29 MB) and on a fresh
 Zendesk store grown to 489 events, `connections revalidate` answered `outcome_unknown` at
 `publication` after 30 s with the 0.27.0 and 0.28.0 CLIs.
+
+## Integrity
+
+Added 2026-10-07 (`decision-blocker:checkpoint-offline-edit-detection`, option B); revised
+2026-10-08 after adversary pass 1 (`review-result:adversary-store-checkpoints-pass-1`, J1, R1) to
+state what is built:
+
+- Only the owner, holding a handle for its whole run, reads from a checkpoint without a complete
+  read; it does one complete read at its start (`Metadata::start_owner`). Every other open (a
+  command run without the owner, a second process, recovery) is a provider open followed by a
+  complete read (`complete_snapshot`), which Entity Runtime 0.29.0 treats as complete
+  verification (Entity Runtime 0.29.0 CHANGELOG and the `CapturePolicy::ProviderTracked` doc comment, `entity-eventlog` `adapter/tracked.rs:19-20`). A command run with the owner reads through
+  it (`LocalOwnerCachedRequest`).
+- Tests: an offline raw edit of the SQLite file is refused before the first command after it, on
+  the owner path (edited while the owner is stopped, then started) and on the direct path.
+- Accepted: inside a process that already holds a verified handle, a later open of the same file
+  skips `PRAGMA quick_check`, so page damage written by a non-SQLite writer while that process
+  runs is seen at the next fresh open, not before; damage in the `connectors_er_*` tables is still refused by the catch-up read (`crates/connectors-host/tests/pooled_open_scan_adversary.rs`). This matches the provider-tracked posture
+  recorded on 2026-10-05.
+- `CHANGELOG.md` and the store contract (`docs/local-er-metadata.md`,
+  `contracts/cli/v1alpha1/semantics.md` §3) say which open verifies what.
+- No disable command is offered.

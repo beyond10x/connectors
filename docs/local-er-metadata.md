@@ -235,6 +235,53 @@ after dispatch returns `OutcomeUnknown`; recovery reads the exact owner subject 
 batch identity and never resends a provider effect solely because a process
 restarted.
 
+## Durable open checkpoints: which open verifies what
+
+Entity Runtime 0.29.0 can persist an open checkpoint: the observation a
+`ProviderTracked` handle last verified, with Eventlog's proof that only
+acknowledged appends followed it. A store has them once they are enabled, which
+installs Eventlog's continuity tables and triggers (`connectors_er_capture_*`).
+`setup init` enables them on every database it creates; an existing database
+gets them only through `setup checkpoints-enable --confirm one-way`. Enabling is
+one-way for older releases: connectors 0.32.0 and earlier (Entity Runtime 0.28.0
+and earlier) refuse to open the store afterwards, and no command removes them.
+The host persists a handle's verified observation as the checkpoint when it
+returns the handle to its process pool.
+
+| Open | What the provider verifies | What the host verifies before the handle answers |
+|---|---|---|
+| Any fresh open in any process: a command, a second process, the owner when it starts, recovery after a refused handle | a `ProviderTracked` open: the checkpoint and the suffix after it, or the whole store when there is no usable checkpoint | the whole store: a complete snapshot, which reads and verifies every event, bound blob and index row; Entity Runtime 0.29.0 treats a complete read as a complete verification (its CHANGELOG, and `CapturePolicy::ProviderTracked` in `entity-eventlog` `adapter/tracked.rs`), so no open uses a separate `FullVerification` policy |
+| A pooled handle reused in the process that verified it | — | the events appended since its head, by subject, or a complete snapshot when one cannot be attributed; the physical page scan (`quick_check`, foreign keys) of its fresh open is not repeated |
+| A live `ProviderTracked` handle reading after another connection appended | the appended suffix, proven continuous by Eventlog's journal | — |
+
+So the checkpoint shortens the provider's own open, and every fresh open still
+verifies completely: a raw edit of `metadata.sqlite3` that bypasses SQLite while
+no handle is open is refused by the first open after it, a command run directly
+or the owner when it starts. The owner holds its handles for its whole run, so
+it verifies the whole store once per start; no open, the owner's included,
+answers from a checkpoint without that complete read. A command run while an
+owner of its own build runs reads through it ([owner transport](../contracts/cli/v1alpha1/owner.md))
+and does not open the store; without one it opens the store directly.
+Page damage written to the file by something other than SQLite while a process
+holds a verified handle for it is accepted by that process's later opens, which
+do not repeat the page scan, until its next fresh open, which refuses it.
+
+Owner start, measured on stores grown by read invokes (release build,
+`owner_start_of_a_grown_store`, 2026-10-08): 763–834 ms at 600 events,
+1,134–1,393 ms at 1,200 and 6,148–7,401 ms at 6,000, about 1.1 ms per event,
+within the 10-second spawn deadline the CLI waits for a starting owner.
+
+Due expiries of transient subjects (`ExpireReadUse`, `ExpireConnectionListCursor`)
+are recorded in batches of at most 128 before the batch carrying the caller's own
+change, because one batch's time grows with its members: on Entity Runtime 0.30.2
+every due expiry in one batch took 14.4 s at 6,000 events, and batches of 128
+took at most 1.5–2.5 s each (release build, `first_owner_open_of_a_grown_store`,
+2026-10-08; on 0.29.0, 396 expiries in one batch took 101.9 s at 1,201 events,
+and the bound was 32). Each expiry
+batch's receipt is read back; the projection check runs once, after the
+caller's batch. A refused or uncertain expiry batch leaves earlier ones
+committed and the caller's change unapplied; the next write records the rest.
+
 The local owner, adapter children and keyring remain separate processes with their
 current socket, supervision, startup coalescing, bounded shutdown and explicit
 stop suppression contracts. Only metadata persistence changes. Public results,

@@ -1,6 +1,214 @@
 # Changelog
 
-## Unreleased
+## 0.36.0 — 2026-10-08
+
+### Added
+
+- The catalog provider creates, lists and terminates Runpod pods: `pod.create` (`CreatePod`,
+  `POST /v1/pods`), `pods.list` (`ListPods`, `GET /v1/pods`) and `pod.terminate` (`DeletePod`,
+  `DELETE /v1/pods/{podId}`), from the Runpod REST API document pinned as served under
+  `adapters/runpod/upstream/` (SHA-256 `9500a898…b580db`, with a gzip archive the gate
+  re-derives). The API key travels as `Authorization: Bearer` under profile `runpod.api-key`.
+  Both writes are unguarded required-approval mutations; `pod.create`'s body is closed by
+  `body_keys` to twelve `PodCreateInput` keys. A create answered with a definite 4xx is
+  `refused`; one whose connection is lost after the request was sent, or answered 5xx, is
+  `unknown` and is never sent again. A terminate answered 404 is `refused` with `not_found`.
+  See `docs/catalog-runpod.md`.
+- `auth.identity.source` `configuration`: the read at `path` must answer 200 and its body is
+  not read; the subject is the configuration's `instance` id. Runpod has no user or account
+  read, so its identity is the configured connection (`runpod.connection`), not an account.
+  Only a static credential (`token` or `basic`) may use it; an OAuth profile with it is refused
+  at load. The rules are modeled as `connectors_catalog.identity.Probe` and `Profile` in
+  `adapters/catalog/spec/ess`, and every identity the guides document is checked against them.
+
+- The local metadata store records the release version of the build that wrote each local
+  runtime bootstrap (`connectors.cli.LocalRuntimeRecord.build_version`). It is kept beside the
+  bootstrap in its cached column; a store written before this release opens unchanged, its
+  records carry no version, and the next bootstrap a build remembers records that build's.
+
+### Changed
+
+- A selection, guard preflight or feed declaration that names an `operationId` the bundle
+  carries more than once is refused when it loads, instead of resolving to the first
+  operation listed. No shipped selection changes: only the Runpod document declares an id
+  twice (`UpdatePod`, `UpdateEndpoint`, `UpdateNetworkVolume`, `UpdateTemplate`), and none
+  of them is selected.
+
+### Fixed
+
+- A local `connectors operations invoke` read whose deadline passes after the owner dispatched
+  it (its read use recorded `DispatchReadUse`) reports `code = timeout` at `stage = dispatch`
+  instead of `stage = admission`. A deadline that passes before dispatch keeps
+  `stage = admission`, and the owner no longer dispatches that read afterwards. The CLI waits
+  up to 2 s past the deadline for the owner's answer; an invoke it sent whose answer never
+  arrives reports `outcome_unknown` instead of the host's admission timeout.
+
+### Limits
+
+- Runpod has not been called live: no account or key was used, and every outcome was
+  produced by a local HTTPS fixture.
+
+## 0.35.0 — 2026-10-08
+
+### Breaking
+
+- `connectors.mutations.AttemptRecord.connection_ref` is now optional: an attempt the HTTP
+  host records names no connection, so the member is absent for it. This is a breaking change
+  for `connectors-client` callers that read `connection_ref` from an attempt record; treat an
+  absent value as an HTTP-host attempt and correlate it through the attempt id instead. Attempts
+  the local owner records keep naming their connection.
+
+### Added
+
+- The HTTP host serves the first v1alpha2 binding, `POST /v1alpha2/invoke`
+  (`contracts/service/compatibility.md` § 2.1), when its service configuration names a
+  private `state` directory (`urn:connectors:config:v2:service`; `urn:connectors:config:v1:service`
+  is read unchanged). Without `state` the route answers `unavailable` (HTTP 503) before decoding.
+  The request is the five v1alpha1 members with `version: v1alpha2`; `connection`,
+  `idempotency_key`, `approval` and `executor` are refused as `unsupported`. Describe stays on
+  `GET /v1/describe`.
+- Audit anchor: every admitted invocation on the route, read or write, is anchored in the
+  host's execution audit before dispatch. The Response carries `audit_ref` and `audit_status`
+  (`complete` when the final observation is recorded, `incomplete` when only its append
+  failed, `unavailable` with a null `audit_ref` for a refusal before the anchor). A running
+  host retries a retained final observation by itself.
+- Attempt record: an admitted `external_write` records a `connectors.mutations.AttemptRecord`
+  after the anchor and before its one dispatch. Its Response carries `mutation`
+  (`classification`, `attempt: {instance, id}`, `original_request_id`, `replayed: false`,
+  `cause`). A write whose answer is lost after dispatch is `outcome_unknown` with
+  `classification: unknown` and its attempt, and is not dispatched again. Reads and refusals
+  before the record carry no `mutation`.
+- Client entry point: `connectors_client::Client::invoke_v1alpha2` invokes on
+  `POST /v1alpha2/invoke` with a descriptor from `GET /v1/describe` and returns `Invoked`
+  (the result value, the optional `MutationObservation`, `audit_ref`, `audit_status`) or a
+  boxed `Failure` that keeps the host's `mutation` when one was recorded. It checks request
+  correlation and the § 5 HTTP mapping, never falls back to `/v1/invoke` and never resends;
+  an endpoint answering HTTP 404 without a v1alpha2 envelope is reported as `unsupported`.
+  `Client::invoke` keeps its signature and the legacy `/v1/invoke` binding, whose wire is
+  unchanged.
+- The repository gate generates the JSON Schema of the v1alpha2 request and Response and
+  checks every wire vector against it; raw-byte refusal vectors are excluded by a named rule.
+- The ESS specification declares `UpgradeServiceConfiguration`, which moves an instance's
+  configuration revision and registry epoch together.
+
+### Fixed
+
+- The browser realization example builds again with the optional attempt connection; the
+  website production build failed with E0277.
+
+### Limitations
+
+- Final audit observations the host retains for retry are held in memory: a restart loses
+  them and those audit records stay `Anchored`. With 10,000 retained the host refuses new
+  invocations on the route and evicts none.
+- A write whose completion cannot be stored stays `Dispatching`; its Response says `applied`
+  with cause `{unavailable, attempt_store}`, and nothing retries the settlement.
+- An HTTP host must not share its `state` directory with a local owner; nothing checks it.
+- HTTP-host attempts carry no idempotency key and are stamped with the system clock under the
+  anti-regression floor.
+
+## 0.34.0 — 2026-10-08
+
+### Fixed
+
+- A connection saved under another configuration revision no longer refuses with
+  `lifecycle_conflict` and `next_action = retry_status`, which no status change clears. Reads,
+  approval targets, consumer launches and approval key and policy commands answer
+  `revalidate_connection` when an upgrade can succeed (only the configuration revision
+  changed, the credential is neither invalid nor expired, and no upgrade to the configured
+  revision was refused), and `create_connection` otherwise. A refused upgrade is recorded on
+  the connection; a repair clears it. Creating a connection under the configured revision is
+  admitted again and moves the instance to that revision when it publishes, never back to an
+  older one. A changed provider authority or profile declaration still needs a new
+  instance id. Found by a read-only CLI audit: a Confluence connection saved before 0.30.0 added
+  the profile's access read refused every read with `retry_status`.
+- `connectors help describe`, `help invoke` and `help serve` print that command's usage, and
+  `connectors completions bash` completes the three explicit service commands at the root with
+  their own flags.
+
+### Changed
+
+- The repository plans with AEP 0.69.1 (from 0.68.0). A missing or mismatched `aep` names the
+  pinned release's download, checksum and `CONNECTORS_AEP` steps.
+
+- Due expiries of transient subjects are recorded in batches of at most 128 members (from 32)
+  before the batch carrying a command's own change. Every store the host opens is SQLite,
+  where Entity Runtime 0.30.2 no longer shows 0.29.0's superlinear batch cost. Measured on
+  the release build of `first_owner_open_of_a_grown_store`, 2026-10-08, the catch-up of a
+  fresh owner's first write:
+
+  | store | bound | expiry batches | largest batch | catch-up |
+  |---|---|---|---|---|
+  | 1,201 events (396 expiries) | none | one, with the write | 4.0 s | 6.5 s |
+  | 1,201 events | 128 | 4 | 1.4 s | 5.8 s |
+  | 6,000 events | none | one, with the write | 14.4 s | 20.9 s |
+  | 6,000 events | 32 (3 runs) | 32 | 0.5–1.3 s | 14.7–17.6 s |
+  | 6,000 events | 128 (4 runs) | 8 | 1.5–2.5 s | 13.2–20.0 s |
+  | 6,000 events | 256 | 4 | 2.8 s | 13.9 s |
+
+  On Entity Runtime 0.29.0 one batch of 396 expiries took 101.9 s, past the 30-second bridge
+  deadline. Unbounded batches now finish inside it at both sizes, but still grow with the
+  backlog, so a bound stays: 128 keeps each batch more than ten times inside the deadline in
+  a quarter of the batches 32 needs. The machine was loaded (load average about 21 on 20
+  cores), so single runs vary by up to 40 %.
+
+## 0.33.0 — 2026-10-08
+
+### Breaking
+
+- `setup init` creates every new metadata database with Entity Runtime 0.29.0 durable open
+  checkpoints enabled. Enabling installs Eventlog's continuity tables and triggers, and is
+  one-way for older releases: connectors 0.32.0 and earlier (Entity Runtime 0.28.0 and
+  earlier) refuse to open such a store. Upgrade every installed `connectors` binary and any
+  other tool that opens the store before using a store this release created. No command
+  removes them.
+
+### Migration
+
+- `setup checkpoints-enable --confirm one-way` enables durable open checkpoints on an existing
+  store; nothing else does, so an existing store keeps working with older releases until its
+  owner runs it. Without `--confirm one-way` it refuses `confirmation_required` (exit 2)
+  before it takes a lock or opens the store. It holds the owner lifetime lock without
+  waiting, so while an owner runs it refuses `lifecycle_conflict` with `next_action =
+  stop_owner` and the store unchanged. A store that already has checkpoints, including every
+  store `setup init` creates, answers `disposition = already_enabled`. Every result states
+  `change = one-way` and `newest_incompatible_release = "0.32.0"`.
+
+### Changed
+
+- Which open verifies what (`docs/local-er-metadata.md`, `contracts/cli/v1alpha1/semantics.md`
+  §3): the provider's open of a store with checkpoints starts from the persisted checkpoint,
+  and every fresh open the host makes (a command run directly, a second process, the owner
+  when it starts, recovery) still reads and verifies the whole store before it answers, so a
+  raw edit of the database file made while no handle was open is refused by the first command
+  or owner start after it. A handle a process keeps reads only what was appended since. The
+  host persists each pooled handle's verified observation as the store's checkpoint.
+- A command run while an owner of its own build runs reads the metadata store through it
+  instead of opening the store: a new owner `cached` request answers cached-description
+  reads from the owner's held handle, and `operations invoke` leaves its admission to the
+  owner's admission of the `invoke` request. The owner greeting's authority is read from
+  the database without replaying the store. Without such an owner a command opens and
+  verifies the store directly, as before. On stores grown by read invokes (release build,
+  `read_invoke_cost_by_store_size`), the median per-invoke metadata time is 229 ms at 601
+  events, 341 ms at 1,201 and 255 ms at 6,000; a direct open costs 0.9 s, 1.5 s and 6.9 s.
+- Due expiries of transient subjects are recorded in batches of at most 32 before the batch
+  carrying a write's own change. One batch holding every due expiry ran past the 30-second
+  bridge deadline from about 1,200 recorded events (396 expiries took 101.9 s), answered
+  `outcome_unknown`, and left the store `metadata_unavailable` until the batch finished.
+- A process that keeps a verified handle for the store no longer repeats the physical page
+  scan (`quick_check`, foreign keys) on each later open of the same file; every fresh open
+  still runs it. Page damage written to the file outside SQLite while a process holds a
+  verified handle is therefore accepted by that process until its next fresh open refuses it.
+- ESS 0.56.0 (from 0.55.0): the seven ESS crates and the pinned toolchain; it brings Entity
+  Runtime Core 0.28.0 through `ess-entity-runtime`.
+- Entity Runtime 0.30.2 (from 0.29.0) and Eventlog 0.8.1 (from 0.8.0). One Eventlog is
+  linked. The 0.8.1 release notes list changes to its file backend only
+  (https://github.com/beyond10x/eventlog/issues/42); this repository uses the SQLite backend. A
+  store written by 0.32.0 opens and reads under the new pins (`metadata_store_previous_pin`).
+  Entity Runtime 0.30.2 records a batch in time linear in its members on SQLite stores; the
+  measurements above were taken on 0.30.1, and the 32-member expiry batch bound is unchanged.
+
+## 0.32.0 — 2026-10-07
 
 ### Added
 
@@ -82,6 +290,17 @@
   approval policies again (`docs/local-catalog-provider.md`). Until then the adapter does
   not start and the connection reports `pending`. To read the feed, add `feed.containers`
   and `feed.items` to the adapter's permitted operations.
+- Connectors builds on Entity Runtime 0.29.0 (from 0.26.0) and Eventlog 0.8.0 (from the
+  unreleased revision `6983cc25`), one copy of each; ESS 0.55.0 still brings Entity Runtime
+  Core 0.24.1 through `ess-entity-runtime`. No call site changed. Entity Runtime 0.28.0 keeps
+  each committed record of a verified model once rather than three times; 0.29.0 adds
+  durable open checkpoints, which Connectors does not enable, so a tracked open still
+  verifies the whole store. Stores this version writes stay readable by 0.31.0 and earlier:
+  without that enable call Eventlog installs no continuity table, journal or trigger, and
+  `tests/metadata_store_previous_pin.rs` checks that a write leaves the store's schema as
+  the previous runtime wrote it. The same test opens a committed store that Entity Runtime
+  0.26.0 wrote (`tests/fixtures/metadata-store-er-0.26.0/`), reads it and writes to it.
+
 
 ## 0.31.0 — 2026-10-06
 

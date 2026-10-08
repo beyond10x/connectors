@@ -99,6 +99,16 @@ pub enum Outcome {
     Unknown,
 }
 
+/// `connectors.execution_audit.AnchorAccess`: `write` exactly when the admitted
+/// operation's host declaration includes `external_write`. Only a write anchor
+/// can be linked to an attempt.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Access {
+    Read,
+    Write,
+}
+
 /// Trusted host facts, not caller-supplied or a public request codec. Optional
 /// coordinates may be supplied only when independently verified by the owner.
 /// Timestamps describe observations; they never prove authorization or expiry.
@@ -108,6 +118,10 @@ pub struct Anchor {
     pub instance_id: String,
     pub kind: Kind,
     pub activity: Option<Activity>,
+    /// Omitted from the stored record when absent, so every record written
+    /// before it existed keeps its exact bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access: Option<Access>,
     pub hop: Hop,
     pub stage: Stage,
     pub request_id: Option<String>,
@@ -139,7 +153,7 @@ impl Anchor {
             return Err(Failure::InvalidInput);
         }
         if self.activity == Some(Activity::Describe)
-            && (self.operation_id.is_some() || self.attempt_id.is_some())
+            && (self.operation_id.is_some() || self.attempt_id.is_some() || self.access.is_some())
         {
             return Err(Failure::InvalidInput);
         }
@@ -206,6 +220,14 @@ impl Record {
         }
         Ok(encoded)
     }
+}
+
+/// The acknowledgement of `LinkAnchorAttempt`. `Repeated` is the same attempt
+/// linked again: nothing changed, and the owner treats it as the original link.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Linked {
+    Linked,
+    Repeated,
 }
 
 pub enum Acknowledgement {
