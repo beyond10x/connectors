@@ -8,6 +8,7 @@ relations:
 - decomposes: story:invoke-returns-attempt-id
 - depends_on: task:v1alpha2-invoke-wire-codec
 - serves: vision:independent-contract-adapters
+- depends_on: task:http-host-audit-anchor
 revision: 1
 ---
 ## Outcome
