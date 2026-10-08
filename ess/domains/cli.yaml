@@ -195,7 +195,8 @@ types:
   # Request::Cached: a CLI's read of an adapter's cached description through the
   # running owner, answered from the owner's held metadata handle instead of a
   # direct open of the store (contracts/cli/v1alpha1/owner.md). Sent only to an
-  # owner of the CLI's own build; without a reachable owner the CLI reads directly.
+  # owner of the CLI's own build; without a reachable owner, or after an exchange that
+  # failed past the greeting, the CLI reads directly.
   - name: connectors.cli.LocalOwnerCachedKind
     kind: enum
     variants: [cached]

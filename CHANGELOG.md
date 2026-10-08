@@ -45,7 +45,8 @@
   `outcome_unknown`, and left the store `metadata_unavailable` until the batch finished.
 - A process that keeps a verified handle for the store no longer repeats the physical page
   scan (`quick_check`, foreign keys) on each later open of the same file; every fresh open
-  still runs it.
+  still runs it. Page damage written to the file outside SQLite while a process holds a
+  verified handle is therefore accepted by that process until its next fresh open refuses it.
 - ESS 0.56.0 (from 0.55.0): the seven ESS crates and the pinned toolchain; it brings Entity
   Runtime Core 0.28.0 through `ess-entity-runtime`.
 

@@ -100,3 +100,27 @@ fn a_failed_second_expiry_batch_keeps_the_first_and_skips_the_callers_action() {
     assert_eq!(expiry_batches, (DUE as usize - K).div_ceil(K));
     assert_eq!(unexpired_read_uses(root.path()), 1);
 }
+
+/// A write that records nothing but due expiries, more than two batches of
+/// them: every batch but the last runs ahead, and the last is the final batch
+/// that carries the post-commit checks. No expiry is dropped.
+#[test]
+fn a_write_of_only_due_expiries_records_every_one_with_the_last_batch_final() {
+    let (root, _registry, _reference) = store_with_due_read_uses(DUE);
+    let (persisted, expiry_batches) = with_expiry_batches(K, None, || {
+        // The sweep every registry use transaction runs, and nothing else.
+        let mut metadata = Metadata::update(root.path(), true).unwrap();
+        metadata
+            .connection
+            .execute(
+                "DELETE FROM registry_uses WHERE expires_at_ms<=?1",
+                [timestamp(NOW + 10_000).unwrap()],
+            )
+            .unwrap();
+        metadata.persist()
+    });
+    persisted.unwrap();
+    // ceil(10 / 4) = 3 batches: two ahead, the last as the final batch.
+    assert_eq!(expiry_batches, (DUE as usize).div_ceil(K) - 1);
+    assert_eq!(unexpired_read_uses(root.path()), 0);
+}

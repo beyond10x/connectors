@@ -77,7 +77,9 @@ admission of the `invoke` request decides it, before dispatch, from the same hel
 handle. The authority a greeting names is read from the database's authority row
 without replaying the store. Without a reachable owner of the same build a
 command reads the store directly, which verifies it completely, and `operations
-invoke` admits directly before it starts an owner. The owner itself never routes
+invoke` admits directly before it starts an owner. A `cached` exchange that fails
+after the greeting, an owner's refusal included, is answered by that direct
+read, so a refusal carries the direct read's own code. The owner itself never routes
 its reads through an owner.
 
 The generated parser's protected Sources hook retains one clearing buffer and

@@ -254,13 +254,29 @@ fn selected(paths: &Paths, alias: &str) -> Result<(Config, Adapter)> {
 /// this build answers it from its held metadata handle; without one the store
 /// is read directly, which verifies it completely (`docs/local-er-metadata.md`).
 pub fn cached(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
-    if !transport::in_owner()
-        && let Ok(client) = Client::connect(paths, false)
-        && client.is_same_build()
-    {
-        return client.cached(alias);
+    cached_through(paths, alias, |paths, alias| {
+        if transport::in_owner() {
+            return None;
+        }
+        let client = Client::connect(paths, false)
+            .ok()
+            .filter(Client::is_same_build)?;
+        Some(client.cached(alias))
+    })
+}
+/// `through_owner` asks a running owner, or answers `None` when there is none
+/// to ask. Only its answer is taken; a failed or broken exchange after the
+/// greeting, a refusal included, is answered by the direct read, which gives
+/// a refusal its own code.
+fn cached_through(
+    paths: &Paths,
+    alias: &str,
+    through_owner: impl FnOnce(&Paths, &str) -> Option<Result<runtime::Bootstrap>>,
+) -> Result<runtime::Bootstrap> {
+    match through_owner(paths, alias) {
+        Some(Ok(bootstrap)) => Ok(bootstrap),
+        Some(Err(_)) | None => cached_direct(paths, alias),
     }
-    cached_direct(paths, alias)
 }
 /// The adapter's cached description, read from this process's metadata handle.
 fn cached_direct(paths: &Paths, alias: &str) -> Result<runtime::Bootstrap> {
@@ -609,4 +625,87 @@ enum Reply {
     Failed {
         error: Error,
     },
+}
+
+#[cfg(test)]
+mod cached_tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    fn bootstrap(instance: &str) -> runtime::Bootstrap {
+        runtime::Bootstrap {
+            instance: instance.into(),
+            adapter: "fixture-adapter".into(),
+            protocol: "v1alpha1".into(),
+            configuration_revision: "cfg-1".into(),
+            provider_authority: "https://fixture.invalid".into(),
+            descriptor: "{}".into(),
+            profiles: Vec::new(),
+            requirements: Vec::new(),
+        }
+    }
+
+    /// A configured adapter whose cached description was never recorded: the
+    /// direct read refuses it as `description_unavailable`.
+    fn configured() -> (tempfile::TempDir, Paths) {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        Config::initialize(&paths).unwrap();
+        let mut config = Config::load(&paths.config).unwrap();
+        config.format = "connectors-local/2".into();
+        config.adapters.insert(
+            "fixture".into(),
+            super::super::config::Adapter {
+                instance_id: "fixture-instance".into(),
+                adapter_id: "fixture-adapter".into(),
+                configuration_revision: "cfg-1".into(),
+                protocol: "v1alpha1".into(),
+                private_protocol: Some(runtime::PrivateProtocol::V2),
+                startup: Default::default(),
+                restart: Default::default(),
+                executable: super::super::config::Executable {
+                    path: root.path().join("absent-adapter"),
+                    sha256: "a".repeat(64),
+                    args: vec![],
+                },
+                permissions: super::super::config::Permissions {
+                    profiles: BTreeSet::new(),
+                    operations: BTreeSet::new(),
+                },
+            },
+        );
+        std::fs::write(&paths.config, toml::to_string(&config).unwrap()).unwrap();
+        (root, paths)
+    }
+
+    #[test]
+    fn a_failed_cached_exchange_falls_back_to_the_direct_read() {
+        let (_root, paths) = configured();
+        let direct = cached_direct(&paths, "fixture")
+            .map(|_| ())
+            .map_err(|e| e.code);
+        assert_eq!(direct, Err(Code::DescriptionUnavailable));
+        // An exchange that broke after the greeting, or a refusal by the owner,
+        // is answered by the direct read and its own code.
+        for failure in [Code::Unavailable, Code::Timeout, Code::OwnerBuildMismatch] {
+            let answered = cached_through(&paths, "fixture", |_, _| Some(Err(failure.into())));
+            assert_eq!(
+                answered.map(|_| ()).map_err(|e| e.code),
+                direct,
+                "{failure:?}"
+            );
+        }
+        // No owner to ask: the direct read.
+        let answered = cached_through(&paths, "fixture", |_, _| None);
+        assert_eq!(answered.map(|_| ()).map_err(|e| e.code), direct);
+        // The owner's answer is taken as it is.
+        let answered = cached_through(&paths, "fixture", |_, _| Some(Ok(bootstrap("owned"))));
+        assert_eq!(
+            answered.map(|b| b.instance).map_err(|e| e.code),
+            Ok("owned".into())
+        );
+    }
 }
