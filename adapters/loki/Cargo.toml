@@ -1,0 +1,17 @@
+[package]
+name = "connectors-loki"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+connectors-core.workspace = true
+connectors-sdk.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+connectors-host.workspace = true
+tokio.workspace = true

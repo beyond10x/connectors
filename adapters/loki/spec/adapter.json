@@ -1,0 +1,517 @@
+{
+  "kind": "connectors.adapter/v1",
+  "id": "loki",
+  "version": "0.1.0",
+  "sources": [
+    "https://grafana.com/docs/loki/v3.7.x/reference/loki-http-api/",
+    "https://github.com/grafana/loki/tree/v3.7.0/pkg/logql/syntax"
+  ],
+  "configuration_schema": {
+    "title": "effective local configuration",
+    "description": "The document the adapter composition builds and validates. See adapters/loki/contracts/logs/v1alpha1/semantics.md §11.3.",
+    "type": "object",
+    "properties": {
+      "format": {
+        "const": "connectors-loki-local/1"
+      },
+      "instance": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9_.-]+$"
+      },
+      "base_url": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 512
+      },
+      "query_scope": {
+        "type": "object",
+        "properties": {
+          "required_equalities": {
+            "type": "array",
+            "maxItems": 0
+          }
+        },
+        "required": [
+          "required_equalities"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "format",
+      "instance",
+      "base_url",
+      "query_scope"
+    ],
+    "additionalProperties": false
+  },
+  "operations": [
+    {
+      "id": "logs.query_range",
+      "description": "Run one LogQL log query over a time window and return its log lines, newest first by default. One GET /loki/api/v1/query_range; unpaged, at most limit lines.",
+      "contract": "datasource.logs/v1alpha1",
+      "profile": "logql-range",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "start_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "end_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "direction": {
+            "enum": [
+              "forward",
+              "backward"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "max_line_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          }
+        },
+        "required": [
+          "query",
+          "start_unix_ns"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "unix_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp_unix_ns": {
+                  "type": "string"
+                },
+                "stream": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "line": {
+                  "type": "string"
+                },
+                "line_truncated": {
+                  "type": "boolean"
+                },
+                "redacted": {
+                  "type": "boolean"
+                },
+                "source": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "timestamp_unix_ns",
+                "stream",
+                "line",
+                "line_truncated",
+                "redacted",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "selection": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "loki-range"
+              },
+              "start_unix_ns": {
+                "type": "string"
+              },
+              "end_unix_ns": {
+                "type": "string"
+              },
+              "direction": {
+                "enum": [
+                  "forward",
+                  "backward"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "start_unix_ns",
+              "end_unix_ns",
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "order": {
+            "enum": [
+              "timestamp-forward",
+              "timestamp-backward"
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "object",
+            "properties": {
+              "causes": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "provider_limit",
+                    "stream_limit",
+                    "response_bytes",
+                    "line_bytes"
+                  ]
+                }
+              },
+              "occurrences_dropped": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "stream_groups_dropped": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "causes",
+              "occurrences_dropped",
+              "stream_groups_dropped"
+            ],
+            "additionalProperties": false
+          },
+          "next_cursor": {
+            "type": "null"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "resource": {
+                "const": "loki:query_range"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "lines",
+          "selection",
+          "order",
+          "complete",
+          "truncation",
+          "next_cursor",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "logs.query_metric",
+      "description": "Run one LogQL metric query, either at one instant (time_unix_ns, default now) or over a window with a step, and return its series. One GET /loki/api/v1/query or /loki/api/v1/query_range.",
+      "contract": "datasource.series/v1alpha1",
+      "profile": "logql-metric",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "time_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "start_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "end_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "step_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "start_unix_ns"
+                  ]
+                },
+                {
+                  "required": [
+                    "end_unix_ns"
+                  ]
+                },
+                {
+                  "required": [
+                    "step_seconds"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "required": [
+              "start_unix_ns",
+              "end_unix_ns",
+              "step_seconds"
+            ],
+            "not": {
+              "required": [
+                "time_unix_ns"
+              ]
+            }
+          }
+        ],
+        "$defs": {
+          "unix_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "result_type": {
+            "enum": [
+              "vector",
+              "matrix",
+              "scalar"
+            ]
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "labels": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "samples": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "timestamp_unix_ns": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "timestamp_unix_ns",
+                      "value"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "labels",
+                "samples"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "series_limit",
+                "sample_limit"
+              ]
+            }
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "result_type",
+          "series",
+          "complete",
+          "truncation",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "profile": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "instance",
+              "profile",
+              "observed_at_unix_ms"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "logs.labels",
+      "description": "List the label names Loki holds in a window, or the values of one label. One GET /loki/api/v1/labels or /loki/api/v1/label/<name>/values; the window defaults to the last six hours.",
+      "contract": "datasource.logs/v1alpha1",
+      "profile": "loki-labels",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "start_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "end_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          }
+        },
+        "additionalProperties": false,
+        "$defs": {
+          "unix_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "value_limit"
+              ]
+            }
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "label",
+          "values",
+          "complete",
+          "truncation",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "profile": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "instance",
+              "profile",
+              "observed_at_unix_ms"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  ]
+}
