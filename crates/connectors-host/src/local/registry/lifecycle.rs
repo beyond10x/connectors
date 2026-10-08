@@ -277,6 +277,28 @@ impl Registry {
     }
 }
 
+/// Whether a connection of the binding's instance, revoked ones included, was
+/// admitted under another provider authority, or under another declaration of
+/// the binding's profile. The scan is bounded by the per-instance capacity.
+fn authentication_changed(tx: &Transaction<'_>, binding: &Binding) -> Result<bool> {
+    let stored = tx
+        .prepare("SELECT binding FROM registry_connections WHERE instance_id=?1")
+        .map_err(db)?
+        .query_map([&binding.instance_id], |r| r.get::<_, String>(0))
+        .map_err(db)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(db)?;
+    for text in stored {
+        let (admitted, _) = decode_stored(&text)?;
+        if admitted.provider_authority != binding.provider_authority
+            || (admitted.profile.id == binding.profile.id && admitted.profile != binding.profile)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// Registers the instance and profile; answers the instance's recorded
 /// revision when the binding names another one (`Kept::begun_at`).
 fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<Option<String>> {
@@ -297,7 +319,15 @@ fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<Option<String>> {
         // after an upgrading revalidation. Refusing it here left an instance
         // whose connections never followed an upgrade (the new provider
         // refused the credential) admitting no connection at all.
-        Some((_, revision)) if revision != binding.configuration_revision => Some(revision),
+        // The provider authority and the profile declaration still bind the
+        // instance id: a new revision that changes either for a profile the
+        // instance already holds needs a new instance id.
+        Some((_, revision)) if revision != binding.configuration_revision => {
+            if authentication_changed(tx, binding)? {
+                return Err(Failure::Conflict);
+            }
+            Some(revision)
+        }
         Some(_) => None,
         None => {
             tx.execute("INSERT INTO registry_instances (instance_id,adapter_id,configuration_revision) VALUES (?1,?2,?3)", params![binding.instance_id,binding.adapter_id,binding.configuration_revision]).map_err(db)?;
