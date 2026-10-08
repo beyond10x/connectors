@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T21:54:04Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-slack-reads",
+  "kind": "story",
+  "revision": 9,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-catalog-provider --locked --no-fail-fast and cargo clippy -p connectors-catalog-provider --all-targets --locked -- -D warnings on wave/20261008e c6b3f9fc3 (with connectors-build, connectors-docs and connectors): exit 0",
+    "reference": "c6b3f9fc3"
+  }
+}

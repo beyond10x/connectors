@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T21:54:03Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-loki-query",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-loki --locked --no-fail-fast and cargo clippy -p connectors-loki --all-targets --locked -- -D warnings on wave/20261008e c6b3f9fc3 (with connectors-build, connectors-docs and connectors): exit 0",
+    "reference": "c6b3f9fc3"
+  }
+}

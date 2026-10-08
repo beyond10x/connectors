@@ -6,7 +6,28 @@ status: active
 title: Connectors documentation on its own site with the shared look and feel
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+scope:
+- confidence: cited
+  path: .github/workflows/pages.yml
+- confidence: cited
+  path: AGENTS.md
+- confidence: cited
+  path: Cargo.lock
+- confidence: cited
+  path: Cargo.toml
+- confidence: cited
+  path: README.md
+- confidence: cited
+  path: apps/connectors/src
+- confidence: cited
+  path: contracts/catalog/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-build
+- confidence: cited
+  path: crates/connectors-docs
+- confidence: cited
+  path: website
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T20:00:37Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-08T20:00:37Z", actor: "human:timo", revision: 3}
@@ -47,3 +68,9 @@ which other repositories own; the GitHub website field, which follows stage D.
 - No page states an unshipped capability as shipped; planned items are labelled.
 - After merge to `main`, the `Documentation validation` and `Documentation site` runs for the
   merge commit conclude successfully.
+
+## Wave 20261008e result
+
+Stages A and B on wave/20261008e (unit commit 87265871c): the site builds for /connectors/ on Docs System 9d35e63; connectors-docs (34 tests) generates the derivable pages and the gate runs its generate --check; pages.yml (Documentation validation) added. Site build, test:examples (15), test:browser and test:ui passed; docs-system check-source passed.
+
+Open: the organisation side of the move (website redirects and independent-site record, root caller, catalog listing), then deleting the unified-site files and adding the project-site caller, then the live checks and the repository website field. This story stays active until the Documentation validation and Documentation site runs on main succeed.
