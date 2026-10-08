@@ -1,18 +1,20 @@
-//! Jira Cloud issues, comments and changelog through the catalog provider.
+//! Jira Cloud issues, one issue, comments, changelog, create metadata and users
+//! through the catalog provider.
 //!
 //! The shipped selection set is pinned by id and source operation, resolves
 //! against the committed bundle compiled from the pinned platform REST v3
 //! document, and is cited row by row in `docs/catalog-jira.md`. Each read runs
 //! through the provider child against a disposable HTTPS fixture: the exact
 //! request (path, query with its time filter, `Authorization: Basic …`) and the
-//! returned body are asserted, and every list walks two pages to the end
-//! condition the guide documents. No live credential and no network.
+//! returned body are asserted, and every list walks to the end condition the
+//! guide documents. Every key, id and name in the fixture is synthetic. No live
+//! credential and no network.
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
-    runtime::{Bootstrap, Child},
+    runtime::{Bootstrap, Child, Failure},
 };
 use connectors_sdk::Secret;
 use serde_json::{Value, json};
@@ -46,7 +48,7 @@ const PROFILE: &str = "atlassian.basic";
 
 /// The shipped ids, their pinned `operationId` and their pinned path. A renamed,
 /// dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 3] = [
+const SHIPPED: [(&str, &str, &str); 6] = [
     (
         "issue.changelog",
         "getChangeLogs",
@@ -58,10 +60,17 @@ const SHIPPED: [(&str, &str, &str); 3] = [
         "/rest/api/3/issue/{issueIdOrKey}/comment",
     ),
     (
+        "issue.create_meta",
+        "getCreateIssueMetaIssueTypes",
+        "/rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes",
+    ),
+    ("issue.get", "getIssue", "/rest/api/3/issue/{issueIdOrKey}"),
+    (
         "issues.search",
         "searchAndReconsileIssuesUsingJql",
         "/rest/api/3/search/jql",
     ),
+    ("users.search", "findUsers", "/rest/api/3/user/search"),
 ];
 
 fn root() -> &'static Path {
@@ -77,7 +86,7 @@ fn shipped() -> Vec<Selection> {
 }
 
 #[test]
-fn shipped_jira_selections_are_exactly_the_three_reads() {
+fn shipped_jira_selections_are_exactly_the_six_reads() {
     let selections = shipped();
     let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
@@ -178,6 +187,30 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
             "`isLast: true`",
             "`issues.search`",
         ),
+        (
+            "issue.get",
+            "getIssue",
+            "/rest/api/3/issue/{issueIdOrKey}",
+            "none",
+            "one issue per call",
+            "`issues.search`",
+        ),
+        (
+            "issue.create_meta",
+            "getCreateIssueMetaIssueTypes",
+            "/rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes",
+            "`startAt`, `maxResults`",
+            "`startAt + len(issueTypes) >= total`",
+            "none",
+        ),
+        (
+            "users.search",
+            "findUsers",
+            "/rest/api/3/user/search",
+            "`startAt`, `maxResults`",
+            "an empty page",
+            "none",
+        ),
     ] {
         let cited = rows.iter().any(|row| {
             row.contains(&format!("`{id}`"))
@@ -199,7 +232,8 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
 type Requests = Arc<Mutex<Vec<(String, Option<String>)>>>;
 
 /// The recorded pages the fixture serves, keyed by route and paging position.
-/// Each list has three items over two pages; `None` for anything else.
+/// Each list has three items over two pages, and the user search a third,
+/// empty page; `None` for anything else, which the fixture answers 404.
 fn page(path: &str) -> Option<Value> {
     let (route, query) = path.split_once('?').unwrap_or((path, ""));
     let has = |pair: &str| query.split('&').any(|p| p == pair);
@@ -224,8 +258,49 @@ fn page(path: &str) -> Option<Value> {
                "items": [{"field": "status", "fieldtype": "jira",
                           "fromString": "Open", "toString": "Done"}]})
     };
+    // An issue type of `PageOfCreateMetaIssueTypes.issueTypes`.
+    let issue_type = |id: u64, name: &str| {
+        json!({"id": id.to_string(), "name": name, "subtask": false,
+               "description": format!("fixture issue type {name}"),
+               "iconUrl": format!("https://tracker.example.test/images/icons/issuetypes/{id}.png"),
+               "self": format!("https://tracker.example.test/rest/api/3/issuetype/{id}")})
+    };
+    // A `User` of the `findUsers` array; no email address, as privacy
+    // controls may withhold it.
+    let user = |n: u64| {
+        json!({"accountId": format!("fixture-user-{n}"), "accountType": "atlassian",
+               "active": true, "displayName": format!("Fixture User {n}"),
+               "self": format!("https://tracker.example.test/rest/api/3/user?accountId=fixture-user-{n}")})
+    };
     Some(match route {
         "/rest/api/3/myself" => json!({"accountId": "fixture-account-id", "active": true}),
+        // `getIssue` with `fields` and `expand=renderedFields,names`: the
+        // `IssueBean` keeps the ADF body in `fields` and the rendered HTML in
+        // `renderedFields`; attachments come as the `attachment` field.
+        "/rest/api/3/issue/FIX-1" => json!({
+            "expand": "renderedFields,names",
+            "id": "10001", "key": "FIX-1",
+            "self": "https://tracker.example.test/rest/api/3/issue/10001",
+            "fields": {
+                "summary": "fixture issue FIX-1",
+                "status": {"id": "3", "name": "In Progress"},
+                "description": {"type": "doc", "version": 1, "content": [{"type": "paragraph",
+                                "content": [{"type": "text", "text": "fixture description"}]}]},
+                "attachment": [{"id": "20001", "filename": "fixture.txt", "mimeType": "text/plain",
+                                "size": 7, "created": "2026-09-12T08:00:00.000+0000",
+                                "content": "https://tracker.example.test/rest/api/3/attachment/content/20001"}]
+            },
+            "renderedFields": {"description": "<p>fixture description</p>"},
+            "names": {"summary": "Summary", "status": "Status",
+                      "description": "Description", "attachment": "Attachment"}}),
+        "/rest/api/3/issue/createmeta/FIX/issuetypes" if has("startAt=2") => json!({
+            "startAt": 2, "maxResults": 2, "total": 3, "issueTypes": [issue_type(3, "Bug")]}),
+        "/rest/api/3/issue/createmeta/FIX/issuetypes" => json!({
+            "startAt": 0, "maxResults": 2, "total": 3,
+            "issueTypes": [issue_type(1, "Task"), issue_type(2, "Story")]}),
+        "/rest/api/3/user/search" if has("startAt=4") => json!([]),
+        "/rest/api/3/user/search" if has("startAt=2") => json!([user(3)]),
+        "/rest/api/3/user/search" => json!([user(1), user(2)]),
         "/rest/api/3/search/jql" if has("nextPageToken=fixture-page-2") => {
             json!({"issues": [issue(10003, "FIX-3")], "isLast": true})
         }
@@ -443,7 +518,7 @@ fn invoke(child: &mut Child, operation: &str, input: Value) -> Value {
 
 /// Each read's first page: the input, and the exact request the fixture must
 /// observe, including the JQL time filter on the search.
-fn first_pages() -> [(&'static str, Value, &'static str); 3] {
+fn first_pages() -> [(&'static str, Value, &'static str); 4] {
     [
         (
             "issues.search",
@@ -461,6 +536,11 @@ fn first_pages() -> [(&'static str, Value, &'static str); 3] {
             "issue.changelog",
             json!({"issueIdOrKey": "FIX-1", "startAt": 0, "maxResults": 2}),
             "/rest/api/3/issue/FIX-1/changelog?startAt=0&maxResults=2",
+        ),
+        (
+            "issue.create_meta",
+            json!({"projectIdOrKey": "FIX", "startAt": 0, "maxResults": 2}),
+            "/rest/api/3/issue/createmeta/FIX/issuetypes?startAt=0&maxResults=2",
         ),
     ]
 }
@@ -511,6 +591,23 @@ fn next(operation: &str, input: &Value, body: &Value) -> Option<Value> {
             }
             input["startAt"] = json!(seen);
         }
+        // `startAt + len(issueTypes) >= total`.
+        "issue.create_meta" => {
+            let start = body["startAt"].as_u64().unwrap();
+            let seen = start + body["issueTypes"].as_array().unwrap().len() as u64;
+            if seen >= body["total"].as_u64().unwrap() {
+                return None;
+            }
+            input["startAt"] = json!(seen);
+        }
+        // An empty page: the body is the bare `User` array.
+        "users.search" => {
+            let users = body.as_array().unwrap().len() as u64;
+            if users == 0 {
+                return None;
+            }
+            input["startAt"] = json!(input["startAt"].as_u64().unwrap() + users);
+        }
         // `isLast: true`.
         "issue.changelog" => {
             if body["isLast"] == json!(true) {
@@ -533,6 +630,7 @@ fn each_list_walks_two_pages_and_stops_at_its_documented_end_condition() {
         let items_key = match operation {
             "issues.search" => "issues",
             "issue.comments" => "comments",
+            "issue.create_meta" => "issueTypes",
             _ => "values",
         };
         let mut input = first;
@@ -567,4 +665,135 @@ fn each_list_walks_two_pages_and_stops_at_its_documented_end_condition() {
             "`{operation}` requests"
         );
     }
+}
+
+#[test]
+fn issue_get_reads_one_issue_by_key_with_its_fields_expansions_and_attachments() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    // `fields` as one comma-separated string and `expand` as Jira's own
+    // comma-separated list, the shape `jira.issue.show` sends.
+    for (input, expected) in [
+        (
+            json!({"issueIdOrKey": "FIX-1", "fields": "summary,status,description,attachment",
+                   "expand": "renderedFields,names"}),
+            "/rest/api/3/issue/FIX-1?fields=summary%2Cstatus%2Cdescription%2Cattachment\
+             &expand=renderedFields%2Cnames",
+        ),
+        // `fields` as a JSON array: one pair per element, in the order given.
+        (
+            json!({"issueIdOrKey": "FIX-1", "fields": ["summary", "attachment"]}),
+            "/rest/api/3/issue/FIX-1?fields=summary&fields=attachment",
+        ),
+    ] {
+        let before = provider.requests().len();
+        let result = invoke(&mut child, "issue.get", input);
+        let requests = provider.requests();
+        assert_eq!(requests.len(), before + 1);
+        assert_eq!(requests[before].0, expected);
+        assert_eq!(requests[before].1.as_deref(), Some(HEADER));
+        assert_eq!(result["status"], 200);
+        assert_eq!(Some(&result["body"]), page(expected).as_ref());
+        assert_eq!(result["provenance"]["instance"], "fixture-jira");
+    }
+    let body = invoke(&mut child, "issue.get", json!({"issueIdOrKey": "FIX-1"}))["body"].clone();
+    assert_eq!(body["key"], "FIX-1");
+    assert_eq!(body["fields"]["status"]["name"], "In Progress");
+    // The description stays ADF; the rendered HTML comes with the expansion.
+    assert_eq!(body["fields"]["description"]["type"], "doc");
+    assert_eq!(
+        body["renderedFields"]["description"],
+        "<p>fixture description</p>"
+    );
+    // Attachment metadata, what `jira.issue.attachment.list` lists.
+    assert_eq!(body["fields"]["attachment"][0]["filename"], "fixture.txt");
+}
+
+/// Jira answers `404` for an issue that does not exist or that the account
+/// may not see; the read refuses with the provider's not-found, after exactly
+/// one request to the declared path (no query, so the path ends in `?`).
+#[test]
+fn an_issue_jira_does_not_find_is_refused_as_provider_not_found() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let outcome = child.invoke(
+        "issue.get",
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(&json!({"issueIdOrKey": "FIX-404"})).unwrap(),
+        connectors_sdk::now_ms() + 30_000,
+    );
+    assert!(
+        matches!(outcome, Err(Failure::ProviderNotFound)),
+        "{:?}",
+        outcome.map(|_| "an answer")
+    );
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-404?");
+}
+
+#[test]
+fn users_search_sends_the_query_and_walks_to_an_empty_page() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let mut input = json!({"query": "fixture", "startAt": 0, "maxResults": 2});
+    let mut users = Vec::new();
+    let mut pages = 0;
+    loop {
+        let result = invoke(&mut child, "users.search", input.clone());
+        assert_eq!(result["status"], 200);
+        let body = result["body"].clone();
+        pages += 1;
+        users.extend(
+            body.as_array()
+                .unwrap()
+                .iter()
+                .map(|u| u["accountId"].as_str().unwrap().to_owned()),
+        );
+        match next("users.search", &input, &body) {
+            Some(following) => input = following,
+            None => break,
+        }
+        assert!(pages < 4, "`users.search` did not stop");
+    }
+    assert_eq!(pages, 3);
+    assert_eq!(
+        users,
+        ["fixture-user-1", "fixture-user-2", "fixture-user-3"]
+    );
+    let requests = provider.requests();
+    assert_eq!(
+        requests.iter().map(|(p, _)| p.as_str()).collect::<Vec<_>>(),
+        [
+            "/rest/api/3/user/search?query=fixture&startAt=0&maxResults=2",
+            "/rest/api/3/user/search?query=fixture&startAt=2&maxResults=2",
+            "/rest/api/3/user/search?query=fixture&startAt=4&maxResults=2",
+        ]
+    );
+    assert!(requests.iter().all(|(_, a)| a.as_deref() == Some(HEADER)));
+}
+
+#[test]
+fn issue_create_meta_lists_the_issue_types_a_project_can_create() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let result = invoke(
+        &mut child,
+        "issue.create_meta",
+        json!({"projectIdOrKey": "FIX"}),
+    );
+    assert_eq!(
+        provider.requests().last().unwrap().0,
+        "/rest/api/3/issue/createmeta/FIX/issuetypes?"
+    );
+    let names: Vec<&str> = result["body"]["issueTypes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| t["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Task", "Story"]);
 }

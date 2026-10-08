@@ -51,23 +51,23 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 37 | 3,389 | 28 | 3,389 |
-| partial | 23 | 1,273 | 16 | 1,273 |
-| missing | 241 | 1,694 | 65 | 1,694 |
+| covered | 41 | 3,750 | 31 | 3,750 |
+| partial | 22 | 919 | 15 | 919 |
+| missing | 238 | 1,687 | 63 | 1,687 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
 are mapped to the operation they most likely meant in [Used but not declared](#used-but-not-declared):
 
 - 122 calls are mapped from §4a and §4b, and 2 more from §4d.
-- 50 of them land on covered capabilities. The other 74 are added to the gap units.
+- 87 of them land on covered capabilities. The other 37 are added to the gap units.
 
 Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 15 / 2,183 | 8 / 206 | 41 / 281 |
-| jira | 21 | 13 | 1,364 | 3 / 440 | 1 / 354 | 17 / 570 |
+| jira | 21 | 13 | 1,364 | 7 / 801 | 0 / 0 | 14 / 563 |
 | slack | 30 | 16 | 704 | 4 / 360 | 0 / 0 | 26 / 344 |
 | sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 0 / 0 | 0 / 0 | 20 / 425 |
@@ -91,7 +91,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **37 / 3,389** | **23 / 1,273** | **241 / 1,694** |
+| **total** | **301** | **109** | **6,356** | **41 / 3,750** | **22 / 919** | **238 / 1,687** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -205,11 +205,13 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 `adapters/atlassian/upstream/jira-platform-v3.json` carries `getIssue`, `createIssue`,
 `editIssue`, `deleteIssue`, `addComment`, `updateComment`, `deleteComment`, `getTransitions`,
 `doTransition`, `linkIssues`, `getCreateIssueMetaIssueTypes`, `getEditIssueMeta`, `findUsers`,
-`getAttachmentContent`, `addAttachment` and `removeAttachment`. None of them is selected.
+`getAttachmentContent`, `addAttachment` and `removeAttachment`. Since 2026-10-09 `getIssue`,
+`getCreateIssueMetaIssueTypes` and `findUsers` are selected, as `issue.get`,
+`issue.create_meta` and `users.search` (`docs/catalog-jira.md`); none of the others is.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `jira.issue.show` | 354 | 49 | 2026-10-07 | `issues.search` (:5) | partial | No single-issue read (`getIssue` is not selected). JQL `key = <KEY>` returns the issue. Bodies stay in ADF, not Markdown. |
+| `jira.issue.show` | 354 | 49 | 2026-10-07 | `issue.get` (:11) | covered | Takes `issueIdOrKey`, `fields` and `expand`. Bodies stay in ADF, not Markdown; `expand=renderedFields` adds HTML. |
 | `jira.issue.search` | 310 | 34 | 2026-10-06 | `issues.search` (:5) | covered | JQL only. Rich-text fields come back as ADF, not Markdown. |
 | `jira.issue.comment.add` | 141 | 24 | 2026-10-05 | — | missing | `addComment` is not selected. Its body would be ADF; nothing converts Markdown. |
 | `jira.issue.comment.list` | 130 | 20 | 2026-10-05 | `issue.comments` (:7) | covered | Bodies come back as ADF, not Markdown. |
@@ -218,14 +220,14 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 | `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | — | missing | `doTransition` is not selected. It would run by transition id only: no by-name run and no walk to a target status. |
 | `jira.issue.link.add` | 40 | 11 | 2026-09-28 | — | missing | `linkIssues` is not selected. |
 | `jira.issue.edit` | 26 | 10 | 2026-09-24 | — | missing | `editIssue` is not selected. |
-| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | — | missing | `getCreateIssueMetaIssueTypes` is not selected. |
+| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:13) | covered | The issue types a project can create, by project id or key. The fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not selected; it is not established whether fluxplane returns them. |
 | `jira.issue.delete` | 3 | 1 | 2026-09-16 | — | missing | `deleteIssue` is not selected. |
 | `jira.issue.attachment.get` | 2 | 1 | 2026-09-17 | — | missing | A binary download (`getAttachmentContent`). The catalog reads only JSON or text responses. |
-| `jira.user.search` | 2 | 2 | 2026-09-28 | — | missing | `findUsers` is not selected. |
+| `jira.user.search` | 2 | 2 | 2026-09-28 | `users.search` (:15) | covered | By `query` or exact `accountId`, over the first 1,000 matches; privacy controls may withhold email addresses. |
 | `jira.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
 | `jira.issue.attachment.add` | 0 | 0 | - | — | missing | A multipart upload (`addAttachment`). It is not established whether the catalog can send a non-JSON request body. |
 | `jira.issue.attachment.delete` | 0 | 0 | - | — | missing | `removeAttachment` is not selected. |
-| `jira.issue.attachment.list` | 0 | 0 | - | — | missing | Attachments come with `getIssue`, which is not selected. |
+| `jira.issue.attachment.list` | 0 | 0 | - | `issue.get` (:11) | covered | Attachment metadata is the issue's `attachment` field (`fields=attachment`); downloading one is `jira.issue.attachment.get`. |
 | `jira.issue.comment.delete` | 0 | 0 | - | — | missing | `deleteComment` is not selected. |
 | `jira.issue.comment.edit` | 0 | 0 | - | — | missing | `updateComment` is not selected. |
 | `jira.issue.edit_meta` | 0 | 0 | - | — | missing | `getEditIssueMeta` is not selected. |
@@ -737,7 +739,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 
 | name as written (plugin as written) | calls | sessions | most likely meant | Connectors verdict | unit |
 |---|---:|---:|---|---|---|
-| `jira.issue.get` (jira) | 27 | 13 | `jira.issue.show` | partial | U03 |
+| `jira.issue.get` (jira) | 27 | 13 | `jira.issue.show` | covered | — |
 | `gitlab.commit.show` (gitlab) | 6 | 4 | none declared (a single-commit read); nearest is `gitlab.repository.commit.list` | missing (`/repository/commits/:sha` is not selected) | U10 |
 | `gitlab.mr.get` (gitlab) | 6 | 2 | `gitlab.mr.show` | covered | — |
 | `gitlab.repository.branch.list` (gitlab) | 4 | 3 | none declared (a branch list) | missing (only `branch.get` is served) | U10 |
@@ -748,7 +750,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `jira.search` (jira) | 3 | 1 | `jira.issue.search` | covered | — |
 | `slack.thread.replies` (slack) | 3 | 3 | `slack.thread` | covered | — |
 | `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | missing | U02 |
-| `jira.issue.show` (atlassian) | 2 | 1 | `jira.issue.show` | partial | U03 |
+| `jira.issue.show` (atlassian) | 2 | 1 | `jira.issue.show` | covered | — |
 | `gitlab.commit.list` (gitlab) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
 | `gitlab.pipeline.job.list` (gitlab) | 2 | 2 | `gitlab.job.list` | covered | — |
 | `gitlab.pipeline.jobs` (gitlab) | 2 | 1 | `gitlab.job.list` | covered | — |
@@ -769,10 +771,10 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `project.show` (gitlab) | 1 | 1 | `gitlab.project.show` | covered | — |
 | `grafana.loki.metric` (grafana) | 1 | 1 | `grafana.loki.query` (a metric LogQL query) | missing | U05 |
 | `call.list` (homer) | 1 | 1 | `homer.call.list` | missing | U17 |
-| `get_issue` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
-| `issue.get` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
+| `get_issue` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
+| `issue.get` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
 | `jira.issue.comment.create` (jira) | 1 | 1 | `jira.issue.comment.add` | missing | U06 |
-| `jira.issue.view` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
+| `jira.issue.view` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
 | `k8s.pod.list` (kubernetes) | 1 | 1 | `kubernetes.pod.list` | covered | — |
 | `loki.query_range` (loki) | 1 | 1 | `loki.query` | covered | — |
 | `slack.conversation.list` (slack) | 1 | 1 | `slack.channel.list` | covered | — |
@@ -783,14 +785,14 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `slack.message.list` (operation id in the plugin position, §4b) | 6 | 2 | `slack.message.list` | covered | — |
 | `slack.thread` (§4b) | 4 | 3 | `slack.thread` | covered | — |
 | `gitlab.repository.commit.list` (§4b) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
-| `jira.issue.show` (§4b) | 2 | 2 | `jira.issue.show` | partial | U03 |
-| `jira.issue.get` (§4b) | 1 | 1 | `jira.issue.show` | partial | U03 |
+| `jira.issue.show` (§4b) | 2 | 2 | `jira.issue.show` | covered | — |
+| `jira.issue.get` (§4b) | 1 | 1 | `jira.issue.show` | covered | — |
 | `confluence.test` (§4b) | 1 | 1 | `confluence.test` | covered | — |
 | `gitlab.mr.show` (§4b) | 1 | 1 | `gitlab.mr.show` | covered | — |
 | `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | missing | U10 |
-| `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | partial | U03 |
+| `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | covered | — |
 
-In total, 124 calls are mapped: 50 covered and 74 to gap units. The rest of §4 is not
+In total, 124 calls are mapped: 87 covered and 37 to gap units. The rest of §4 is not
 attributed:
 
 - **§4c:** 55 calls whose operation sat in a variable with no literal id in the same command.
@@ -868,13 +870,13 @@ waits for any unit it depends on: U05 after U04, U12 after U05, U08 and U13 afte
 
 ## Not planned until used
 
-183 operations with 0 calls are partial or missing: 176 missing and 7 partial. They belong to
-no unit until a session uses them. The other 9 operations with 0 calls are already covered.
+182 operations with 0 calls are partial or missing: 175 missing and 7 partial. They belong to
+no unit until a session uses them. The other 10 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
 | gitlab | 24 | `branch.delete_merged`, `ci.variable.create`, `ci.variable.delete`, `ci.variable.update`, `index.build`, `issue.list` (partial), `issue.note.create`, `issue.note.list`, `issue.show` (partial), `issue.update`, `mr.approve`, `mr.diff.lines`, `mr.discussion.create`, `release.delete`, `release.link.create`, `release.link.delete`, `release.link.update`, `repository.archive`, `repository.changelog.add`, `repository.changelog.generate`, `repository.file.create`, `repository.file.delete`, `snippet.create`, `snippet.delete` |
-| jira | 7 | `index.build`, `issue.attachment.add`, `issue.attachment.delete`, `issue.attachment.list`, `issue.comment.delete`, `issue.comment.edit`, `issue.edit_meta` |
+| jira | 6 | `index.build`, `issue.attachment.add`, `issue.attachment.delete`, `issue.comment.delete`, `issue.comment.edit`, `issue.edit_meta` |
 | slack | 14 | `bookmark.add`, `bookmark.delete`, `bookmark.edit`, `bookmark.list`, `channel.join`, `channel.mark-read`, `download`, `index.build`, `mentions`, `presence.get`, `presence.set`, `reaction.add`, `reaction.remove`, `unreads` |
 | grafana | 13 | `alerts.active`, `alerts.silences.create`, `alerts.silences.delete`, `alerts.silences.list`, `annotation.add`, `annotation.list`, `dashboard.get`, `dashboard.list`, `datasource.health`, `folder.list`, `tempo.search`, `tempo.trace.get`, `test` |
 | loki | 1 | `recent_logs` |
