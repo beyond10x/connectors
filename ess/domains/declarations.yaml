@@ -99,6 +99,30 @@ types:
     # reader/codec and transport rules; ESS 0.40 has no reader-closure, upstream-pin
     # or transport construct.
 
+  # The HTTP service host's configuration (crates/connectors-host/src/server.rs
+  # ServiceConfig), read as `urn:connectors:config:v2:service`. Revision v2 is
+  # v1 plus the optional `state`; `urn:connectors:config:v1:service` stays
+  # readable unchanged and has no `state` (contracts/service/compatibility.md
+  # § 2.1, Service configuration). `listen` and `service_credential` keep their
+  # v1 meaning; they are transport and credential-reference facts with no ESS
+  # noun and are not modelled here. This is a configuration value, not the
+  # recorded ServiceConfiguration entity: the state directory is where that
+  # record lives, so it is not a field of it.
+  - name: connectors.declarations.ServiceHostConfiguration
+    kind: struct
+    fields:
+      # The service instance id; the ServiceConfiguration the host records at
+      # start carries it as `instance_id`.
+      - {name: instance, type: String}
+      # A directory path. Required for a host that serves
+      # POST /v1alpha2/invoke: the host keeps its execution-audit anchors and its
+      # mutation attempt records in the local metadata authority (Entity
+      # Runtime over Eventlog, SQLite) in this directory, under the bounds and
+      # retention of contracts/service/audit.md § 4. A host without it serves
+      # only /v1/* and answers /v1alpha2/invoke with 503 `unavailable` before
+      # decoding.
+      - {name: state, type: "Optional<String>"}
+
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.
 entities:
@@ -188,6 +212,22 @@ entities:
         - {name: advance_registry_epoch, from: [Declared], to: Declared}
 
 commands:
+  # HTTP host start (compatibility.md § 2.1, Service configuration): a host with
+  # `state` records its own instance before it serves /v1alpha2/invoke, so the
+  # anchors' and attempts' `instance` relation names a recorded
+  # ServiceConfiguration. Idempotent: it reads ServiceConfigurations for its
+  # instance; absent, it sends RecordServiceConfiguration (adapter_id and
+  # revision from its adapter's descriptor, registry_epoch 1); present with the
+  # same adapter_id and revision, it sends nothing; present with the same
+  # adapter_id and another revision, it sends AdvanceRegistryEpoch with the
+  # next epoch, as a local configuration upgrade does; present with another
+  # adapter_id, start is refused and nothing is served on /v1alpha2/invoke.
+  # UNMAPPED: AdvanceRegistryEpoch `advanced` sets only registry_epoch, while
+  # its own comment says a configuration upgrade moves `revision` with the
+  # epoch advance. Which command records the new revision is open for the
+  # owner; the HTTP host start inherits that answer.
+  # ESS-LIMIT: the start sequence spans a view read and several commands; ESS
+  # has no host-procedure construct, so the sequence is a host obligation.
   - name: connectors.declarations.RecordServiceConfiguration
     input:
       - {name: instance_id, type: String}
