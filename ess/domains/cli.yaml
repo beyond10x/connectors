@@ -192,6 +192,25 @@ types:
     kind: struct
     fields:
       - {name: build, type: connectors.cli.BuildDigest}
+  # Request::Cached: a CLI's read of an adapter's cached description through the
+  # running owner, answered from the owner's held metadata handle instead of a
+  # direct open of the store (contracts/cli/v1alpha1/owner.md). Sent only to an
+  # owner of the CLI's own build; without a reachable owner the CLI reads directly.
+  - name: connectors.cli.LocalOwnerCachedKind
+    kind: enum
+    variants: [cached]
+  - name: connectors.cli.LocalOwnerCachedRequest
+    kind: struct
+    fields:
+      - {name: kind, type: connectors.cli.LocalOwnerCachedKind}
+      - {name: adapter, type: String}
+  # The answer: the cached bootstrap the owner holds for the adapter's configured
+  # instance and selection. Refusals keep the codes of a direct read
+  # (not_found, description_unavailable, metadata_unavailable).
+  - name: connectors.cli.LocalOwnerCached
+    kind: struct
+    fields:
+      - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
   - name: connectors.cli.LocalCaptureAdmission
     kind: struct
     fields:

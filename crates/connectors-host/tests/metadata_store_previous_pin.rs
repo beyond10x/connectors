@@ -8,7 +8,7 @@
 //! under the current pins is the oracle: the fixture must answer exactly as it.
 
 use connectors_host::local::{
-    metadata::Metadata,
+    metadata::{Checkpoints, Metadata},
     registry::{Binding, Purpose, Registry, StaticProfile, Subject},
 };
 use rusqlite::{Connection, OpenFlags};
@@ -255,4 +255,76 @@ fn a_write_to_a_previous_pins_store_adds_nothing_the_previous_pins_refuse() {
         })
         .collect::<Vec<_>>();
     assert!(continuity.is_empty(), "{continuity:?}");
+}
+
+/// The previous pins' store gets durable open checkpoints only through the
+/// explicit enable, which installs Eventlog's continuity and persists a
+/// checkpoint: a copy of the enabled store opens from it in a process that
+/// never opened the store, and reads as before. A second enable changes
+/// nothing.
+#[test]
+fn the_previous_pins_store_is_enabled_and_then_opens_from_its_checkpoint() {
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("state");
+    restore(&fixture().join(NAME), &fixture().join(FLOOR), &state);
+    let previous = fixture_references();
+    assert_eq!(
+        Metadata::enable_checkpoints(&state),
+        Ok(Checkpoints::Enabled)
+    );
+    let written = schema(&state.join(NAME));
+    assert!(written.contains(&(
+        "table".to_owned(),
+        "connectors_er_capture_continuity".to_owned()
+    )));
+    assert!(written.iter().any(|(kind, _)| kind == "trigger"));
+    assert_eq!(
+        Metadata::enable_checkpoints(&state),
+        Ok(Checkpoints::AlreadyEnabled)
+    );
+    assert_eq!(schema(&state.join(NAME)), written);
+
+    // This process holds handles on `state`; a byte copy at a new path is
+    // opened afresh. `VACUUM INTO` may renumber rows, which a checkpoint
+    // rightly does not survive, so the committed pages are moved into the
+    // file and the file is copied as it is.
+    let copied = root.path().join("copied");
+    copy_file(&state, &copied);
+    let opened = Metadata::inspect(&copied).unwrap();
+    assert!(opened.opened_from_checkpoint());
+    drop(opened);
+    // Both stores read with the same clock floor, so they answer alike.
+    let read = views(&copied, &previous);
+    assert!(read.iter().any(|(_, _, view)| view.is_ok()), "{read:?}");
+    assert_eq!(read, views(&state, &previous));
+}
+
+/// Copies the store in `from` byte for byte into the new state directory `to`,
+/// after SQLite has moved every committed page into the database file.
+fn copy_file(from: &Path, to: &Path) {
+    let connection = Connection::open(from.join(NAME)).unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        let (busy, log): (i64, i64) = connection
+            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .unwrap();
+        if busy == 0 && log == 0 {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the WAL never emptied"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    drop(connection);
+    private_dir(to);
+    fs::copy(from.join(NAME), to.join(NAME)).unwrap();
+    fs::write(to.join("metadata.lock"), b"").unwrap();
+    fs::copy(from.join(FLOOR), to.join(FLOOR)).unwrap();
+    for name in [NAME, "metadata.lock", FLOOR] {
+        fs::set_permissions(to.join(name), fs::Permissions::from_mode(0o600)).unwrap();
+    }
 }
