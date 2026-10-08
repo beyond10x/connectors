@@ -414,6 +414,21 @@ views:
 # `not_attempted`), answers 503 `unavailable` with zero adapter calls, and keeps
 # the anchor: its final observation (AppendFinalObservation) records the
 # refusal, and the response carries that record's `audit_ref` and status.
+# Final-observation recovery (audit.md § 3): a final observation whose append
+# is not acknowledged (`incomplete`) is retained exactly, in the host process,
+# and the running host retries AppendFinalObservation with it every second
+# until it is acknowledged, already identical, or conflicts; it never
+# dispatches anything. Bound: at most 10,000 retained observations per host,
+# plus the invocations already admitted (at most 32 in flight). While the
+# retained set is full the host refuses every new v1alpha2
+# invocation before its anchor (503 `unavailable`, `audit_ref: null`, zero
+# adapter calls); it never evicts a retained observation. A host restart ends
+# the retry of what it retained: those records stay `Anchored`, as their
+# `incomplete` answer already said, and no later process appends a final
+# observation it did not observe.
+# ESS-LIMIT: the retained set is host process state, not a recorded entity;
+# ESS 0.56 has no retry-schedule, process-memory or cross-record count
+# construct, so the bound, the interval and the refusal are host obligations.
 
 actors:
   - name: connectors.execution_audit.LocalHost
