@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Due expiries of transient subjects are recorded in batches of at most 128 members (from 32)
+  before the batch carrying a command's own change. Every store the host opens is SQLite,
+  where Entity Runtime 0.30.2 no longer shows 0.29.0's superlinear batch cost. Measured on
+  the release build of `first_owner_open_of_a_grown_store`, 2026-10-08, the catch-up of a
+  fresh owner's first write:
+
+  | store | bound | expiry batches | largest batch | catch-up |
+  |---|---|---|---|---|
+  | 1,201 events (396 expiries) | none | one, with the write | 4.0 s | 6.5 s |
+  | 1,201 events | 128 | 4 | 1.4 s | 5.8 s |
+  | 6,000 events | none | one, with the write | 14.4 s | 20.9 s |
+  | 6,000 events | 32 (3 runs) | 32 | 0.5–1.3 s | 14.7–17.6 s |
+  | 6,000 events | 128 (4 runs) | 8 | 1.5–2.5 s | 13.2–20.0 s |
+  | 6,000 events | 256 | 4 | 2.8 s | 13.9 s |
+
+  On Entity Runtime 0.29.0 one batch of 396 expiries took 101.9 s, past the 30-second bridge
+  deadline. Unbounded batches now finish inside it at both sizes, but still grow with the
+  backlog, so a bound stays: 128 keeps each batch more than ten times inside the deadline in
+  a quarter of the batches 32 needs. The machine was loaded (load average about 21 on 20
+  cores), so single runs vary by up to 40 %.
+
 ## 0.33.0 — 2026-10-08
 
 ### Breaking

@@ -1,9 +1,10 @@
 //! Read uses that fell due are recorded as expired in bounded batches before
 //! the caller's own batch, so one write never carries every expiry the store
-//! accumulated (Entity Runtime batch cost grows faster than its member count).
+//! accumulated (an unbounded batch grows with the backlog towards the bridge
+//! deadline).
 use super::tests::{NOW, binding, fixture, prepared, publish_fixture};
 use super::*;
-use crate::local::metadata::with_expiry_batches;
+use crate::local::metadata::{take_expiry_times, with_expiry_batches};
 
 /// One read invoke at `now` whose read use is released, and so falls due
 /// 1 s later.
@@ -123,4 +124,28 @@ fn a_write_of_only_due_expiries_records_every_one_with_the_last_batch_final() {
     // ceil(10 / 4) = 3 batches: two ahead, the last as the final batch.
     assert_eq!(expiry_batches, (DUE as usize).div_ceil(K) - 1);
     assert_eq!(unexpired_read_uses(root.path()), 0);
+}
+
+/// More due expiries than the former 32-member bound (Entity Runtime 0.29.0),
+/// and fewer than the current one, are recorded with the caller's own action
+/// in one batch: no expiry batch runs ahead of it.
+#[test]
+fn due_expiries_past_the_former_32_member_bound_join_the_callers_batch() {
+    const PAST_FORMER_BOUND: u64 = 40;
+    let (root, registry, reference) = store_with_due_read_uses(PAST_FORMER_BOUND);
+    let later = NOW + 10_000;
+    take_expiry_times();
+    let captured = registry
+        .capture_read(
+            &binding(),
+            &reference,
+            &BTreeSet::new(),
+            later,
+            later + 1000,
+        )
+        .unwrap();
+    assert_eq!(take_expiry_times().len(), 0);
+    assert_eq!(unexpired_read_uses(root.path()), 1);
+    let dispatched = registry.dispatch_read(captured, later).unwrap();
+    registry.release_read(dispatched, later).unwrap();
 }
