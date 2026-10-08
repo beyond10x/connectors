@@ -7,9 +7,10 @@
 //! struct is closed, a member declared `null_when_absent` is required and
 //! nullable, and one declared `omitted_when_absent` is absent rather than null.
 //!
-//! The rules a JSON Schema validator does not evaluate are enforced by every
-//! reader of [`InvokeResponse`] and by [`InvokeResponse::encode`]: see
-//! [`InvokeResponse::check`]. The rules of `contracts/service/compatibility.md`
+//! The § 5 rules a JSON Schema validator does not evaluate are enforced by
+//! every reader of [`InvokeResponse`] ([`InvokeResponse::section5_rules`]);
+//! [`InvokeResponse::decode`] and [`InvokeResponse::encode`] add the first
+//! binding's narrowing ([`InvokeResponse::first_binding_rules`]). The rules of `contracts/service/compatibility.md`
 //! § 2.1 that select a request's refusal code are [`InvokeRequest::decode`]'s.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -63,6 +64,28 @@ pub enum ErrorCode {
     OfferRejected,
     LeaseExpired,
     Revoked,
+}
+
+impl ErrorCode {
+    /// One of the 13 [`BaseErrorCode`]s.
+    pub fn is_base(self) -> bool {
+        matches!(
+            self,
+            Self::InvalidInput
+                | Self::Unsupported
+                | Self::Unauthorized
+                | Self::Forbidden
+                | Self::NotFound
+                | Self::StaleDescription
+                | Self::StaleCursor
+                | Self::RateLimited
+                | Self::Unavailable
+                | Self::Capacity
+                | Self::Timeout
+                | Self::UpstreamProtocol
+                | Self::Internal
+        )
+    }
 }
 
 /// `connectors.service_wire.BaseErrorCode`: the 13 v1alpha1 codes.
@@ -331,8 +354,9 @@ impl InvokeRequest {
 ///
 /// `request_id` and `audit_ref` are required and nullable; `result`, `error`,
 /// `source_audit` and `mutation` are omitted when absent. `result` is
-/// `Some(Value::Null)` for a success whose result is JSON null. Every reader
-/// refuses a value [`check`](Self::check) refuses.
+/// `Some(Value::Null)` for a success whose result is JSON null. Every serde reader
+/// refuses a value [`section5_rules`](Self::section5_rules) refuses; [`decode`](Self::decode)
+/// and [`encode`](Self::encode) refuse what [`check`](Self::check) refuses.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(try_from = "ResponseWire")]
 pub struct InvokeResponse {
@@ -385,7 +409,7 @@ impl TryFrom<ResponseWire> for InvokeResponse {
             source_audit: wire.source_audit,
             mutation: wire.mutation,
         };
-        response.check()?;
+        response.section5_rules()?;
         Ok(response)
     }
 }
@@ -415,7 +439,17 @@ impl InvokeResponse {
     /// 5. `Error` bounds ([`Error::check`]);
     /// 6. `attempt` and `original_request_id` are both null or both set,
     ///    `replayed: true` names both, and `unknown` answers `outcome_unknown`.
+    ///
+    /// Then the narrowing of the first binding, [`first_binding_rules`](Self::first_binding_rules).
+    /// [`decode`](Self::decode) and [`encode`](Self::encode) apply both; a serde reader
+    /// applies [`section5_rules`](Self::section5_rules) alone.
     pub fn check(&self) -> std::result::Result<(), Violation> {
+        self.section5_rules()?;
+        self.first_binding_rules()
+    }
+
+    /// The generic compatibility § 5 rules listed on [`check`](Self::check).
+    pub fn section5_rules(&self) -> std::result::Result<(), Violation> {
         if self.version != Version::V1alpha2 {
             return Err(Violation("response version is not v1alpha2"));
         }
@@ -456,16 +490,55 @@ impl InvokeResponse {
         Ok(())
     }
 
+    /// How the first binding, `POST /v1alpha2/invoke`, narrows § 5
+    /// (compatibility § 2.1). A later binding widens these in this one place.
+    ///
+    /// - `source_audit` is always omitted;
+    /// - `audit_status: not_required` is never answered;
+    /// - `mutation.replayed` is false, and `mutation.original_request_id`,
+    ///   when set, is this response's `request_id`;
+    /// - `error.code` is one of the 13 base codes or `outcome_unknown`
+    ///   (`cause.code` is a [`BaseErrorCode`] by declaration).
+    pub fn first_binding_rules(&self) -> std::result::Result<(), Violation> {
+        if self.source_audit.is_some() {
+            return Err(Violation("source_audit is not answered on this binding"));
+        }
+        if self.audit_status == AuditStatus::NotRequired {
+            return Err(Violation("not_required is not answered on this binding"));
+        }
+        if let Some(mutation) = &self.mutation {
+            if mutation.replayed {
+                return Err(Violation("this binding does not replay"));
+            }
+            if mutation
+                .original_request_id
+                .as_ref()
+                .is_some_and(|original| Some(original) != self.request_id.as_ref())
+            {
+                return Err(Violation("original_request_id is not this request's ID"));
+            }
+        }
+        if let Some(error) = &self.error
+            && !(error.code.is_base() || error.code == ErrorCode::OutcomeUnknown)
+        {
+            return Err(Violation("error code is not emitted on this binding"));
+        }
+        Ok(())
+    }
+
     /// Strictly decode a Response: duplicate members refused at every depth,
     /// unknown members refused, then [`check`](Self::check). A refusal is the
     /// reader's `upstream_protocol`.
     pub fn decode(bytes: &[u8]) -> std::result::Result<Self, Error> {
-        crate::read_json(bytes).map_err(|_| {
+        let refused = || {
             Error::new(
                 ErrorCode::UpstreamProtocol,
                 "response is not a valid v1alpha2 invoke envelope",
             )
-        })
+        };
+        let response: Self = crate::read_json(bytes).map_err(|_| refused())?;
+        response.first_binding_rules().map_err(|_| refused())?;
+        Ok(response)
     }
 
     /// Encode a Response that passes [`check`](Self::check).

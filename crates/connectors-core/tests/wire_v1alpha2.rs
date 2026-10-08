@@ -157,12 +157,17 @@ fn response_vectors_round_trip_or_refuse() {
             case.id
         );
         let decoded = InvokeResponse::decode(&bytes(case));
-        // `serde_json` alone reaches the same verdict for every JSON value:
-        // the rules hold for any reader of the type, not only `decode`.
+        // `serde_json` alone reaches the same verdict for every JSON value,
+        // except that only `decode` applies the first binding's narrowing:
+        // the § 5 rules hold for any reader of the type.
         if let Some(value) = &case.value {
+            let read = serde_json::from_value::<InvokeResponse>(value.clone());
+            let narrowed = read
+                .as_ref()
+                .is_ok_and(|r| r.first_binding_rules().is_err());
             assert_eq!(
-                serde_json::from_value::<InvokeResponse>(value.clone()).is_ok(),
-                decoded.is_ok(),
+                read.is_ok(),
+                decoded.is_ok() || narrowed,
                 "{}: serde and decode disagree",
                 case.id
             );
