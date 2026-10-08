@@ -67,6 +67,10 @@ pub fn router_with_state(
     credential: Arc<dyn Credential>,
     state: Option<Arc<ServiceState>>,
 ) -> Router {
+    // The running host retries its retained final observations (audit.md § 3).
+    if let Some(state) = &state {
+        ServiceState::spawn_recovery(state);
+    }
     Router::new()
         .route("/healthz", get(|| async { StatusCode::NO_CONTENT }))
         .route("/v1/describe", get(describe))
