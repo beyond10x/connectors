@@ -567,7 +567,7 @@ fn a_create_body_cannot_smuggle_a_key_past_the_reviewed_set() {
         br#"{"body":{"name":"worker-a","imageName":"i","name":"worker-b"}}"#,
         br#"{"body":{"name":"worker-a","imageName":"i","Name":"worker-b"}}"#,
         br#"{"body":{"name":"worker-a","imageName":"i","templateid":"t"}}"#,
-        br#"{"body":{"name":"worker-a","imageName":"i","dockerStartCmd":["sh"]}}"#,
+        br#"{"body":{"name":"worker-a","imageName":"i","minRAMPerGPU":8}}"#,
         br#"{"body":{"name":"worker-a","imageName":"i"},"body":{"templateId":"t"}}"#,
         br#"{"body":{"name":"worker-a","imageName":"i"},"templateId":"t"}"#,
     ];
