@@ -71,19 +71,19 @@
     {
       "id": "response-replayed-original",
       "schema_valid": true,
-      "expect": "round_trip",
+      "expect": "refuse",
       "value": {"version":"v1alpha2","request_id":"write-7","status":"success","result":{},"audit_ref":"aud-10","audit_status":"complete","mutation":{"classification":"applied","attempt":{"instance":"fixture","id":"00000000-0000-4000-8000-00000000000A"},"original_request_id":"write-original","replayed":true,"cause":null}}
     },
     {
       "id": "response-source-audit",
       "schema_valid": true,
-      "expect": "round_trip",
+      "expect": "refuse",
       "value": {"version":"v1alpha2","request_id":"read-5","status":"success","result":{},"audit_ref":"aud-11","audit_status":"complete","source_audit":{"instance":"origin","audit_ref":"src-1","audit_status":"incomplete"}}
     },
     {
       "id": "response-not-required",
       "schema_valid": true,
-      "expect": "round_trip",
+      "expect": "refuse",
       "value": {"version":"v1alpha2","request_id":"read-6","status":"success","result":{},"audit_ref":null,"audit_status":"not_required"}
     },
     {
