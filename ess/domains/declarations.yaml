@@ -117,7 +117,7 @@ types:
       # A directory path. Required for a host that serves
       # POST /v1alpha2/invoke: the host keeps its execution-audit anchors and its
       # mutation attempt records in the local metadata authority (Entity
-      # Runtime over Eventlog, SQLite) in this directory, under the bounds and
+      # Runtime over Eventlog) in this directory, under the bounds and
       # retention of contracts/service/audit.md § 4. A host without it serves
       # only /v1/* and answers /v1alpha2/invoke with 503 `unavailable` before
       # decoding.

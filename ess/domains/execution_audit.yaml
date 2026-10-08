@@ -402,7 +402,7 @@ views:
 # semantics § 3.1, § 3.2); rotating the credential bytes or moving the
 # credential reference does not change it (v1alpha2 semantics § 4 rule 3).
 # Store: the HTTP host keeps its anchors and its attempt records in the local
-# metadata authority (Entity Runtime over Eventlog, SQLite) in the configured
+# metadata authority (Entity Runtime over Eventlog) in the configured
 # state directory (connectors.declarations.ServiceHostConfiguration `state`),
 # the same component as the local owner (components.yaml
 # local-metadata-authority), under audit.md § 4: at most 100,000 records per
