@@ -87,7 +87,14 @@ entities:
       - {name: instance_id, type: String}
       - {name: request_id, type: String}
       - {name: operation_id, type: String}
-      - {name: connection_ref, type: String}
+      # Rule, both directions: absent exactly for an attempt the HTTP host
+      # records (POST /v1alpha2/invoke has no connection member and the host
+      # resolves no Connection; contracts/service/compatibility.md § 2.1), and
+      # present for every attempt the local owner records. A local-owner attempt
+      # without it, or an HTTP-host attempt with it, is invalid.
+      # ESS-LIMIT: no stored fact says which host recorded an attempt, so this
+      # rule is not an invariant here; the recording host enforces it.
+      - {name: connection_ref, type: "Optional<String>"}
       - {name: input_digest, type: String}
       # Exact admitted request coordinates retained for deterministic replay and
       # projection rebuild. This is the existing typed idempotency fingerprint.
@@ -136,7 +143,9 @@ entities:
     # its lifecycle covers replay retention, separately from audit retention.
     # ApprovalRedemption in connectors.delegation references this attempt;
     # it is a spend receipt, not the dispatch fence.
-    # AuditRecord in connectors.execution_audit may reference this attempt;
+    # AuditRecord in connectors.execution_audit may reference this attempt: set
+    # when the anchor is acknowledged, or, where the anchor precedes the attempt
+    # (v1alpha2 semantics § 4 rule 4), once by LinkAnchorAttempt before dispatch;
     # neither owner cascades deletion or lifecycle changes into the other.
     # The selected Connection is retained independently after local revocation;
     # the reference neither grants current use nor owns binding deletion.
@@ -171,7 +180,7 @@ commands:
       - {name: instance_id, type: String}
       - {name: request_id, type: String}
       - {name: operation_id, type: String}
-      - {name: connection_ref, type: String}
+      - {name: connection_ref, type: "Optional<String>"}
       - {name: input_digest, type: String}
       - {name: request_fingerprint, type: connectors.idempotency.RequestFingerprint}
       - {name: approval_mode, type: connectors.mutations.ApprovalMode}
@@ -342,7 +351,7 @@ views:
       - {name: instance_id, type: String}
       - {name: request_id, type: String}
       - {name: operation_id, type: String}
-      - {name: connection_ref, type: String}
+      - {name: connection_ref, type: "Optional<String>"}
       - {name: input_digest, type: String}
       - {name: approval_ref, type: "Optional<String>"}
       - {name: idempotency_key, type: "Optional<String>"}
