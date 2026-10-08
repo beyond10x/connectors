@@ -9,7 +9,7 @@ relations:
 - informed_by: story:owner-memory-bounded
 - informed_by: story:metadata-invoke-cost-flat-in-store-size
 - informed_by: story:entity-runtime-eventlog-081-pin
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T17:16:09Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T17:16:10Z", actor: "human:timo", revision: 3}
@@ -73,3 +73,33 @@ Added 2026-10-08: `story:entity-runtime-eventlog-081-pin` (#101 and #103 context
 also changes (ESS 0.56.0), so it runs on the integration branch after U2 merges, in
 `conn-w20261007c`, by the coordinator. Acceptance as in the story; its cost measurement runs on
 the same machine as U2's.
+
+## Results
+
+Release build of `read_invoke_cost_by_store_size` (one machine, 2026-10-08), stores grown by read
+invokes. Logs: `conn-w20261007c/.local/wave/{u1,u2,u3}` (git-ignored).
+
+| run | events | invokes failed | median | peak RSS |
+|---|---|---|---|---|
+| base `91e6baae33` (0.32.0, Entity Runtime 0.29.0) | 601 | 0 of 5 | 1,211 ms | 377 MB |
+| base | 1,201 | 3 of 5 (`OutcomeUnknown`, then `MetadataUnavailable`) | 24,711 ms | 608 MB |
+| U2 `a6a59980e4` (Entity Runtime 0.29.0) | 601 | 0 of 5 | 229 ms | 329 MB |
+| U2 | 1,201 | 0 of 5 | 341 ms | 560 MB |
+| U2 | 6,000 | 0 of 5 | 255 ms | 2,314 MB |
+| U2, 700 invokes | 601 | 0 of 700 | 278 ms | 387 MB |
+| U3 `4f712a6e73` (Entity Runtime 0.30.1) | 601 | 0 of 5 | 127 ms | 329 MB |
+| U3 | 1,201 | 0 of 5 | 128 ms | 560 MB |
+
+- #101: median at 6,000 events is 1.11x the median at 600 (limit 2x); 700 invokes with no
+  `timeout` and no `outcome_unknown`.
+- #103: peak RSS 329 MB at 601 events (limit 506) and 560 MB at 1,201 (limit 2x 329 = 658).
+- U2 took three correction rounds: the base failure at 1,201 events was one 396-member expiry
+  batch inside Entity Runtime (`upstream-blocker:er-batch-cost-superlinear`); CLI reads now go
+  through the owner; adversary pass 1 (`review-result:adversary-store-checkpoints-pass-1`).
+- U1 changed no code: the targets hold on the base after Entity Runtime 0.28.0's record fix.
+- Trees: `conn-u1-mem` and `conn-u2-ckpt` finished and removed by `worktree gc` (archives under
+  the worktree archive directory).
+- Package tests on the integration branch at `4f712a6e73`: connectors-host 396 passed, 0 failed,
+  33 ignored; connectors 122 passed, 0 failed, 6 ignored; clippy `-D warnings`, fmt,
+  `connectors-build metadata-entities --check` and `cli --check` clean. The pull request's CI
+  is the full gate.
