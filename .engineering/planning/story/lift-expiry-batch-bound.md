@@ -2,11 +2,19 @@
 format: aep.planning-md/3
 id: story:lift-expiry-batch-bound
 kind: story
-status: draft
+status: active
 title: Lift the 32-member expiry batch bound once Entity Runtime batches scale linearly
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+scope:
+- confidence: cited
+  path: crates/connectors-host/src/local/metadata/er.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/store_cost_tests.rs
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T07:53:31Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T07:53:32Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
@@ -26,3 +34,9 @@ upstream-blocker:er-batch-cost-superlinear, which clears with the Entity Runtime
   of a 1,201-event store (396 members) and of a 6,000-event store finishes inside the 30 s bridge
   deadline; the times are recorded beside the 2026-10-08 numbers in the blocker.
 - If it does not, the bound stays and the measured largest safe size replaces 32.
+
+## Providers
+
+Entity Runtime 0.30.2 (in connectors 0.33.0) records a batch on SQLite in time linear in its members.
+The File and PostgreSQL eventlog providers still verify the whole batch on each member's read, so a
+store on either keeps the 32-member bound; the lift applies to SQLite stores only.
