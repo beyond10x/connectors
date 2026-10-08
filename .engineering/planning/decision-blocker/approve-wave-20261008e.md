@@ -2,9 +2,11 @@
 format: aep.planning-md/3
 id: decision-blocker:approve-wave-20261008e
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has approved wave 20261008e (Loki query, Slack reads)
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-08T19:38:16Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -28,3 +30,7 @@ Loki still needs: the executable binding, the bearer profile with the configured
 | C | Slack alone | Loki branch keeps drifting from main; Grafana (394) stays blocked on Loki |
 
 Recommended: A. Disjoint surfaces; Slack is the highest call count and Loki unblocks Grafana.
+
+## Decided
+
+Option A, 2026-10-08: story:parity-loki-query and story:catalog-slack-reads in wave 20261008e, plus the AGENTS.md release step 7 fix. The units run one after the other inside a 10G build budget; builds pause while / is under 20G free.
