@@ -1,0 +1,40 @@
+domain: connectors_catalog.identity
+summary: The identity probe of a catalog provider's authentication profile, the `auth.identity` member of a `connectors-catalog-local/2` configuration, which names the subject a validated credential is recorded under.
+
+# Normative owner: docs/local-catalog-provider.md, "Configure the provider". The engine reads this
+# document as `auth.identity`; the subject it yields is the `ExternalIdentity.subject` of the
+# shared credential model (connectors.credentials), and `kind` is its `kind`.
+#
+# The profile, not the probe, constrains which source a scheme may use: `id_token` belongs to an
+# `oauth2_refresh` profile only, and a profile with `minimum_scopes` and an `api` source also
+# declares a scope read. Those checks stay with the profile.
+
+types:
+  # Where the subject comes from. An absent `source` is `api`, so configurations written before
+  # the field existed keep their revision.
+  # - `api`: the answer of the read at `path`, at the JSON pointer `subject_pointer`.
+  # - `id_token`: the `sub` of the token answer's `id_token` (or of `tokeninfo`); no read.
+  # - `configuration`: the read at `path` must answer 200 and proves the credential; its body is
+  #   not read, and the subject is the configured instance id. For a provider whose API names no
+  #   account or user, so the subject is the configured connection, not a provider account.
+  - name: connectors_catalog.identity.Source
+    kind: enum
+    variants: [api, id_token, configuration]
+
+  - name: connectors_catalog.identity.Probe
+    kind: struct
+    fields:
+      # The read, relative to the provider base; required by `api` and `configuration`.
+      - {name: path, type: "Optional<String>"}
+      # The identity kind recorded beside the subject, such as `gitlab.user`.
+      - {name: kind, type: String}
+      # An RFC 6901 pointer into the identity read's answer; `api` only.
+      - {name: subject_pointer, type: "Optional<String>"}
+      - {name: source, type: "Optional<connectors_catalog.identity.Source>"}
+    invariants:
+      - kind.count >= 1
+      - any: [{source: id_token}, defined(path)]
+      - any: [{source: id_token}, {source: configuration}, defined(subject_pointer)]
+      - any: [{not: {source: id_token}}, {not: defined(path)}]
+      - any: [{not: {source: id_token}}, {not: defined(subject_pointer)}]
+      - any: [{not: {source: configuration}}, {not: defined(subject_pointer)}]
