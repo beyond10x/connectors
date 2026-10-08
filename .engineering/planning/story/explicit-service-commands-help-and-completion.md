@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:explicit-service-commands-help-and-completion
 kind: story
-status: active
+status: implemented
 title: describe, invoke and serve are reachable through help and completion
 relations:
 - serves: vision:independent-contract-adapters
@@ -13,10 +13,11 @@ scope:
   path: apps/connectors/src/main.rs
 - confidence: inferred
   path: apps/connectors/tests/explicit_commands_help_completion.rs
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T07:53:30Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-08T07:53:31Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-08T10:57:17Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
