@@ -14,9 +14,13 @@ scope:
   path: Cargo.toml
 - confidence: inferred
   path: adapters/loki
+- confidence: cited
+  path: crates/connectors-build/src/gate.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/runtime.rs
 - confidence: inferred
   path: docs/fluxplane-plugin-parity.md
-revision: 4
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T18:06:44Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-08T18:06:45Z", actor: "human:timo", revision: 4}
@@ -40,3 +44,7 @@ new native adapter; `adapters/loki` holds a design, an ESS model and the `logql-
 - Spec first: what the unit adds is modelled in the ESS specification it belongs to (adapter model, or pinned OpenAPI source and selection) and validated with the newest `ess` before implementation.
 - Each operation above answers through `connectors operations invoke` on a saved connection, against a recorded provider fixture, with the same capability the fluxplane operation gives (the parity page names the gap per operation).
 - The parity page row of each operation moves to covered, with the Connectors operation named.
+
+## Wave 20261008d result
+
+Left the wave blocked on decision-blocker:loki-connection-auth. Work kept on branch `unit/loki-query-20261008d` (28d72d124): ESS reads.yaml additions, contract section 11 (logql-metric, loki-labels), adapter.json and generated descriptor, crate `connectors-loki` with 21 tests on hand-written fixtures in Loki v3.7.0 API shapes, gate enrollment in `crates/connectors-build/src/gate.rs` (applied from the implementor patch, not yet compiled). Scope confirmed: Cargo.toml (members only), Cargo.lock, adapters/loki, docs/fluxplane-plugin-parity.md; added: crates/connectors-build/src/gate.rs, crates/connectors-host/src/local/runtime.rs (for an anonymous profile).

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:runpod-create-start-command-and-volume
 kind: story
-status: active
+status: implemented
 title: Runpod pod.create admits the start command, entrypoint and network volume
 relations:
 - serves: vision:independent-contract-adapters
@@ -15,10 +15,11 @@ scope:
   path: adapters/catalog/tests/runpod_adversary.rs
 - confidence: cited
   path: docs/catalog-runpod.md
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T18:14:40Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-08T18:14:40Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-08T18:46:56Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
