@@ -163,7 +163,11 @@ async fn a_write_whose_caller_hangs_up_keeps_its_final_observation() {
     assert!(sent.is_err(), "the caller gave up before the answer");
     // Well past the adapter's own 400 ms.
     tokio::time::sleep(Duration::from_millis(1500)).await;
-    assert_eq!(host.started.load(Ordering::SeqCst), 1, "the write was dispatched");
+    assert_eq!(
+        host.started.load(Ordering::SeqCst),
+        1,
+        "the write was dispatched"
+    );
     let abandoned = host.abandoned.load(Ordering::SeqCst);
     let retained = host.state.pending_observations();
     assert!(
@@ -193,7 +197,11 @@ async fn a_write_whose_answer_fails_its_output_schema_is_observed_unknown() {
         .await
         .unwrap();
     let response = InvokeResponse::decode(&bytes).unwrap();
-    assert_eq!(host.started.load(Ordering::SeqCst), 1, "the write was dispatched");
+    assert_eq!(
+        host.started.load(Ordering::SeqCst),
+        1,
+        "the write was dispatched"
+    );
     assert_eq!(response.audit_status, AuditStatus::Complete);
     let audit_ref = response.audit_ref.expect("an acknowledged reference");
     let observation = observe(&host.path, &audit_ref)

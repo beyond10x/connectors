@@ -482,3 +482,281 @@ fn environment_credentials_apply_the_same_value_bounds_as_files() {
         assert!(output.status.success(), "environment fixture {case} failed");
     }
 }
+
+/// `POST /v1alpha2/invoke` and the HTTP host's mutation attempt ledger
+/// (contracts/service/compatibility.md § 2.1 `mutation`,
+/// ess/domains/mutations.yaml "The HTTP host's attempt ledger").
+mod v1alpha2_ledger {
+    use super::*;
+    use connectors_core::v1alpha2::{
+        AuditStatus, BaseErrorCode, CauseStage, EffectKnowledge, ErrorCode as WireCode,
+        InvokeResponse, ResponseStatus,
+    };
+    use connectors_host::{
+        local::{
+            audit::{self, Reference},
+            mutations,
+        },
+        server::{ServiceState, router_with_state},
+    };
+    use std::{
+        path::{Path, PathBuf},
+        sync::atomic::AtomicBool,
+        time::Duration,
+    };
+
+    /// `write` applies and echoes; `lost-write` is dispatched and its answer is
+    /// lost (a generic adapter error); `read` echoes; `failing-read` errors.
+    /// `break_store` takes the state directory away during the next dispatch.
+    struct Ledger {
+        calls: Arc<AtomicUsize>,
+        state: PathBuf,
+        break_store: Arc<AtomicBool>,
+    }
+    fn operation(id: &str, profile: &str) -> Operation {
+        Operation {
+            id: id.into(),
+            description: format!("{id} fixture"),
+            contract: "operations/v1alpha1".into(),
+            profile: profile.into(),
+            input_schema: json!({"type":"object"}),
+            output_schema: json!({"type":"object"}),
+        }
+    }
+    #[async_trait]
+    impl Adapter for Ledger {
+        fn descriptor(&self) -> Descriptor {
+            Descriptor {
+                version: WIRE_VERSION.into(),
+                instance: "leaf".into(),
+                adapter: "fixture".into(),
+                revision: "rev-1".into(),
+                configuration_schema: json!({"type":"object"}),
+                operations: vec![
+                    operation("write", "mutation"),
+                    operation("lost-write", "mutation"),
+                    operation("read", "read"),
+                    operation("failing-read", "read"),
+                ],
+            }
+        }
+        async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.break_store.swap(false, Ordering::SeqCst) {
+                private(&self.state, false);
+            }
+            match operation {
+                "lost-write" => Err(connectors_core::Error::new(
+                    ErrorCode::Unavailable,
+                    "connection reset before the answer",
+                )),
+                "failing-read" => Err(connectors_core::Error::new(
+                    ErrorCode::NotFound,
+                    "no such item",
+                )),
+                _ => Ok(input),
+            }
+        }
+    }
+    /// A group-readable state directory makes every metadata write fail.
+    fn private(state: &Path, usable: bool) {
+        let mode = if usable { 0o700 } else { 0o750 };
+        std::fs::set_permissions(state, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    struct Host {
+        endpoint: String,
+        task: tokio::task::JoinHandle<()>,
+        state: Arc<ServiceState>,
+        path: PathBuf,
+        calls: Arc<AtomicUsize>,
+        break_store: Arc<AtomicBool>,
+        _root: tempfile::TempDir,
+    }
+    async fn host() -> Host {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        std::fs::create_dir(&path).unwrap();
+        private(&path, true);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let break_store = Arc::new(AtomicBool::new(false));
+        let adapter = Arc::new(Ledger {
+            calls: calls.clone(),
+            state: path.clone(),
+            break_store: break_store.clone(),
+        });
+        let state = Arc::new(ServiceState::open(&path, "leaf", "fixture", "rev-1").unwrap());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let app = router_with_state(adapter, Arc::new(FixedSecret), Some(state.clone()));
+        let task = tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        Host {
+            endpoint: format!("http://{address}/v1alpha2/invoke"),
+            task,
+            state,
+            path,
+            calls,
+            break_store,
+            _root: root,
+        }
+    }
+    async fn invoke(host: &Host, body: Value) -> (u16, InvokeResponse) {
+        let _ = rustls::crypto::ring::default_provider().install_default();
+        let response = reqwest::Client::new()
+            .post(&host.endpoint)
+            .bearer_auth("service-token")
+            .body(serde_json::to_vec(&body).unwrap())
+            .send()
+            .await
+            .unwrap();
+        let status = response.status().as_u16();
+        let bytes = response.bytes().await.unwrap();
+        (status, InvokeResponse::decode(&bytes).unwrap())
+    }
+    fn request(operation: &str, request_id: &str) -> Value {
+        json!({"version":"v1alpha2","request_id":request_id,"operation":operation,"revision":"rev-1","input":{"value":1}})
+    }
+    fn audit_record(path: &Path, audit_ref: &str) -> audit::Record {
+        audit::Store::new(path, 100_000)
+            .unwrap()
+            .observe(&Reference {
+                instance: "leaf".into(),
+                audit_ref: audit_ref.into(),
+            })
+            .unwrap()
+            .expect("the anchored record")
+    }
+
+    #[tokio::test]
+    async fn a_write_returns_its_attempt_and_the_record_reads_back() {
+        let host = host().await;
+        let (status, response) = invoke(&host, request("write", "write-1")).await;
+        assert_eq!(status, 200);
+        assert_eq!(response.status, ResponseStatus::Success);
+        assert_eq!(response.result, Some(json!({"value":1})));
+        assert_eq!(response.audit_status, AuditStatus::Complete);
+        let mutation = response.mutation.expect("a write carries its mutation");
+        assert_eq!(mutation.classification, EffectKnowledge::Applied);
+        assert_eq!(mutation.original_request_id.as_deref(), Some("write-1"));
+        assert!(!mutation.replayed);
+        assert_eq!(mutation.cause, None);
+        let attempt = mutation.attempt.expect("the recorded attempt");
+        assert_eq!(attempt.instance, "leaf");
+
+        let record = host.state.attempt(attempt.id.as_str()).unwrap();
+        assert_eq!(record.reference.attempt_id.to_string(), attempt.id.as_str());
+        assert_eq!(record.request_id, "write-1");
+        assert_eq!(record.state, mutations::State::Completed);
+        assert_eq!(record.result, Some(json!({"classification":"applied"})));
+        assert!(record.settled_at_ms.is_some());
+        // The audit anchor names the same attempt (LinkAnchorAttempt).
+        let anchored = audit_record(&host.path, &response.audit_ref.unwrap());
+        assert_eq!(
+            anchored
+                .anchor
+                .attempt_id
+                .map(|id| id.to_string())
+                .as_deref(),
+            Some(attempt.id.as_str())
+        );
+        assert_eq!(host.state.attempt_count().unwrap(), 1);
+        assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+        host.task.abort();
+    }
+
+    #[tokio::test]
+    async fn a_refusal_before_dispatch_returns_no_attempt() {
+        let host = host().await;
+        let mut stale = request("write", "stale");
+        stale["revision"] = json!("rev-0");
+        let mut invalid = request("write", "invalid");
+        invalid["input"] = json!("not an object");
+        for (body, code) in [
+            (stale, WireCode::StaleDescription),
+            (request("missing-write", "unknown"), WireCode::NotFound),
+            (invalid, WireCode::InvalidInput),
+        ] {
+            let (_, response) = invoke(&host, body).await;
+            assert_eq!(response.status, ResponseStatus::Error);
+            assert_eq!(response.error.unwrap().code, code);
+            assert!(response.mutation.is_none(), "{code:?}");
+            assert_eq!(response.audit_ref, None);
+        }
+        assert_eq!(host.state.attempt_count().unwrap(), 0);
+        assert_eq!(host.calls.load(Ordering::SeqCst), 0);
+        host.task.abort();
+    }
+
+    #[tokio::test]
+    async fn a_lost_answer_is_outcome_unknown_with_the_recorded_attempt_and_no_second_dispatch() {
+        let host = host().await;
+        let (status, response) = invoke(&host, request("lost-write", "lost-1")).await;
+        assert_eq!(status, 502);
+        assert_eq!(response.status, ResponseStatus::Error);
+        assert_eq!(response.error.unwrap().code, WireCode::OutcomeUnknown);
+        let mutation = response.mutation.expect("the recorded attempt");
+        assert_eq!(mutation.classification, EffectKnowledge::Unknown);
+        assert_eq!(mutation.original_request_id.as_deref(), Some("lost-1"));
+        let cause = mutation.cause.expect("the secondary cause");
+        assert_eq!(cause.code, BaseErrorCode::Unavailable);
+        assert_eq!(cause.stage, CauseStage::Dispatch);
+        let attempt = mutation.attempt.expect("the attempt id");
+        let record = host.state.attempt(attempt.id.as_str()).unwrap();
+        assert_eq!(record.state, mutations::State::Indeterminate);
+        assert_eq!(record.settled_at_ms, None);
+        let observed = audit_record(&host.path, &response.audit_ref.unwrap())
+            .final_observation
+            .expect("the final observation");
+        assert_eq!(observed.outcome, audit::Outcome::Unknown);
+        // Settled once; the host did not dispatch again.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(host.state.attempt_count().unwrap(), 1);
+        host.task.abort();
+    }
+
+    #[tokio::test]
+    async fn a_read_has_no_mutation_and_records_no_attempt() {
+        let host = host().await;
+        let (status, response) = invoke(&host, request("read", "read-1")).await;
+        assert_eq!(status, 200);
+        assert_eq!(response.status, ResponseStatus::Success);
+        assert!(response.mutation.is_none());
+        let (status, response) = invoke(&host, request("failing-read", "read-2")).await;
+        assert_eq!(status, 404);
+        assert_eq!(response.error.unwrap().code, WireCode::NotFound);
+        assert!(response.mutation.is_none());
+        assert_eq!(host.state.attempt_count().unwrap(), 0);
+        host.task.abort();
+    }
+
+    /// audit.md § 3: the running host retries a lost final observation by
+    /// itself; nothing here calls the recovery entry point.
+    #[tokio::test]
+    async fn the_running_host_recovers_a_lost_final_observation_by_itself() {
+        let host = host().await;
+        host.break_store.store(true, Ordering::SeqCst);
+        let (status, response) = invoke(&host, request("read", "unobserved")).await;
+        assert_eq!(status, 200);
+        assert_eq!(response.audit_status, AuditStatus::Incomplete);
+        let audit_ref = response.audit_ref.unwrap();
+        private(&host.path, true);
+        let mut observed = None;
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            observed = audit_record(&host.path, &audit_ref).final_observation;
+            if observed.is_some() {
+                break;
+            }
+        }
+        assert_eq!(
+            observed.expect("recovered without a caller").outcome,
+            audit::Outcome::Success
+        );
+        assert_eq!(host.state.pending_observations(), 0);
+        assert_eq!(host.calls.load(Ordering::SeqCst), 1);
+        host.task.abort();
+    }
+}
