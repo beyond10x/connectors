@@ -83,6 +83,24 @@ fn read_reply(
     )
     .map_err(Error::from)
 }
+/// How long past an invoke's deadline its client waits for the owner's answer,
+/// which the owner sends by that deadline.
+const ANSWER_GRACE: Duration = Duration::from_secs(2);
+/// A read's answer: the provider result, which the adapter child held to
+/// [`channel::DEPTH`], one level under the answer's own scalar members. The
+/// answer is held to one level more and every member but `result` to a
+/// scalar, so each result the child admits arrives and nothing else may nest
+/// deeper than in any other answer.
+fn read_shape(answer: Value) -> Result<Value> {
+    let members = answer.as_object().ok_or(Code::Unavailable)?;
+    if members
+        .iter()
+        .any(|(name, value)| name != "result" && (value.is_array() || value.is_object()))
+    {
+        return Err(Code::Unavailable.into());
+    }
+    Ok(answer)
+}
 /// A request without a well-formed reply may have been carried out: its
 /// outcome is unknown, whatever failed while sending or while reading and
 /// decoding the reply. An interruption stays one (C03 "or interruption as
@@ -410,14 +428,16 @@ impl Client {
             revision: input(call, "revision")?,
             deadline_ms,
         };
-        channel::write(
-            &mut self.stream,
-            &request,
-            None,
-            document,
-            until(deadline_ms)?,
-        )?;
-        self.read_answer(until(deadline_ms)?)
+        let deadline = until(deadline_ms)?;
+        channel::write(&mut self.stream, &request, None, document, deadline)?;
+        // The owner answers by the deadline, its own timeout included, and that
+        // answer decides the failure's stage; wait a bounded grace beyond it for
+        // the answer. A sent invoke whose answer never arrives may have been
+        // dispatched, so its outcome is unknown, not the host's admission.
+        match self.answer_within(deadline + ANSWER_GRACE, channel::DEPTH + 1) {
+            Ok(answer) => read_shape(answer?),
+            Err(error) => Err(lost(error)),
+        }
     }
     pub fn revalidate(
         mut self,
@@ -567,23 +587,13 @@ impl Client {
     fn answer(&mut self, deadline: Instant) -> std::result::Result<Result<Value>, Error> {
         self.answer_within(deadline, channel::DEPTH)
     }
-    /// A read's answer: the provider result, which the adapter child held to
-    /// [`channel::DEPTH`], one level under the answer's own scalar members. The
-    /// answer is held to one level more and every member but `result` to a
-    /// scalar, so each result the child admits arrives and nothing else may nest
-    /// deeper than in any other answer.
+    /// A read's answer as `invoke` reads it ([`read_shape`]).
+    #[cfg(test)]
     fn read_answer(&mut self, deadline: Instant) -> Result<Value> {
-        let answer = self
-            .answer_within(deadline, channel::DEPTH + 1)
-            .unwrap_or_else(Err)?;
-        let members = answer.as_object().ok_or(Code::Unavailable)?;
-        if members
-            .iter()
-            .any(|(name, value)| name != "result" && (value.is_array() || value.is_object()))
-        {
-            return Err(Code::Unavailable.into());
-        }
-        Ok(answer)
+        read_shape(
+            self.answer_within(deadline, channel::DEPTH + 1)
+                .unwrap_or_else(Err)?,
+        )
     }
     fn answer_within(
         &mut self,
@@ -1691,6 +1701,71 @@ fn launch(
     registry.release_read(dispatched, connectors_sdk::now_ms())?;
     delivered?;
     Ok(json!({}))
+}
+
+/// story:invoke-timeout-after-dispatch-stage: the owner answers an invoke by
+/// its deadline, its own timeout included, and that answer decides the
+/// failure. A sent invoke whose answer never arrives may have been
+/// dispatched, so its outcome is unknown, never the host's admission.
+#[cfg(test)]
+mod invoke_answer_tests {
+    use super::*;
+
+    fn client() -> (Client, UnixStream) {
+        let (client, owner) = UnixStream::pair().unwrap();
+        (
+            Client {
+                stream: client,
+                host_incarnation: "fixture-host".into(),
+                owner_build: Some(own_build().unwrap().into()),
+            },
+            owner,
+        )
+    }
+
+    fn call() -> Value {
+        json!({"connection":"connection","operation":"read","schema":"schema","revision":"revision"})
+    }
+
+    #[test]
+    fn an_owner_answer_sent_at_the_deadline_decides_the_invoke_failure() {
+        let (client, mut owner) = client();
+        let deadline = connectors_sdk::now_ms() + 200;
+        let answered = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(300));
+            let mut error = Error::from(Code::Timeout);
+            error.origin = Origin::Provider;
+            channel::write(
+                &mut owner,
+                &Reply::Failed { error },
+                None,
+                &[],
+                Instant::now() + Duration::from_secs(5),
+            )
+            .unwrap();
+            owner
+        });
+        let error = client
+            .invoke("alias", &call(), b"{}", deadline)
+            .unwrap_err();
+        drop(answered.join().unwrap());
+        assert_eq!(error.code, Code::Timeout);
+        assert_eq!(
+            error.origin,
+            Origin::Provider,
+            "the client's own read expiry replaced the owner's answer"
+        );
+    }
+
+    #[test]
+    fn an_invoke_whose_answer_never_arrives_is_outcome_unknown() {
+        let (client, owner) = client();
+        let error = client
+            .invoke("alias", &call(), b"{}", connectors_sdk::now_ms() + 200)
+            .unwrap_err();
+        drop(owner);
+        assert_eq!(error.code, Code::OutcomeUnknown);
+    }
 }
 
 #[cfg(test)]

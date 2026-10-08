@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.36.0 — 2026-10-08
+
+### Added
+
+- The catalog provider creates, lists and terminates Runpod pods: `pod.create` (`CreatePod`,
+  `POST /v1/pods`), `pods.list` (`ListPods`, `GET /v1/pods`) and `pod.terminate` (`DeletePod`,
+  `DELETE /v1/pods/{podId}`), from the Runpod REST API document pinned as served under
+  `adapters/runpod/upstream/` (SHA-256 `9500a898…b580db`, with a gzip archive the gate
+  re-derives). The API key travels as `Authorization: Bearer` under profile `runpod.api-key`.
+  Both writes are unguarded required-approval mutations; `pod.create`'s body is closed by
+  `body_keys` to twelve `PodCreateInput` keys. A create answered with a definite 4xx is
+  `refused`; one whose connection is lost after the request was sent, or answered 5xx, is
+  `unknown` and is never sent again. A terminate answered 404 is `refused` with `not_found`.
+  See `docs/catalog-runpod.md`.
+- `auth.identity.source` `configuration`: the read at `path` must answer 200 and its body is
+  not read; the subject is the configuration's `instance` id. Runpod has no user or account
+  read, so its identity is the configured connection (`runpod.connection`), not an account.
+  Only a static credential (`token` or `basic`) may use it; an OAuth profile with it is refused
+  at load. The rules are modeled as `connectors_catalog.identity.Probe` and `Profile` in
+  `adapters/catalog/spec/ess`, and every identity the guides document is checked against them.
+
+- The local metadata store records the release version of the build that wrote each local
+  runtime bootstrap (`connectors.cli.LocalRuntimeRecord.build_version`). It is kept beside the
+  bootstrap in its cached column; a store written before this release opens unchanged, its
+  records carry no version, and the next bootstrap a build remembers records that build's.
+
+### Changed
+
+- A selection, guard preflight or feed declaration that names an `operationId` the bundle
+  carries more than once is refused when it loads, instead of resolving to the first
+  operation listed. No shipped selection changes: only the Runpod document declares an id
+  twice (`UpdatePod`, `UpdateEndpoint`, `UpdateNetworkVolume`, `UpdateTemplate`), and none
+  of them is selected.
+
+### Fixed
+
+- A local `connectors operations invoke` read whose deadline passes after the owner dispatched
+  it (its read use recorded `DispatchReadUse`) reports `code = timeout` at `stage = dispatch`
+  instead of `stage = admission`. A deadline that passes before dispatch keeps
+  `stage = admission`, and the owner no longer dispatches that read afterwards. The CLI waits
+  up to 2 s past the deadline for the owner's answer; an invoke it sent whose answer never
+  arrives reports `outcome_unknown` instead of the host's admission timeout.
+
+### Limits
+
+- Runpod has not been called live: no account or key was used, and every outcome was
+  produced by a local HTTPS fixture.
+
 ## 0.35.0 — 2026-10-08
 
 ### Breaking

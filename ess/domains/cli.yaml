@@ -342,6 +342,13 @@ types:
     fields:
       - {name: kind, type: "connectors.cli.FailureKind"}
       - {name: code, type: "connectors.cli.FailureCode"}
+      # ESS-LIMIT: a read's `timeout` is at `stage = dispatch` once its
+      # connectors.credential_evidence.ReadUse took `dispatch` (DispatchReadUse), and at
+      # `stage = admission` before; a host that stops waiting first dispatches nothing more.
+      # A sent read whose answer never arrives is `outcome_unknown`
+      # (contracts/cli/v1alpha1/semantics.md). ESS 0.56 `specify cli` refuses any invariant
+      # on a CLI type ("unsupported invariants or union semantics"), and this type carries no
+      # dispatch fact to guard on, so the host enforces the rule and tests pin it.
       - {name: stage, type: "connectors.cli.FailureStage"}
       - {name: next_action, type: "connectors.cli.NextAction"}
       - {name: service_code, type: "Optional<connectors.service_wire.ErrorCode>"}
@@ -810,6 +817,7 @@ entities:
       - {name: selection, type: "Optional<String>"}
       - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
       - {name: observed_at, type: "Optional<Timestamp>"}
+      - {name: build_version, type: "Optional<String>"}
     lifecycle:
       initial: Retained
       states: [Retained]
@@ -819,6 +827,11 @@ entities:
         - {name: remember_bootstrap, from: [Retained], to: Retained}
     # Durable stop suppression and the bounded cached bootstrap owned by local
     # configuration. A cached bootstrap never establishes live readiness.
+    # build_version is the release version of the build that wrote the cached
+    # bootstrap, so a refusal can be traced to the build that produced it. A record
+    # written before it was recorded has none, and the next bootstrap a build
+    # remembers records that build's; a suppression change keeps it. Remembering a
+    # bootstrap always records one.
 
   - name: connectors.cli.ConnectionListCursor
     identity: {name: cursor_id, type: Uuid}
@@ -867,6 +880,7 @@ commands:
       - {name: selection, type: "Optional<String>"}
       - {name: bootstrap, type: "Optional<connectors.cli.PrivateAdapterBootstrap>"}
       - {name: observed_at, type: "Optional<Timestamp>"}
+      - {name: build_version, type: "Optional<String>"}
     outcomes:
       - name: recorded
         creates: connectors.cli.LocalRuntimeRecord
@@ -880,6 +894,7 @@ commands:
           selection: input.selection
           bootstrap: input.bootstrap
           observed_at: input.observed_at
+          build_version: input.build_version
   - name: connectors.cli.SetLocalRuntimeSuppression
     input:
       - {name: instance_id, type: String}
@@ -900,6 +915,7 @@ commands:
       - {name: selection, type: String}
       - {name: bootstrap, type: connectors.cli.PrivateAdapterBootstrap}
       - {name: observed_at, type: Timestamp}
+      - {name: build_version, type: String}
     outcomes:
       - name: remembered
         moves: connectors.cli.LocalRuntimeRecord.remember_bootstrap
@@ -912,6 +928,7 @@ commands:
           selection: input.selection
           bootstrap: input.bootstrap
           observed_at: input.observed_at
+          build_version: input.build_version
   - name: connectors.cli.RecordConnectionListCursor
     input:
       - {name: cursor_id, type: Uuid}
@@ -953,7 +970,7 @@ commands:
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
     # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:456) and the host
-    # removal path (er.rs:4066-4068) only expires Active cursors. The error name is
+    # removal path (er.rs:4075-4077) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:
