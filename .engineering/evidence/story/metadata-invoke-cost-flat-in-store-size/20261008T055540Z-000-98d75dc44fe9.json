@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-08T05:55:40Z",
+  "actor": "human:timo",
+  "artifact": "story:metadata-invoke-cost-flat-in-store-size",
+  "kind": "story",
+  "revision": 16,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "read_invoke_cost_by_store_size, base 91e6baae33 vs treatment",
+    "reference": "specification:wave-20261007c-store-cost-memory#results"
+  }
+}

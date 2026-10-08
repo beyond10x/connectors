@@ -2,17 +2,18 @@
 format: aep.planning-md/3
 id: specification:wave-20261007c-store-cost-memory
 kind: specification
-status: approved
+status: implemented
 title: 'Wave 20261007c: store cost (#101) and owner memory (#103)'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:owner-memory-bounded
 - informed_by: story:metadata-invoke-cost-flat-in-store-size
 - informed_by: story:entity-runtime-eventlog-081-pin
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T17:16:09Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T17:16:10Z", actor: "human:timo", revision: 3}
+- {from: "approved", to: "implemented", at: "2026-10-08T06:30:15Z", actor: "human:timo", revision: 7}
 ---
 ## Wave 20261007c: store cost (#101) and owner memory (#103)
 

@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: specification:wave-20261007b-entity-runtime-029
 kind: specification
-status: approved
+status: implemented
 title: 'Wave 20261007b: Entity Runtime 0.29.0'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: story:entity-runtime-029-pin
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "in_review", at: "2026-10-07T08:02:01Z", actor: "human:timo", revision: 2}
 - {from: "in_review", to: "approved", at: "2026-10-07T08:02:01Z", actor: "human:timo", revision: 3}
+- {from: "approved", to: "implemented", at: "2026-10-08T06:30:15Z", actor: "human:timo", revision: 5}
 ---
 ## Wave 20261007b: Entity Runtime 0.29.0
 

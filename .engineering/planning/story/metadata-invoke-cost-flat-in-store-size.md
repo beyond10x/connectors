@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:metadata-invoke-cost-flat-in-store-size
 kind: story
-status: active
+status: implemented
 title: Per-invoke metadata cost does not grow with the store
 relations:
 - serves: vision:independent-contract-adapters
@@ -21,10 +21,11 @@ scope:
   path: crates/connectors-host/src/local/registry.rs
 - confidence: inferred
   path: crates/connectors-host/src/local/registry/tests.rs
-revision: 16
+revision: 17
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-01T22:09:40Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-01T22:09:41Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-08T06:29:54Z", actor: "human:timo", revision: 17, decided_on: {"recorded":{"test_result":1,"review_outcome":3,"verification":1}}}
 ---
 ## Source
 
