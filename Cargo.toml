@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 # Specification-only adapters have no Cargo package until implemented.
-members = ["crates/*", "adapters/catalog", "adapters/kubernetes", "adapters/sql", "adapters/tavily", "apps/connectors"]
+members = ["crates/*", "adapters/catalog", "adapters/kubernetes", "adapters/loki", "adapters/sql", "adapters/tavily", "apps/connectors"]
 exclude = ["apps/connectors-cli-contract"]
 
 [workspace.package]
