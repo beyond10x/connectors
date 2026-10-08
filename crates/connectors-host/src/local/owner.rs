@@ -137,7 +137,7 @@ impl From<registry::Failure> for Error {
             F::ConcurrentRevision => Code::RevisionConflict,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
-            F::Conflict => Code::LifecycleConflict,
+            F::Conflict | F::UpgradeRequired => Code::LifecycleConflict,
             F::Revoked => Code::Revoked,
             F::IdentityMismatch | F::UpgradeIdentityMismatch => Code::IdentityMismatch,
             F::Expired => Code::Timeout,
@@ -148,7 +148,9 @@ impl From<registry::Failure> for Error {
             F::CustodyUnavailable => Code::CustodyUnavailable,
         });
         error.reconnect = reconnect;
-        error.revalidate = e == F::EvidenceExpired;
+        // Revalidation helps: it recollects expired evidence, and it follows a
+        // configuration upgrade of the connection's instance.
+        error.revalidate = matches!(e, F::EvidenceExpired | F::UpgradeRequired);
         error
     }
 }

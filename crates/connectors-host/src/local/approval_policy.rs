@@ -49,6 +49,10 @@ fn install_sql_write_fault(
 pub enum Failure {
     InvalidInput,
     Conflict,
+    /// The instance's recorded configuration revision is not the configured
+    /// one: a new connection under the configured revision, or a revalidation
+    /// that upgrades one, moves it.
+    BindingChanged,
     NotFound,
     NotAdmitted,
     MetadataUnavailable,
@@ -301,10 +305,11 @@ impl Store {
             "SELECT i.issuer_id,r.adapter_id,r.configuration_revision FROM local_approval_issuers i JOIN registry_instances r USING(instance_id) WHERE i.instance_id=?1",
             [&self.instance], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional().map_err(db)?;
         let (issuer, adapter, configuration) = row.ok_or(Failure::NotFound)?;
-        if adapter != self.adapter
-            || selection.is_some_and(|s| s.configuration_revision != configuration)
-        {
+        if adapter != self.adapter {
             return Err(Failure::Conflict);
+        }
+        if selection.is_some_and(|s| s.configuration_revision != configuration) {
+            return Err(Failure::BindingChanged);
         }
         let id = Uuid::parse_str(&issuer).map_err(|_| Failure::MetadataUnavailable)?;
         if id.is_nil() || id.to_string() != issuer {
