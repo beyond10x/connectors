@@ -2,11 +2,14 @@
 format: aep.planning-md/3
 id: story:invoke-returns-attempt-id
 kind: story
-status: draft
+status: active
 title: A successful invoke names the attempt it produced
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-08T10:59:14Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-08T10:59:14Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
