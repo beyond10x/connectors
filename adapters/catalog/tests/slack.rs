@@ -1,4 +1,4 @@
-//! Slack conversations through the catalog provider.
+//! Slack conversations and users through the catalog provider.
 //!
 //! The shipped selection set is pinned by id and source operation, resolves
 //! against the committed bundle compiled from the OpenAPI projection of the
@@ -8,8 +8,11 @@
 //! time window, `Authorization: Bearer …`) and the returned body bytes are
 //! asserted, every list walks two pages to an empty
 //! `response_metadata.next_cursor`, and the `auth.test` identity read yields
-//! the token's user id. Every id, name and message is synthetic. No live
-//! credential and no network.
+//! the token's user id. The methods the guide lists as not selectable —
+//! `auth.test`, `team.info`, `emoji.list` and `search.messages`, whose pinned
+//! `token` parameter is required — are pinned as refused, so the guide's
+//! limit fails here the day one of them ships. Every id, name and message
+//! is synthetic. No live credential and no network.
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
@@ -52,7 +55,7 @@ const SOURCE_SHA256: &str = "8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471bab
 
 /// The shipped ids, their pinned `operationId` and the path the bundle
 /// records. A renamed, dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 3] = [
+const SHIPPED: [(&str, &str, &str); 4] = [
     (
         "conversations.history",
         "conversations_history",
@@ -68,6 +71,7 @@ const SHIPPED: [(&str, &str, &str); 3] = [
         "conversations_replies",
         "/api/conversations.replies",
     ),
+    ("users.list", "users_list", "/api/users.list"),
 ];
 
 fn root() -> &'static Path {
@@ -89,7 +93,7 @@ fn pinned() -> Value {
 }
 
 #[test]
-fn shipped_slack_selections_are_exactly_the_three_conversation_reads() {
+fn shipped_slack_selections_are_exactly_the_conversation_and_user_reads() {
     let selections = shipped();
     let bundle = committed();
     assert_eq!(bundle.auth_profile, PROFILE);
@@ -140,6 +144,68 @@ fn a_missing_or_writing_source_operation_cannot_ship_as_a_read() {
     assert!(Engine::new(&bundle, BASE, &selections).is_err());
 }
 
+fn selection(id: &str, operation_id: &str, withhold: &[&str]) -> Selection {
+    serde_json::from_value(json!({
+        "id": id, "operation_id": operation_id, "effect": "read", "withhold": withhold
+    }))
+    .unwrap()
+}
+fn refusal(selections: &[Selection]) -> String {
+    match Engine::new(&committed(), BASE, selections) {
+        Ok(_) => panic!("loaded"),
+        Err(error) => error.message,
+    }
+}
+
+/// The limit `docs/catalog-slack.md` states for `team.info`, `emoji.list`,
+/// `search.messages` and `auth.test`: the pinned document marks their `token`
+/// parameter required, and the engine withholds only a parameter nothing
+/// requires. Withheld, the selection is refused; not withheld, the bot token
+/// would be a required input sent in the query, so none is shipped.
+/// `auth.test`'s `token` is a required header, which no selection can carry.
+/// Shipping any of them fails the last loop here, so the guide's section and
+/// the parity page move with the selection set.
+#[test]
+fn methods_whose_pinned_token_is_required_cannot_ship_with_the_token_withheld() {
+    for (id, operation_id) in [
+        ("team.info", "team_info"),
+        ("emoji.list", "emoji_list"),
+        ("search.messages", "search_messages"),
+    ] {
+        let message = refusal(&[selection(id, operation_id, &["token"])]);
+        assert!(
+            message.contains("withholds `token`, which is required"),
+            "`{id}`: {message}"
+        );
+        let engine = Engine::new(&committed(), BASE, &[selection(id, operation_id, &[])])
+            .unwrap_or_else(|error| panic!("`{id}`: {}", error.message));
+        let declaration = engine.declarations(&[Effect::Read]).remove(0);
+        assert!(
+            declaration.input_schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("token")),
+            "`{id}` would take the token as input"
+        );
+    }
+    for withhold in [&["token"][..], &[][..]] {
+        let message = refusal(&[selection("auth.test", "auth_test", withhold)]);
+        assert!(
+            message.contains("needs a header parameter this transport does not carry"),
+            "{message}"
+        );
+    }
+    // None of them is shipped.
+    for selection in shipped() {
+        assert!(
+            !["team_info", "emoji_list", "search_messages", "auth_test"]
+                .contains(&selection.operation_id.as_str()),
+            "`{}`",
+            selection.id
+        );
+    }
+}
+
 #[test]
 fn the_bundle_is_derived_from_the_pinned_swagger_document() {
     let bytes = fs::read(root().join(UPSTREAM)).unwrap();
@@ -167,9 +233,10 @@ fn the_bundle_is_derived_from_the_pinned_swagger_document() {
 }
 
 /// Every list's end condition and time window is in the pinned parameters:
-/// `cursor` and `limit` on all three, `oldest` and `latest` on the two
+/// `cursor` and `limit` on all four, `oldest` and `latest` on the two
 /// message reads, `ts` and `channel` on replies. The only stated page bound is
-/// `conversations.list`'s 1,000, and only it carries a bound.
+/// `conversations.list`'s 1,000, and only it carries a bound: `users.list`'s
+/// `limit` states none, only that its absence asks for the whole list.
 #[test]
 fn the_paging_and_window_parameters_are_in_the_pinned_document() {
     let document = pinned();
@@ -206,6 +273,7 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
                 "inclusive",
             ][..],
         ),
+        ("/users.list", &["cursor", "limit", "include_locale"][..]),
     ] {
         let declared = names(path);
         for name in wanted {
@@ -225,6 +293,19 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
         .unwrap()
         .to_owned();
     assert!(limit.contains("no larger than 1000"), "{limit}");
+    let users_limit = document["paths"]["/users.list"]["get"]["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "limit")
+        .unwrap()["description"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        users_limit.contains("deliver you the entire result set"),
+        "{users_limit}"
+    );
     for selection in shipped() {
         let bound = selection.bounds.get("limit");
         if selection.id == "conversations.list" {
@@ -259,6 +340,7 @@ fn guide_cites_each_operation_its_paging_and_its_time_window() {
             "/api/conversations.replies",
             "`oldest`, `latest`",
         ),
+        ("users.list", "users_list", "/api/users.list", "none"),
     ] {
         let row = rows
             .iter()
@@ -314,6 +396,13 @@ fn reply(ts: &str, text: &str) -> Value {
     json!({"type": "message", "user": "U0FIXTURE02", "text": text, "ts": ts,
            "thread_ts": "1780000100.000100"})
 }
+/// An `objs_user` with the members both of its pinned variants require.
+fn user(n: u64) -> Value {
+    json!({"id": format!("U0FIXTURE{n:02}"), "name": format!("fixture-user-{n}"),
+           "deleted": false, "is_bot": false, "is_app_user": false,
+           "profile": {"real_name": format!("Fixture User {n}")},
+           "team_id": "T0FIXTURE01", "updated": 1_780_000_000u64 + n})
+}
 fn more(cursor: &str) -> Value {
     json!({"next_cursor": cursor})
 }
@@ -353,6 +442,12 @@ fn page(path: &str) -> Option<Value> {
             "messages": [reply("1780000100.000100", "fixture thread parent"),
                          reply("1780000300.000300", "fixture reply one")],
             "has_more": true, "response_metadata": more("fixture-replies-2")}),
+        "/api/users.list" if has("cursor=fixture-users-2") => json!({
+            "ok": true, "members": [user(13)], "cache_ts": 1_780_000_500u64,
+            "response_metadata": more("")}),
+        "/api/users.list" => json!({
+            "ok": true, "members": [user(11), user(12)], "cache_ts": 1_780_000_500u64,
+            "response_metadata": more("fixture-users-2")}),
         _ => return None,
     })
 }
@@ -581,7 +676,7 @@ fn an_identity_answer_without_a_user_id_refuses_the_connection() {
 /// Each read's first request: the input, and the exact request the fixture
 /// must observe. Query parameters go out in the order the pinned document
 /// declares them, not the order of the input.
-fn first_pages() -> [(&'static str, Value, &'static str); 3] {
+fn first_pages() -> [(&'static str, Value, &'static str); 4] {
     [
         (
             "conversations.list",
@@ -600,6 +695,11 @@ fn first_pages() -> [(&'static str, Value, &'static str); 3] {
             json!({"channel": "C0FIXTURE01", "ts": "1780000100.000100",
                    "oldest": "1780000000.000000", "latest": "1780000500.000000", "limit": 2}),
             "/api/conversations.replies?channel=C0FIXTURE01&ts=1780000100.000100&latest=1780000500.000000&oldest=1780000000.000000&limit=2",
+        ),
+        (
+            "users.list",
+            json!({"include_locale": true, "limit": 2}),
+            "/api/users.list?limit=2&include_locale=true",
         ),
     ]
 }
@@ -648,6 +748,8 @@ fn a_withheld_missing_or_out_of_bound_parameter_is_refused_before_any_request() 
     let mut child = Child::spawn(&provider.selection()).unwrap();
     for (operation, input) in [
         ("conversations.list", json!({"token": TOKEN})),
+        ("users.list", json!({"limit": 2, "token": TOKEN})),
+        ("users.list", json!({"presence": true})),
         (
             "conversations.history",
             json!({"channel": "C0FIXTURE01", "token": TOKEN}),
@@ -781,6 +883,19 @@ fn conversations_replies_walks_two_pages_and_stops_on_an_empty_next_cursor() {
         [
             "/api/conversations.replies?channel=C0FIXTURE01&ts=1780000100.000100&limit=2",
             "/api/conversations.replies?channel=C0FIXTURE01&ts=1780000100.000100&limit=2&cursor=fixture-replies-2",
+        ]
+    );
+}
+
+#[test]
+fn users_list_walks_two_pages_and_stops_on_an_empty_next_cursor() {
+    let (read, requests) = walk("users.list", json!({"limit": 2}), "members");
+    assert_eq!(read, ["U0FIXTURE11", "U0FIXTURE12", "U0FIXTURE13"]);
+    assert_eq!(
+        requests,
+        [
+            "/api/users.list?limit=2",
+            "/api/users.list?limit=2&cursor=fixture-users-2",
         ]
     );
 }
