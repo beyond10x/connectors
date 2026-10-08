@@ -1,5 +1,6 @@
 [package]
 name = "connectors-sql"
+description = "PostgreSQL adapter: schema listing and bounded read-only queries."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

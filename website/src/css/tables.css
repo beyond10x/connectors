@@ -1,0 +1,8 @@
+/* Docs System lays `.markdown table` out as a table and keeps identifiers in its cells on one
+   line, so a wide reference table (the CLI arguments, the crate list) pushes the whole page
+   sideways on mid-size screens. Let such a table scroll inside the content column instead. */
+article .markdown table {
+  display: block;
+  max-inline-size: 100%;
+  overflow-x: auto;
+}

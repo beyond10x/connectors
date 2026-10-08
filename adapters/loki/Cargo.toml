@@ -1,5 +1,6 @@
 [package]
 name = "connectors-loki"
+description = "Loki adapter: LogQL range and metric queries and label reads, one GET each."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
