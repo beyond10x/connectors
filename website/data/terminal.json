@@ -1,0 +1,19 @@
+{
+  "format": "b10x-terminal/1",
+  "title": "One gateway in front of an adapter service",
+  "recordedWith": "connectors 0.37.0, the federation guide's configuration, no Kubernetes cluster",
+  "entries": [
+    {
+      "comment": "A federation host lists its downstream operations under their source prefix.",
+      "command": "connectors describe --endpoint http://127.0.0.1:17100/ --allow-plaintext --token-file gateway.secret | jq '{instance, adapter, operations: [.operations[].id]}'",
+      "output": "{\n  \"instance\": \"engineering-gateway\",\n  \"adapter\": \"federation\",\n  \"operations\": [\n    \"kubernetes__resources.list\",\n    \"kubernetes__endpoints.discover\"\n  ]\n}",
+      "exitCode": 0
+    },
+    {
+      "comment": "No cluster answers behind the adapter: the refusal is named and nothing is retried.",
+      "command": "connectors invoke --endpoint http://127.0.0.1:17100/ --allow-plaintext --token-file gateway.secret --operation kubernetes__resources.list --input pods.json",
+      "output": "{\"code\":\"unavailable\",\"message\":\"dependency unavailable\"}",
+      "exitCode": 1
+    }
+  ]
+}

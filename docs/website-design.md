@@ -1,10 +1,34 @@
 # Public documentation and executable contract examples
 
-Status: implemented locally on 2026-09-09. Public hosting,
-release publication and Atlas integration remain deferred. The operator requested
-a development server while the site is built. See the
-[delivery verification](website-verification.md) for the implemented surface,
-observed checks and remaining limits.
+Status: implemented locally on 2026-09-09; moved to its own site on the shared shell on
+2026-10-08 (below). The `Documentation validation` workflow builds it; serving it at its own
+address waits for the organization's site to move it. See the
+[delivery verification](website-verification.md) for the 2026-09-09 surface,
+observed checks and limits.
+
+## Own site on the shared shell (2026-10-08)
+
+The operator asked for documentation that is current and uses the shared look and feel of the
+other beyond10x sites. This supersedes the parts of this record below that describe the bespoke
+shell, its navigation and its search:
+
+- The site builds for `https://beyond10x.github.io/connectors/` (`baseUrl: '/connectors/'`) with
+  the `@beyond10x/docs-system` product shell, pinned to the commit the other independent sites
+  pin. The landing page is `website/product.json`; documentation lives under `/docs/`.
+- Pages follow the shared page set: an overview, getting started, concepts, guides, examples,
+  reference and status. The former Home / Introduction / Contracts / Adapters sections map onto
+  it: introduction and contracts overviews became concepts, the adapter pages became
+  `reference/adapters/`, and the two guided experiences became `examples/`.
+- The contract and ESS model reference are generated Markdown pages, written and drift-checked by
+  the Rust crate `connectors-docs` from the same `publication.json` allowlist and the pinned
+  `ess generate --kind docs`, instead of JSON rendered by local React components. The
+  publication boundary below still holds: selected sources only, links to unselected files keep
+  their label only, private paths refuse the page, and the history section is omitted.
+- The local theme wrappers, documentation frame, custom homepage and Pagefind search were
+  removed; navigation, theme and typography are the shared shell's. Search returns when the
+  shared shell offers it. The Rust public-output audit runs after every production build.
+- The status page is generated from a capability list in which every shipped item names the test
+  that holds it.
 
 ## Audience and navigation
 

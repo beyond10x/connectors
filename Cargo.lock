@@ -705,6 +705,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-docs"
+version = "0.37.0"
+dependencies = [
+ "clap",
+ "connectors",
+ "connectors-cli-contract",
+ "connectors-spec",
+ "pulldown-cmark",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
 name = "connectors-host"
 version = "0.37.0"
 dependencies = [

@@ -1,5 +1,6 @@
 [package]
 name = "connectors-contracts"
+description = "Higher-level, provider-neutral data and discovery contracts."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

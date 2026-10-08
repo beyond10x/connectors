@@ -1,5 +1,6 @@
 [package]
 name = "connectors-tavily"
+description = "Tavily adapter: web search, page fetch and site crawl through the shared websearch family."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

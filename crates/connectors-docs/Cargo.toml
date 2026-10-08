@@ -1,0 +1,21 @@
+[package]
+name = "connectors-docs"
+description = "Generates the derived pages of the Connectors documentation site (CLI, crates, contract and model reference, status) and checks them for drift."
+version.workspace = true
+edition.workspace = true
+rust-version = "1.91"
+license.workspace = true
+publish = false
+
+[dependencies]
+# The CLI reference is walked from the clap definitions the `connectors` binary parses:
+# the generated grouped commands and the explicit service commands.
+connectors = { path = "../../apps/connectors" }
+connectors_cli_contract.workspace = true
+connectors-spec = { path = "../connectors-spec" }
+clap.workspace = true
+pulldown-cmark = "0.13.4"
+regex = "1"
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
