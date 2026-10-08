@@ -582,13 +582,13 @@ impl Lab {
             instance_id: "example-service".into(),
             request_id: "request-1".into(),
             operation_id: "example.change".into(),
-            connection_ref: "example-connection".into(),
+            connection_ref: Some("example-connection".into()),
             input_digest: input_digest.into(),
             // Fictional host-resolved coordinates; never caller authority.
             request_fingerprint: RequestFingerprint {
                 operation_ref: "example-service/example-adapter/example.change".into(),
-                connection_ref: "example-connection".into(),
-                connection_revision: "revision-1".into(),
+                connection_ref: Some("example-connection".into()),
+                connection_revision: Some("revision-1".into()),
                 contract_ref: "operations/v1alpha1".into(),
                 profile: "mutation".into(),
                 descriptor_revision: "descriptor-1".into(),
