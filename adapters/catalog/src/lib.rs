@@ -132,6 +132,17 @@ pub struct Selection {
     /// carrying it is refused before any request. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub withhold: Vec<String>,
+    /// Parameters through which the pinned document passes the credential
+    /// that the connection already sends in its authentication header, such
+    /// as Slack's `token`. Each must be a parameter of the operation, in the
+    /// query or a header, that is not bounded, not listed in `required` or
+    /// `withhold` and that no guard reads as an input. It is left out of the
+    /// declaration whether or not the document requires it, before the
+    /// required-header check, so an input carrying it is refused before any
+    /// request and the credential travels in the header alone. Omitted when
+    /// empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub credential: Vec<String>,
     /// The reasons a provider gives in a `403` answer when it means a quota,
     /// not a permission: a `403` whose JSON body carries one of them in
     /// `error.errors[].reason` or `error.status` is `rate_limited`. Every other
@@ -356,6 +367,62 @@ impl Engine {
                     )));
                 }
             }
+            // The names a guard reads as input, through its preflight values
+            // and the expectations of its checks.
+            let guard_inputs: Vec<&str> = selection
+                .guard
+                .iter()
+                .flat_map(|guard| {
+                    guard.preflight.values.values().chain(
+                        guard
+                            .preflight
+                            .checks
+                            .iter()
+                            .chain(&guard.postflight.checks)
+                            .filter_map(|check| match &check.expect {
+                                Expectation::Input(path) => Some(path),
+                                Expectation::Literal(_) => None,
+                            }),
+                    )
+                })
+                .map(|path| path.split('.').next().unwrap_or(path))
+                .collect();
+            // A credential the document passes as a parameter travels in the
+            // connection's authentication header instead: it leaves the
+            // operation before anything reads its parameters, whether or not
+            // the document requires it, so a required `token` header no longer
+            // refuses the selection below.
+            for name in &selection.credential {
+                let declared: Vec<_> = operation
+                    .parameters
+                    .iter()
+                    .filter(|p| &p.name == name)
+                    .collect();
+                let reason = if declared.is_empty()
+                    || declared
+                        .iter()
+                        .any(|p| !matches!(p.location, Location::Query | Location::Header))
+                {
+                    Some("which is not only a query or header parameter of its operation")
+                } else if selection.bounds.contains_key(name) {
+                    Some("which it also bounds")
+                } else if selection.required.contains(name) || selection.withhold.contains(name) {
+                    Some("which it also marks required or withholds")
+                } else if guard_inputs.contains(&name.as_str()) {
+                    Some("which its guard reads as an input")
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    return Err(refuse(format!(
+                        "selection `{}` passes `{name}` as the credential, {reason}",
+                        selection.id
+                    )));
+                }
+            }
+            operation
+                .parameters
+                .retain(|p| !selection.credential.contains(&p.name));
             if operation
                 .parameters
                 .iter()
@@ -416,24 +483,6 @@ impl Engine {
             // A withheld parameter leaves the operation this selection
             // exposes: undeclared, so the closed input schema refuses it, and
             // absent from the template, so it is never bound into a request.
-            let guard_inputs: Vec<&str> = selection
-                .guard
-                .iter()
-                .flat_map(|guard| {
-                    guard.preflight.values.values().chain(
-                        guard
-                            .preflight
-                            .checks
-                            .iter()
-                            .chain(&guard.postflight.checks)
-                            .filter_map(|check| match &check.expect {
-                                Expectation::Input(path) => Some(path),
-                                Expectation::Literal(_) => None,
-                            }),
-                    )
-                })
-                .map(|path| path.split('.').next().unwrap_or(path))
-                .collect();
             for name in &selection.withhold {
                 let declared: Vec<_> = operation
                     .parameters
