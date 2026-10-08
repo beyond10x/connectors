@@ -136,7 +136,9 @@ entities:
     # its lifecycle covers replay retention, separately from audit retention.
     # ApprovalRedemption in connectors.delegation references this attempt;
     # it is a spend receipt, not the dispatch fence.
-    # AuditRecord in connectors.execution_audit may reference this attempt;
+    # AuditRecord in connectors.execution_audit may reference this attempt: set
+    # when the anchor is acknowledged, or, where the anchor precedes the attempt
+    # (v1alpha2 semantics § 4 rule 4), once by LinkAnchorAttempt before dispatch;
     # neither owner cascades deletion or lifecycle changes into the other.
     # The selected Connection is retained independently after local revocation;
     # the reference neither grants current use nor owns binding deletion.
