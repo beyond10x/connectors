@@ -25,6 +25,27 @@ Sources:
   ids are the same 80 as at `fef5e36f7` (every `adapters/catalog/providers/*/operations.json` and
   `adapters/*/spec/adapter.json`), so no verdict below changes. The call counts are still those
   of 2026-10-07; they were not recounted.
+- **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
+  Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
+  invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
+  id. Declared and undeclared operation names both count. The tables below keep the 2026-10-07
+  counts; the stories of `epic:fluxplane-plugin-parity` are ordered by this recount.
+
+  | plugin | calls | verdict |
+  |---|---:|---|
+  | gitlab | 2,541 | covered |
+  | jira | 1,415 | covered |
+  | slack | 710 | missing |
+  | sql | 663 | partial only |
+  | grafana | 394 | missing |
+  | loki | 334 | missing |
+  | kubernetes | 81 | covered |
+  | homer | 33 | missing |
+  | confluence | 13 | covered |
+  | alertmanager | 2 | missing |
+  | prometheus | 2 | missing |
+  | the other 11 missing plugins | 0 | missing |
+  | **total** | **6,191** (148 operation names) | |
 
 ## Summary
 
