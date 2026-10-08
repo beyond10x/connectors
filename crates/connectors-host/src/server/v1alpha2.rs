@@ -165,11 +165,18 @@ async fn execute(
                 .await
                 .unwrap_or(Staged::NotRecorded(ErrorCode::Internal))
         };
+        // Nothing was dispatched: the final observation records the refusal
+        // (audit.md § 1 rule 6; execution_audit.yaml, Failed link).
         match staged {
             Staged::Open(opened) => attempt = Some(opened),
             Staged::NotRecorded(code) => {
-                let complete =
-                    finish(&state, &reference, audit::Outcome::Error, Some(text(code))).await;
+                let complete = finish(
+                    &state,
+                    &reference,
+                    audit::Outcome::Refused,
+                    Some(text(code)),
+                )
+                .await;
                 return respond(
                     request_id,
                     &reference,
@@ -185,7 +192,7 @@ async fn execute(
                 let complete = finish(
                     &state,
                     &reference,
-                    audit::Outcome::Error,
+                    audit::Outcome::Refused,
                     Some(text(ErrorCode::Unavailable)),
                 )
                 .await;
@@ -404,14 +411,22 @@ async fn dispatch(
             DiagnosticCause { code: base, stage },
         )
     };
-    let result = match tokio::time::timeout(
-        DEADLINE,
+    let call =
         service
             .adapter
-            .invoke_at(&request.revision, &request.operation, request.input.clone()),
-    )
-    .await
-    {
+            .invoke_at(&request.revision, &request.operation, request.input.clone());
+    let result = match tokio::time::timeout(DEADLINE, Unwind(call)).await {
+        // The adapter panicked after dispatch: its answer is lost, which a
+        // write observes as `unknown` (mutations.yaml) and a read as an
+        // `internal` error, each with its anchor's final observation.
+        Ok(Err(Panicked)) => {
+            return Err(failed(
+                ErrorCode::Internal,
+                BaseErrorCode::Internal,
+                CauseStage::Dispatch,
+                "internal error".to_owned(),
+            ));
+        }
         Err(_) => {
             return Err(failed(
                 ErrorCode::Timeout,
@@ -420,7 +435,7 @@ async fn dispatch(
                 "operation deadline exceeded".to_owned(),
             ));
         }
-        Ok(Err(error)) => {
+        Ok(Ok(Err(error))) => {
             return Err(failed(
                 code(error.code.clone()),
                 base(error.code),
@@ -428,7 +443,7 @@ async fn dispatch(
                 error.message,
             ));
         }
-        Ok(Ok(result)) => result,
+        Ok(Ok(Ok(result))) => result,
     };
     if validate(&operation.output_schema, &result).is_err() {
         return Err(failed(
@@ -548,4 +563,30 @@ fn answer(response: InvokeResponse) -> HttpResponse {
         .map(|error| http_status(error.code))
         .unwrap_or(StatusCode::OK);
     (status, Json(response)).into_response()
+}
+
+/// The adapter call panicked; its answer is lost.
+struct Panicked;
+
+/// Polls the adapter call and turns a panic into [`Panicked`], so an answer
+/// lost to a panic after dispatch is observed like any other lost answer
+/// instead of unwinding the host task past its settlement and final
+/// observation.
+struct Unwind<F>(F);
+
+impl<F: std::future::Future + Unpin> std::future::Future for Unwind<F> {
+    type Output = std::result::Result<F::Output, Panicked>;
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        context: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let call = &mut self.0;
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            std::pin::Pin::new(call).poll(context)
+        })) {
+            Ok(poll) => poll.map(Ok),
+            Err(_) => std::task::Poll::Ready(Err(Panicked)),
+        }
+    }
 }
