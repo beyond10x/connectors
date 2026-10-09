@@ -11,7 +11,16 @@
     "https://dev.mysql.com/doc/refman/8.4/en/derived-tables.html",
     "https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html",
     "https://dev.mysql.com/doc/refman/8.4/en/kill.html",
-    "https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html"
+    "https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html",
+    "https://www.postgresql.org/docs/current/catalog-pg-database.html",
+    "https://www.postgresql.org/docs/current/catalog-pg-class.html",
+    "https://www.postgresql.org/docs/current/catalog-pg-attribute.html",
+    "https://www.postgresql.org/docs/current/catalog-pg-constraint.html",
+    "https://www.postgresql.org/docs/current/catalog-pg-index.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/information-schema-schemata-table.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/information-schema-key-column-usage-table.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/information-schema-statistics-table.html"
   ],
   "configuration_schema": {
     "oneOf": [
@@ -297,6 +306,456 @@
         },
         "required": [
           "query",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "native_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "name",
+                "native_type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "truncated",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "database.list",
+      "description": "List the names of the databases on the server: on PostgreSQL those the configured role may connect to (pg_database, excluding templates and databases that refuse connections), on MySQL those the configured user may see (information_schema.SCHEMATA). Rows are one column, database_name. No other database is opened.",
+      "contract": "datasource.relational/v1alpha1",
+      "profile": "postgresql-native-text",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "native_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "name",
+                "native_type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "truncated",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "table.list",
+      "description": "List the tables and views of one schema visible to the configured role or user. Rows are table_name, table_kind (table or view) and row_estimate, the engine's own estimate as decimal text or null (always null for a view). On PostgreSQL schema is required and names a schema inside the connected database; on MySQL schema may be omitted or name the connected database, and any other is refused as invalid_input.",
+      "contract": "datasource.relational/v1alpha1",
+      "profile": "postgresql-native-text",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "native_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "name",
+                "native_type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "truncated",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "table.describe",
+      "description": "Describe one table or view: one row per column in ordinal order, with column_name, native_type, is_nullable (YES or NO), column_default, ordinal_position, primary_key_position, and the foreign key the column belongs to (foreign_key, referenced_schema, referenced_table, referenced_column); a column in several foreign keys has one row per key. A table with no column visible to the configured role or user is not_found. Schema follows table.list.",
+      "contract": "datasource.relational/v1alpha1",
+      "profile": "postgresql-native-text",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "table": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "table",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "native_type": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 512
+                }
+              },
+              "required": [
+                "name",
+                "native_type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "columns",
+          "rows",
+          "truncated",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "index.list",
+      "description": "List the indexes of one table, or of every table of one schema when table is omitted: one row per key column, with index_name, table_name, column_position, column_name (the expression text for an expression key part), is_unique and is_primary (YES or NO). Schema follows table.list.",
+      "contract": "datasource.relational/v1alpha1",
+      "profile": "postgresql-native-text",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "table": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
           "limit"
         ],
         "additionalProperties": false

@@ -214,9 +214,16 @@
     },
     {
       "area": "Native adapters",
-      "detail": "schema.list and query.read in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query.",
+      "detail": "schema.list, query.read, database.list, table.list, table.describe and index.list in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query.",
       "href": "/docs/reference/adapters/sql",
       "label": "PostgreSQL reads",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "The same six reads on a connection whose engine is mysql, in a read-only session bound to the configured database, over TLS unless plaintext is allowed.",
+      "href": "/docs/reference/adapters/sql",
+      "label": "MySQL reads",
       "status": "shipped"
     },
     {

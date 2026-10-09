@@ -150,11 +150,12 @@ impl Local {
                     operation: o.id.clone(),
                     profile: config.engine.profile_id().into(),
                     scopes: BTreeSet::new(),
-                    // Both operations read inside a read-only transaction
+                    // Every operation reads inside a read-only transaction
                     // (PostgreSQL) or session (MySQL) the adapter opens itself;
-                    // neither can express a write.
+                    // none can express a write.
                     effect: match o.id.as_str() {
-                        "schema.list" | "query.read" => Effect::Read,
+                        "schema.list" | "query.read" | "database.list" | "table.list"
+                        | "table.describe" | "index.list" => Effect::Read,
                         _ => Effect::Unknown,
                     },
                 })

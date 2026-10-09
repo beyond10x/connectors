@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-09: 32 capabilities are shipped, 3 are decided and 4 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-09: 33 capabilities are shipped, 3 are decided and 4 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -60,7 +60,8 @@ As of 2026-10-09: 32 capabilities are shipped, 3 are decided and 4 are planned. 
 |---|---|---|
 | [Kubernetes reads and discovery](./reference/adapters/kubernetes/index.md) | ● shipped | resources.list, endpoints.discover and optionally hosts.discover, scoped to configured namespaces and kinds, with a saved bearer token. |
 | [Helm release reads](./reference/adapters/kubernetes/index.md) | ● shipped | History, status, values and manifest of a named release, values and manifests disclosed only as redacted projections. |
-| [PostgreSQL reads](./reference/adapters/sql/index.md) | ● shipped | schema.list and query.read in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query. |
+| [PostgreSQL reads](./reference/adapters/sql/index.md) | ● shipped | schema.list, query.read, database.list, table.list, table.describe and index.list in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query. |
+| [MySQL reads](./reference/adapters/sql/index.md) | ● shipped | The same six reads on a connection whose engine is mysql, in a read-only session bound to the configured database, over TLS unless plaintext is allowed. |
 | [Tavily web search](./reference/adapters/tavily/index.md) | ● shipped | websearch.search, websearch.fetch and websearch.crawl through the shared websearch family; the key is checked without spending a search. |
 | [Loki LogQL reads](./reference/adapters/loki/index.md) | ● shipped | logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0). |
 | [Grafana data sources](./reference/adapters/grafana/index.md) | ● shipped | datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (since 0.39.0). |
