@@ -4,6 +4,11 @@ The current local binding lists schemas and runs bounded, parameterized
 read-only queries using a saved PostgreSQL password. It requires Linux x86_64 and
 the [qualified Secret Service binding](local-secret-service.md).
 
+The same adapter serves MySQL when its native file says `"engine": "mysql"`; see
+[MySQL through the local CLI](local-mysql-cli.md). A file without `engine`
+selects PostgreSQL, so every existing configuration and connection keeps working
+unchanged.
+
 PostgreSQL is the third execution family in this repository. GitLab and
 Kubernetes reach their provider over HTTP; this adapter speaks the PostgreSQL
 wire protocol, so there is no HTTP capability, no bearer header and no identity
@@ -159,14 +164,14 @@ PostgreSQL itself rejects any statement that would write.
 
 ## Limitations
 
-MySQL is not implemented and belongs to the remaining-provider phase. No write,
+MySQL is served by the same adapter; see [the MySQL guide](local-mysql-cli.md). No write,
 DDL, transaction control, cursor, stored procedure or connection pooling is
 exposed. `schema.list` and `query.read` are the whole surface.
 
 The [retained real-provider restart evidence](evidence/provider-restarts-20261002/README.md)
 covers a disposable PostgreSQL server and saved-credential reuse. Wire-protocol
 fixtures remain separate from that provider evidence. Neither establishes TLS
-for the plaintext loopback sandbox or MySQL support.
+for the plaintext loopback sandbox, and neither covers MySQL.
 
 ## Running the bounded provider acceptance cases
 

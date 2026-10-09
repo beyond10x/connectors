@@ -5,13 +5,19 @@
   "sources": [
     "https://www.postgresql.org/docs/current/sql-set-transaction.html",
     "https://www.postgresql.org/docs/current/runtime-config-client.html",
-    "https://www.postgresql.org/docs/current/protocol-flow.html"
+    "https://www.postgresql.org/docs/current/protocol-flow.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/set-transaction.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/derived-tables.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html",
+    "https://dev.mysql.com/doc/refman/8.4/en/kill.html",
+    "https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html"
   ],
   "configuration_schema": {
     "oneOf": [
       {
         "title": "effective local configuration",
-        "description": "The document the adapter composition builds and validates at bootstrap, not the file an operator writes. The file carries ca_file; this schema describes the resolved form, in which the CA is reduced to ca_digest. See docs/local-postgres-cli.md for the on-disk format.",
+        "description": "The document the adapter composition builds and validates at bootstrap, not the file an operator writes. The file carries ca_file; this schema describes the resolved form, in which the CA is reduced to ca_digest. See docs/local-postgres-cli.md and docs/local-mysql-cli.md for the on-disk format. The engine member is present only for MySQL: PostgreSQL is the default and is never named, so a configuration written before the engine existed keeps its revision.",
         "type": "object",
         "properties": {
           "format": {
@@ -22,6 +28,9 @@
             "minLength": 1,
             "maxLength": 128,
             "pattern": "^[A-Za-z0-9_.-]+$"
+          },
+          "engine": {
+            "const": "mysql"
           },
           "host": {
             "type": "string",
@@ -80,6 +89,12 @@
           "adapter": {
             "type": "object",
             "properties": {
+              "engine": {
+                "enum": [
+                  "postgresql",
+                  "mysql"
+                ]
+              },
               "host": {
                 "type": "string",
                 "minLength": 1,
@@ -137,7 +152,7 @@
   "operations": [
     {
       "id": "schema.list",
-      "description": "Read column metadata visible to the configured PostgreSQL role.",
+      "description": "Read column metadata of one schema (a PostgreSQL schema, or a MySQL database) visible to the configured role or user.",
       "contract": "datasource.relational/v1alpha1",
       "profile": "postgresql-native-text",
       "input_schema": {
@@ -249,7 +264,7 @@
     },
     {
       "id": "query.read",
-      "description": "Execute a bounded read-only PostgreSQL query with text-format parameters.",
+      "description": "Execute one bounded read-only query on the configured engine, PostgreSQL or MySQL, with text-format parameters.",
       "contract": "datasource.relational/v1alpha1",
       "profile": "postgresql-native-text",
       "input_schema": {

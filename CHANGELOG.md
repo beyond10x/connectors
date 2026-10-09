@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The SQL adapter (`connectors-sql`) serves MySQL as well as PostgreSQL, chosen per connection
+  by a new `engine` member of its configuration (`postgresql` or `mysql`). `schema.list` and
+  `query.read` keep their input bounds, deadlines and output shape on MySQL. Each read opens a
+  fresh session made `READ ONLY` and bounded (`max_execution_time` 10 s, lock waits 2 s) before
+  the caller's statement is prepared; a statement that returns no columns, such as any write,
+  is refused as `unsupported` before execution, and a write the read-only session refuses is
+  `forbidden`. The descriptor of a MySQL connection names the profile `mysql-native-text`:
+  every cell is a JSON string or null — integers, `DECIMAL` and floats as text, `DATE` and
+  `DATETIME`/`TIMESTAMP` as ISO 8601, `TIME` as a signed elapsed time, binary strings, `BIT`
+  and geometry as base64. `schema.list` reads `information_schema.COLUMNS` for the named
+  database. A MySQL connection uses the profile `mysql.password`; connect, repair and
+  `connections revalidate` prove the password with the handshake, and the identity is
+  `mysql.user` (`user@database`). TLS is required unless `allow_plaintext`, and `ca_file`
+  replaces the public roots, as on PostgreSQL. The adapter's own deadline or a dropped
+  invocation kills the statement with `KILL QUERY` from a second session. The wire binding is
+  `mysql_async` 0.37.1 on rustls with the ring provider (no native-tls/OpenSSL). Modeled in
+  `adapters/sql/spec/ess` (engine, configuration, password profile, read binding and the MySQL
+  cell rules); the operator guide is `docs/local-mysql-cli.md`.
+
+### Compatibility
+
+- A configuration without `engine` is PostgreSQL, unchanged: its effective configuration, and
+  so its configuration revision, carries no `engine` member, and existing saved connections
+  keep working. `engine: "postgresql"` yields the same revision. The library's `Config` gains
+  a public `engine` field, so Rust code that builds a `Config` literal must set it
+  (`Engine::Postgresql`). The descriptor's operation descriptions now name both engines.
+
+### Limits
+
+- MySQL is verified against a scripted MySQL wire fixture on loopback (handshake, TLS,
+  `caching_sha2_password`, session statements, prepared statements with typed binary rows,
+  `information_schema` reads, `KILL QUERY`), not a live server; there is no real-provider
+  evidence yet. MySQL 8.0 or later is assumed; MariaDB is not tested. SQLite is not served.
+  `schema.list` remains column metadata only on both engines.
+
 ## 0.39.0 — 2026-10-09
 
 ### Added

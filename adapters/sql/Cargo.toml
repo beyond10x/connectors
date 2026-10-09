@@ -1,6 +1,6 @@
 [package]
 name = "connectors-sql"
-description = "PostgreSQL adapter: schema listing and bounded read-only queries."
+description = "SQL adapter (PostgreSQL and MySQL): schema listing and bounded read-only queries."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -32,6 +32,10 @@ bytes = "1"
 tokio-postgres-rustls = "0.14"
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 webpki-roots = "1"
+base64.workspace = true
+# MySQL wire binding: rustls on ring only, the Rust flate2 backend, no native-tls/OpenSSL
+# and no second async runtime.
+mysql_async = { version = "=0.37.1", default-features = false, features = ["minimal-rust", "rustls-tls", "ring", "tls12"] }
 
 [dev-dependencies]
 sha2.workspace = true
@@ -39,3 +43,6 @@ hex.workspace = true
 rcgen = "0.14"
 connectors-client.workspace = true
 tempfile.workspace = true
+connectors-spec = { path = "../../crates/connectors-spec" }
+jsonschema.workspace = true
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
