@@ -515,6 +515,11 @@ impl Provider {
                     );
                     let _ = stream.write_all(head.as_bytes()).await;
                     let _ = stream.write_all(&answer).await;
+                    // A multi-MiB answer can still sit in the TLS session when the
+                    // stream drops; flush it and send close_notify, or the client
+                    // reads a truncated body as `Unavailable`.
+                    let _ = stream.flush().await;
+                    let _ = stream.shutdown().await;
                 }
             });
         });
