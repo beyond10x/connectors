@@ -222,7 +222,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Jira Cloud",
-        "Issue search by JQL, one issue by key, comments, changelogs, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search unreleased).",
+        "Issue search by JQL, one issue by key, comments, changelogs, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
         "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_exactly_the_six_reads",
         "/docs/reference/adapters/catalog",
     ),
@@ -319,7 +319,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Native adapters",
         "Grafana data sources",
-        "datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (unreleased).",
+        "datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (since 0.39.0).",
         "adapters/grafana/tests/local_runtime.rs::the_datasource_list_answers_through_the_private_runtime_from_the_recorded_answer",
         "/docs/reference/adapters/grafana",
     ),

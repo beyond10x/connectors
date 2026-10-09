@@ -1,7 +1,7 @@
 ---
 title: Grafana
 sidebar_position: 9
-description: Data-source records through a saved service-account connection, and Loki reads through Grafana's proxy; on main, not yet in a release.
+description: Data-source records through a saved service-account connection, and Loki reads through Grafana's proxy.
 ---
 
 # Grafana
