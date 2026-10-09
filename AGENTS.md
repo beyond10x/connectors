@@ -224,22 +224,16 @@ Consumers are still on the predecessor — `devcenter/Cargo.toml:37-38` pins
 `beyond10x/connectors` at rev `e80b7ae1` (`=0.7.0`) — and moving one is its own
 requested scope. A local recovery remote is not public distribution.
 
-<!-- b10x-docs-operations:start -->
-## Public documentation operations
+## Documentation
 
-This repository owns the public source and presentation allowlist in `b10x.docs.yaml`. The generated credential-free `.github/workflows/b10x-docs-bundle.yml` passively packages only those declared files for the exact successful `main` commit; it must never run repository code. The generated `.github/workflows/b10x-docs-check.yml` runs the publisher's per-source checks on every pull request and main push, with read-only contents and no credentials; it is deliberately separate from the shared gate, which runs on `pull_request_target` with a secret and never reads candidate source. Atlas selects the latest successful bundle with every other catalog source, and Website plus Docs System own rendering, shared components, search, and feeds. Do not add a standalone docs deployer or put App credentials in this public repository. If Atlas catalogs a former Pages workflow, that file remains repository-owned validation: preserve its bespoke checks while keeping exact read-only permissions, an unconditional pull-request trigger, and no deployment primitives. Project Pages at `/connectors/` is only the generated stable redirect façade in `.github/workflows/b10x-docs-pages.yml`; content-only publication never rebuilds it.
+The site (`website/`, Docusaurus on `@beyond10x/docs-system`) is independent of the unified
+site. `pages.yml` (`Documentation validation`) builds it on every pull request and push, and on a
+bot push to `main` `b10x-docs-site.yml` (`Documentation site`) deploys that build to
+<https://beyond10x.github.io/connectors/> through Website's `project-site.yml`, pinned to an
+exact Website commit. Change the site's content through its owning sources
+([website ownership](website/README.md#edit-the-owning-source)); generated pages are regenerated,
+never edited by hand. Do not add a second deployer, and keep App credentials out of this public
+repository.
 
-From the complete organization workspace, verify the contract with a clean Atlas checkout at the current remote `main`. Set `B10X_ATLAS_CHECKOUT` to a managed Atlas worktree when the primary checkout is dirty or stale; never infer command availability from the primary alone.
-
-```bash
-atlas_checkout="${B10X_ATLAS_CHECKOUT:-atlas}"
-atlas_head="$(git -C "$atlas_checkout" rev-parse HEAD)"
-atlas_main="$(git -C "$atlas_checkout" ls-remote origin refs/heads/main | awk '{print $1}')"
-test -z "$(git -C "$atlas_checkout" status --porcelain)"
-test "$atlas_head" = "$atlas_main"
-cargo run --manifest-path "$atlas_checkout/Cargo.toml" --locked -q -- \
-  --store "$atlas_checkout/catalog/store" docs reconcile --workspace . --check
-```
-
-Keep internal plans, stories, ADRs, decisions, worklogs, security material, and research out of the public allowlist unless a repository authority explicitly declares them public.
-<!-- b10x-docs-operations:end -->
+Keep internal plans, stories, ADRs, decisions, worklogs, security material, and research out of
+the site unless a repository authority explicitly declares them public.

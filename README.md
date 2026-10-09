@@ -5,11 +5,10 @@ integrations. Independent adapter services expose typed operations through share
 versioned contracts. An application can call an adapter directly or reach several
 adapters through an optional federation host.
 
-Documentation: [Connectors on the beyond10x site](https://beyond10x.github.io/docs/connectors/).
-The documentation website in [website/](website/README.md) (concepts, guides, the CLI, crate,
-contract and model reference, and the status of every capability, each held by a test) is built
-for its own address, `beyond10x.github.io/connectors/`, and is served there once the
-organization's site moves it.
+**Documentation: <https://beyond10x.github.io/connectors/>**, starting at
+[Getting started](https://beyond10x.github.io/connectors/docs/getting-started). The site's
+source is [website/](website/README.md): concepts, guides, the CLI, crate, contract and model
+reference, and the status of every capability, each held by a test.
 
 The aim is to make an integration useful on its own and predictable when combined
 with others. Provider behavior stays with its adapter; shared contracts define
@@ -193,9 +192,3 @@ Rust/WASM behavior, separately from the adapter runtime; specified user authoriz
 is labeled separately from configured federation available today.
 
 Agents making repository changes should start with [AGENTS.md](AGENTS.md).
-
-<!-- b10x-docs:start -->
-## Documentation
-
-[Connectors documentation](https://beyond10x.github.io/docs/connectors/) · [Start](https://beyond10x.github.io/) · [Ecosystem](https://beyond10x.github.io/ecosystem/) · [Impact](https://beyond10x.github.io/changes/) · [Releases](https://beyond10x.github.io/releases/)
-<!-- b10x-docs:end -->
