@@ -131,7 +131,9 @@ https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html,
 https://dev.mysql.com/doc/refman/8.4/en/kill.html and
 https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html.
 These MySQL pages were cited, not fetched, when this section was written (2026-10-09);
-the wire behavior is checked against a scripted fixture, not a live server.
+the wire behavior is checked against a scripted fixture. The ignored live cases in
+`adapters/sql/tests/` ran against disposable MySQL 8.0.46 and PostgreSQL 17.11 servers on
+2026-10-09; they are not part of the default suite.
 
 ## Catalogue reads
 

@@ -25,7 +25,7 @@ Sources:
   ids are the same 80 as at `fef5e36f7` (every `adapters/catalog/providers/*/operations.json` and
   `adapters/*/spec/adapter.json`), so no verdict below changes. The call counts are still those
   of 2026-10-07; they were not recounted.
-- **Slack, 2026-10-09 (unreleased).** `slack.search`, `slack.info` and `slack.emoji.list` moved
+- **Slack, 2026-10-09 (0.39.0).** `slack.search`, `slack.info` and `slack.emoji.list` moved
   from missing to covered when `team.info`, `emoji.list`, `auth.test` and, on a user-token
   connection, `search.messages` were selected. `slack.user.info`, `slack.user.lookup` and
   `slack.user.show` were lowered from covered to partial: `users.list` lists users but reads no
@@ -33,12 +33,12 @@ Sources:
   [Used but not declared](#used-but-not-declared) table: 51 covered and 73 to gap units (the
   earlier 55 and 69 did not match that table). The [Gap units](#gap-units) table still shows
   the 2026-10-07 baseline.
-- **SQL, 2026-10-09 (unreleased).** `sql.query` and `sql.test` moved from partial to covered
+- **SQL, 2026-10-09 (0.40.0).** `sql.query` and `sql.test` moved from partial to covered
   when the SQL adapter gained a MySQL engine (`docs/local-mysql-cli.md`), verified against a
   scripted MySQL wire fixture, not a live server. The `adapters/sql/spec/adapter.json` line
   citations in the [sql](#sql) section moved with that file. The per-plugin and verdict tables
   below and the [Gap units](#gap-units) table were not recounted for this change.
-- **SQL catalogue reads, 2026-10-09 (unreleased).** `sql.table.show`, `sql.table.list`,
+- **SQL catalogue reads, 2026-10-09 (0.40.0).** `sql.table.show`, `sql.table.list`,
   `sql.database.list` and `sql.index.list` moved from partial to covered when the SQL adapter
   gained `table.describe`, `table.list`, `database.list` and `index.list` on both engines
   (`adapters/sql/contracts/reads/v1alpha1/semantics.md`), verified against scripted
@@ -309,16 +309,16 @@ the Slack Web API method that would back it.
 
 Source: fluxplane inventory §2 sql.
 
-Connectors native adapter: `adapters/sql/spec/adapter.json`. It serves PostgreSQL and, since 2026-10-09 (unreleased), MySQL, chosen per connection by the configuration's `engine` (`docs/local-mysql-cli.md`).
+Connectors native adapter: `adapters/sql/spec/adapter.json`. It serves PostgreSQL and, since 0.40.0, MySQL, chosen per connection by the configuration's `engine` (`docs/local-mysql-cli.md`).
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
 | `sql.query` | 647 | 24 | 2026-10-06 | `query.read` (:274) on a PostgreSQL or MySQL connection | covered | No SQLite engine. MySQL is verified against a scripted wire fixture, not a live server (`docs/local-mysql-cli.md`). |
-| `sql.table.show` | 32 | 5 | 2026-09-28 | `table.describe` (:618) on a PostgreSQL or MySQL connection | covered | Fixture-verified only: scripted wire fixtures of both engines, not a live server. |
-| `sql.table.list` | 14 | 4 | 2026-09-28 | `table.list` (:507) on a PostgreSQL or MySQL connection: kind (table or view) and the engine's row estimate | covered | Fixture-verified only, as above. |
+| `sql.table.show` | 32 | 5 | 2026-09-28 | `table.describe` (:618) on a PostgreSQL or MySQL connection | covered | Scripted wire fixtures of both engines in the default suite; ignored live cases ran against disposable PostgreSQL 17.11 and MySQL 8.0.46 servers (2026-10-09). |
+| `sql.table.list` | 14 | 4 | 2026-09-28 | `table.list` (:507) on a PostgreSQL or MySQL connection: kind (table or view) and the engine's row estimate | covered | As for `sql.table.show`. |
 | `sql.test` | 5 | 5 | 2026-09-28 | `connections revalidate` on a PostgreSQL or MySQL connection (the session is the credential check, `adapters/sql/src/auth.rs:8`) | covered | — |
-| `sql.database.list` | 4 | 3 | 2026-09-15 | `database.list` (:401) on a PostgreSQL or MySQL connection | covered | Names only; fixture-verified only, as above. |
-| `sql.index.list` | 1 | 1 | 2026-09-16 | `index.list` (:735) on a PostgreSQL or MySQL connection | covered | Fixture-verified only, as above. |
+| `sql.database.list` | 4 | 3 | 2026-09-15 | `database.list` (:401) on a PostgreSQL or MySQL connection | covered | Names only; verified as for `sql.table.show`. |
+| `sql.index.list` | 1 | 1 | 2026-09-16 | `index.list` (:735) on a PostgreSQL or MySQL connection | covered | As for `sql.table.show`. |
 
 **Engines.** The fluxplane `sql` plugin (skill reference `sql.md`, version 0.20.0) describes
 itself as "Read-only SQL query operations for MySQL, PostgreSQL, SQLite, and compatible
