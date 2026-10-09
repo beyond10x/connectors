@@ -462,16 +462,22 @@ async fn close(conn: Conn, opts: Opts, kill: bool) {
 }
 
 async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> Result<Value> {
-    conn.query_drop(SESSION_READ_ONLY)
-        .await
-        .map_err(mysql_error)?;
-    conn.query_drop(SESSION_BOUNDS).await.map_err(mysql_error)?;
+    let catalogue = args.catalogue;
+    let classify = move |error| {
+        if catalogue {
+            catalogue_error(error)
+        } else {
+            mysql_error(error)
+        }
+    };
+    conn.query_drop(SESSION_READ_ONLY).await.map_err(classify)?;
+    conn.query_drop(SESSION_BOUNDS).await.map_err(classify)?;
     let query = args
         .query
         .trim()
         .strip_suffix(';')
         .unwrap_or(args.query.trim());
-    let original = conn.prep(query).await.map_err(mysql_error)?;
+    let original = conn.prep(query).await.map_err(classify)?;
     column_bounds(original.columns().len())?;
     if original.num_params() as usize != args.parameters.len() {
         return Err(Error::invalid("parameter count does not match query"));
@@ -484,7 +490,7 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
             native_type: native_type(c),
         })
         .collect::<Vec<_>>();
-    conn.close(original).await.map_err(mysql_error)?;
+    conn.close(original).await.map_err(classify)?;
     let aliases = (0..columns.len())
         .map(|i| format!("c{i}"))
         .collect::<Vec<_>>()
@@ -498,7 +504,7 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
         "SELECT * FROM ({query}\n) AS result ({aliases}) LIMIT {}",
         u32::from(args.limit) + 1
     );
-    let statement = conn.prep(&wrapped).await.map_err(mysql_error)?;
+    let statement = conn.prep(&wrapped).await.map_err(classify)?;
     let parameters = if args.parameters.is_empty() {
         Params::Empty
     } else {
@@ -515,11 +521,11 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
     let mut result = conn
         .exec_iter(&statement, parameters)
         .await
-        .map_err(mysql_error)?;
+        .map_err(classify)?;
     let mut truncated = false;
     let mut rows = Vec::new();
     let mut total = 0;
-    while let Some(row) = result.next().await.map_err(mysql_error)? {
+    while let Some(row) = result.next().await.map_err(classify)? {
         if rows.len() == args.limit as usize {
             truncated = true;
             break;
@@ -542,8 +548,8 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
         }
         rows.push(values);
     }
-    result.drop_result().await.map_err(mysql_error)?;
-    conn.close(statement).await.map_err(mysql_error)?;
+    result.drop_result().await.map_err(classify)?;
+    conn.close(statement).await.map_err(classify)?;
     encode(QueryResult {
         columns,
         rows,
@@ -556,6 +562,18 @@ fn mysql_error(error: mysql_async::Error) -> Error {
     match error {
         mysql_async::Error::Server(error) => server_error(error.code, &error.state),
         _ => sqlstate_error(None),
+    }
+}
+/// A catalogue read binds the caller's table name against `information_schema`,
+/// whose metadata is `utf8mb3`. A name that character set cannot represent
+/// makes the server answer error 3988 (`HY000`, a conversion it finds
+/// impossible): no table can carry that name, so the read is `not_found`, not
+/// a server fault to retry. Every other error, and 3988 on `query.read`, is
+/// classified by `mysql_error`.
+fn catalogue_error(error: mysql_async::Error) -> Error {
+    match &error {
+        mysql_async::Error::Server(server) if server.code == 3988 => super::table_not_found(),
+        _ => mysql_error(error),
     }
 }
 /// Classify a MySQL server error by its error number where the SQLSTATE class

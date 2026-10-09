@@ -106,11 +106,18 @@ const POSTGRESQL_DATABASE_QUERY: &str = "SELECT d.datname AS database_name FROM 
 const POSTGRESQL_TABLE_QUERY: &str = "SELECT c.relname AS table_name, CASE WHEN c.relkind IN ('v', 'm') THEN 'view' ELSE 'table' END AS table_kind, CASE WHEN c.relkind IN ('v', 'm') OR c.reltuples < 0 THEN NULL ELSE c.reltuples::bigint END AS row_estimate FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relkind IN ('r', 'p', 'v', 'm') AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES')) ORDER BY c.relname";
 /// `table.describe`: the visible columns of one relation in ordinal order, each
 /// with its place in the primary key and one row per foreign key it belongs to.
-const POSTGRESQL_DESCRIBE_QUERY: &str = "SELECT a.attname AS column_name, pg_catalog.format_type(a.atttypid, a.atttypmod) AS native_type, CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable, pg_catalog.pg_get_expr(d.adbin, d.adrelid) AS column_default, a.attnum AS ordinal_position, pk.key_position AS primary_key_position, fk.conname AS foreign_key, fk.referenced_schema, fk.referenced_table, fk.referenced_column FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum LEFT JOIN LATERAL (SELECT k.key_position FROM pg_catalog.pg_constraint p CROSS JOIN LATERAL pg_catalog.unnest(p.conkey) WITH ORDINALITY AS k(attnum, key_position) WHERE p.conrelid = c.oid AND p.contype = 'p' AND k.attnum = a.attnum) pk ON true LEFT JOIN LATERAL (SELECT f.conname, rn.nspname AS referenced_schema, rc.relname AS referenced_table, ra.attname AS referenced_column FROM pg_catalog.pg_constraint f CROSS JOIN LATERAL ROWS FROM (pg_catalog.unnest(f.conkey), pg_catalog.unnest(f.confkey)) AS k(attnum, referenced) JOIN pg_catalog.pg_class rc ON rc.oid = f.confrelid JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace JOIN pg_catalog.pg_attribute ra ON ra.attrelid = f.confrelid AND ra.attnum = k.referenced WHERE f.conrelid = c.oid AND f.contype = 'f' AND k.attnum = a.attnum) fk ON true WHERE n.nspname = $1 AND c.relname = $2 AND c.relkind IN ('r', 'p', 'v', 'm') AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_column_privilege(c.oid, a.attnum, 'SELECT, INSERT, UPDATE, REFERENCES')) ORDER BY a.attnum, fk.conname";
+/// A generated column has no default (its expression in `pg_attrdef` is not
+/// one, as in `information_schema.columns`). A foreign key is reported only when
+/// the role holds `USAGE` on the referenced schema and a privilege on the
+/// referenced table, as `information_schema` decides.
+const POSTGRESQL_DESCRIBE_QUERY: &str = "SELECT a.attname AS column_name, pg_catalog.format_type(a.atttypid, a.atttypmod) AS native_type, CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable, CASE WHEN a.attgenerated <> '' THEN NULL ELSE pg_catalog.pg_get_expr(d.adbin, d.adrelid) END AS column_default, a.attnum AS ordinal_position, pk.key_position AS primary_key_position, fk.conname AS foreign_key, fk.referenced_schema, fk.referenced_table, fk.referenced_column FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum LEFT JOIN LATERAL (SELECT k.key_position FROM pg_catalog.pg_constraint p CROSS JOIN LATERAL pg_catalog.unnest(p.conkey) WITH ORDINALITY AS k(attnum, key_position) WHERE p.conrelid = c.oid AND p.contype = 'p' AND k.attnum = a.attnum) pk ON true LEFT JOIN LATERAL (SELECT f.conname, rn.nspname AS referenced_schema, rc.relname AS referenced_table, ra.attname AS referenced_column FROM pg_catalog.pg_constraint f CROSS JOIN LATERAL ROWS FROM (pg_catalog.unnest(f.conkey), pg_catalog.unnest(f.confkey)) AS k(attnum, referenced) JOIN pg_catalog.pg_class rc ON rc.oid = f.confrelid JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace JOIN pg_catalog.pg_attribute ra ON ra.attrelid = f.confrelid AND ra.attnum = k.referenced WHERE f.conrelid = c.oid AND f.contype = 'f' AND k.attnum = a.attnum AND pg_catalog.has_schema_privilege(rn.oid, 'USAGE') AND (pg_catalog.pg_has_role(rc.relowner, 'USAGE') OR pg_catalog.has_table_privilege(rc.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') OR pg_catalog.has_any_column_privilege(rc.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))) fk ON true WHERE n.nspname = $1 AND c.relname = $2 AND c.relkind IN ('r', 'p', 'v', 'm') AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_column_privilege(c.oid, a.attnum, 'SELECT, INSERT, UPDATE, REFERENCES')) ORDER BY a.attnum, fk.conname";
 /// `index.list`: one row per key column of each index of one table, or of
 /// every visible table of the schema when `$2` is null. An expression key part
-/// is written as the server's own text of the expression.
-const POSTGRESQL_INDEX_QUERY: &str = "SELECT ic.relname AS index_name, c.relname AS table_name, k.key_position AS column_position, COALESCE(a.attname::pg_catalog.text, pg_catalog.pg_get_indexdef(i.indexrelid, k.key_position::integer, true)) AS column_name, CASE WHEN i.indisunique THEN 'YES' ELSE 'NO' END AS is_unique, CASE WHEN i.indisprimary THEN 'YES' ELSE 'NO' END AS is_primary FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid = i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace JOIN pg_catalog.pg_class ic ON ic.oid = i.indexrelid CROSS JOIN LATERAL pg_catalog.unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, key_position) LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum = k.attnum AND k.attnum > 0 WHERE n.nspname = $1 AND c.relname = COALESCE($2::pg_catalog.name, c.relname) AND k.key_position <= i.indnkeyatts AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES')) ORDER BY c.relname, ic.relname, k.key_position";
+/// is written as the server's own text of the expression. An index follows
+/// column visibility: it is left out when a column it is built on (a key or
+/// INCLUDE column in `indkey`, or a column of an expression or the predicate,
+/// which `pg_depend` records) is one `table.describe` hides.
+const POSTGRESQL_INDEX_QUERY: &str = "SELECT ic.relname AS index_name, c.relname AS table_name, k.key_position AS column_position, COALESCE(a.attname::pg_catalog.text, pg_catalog.pg_get_indexdef(i.indexrelid, k.key_position::integer, true)) AS column_name, CASE WHEN i.indisunique THEN 'YES' ELSE 'NO' END AS is_unique, CASE WHEN i.indisprimary THEN 'YES' ELSE 'NO' END AS is_primary FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid = i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace JOIN pg_catalog.pg_class ic ON ic.oid = i.indexrelid CROSS JOIN LATERAL pg_catalog.unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, key_position) LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum = k.attnum AND k.attnum > 0 WHERE n.nspname = $1 AND c.relname = COALESCE($2::pg_catalog.name, c.relname) AND k.key_position <= i.indnkeyatts AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES')) AND NOT EXISTS (SELECT 1 FROM pg_catalog.unnest(i.indkey::smallint[]) AS u(attnum) WHERE u.attnum > 0 AND NOT (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_column_privilege(c.oid, u.attnum, 'SELECT, INSERT, UPDATE, REFERENCES'))) AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend dep WHERE dep.classid = 'pg_catalog.pg_class'::pg_catalog.regclass AND dep.objid = i.indexrelid AND dep.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass AND dep.refobjid = c.oid AND dep.refobjsubid > 0 AND NOT (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_column_privilege(c.oid, dep.refobjsubid::smallint, 'SELECT, INSERT, UPDATE, REFERENCES'))) ORDER BY c.relname, ic.relname, k.key_position";
 
 /// A catalogue read: one fixed statement per engine.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -509,6 +516,17 @@ struct Query {
     #[serde(default)]
     parameters: Vec<Option<String>>,
     limit: u16,
+    /// Set by the adapter for a catalogue read, never by the caller: its
+    /// statement binds a table name, so on MySQL a name the metadata character
+    /// set cannot represent (error 3988) names no table.
+    #[serde(skip)]
+    catalogue: bool,
+}
+
+/// A table the read cannot find: it does not exist, the configured role or
+/// user cannot see it, or (on MySQL) its name is one MySQL cannot hold.
+fn table_not_found() -> Error {
+    Error::new(ErrorCode::NotFound, "table not found or not visible")
 }
 
 /// The input of `schema.list` and of the catalogue reads; the descriptor's
@@ -561,6 +579,7 @@ impl Adapter for Sql {
                     .into(),
                     parameters: vec![Some(self.scoped_schema(args.schema)?)],
                     limit: args.limit,
+                    catalogue: false,
                 }
             }
             (_, Some(read)) => {
@@ -569,7 +588,16 @@ impl Adapter for Sql {
                     Catalogue::Databases => vec![],
                     Catalogue::Tables => vec![Some(self.scoped_schema(args.schema)?)],
                     Catalogue::Describe | Catalogue::Indexes => {
-                        vec![Some(self.scoped_schema(args.schema)?), args.table]
+                        let schema = self.scoped_schema(args.schema)?;
+                        // MySQL cannot hold a table name that ends in a space,
+                        // and its metadata collation pads, so `TABLE_NAME = ?`
+                        // would answer the unpadded table under this name.
+                        if engine == Engine::Mysql
+                            && args.table.as_deref().is_some_and(|t| t.ends_with(' '))
+                        {
+                            return Err(table_not_found());
+                        }
+                        vec![Some(schema), args.table]
                     }
                 };
                 let result = self
@@ -577,6 +605,7 @@ impl Adapter for Sql {
                         query: read.statement(engine).into(),
                         parameters,
                         limit: args.limit,
+                        catalogue: true,
                     })
                     .await?;
                 // Every table has at least one column, so a description with
@@ -585,10 +614,7 @@ impl Adapter for Sql {
                 if read == Catalogue::Describe
                     && result["rows"].as_array().is_some_and(Vec::is_empty)
                 {
-                    return Err(Error::new(
-                        ErrorCode::NotFound,
-                        "table not found or not visible",
-                    ));
+                    return Err(table_not_found());
                 }
                 return Ok(result);
             }

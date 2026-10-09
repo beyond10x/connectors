@@ -767,7 +767,9 @@ async fn mysql_table_list_reads_the_connected_database_with_kind_and_estimate() 
 
 #[tokio::test]
 async fn mysql_table_describe_reports_nullability_defaults_and_keys() {
-    let hostile = "incidents`; DROP TABLE incidents; -- ";
+    // A `#` comment, which needs no trailing space: a name ending in a space
+    // never reaches the server (it is `not_found`, below).
+    let hostile = "incidents`; DROP TABLE incidents; #";
     let server = start(Script {
         columns: describe_columns(),
         rows: vec![
@@ -1028,4 +1030,92 @@ async fn mysql_catalogue_reads_refuse_another_database_before_a_session() {
         0,
         "a refused read opens no session"
     );
+}
+
+/// A table name MySQL cannot hold names no table, so the table and index
+/// reads answer `not_found`. A name ending in a space (MySQL forbids one, and
+/// its `utf8mb3_bin` metadata collation pads, so `TABLE_NAME = ?` would match
+/// the unpadded table) is refused before a session is opened; a name the
+/// metadata character set cannot represent makes the server answer error
+/// 3988, which these reads classify as `not_found`. `query.read` keeps the
+/// shared classifier: 3988 there is the server's `HY000`, `unavailable`.
+#[tokio::test]
+async fn mysql_catalogue_reads_answer_a_name_mysql_cannot_hold_as_not_found() {
+    let server = start(Script::default()).await;
+    let sql = adapter(&server);
+    for (operation, input) in [
+        ("table.describe", json!({"table":"orders ","limit":1})),
+        (
+            "table.describe",
+            json!({"schema":"fixture","table":"orders  ","limit":1}),
+        ),
+        ("table.describe", json!({"table":" ","limit":1})),
+        ("index.list", json!({"table":"orders ","limit":1})),
+        (
+            "index.list",
+            json!({"schema":"fixture","table":"orders ","limit":1}),
+        ),
+    ] {
+        let error = invoke(&sql, operation, input.clone()).await.unwrap_err();
+        assert_eq!(error.code, ErrorCode::NotFound, "{operation} {input}");
+        assert!(!error.upstream_answer, "{operation} {input}");
+    }
+    assert_eq!(
+        server.log.lock().unwrap().sessions,
+        0,
+        "a name ending in a space opens no session"
+    );
+    // Another database is still refused first.
+    let error = invoke(
+        &sql,
+        "index.list",
+        json!({"schema":"other","table":"orders ","limit":1}),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+    for (operation, columns) in [
+        ("table.describe", describe_columns()),
+        ("index.list", index_columns()),
+    ] {
+        let server = start(Script {
+            columns,
+            rows: vec![],
+            params: 2,
+            execute_error: Some((3988, "HY000")),
+            ..Script::default()
+        })
+        .await;
+        let error = invoke(
+            &adapter(&server),
+            operation,
+            json!({"table":"\u{1F600}","limit":10}),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, ErrorCode::NotFound, "{operation}");
+        sanitized(&error);
+        assert_eq!(
+            server.log.lock().unwrap().executions,
+            [vec![
+                Some("fixture".to_owned()),
+                Some("\u{1F600}".to_owned())
+            ]],
+            "{operation}: the name was bound"
+        );
+    }
+    let server = start(Script {
+        params: 1,
+        execute_error: Some((3988, "HY000")),
+        ..Script::default()
+    })
+    .await;
+    let error = invoke(
+        &adapter(&server),
+        "query.read",
+        json!({"query":"SELECT ? AS answer, NULL AS nothing","parameters":["\u{1F600}"],"limit":1}),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Unavailable);
 }

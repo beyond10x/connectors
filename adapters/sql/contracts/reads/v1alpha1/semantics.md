@@ -154,23 +154,50 @@ null for every view.
 `table.describe` answers one row per column in ordinal order. `native_type` is the full type
 (`format_type` on PostgreSQL, `COLUMN_TYPE` on MySQL), `column_default` the engine's own text
 of the default or null, and `primary_key_position` the column's 1-based place in the primary
-key or null. A column in a foreign key carries the constraint name and the referenced schema,
-table and column paired with it, so a composite key appears on each of its columns; a column
-in several foreign keys has one row per key, ordered by constraint name. A table with no row
-is refused as `not_found`, whether it does not exist or the configured role or user can see
-none of its columns: the two are not told apart.
+key or null. A generated column has no default: on PostgreSQL its generation expression
+(`attgenerated`) is not reported as `column_default`, as `information_schema.columns` does
+not report it, and MySQL's `COLUMN_DEFAULT` is null for it. A column in a foreign key carries
+the constraint name and the referenced schema, table and column paired with it, so a
+composite key appears on each of its columns; a column in several foreign keys has one row
+per key, ordered by constraint name. A table with no row is refused as `not_found`, whether
+it does not exist or the configured role or user can see none of its columns: the two are
+not told apart.
+
+Foreign keys into what the caller cannot see differ by engine. On PostgreSQL a foreign key is
+reported only when the role holds `USAGE` on the referenced schema and some privilege on the
+referenced table (or is a member of its owner), as `information_schema` decides; otherwise the
+column is still described, without that key. On MySQL `information_schema.KEY_COLUMN_USAGE`
+decides: it lists a foreign key of a table the user can see and names its referenced schema,
+table and column even when the user holds no privilege on them, so `table.describe` can name
+a referenced database that `database.list` does not list.
 
 `index.list` answers one row per key column of each index, in index order, for one table or,
 without `table`, for every table of the schema; included (non-key) columns are not listed. An
 expression key part carries the engine's text of the expression in `column_name`. A table
-with no index, and a table that does not exist, are both an empty answer.
+with no index, and a table that does not exist, are both an empty answer. On PostgreSQL an
+index follows column visibility: it is left out when any column it is built on is one
+`table.describe` hides (one the role holds no column privilege on and does not own through
+the table's owner). That covers a key column, an INCLUDE column and a column used in a key
+expression; a column used only in a partial index's predicate counts too, because PostgreSQL
+records expression and predicate columns alike (`pg_depend`).
+
+MySQL cannot hold a table name that ends in a space, and its metadata collation
+(`utf8mb3_bin`) pads, so a lookup of `orders ` would match `orders`. On MySQL,
+`table.describe` and `index.list` answer such a name `not_found` before any session is
+opened. A name the `utf8mb3` metadata cannot represent (a supplementary character) makes
+the server answer error 3988 to the bound lookup; these reads answer it `not_found`, as no
+table can carry that name. `query.read` keeps the shared classification, under which 3988
+(`HY000`) is `unavailable`. On PostgreSQL both kinds of name are ordinary names and are
+looked up as given.
 
 Visibility is the engine's: on PostgreSQL a relation or column is listed when the role owns it
 (or is a member of its owner) or holds a privilege on it, as `information_schema` decides; on
 MySQL `information_schema` shows only what the user holds a privilege on. The adapter's ESS
 model (`connectors_sql.reads.CatalogScope` and the row types `DatabaseRow`, `TableRow`,
 `ColumnRow` and `IndexRow`) fixes these rules. The statements are checked on scripted wire
-fixtures of both engines, not against a live server (2026-10-09).
+fixtures of both engines. On 2026-10-09 the generated-column, foreign-key, index-visibility
+and MySQL name rules were also run against disposable PostgreSQL 17 and MySQL 8.0.46
+servers (`adapters/sql/tests/catalogue_adversary.rs`, ignored by default).
 Source facts: https://www.postgresql.org/docs/current/catalog-pg-database.html,
 https://www.postgresql.org/docs/current/catalog-pg-class.html,
 https://www.postgresql.org/docs/current/catalog-pg-attribute.html,
