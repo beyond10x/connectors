@@ -42,6 +42,7 @@ impl Drop for Container {
 }
 fn adapter(port: u16, ca: Option<&Path>, plaintext: bool) -> Result<Sql> {
     let config = Config {
+        engine: connectors_sql::Engine::Postgresql,
         host: "127.0.0.1".into(),
         port,
         database: "postgres".into(),

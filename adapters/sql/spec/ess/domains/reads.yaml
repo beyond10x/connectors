@@ -1,0 +1,140 @@
+domain: connectors_sql.reads
+summary: How each engine's reads are bound — the result profile its operations carry, the read-only session it opens, and how a MySQL cell becomes a JSON value.
+
+# Normative owner: adapters/sql/contracts/reads/v1alpha1/semantics.md. `schema.list` and
+# `query.read` keep one output shape on both engines: rows of cells, each a JSON string or
+# null. The profile names how the string is written. The executable (adapters/sql/src/lib.rs
+# and src/mysql.rs) implements these rules; tests/mysql_protocol.rs checks each one on the
+# wire and tests/ess_model.rs checks the bindings against the schemas this model generates.
+types:
+  - name: connectors_sql.reads.Engine
+    kind: enum
+    variants: [postgresql, mysql]
+
+  # The result profile an engine's operations carry in the instance descriptor.
+  # `postgresql-native-text` is PostgreSQL's own lossless text output for every cell;
+  # `mysql-native-text` is the per-type rendering `MysqlCellRule` fixes.
+  - name: connectors_sql.reads.ResultProfile
+    kind: enum
+    variants: [postgresql-native-text, mysql-native-text]
+
+  # The session a read runs in. On PostgreSQL a READ ONLY transaction with local statement
+  # and lock timeouts; on MySQL the session is made READ ONLY and bounded before the
+  # caller's statement is prepared. On both, the caller's statement must return between one
+  # and 256 columns, so a statement that returns no rows (any write) is refused before it is
+  # executed, and it runs inside a derived table that bounds the rows it can return.
+  # This is not a boundary for routines: a function the configured user may execute keeps
+  # its side effects (server variables, definer-rights writes); grants are that boundary.
+  # A MySQL session also sets its time zone to UTC (`+00:00`), so a TIMESTAMP, which MySQL
+  # stores as an instant and converts to the session time zone, is written as that instant
+  # in UTC whatever the server's own `time_zone` is. PostgreSQL sets none: its native text
+  # for `timestamptz` carries its own offset.
+  - name: connectors_sql.reads.ReadBinding
+    kind: struct
+    fields:
+      - {name: engine, type: connectors_sql.reads.Engine}
+      - {name: profile, type: connectors_sql.reads.ResultProfile}
+      - {name: session_statements, type: "List<String>"}
+      - {name: session_time_zone, type: "Optional<String>"}
+      - {name: minimum_columns, type: Integer}
+      - {name: maximum_columns, type: Integer}
+    invariants:
+      - minimum_columns == 1
+      - maximum_columns == 256
+      - any: [engine != postgresql, profile == postgresql-native-text]
+      - any: [engine != mysql, profile == mysql-native-text]
+      - any: [engine != mysql, session_statements.count == 2]
+      - any: [engine != mysql, "defined(session_time_zone)"]
+      - any: [engine != mysql, session_time_zone == "+00:00"]
+      - any: [engine != postgresql, "missing(session_time_zone)"]
+
+  # What `schema.list` reads. A connection is bound to one database on both engines.
+  # On PostgreSQL a schema is a namespace inside the connected database: the caller names
+  # it, and an input without one is refused (`invalid_input`). On MySQL a schema is a
+  # database, so the only schema a connection reads is its connected database: an input
+  # without one reads it, an input naming it reads it, and an input naming any other
+  # database is refused with `invalid_input` before any session is opened or any query
+  # sent. Either way the answer's provenance names the connected database, which on both
+  # engines is the database the rows were read from.
+  - name: connectors_sql.reads.SchemaListOutcome
+    kind: enum
+    variants: [read, invalid_input]
+
+  # One `schema.list` call: the engine and database the connection is bound to, the
+  # `schema` input (absent when the caller gave none), the outcome, the schema whose
+  # columns were read (absent when nothing was sent) and the answer's provenance resource.
+  - name: connectors_sql.reads.SchemaListCall
+    kind: struct
+    fields:
+      - {name: engine, type: connectors_sql.reads.Engine}
+      - {name: connected_database, type: String}
+      - {name: requested_schema, type: "Optional<String>"}
+      - {name: outcome, type: connectors_sql.reads.SchemaListOutcome}
+      - {name: schema_read, type: "Optional<String>"}
+      - {name: provenance_resource, type: "Optional<String>"}
+
+  - name: connectors_sql.reads.SchemaListScope
+    kind: struct
+    fields:
+      - {name: call, type: connectors_sql.reads.SchemaListCall}
+    invariants:
+      - any: [call.outcome != read, "defined(call.schema_read)"]
+      - any: [call.outcome != read, "defined(call.provenance_resource)"]
+      - any: [call.outcome != read, call.provenance_resource == call.connected_database]
+      - any: [call.outcome != invalid_input, "missing(call.schema_read)"]
+      - any: [call.outcome != invalid_input, "missing(call.provenance_resource)"]
+      - any: [call.engine != mysql, call.outcome != read, call.schema_read == call.connected_database]
+      - any: [call.engine != mysql, "defined(call.requested_schema)", call.outcome == read]
+      - any: [call.engine != mysql, "missing(call.requested_schema)", call.requested_schema == call.connected_database, call.outcome == invalid_input]
+      - any: [call.engine != postgresql, "defined(call.requested_schema)", call.outcome == invalid_input]
+      - any: [call.engine != postgresql, call.outcome != read, call.schema_read == call.requested_schema]
+
+  # The MySQL column families the binary result protocol distinguishes.
+  # `binary_string` is any string or BLOB column in the binary character set (63);
+  # `text_string` is one in any other character set, ENUM and SET included.
+  - name: connectors_sql.reads.MysqlTypeFamily
+    kind: enum
+    variants: [signed_integer, unsigned_integer, decimal, floating, year, date, datetime, timestamp, time, binary_string, bit, geometry, text_string, json, null_type]
+
+  # How a cell is written. NULL is always JSON null (`json_null`), whatever the family.
+  # - integer_text: the decimal integer, never a JSON number, so no 64-bit value loses digits.
+  # - decimal_text: the server's exact decimal text, never a JSON number.
+  # - float_text: the shortest text that reads back as the same IEEE value; the positional
+  #   form on a tie (`1.5`, `100`), otherwise the exponent form (`1e300`, `1e-4`).
+  # - iso8601_date: `YYYY-MM-DD`.
+  # - iso8601_datetime: `YYYY-MM-DDTHH:MM:SS`, then `.` and as many fractional digits as the
+  #   column declares (or six when it declares none and the value has a fraction). A naive
+  #   local date-time with no offset: MySQL DATETIME records no time zone.
+  # - iso8601_instant_utc: the `iso8601_datetime` text of the instant in UTC, then `Z`. A
+  #   TIMESTAMP is an instant; the session time zone is `+00:00`, so the server converts it
+  #   to UTC before it is sent, and the `Z` says so.
+  # - signed_elapsed_time: `[-]HH:MM:SS[.ffffff]`, hours unbounded: MySQL TIME is an
+  #   elapsed time of up to 838 hours, not a time of day.
+  # - base64: standard base64 with padding of the raw bytes.
+  # - utf8_text: the text itself; a cell that is not valid UTF-8 is refused, not replaced.
+  - name: connectors_sql.reads.CellRendering
+    kind: enum
+    variants: [integer_text, decimal_text, float_text, iso8601_date, iso8601_datetime, iso8601_instant_utc, signed_elapsed_time, base64, utf8_text, json_null]
+
+  # One rule of the `mysql-native-text` profile.
+  - name: connectors_sql.reads.MysqlCellRule
+    kind: struct
+    fields:
+      - {name: family, type: connectors_sql.reads.MysqlTypeFamily}
+      - {name: rendering, type: connectors_sql.reads.CellRendering}
+    invariants:
+      - any: [family != signed_integer, rendering == integer_text]
+      - any: [family != unsigned_integer, rendering == integer_text]
+      - any: [family != year, rendering == integer_text]
+      - any: [family != decimal, rendering == decimal_text]
+      - any: [family != floating, rendering == float_text]
+      - any: [family != date, rendering == iso8601_date]
+      - any: [family != datetime, rendering == iso8601_datetime]
+      - any: [family != timestamp, rendering == iso8601_instant_utc]
+      - any: [family != time, rendering == signed_elapsed_time]
+      - any: [family != binary_string, rendering == base64]
+      - any: [family != bit, rendering == base64]
+      - any: [family != geometry, rendering == base64]
+      - any: [family != text_string, rendering == utf8_text]
+      - any: [family != json, rendering == utf8_text]
+      - any: [family != null_type, rendering == json_null]
