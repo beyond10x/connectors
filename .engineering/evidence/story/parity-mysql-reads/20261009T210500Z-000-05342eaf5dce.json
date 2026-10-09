@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-09T21:05:00Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-mysql-reads",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "MySQL query.read, schema.list and the four catalogue reads answer on an engine=mysql connection: new behaviour the base 2e5290f67 cannot show (no engine field); wire-fixture cases mysql_protocol 21 and live cases above",
+    "reference": "adapters/sql/tests/mysql_protocol.rs, adapters/sql/tests/catalogue_adversary.rs"
+  }
+}
