@@ -58,14 +58,23 @@ ONLY`) and bounded (`max_execution_time` 10 s, `lock_wait_timeout` and
 `innodb_lock_wait_timeout` 2 s) before the caller's statement is prepared. A
 statement must return between one and 256 columns, so a statement that returns no
 rows is refused as `unsupported` before execution; it then runs as a derived table
-with positional column aliases and `LIMIT <limit+1>`, so only a query can run and
-truncation is reported without draining the result. A write the read-only session
-refuses (error 1792) is `forbidden`. Parameters are text or null, bound positionally.
+with positional column aliases and `LIMIT <limit+1>`, so only one result-returning
+statement runs and truncation is reported without draining the result. A table
+write the read-only session refuses (error 1792), including one inside a stored
+function, is `forbidden`. The guarantee is that read-only session plus one
+result-returning statement; it does not prevent the side effects of a routine the
+statement calls. A function the configured user may execute runs with its own
+rights: on a live MySQL 8.0.46 a definer-rights function called through
+`query.read` ran `SET PERSIST` and `SET GLOBAL`, and the change persisted. The
+configured user's grants are therefore the boundary for routines: grant `SELECT`
+only, and no `EXECUTE` on a routine with side effects. Parameters are text or
+null, bound positionally.
 
 `mysql-native-text` writes every non-NULL cell as a JSON string by its column's
 family, never coercing a database value to a JSON number: integers (signed,
 unsigned, `YEAR`) as decimal text; `DECIMAL` as the server's exact text; floating
-values as the shortest text that reads back as the same value; `DATE` as
+values as the shortest text that reads back as the same value (positional on a
+tie, otherwise the exponent form `1e300`, `1e-4`; PostgreSQL writes `1e+300`); `DATE` as
 `YYYY-MM-DD`; `DATETIME` and `TIMESTAMP` as `YYYY-MM-DDTHH:MM:SS` with as many
 fractional digits as the column declares; `TIME` as `[-]HH:MM:SS[.ffffff]` with
 unbounded hours (an elapsed time, not a time of day); binary-charset strings,

@@ -23,6 +23,8 @@ types:
   # caller's statement is prepared. On both, the caller's statement must return between one
   # and 256 columns, so a statement that returns no rows (any write) is refused before it is
   # executed, and it runs inside a derived table that bounds the rows it can return.
+  # This is not a boundary for routines: a function the configured user may execute keeps
+  # its side effects (server variables, definer-rights writes); grants are that boundary.
   - name: connectors_sql.reads.ReadBinding
     kind: struct
     fields:
@@ -48,7 +50,8 @@ types:
   # How a cell is written. NULL is always JSON null (`json_null`), whatever the family.
   # - integer_text: the decimal integer, never a JSON number, so no 64-bit value loses digits.
   # - decimal_text: the server's exact decimal text, never a JSON number.
-  # - float_text: the shortest text that reads back as the same IEEE value.
+  # - float_text: the shortest text that reads back as the same IEEE value; the positional
+  #   form on a tie (`1.5`, `100`), otherwise the exponent form (`1e300`, `1e-4`).
   # - iso8601_date: `YYYY-MM-DD`.
   # - iso8601_datetime: `YYYY-MM-DDTHH:MM:SS`, then `.` and as many fractional digits as the
   #   column declares (or six when it declares none and the value has a fraction).

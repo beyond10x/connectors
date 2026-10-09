@@ -39,7 +39,7 @@ types:
       - {name: database, type: String}
       - {name: user, type: String}
       - {name: allow_plaintext, type: "Optional<Boolean>"}
-      - {name: ca_file, type: "Optional<String>"}
+      - {name: ca_file, type: "Optional<connectors_sql.connection.CaFile>"}
     invariants:
       - format == "connectors-sql-local/1"
       - host.count: {gte: 1, lte: 512}
@@ -48,7 +48,14 @@ types:
       - port <= 65535
       - database.count: {gte: 1, lte: 512}
       - user.count: {gte: 1, lte: 512}
-      - ca_file.count: {gte: 1, lte: 4096}
+
+  # The path of an owner-only PEM bundle, 1–4,096 characters. The file may name it, write
+  # `null` for none, or omit it; `null` and absence mean the same thing.
+  - name: connectors_sql.connection.CaFile
+    kind: newtype
+    of: "Optional<String>"
+    invariants:
+      - value.count: {gte: 1, lte: 4096}
 
   # A database password: 1–8,192 bytes. It enters through the host's protected entry and
   # custody, never the configuration, and is held only for the session handshake.

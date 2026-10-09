@@ -256,6 +256,18 @@ fn fraction(micros: u32, decimals: u8) -> String {
     format!(".{:06}", micros)[..digits + 1].to_owned()
 }
 
+/// The shortest text that reads back as the same floating value. Both
+/// candidates carry the shortest round-trip digits; the positional form
+/// (`1.5`, `0.01`) wins a tie, the exponent form (`1e300`, `1.5e-7`) wins
+/// when it is shorter. The value never passes through a JSON number.
+fn shortest(positional: String, exponent: String) -> String {
+    if exponent.len() < positional.len() {
+        exponent
+    } else {
+        positional
+    }
+}
+
 /// Write one cell by its column's family. The mapping is total over the values
 /// the binary protocol produces for each family; anything else is refused
 /// rather than coerced.
@@ -266,8 +278,12 @@ fn cell(value: Cell, column: &mysql_async::Column) -> Result<Value> {
     let text = match (Family::of(column).rendering(), value) {
         (Rendering::IntegerText, Cell::Int(value)) => value.to_string(),
         (Rendering::IntegerText, Cell::UInt(value)) => value.to_string(),
-        (Rendering::FloatText, Cell::Double(value)) => value.to_string(),
-        (Rendering::FloatText, Cell::Float(value)) => value.to_string(),
+        (Rendering::FloatText, Cell::Double(value)) => {
+            shortest(value.to_string(), format!("{value:e}"))
+        }
+        (Rendering::FloatText, Cell::Float(value)) => {
+            shortest(value.to_string(), format!("{value:e}"))
+        }
         (Rendering::DecimalText | Rendering::Utf8Text, Cell::Bytes(bytes)) => {
             String::from_utf8(bytes).map_err(|_| unsupported_value())?
         }
@@ -536,6 +552,30 @@ fn server_error(code: u16, state: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn float_text_is_the_shortest_text_that_reads_back() {
+        for (value, expected) in [
+            (1.5_f64, "1.5"),
+            (0.0, "0"),
+            (-2.25, "-2.25"),
+            (100.0, "100"),
+            (1000.0, "1e3"),
+            (0.01, "0.01"),
+            (0.001, "1e-3"),
+            (0.0001, "1e-4"),
+            (1e300, "1e300"),
+            (1e-300, "1e-300"),
+            (-1.7976931348623157e308, "-1.7976931348623157e308"),
+            (123456789.125, "123456789.125"),
+        ] {
+            let text = shortest(value.to_string(), format!("{value:e}"));
+            assert_eq!(text, expected, "{value:e}");
+            assert_eq!(text.parse::<f64>().unwrap(), value);
+        }
+        let single = 1e30_f32;
+        assert_eq!(shortest(single.to_string(), format!("{single:e}")), "1e30");
+    }
 
     #[test]
     fn fractions_follow_the_declared_precision() {

@@ -77,7 +77,8 @@ fn holds(document: &Value, invariant: &str) -> bool {
         let expected = literal(right);
         let actual = match left.strip_suffix(".count") {
             Some(name) => match field(document, name) {
-                None => return true,
+                // An optional member that is absent or null holds, as in ESS.
+                None | Some(Value::Null) => return true,
                 Some(Value::String(s)) => json!(s.chars().count()),
                 Some(Value::Array(a)) => json!(a.len()),
                 Some(other) => panic!("count of {other}"),
@@ -164,6 +165,10 @@ fn bootstrap(directory: &Path, configuration: &Value) -> Option<Bootstrap> {
         .then(|| serde_json::from_slice(&output.stdout).unwrap())
 }
 
+/// Marks a member to remove. JSON `null` is kept as a literal null, which is a
+/// different document from an absent member and must reach both verdicts.
+const ABSENT: &str = "<absent>";
+
 fn configuration(changes: Value) -> Value {
     let mut document = json!({
         "format":"connectors-sql-local/1",
@@ -175,7 +180,7 @@ fn configuration(changes: Value) -> Value {
         "allow_plaintext":false
     });
     for (key, value) in changes.as_object().unwrap() {
-        if value.is_null() {
+        if value == ABSENT {
             document.as_object_mut().unwrap().remove(key);
         } else {
             document[key] = value.clone();
@@ -195,9 +200,16 @@ fn the_model_admits_exactly_the_configurations_the_executable_admits() {
         (json!({}), true),
         (json!({"engine":"postgresql"}), true),
         (json!({"engine":"mysql"}), true),
-        (json!({"engine":"mysql","allow_plaintext":null}), true),
+        (json!({"engine":"mysql","allow_plaintext":ABSENT}), true),
+        (json!({"engine":"mysql","allow_plaintext":null}), false),
+        (json!({"engine":"mysql","ca_file":null}), true),
+        (json!({"engine":"postgresql","ca_file":null}), true),
+        (json!({"ca_file":null}), true),
+        (json!({"engine":"mysql","ca_file":""}), false),
+        (json!({"engine":null}), false),
         (json!({"engine":"sqlite"}), false),
         (json!({"engine":"MySQL"}), false),
+        (json!({"engine":"mysql","port":ABSENT}), false),
         (json!({"engine":"mysql","port":null}), false),
         (json!({"engine":"mysql","port":0}), false),
         (json!({"engine":"mysql","host":"/var/run/mysqld"}), false),
