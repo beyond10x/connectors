@@ -377,7 +377,10 @@ The complete configuration used against the sandbox is
   body schema gives it. A typed key present in a body must be a JSON value of
   exactly that type, with no string spelling of a boolean or an integer and no
   `null`, or the write is refused as `invalid_input` before any request; the
-  declared input schema types it the same, also where a guard reads it.
+  declared input schema types it the same, also where a guard reads it. One
+  difference: an `integer` key admits only an integer literal in the 64-bit
+  range, while JSON Schema's `integer` also admits `3.0` or `1e2`, so such a
+  value passes the declaration and is still refused.
   `body_required` is optional too: `["<key>", …]` names the closed body keys
   that schema requires, and a body without one is refused as `invalid_input`
   before any request and declared required (keys a guard reads are required
