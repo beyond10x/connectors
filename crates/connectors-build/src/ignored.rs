@@ -137,7 +137,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "local::clock::tests::independent_live_source" => Some((Live, vec![])),
             "local::registry::tests::read_invoke_metadata_time"
             | "local::registry::store_cost_tests::read_invoke_cost_by_store_size"
-            | "local::registry::store_cost_tests::batch_cost_by_subject" => Some((Timing, vec![])),
+            | "local::registry::store_cost_tests::batch_cost_by_subject"
+            | "local::registry::store_cost_tests::first_owner_open_of_a_grown_store"
+            | "local::registry::store_cost_tests::owner_start_of_a_grown_store" => {
+                Some((Timing, vec![]))
+            }
             "local::oauth_adversary_tests::chrome_following_the_redirect_is_accepted"
             | "local::oauth_adversary_tests::chrome_opens_one_connection_per_navigation"
             | "local::oauth_adversary_pass2_tests::chrome_with_loopback_cookies_following_the_redirect_is_accepted" => {
@@ -206,6 +210,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::a_provider_refusal_reads_dispatch_and_a_host_refusal_reads_admission"
             | "cli_journey::oauth_connect_journey"
             | "cli_journey::oauth_repair_journey"
+            | "cli_journey::reason_cli_adversary::a_provider_reason_reaches_the_cli_failure_json_and_a_credential_echo_does_not"
+            | "cli_journey::retry_after_cli::a_rate_limited_read_is_waited_for_once_or_states_its_delay_in_the_cli_json"
             | "oauth2_refresh::oauth_invalid_grant_reports_repair"
             | "oauth2_refresh::oauth_connect_refusal_does_not_say_repair"
             | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart",
