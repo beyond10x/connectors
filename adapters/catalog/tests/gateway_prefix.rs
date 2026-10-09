@@ -128,7 +128,8 @@ fn refusal(config: &Value) -> String {
 /// (`feed.containers`, `feed.items`), which the configuration revision carries,
 /// again when it gained the merge-request note, discussion read, reply and
 /// resolve, and again when those writes typed and required their body keys
-/// and the resolve guard compared the discussion id.
+/// and the resolve guard compared the discussion id, and again when it gained
+/// `repository.tree`, `commit.get`, `commit.diff` and `branches.list`.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
 /// `users.search`, and again when it gained `issue.transitions`.
@@ -136,8 +137,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "8ffe566411b0af9e4b7483d31b19778c7920bf3b19dbf15ab941785088a5ffff",
-        "8135b09053bbddfd43de2fa41b4978828c1bc5588bd371f4459e3dec4791a552",
+        "76b335f641b5595e516031259b2d9048f70805ed0a3962a5934d8bd5b594838f",
+        "f031cac0faf72916cda75f1308ac74e7853ecf4d6b676db9640b2adb1a48a7dc",
     ),
     (
         "catalog-jira.md",
