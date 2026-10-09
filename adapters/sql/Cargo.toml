@@ -1,6 +1,6 @@
 [package]
 name = "connectors-sql"
-description = "SQL adapter (PostgreSQL and MySQL): schema listing and bounded read-only queries."
+description = "SQL adapter (PostgreSQL and MySQL): bounded read-only queries and catalogue reads (databases, tables, columns and keys, indexes)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

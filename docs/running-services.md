@@ -39,7 +39,7 @@ The first profile supports one federation hop. It never retries a provider reque
 | Adapter | Operations | External binding |
 |---|---|---|
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, optionally `helm_releases.history`/`.status`/`.values`/`.manifest` | Kubernetes API; namespace/kind restrictions; bearer token and CA; Helm release reads need their own `helm_release_reads` selection |
-| SQL | `schema.list`, `query.read` | PostgreSQL; explicit role/database; read-only transactions and deadlines |
+| SQL | `schema.list`, `query.read`, `database.list`, `table.list`, `table.describe`, `index.list` | PostgreSQL or MySQL; explicit role or user and database; read-only transactions or sessions and deadlines |
 
 SQL uses the `postgresql-native-text` profile: column names and native type names
 accompany rows of strings or JSON null. Exact numeric, array, timestamp, and JSON

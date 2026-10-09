@@ -640,3 +640,392 @@ async fn mysql_a_trailing_line_comment_cannot_swallow_the_wrapper() {
         "SELECT * FROM (SELECT 42, NULL -- the answer\n) AS result (c0,c1) LIMIT 2"
     );
 }
+
+// The catalogue reads on MySQL: one fixed `information_schema` statement each,
+// the caller's names bound positionally, and the connected database the only
+// schema a table or index read can name.
+
+fn column_names(result: &Value) -> Vec<String> {
+    result["columns"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["name"].as_str().unwrap().to_owned())
+        .collect()
+}
+
+#[tokio::test]
+async fn mysql_database_list_reads_schemata_without_parameters() {
+    let server = start(Script {
+        columns: database_columns(),
+        rows: vec![
+            vec![text("fixture")],
+            vec![text("information_schema")],
+            vec![text("reports")],
+        ],
+        ..Script::default()
+    })
+    .await;
+    let sql = adapter(&server);
+    let result = invoke(&sql, "database.list", json!({"limit":2}))
+        .await
+        .unwrap();
+    assert_eq!(column_names(&result), ["database_name"]);
+    assert_eq!(result["rows"], json!([["fixture"], ["information_schema"]]));
+    assert_eq!(result["truncated"], true);
+    assert_eq!(result["provenance"]["resource"], "fixture");
+    {
+        let log = server.log.lock().unwrap();
+        assert!(
+            log.prepares[0].contains("FROM information_schema.SCHEMATA"),
+            "{}",
+            log.prepares[0]
+        );
+        assert_eq!(log.executions, [Vec::<Option<String>>::new()]);
+        // It opened only the configured database.
+        assert!(log.logins.iter().all(|login| login.database == "fixture"));
+    }
+    let empty = start(Script {
+        columns: database_columns(),
+        rows: vec![],
+        ..Script::default()
+    })
+    .await;
+    let result = invoke(&adapter(&empty), "database.list", json!({"limit":2}))
+        .await
+        .unwrap();
+    assert_eq!(result["rows"], json!([]));
+    assert_eq!(result["truncated"], false);
+}
+
+#[tokio::test]
+async fn mysql_table_list_reads_the_connected_database_with_kind_and_estimate() {
+    let server = start(Script {
+        columns: table_columns(),
+        rows: vec![
+            vec![text("incidents"), text("table"), uint8(1200)],
+            vec![text("open_incidents"), text("view"), None],
+            vec![text("teams"), text("table"), uint8(0)],
+        ],
+        params: 1,
+        ..Script::default()
+    })
+    .await;
+    let sql = adapter(&server);
+    let result = invoke(&sql, "table.list", json!({"limit":2}))
+        .await
+        .unwrap();
+    assert_eq!(
+        column_names(&result),
+        ["table_name", "table_kind", "row_estimate"]
+    );
+    assert_eq!(result["columns"][2]["native_type"], "bigint unsigned");
+    assert_eq!(
+        result["rows"],
+        json!([
+            ["incidents", "table", "1200"],
+            ["open_incidents", "view", null]
+        ])
+    );
+    assert_eq!(result["truncated"], true);
+    let result = invoke(&sql, "table.list", json!({"schema":"fixture","limit":10}))
+        .await
+        .unwrap();
+    assert_eq!(result["truncated"], false);
+    {
+        let log = server.log.lock().unwrap();
+        assert!(
+            log.prepares[0].contains("FROM information_schema.TABLES"),
+            "{}",
+            log.prepares[0]
+        );
+        assert!(
+            log.prepares[0].contains("TABLE_SCHEMA = ?"),
+            "{}",
+            log.prepares[0]
+        );
+        assert_eq!(
+            log.executions,
+            [
+                vec![Some("fixture".to_owned())],
+                vec![Some("fixture".to_owned())]
+            ]
+        );
+    }
+    let empty = start(Script {
+        columns: table_columns(),
+        rows: vec![],
+        params: 1,
+        ..Script::default()
+    })
+    .await;
+    let result = invoke(&adapter(&empty), "table.list", json!({"limit":2}))
+        .await
+        .unwrap();
+    assert_eq!(result["rows"], json!([]));
+}
+
+#[tokio::test]
+async fn mysql_table_describe_reports_nullability_defaults_and_keys() {
+    let hostile = "incidents`; DROP TABLE incidents; -- ";
+    let server = start(Script {
+        columns: describe_columns(),
+        rows: vec![
+            vec![
+                text("id"),
+                text("bigint unsigned"),
+                text("NO"),
+                None,
+                int4(1),
+                int4(1),
+                None,
+                None,
+                None,
+                None,
+            ],
+            vec![
+                text("team_id"),
+                text("int"),
+                text("YES"),
+                text("0"),
+                int4(2),
+                None,
+                text("incidents_team_fk"),
+                text("fixture"),
+                text("teams"),
+                text("id"),
+            ],
+        ],
+        params: 2,
+        ..Script::default()
+    })
+    .await;
+    let sql = adapter(&server);
+    let result = invoke(&sql, "table.describe", json!({"table":hostile,"limit":10}))
+        .await
+        .unwrap();
+    assert_eq!(
+        column_names(&result),
+        [
+            "column_name",
+            "native_type",
+            "is_nullable",
+            "column_default",
+            "ordinal_position",
+            "primary_key_position",
+            "foreign_key",
+            "referenced_schema",
+            "referenced_table",
+            "referenced_column"
+        ]
+    );
+    assert_eq!(
+        result["rows"],
+        json!([
+            [
+                "id",
+                "bigint unsigned",
+                "NO",
+                null,
+                "1",
+                "1",
+                null,
+                null,
+                null,
+                null
+            ],
+            [
+                "team_id",
+                "int",
+                "YES",
+                "0",
+                "2",
+                null,
+                "incidents_team_fk",
+                "fixture",
+                "teams",
+                "id"
+            ]
+        ])
+    );
+    {
+        let log = server.log.lock().unwrap();
+        assert!(
+            !log.prepares[0].contains("DROP"),
+            "the table is bound, not interpolated: {}",
+            log.prepares[0]
+        );
+        assert!(
+            log.prepares[0].contains("FROM information_schema.COLUMNS"),
+            "{}",
+            log.prepares[0]
+        );
+        assert!(
+            log.prepares[0].contains("KEY_COLUMN_USAGE"),
+            "{}",
+            log.prepares[0]
+        );
+        assert_eq!(
+            log.executions,
+            [vec![Some("fixture".to_owned()), Some(hostile.to_owned())]]
+        );
+    }
+    let result = invoke(
+        &sql,
+        "table.describe",
+        json!({"schema":"fixture","table":"incidents","limit":1}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result["truncated"], true);
+}
+
+#[tokio::test]
+async fn mysql_table_describe_of_a_missing_table_is_not_found() {
+    let server = start(Script {
+        columns: describe_columns(),
+        rows: vec![],
+        params: 2,
+        ..Script::default()
+    })
+    .await;
+    let error = invoke(
+        &adapter(&server),
+        "table.describe",
+        json!({"table":"missing","limit":10}),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::NotFound);
+    assert_eq!(
+        server.log.lock().unwrap().executions,
+        [vec![Some("fixture".to_owned()), Some("missing".to_owned())]]
+    );
+}
+
+#[tokio::test]
+async fn mysql_index_list_reads_one_table_or_every_table() {
+    let server = start(Script {
+        columns: index_columns(),
+        rows: vec![
+            vec![
+                text("PRIMARY"),
+                text("incidents"),
+                int4(1),
+                text("id"),
+                text("YES"),
+                text("YES"),
+            ],
+            vec![
+                text("incidents_team_opened"),
+                text("incidents"),
+                int4(1),
+                text("team_id"),
+                text("NO"),
+                text("NO"),
+            ],
+            vec![
+                text("incidents_team_opened"),
+                text("incidents"),
+                int4(2),
+                text("opened_at"),
+                text("NO"),
+                text("NO"),
+            ],
+        ],
+        params: 2,
+        ..Script::default()
+    })
+    .await;
+    let sql = adapter(&server);
+    let result = invoke(&sql, "index.list", json!({"table":"incidents","limit":10}))
+        .await
+        .unwrap();
+    assert_eq!(
+        column_names(&result),
+        [
+            "index_name",
+            "table_name",
+            "column_position",
+            "column_name",
+            "is_unique",
+            "is_primary"
+        ]
+    );
+    assert_eq!(
+        result["rows"][0],
+        json!(["PRIMARY", "incidents", "1", "id", "YES", "YES"])
+    );
+    assert_eq!(result["truncated"], false);
+    let result = invoke(&sql, "index.list", json!({"limit":2}))
+        .await
+        .unwrap();
+    assert_eq!(result["truncated"], true);
+    {
+        let log = server.log.lock().unwrap();
+        assert!(
+            log.prepares[0].contains("FROM information_schema.STATISTICS"),
+            "{}",
+            log.prepares[0]
+        );
+        // The same statement text for one table and for all of them.
+        assert_eq!(log.prepares[0], log.prepares[2]);
+        assert_eq!(
+            log.executions,
+            [
+                vec![Some("fixture".to_owned()), Some("incidents".to_owned())],
+                vec![Some("fixture".to_owned()), None]
+            ]
+        );
+    }
+    let empty = start(Script {
+        columns: index_columns(),
+        rows: vec![],
+        params: 2,
+        ..Script::default()
+    })
+    .await;
+    let result = invoke(
+        &adapter(&empty),
+        "index.list",
+        json!({"table":"plain","limit":2}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result["rows"], json!([]));
+}
+
+/// The table and index reads follow `schema.list`: a MySQL connection reads
+/// only its configured database, and naming another is refused before a
+/// session is opened.
+#[tokio::test]
+async fn mysql_catalogue_reads_refuse_another_database_before_a_session() {
+    let server = start(Script::default()).await;
+    let sql = adapter(&server);
+    for (operation, input) in [
+        ("table.list", json!({"schema":"other","limit":1})),
+        (
+            "table.describe",
+            json!({"schema":"other","table":"t","limit":1}),
+        ),
+        (
+            "table.describe",
+            json!({"schema":"FIXTURE","table":"t","limit":1}),
+        ),
+        ("index.list", json!({"schema":"other","limit":1})),
+        (
+            "index.list",
+            json!({"schema":"fixture ","table":"t","limit":1}),
+        ),
+        ("table.describe", json!({"limit":1})),
+        ("database.list", json!({"schema":"fixture","limit":1})),
+    ] {
+        let error = invoke(&sql, operation, input.clone()).await.unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{operation} {input}");
+    }
+    assert_eq!(
+        server.log.lock().unwrap().sessions,
+        0,
+        "a refused read opens no session"
+    );
+}

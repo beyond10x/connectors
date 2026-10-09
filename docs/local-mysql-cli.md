@@ -1,12 +1,12 @@
 # MySQL through the local CLI
 
 The SQL adapter serves MySQL as well as PostgreSQL, chosen per connection by the
-`engine` member of its native file. A MySQL connection has the same two reads,
-`schema.list` and `query.read`, the same input bounds and the same output shape as
-a PostgreSQL one; what differs is the wire protocol, the profile id and how a
-value is written. Everything this guide does not repeat — setup, the TOML entry,
-credential prompts and files, consumer launch — is as in the
-[PostgreSQL guide](local-postgres-cli.md).
+`engine` member of its native file. A MySQL connection has the same reads —
+`schema.list`, `query.read` and the four [catalogue reads](#catalogue-reads) — the same
+input bounds and the same output shape as a PostgreSQL one; what differs is the wire
+protocol, the profile id and how a value is written. Everything this guide does not
+repeat — setup, the TOML entry, credential prompts and files, consumer launch — is as in
+the [PostgreSQL guide](local-postgres-cli.md).
 
 ```sh
 CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-sql
@@ -66,7 +66,7 @@ restart = "never"
 
 [adapters.incidents.permissions]
 profiles = ["mysql.password"]
-operations = ["schema.list", "query.read"]
+operations = ["schema.list", "query.read", "database.list", "table.list", "table.describe", "index.list"]
 
 [adapters.incidents.executable]
 path = "/absolute/path/connectors-sql"
@@ -193,6 +193,37 @@ it. The answer's provenance resource is the connected database. It reads
 `udt_name` carries MySQL's full `COLUMN_TYPE`, such as `bigint unsigned` or
 `varchar(255)`.
 
+## Catalogue reads
+
+The four catalogue reads of the [PostgreSQL guide](local-postgres-cli.md#catalogue-reads)
+serve MySQL with the same columns, bounds and read-only session, each as one fixed
+`information_schema` statement with the schema and table bound as `?` parameters:
+
+```sh
+target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
+target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
+target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
+target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"table":"incidents","limit":200}'
+```
+
+- `database.list` reads `information_schema.SCHEMATA`: the databases the user holds a
+  privilege on (every one with `SHOW DATABASES`), `information_schema` included. It lists
+  names only and opens no other database.
+- `table.list`, `table.describe` and `index.list` read only the connected database, as
+  `schema.list` does: omit `schema` or pass the connected database's exact name; any other
+  is refused as `invalid_input` before a session is opened.
+- `table.list` reports base tables as `table` and views as `view`; `row_estimate` is
+  `TABLE_ROWS`, cached statistics that InnoDB only approximates, and `null` for a view.
+- `table.describe` reads `COLUMNS` and `KEY_COLUMN_USAGE`: `native_type` is the full
+  `COLUMN_TYPE` (`bigint unsigned`, `varchar(255)`), `column_default` MySQL's own text of the
+  default, `primary_key_position` the column's place in `PRIMARY`, and each foreign key the
+  referenced schema, table and column. Positions are decimal text: a row reads
+  `["team_id","int","YES","0","2",null,"incidents_team_fk","incidents","teams","id"]`. A
+  table that does not exist, or whose columns the user cannot see, is `not_found`.
+- `index.list` reads `STATISTICS`: one row per key part, `PRIMARY` as the primary key's
+  name, and a functional key part's expression as `column_name`. Without `table` it lists
+  every table's indexes.
+
 ## Limitations
 
 - Verified against a scripted MySQL wire fixture on loopback (handshake, TLS,
@@ -201,8 +232,8 @@ it. The answer's provenance resource is the connected database. It reads
   server. There is no real-provider acceptance evidence for MySQL yet.
 - MySQL 8.0 or later is assumed: the derived-table column list and
   `max_execution_time` are MySQL features. MariaDB is not tested.
-- `schema.list` gives column metadata only: no primary keys, indexes, foreign keys,
-  views flag or row estimates, and no database listing.
+- `schema.list` gives column metadata only; keys, indexes, views and row estimates come from
+  the catalogue reads, which are checked on the same scripted fixture, not a live server.
 - The read-only session does not stop a routine's side effects: a function the user
   may execute can change server variables (`SET PERSIST`, `SET GLOBAL`) or write with
   definer rights. Grant `SELECT` only, and no `EXECUTE` on such routines.
