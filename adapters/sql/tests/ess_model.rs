@@ -3,13 +3,19 @@
 //! configurations the executable accepts and refuse what it refuses, hold for
 //! the profile each engine advertises, and fix the read binding and the MySQL
 //! cell rules the library implements.
+#[path = "mysql/fixture.rs"]
+mod fixture;
+
+use async_trait::async_trait;
+use connectors_core::ErrorCode;
 use connectors_host::local::runtime::Bootstrap;
+use connectors_sdk::{Adapter, Credential, Secret};
 use connectors_sql::{
-    Engine, MAX_COLUMNS,
+    Config, Engine, MAX_COLUMNS, Sql,
     mysql::{Family, Rendering},
 };
 use serde_json::{Value, json};
-use std::{fs, os::unix::fs::PermissionsExt, path::Path, process::Command};
+use std::{fs, os::unix::fs::PermissionsExt, path::Path, process::Command, sync::Arc};
 
 /// The schema of one model type, generated now by the pinned `ess`.
 fn schema(out: &Path, name: &str) -> Value {
@@ -63,6 +69,12 @@ fn holds(document: &Value, invariant: &str) -> bool {
         }
         return inner.split(" and ").all(|part| holds(document, part));
     }
+    if let Some(path) = invariant
+        .strip_prefix("defined(")
+        .and_then(|s| s.strip_suffix(')'))
+    {
+        return field(document, path).is_some_and(|v| !v.is_null());
+    }
     if let Some((left, right)) = invariant.split_once(" starts_with ") {
         let prefix = literal(right);
         return field(document, left).is_none_or(|v| {
@@ -74,7 +86,14 @@ fn holds(document: &Value, invariant: &str) -> bool {
         let Some((left, right)) = invariant.split_once(operator) else {
             continue;
         };
-        let expected = literal(right);
+        // In ESS a right-hand side with a dot names a member of the same
+        // struct; without one it is a literal. An absent member compares as null.
+        let expected =
+            if right.contains('.') && !right.starts_with('"') && right.parse::<f64>().is_err() {
+                field(document, right).cloned().unwrap_or(Value::Null)
+            } else {
+                literal(right)
+            };
         let actual = match left.strip_suffix(".count") {
             Some(name) => match field(document, name) {
                 // An optional member that is absent or null holds, as in ESS.
@@ -217,7 +236,21 @@ fn the_model_admits_exactly_the_configurations_the_executable_admits() {
         (json!({"engine":"mysql","user":""}), false),
         (json!({"format":"connectors-sql-local/2"}), false),
         (json!({"engine":"mysql","password":"never-here"}), false),
-    ] {
+    ]
+    .into_iter()
+    .chain(
+        // The bounds count characters on both sides: 512 two-byte characters
+        // (1,024 bytes) are admitted, 513 are refused, on either engine.
+        ["host", "database", "user"].into_iter().flat_map(|name| {
+            Engine::ALL.into_iter().flat_map(move |engine| {
+                [(512, true), (513, false)].map(|(count, admitted)| {
+                    let mut changes = json!({"engine": engine.name()});
+                    changes[name] = json!("\u{e9}".repeat(count));
+                    (changes, admitted)
+                })
+            })
+        }),
+    ) {
         let document = configuration(changes);
         let verdict = conforms(&model, &document);
         assert_eq!(
@@ -275,14 +308,35 @@ fn the_read_binding_and_the_mysql_cell_rules_match_the_model() {
     let out = tempfile::tempdir().unwrap();
     let binding = schema(out.path(), "reads.ReadBinding");
     for engine in Engine::ALL {
-        let document = json!({
+        let mut document = json!({
             "engine": engine.name(),
             "profile": engine.result_profile(),
             "session_statements": engine.session_statements(),
             "minimum_columns": 1,
             "maximum_columns": MAX_COLUMNS,
         });
+        // The session time zone is the one a session statement actually sets.
+        let zones = engine
+            .session_statements()
+            .iter()
+            .filter_map(|statement| {
+                let (_, rest) = statement.split_once("time_zone = '")?;
+                Some(rest.split_once('\'')?.0.to_owned())
+            })
+            .collect::<Vec<_>>();
+        assert!(zones.len() <= 1, "{engine:?}: {zones:?}");
+        if let Some(zone) = zones.first() {
+            document["session_time_zone"] = json!(zone);
+        }
         conforms(&binding, &document).unwrap_or_else(|e| panic!("{engine:?}: {e}"));
+        // A MySQL session left in the server's time zone is refused.
+        if engine == Engine::Mysql {
+            let mut system = document.clone();
+            system["session_time_zone"] = json!("SYSTEM");
+            assert!(conforms(&binding, &system).is_err());
+            system.as_object_mut().unwrap().remove("session_time_zone");
+            assert!(conforms(&binding, &system).is_err());
+        }
     }
     let rule = schema(out.path(), "reads.MysqlCellRule");
     let families = rule["$defs"]["connectors_sql.reads.MysqlTypeFamily"]["enum"]
@@ -303,5 +357,118 @@ fn the_read_binding_and_the_mysql_cell_rules_match_the_model() {
         };
         let wrong = json!({"family": family.name(), "rendering": other.name()});
         assert!(conforms(&rule, &wrong).is_err(), "{family:?}");
+    }
+}
+
+struct Password;
+#[async_trait]
+impl Credential for Password {
+    async fn resolve(&self) -> connectors_core::Result<Secret> {
+        Ok(Secret(fixture::PASSWORD.as_bytes().to_vec()))
+    }
+}
+
+fn sql(engine: Engine, port: u16) -> Sql {
+    let config = Config {
+        engine,
+        host: "127.0.0.1".into(),
+        port,
+        database: "fixture".into(),
+        user: "reader".into(),
+        allow_plaintext: true,
+        ca_file: None,
+    };
+    let effective = json!({"service":{"instance":"fixture-sql","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED"}},"password":{"kind":"environment","name":"UNUSED"},"adapter":config});
+    Sql::new("fixture-sql", config, effective, Arc::new(Password)).unwrap()
+}
+
+/// One `schema.list` call as the model's `SchemaListCall`, read off the wire:
+/// the schema the server was asked for is the parameter bound to its
+/// `information_schema` read, and the provenance is the answer's own.
+async fn schema_list_call(engine: Engine, requested: Option<&str>) -> Value {
+    let text = || fixture::col("c", fixture::VAR_STRING, 0, fixture::UTF8MB4, 0);
+    let server = fixture::start(fixture::Script {
+        columns: (0..7).map(|_| text()).collect(),
+        rows: vec![],
+        params: 1,
+        ..fixture::Script::default()
+    })
+    .await;
+    // PostgreSQL never reaches the MySQL fixture: its refusal must come
+    // before any connection, which a closed port would otherwise turn into
+    // `unavailable`.
+    let port = match engine {
+        Engine::Mysql => server.port,
+        Engine::Postgresql => 1,
+    };
+    let mut input = json!({"limit": 10});
+    if let Some(schema) = requested {
+        input["schema"] = json!(schema);
+    }
+    let answer = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        sql(engine, port).invoke("schema.list", input),
+    )
+    .await
+    .expect("schema.list hung");
+    let log = server.log.lock().unwrap();
+    let mut call = json!({
+        "engine": engine.name(),
+        "connected_database": "fixture",
+        "outcome": match &answer {
+            Ok(_) => "read",
+            Err(error) if error.code == ErrorCode::InvalidInput => "invalid_input",
+            Err(error) => panic!("{engine:?} {requested:?}: {error:?}"),
+        },
+    });
+    if let Some(schema) = requested {
+        call["requested_schema"] = json!(schema);
+    }
+    if let [bound] = log.executions.as_slice() {
+        call["schema_read"] = json!(bound[0]);
+    }
+    if let Ok(result) = &answer {
+        call["provenance_resource"] = result["provenance"]["resource"].clone();
+    }
+    if answer.is_err() {
+        assert_eq!(
+            log.sessions, 0,
+            "{engine:?} {requested:?}: a session was opened"
+        );
+    }
+    json!({ "call": call })
+}
+
+#[tokio::test]
+async fn schema_list_reads_only_what_the_model_fixes() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "reads.SchemaListScope");
+    for (engine, requested, outcome) in [
+        (Engine::Mysql, None, "read"),
+        (Engine::Mysql, Some("fixture"), "read"),
+        (Engine::Mysql, Some("other"), "invalid_input"),
+        (Engine::Postgresql, None, "invalid_input"),
+    ] {
+        let document = schema_list_call(engine, requested).await;
+        assert_eq!(document["call"]["outcome"], outcome, "{document}");
+        conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
+    }
+    // The model refuses the reads it rules out: another database read on
+    // MySQL under the connected one's name, and a PostgreSQL call without a
+    // schema that is answered.
+    for wrong in [
+        json!({"engine":"mysql","connected_database":"fixture","requested_schema":"other",
+            "outcome":"read","schema_read":"other","provenance_resource":"fixture"}),
+        json!({"engine":"mysql","connected_database":"fixture","requested_schema":"other",
+            "outcome":"read","schema_read":"other","provenance_resource":"other"}),
+        json!({"engine":"mysql","connected_database":"fixture",
+            "outcome":"invalid_input"}),
+        json!({"engine":"postgresql","connected_database":"fixture",
+            "outcome":"read","schema_read":"public","provenance_resource":"fixture"}),
+        json!({"engine":"mysql","connected_database":"fixture","requested_schema":"other",
+            "outcome":"invalid_input","schema_read":"other"}),
+    ] {
+        let document = json!({ "call": wrong });
+        assert!(conforms(&model, &document).is_err(), "{document}");
     }
 }

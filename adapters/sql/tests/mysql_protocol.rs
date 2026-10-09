@@ -136,7 +136,7 @@ async fn mysql_typed_values_map_deterministically() {
             "1.5",
             "2026-10-09",
             "2026-10-09T08:07:06.000123",
-            "2026-10-09T08:07:06",
+            "2026-10-09T08:07:06Z",
             "-26:03:04",
             "AAEC/w==",
             "snow 雪",
@@ -194,7 +194,7 @@ async fn mysql_typed_values_map_deterministically() {
         log.statements,
         [
             "SET SESSION TRANSACTION READ ONLY",
-            "SET SESSION max_execution_time = 10000, SESSION lock_wait_timeout = 2, SESSION innodb_lock_wait_timeout = 2",
+            "SET SESSION max_execution_time = 10000, SESSION lock_wait_timeout = 2, SESSION innodb_lock_wait_timeout = 2, SESSION time_zone = '+00:00'",
             "SELECT * FROM typed",
             "SELECT * FROM (SELECT * FROM typed\n) AS result (c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12) LIMIT 11",
         ]
@@ -356,6 +356,92 @@ async fn mysql_schema_list_reads_information_schema() {
         log.prepares[0]
     );
     assert_eq!(log.executions, [vec![Some("fixture".to_owned())]]);
+}
+
+/// A MySQL connection is bound to one database, and on MySQL a schema is a
+/// database: `schema.list` reads the connected database when no schema is
+/// given, and refuses any other before a session is opened.
+#[tokio::test]
+async fn mysql_schema_list_reads_only_the_connected_database() {
+    let script = Script {
+        columns: (0..7)
+            .map(|_| col("c", VAR_STRING, 0, UTF8MB4, 0))
+            .collect(),
+        rows: vec![],
+        params: 1,
+        ..Script::default()
+    };
+    let server = start(script).await;
+    let sql = adapter(&server);
+    for input in [
+        json!({"schema":"other","limit":10}),
+        json!({"schema":"FIXTURE","limit":10}),
+        json!({"schema":"fixture ","limit":10}),
+    ] {
+        let error = invoke(&sql, "schema.list", input.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{input}");
+    }
+    assert_eq!(
+        server.log.lock().unwrap().sessions,
+        0,
+        "a refused schema opens no session"
+    );
+    let result = invoke(&sql, "schema.list", json!({"limit":10}))
+        .await
+        .unwrap();
+    assert_eq!(result["provenance"]["resource"], "fixture");
+    let log = server.log.lock().unwrap();
+    assert_eq!(log.executions, [vec![Some("fixture".to_owned())]]);
+}
+
+/// TIMESTAMP is an instant: the session's time zone is UTC before the
+/// caller's statement is prepared, and the cell is written with `Z`. DATETIME
+/// records no time zone and stays a naive local date-time.
+#[tokio::test]
+async fn mysql_timestamp_is_written_as_an_instant_in_utc() {
+    let script = Script {
+        columns: vec![
+            col("stamp", TIMESTAMP, 0, BINARY_CHARSET, 3),
+            col("plain_stamp", TIMESTAMP, 0, BINARY_CHARSET, 0),
+            col("moment", DATETIME, 0, BINARY_CHARSET, 3),
+        ],
+        rows: vec![vec![
+            datetime(2026, 10, 25, [0, 30, 0], 250_000),
+            datetime(2026, 10, 25, [1, 30, 0], 0),
+            datetime(2026, 10, 25, [0, 30, 0], 250_000),
+        ]],
+        ..Script::default()
+    };
+    let server = start(script).await;
+    let result = invoke(
+        &adapter(&server),
+        "query.read",
+        json!({"query":"SELECT stamp, plain_stamp, moment FROM instants","limit":10}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        result["rows"],
+        json!([[
+            "2026-10-25T00:30:00.250Z",
+            "2026-10-25T01:30:00Z",
+            "2026-10-25T00:30:00.250"
+        ]])
+    );
+    let log = server.log.lock().unwrap();
+    let zone = log
+        .statements
+        .iter()
+        .position(|s| s.starts_with("SET ") && s.contains("time_zone = '+00:00'"))
+        .expect("the session's time zone is set to UTC");
+    let prepared = log
+        .statements
+        .iter()
+        .position(|s| s == "SELECT stamp, plain_stamp, moment FROM instants")
+        .unwrap();
+    assert!(zone < prepared, "{:?}", log.statements);
 }
 
 #[tokio::test]
