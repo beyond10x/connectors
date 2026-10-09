@@ -2,13 +2,17 @@
 format: aep.planning-md/3
 id: story:parity-grafana-datasource-loki
 kind: story
-status: draft
+status: implemented
 title: Grafana datasource discovery and Loki through Grafana
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:parity-loki-query
-revision: 2
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-09T04:56:04Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1}}}
+- {from: "proposed", to: "active", at: "2026-10-09T04:56:04Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-09T04:56:04Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
