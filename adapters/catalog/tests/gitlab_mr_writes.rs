@@ -67,6 +67,13 @@ const SINGLE: &str = "d15c000000000000000000000000000000000002";
 const STUCK: &str = "d15c000000000000000000000000000000000003";
 /// A discussion GitLab does not find.
 const ABSENT: &str = "d15c000000000000000000000000000000000404";
+/// A discussion whose read answers with another discussion, `ELSEWHERE`.
+const MISROUTED: &str = "d15c000000000000000000000000000000000005";
+/// A resolvable thread whose read answers as itself but whose PUT answers with
+/// another discussion, `ELSEWHERE`, carrying the requested state.
+const ASTRAY: &str = "d15c000000000000000000000000000000000006";
+/// The discussion the misrouted answers name.
+const ELSEWHERE: &str = "d15c0000000000000000000000000000000000ee";
 
 /// Method, request target and body of each fixture request.
 type Requests = Arc<Mutex<Vec<(String, String, Vec<u8>)>>>;
@@ -143,6 +150,8 @@ impl Fixture {
             ("GET", ["discussions", id]) => match *id {
                 THREAD | STUCK => (200, discussion(id, true, self.resolved[*id])),
                 SINGLE => (200, discussion(id, false, false)),
+                MISROUTED => (200, discussion(ELSEWHERE, true, false)),
+                ASTRAY => (200, discussion(ASTRAY, true, false)),
                 _ => (404, json!({"message": "404 Not found"})),
             },
             ("PUT", ["discussions", _]) if refused => refusal(iid as u16),
@@ -152,7 +161,11 @@ impl Fixture {
                     (200, discussion(id, true, resolved))
                 }
                 (STUCK, Some(_)) => (200, discussion(id, true, self.resolved[STUCK])),
-                (THREAD | STUCK, None) => (400, json!({"error": "resolved is missing"})),
+                (ASTRAY, Some(resolved)) => (200, discussion(ELSEWHERE, true, resolved)),
+                (MISROUTED, Some(resolved)) => (200, discussion(ELSEWHERE, true, resolved)),
+                (THREAD | STUCK | ASTRAY | MISROUTED, None) => {
+                    (400, json!({"error": "resolved is missing"}))
+                }
                 _ => (404, json!({"message": "404 Not found"})),
             },
             ("POST", ["discussions", _, "notes"]) if refused => refusal(iid as u16),
@@ -522,6 +535,19 @@ fn note_writes_admit_only_the_note_text_and_refuse_any_other_body_key_before_a_r
         ["body", "discussion_id", "id", "noteable_id"]
     );
     assert_eq!(keys(&reply.input_schema["properties"]["body"]), ["body"]);
+    // The pinned `RequestBody_ac6f9367f3de` (note) and `RequestBody_a45089edc8dd`
+    // (reply) require `body`, a string; the note's `internal` is a boolean.
+    assert_eq!(
+        create.input_schema["properties"]["body"],
+        json!({"type": "object",
+               "properties": {"body": {"type": "string"}, "internal": {"type": "boolean"}},
+               "required": ["body"], "additionalProperties": false})
+    );
+    assert_eq!(
+        reply.input_schema["properties"]["body"],
+        json!({"type": "object", "properties": {"body": {"type": "string"}},
+               "required": ["body"], "additionalProperties": false})
+    );
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
     for (operation, input) in [
@@ -541,7 +567,34 @@ fn note_writes_admit_only_the_note_text_and_refuse_any_other_body_key_before_a_r
                 "`{operation}` with body.{key}: {outcome:?}"
             );
         }
+        // Without its text, or with text that is not a string, a note or a
+        // reply is refused before any request.
+        for body in [json!({}), json!({"body": null}), json!({"body": 5})] {
+            let mut input = input.clone();
+            input["body"] = body.clone();
+            let outcome = write(&mut child, operation, &input).map(|r| r.effect);
+            assert!(
+                matches!(outcome, Err(Failure::InvalidInput)),
+                "`{operation}` with body {body}: {outcome:?}"
+            );
+        }
     }
+    for internal in [json!("true"), json!(1), json!(null)] {
+        let mut input = note_input();
+        input["body"]["internal"] = internal.clone();
+        let outcome = write(&mut child, "merge_request.note.create", &input).map(|r| r.effect);
+        assert!(
+            matches!(outcome, Err(Failure::InvalidInput)),
+            "note with internal {internal}: {outcome:?}"
+        );
+    }
+    let mut internal_only = note_input();
+    internal_only["body"] = json!({"internal": true});
+    let outcome = write(&mut child, "merge_request.note.create", &internal_only).map(|r| r.effect);
+    assert!(
+        matches!(outcome, Err(Failure::InvalidInput)),
+        "note with only internal: {outcome:?}"
+    );
     assert!(provider.requests().is_empty(), "a refused body was sent");
 }
 
@@ -627,7 +680,10 @@ fn discussion_get_reads_one_discussion() {
 }
 
 /// The resolve write takes the three path parameters and a closed body of
-/// exactly `resolved`, which the guard reads and so is required and a scalar.
+/// exactly `resolved`, a JSON boolean as the pinned `RequestBody_b5c6ef66b3c0`
+/// types it, required. The guard compares the discussion's `/id` with
+/// `discussion_id` before and after the write, `/resolvable` before and
+/// `/resolved` after.
 #[test]
 fn resolve_declares_a_closed_body_of_resolved_which_its_guard_reads() {
     let resolve = declared("merge_request.discussion.resolve");
@@ -635,10 +691,11 @@ fn resolve_declares_a_closed_body_of_resolved_which_its_guard_reads() {
         keys(&resolve.input_schema),
         ["body", "discussion_id", "id", "noteable_id"]
     );
-    let body = &resolve.input_schema["properties"]["body"];
-    assert_eq!(keys(body), ["resolved"]);
-    assert_eq!(body["required"], json!(["resolved"]));
-    assert_eq!(body["additionalProperties"], json!(false));
+    assert_eq!(
+        resolve.input_schema["properties"]["body"],
+        json!({"type": "object", "properties": {"resolved": {"type": "boolean"}},
+               "required": ["resolved"], "additionalProperties": false})
+    );
     let guard = shipped()
         .into_iter()
         .find(|s| s.id == "merge_request.discussion.resolve")
@@ -646,8 +703,15 @@ fn resolve_declares_a_closed_body_of_resolved_which_its_guard_reads() {
         .guard
         .unwrap();
     assert_eq!(
-        guard.preflight.operation_id,
-        "getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId"
+        serde_json::to_value(&guard).unwrap(),
+        json!({
+            "preflight": {"operation_id": "getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId",
+                          "values": {"id": "id", "noteable_id": "noteable_id",
+                                     "discussion_id": "discussion_id"},
+                          "checks": [{"pointer": "/id", "expect": {"input": "discussion_id"}},
+                                     {"pointer": "/resolvable", "expect": {"literal": "true"}}]},
+            "postflight": {"checks": [{"pointer": "/id", "expect": {"input": "discussion_id"}},
+                                      {"pointer": "/resolved", "expect": {"input": "body.resolved"}}]}})
     );
 }
 
@@ -684,15 +748,16 @@ fn an_approved_resolve_reads_the_discussion_then_sends_one_put_and_proves_the_ne
 }
 
 /// The guard refuses before the write: a discussion GitLab does not let
-/// anyone resolve (an individual note), and a discussion GitLab does not find,
-/// each after the one preflight `GET` and with no `PUT` sent. A missing or
-/// non-scalar `resolved` and an extra body key are refused before any
-/// request at all.
+/// anyone resolve (an individual note), a discussion GitLab does not find,
+/// and a read that answers with another discussion than `discussion_id`, each
+/// after the one preflight `GET` and with no `PUT` sent. A missing or
+/// non-boolean `resolved` (`"true"`, `1`, `"yes"`, `null`, an object) and an
+/// extra body key are refused before any request at all.
 #[test]
 fn resolve_refuses_each_preflight_mismatch_before_the_write() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    for thread in [SINGLE, ABSENT] {
+    for thread in [SINGLE, ABSENT, MISROUTED] {
         let before = provider.requests().len();
         let outcome = write(
             &mut child,
@@ -712,6 +777,12 @@ fn resolve_refuses_each_preflight_mismatch_before_the_write() {
     for body in [
         json!({}),
         json!({"resolved": {"value": true}}),
+        json!({"resolved": "true"}),
+        json!({"resolved": "false"}),
+        json!({"resolved": 1}),
+        json!({"resolved": 0}),
+        json!({"resolved": "yes"}),
+        json!({"resolved": null}),
         json!({"resolved": true, "body": "and a note"}),
     ] {
         let mut input = resolve_input(THREAD, true);
@@ -738,21 +809,28 @@ fn resolve_refuses_each_preflight_mismatch_before_the_write() {
 }
 
 /// GitLab's answer to the `PUT` decides the outcome after dispatch: an answer
-/// whose `resolved` is not the requested state leaves the effect unknown,
-/// never refused and never applied.
+/// whose `resolved` is not the requested state, or an answer for another
+/// discussion than `discussion_id` although it carries the requested state,
+/// leaves the effect unknown, never refused and never applied.
 #[test]
 fn a_resolve_answer_without_the_requested_state_is_unknown() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    let result = write(
-        &mut child,
-        "merge_request.discussion.resolve",
-        &resolve_input(STUCK, true),
-    )
-    .unwrap();
-    assert_eq!(result.effect, WriteEffect::Unknown);
-    let methods: Vec<String> = provider.requests().into_iter().map(|r| r.0).collect();
-    assert_eq!(methods, ["GET", "PUT"]);
+    for thread in [STUCK, ASTRAY] {
+        let before = provider.requests().len();
+        let result = write(
+            &mut child,
+            "merge_request.discussion.resolve",
+            &resolve_input(thread, true),
+        )
+        .unwrap();
+        assert_eq!(result.effect, WriteEffect::Unknown, "{thread}");
+        let methods: Vec<String> = provider.requests()[before..]
+            .iter()
+            .map(|r| r.0.clone())
+            .collect();
+        assert_eq!(methods, ["GET", "PUT"], "{thread}");
+    }
 }
 
 /// A provider refusal of the write itself is refused by name for each write:

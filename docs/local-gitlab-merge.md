@@ -124,10 +124,10 @@ gives each discussion; `merge_request.discussion.get` reads one by that id.
 
 | id | GitLab operation | request | guard |
 |---|---|---|---|
-| `merge_request.note.create` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes` | `POST /projects/{id}/merge_requests/{noteable_id}/notes`, body `body` and optionally `internal` | none |
-| `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes` | `POST …/discussions/{discussion_id}/notes`, body `body` | none |
+| `merge_request.note.create` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes` | `POST /projects/{id}/merge_requests/{noteable_id}/notes`, body `body` (a string, required) and optionally `internal` (a boolean) | none |
+| `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes` | `POST …/discussions/{discussion_id}/notes`, body `body` (a string, required) | none |
 | `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | `GET …/discussions/{discussion_id}` (a read) | — |
-| `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | `PUT …/discussions/{discussion_id}`, body exactly `resolved` | preflight `resolvable` is `true`; postflight `resolved` equals `body.resolved` |
+| `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | `PUT …/discussions/{discussion_id}`, body exactly `resolved`, a JSON boolean | preflight `id` equals `discussion_id` and `resolvable` is `true`; postflight `id` equals `discussion_id` and `resolved` equals `body.resolved` |
 
 A note on merge request 17:
 
@@ -150,13 +150,21 @@ well as comment on it. Which quick actions GitLab runs from a note has not been 
 a running GitLab. The bodies are closed: the merge-request note takes `body` and `internal`, the
 reply takes `body`, and a body carrying `created_at` ("The creation date of the note"),
 `confidential` (deprecated in 15.5, renamed to `internal`), `merge_request_diff_head_sha` ("The
-SHA of the head commit") or any other key is refused before any request.
+SHA of the head commit") or any other key is refused before any request. As the pinned request
+bodies require (`RequestBody_ac6f9367f3de` for the note, `RequestBody_a45089edc8dd` for the
+reply), `body` must be present and a JSON string, and the note's `internal`, when given, a JSON
+boolean; a body without its text, with a non-string text or with `internal` as `"true"` or `1` is
+refused as `invalid_input` before any request (the selections' `body_required` and `body_types`,
+[selection format](local-catalog-provider.md)).
 
-**Resolve is guarded.** Before the one `PUT` the provider reads the discussion and refuses, with
-nothing written, unless GitLab reports it `resolvable`: an individual note cannot be resolved, and
-a discussion GitLab does not find is refused the same way. GitLab answers the `PUT` with the
-discussion, and that answer must carry the requested `resolved`; otherwise the outcome is
-`unknown`, never refused. Resolving an already resolved discussion is allowed and is applied when
+**Resolve is guarded.** `resolved` must be a JSON `true` or `false`, as the pinned
+`RequestBody_b5c6ef66b3c0` types it: `"true"`, `1`, `"yes"` or `null` is refused as
+`invalid_input` before any request. Before the one `PUT` the provider reads the discussion and
+refuses, with nothing written, unless GitLab's answer is the discussion `discussion_id` (its `id`)
+and reports it `resolvable`: an individual note cannot be resolved, and a discussion GitLab does
+not find, or a read answered with another discussion, is refused the same way. GitLab answers the
+`PUT` with the discussion, and that answer must again carry `discussion_id` as its `id` and the
+requested `resolved`; otherwise the outcome is `unknown`, never refused. Resolving an already resolved discussion is allowed and is applied when
 GitLab's answer shows it resolved. Like the update guard, this one is not atomic: GitLab offers
 no precondition on the `PUT`, so a discussion that changes between the read and the write is seen
 only in the answer.

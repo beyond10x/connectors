@@ -372,6 +372,21 @@ The complete configuration used against the sandbox is
   a `body.<key>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
+- `body_types` is optional, beside `body_keys`: `{"<key>": "string" | "integer"
+  | "boolean"}` gives a closed body key the JSON type the provider's request
+  body schema gives it. A typed key present in a body must be a JSON value of
+  exactly that type, with no string spelling of a boolean or an integer and no
+  `null`, or the write is refused as `invalid_input` before any request; the
+  declared input schema types it the same, also where a guard reads it.
+  `body_required` is optional too: `["<key>", …]` names the closed body keys
+  that schema requires, and a body without one is refused as `invalid_input`
+  before any request and declared required (keys a guard reads are required
+  already). GitLab's note and reply type `body` as a string and require it; its
+  discussion resolve types `resolved` as a boolean. A key either names that
+  `body_keys` does not admit (so either one without `body_keys`), a key
+  `body_required` repeats, or a guard reading a path nested under a typed key
+  is refused when the selection loads. Like `body_keys`, they are declared by
+  the selection from the pinned document and not checked against it.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
