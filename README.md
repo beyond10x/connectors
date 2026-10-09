@@ -30,7 +30,7 @@ separate steps.
 
 ## Where the project stands
 
-Source release **v0.38.0** keeps connection metadata in Entity Runtime over an
+Source release **v0.39.0** keeps connection metadata in Entity Runtime over an
 Eventlog SQLite store, specified at ESS source format `ess/15`, with GitLab, Jira Cloud, Confluence Cloud, HubSpot CRM and Zendesk Support served from their pinned OpenAPI sources, and Google Drive, Slides, Calendar and Gmail from pinned Discovery documents projected to OpenAPI, through
 the catalog provider. The [changelog](CHANGELOG.md) records its scope and
 remaining work.
@@ -117,9 +117,9 @@ The current services provide:
 | SQL | `schema.list`, `query.read` | PostgreSQL, with read-only transactions and execution deadlines; saved password through the local CLI |
 | Tavily | `websearch.search`, `websearch.fetch`, `websearch.crawl` | Tavily API from the pinned OpenAPI source, profile `tavily/2026-10`; API key from keyring custody, checked with `GET /usage`; every operation is a read Tavily serves as a POST; see [the Tavily guide](docs/local-tavily.md) |
 | Loki | `logs.query_range`, `logs.query_metric`, `logs.labels` | Loki HTTP API, one GET each; bearer token from keyring custody, proved with `GET /loki/api/v1/labels`; no tenant header is sent; see [the Loki guide](adapters/loki/README.md) |
-| Grafana (unreleased) | `datasources.list` | Grafana HTTP API, one `GET /api/datasources`; service-account token from keyring custody, proved with that same GET; records carry uid, name, type, access and default flag only. A Loki data source is read through Grafana as a Loki connection on its proxy path; see [the Grafana guide](adapters/grafana/README.md) |
+| Grafana | `datasources.list` | Grafana HTTP API, one `GET /api/datasources`; service-account token from keyring custody, proved with that same GET; records carry uid, name, type, access and default flag only. A Loki data source is read through Grafana as a Loki connection on its proxy path; see [the Grafana guide](adapters/grafana/README.md) |
 | Runpod (catalog provider) | `pod.create`, `pods.list`, `pod.terminate` | Runpod REST API v1 from the pinned OpenAPI source; API key as `Authorization: Bearer` from keyring custody; both writes are unguarded required-approval mutations, a create without a definite answer is `unknown`; verified against a local fixture only, see [the Runpod guide](docs/catalog-runpod.md) |
-| Slack (catalog provider) | `conversations.list`, `conversations.history`, `conversations.replies`; `users.list`, `team.info`, `emoji.list`, `auth.test`, and `search.messages` on a second connection with a user token (unreleased) | Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; bot token as `Authorization: Bearer` from keyring custody, and a user token under `slack.user` for search; the document's `token` parameter is never sent; reads only, one page per call; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md) |
+| Slack (catalog provider) | `conversations.list`, `conversations.history`, `conversations.replies`; `users.list`, `team.info`, `emoji.list`, `auth.test`, and `search.messages` on a second connection with a user token | Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; bot token as `Authorization: Bearer` from keyring custody, and a user token under `slack.user` for search; the document's `token` parameter is never sent; reads only, one page per call; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md) |
 
 Kubernetes and SQL also run as separate Rust services, with a generic CLI and one-hop
 federation; those services advertise no writes. Writes run only through the local CLI under
