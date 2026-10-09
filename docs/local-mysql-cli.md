@@ -246,7 +246,9 @@ target/release/connectors --output json operations invoke --adapter incidents --
 - MySQL 8.0 or later is assumed: the derived-table column list and
   `max_execution_time` are MySQL features. MariaDB is not tested.
 - `schema.list` gives column metadata only; keys, indexes, views and row estimates come from
-  the catalogue reads, which are checked on the same scripted fixture, not a live server.
+  the catalogue reads, which are checked on the same scripted fixture and were also run on
+  2026-10-09 against disposable MySQL 8.0.46 and PostgreSQL 17.11 servers by the ignored live
+  cases in `adapters/sql/tests/catalogue_adversary.rs` and `catalogue_adversary_2.rs`.
 - The read-only session does not stop a routine's side effects: a function the user
   may execute can change server variables (`SET PERSIST`, `SET GLOBAL`) or write with
   definer rights. Grant `SELECT` only, and no `EXECUTE` on such routines.
