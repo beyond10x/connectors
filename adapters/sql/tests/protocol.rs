@@ -24,6 +24,7 @@ impl Credential for Password {
 }
 fn adapter(port: u16, resolutions: Arc<AtomicUsize>) -> Sql {
     let config = Config {
+        engine: connectors_sql::Engine::Postgresql,
         host: "127.0.0.1".into(),
         port,
         database: "fixture".into(),

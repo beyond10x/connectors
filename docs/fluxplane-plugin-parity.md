@@ -33,6 +33,11 @@ Sources:
   [Used but not declared](#used-but-not-declared) table: 51 covered and 73 to gap units (the
   earlier 55 and 69 did not match that table). The [Gap units](#gap-units) table still shows
   the 2026-10-07 baseline.
+- **SQL, 2026-10-09 (unreleased).** `sql.query` and `sql.test` moved from partial to covered
+  when the SQL adapter gained a MySQL engine (`docs/local-mysql-cli.md`), verified against a
+  scripted MySQL wire fixture, not a live server. The `adapters/sql/spec/adapter.json` line
+  citations in the [sql](#sql) section moved with that file. The per-plugin and verdict tables
+  below and the [Gap units](#gap-units) table were not recounted for this change.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -293,21 +298,21 @@ the Slack Web API method that would back it.
 
 Source: fluxplane inventory §2 sql.
 
-Connectors native adapter: `adapters/sql/spec/adapter.json`. It is PostgreSQL only (README.md:112).
+Connectors native adapter: `adapters/sql/spec/adapter.json`. It serves PostgreSQL and, since 2026-10-09 (unreleased), MySQL, chosen per connection by the configuration's `engine` (`docs/local-mysql-cli.md`).
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `sql.query` | 647 | 24 | 2026-10-06 | `query.read` (:251) | partial | PostgreSQL only. No MySQL or SQLite engine. |
-| `sql.table.show` | 32 | 5 | 2026-09-28 | `schema.list` (:139) | partial | PostgreSQL only. Gives column names and native types; no primary keys, foreign keys or nullability. |
-| `sql.table.list` | 14 | 4 | 2026-09-28 | `schema.list` (:139) | partial | PostgreSQL only. Tables are derived from column metadata; no views flag and no row estimates. |
-| `sql.test` | 5 | 5 | 2026-09-28 | `connections revalidate` (the session is the credential check, `adapters/sql/src/auth.rs:14`) | partial | PostgreSQL only. |
-| `sql.database.list` | 4 | 3 | 2026-09-15 | `schema.list` (:139) | partial | PostgreSQL only. Lists the schemas of the one connected database; there is no database listing. |
-| `sql.index.list` | 1 | 1 | 2026-09-16 | `query.read` (:251) against `pg_indexes` | partial | PostgreSQL only. No dedicated index read. |
+| `sql.query` | 647 | 24 | 2026-10-06 | `query.read` (:266) on a PostgreSQL or MySQL connection | covered | No SQLite engine. MySQL is verified against a scripted wire fixture, not a live server (`docs/local-mysql-cli.md`). |
+| `sql.table.show` | 32 | 5 | 2026-09-28 | `schema.list` (:154) | partial | PostgreSQL only. Gives column names and native types; no primary keys, foreign keys or nullability. |
+| `sql.table.list` | 14 | 4 | 2026-09-28 | `schema.list` (:154) | partial | PostgreSQL only. Tables are derived from column metadata; no views flag and no row estimates. |
+| `sql.test` | 5 | 5 | 2026-09-28 | `connections revalidate` on a PostgreSQL or MySQL connection (the session is the credential check, `adapters/sql/src/auth.rs:8`) | covered | — |
+| `sql.database.list` | 4 | 3 | 2026-09-15 | `schema.list` (:154) | partial | PostgreSQL only. Lists the schemas of the one connected database; there is no database listing. |
+| `sql.index.list` | 1 | 1 | 2026-09-16 | `query.read` (:266) against `pg_indexes` | partial | PostgreSQL only. No dedicated index read. |
 
 **Engines.** The fluxplane `sql` plugin (skill reference `sql.md`, version 0.20.0) describes
 itself as "Read-only SQL query operations for MySQL, PostgreSQL, SQLite, and compatible
 endpoints". Its credential method reads `MYSQL_USERNAME` and `MYSQL_PASSWORD` as well as the
-generic `SQL_*` variables. Connectors serves PostgreSQL only.
+generic `SQL_*` variables. Connectors serves PostgreSQL and MySQL; SQLite is not served.
 
 **Which engine the 647 `sql.query` calls hit: unknown.** The inventory counted operation names
 only. It recorded neither the `endpoint_ref` nor the engine. Two indicators point to MySQL, but

@@ -2,10 +2,12 @@
 //! here. The business adapter receives only an immutable password capability.
 //!
 //! This is the third execution family in the repository. GitLab and Kubernetes
-//! reach their provider over HTTP and share `ScopedHttp`; PostgreSQL speaks its
-//! own wire protocol, so there is no HTTP port, no probe capability and no
-//! bearer header — the credential establishes a session instead of signing each
-//! request, which is why the profile selects `session_authority`.
+//! reach their provider over HTTP and share `ScopedHttp`; PostgreSQL and MySQL
+//! each speak their own wire protocol, so there is no HTTP port, no probe
+//! capability and no bearer header — the credential establishes a session
+//! instead of signing each request, which is why the profile selects
+//! `session_authority`. The engine selects the wire protocol, the profile id
+//! and the identity kind; everything else is shared.
 use connectors_host::local::{
     filesystem, registry,
     runtime::{Baseline, Bootstrap, Effect, EntryField, Failure, Profile, Requirement, Result},
@@ -24,6 +26,8 @@ use std::{
 #[serde(deny_unknown_fields)]
 struct Configuration {
     format: String,
+    #[serde(default)]
+    engine: connectors_sql::Engine,
     instance: String,
     host: String,
     port: u16,
@@ -70,18 +74,28 @@ impl Local {
             .map(|path| filesystem::read_bounded(filesystem::private_file(path)?, 1024 * 1024))
             .transpose()
             .map_err(|_| Failure::InvalidConfiguration)?;
-        let effective = json!({"format":config.format,"instance":config.instance,
+        let mut effective = json!({"format":config.format,"instance":config.instance,
             "host":config.host,"port":config.port,"database":config.database,"user":config.user,
             "allow_plaintext":config.allow_plaintext,
             "ca_digest":ca.as_ref().map(|b|connectors_core::digest(&json!(b)))});
+        // PostgreSQL is the default engine and is never named here, so every
+        // configuration written before the engine existed keeps its revision.
+        if !config.engine.is_postgresql() {
+            effective["engine"] = json!(config.engine.name());
+        }
         let configuration_revision = connectors_core::digest(&effective);
         // The provider authority is the exact database endpoint, so a changed
-        // host, port or database is a changed binding rather than a new session.
+        // engine, host, port or database is a changed binding rather than a new
+        // session.
         let provider_authority = format!(
-            "postgresql://{}:{}/{}",
-            config.host, config.port, config.database
+            "{}://{}:{}/{}",
+            config.engine.name(),
+            config.host,
+            config.port,
+            config.database
         );
         let native = Config {
+            engine: config.engine,
             host: config.host,
             port: config.port,
             database: config.database,
@@ -100,7 +114,7 @@ impl Local {
         // A password establishes a session; it does not sign a request and
         // carries no scope grant, so the profile declares no required scopes.
         let mut profile = Profile {
-            id: auth::PROFILE_ID.into(),
+            id: config.engine.profile_id().into(),
             revision: String::new(),
             purpose: registry::Purpose::DelegatedUser,
             subject: registry::Subject::User,
@@ -110,7 +124,7 @@ impl Local {
             evidence_lifetime_ms: auth::EVIDENCE_LIFETIME_MS,
             fields: vec![EntryField {
                 name: "password".into(),
-                label: "PostgreSQL password".into(),
+                label: config.engine.profile_label().into(),
                 max_bytes: 8192,
             }],
             acquisition: None,
@@ -132,10 +146,11 @@ impl Local {
                 .iter()
                 .map(|o| Requirement {
                     operation: o.id.clone(),
-                    profile: auth::PROFILE_ID.into(),
+                    profile: config.engine.profile_id().into(),
                     scopes: BTreeSet::new(),
-                    // Both operations read inside a read-only transaction the
-                    // adapter opens itself; neither can express a write.
+                    // Both operations read inside a read-only transaction
+                    // (PostgreSQL) or session (MySQL) the adapter opens itself;
+                    // neither can express a write.
                     effect: match o.id.as_str() {
                         "schema.list" | "query.read" => Effect::Read,
                         _ => Effect::Unknown,
@@ -194,7 +209,7 @@ impl connectors_host::local::runtime::Adapter for Local {
         self.bootstrap.clone()
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline> {
-        if profile != auth::PROFILE_ID {
+        if profile != self.config.engine.profile_id() {
             return Err(Failure::Unsupported);
         }
         let collected_at_ms = connectors_sdk::now_ms();
@@ -203,12 +218,12 @@ impl connectors_host::local::runtime::Adapter for Local {
             .await
             .map_err(Failure::from_provider)?;
         Ok(Baseline {
-            // The role name is the principal PostgreSQL authorises against, and
-            // the database scopes it, so the pair is the identity. A changed
-            // host or port is a changed configuration revision, not a changed
-            // identity, and is refused before this point.
+            // The role (PostgreSQL) or user (MySQL) name is the principal the
+            // server authorises against, and the database scopes it, so the pair
+            // is the identity. A changed host or port is a changed configuration
+            // revision, not a changed identity, and is refused before this point.
             identity: registry::ExternalIdentity {
-                kind: "postgresql.role".into(),
+                kind: self.config.engine.identity_kind().into(),
                 subject: format!("{}@{}", self.config.user, self.config.database),
             },
             // A password carries no scope grant and no readable expiry.

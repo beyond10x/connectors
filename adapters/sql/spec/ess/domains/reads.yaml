@@ -1,0 +1,84 @@
+domain: connectors_sql.reads
+summary: How each engine's reads are bound — the result profile its operations carry, the read-only session it opens, and how a MySQL cell becomes a JSON value.
+
+# Normative owner: adapters/sql/contracts/reads/v1alpha1/semantics.md. `schema.list` and
+# `query.read` keep one output shape on both engines: rows of cells, each a JSON string or
+# null. The profile names how the string is written. The executable (adapters/sql/src/lib.rs
+# and src/mysql.rs) implements these rules; tests/mysql_protocol.rs checks each one on the
+# wire and tests/ess_model.rs checks the bindings against the schemas this model generates.
+types:
+  - name: connectors_sql.reads.Engine
+    kind: enum
+    variants: [postgresql, mysql]
+
+  # The result profile an engine's operations carry in the instance descriptor.
+  # `postgresql-native-text` is PostgreSQL's own lossless text output for every cell;
+  # `mysql-native-text` is the per-type rendering `MysqlCellRule` fixes.
+  - name: connectors_sql.reads.ResultProfile
+    kind: enum
+    variants: [postgresql-native-text, mysql-native-text]
+
+  # The session a read runs in. On PostgreSQL a READ ONLY transaction with local statement
+  # and lock timeouts; on MySQL the session is made READ ONLY and bounded before the
+  # caller's statement is prepared. On both, the caller's statement must return between one
+  # and 256 columns, so a statement that returns no rows (any write) is refused before it is
+  # executed, and it runs inside a derived table that bounds the rows it can return.
+  - name: connectors_sql.reads.ReadBinding
+    kind: struct
+    fields:
+      - {name: engine, type: connectors_sql.reads.Engine}
+      - {name: profile, type: connectors_sql.reads.ResultProfile}
+      - {name: session_statements, type: "List<String>"}
+      - {name: minimum_columns, type: Integer}
+      - {name: maximum_columns, type: Integer}
+    invariants:
+      - minimum_columns == 1
+      - maximum_columns == 256
+      - any: [engine != postgresql, profile == postgresql-native-text]
+      - any: [engine != mysql, profile == mysql-native-text]
+      - any: [engine != mysql, session_statements.count == 2]
+
+  # The MySQL column families the binary result protocol distinguishes.
+  # `binary_string` is any string or BLOB column in the binary character set (63);
+  # `text_string` is one in any other character set, ENUM and SET included.
+  - name: connectors_sql.reads.MysqlTypeFamily
+    kind: enum
+    variants: [signed_integer, unsigned_integer, decimal, floating, year, date, datetime, timestamp, time, binary_string, bit, geometry, text_string, json, null_type]
+
+  # How a cell is written. NULL is always JSON null (`json_null`), whatever the family.
+  # - integer_text: the decimal integer, never a JSON number, so no 64-bit value loses digits.
+  # - decimal_text: the server's exact decimal text, never a JSON number.
+  # - float_text: the shortest text that reads back as the same IEEE value.
+  # - iso8601_date: `YYYY-MM-DD`.
+  # - iso8601_datetime: `YYYY-MM-DDTHH:MM:SS`, then `.` and as many fractional digits as the
+  #   column declares (or six when it declares none and the value has a fraction).
+  # - signed_elapsed_time: `[-]HH:MM:SS[.ffffff]`, hours unbounded: MySQL TIME is an
+  #   elapsed time of up to 838 hours, not a time of day.
+  # - base64: standard base64 with padding of the raw bytes.
+  # - utf8_text: the text itself; a cell that is not valid UTF-8 is refused, not replaced.
+  - name: connectors_sql.reads.CellRendering
+    kind: enum
+    variants: [integer_text, decimal_text, float_text, iso8601_date, iso8601_datetime, signed_elapsed_time, base64, utf8_text, json_null]
+
+  # One rule of the `mysql-native-text` profile.
+  - name: connectors_sql.reads.MysqlCellRule
+    kind: struct
+    fields:
+      - {name: family, type: connectors_sql.reads.MysqlTypeFamily}
+      - {name: rendering, type: connectors_sql.reads.CellRendering}
+    invariants:
+      - any: [family != signed_integer, rendering == integer_text]
+      - any: [family != unsigned_integer, rendering == integer_text]
+      - any: [family != year, rendering == integer_text]
+      - any: [family != decimal, rendering == decimal_text]
+      - any: [family != floating, rendering == float_text]
+      - any: [family != date, rendering == iso8601_date]
+      - any: [family != datetime, rendering == iso8601_datetime]
+      - any: [family != timestamp, rendering == iso8601_datetime]
+      - any: [family != time, rendering == signed_elapsed_time]
+      - any: [family != binary_string, rendering == base64]
+      - any: [family != bit, rendering == base64]
+      - any: [family != geometry, rendering == base64]
+      - any: [family != text_string, rendering == utf8_text]
+      - any: [family != json, rendering == utf8_text]
+      - any: [family != null_type, rendering == json_null]

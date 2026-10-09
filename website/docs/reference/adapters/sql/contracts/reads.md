@@ -20,7 +20,7 @@ Shared wire envelopes and admission remain in
 [service v1alpha1](../../../contracts/service.md).
 This relocation changes no runtime or selected codec.
 
-SQL: PostgreSQL schema discovery and parameterized, bounded single-statement reads
+SQL: PostgreSQL (and, below, MySQL) schema discovery and parameterized, bounded single-statement reads
 through a configured role/database. Database-enforced read-only transactions and
 an adapter-owned execution deadline are mandatory. Each transaction installs
 statement/lock timeouts as additional server-side guards. Caller-accessible
@@ -59,3 +59,57 @@ trust. The supervisor drives cleanup for at most 2 s if the caller disappears,
 then closes the connection. Cancellation has no acknowledgement; an unreachable
 database, process crash or shutdown may prevent backend termination. Finite local
 wait does not guarantee zero query cost or remote termination.
+
+## MySQL engine
+
+A connection whose configuration names `"engine": "mysql"` serves the same two
+operations with the same input bounds, deadlines and output shape over the MySQL
+wire protocol; a configuration without `engine` is PostgreSQL, unchanged, and its
+effective configuration (and so its revision) carries no `engine` member. The
+instance descriptor names the profile `mysql-native-text` for both operations.
+
+Each request uses a fresh session made `READ ONLY` (`SET SESSION TRANSACTION READ
+ONLY`) and bounded (`max_execution_time` 10 s, `lock_wait_timeout` and
+`innodb_lock_wait_timeout` 2 s) before the caller's statement is prepared. A
+statement must return between one and 256 columns, so a statement that returns no
+rows is refused as `unsupported` before execution; it then runs as a derived table
+with positional column aliases and `LIMIT <limit+1>`, so only a query can run and
+truncation is reported without draining the result. A write the read-only session
+refuses (error 1792) is `forbidden`. Parameters are text or null, bound positionally.
+
+`mysql-native-text` writes every non-NULL cell as a JSON string by its column's
+family, never coercing a database value to a JSON number: integers (signed,
+unsigned, `YEAR`) as decimal text; `DECIMAL` as the server's exact text; floating
+values as the shortest text that reads back as the same value; `DATE` as
+`YYYY-MM-DD`; `DATETIME` and `TIMESTAMP` as `YYYY-MM-DDTHH:MM:SS` with as many
+fractional digits as the column declares; `TIME` as `[-]HH:MM:SS[.ffffff]` with
+unbounded hours (an elapsed time, not a time of day); binary-charset strings,
+`BIT` and geometry as padded standard base64; other strings, `ENUM`, `SET` and
+`JSON` as their text. A text cell that is not valid UTF-8 is refused as
+`unsupported`, not replaced. NULL is JSON null. Column metadata carries MySQL's
+lower-case type name, with ` unsigned` for unsigned integers. The adapter's ESS
+model (`adapters/sql/spec/ess`, `connectors_sql.reads`) fixes these rules.
+
+`schema.list` reads `information_schema.COLUMNS` for the named schema, which on
+MySQL is a database, returning the PostgreSQL path's seven columns; `udt_name`
+carries MySQL's `COLUMN_TYPE`.
+
+The connection uses only its configured endpoint (never a server-named Unix
+socket), installs no local-file handler, and without `allow_plaintext` requires TLS
+before any credential is sent; a configured CA bundle replaces the public roots and
+is refused when empty. The adapter's own deadline or a dropped invocation kills the
+statement with `KILL QUERY <connection id>` from a second session within the 2 s
+cleanup budget, then closes the session; as on PostgreSQL this does not guarantee
+remote termination. MySQL errors are classified by number where the SQLSTATE class
+is too coarse (access refusals 1044, 1142, 1143, 1227 and 1370 are `forbidden`,
+1045 `unauthorized`, 1235 `unsupported`, 3024 `timeout` and 1040/1203 `capacity`,
+the last two as the server's answer), and otherwise by SQLSTATE as above. MySQL 8.0
+or later is assumed; MariaDB is not claimed.
+Source facts: https://dev.mysql.com/doc/refman/8.4/en/set-transaction.html,
+https://dev.mysql.com/doc/refman/8.4/en/server-system-variables.html,
+https://dev.mysql.com/doc/refman/8.4/en/derived-tables.html,
+https://dev.mysql.com/doc/refman/8.4/en/information-schema-columns-table.html,
+https://dev.mysql.com/doc/refman/8.4/en/kill.html and
+https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_binary_resultset.html.
+These MySQL pages were cited, not fetched, when this section was written (2026-10-09);
+the wire behavior is checked against a scripted fixture, not a live server.

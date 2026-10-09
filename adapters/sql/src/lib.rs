@@ -9,6 +9,7 @@ use serde_json::Value;
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 pub mod auth;
+pub mod mysql;
 use tokio::{sync::oneshot, time::Instant};
 use tokio_postgres::{
     CancelToken, Client, NoTls,
@@ -21,9 +22,91 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(10);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// The database engine a connection speaks. PostgreSQL is the default, so a
+/// configuration written before the engine existed selects it unchanged; the
+/// field is omitted from the effective configuration for PostgreSQL so that
+/// configuration revisions recorded earlier keep their value.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Engine {
+    #[default]
+    Postgresql,
+    Mysql,
+}
+impl Engine {
+    pub const ALL: [Engine; 2] = [Engine::Postgresql, Engine::Mysql];
+    pub fn is_postgresql(&self) -> bool {
+        *self == Engine::Postgresql
+    }
+    /// The engine's configuration name, which is also the scheme of its
+    /// provider authority (`<scheme>://<host>:<port>/<database>`).
+    pub fn name(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "postgresql",
+            Engine::Mysql => "mysql",
+        }
+    }
+    /// The one password profile a connection on this engine advertises.
+    pub fn profile_id(self) -> &'static str {
+        match self {
+            Engine::Postgresql => auth::PROFILE_ID,
+            Engine::Mysql => auth::MYSQL_PROFILE_ID,
+        }
+    }
+    pub fn profile_label(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "PostgreSQL password",
+            Engine::Mysql => "MySQL password",
+        }
+    }
+    /// The kind of the principal a validated session authenticates.
+    pub fn identity_kind(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "postgresql.role",
+            Engine::Mysql => "mysql.user",
+        }
+    }
+    /// The result profile the engine's operations carry in its descriptor.
+    pub fn result_profile(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "postgresql-native-text",
+            Engine::Mysql => "mysql-native-text",
+        }
+    }
+    /// The statements that bound a read's session before the caller's
+    /// statement is prepared.
+    pub fn session_statements(self) -> &'static [&'static str] {
+        match self {
+            Engine::Postgresql => &[POSTGRESQL_SESSION],
+            Engine::Mysql => &[mysql::SESSION_READ_ONLY, mysql::SESSION_BOUNDS],
+        }
+    }
+}
+
+/// A read must return at least one and at most this many columns on either
+/// engine, so a statement that returns no rows, such as any write, is refused
+/// before it is executed.
+pub const MAX_COLUMNS: usize = 256;
+const POSTGRESQL_SESSION: &str = "SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog";
+/// `schema.list` on PostgreSQL: the column metadata of one schema of the
+/// connected database visible to the configured role.
+const POSTGRESQL_SCHEMA_QUERY: &str = "SELECT table_schema, table_name, column_name, data_type, udt_name, is_nullable, ordinal_position FROM information_schema.columns WHERE table_schema = $1 ORDER BY table_name, ordinal_position";
+
+fn column_bounds(columns: usize) -> Result<()> {
+    if columns == 0 || columns > MAX_COLUMNS {
+        return Err(Error::new(
+            ErrorCode::Unsupported,
+            "query must return between one and 256 columns",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default, skip_serializing_if = "Engine::is_postgresql")]
+    pub engine: Engine,
     pub host: String,
     pub port: u16,
     pub database: String,
@@ -53,11 +136,16 @@ impl Sql {
         {
             return Err(Error::invalid("invalid database binding"));
         }
-        let descriptor = instance_descriptor(
+        let mut descriptor = instance_descriptor(
             include_str!("../generated/descriptor.json"),
             instance,
             &effective_configuration,
         )?;
+        // The operations are the same on both engines; the profile names how a
+        // cell is written, which is the engine's own.
+        for operation in &mut descriptor.operations {
+            operation.profile = config.engine.result_profile().into();
+        }
         connectors_sdk::verify_handlers(&descriptor, &["schema.list", "query.read"])?;
         Ok(Self {
             descriptor,
@@ -120,6 +208,9 @@ impl Sql {
     /// whole check: no statement runs and no business read is performed. A
     /// rejected password surfaces as the provider's own authentication failure.
     pub async fn validate_session(&self) -> Result<()> {
+        if self.config.engine == Engine::Mysql {
+            return mysql::validate_session(&self.config, &*self.password).await;
+        }
         let (client, connection) = tokio::time::timeout(CONNECT_TIMEOUT, self.connect())
             .await
             .map_err(|_| query_timeout())??;
@@ -137,6 +228,15 @@ impl Sql {
             return Err(Error::invalid(
                 "query, parameters or row limit exceed bounds",
             ));
+        }
+        if self.config.engine == Engine::Mysql {
+            return mysql::query(
+                &self.config,
+                &*self.password,
+                &self.descriptor.instance,
+                args,
+            )
+            .await;
         }
         let deadline = Instant::now() + REQUEST_TIMEOUT;
         let (mut client, connection) = tokio::time::timeout(CONNECT_TIMEOUT, self.connect())
@@ -179,19 +279,17 @@ impl Sql {
             .start()
             .await
             .map_err(database_error)?;
-        transaction.batch_execute("SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog").await.map_err(database_error)?;
+        transaction
+            .batch_execute(POSTGRESQL_SESSION)
+            .await
+            .map_err(database_error)?;
         let query = args
             .query
             .trim()
             .strip_suffix(';')
             .unwrap_or(args.query.trim());
         let original = transaction.prepare(query).await.map_err(database_error)?;
-        if original.columns().is_empty() || original.columns().len() > 256 {
-            return Err(Error::new(
-                ErrorCode::Unsupported,
-                "query must return between one and 256 columns",
-            ));
-        }
+        column_bounds(original.columns().len())?;
         if original.params().len() != args.parameters.len() {
             return Err(Error::invalid("parameter count does not match query"));
         }
@@ -368,7 +466,15 @@ impl Adapter for Sql {
                     limit: u16,
                 }
                 let args: Schema = decode(input)?;
-                Query{query:"SELECT table_schema, table_name, column_name, data_type, udt_name, is_nullable, ordinal_position FROM information_schema.columns WHERE table_schema = $1 ORDER BY table_name, ordinal_position".into(),parameters:vec![Some(args.schema)],limit:args.limit}
+                let query = match self.config.engine {
+                    Engine::Postgresql => POSTGRESQL_SCHEMA_QUERY,
+                    Engine::Mysql => mysql::SCHEMA_QUERY,
+                };
+                Query {
+                    query: query.into(),
+                    parameters: vec![Some(args.schema)],
+                    limit: args.limit,
+                }
             }
             _ => {
                 return Err(Error::new(
@@ -387,20 +493,29 @@ fn database_roots(path: Option<&std::path::Path>) -> Result<rustls::RootCertStor
             webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
         ));
     };
-    let bytes =
-        std::fs::read(path).map_err(|_| Error::invalid("configured database CA unavailable"))?;
     let mut roots = rustls::RootCertStore::empty();
-    for cert in CertificateDer::pem_slice_iter(&bytes) {
+    for cert in database_certificates(path)? {
         roots
-            .add(cert.map_err(|_| Error::invalid("invalid database CA"))?)
+            .add(cert)
             .map_err(|_| Error::invalid("invalid database CA"))?;
     }
-    if roots.is_empty() {
+    Ok(roots)
+}
+
+/// The certificates of a configured CA bundle, read once per session. Both
+/// engines refuse an unreadable, malformed or empty bundle the same way.
+fn database_certificates(path: &std::path::Path) -> Result<Vec<CertificateDer<'static>>> {
+    let bytes =
+        std::fs::read(path).map_err(|_| Error::invalid("configured database CA unavailable"))?;
+    let certificates = CertificateDer::pem_slice_iter(&bytes)
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|_| Error::invalid("invalid database CA"))?;
+    if certificates.is_empty() {
         return Err(Error::invalid(
             "configured database CA contains no certificates",
         ));
     }
-    Ok(roots)
+    Ok(certificates)
 }
 
 fn database_error(error: tokio_postgres::Error) -> Error {

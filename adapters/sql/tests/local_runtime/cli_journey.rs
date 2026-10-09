@@ -878,6 +878,7 @@ async fn postgres_dropped_invocation_cancels_its_backend() {
     let admin = PgAdmin::new();
     for drop_invocation in [false, true] {
         let config = connectors_sql::Config {
+            engine: connectors_sql::Engine::Postgresql,
             host: host.clone(),
             port,
             database: "incidents".into(),
