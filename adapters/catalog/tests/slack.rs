@@ -1,15 +1,20 @@
-//! Slack conversations through the catalog provider.
+//! Slack conversations, users, workspace, emoji and search through the
+//! catalog provider.
 //!
-//! The shipped selection set is pinned by id and source operation, resolves
+//! The two shipped selection sets — the bot token's and the user token's
+//! (`search.messages` alone) — are pinned by id and source operation, resolve
 //! against the committed bundle compiled from the OpenAPI projection of the
-//! pinned Slack Web API Swagger 2.0 document, and is cited row by row in
+//! pinned Slack Web API Swagger 2.0 document, and are cited row by row in
 //! `docs/catalog-slack.md`. Each read runs through the provider child against
 //! a disposable HTTPS fixture: the exact request (path, query including the
-//! time window, `Authorization: Bearer …`) and the returned body bytes are
-//! asserted, every list walks two pages to an empty
-//! `response_metadata.next_cursor`, and the `auth.test` identity read yields
-//! the token's user id. Every id, name and message is synthetic. No live
-//! credential and no network.
+//! time window, `Authorization: Bearer …`, never a `token` query parameter)
+//! and the returned body bytes are asserted, every list walks two pages to an
+//! empty `response_metadata.next_cursor`, and the `auth.test` identity read
+//! yields the token's user id. `auth.test`, `team.info`, `emoji.list` and
+//! `search.messages`, whose pinned `token` parameter is required, ship with
+//! `token` named as the selection's credential; withholding it instead is
+//! still refused. Every id, name and message is synthetic. No live credential
+//! and no network.
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
@@ -45,14 +50,19 @@ const BASE: &str = "/api";
 const TOKEN: &str = "fixture-slack-bot-token";
 const HEADER: &str = "Bearer fixture-slack-bot-token";
 const PROFILE: &str = "slack.bot";
+/// A fictional user token, for the search connection.
+const USER_TOKEN: &str = "fixture-slack-user-token";
+const USER_HEADER: &str = "Bearer fixture-slack-user-token";
+const USER_PROFILE: &str = "slack.user";
 /// The pinned document and its committed projection, relative to this crate.
 const UPSTREAM: &str = "../slack/upstream/slack_web_openapi_v2_without_examples.json";
 const PROJECTION: &str = "../slack/generated/slack-web.openapi.json";
 const SOURCE_SHA256: &str = "8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471babb68b91936bc3a";
 
-/// The shipped ids, their pinned `operationId` and the path the bundle
-/// records. A renamed, dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 3] = [
+/// The bot selection set's ids, their pinned `operationId` and the path the
+/// bundle records. A renamed, dropped or added id fails here.
+const SHIPPED: [(&str, &str, &str); 7] = [
+    ("auth.test", "auth_test", "/api/auth.test"),
     (
         "conversations.history",
         "conversations_history",
@@ -68,17 +78,32 @@ const SHIPPED: [(&str, &str, &str); 3] = [
         "conversations_replies",
         "/api/conversations.replies",
     ),
+    ("emoji.list", "emoji_list", "/api/emoji.list"),
+    ("team.info", "team_info", "/api/team.info"),
+    ("users.list", "users_list", "/api/users.list"),
 ];
+/// The user selection set: search alone.
+const USER_SHIPPED: [(&str, &str, &str); 1] =
+    [("search.messages", "search_messages", "/api/search.messages")];
+/// The methods whose pinned `token` is required, so their selections name it
+/// as the credential instead of withholding it.
+const CREDENTIAL: [&str; 4] = ["auth_test", "emoji_list", "search_messages", "team_info"];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }
 fn shipped() -> Vec<Selection> {
-    let file: Value =
-        serde_json::from_slice(&fs::read(root().join("providers/slack/operations.json")).unwrap())
-            .unwrap();
+    shipped_in("providers/slack/operations.json")
+}
+/// The user token's selection set, for the search connection.
+fn user_shipped() -> Vec<Selection> {
+    shipped_in("providers/slack/user-operations.json")
+}
+fn shipped_in(relative: &str) -> Vec<Selection> {
+    let file: Value = serde_json::from_slice(&fs::read(root().join(relative)).unwrap()).unwrap();
     assert_eq!(file["format"], "connectors-catalog-operations/1");
     assert_eq!(file["provider"], "slack");
+    assert!(file.get("feed").is_none(), "{relative}");
     serde_json::from_value(file["operations"].clone()).unwrap()
 }
 fn committed() -> bundle::Bundle {
@@ -89,44 +114,78 @@ fn pinned() -> Value {
 }
 
 #[test]
-fn shipped_slack_selections_are_exactly_the_three_conversation_reads() {
-    let selections = shipped();
+fn shipped_slack_selections_are_exactly_the_bot_reads_and_the_user_search() {
     let bundle = committed();
     assert_eq!(bundle.auth_profile, PROFILE);
-    let engine = Engine::new(&bundle, BASE, &selections).unwrap();
-    let mut declared: Vec<String> = engine
-        .declarations(&[Effect::Read, Effect::Write])
-        .into_iter()
-        .map(|o| o.id)
-        .collect();
-    declared.sort();
-    let expected: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
-    assert_eq!(declared, expected);
-    assert!(engine.declarations(&[Effect::Write]).is_empty());
-    for (id, operation_id, path) in SHIPPED {
-        let selection = selections.iter().find(|s| s.id == id).unwrap();
-        assert_eq!(selection.operation_id, operation_id, "`{id}`");
-        assert_eq!(selection.effect, Effect::Read, "`{id}`");
-        assert_eq!(engine.effect(id), Some(Effect::Read), "`{id}`");
-        let operation = bundle
-            .inventory
-            .operations
-            .iter()
-            .find(|o| o.operation_id.as_deref() == Some(operation_id))
-            .unwrap_or_else(|| panic!("the pinned source lacks `{operation_id}`"));
-        assert_eq!(operation.method, "get", "`{id}`");
-        assert_eq!(operation.path, path, "`{id}`");
-        // The same operation, at the same path, in the pinned Swagger document.
-        let source_path = path.strip_prefix(BASE).unwrap();
-        assert_eq!(
-            pinned()["paths"][source_path]["get"]["operationId"],
-            operation_id,
-            "`{id}`"
-        );
-        // The credential travels in the header only: the document's `token`
-        // query parameter is never exposed.
-        assert!(selection.withhold.contains(&"token".to_owned()), "`{id}`");
+    for (selections, shipped) in [
+        (shipped(), &SHIPPED[..]),
+        (user_shipped(), &USER_SHIPPED[..]),
+    ] {
+        let engine = Engine::new(&bundle, BASE, &selections).unwrap();
+        let mut declared: Vec<String> = engine
+            .declarations(&[Effect::Read, Effect::Write])
+            .into_iter()
+            .map(|o| o.id)
+            .collect();
+        declared.sort();
+        let expected: Vec<&str> = shipped.iter().map(|(id, _, _)| *id).collect();
+        assert_eq!(declared, expected);
+        assert!(engine.declarations(&[Effect::Write]).is_empty());
+        for (id, operation_id, path) in shipped.iter().copied() {
+            let selection = selections.iter().find(|s| s.id == id).unwrap();
+            assert_eq!(selection.operation_id, operation_id, "`{id}`");
+            assert_eq!(selection.effect, Effect::Read, "`{id}`");
+            assert_eq!(engine.effect(id), Some(Effect::Read), "`{id}`");
+            let operation = bundle
+                .inventory
+                .operations
+                .iter()
+                .find(|o| o.operation_id.as_deref() == Some(operation_id))
+                .unwrap_or_else(|| panic!("the pinned source lacks `{operation_id}`"));
+            assert_eq!(operation.method, "get", "`{id}`");
+            assert_eq!(operation.path, path, "`{id}`");
+            // The same operation, at the same path, in the pinned Swagger document.
+            let source_path = path.strip_prefix(BASE).unwrap();
+            let document = pinned();
+            let source = &document["paths"][source_path]["get"];
+            assert_eq!(source["operationId"], operation_id, "`{id}`");
+            // The credential travels in the header only. Where the document
+            // marks its `token` required, the selection names it as the
+            // credential; otherwise it withholds it. Either way `token` is
+            // never declared.
+            let token_required = source["parameters"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|p| p["name"] == "token" && p["required"] == true);
+            assert_eq!(token_required, CREDENTIAL.contains(&operation_id), "`{id}`");
+            let token = vec!["token".to_owned()];
+            if token_required {
+                assert_eq!(selection.credential, token, "`{id}`");
+                assert!(selection.withhold.is_empty(), "`{id}`");
+            } else {
+                assert_eq!(selection.withhold, token, "`{id}`");
+                assert!(selection.credential.is_empty(), "`{id}`");
+            }
+            let declaration = engine
+                .declarations(&[Effect::Read])
+                .into_iter()
+                .find(|o| o.id == id)
+                .unwrap();
+            assert!(
+                declaration.input_schema["properties"]
+                    .get("token")
+                    .is_none(),
+                "`{id}` declares token"
+            );
+        }
     }
+    // Search is the user token's alone: the bot connection never exposes it.
+    assert!(
+        shipped()
+            .iter()
+            .all(|selection| selection.operation_id != "search_messages")
+    );
 }
 
 /// A source operation the document lacks, or a write, cannot ship as a read.
@@ -138,6 +197,67 @@ fn a_missing_or_writing_source_operation_cannot_ship_as_a_read() {
     assert!(Engine::new(&bundle, BASE, &selections).is_err());
     selections[0].operation_id = "chat_postMessage".into();
     assert!(Engine::new(&bundle, BASE, &selections).is_err());
+}
+
+fn selection(id: &str, operation_id: &str, withhold: &[&str]) -> Selection {
+    serde_json::from_value(json!({
+        "id": id, "operation_id": operation_id, "effect": "read", "withhold": withhold
+    }))
+    .unwrap()
+}
+fn refusal(selections: &[Selection]) -> String {
+    match Engine::new(&committed(), BASE, selections) {
+        Ok(_) => panic!("loaded"),
+        Err(error) => error.message,
+    }
+}
+
+/// `team.info`, `emoji.list` and `search.messages` declare `token` as a
+/// required query parameter and `auth.test` as a required header
+/// (`docs/catalog-slack.md`, "Credential parameters"). `withhold` still
+/// refuses a required parameter, and without either field the bot token would
+/// be a required input sent in the query, or `auth.test` would be refused for
+/// its header; so each ships with `token` named as its credential, and only
+/// that way.
+#[test]
+fn methods_whose_pinned_token_is_required_ship_with_it_as_the_credential() {
+    for (id, operation_id) in [
+        ("team.info", "team_info"),
+        ("emoji.list", "emoji_list"),
+        ("search.messages", "search_messages"),
+    ] {
+        let message = refusal(&[selection(id, operation_id, &["token"])]);
+        assert!(
+            message.contains("withholds `token`, which is required"),
+            "`{id}`: {message}"
+        );
+        let engine = Engine::new(&committed(), BASE, &[selection(id, operation_id, &[])])
+            .unwrap_or_else(|error| panic!("`{id}`: {}", error.message));
+        let declaration = engine.declarations(&[Effect::Read]).remove(0);
+        assert!(
+            declaration.input_schema["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("token")),
+            "`{id}` would take the token as input"
+        );
+    }
+    for withhold in [&["token"][..], &[][..]] {
+        let message = refusal(&[selection("auth.test", "auth_test", withhold)]);
+        assert!(
+            message.contains("needs a header parameter this transport does not carry"),
+            "{message}"
+        );
+    }
+    // Each shipped selection of the four names `token` as its credential.
+    let all: Vec<Selection> = shipped().into_iter().chain(user_shipped()).collect();
+    for operation_id in CREDENTIAL {
+        let selection = all
+            .iter()
+            .find(|s| s.operation_id == operation_id)
+            .unwrap_or_else(|| panic!("`{operation_id}` is not shipped"));
+        assert_eq!(selection.credential, ["token"], "`{operation_id}`");
+    }
 }
 
 #[test]
@@ -167,9 +287,10 @@ fn the_bundle_is_derived_from_the_pinned_swagger_document() {
 }
 
 /// Every list's end condition and time window is in the pinned parameters:
-/// `cursor` and `limit` on all three, `oldest` and `latest` on the two
+/// `cursor` and `limit` on all four, `oldest` and `latest` on the two
 /// message reads, `ts` and `channel` on replies. The only stated page bound is
-/// `conversations.list`'s 1,000, and only it carries a bound.
+/// `conversations.list`'s 1,000, and only it carries a bound: `users.list`'s
+/// `limit` states none, only that its absence asks for the whole list.
 #[test]
 fn the_paging_and_window_parameters_are_in_the_pinned_document() {
     let document = pinned();
@@ -206,6 +327,7 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
                 "inclusive",
             ][..],
         ),
+        ("/users.list", &["cursor", "limit", "include_locale"][..]),
     ] {
         let declared = names(path);
         for name in wanted {
@@ -225,6 +347,19 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
         .unwrap()
         .to_owned();
     assert!(limit.contains("no larger than 1000"), "{limit}");
+    let users_limit = document["paths"]["/users.list"]["get"]["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "limit")
+        .unwrap()["description"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        users_limit.contains("deliver you the entire result set"),
+        "{users_limit}"
+    );
     for selection in shipped() {
         let bound = selection.bounds.get("limit");
         if selection.id == "conversations.list" {
@@ -233,6 +368,30 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
             assert!(selection.bounds.is_empty(), "`{}`", selection.id);
         }
     }
+    // Search pages by `page` and `count`, not by cursor, and the pinned
+    // `count` states its maximum of 100, which the user selection bounds.
+    let search = names("/search.messages");
+    for name in ["query", "count", "page", "sort", "sort_dir", "highlight"] {
+        assert!(search.iter().any(|d| d == name), "search lacks `{name}`");
+    }
+    assert!(!search.iter().any(|d| d == "cursor"));
+    let count = document["paths"]["/search.messages"]["get"]["parameters"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["name"] == "count")
+        .unwrap()["description"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(count.contains("Maximum of `100`"), "{count}");
+    let selections = user_shipped();
+    let bounds = &selections[0].bounds;
+    assert_eq!(bounds.len(), 1);
+    assert_eq!(
+        bounds.get("count").map(|b| (b.minimum, b.maximum)),
+        Some((Some(1), 100))
+    );
 }
 
 #[test]
@@ -259,6 +418,7 @@ fn guide_cites_each_operation_its_paging_and_its_time_window() {
             "/api/conversations.replies",
             "`oldest`, `latest`",
         ),
+        ("users.list", "users_list", "/api/users.list", "none"),
     ] {
         let row = rows
             .iter()
@@ -272,16 +432,78 @@ fn guide_cites_each_operation_its_paging_and_its_time_window() {
     }
 }
 
-/// The guide's configuration example.
+/// Each discovery read the bot set adds, and search, has its row in the guide.
+#[test]
+fn guide_cites_each_discovery_read_and_search() {
+    let guide = fs::read_to_string(root().join("../../docs/catalog-slack.md")).unwrap();
+    let rows: Vec<&str> = guide.lines().filter(|l| l.starts_with('|')).collect();
+    for (id, operation_id, path, scope) in [
+        ("team.info", "team_info", "/api/team.info", "`team:read`"),
+        (
+            "emoji.list",
+            "emoji_list",
+            "/api/emoji.list",
+            "`emoji:read`",
+        ),
+        ("auth.test", "auth_test", "/api/auth.test", "none"),
+        (
+            "search.messages",
+            "search_messages",
+            "/api/search.messages",
+            "`search:read`",
+        ),
+    ] {
+        let row = rows
+            .iter()
+            .find(|row| row.contains(&format!("| `{id}` |")))
+            .unwrap_or_else(|| panic!("no row for `{id}`"));
+        assert!(row.contains(&format!("`{operation_id}`")), "{row}");
+        assert!(row.contains(&format!("`GET {path}`")), "{row}");
+        assert!(row.contains(scope), "{row}");
+    }
+}
+
+/// The guide's bot configuration example.
 fn documented_config() -> Value {
+    documented_config_for(PROFILE)
+}
+/// The guide's configuration example for the connection under `profile`.
+fn documented_config_for(profile: &str) -> Value {
     let guide = fs::read_to_string(root().join("../../docs/catalog-slack.md")).unwrap();
     let example = guide
         .split("```json\n")
         .skip(1)
         .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains("\"provider\": \"slack\""))
-        .expect("the documented slack configuration");
+        .find(|body| {
+            body.contains("\"provider\": \"slack\"")
+                && body.contains(&format!("\"profile\": \"{profile}\""))
+        })
+        .unwrap_or_else(|| panic!("the documented `{profile}` configuration"));
     serde_json::from_str::<Value>(example).unwrap()
+}
+
+/// The search connection: the same bundle and base, a user token under
+/// `slack.user`, the same `auth.test` identity read, and the user selection set.
+#[test]
+fn the_documented_user_profile_is_a_bearer_user_token_selecting_search_alone() {
+    let config = documented_config_for(USER_PROFILE);
+    let bot = documented_config();
+    assert_eq!(config["api_base"], bot["api_base"]);
+    assert_eq!(config["provider"], "slack");
+    assert_ne!(config["instance"], bot["instance"]);
+    let auth = &config["auth"];
+    assert_eq!(auth["profile"], USER_PROFILE);
+    assert_eq!(auth["scheme"], Value::Null);
+    assert_eq!(auth["header"], "Authorization");
+    assert_eq!(auth["bearer"], true);
+    assert_eq!(auth["identity"], bot["auth"]["identity"]);
+    assert_eq!(auth["scopes"], Value::Null);
+    assert!(
+        config["operations_file"]
+            .as_str()
+            .unwrap()
+            .ends_with("adapters/catalog/providers/slack/user-operations.json")
+    );
 }
 
 #[test]
@@ -299,8 +521,9 @@ fn the_documented_profile_is_a_bearer_bot_token_with_auth_test_as_identity() {
     assert_eq!(auth["scopes"], Value::Null);
 }
 
-/// Route and `Authorization` header of each fixture request.
-type Requests = Arc<Mutex<Vec<(String, Option<String>)>>>;
+/// Route, `Authorization` header, and whether a `token` header was sent, of
+/// each fixture request.
+type Requests = Arc<Mutex<Vec<(String, Option<String>, bool)>>>;
 
 fn channel(n: u64) -> Value {
     json!({"id": format!("C0FIXTURE{n:02}"), "name": format!("fixture-channel-{n}"),
@@ -313,6 +536,13 @@ fn message(ts: &str, text: &str) -> Value {
 fn reply(ts: &str, text: &str) -> Value {
     json!({"type": "message", "user": "U0FIXTURE02", "text": text, "ts": ts,
            "thread_ts": "1780000100.000100"})
+}
+/// An `objs_user` with the members both of its pinned variants require.
+fn user(n: u64) -> Value {
+    json!({"id": format!("U0FIXTURE{n:02}"), "name": format!("fixture-user-{n}"),
+           "deleted": false, "is_bot": false, "is_app_user": false,
+           "profile": {"real_name": format!("Fixture User {n}")},
+           "team_id": "T0FIXTURE01", "updated": 1_780_000_000u64 + n})
 }
 fn more(cursor: &str) -> Value {
     json!({"next_cursor": cursor})
@@ -353,6 +583,49 @@ fn page(path: &str) -> Option<Value> {
             "messages": [reply("1780000100.000100", "fixture thread parent"),
                          reply("1780000300.000300", "fixture reply one")],
             "has_more": true, "response_metadata": more("fixture-replies-2")}),
+        "/api/users.list" if has("cursor=fixture-users-2") => json!({
+            "ok": true, "members": [user(13)], "cache_ts": 1_780_000_500u64,
+            "response_metadata": more("")}),
+        "/api/users.list" => json!({
+            "ok": true, "members": [user(11), user(12)], "cache_ts": 1_780_000_500u64,
+            "response_metadata": more("fixture-users-2")}),
+        // An `objs_team` with the members the pinned document requires.
+        "/api/team.info" => json!({
+            "ok": true,
+            "team": {"id": "T0FIXTURE01", "name": "Fixture Team", "domain": "fixture-team",
+                     "email_domain": "", "icon": {"image_default": true}}}),
+        "/api/emoji.list" => json!({
+            "ok": true, "cache_ts": "1780000600.000000",
+            "emoji": {"fixture-alias": "alias:fixture-party",
+                      "fixture-party": "https://emoji.fixture.example.test/fixture-party.png"}}),
+        _ => return None,
+    })
+}
+
+/// What the fixture answers the user token: its own identity, and search.
+/// `None` for anything else, which the fixture answers 404.
+fn user_page(path: &str) -> Option<Value> {
+    let (route, query) = path.split_once('?').unwrap_or((path, ""));
+    let has = |pair: &str| query.split('&').any(|p| p == pair);
+    Some(match route {
+        "/api/auth.test" => json!({
+            "ok": true, "url": "https://fixture.example.test/", "team": "Fixture Team",
+            "user": "fixture-user-2", "team_id": "T0FIXTURE01", "user_id": "U0FIXTURE02",
+            "is_enterprise_install": false}),
+        "/api/search.messages" if has("query=fixture") => json!({
+            "ok": true, "query": "fixture",
+            "messages": {
+                "total": 1,
+                "matches": [{
+                    "type": "message", "user": "U0FIXTURE02", "text": "fixture message one",
+                    "ts": "1780000300.000300",
+                    "channel": {"id": "C0FIXTURE01", "name": "fixture-channel-1"},
+                    "permalink": "https://fixture.example.test/archives/C0FIXTURE01/p1780000300000300"}],
+                "paging": {"count": 20, "page": 1, "pages": 1, "total": 1}}}),
+        "/api/search.messages" => json!({
+            "ok": true, "query": "",
+            "messages": {"total": 0, "matches": [],
+                         "paging": {"count": 20, "page": 1, "pages": 0, "total": 0}}}),
         _ => return None,
     })
 }
@@ -368,9 +641,17 @@ impl Provider {
     fn new() -> Self {
         Self::serving(false)
     }
+    /// The search connection: the guide's `slack.user` configuration and the
+    /// user selection set.
+    fn user() -> Self {
+        Self::start(false, true)
+    }
     /// `refuse_identity`: answer `auth.test` as Slack answers a revoked
     /// token, `200` with `ok: false` and no `user_id`.
     fn serving(refuse_identity: bool) -> Self {
+        Self::start(refuse_identity, false)
+    }
+    fn start(refuse_identity: bool, user: bool) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -425,21 +706,31 @@ impl Provider {
                             .filter(|(name, _)| name.eq_ignore_ascii_case("authorization"))
                             .map(|(_, value)| value.trim().to_owned())
                     });
+                    let token_header = request.lines().any(|line| {
+                        line.split_once(':')
+                            .is_some_and(|(name, _)| name.eq_ignore_ascii_case("token"))
+                    });
                     // Slack answers a bad token `200` with `ok: false`; only
-                    // the fictional header is accepted, and raw headers are
-                    // compared, never printed.
-                    let body = if authorization.as_deref() != Some(HEADER)
-                        || (refuse_identity && path.starts_with("/api/auth.test"))
-                    {
+                    // the two fictional headers are accepted, each answered
+                    // as its token, and raw headers are compared, never
+                    // printed.
+                    let body = if refuse_identity && path.starts_with("/api/auth.test") {
                         Some(json!({"ok": false, "error": "invalid_auth"}))
-                    } else {
+                    } else if authorization.as_deref() == Some(HEADER) {
                         page(&path)
+                    } else if authorization.as_deref() == Some(USER_HEADER) {
+                        user_page(&path)
+                    } else {
+                        Some(json!({"ok": false, "error": "invalid_auth"}))
                     };
                     let (status, body) = match body {
                         Some(body) => (200, body),
                         None => (404, json!({"ok": false, "error": "no fixture"})),
                     };
-                    observed.lock().unwrap().push((path, authorization));
+                    observed
+                        .lock()
+                        .unwrap()
+                        .push((path, authorization, token_header));
                     let body = serde_json::to_vec(&body).unwrap();
                     let header = format!(
                         "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -452,12 +743,17 @@ impl Provider {
         });
         let address = address_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         let config = directory.join("catalog.json");
-        let mut document = documented_config();
+        let (profile, operations) = if user {
+            (USER_PROFILE, "providers/slack/user-operations.json")
+        } else {
+            (PROFILE, "providers/slack/operations.json")
+        };
+        let mut document = documented_config_for(profile);
         document["instance"] = json!("fixture-slack");
         document["bundle_directory"] = json!(root_path("generated/bundles"));
         document["api_base"] = json!(format!("https://localhost:{}/api", address.port()));
         document["ca_file"] = json!(ca);
-        document["operations_file"] = json!(root_path("providers/slack/operations.json"));
+        document["operations_file"] = json!(root_path(operations));
         private(&config, &serde_json::to_vec(&document).unwrap());
         Self {
             stop: Some(stop),
@@ -503,7 +799,7 @@ impl Provider {
             },
         }
     }
-    fn requests(&self) -> Vec<(String, Option<String>)> {
+    fn requests(&self) -> Vec<(String, Option<String>, bool)> {
         self.requests.lock().unwrap().clone()
     }
 }
@@ -526,13 +822,24 @@ fn secret() -> Secret {
 fn deadline() -> u64 {
     connectors_sdk::now_ms() + 30_000
 }
+fn user_secret() -> Secret {
+    Secret(serde_json::to_vec(&json!({"token": USER_TOKEN})).unwrap())
+}
 fn attempt(child: &mut Child, operation: &str, input: &Value) -> Result<Vec<u8>, Failure> {
+    attempt_as(child, operation, input, &secret())
+}
+fn attempt_as(
+    child: &mut Child,
+    operation: &str,
+    input: &Value,
+    secret: &Secret,
+) -> Result<Vec<u8>, Failure> {
     let revision = child.bootstrap().descriptor().unwrap().revision;
     child.invoke(
         operation,
         &revision,
         "one",
-        &secret(),
+        secret,
         &serde_json::to_vec(input).unwrap(),
         deadline(),
     )
@@ -581,7 +888,7 @@ fn an_identity_answer_without_a_user_id_refuses_the_connection() {
 /// Each read's first request: the input, and the exact request the fixture
 /// must observe. Query parameters go out in the order the pinned document
 /// declares them, not the order of the input.
-fn first_pages() -> [(&'static str, Value, &'static str); 3] {
+fn first_pages() -> [(&'static str, Value, &'static str); 4] {
     [
         (
             "conversations.list",
@@ -600,6 +907,11 @@ fn first_pages() -> [(&'static str, Value, &'static str); 3] {
             json!({"channel": "C0FIXTURE01", "ts": "1780000100.000100",
                    "oldest": "1780000000.000000", "latest": "1780000500.000000", "limit": 2}),
             "/api/conversations.replies?channel=C0FIXTURE01&ts=1780000100.000100&latest=1780000500.000000&oldest=1780000000.000000&limit=2",
+        ),
+        (
+            "users.list",
+            json!({"include_locale": true, "limit": 2}),
+            "/api/users.list?limit=2&include_locale=true",
         ),
     ]
 }
@@ -648,6 +960,8 @@ fn a_withheld_missing_or_out_of_bound_parameter_is_refused_before_any_request() 
     let mut child = Child::spawn(&provider.selection()).unwrap();
     for (operation, input) in [
         ("conversations.list", json!({"token": TOKEN})),
+        ("users.list", json!({"limit": 2, "token": TOKEN})),
+        ("users.list", json!({"presence": true})),
         (
             "conversations.history",
             json!({"channel": "C0FIXTURE01", "token": TOKEN}),
@@ -660,11 +974,168 @@ fn a_withheld_missing_or_out_of_bound_parameter_is_refused_before_any_request() 
             "conversations.list",
             json!({"cursor": "c", "undeclared": 1}),
         ),
+        // A credential parameter, in every spelling, on each method that
+        // names `token` as its credential.
+        ("team.info", json!({"token": TOKEN})),
+        ("team.info", json!({"query:token": TOKEN})),
+        ("emoji.list", json!({"token": TOKEN})),
+        ("emoji.list", json!({"header:token": TOKEN})),
+        ("auth.test", json!({"token": TOKEN})),
+        ("auth.test", json!({"header:token": TOKEN})),
+        ("auth.test", json!({"query:token": TOKEN})),
     ] {
         let outcome = attempt(&mut child, operation, &input);
         assert!(
             matches!(outcome, Err(Failure::InvalidInput)),
             "`{operation}` {input}: {outcome:?}"
+        );
+    }
+    assert!(provider.requests().is_empty());
+}
+
+/// One answered request: its exact route, the bearer header it carried, no
+/// `token` header, and the served body bytes returned unchanged as `body`.
+fn assert_answered(
+    provider: &Provider,
+    before: usize,
+    raw: &[u8],
+    operation: &str,
+    expected: &str,
+    header: &str,
+    served: Value,
+) {
+    let requests = provider.requests();
+    assert_eq!(requests.len(), before + 1, "`{operation}` requests");
+    assert_eq!(requests[before].0, expected, "`{operation}` request");
+    assert_eq!(
+        requests[before].1.as_deref(),
+        Some(header),
+        "`{operation}` authorization"
+    );
+    assert!(!requests[before].2, "`{operation}` sent a token header");
+    let result: Value = serde_json::from_slice(raw).unwrap();
+    assert_eq!(result["status"], 200, "`{operation}` status");
+    assert_eq!(result["provenance"]["instance"], "fixture-slack");
+    let served = serde_json::to_vec(&served).unwrap();
+    assert_eq!(
+        serde_json::to_vec(&result["body"]).unwrap(),
+        served,
+        "`{operation}` body"
+    );
+}
+
+/// `team.info`, `emoji.list` and `auth.test` on the bot connection: the token
+/// travels in the `Authorization` header only — no `token` query parameter,
+/// no `token` header — and Slack's answer comes back as served. An empty
+/// input sends an empty query.
+#[test]
+fn each_discovery_read_sends_the_bearer_header_and_no_token() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, input, expected) in [
+        ("team.info", json!({}), "/api/team.info?"),
+        (
+            "team.info",
+            json!({"team": "T0FIXTURE01"}),
+            "/api/team.info?team=T0FIXTURE01",
+        ),
+        ("emoji.list", json!({}), "/api/emoji.list?"),
+        ("auth.test", json!({}), "/api/auth.test?"),
+    ] {
+        let before = provider.requests().len();
+        let raw = invoke_raw(&mut child, operation, &input);
+        assert_answered(
+            &provider,
+            before,
+            &raw,
+            operation,
+            expected,
+            HEADER,
+            page(expected).unwrap(),
+        );
+    }
+    // The bot connection does not expose search.
+    let before = provider.requests().len();
+    assert!(attempt(&mut child, "search.messages", &json!({"query": "fixture"})).is_err());
+    assert_eq!(provider.requests().len(), before);
+}
+
+/// The search connection: a user token under `slack.user`, proved by the same
+/// `auth.test` identity read, whose `user_id` is the person's. Search sends
+/// its query in the document's parameter order with the user token in the
+/// header only, and the conversation reads are not exposed on it.
+#[test]
+fn search_runs_on_the_user_token_connection() {
+    let provider = Provider::user();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let baseline = child
+        .validate(USER_PROFILE, &user_secret(), deadline())
+        .unwrap();
+    assert_eq!(baseline.identity.kind, "slack.user");
+    assert_eq!(baseline.identity.subject, "U0FIXTURE02");
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, "/api/auth.test?");
+    assert_eq!(requests[0].1.as_deref(), Some(USER_HEADER));
+    assert!(matches!(
+        child.validate(PROFILE, &user_secret(), deadline()),
+        Err(Failure::Unsupported)
+    ));
+
+    let expected =
+        "/api/search.messages?count=20&page=1&query=fixture&sort=timestamp&sort_dir=desc";
+    let before = provider.requests().len();
+    let raw = attempt_as(
+        &mut child,
+        "search.messages",
+        &json!({"sort_dir": "desc", "sort": "timestamp", "query": "fixture",
+                "page": 1, "count": 20}),
+        &user_secret(),
+    )
+    .unwrap_or_else(|failure| panic!("search failed: {failure:?}"));
+    assert_answered(
+        &provider,
+        before,
+        &raw,
+        "search.messages",
+        expected,
+        USER_HEADER,
+        user_page(expected).unwrap(),
+    );
+
+    let before = provider.requests().len();
+    assert!(
+        attempt_as(
+            &mut child,
+            "conversations.list",
+            &json!({"limit": 2}),
+            &user_secret()
+        )
+        .is_err()
+    );
+    assert_eq!(provider.requests().len(), before);
+}
+
+/// The token in any spelling, a missing `query`, a `count` outside the
+/// pinned 1 to 100, and a cursor search does not take: each refused before
+/// any request.
+#[test]
+fn search_refuses_a_token_a_missing_query_or_an_out_of_bound_count_before_any_request() {
+    let provider = Provider::user();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for input in [
+        json!({"query": "fixture", "token": USER_TOKEN}),
+        json!({"query": "fixture", "query:token": USER_TOKEN}),
+        json!({"query": "fixture", "header:token": USER_TOKEN}),
+        json!({"count": 20}),
+        json!({"query": "fixture", "count": 0}),
+        json!({"query": "fixture", "count": 101}),
+        json!({"query": "fixture", "cursor": "c"}),
+    ] {
+        let outcome = attempt_as(&mut child, "search.messages", &input, &user_secret());
+        assert!(
+            matches!(outcome, Err(Failure::InvalidInput)),
+            "{input}: {outcome:?}"
         );
     }
     assert!(provider.requests().is_empty());
@@ -719,7 +1190,7 @@ fn walk(operation: &str, first: Value, items: &str) -> (Vec<String>, Vec<String>
     let requests = provider
         .requests()
         .into_iter()
-        .map(|(path, _)| path)
+        .map(|(path, _, _)| path)
         .collect();
     (read, requests)
 }
@@ -781,6 +1252,19 @@ fn conversations_replies_walks_two_pages_and_stops_on_an_empty_next_cursor() {
         [
             "/api/conversations.replies?channel=C0FIXTURE01&ts=1780000100.000100&limit=2",
             "/api/conversations.replies?channel=C0FIXTURE01&ts=1780000100.000100&limit=2&cursor=fixture-replies-2",
+        ]
+    );
+}
+
+#[test]
+fn users_list_walks_two_pages_and_stops_on_an_empty_next_cursor() {
+    let (read, requests) = walk("users.list", json!({"limit": 2}), "members");
+    assert_eq!(read, ["U0FIXTURE11", "U0FIXTURE12", "U0FIXTURE13"]);
+    assert_eq!(
+        requests,
+        [
+            "/api/users.list?limit=2",
+            "/api/users.list?limit=2&cursor=fixture-users-2",
         ]
     );
 }
