@@ -219,10 +219,21 @@ target/release/connectors --output json operations invoke --adapter incidents --
   default, `primary_key_position` the column's place in `PRIMARY`, and each foreign key the
   referenced schema, table and column. Positions are decimal text: a row reads
   `["team_id","int","YES","0","2",null,"incidents_team_fk","incidents","teams","id"]`. A
-  table that does not exist, or whose columns the user cannot see, is `not_found`.
+  generated column's `column_default` is `null`. A table that does not exist, or whose
+  columns the user cannot see, is `not_found`.
+- Foreign keys follow MySQL's own `KEY_COLUMN_USAGE` visibility, which differs from
+  PostgreSQL: a foreign key of a table the user can see names its referenced schema, table
+  and column even when the user holds no privilege on them, so `table.describe` can name a
+  database that `database.list` does not list. On PostgreSQL such a key is left out.
 - `index.list` reads `STATISTICS`: one row per key part, `PRIMARY` as the primary key's
   name, and a functional key part's expression as `column_name`. Without `table` it lists
-  every table's indexes.
+  every table's indexes; a table that does not exist is an empty answer.
+- A table name MySQL cannot hold is `not_found` on `table.describe` and `index.list`. MySQL
+  forbids a name ending in a space, and its metadata collation pads, so `orders ` would
+  otherwise match `orders`: such a name is refused before a session is opened. A name with a
+  character the `utf8mb3` metadata cannot represent (such as an emoji) makes the server answer
+  error 3988, which these reads report as `not_found`; `query.read` still reports that error
+  as `unavailable`.
 
 ## Limitations
 

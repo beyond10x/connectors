@@ -952,3 +952,78 @@ async fn postgresql_catalogue_inputs_are_refused_before_credentials_or_connectio
     }
     assert_eq!(count.load(Ordering::SeqCst), 0);
 }
+
+/// What the PostgreSQL statements hide, pinned on their text; the live cases
+/// in `catalogue_adversary.rs` measure the behaviour on a server.
+/// - A generated column (`attgenerated <> ''`) has no default: its expression
+///   in `pg_attrdef` is not `column_default`, as in `information_schema.columns`.
+/// - A foreign key is reported only when the role holds `USAGE` on the
+///   referenced schema and some privilege on the referenced table.
+/// - An index is left out when any column it depends on (key, INCLUDE,
+///   expression or predicate, `pg_depend`) is one the role holds no column
+///   privilege on, the rule that hides the column from `table.describe`.
+/// A name ending in a space is an ordinary PostgreSQL name and is bound.
+#[tokio::test]
+async fn postgresql_catalogue_statements_hide_what_the_role_cannot_see() {
+    let scenario = Scenario {
+        columns: DESCRIBE_COLUMNS.to_vec(),
+        rows: vec![row(&[
+            Some("b"),
+            Some("integer"),
+            Some("YES"),
+            None,
+            Some("2"),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ])],
+        parameters: 2,
+        bound_values: vec![Some("app".into()), Some("gen ".into())],
+        ..Scenario::default()
+    };
+    let prepared = scenario.prepared.clone();
+    catalogue(
+        scenario,
+        "table.describe",
+        json!({"schema":"app","table":"gen ","limit":10}),
+    )
+    .await
+    .unwrap();
+    let describe = prepared.lock().unwrap()[0].clone();
+    assert!(
+        describe.contains("CASE WHEN a.attgenerated <> '' THEN NULL ELSE pg_catalog.pg_get_expr(d.adbin, d.adrelid) END AS column_default"),
+        "{describe}"
+    );
+    assert!(
+        describe.contains("pg_catalog.has_schema_privilege(rn.oid, 'USAGE')"),
+        "{describe}"
+    );
+    assert!(
+        describe.contains("pg_catalog.has_table_privilege(rc.oid, "),
+        "{describe}"
+    );
+    let scenario = Scenario {
+        columns: INDEX_COLUMNS.to_vec(),
+        rows: vec![],
+        parameters: 2,
+        bound_values: vec![Some("app".into()), Some("partial ".into())],
+        ..Scenario::default()
+    };
+    let prepared = scenario.prepared.clone();
+    let result = catalogue(
+        scenario,
+        "index.list",
+        json!({"schema":"app","table":"partial ","limit":10}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result["rows"], json!([]));
+    let index = prepared.lock().unwrap()[0].clone();
+    assert!(index.contains("FROM pg_catalog.pg_depend"), "{index}");
+    assert!(
+        index.contains("pg_catalog.has_column_privilege(c.oid, "),
+        "{index}"
+    );
+}

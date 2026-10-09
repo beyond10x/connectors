@@ -616,7 +616,7 @@
     },
     {
       "id": "table.describe",
-      "description": "Describe one table or view: one row per column in ordinal order, with column_name, native_type, is_nullable (YES or NO), column_default, ordinal_position, primary_key_position, and the foreign key the column belongs to (foreign_key, referenced_schema, referenced_table, referenced_column); a column in several foreign keys has one row per key. A table with no column visible to the configured role or user is not_found. Schema follows table.list.",
+      "description": "Describe one table or view: one row per column in ordinal order, with column_name, native_type, is_nullable (YES or NO), column_default, ordinal_position, primary_key_position, and the foreign key the column belongs to (foreign_key, referenced_schema, referenced_table, referenced_column); a column in several foreign keys has one row per key. A generated column has a null column_default. On PostgreSQL a foreign key is reported only when the role holds USAGE on the referenced schema and a privilege on the referenced table. A table with no column visible to the configured role or user is not_found, and so, on MySQL, is a table name MySQL cannot hold (one ending in a space, or one its metadata character set cannot represent). Schema follows table.list.",
       "contract": "datasource.relational/v1alpha1",
       "profile": "postgresql-native-text",
       "input_schema": {
@@ -733,7 +733,7 @@
     },
     {
       "id": "index.list",
-      "description": "List the indexes of one table, or of every table of one schema when table is omitted: one row per key column, with index_name, table_name, column_position, column_name (the expression text for an expression key part), is_unique and is_primary (YES or NO). Schema follows table.list.",
+      "description": "List the indexes of one table, or of every table of one schema when table is omitted: one row per key column, with index_name, table_name, column_position, column_name (the expression text for an expression key part), is_unique and is_primary (YES or NO). On PostgreSQL an index built on a column the role cannot see (key, INCLUDE, expression or predicate) is left out, as table.describe leaves out the column. A table that does not exist is an empty answer; on MySQL a table name MySQL cannot hold is not_found. Schema follows table.list.",
       "contract": "datasource.relational/v1alpha1",
       "profile": "postgresql-native-text",
       "input_schema": {

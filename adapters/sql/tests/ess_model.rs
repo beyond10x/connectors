@@ -82,6 +82,15 @@ fn holds(document: &Value, invariant: &str) -> bool {
                 .is_some_and(|s| s.starts_with(prefix.as_str().unwrap()))
         });
     }
+    // An absent member matches no suffix, so a model guard that must hold
+    // for an absent member names `missing(...)` itself.
+    if let Some((left, right)) = invariant.split_once(" ends_with ") {
+        let suffix = literal(right);
+        return field(document, left).is_some_and(|v| {
+            v.as_str()
+                .is_some_and(|s| s.ends_with(suffix.as_str().unwrap()))
+        });
+    }
     for operator in [" == ", " != ", " >= ", " <= "] {
         let Some((left, right)) = invariant.split_once(operator) else {
             continue;
@@ -532,7 +541,24 @@ async fn catalogue_call(
     table: Option<&str>,
     answered: bool,
 ) -> Value {
-    let server = fixture::start(catalogue_script(read, answered)).await;
+    catalogue_call_with(
+        engine,
+        read,
+        schema,
+        table,
+        catalogue_script(read, answered),
+    )
+    .await
+}
+
+async fn catalogue_call_with(
+    engine: Engine,
+    read: &str,
+    schema: Option<&str>,
+    table: Option<&str>,
+    script: fixture::Script,
+) -> Value {
+    let server = fixture::start(script).await;
     // PostgreSQL never reaches the MySQL fixture: its refusals come before
     // any connection, which a closed port would otherwise turn into
     // `unavailable`.
@@ -587,6 +613,9 @@ async fn catalogue_call(
         .is_err_and(|e| e.code == ErrorCode::InvalidInput)
     {
         assert_eq!(log.sessions, 0, "{engine:?} {read}: a session was opened");
+    }
+    if engine == Engine::Mysql && table.is_some_and(|t| t.ends_with(' ')) {
+        assert_eq!(log.sessions, 0, "{read} {table:?}: a session was opened");
     }
     json!({ "call": call })
 }
@@ -685,6 +714,37 @@ async fn catalogue_reads_read_only_what_the_model_fixes() {
         assert_eq!(document["call"]["outcome"], outcome, "{document}");
         conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
     }
+    // A table name MySQL cannot hold: one ending in a space is `not_found`
+    // with nothing bound; one the metadata character set cannot represent is
+    // bound, answered with error 3988 and `not_found`.
+    for (read, schema, table, refused, outcome) in [
+        ("table.describe", None, "incidents ", false, "not_found"),
+        (
+            "table.describe",
+            Some("fixture"),
+            "incidents ",
+            false,
+            "not_found",
+        ),
+        ("index.list", None, "incidents ", false, "not_found"),
+        (
+            "index.list",
+            Some("other"),
+            "incidents ",
+            false,
+            "invalid_input",
+        ),
+        ("table.describe", None, "\u{1F600}", true, "not_found"),
+        ("index.list", None, "\u{1F600}", true, "not_found"),
+    ] {
+        let mut script = catalogue_script(read, true);
+        if refused {
+            script.execute_error = Some((3988, "HY000"));
+        }
+        let document = catalogue_call_with(Engine::Mysql, read, schema, Some(table), script).await;
+        assert_eq!(document["call"]["outcome"], outcome, "{document}");
+        conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
+    }
     // The model refuses the reads it rules out.
     for wrong in [
         // Another database read on MySQL.
@@ -707,6 +767,20 @@ async fn catalogue_reads_read_only_what_the_model_fixes() {
         // A refusal that still bound a statement.
         json!({"read":"table_describe","engine":"mysql","connected_database":"fixture","requested_schema":"other",
             "requested_table":"a","outcome":"invalid_input","schema_read":"other","table_read":"a"}),
+        // A MySQL name ending in a space answered with the unpadded table's rows,
+        // or bound to a statement before it was refused.
+        json!({"read":"table_describe","engine":"mysql","connected_database":"fixture","requested_table":"a ",
+            "outcome":"read","schema_read":"fixture","table_read":"a ","provenance_resource":"fixture"}),
+        json!({"read":"index_list","engine":"mysql","connected_database":"fixture","requested_table":"a ",
+            "outcome":"read","schema_read":"fixture","table_read":"a ","provenance_resource":"fixture"}),
+        json!({"read":"index_list","engine":"mysql","connected_database":"fixture","requested_table":"a ",
+            "outcome":"not_found","schema_read":"fixture","table_read":"a "}),
+        // `not_found` from `index.list` on PostgreSQL, and a PostgreSQL name
+        // ending in a space that was not bound.
+        json!({"read":"index_list","engine":"postgresql","connected_database":"fixture","requested_schema":"public",
+            "requested_table":"a","outcome":"not_found","schema_read":"public","table_read":"a"}),
+        json!({"read":"table_describe","engine":"postgresql","connected_database":"fixture","requested_schema":"public",
+            "requested_table":"a ","outcome":"not_found"}),
     ] {
         let document = json!({ "call": wrong });
         assert!(conforms(&model, &document).is_err(), "{document}");

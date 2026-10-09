@@ -97,6 +97,8 @@ const CHROME: &str = "google-chrome-stable";
 const OLD_CLI: &str = "CONNECTORS_ADVERSARY_PRE_HANDSHAKE";
 const PG: &str = "CONNECTORS_PG_SANDBOX";
 const PG_CONTAINER: &str = "CONNECTORS_PG_CONTAINER";
+const PG_ADVERSARY: &str = "CONNECTORS_PG_ADVERSARY_PORT";
+const MYSQL_ADVERSARY: &str = "CONNECTORS_MYSQL_ADVERSARY_PORT";
 const DOCKER: &str = "docker";
 const K8S: &str = "CONNECTORS_K8S_SANDBOX";
 const CA: &str = "CONNECTORS_K8S_CA";
@@ -250,6 +252,27 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "local_runtime",
             "cli_journey::postgres_dropped_invocation_cancels_its_backend",
         ) => Some((Live, vec![PG, PG_CONTAINER, DOCKER])),
+        (
+            "connectors-sql",
+            "catalogue_adversary",
+            "postgresql_composite_keys_expressions_and_case_on_a_live_server"
+            | "postgresql_foreign_keys_into_what_the_role_cannot_see_are_left_out"
+            | "postgresql_generated_column_is_not_reported_as_a_default"
+            | "postgresql_index_list_does_not_name_a_column_the_role_cannot_see"
+            | "postgresql_index_list_leaves_out_every_index_over_a_hidden_column",
+        ) => Some((Live, vec![PG_ADVERSARY])),
+        (
+            "connectors-sql",
+            "catalogue_adversary",
+            "mysql_a_name_mysql_cannot_represent_is_not_found_on_a_live_server"
+            | "mysql_table_describe_of_a_name_with_a_trailing_space_is_not_found"
+            | "mysql_table_names_are_case_sensitive_on_a_live_server",
+        )
+        | (
+            "connectors-sql",
+            "mysql_adversary_2",
+            "live_mysql_distinct_timestamps_are_written_distinctly",
+        ) => Some((Live, vec![MYSQL_ADVERSARY])),
         (
             "connectors",
             "failed_connect",
@@ -601,6 +624,14 @@ fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static st
             K8S,
             "CONNECTORS_K8S_SANDBOX must name the prepared sandbox API base".into(),
         );
+    }
+    for key in [PG_ADVERSARY, MYSQL_ADVERSARY] {
+        if !std::env::var(key).is_ok_and(|port| port.parse::<u16>().is_ok_and(|port| port > 0)) {
+            missing.insert(
+                key,
+                format!("{key} must name the loopback port of a disposable server prepared as the test file says"),
+            );
+        }
     }
     if !executable(Path::new(KUBECTL)) {
         missing.insert(KUBECTL, "/usr/bin/kubectl is not executable".into());

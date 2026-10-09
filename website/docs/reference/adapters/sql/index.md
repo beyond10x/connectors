@@ -34,14 +34,18 @@ database.
 Results preserve column names, native type names and values as text or JSON null, under the
 `postgresql-native-text` or `mysql-native-text` profile. A MySQL connection reads only its
 configured database: the table and index reads, like `schema.list`, refuse any other schema as
-`invalid_input`. `table.describe` of a table that does not exist is `not_found`. SQLSTATE `0A000`
-returns `unsupported`.
+`invalid_input`. `table.describe` of a table that does not exist is `not_found`, and on MySQL
+so is `table.describe` or `index.list` of a table name MySQL cannot hold. The catalogue reads
+hide what the role or user cannot see as the engine's `information_schema` does; on PostgreSQL
+that includes foreign keys into schemas or tables the role cannot see and indexes built on
+hidden columns. SQLSTATE `0A000` returns `unsupported`.
 
 Six real PostgreSQL 17.6 acceptance cases passed on 2026-10-02, covering saved-credential
 restart, joins and UTC boundaries, result bounds, read-only refusals, native invocation-drop
 cancellation and local lifecycle controls. The plaintext loopback fixture does not establish TLS
 or a universal remote cancellation deadline. MySQL and the catalogue reads are verified against
-scripted wire fixtures, not a live server.
+scripted wire fixtures; the catalogue reads' visibility and name rules were also run against
+disposable PostgreSQL 17 and MySQL 8.0 servers on 2026-10-09.
 
 ## Access and limits
 

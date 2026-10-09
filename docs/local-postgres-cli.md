@@ -195,9 +195,18 @@ rows such as:
 `schema` is required for the table and index reads, as for `schema.list`. `index.list`
 without `table` lists the indexes of every table of the schema, one row per key column.
 `table.describe` of a table that does not exist, or whose columns the role cannot see, is
-`not_found`; `table.list` and `index.list` answer an empty `rows` instead. Add the
-operations you grant to `operations` in the adapter entry. These reads are checked against
-a scripted PostgreSQL wire fixture, not yet against a live server.
+`not_found`; `table.list` and `index.list` answer an empty `rows` instead.
+
+The reads hide what the role cannot see, as `information_schema` does. A generated column's
+`column_default` is `null` (its generation expression is not a default). A foreign key is
+reported only when the role holds `USAGE` on the referenced schema and a privilege on the
+referenced table; otherwise the column is described without it. `index.list` leaves out an
+index built on any column `table.describe` hides: a key, INCLUDE or expression column, or a
+column in a partial index's predicate.
+
+Add the operations you grant to `operations` in the adapter entry. These reads are checked
+against a scripted PostgreSQL wire fixture; their visibility rules were also run against a
+disposable PostgreSQL 17 server on 2026-10-09.
 
 ## Limitations
 
