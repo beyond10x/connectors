@@ -69,7 +69,8 @@ fn answer(method: &str, target: &str, authorization: &str, probe: u16) -> (u16, 
     {
         return (401, br#"{"message":"Unauthorized"}"#.to_vec());
     }
-    match (method, target) {
+    let route = target.split('?').next().unwrap_or_default();
+    match (method, route) {
         ("GET", "/api/datasources") if probe != 0 => (probe, b"{}".to_vec()),
         ("GET", "/api/datasources") => (200, fixture("datasources.json")),
         _ => (404, br#"{"message":"Not found"}"#.to_vec()),
@@ -217,7 +218,7 @@ impl Provider {
             .lock()
             .unwrap()
             .iter()
-            .map(|c| c.target.clone())
+            .map(|c| c.target.split('?').next().unwrap_or_default().to_owned())
             .collect()
     }
 }
