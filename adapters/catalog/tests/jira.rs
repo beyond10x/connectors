@@ -298,7 +298,7 @@ fn page(path: &str) -> Option<Value> {
         "/rest/api/3/issue/createmeta/FIX/issuetypes" => json!({
             "startAt": 0, "maxResults": 2, "total": 3,
             "issueTypes": [issue_type(1, "Task"), issue_type(2, "Story")]}),
-        "/rest/api/3/user/search" if has("startAt=4") => json!([]),
+        "/rest/api/3/user/search" if has("startAt=3") => json!([]),
         "/rest/api/3/user/search" if has("startAt=2") => json!([user(3)]),
         "/rest/api/3/user/search" => json!([user(1), user(2)]),
         "/rest/api/3/search/jql" if has("nextPageToken=fixture-page-2") => {
@@ -770,7 +770,7 @@ fn users_search_sends_the_query_and_walks_to_an_empty_page() {
         [
             "/rest/api/3/user/search?query=fixture&startAt=0&maxResults=2",
             "/rest/api/3/user/search?query=fixture&startAt=2&maxResults=2",
-            "/rest/api/3/user/search?query=fixture&startAt=4&maxResults=2",
+            "/rest/api/3/user/search?query=fixture&startAt=3&maxResults=2",
         ]
     );
     assert!(requests.iter().all(|(_, a)| a.as_deref() == Some(HEADER)));
