@@ -58,7 +58,8 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
 serves the provider from the pinned source alone, plus seven repository reads
-and one unguarded write, `issue.create`:
+and one unguarded write, `issue.create`, and the merge-request note and discussion
+operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)):
 
 | id | source operation | effect |
 |---|---|---|
@@ -70,6 +71,9 @@ and one unguarded write, `issue.create`:
 | `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
+| `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | read |
+| `merge_request.note.create`, `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes`, `…DiscussionsDiscussionIdNotes`, unguarded | write |
+| `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`, guarded | write |
 
 The GitLab set also declares the merge request feed, a `datasource.feed/v1alpha1`
 binding under profile `gitlab-merge-requests/1`: `feed.containers` lists the

@@ -78,7 +78,23 @@
                                 {"pointer": "/head_pipeline/id", "expect": {"input": "pipeline_id"}},
                                 {"pointer": "/head_pipeline/status", "expect": {"literal": "success"}}]},
        "postflight": {"checks": [{"pointer": "/state", "expect": {"literal": "merged"}},
-                                 {"pointer": "/sha", "expect": {"input": "body.sha"}}]}}}
+                                 {"pointer": "/sha", "expect": {"input": "body.sha"}}]}}},
+    {"id": "merge_request.note.create", "operation_id": "postApiV4ProjectsIdMergeRequestsNoteableIdNotes", "effect": "write",
+     "description": "Add one note to merge request noteable_id (its IID) in project id; body.body is the text, body.internal true makes it internal. Unguarded: nothing exists to compare before a create, so the same input approved and sent again adds a second note. GitLab runs quick actions in the text, such as /close, /approve or /assign_reviewer, so read the whole text before approving",
+     "body_keys": ["body", "internal"]},
+    {"id": "merge_request.discussion.get", "operation_id": "getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId", "effect": "read",
+     "description": "Read one discussion of merge request noteable_id (its IID) by discussion_id, with its notes and its resolvable and resolved state"},
+    {"id": "merge_request.discussion.reply", "operation_id": "postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes", "effect": "write",
+     "description": "Add one reply, body.body, to discussion discussion_id of merge request noteable_id (its IID). Unguarded: the same input approved and sent again adds a second reply. GitLab runs quick actions in the text, so read the whole text before approving",
+     "body_keys": ["body"]},
+    {"id": "merge_request.discussion.resolve", "operation_id": "putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId", "effect": "write",
+     "description": "Resolve (body.resolved true) or unresolve (false) one resolvable discussion of merge request noteable_id (its IID); GitLab's answer must carry the requested state",
+     "body_keys": ["resolved"],
+     "guard": {
+       "preflight": {"operation_id": "getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId",
+                     "values": {"id": "id", "noteable_id": "noteable_id", "discussion_id": "discussion_id"},
+                     "checks": [{"pointer": "/resolvable", "expect": {"literal": "true"}}]},
+       "postflight": {"checks": [{"pointer": "/resolved", "expect": {"input": "body.resolved"}}]}}}
   ],
   "feed": {
     "profile": "gitlab-merge-requests/1",
