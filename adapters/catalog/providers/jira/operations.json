@@ -10,6 +10,8 @@
      "description": "List one issue's changelog, one page per call; the walk ends on a page with isLast true"},
     {"id": "issue.get", "operation_id": "getIssue", "effect": "read",
      "description": "Read one issue by id or key, with the fields named in fields (default all fields, attachment among them) and the expansions named in expand, such as renderedFields,names"},
+    {"id": "issue.transitions", "operation_id": "getTransitions", "effect": "read",
+     "description": "List the transitions the account may run on one issue by id or key, each with its target status in to; transitionId narrows to one, expand=transitions.fields adds the transition screen's fields, includeUnavailableTransitions=true adds those that fail a condition"},
     {"id": "issue.create_meta", "operation_id": "getCreateIssueMetaIssueTypes", "effect": "read",
      "description": "List the issue types the account can create in one project, by id or key, one page per call; the walk ends when startAt plus the page's issueTypes reaches total"},
     {"id": "users.search", "operation_id": "findUsers", "effect": "read",
