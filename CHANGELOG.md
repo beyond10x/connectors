@@ -22,16 +22,27 @@
     discussion. Both are unguarded, as creates: the same approved input sent twice adds a second
     note. Their bodies are closed: `body` and `internal` for a note, `body` for a reply, so
     `created_at`, the deprecated `confidential` and `merge_request_diff_head_sha` are refused
-    before any request. GitLab runs quick actions written in the text, so the approver reads it
-    whole.
+    before any request. As the pinned request bodies require, `body` must be present and a JSON
+    string and `internal` a JSON boolean, so a note or reply without its text is refused before
+    any request. GitLab runs quick actions written in the text, so the approver reads it whole.
   - `merge_request.discussion.resolve`
     (`putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`) resolves or unresolves
-    one discussion. Its guard reads the discussion first through the new read
-    `merge_request.discussion.get` and refuses unless it is resolvable; GitLab's answer must
-    carry the requested `resolved`, or the outcome is unknown.
+    one discussion. `resolved` must be a JSON boolean, as the pinned document types it; `"true"`,
+    `1` or `"yes"` is refused before any request. Its guard reads the discussion first through
+    the new read `merge_request.discussion.get` and refuses unless that answer is the discussion
+    `discussion_id` and it is resolvable; GitLab's answer must carry the same discussion id and
+    the requested `resolved`, or the outcome is unknown.
   Verified against a local fixture written in the pinned document's shapes, not a live GitLab.
   The GitLab example configuration in `docs/local-catalog-provider.md` therefore has a new
   configuration revision.
+- A catalog selection that closes a write's body with `body_keys` may also declare
+  `body_types`, the JSON type (`string`, `integer` or `boolean`) of each key as the provider's
+  request body schema gives it, and `body_required`, the keys that schema requires. A typed key
+  must be a JSON value of exactly that type, with no string spelling and no `null`, and a body
+  without a required key is refused; both as `invalid_input` before any request, and the declared
+  input schema says the same. Either naming a key `body_keys` does not admit, a repeated required
+  key, or a guard reading a path nested under a typed key is refused when the selection loads
+  (`docs/local-catalog-provider.md`). Selections without them are unchanged.
 
 ### Limits
 

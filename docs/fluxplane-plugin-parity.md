@@ -194,7 +194,7 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.mr.discussion.list` | 43 | 11 | 2026-10-06 | — | missing | The discussion list is not selected. One discussion by id is read by `merge_request.discussion.get` (:85) since 2026-10-10, which needs the id the list would give. |
 | `gitlab.project.show` | 36 | 19 | 2026-10-03 | `project.get` (:5) | covered | — |
 | `gitlab.repository.tree` | 35 | 13 | 2026-10-06 | — | missing | Repository tree is not selected. |
-| `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | `merge_request.note.create` (:82) | covered | One note by merge-request IID, optionally `internal`. Unguarded, as a create: the same approved input sent twice adds a second note. GitLab runs quick actions in the text; `/merge` is cut off because the body does not admit `merge_request_diff_head_sha` (2026-10-10). |
+| `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | `merge_request.note.create` (:82) | covered | One note by merge-request IID, its text required, optionally `internal`. Unguarded, as a create: the same approved input sent twice adds a second note. GitLab runs quick actions in the text; `/merge` is cut off because the body does not admit `merge_request_diff_head_sha` (2026-10-10). |
 | `gitlab.pipeline.retry` | 19 | 5 | 2026-10-05 | — | missing | Pipeline retry is not selected. |
 | `gitlab.release.create` | 16 | 3 | 2026-10-02 | — | missing | The release write is not selected. |
 | `gitlab.repository.tag.create` | 16 | 5 | 2026-09-20 | — | missing | The tag write is not selected. |
@@ -211,8 +211,8 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.release.link.list` | 2 | 1 | 2026-10-02 | `releases.list` (:38) | partial | Links appear only inside each release's `assets`. There is no per-release link list. |
 | `gitlab.deployment.list` | 1 | 1 | 2026-09-28 | `deployments.list` (:50) | covered | — |
 | `gitlab.environment.list` | 1 | 1 | 2026-09-28 | — | missing | Environments are not selected. |
-| `gitlab.mr.discussion.reply` | 1 | 1 | 2026-09-24 | `merge_request.discussion.reply` (:87) | covered | One reply by discussion id. Unguarded, as a create (2026-10-10). |
-| `gitlab.mr.discussion.resolve` | 1 | 1 | 2026-09-24 | `merge_request.discussion.resolve` (:90) | covered | Resolve or unresolve by discussion id. Guarded: refused before the write unless the discussion is resolvable; GitLab's answer must carry the requested state, or the outcome is unknown (2026-10-10). |
+| `gitlab.mr.discussion.reply` | 1 | 1 | 2026-09-24 | `merge_request.discussion.reply` (:87) | covered | One reply by discussion id, its text required. Unguarded, as a create (2026-10-10). |
+| `gitlab.mr.discussion.resolve` | 1 | 1 | 2026-09-24 | `merge_request.discussion.resolve` (:90) | covered | Resolve or unresolve by discussion id, `resolved` a JSON boolean. Guarded: refused before the write unless the read answers with that discussion and it is resolvable; GitLab's answer must carry the same discussion id and the requested state, or the outcome is unknown (2026-10-10). |
 | `gitlab.release.update` | 1 | 1 | 2026-09-29 | — | missing | The release write is not selected. |
 | `gitlab.repository.tag.delete` | 1 | 1 | 2026-09-20 | — | missing | Tag delete is not selected. |
 | `gitlab.branch.delete_merged` | 0 | 0 | - | — | missing | Not selected. |

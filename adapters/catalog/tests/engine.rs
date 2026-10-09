@@ -123,6 +123,8 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         credential: Vec::new(),
         rate_limit_reasons: Vec::new(),
         body_keys: Vec::new(),
+        body_types: BTreeMap::new(),
+        body_required: Vec::new(),
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {
@@ -1690,6 +1692,165 @@ fn body_keys_are_refused_at_load_unless_they_close_a_write_body() {
         engine.declarations(&[Effect::Write])[0].input_schema["properties"]["body"],
         json!({"type": "object",
                "properties": {"sha": {"type": ["string", "integer", "boolean"]}, "note": {}},
+               "required": ["sha"], "additionalProperties": false})
+    );
+}
+
+/// A write closed to `id`, `flag`, `count` and `note`, typing the first three
+/// and requiring `id`, as a pinned request body schema would.
+fn typed_thing() -> Engine {
+    let selection = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["id", "flag", "count", "note"],
+        "body_types": {"id": "string", "flag": "boolean", "count": "integer"},
+        "body_required": ["id"]
+    }));
+    Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap()
+}
+
+/// `body_types` declares a closed body key as exactly one JSON type, with no
+/// string or number spelling of it, and `body_required` requires a key. The
+/// declaration says both; the fields round-trip and are omitted when empty.
+#[test]
+fn body_types_and_body_required_declare_the_closed_body() {
+    let engine = typed_thing();
+    assert_eq!(
+        engine.declarations(&[Effect::Write])[0].input_schema["properties"]["body"],
+        json!({"type": "object",
+               "properties": {"id": {"type": "string"}, "flag": {"type": "boolean"},
+                              "count": {"type": "integer"}, "note": {}},
+               "required": ["id"], "additionalProperties": false})
+    );
+    let typed = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["id", "flag"], "body_types": {"flag": "boolean"}, "body_required": ["id"]
+    }));
+    let value = serde_json::to_value(&typed).unwrap();
+    assert_eq!(value["body_types"], json!({"flag": "boolean"}));
+    assert_eq!(value["body_required"], json!(["id"]));
+    let plain = serde_json::to_value(select("thing.create", "createThing", Effect::Write)).unwrap();
+    assert!(plain.get("body_types").is_none(), "{plain}");
+    assert!(plain.get("body_required").is_none(), "{plain}");
+}
+
+/// A body missing a required key, or carrying a typed key as any other JSON
+/// type (a string `"true"` for a boolean, `1` for a boolean, `"3"` or `1.5`
+/// for an integer, `null` for anything), is `invalid_input` before any
+/// request. A body that fits is sent unchanged, an untyped key with any value.
+#[tokio::test]
+async fn a_body_missing_a_required_key_or_mistyped_is_refused_before_any_request() {
+    let engine = typed_thing();
+    for body in [
+        json!({}),
+        json!({"flag": true}),
+        json!({"id": null}),
+        json!({"id": 7}),
+        json!({"id": "t-1", "flag": "true"}),
+        json!({"id": "t-1", "flag": 1}),
+        json!({"id": "t-1", "flag": null}),
+        json!({"id": "t-1", "count": "3"}),
+        json!({"id": "t-1", "count": 1.5}),
+        json!({"id": "t-1", "count": true}),
+    ] {
+        let http = reads(vec![]);
+        let error = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "thing.create",
+                json!({"body": body}),
+            )
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{body} was prepared"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{body}");
+        assert!(http.calls.lock().unwrap().is_empty(), "{body}");
+    }
+    let body = json!({"id": "t-1", "flag": false, "count": 3, "note": {"any": [1]}});
+    let http = reads(vec![]);
+    let prepared = engine
+        .prepare(
+            http.as_ref(),
+            "fixture",
+            "thing.create",
+            json!({"body": body.clone()}),
+        )
+        .await
+        .unwrap();
+    let sent: Sent = Arc::default();
+    let outcome = prepared
+        .execute(Box::new(Send {
+            sent: sent.clone(),
+            response: Some(response(200, json!({"id": "t-1"}))),
+        }))
+        .await;
+    assert!(matches!(outcome, WriteOutcome::Applied(Ok(_))));
+    assert_eq!(sent.lock().unwrap()[0].2, body);
+}
+
+/// `body_types` and `body_required` name keys of a closed body: either one
+/// without `body_keys`, naming a key outside them, or repeating a key is
+/// refused when the selection loads, and so is a guard reading a path nested
+/// under a key typed as a scalar. A guarded key typed by the selection is
+/// declared as that type.
+#[test]
+fn body_types_and_body_required_are_refused_at_load_unless_they_name_closed_keys() {
+    for (label, selection) in [
+        (
+            "types without body_keys",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_types": {"id": "string"}}),
+        ),
+        (
+            "required without body_keys",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_required": ["id"]}),
+        ),
+        (
+            "a type for a key outside the set",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id"], "body_types": {"other": "string"}}),
+        ),
+        (
+            "a required key outside the set",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id"], "body_required": ["other"]}),
+        ),
+        (
+            "a repeated required key",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id"], "body_required": ["id", "id"]}),
+        ),
+    ] {
+        let error = Engine::new(&shapes_bundle(), "/v1", &[written(selection)])
+            .err()
+            .unwrap_or_else(|| panic!("{label} loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{label}");
+        assert!(
+            error.message.contains("body_types") || error.message.contains("body_required"),
+            "{label}: {}",
+            error.message
+        );
+    }
+    let guarded = |pointer_input: &str| {
+        written(json!({
+            "id": "merge_request.merge", "operation_id": "mergeMergeRequest", "effect": "write",
+            "body_keys": ["sha"], "body_types": {"sha": "string"},
+            "guard": {
+                "preflight": {"operation_id": "getMergeRequest",
+                              "values": {"id": "id", "merge_request_iid": "merge_request_iid"},
+                              "checks": [{"pointer": "/sha", "expect": {"input": pointer_input}}]},
+                "postflight": {"checks": []}}
+        }))
+    };
+    let error = Engine::new(&bundle(), "/api/v4", &[guarded("body.sha.value")])
+        .err()
+        .expect("a guard reading under a scalar-typed key loaded");
+    assert!(error.message.contains("body_types"), "{}", error.message);
+    let engine = Engine::new(&bundle(), "/api/v4", &[guarded("body.sha")]).unwrap();
+    assert_eq!(
+        engine.declarations(&[Effect::Write])[0].input_schema["properties"]["body"],
+        json!({"type": "object", "properties": {"sha": {"type": "string"}},
                "required": ["sha"], "additionalProperties": false})
     );
 }
