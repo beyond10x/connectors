@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-09T20:48:19Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-mysql-reads",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-sql-catalogue-reads-pass-1",
+    "review": "review-result:adversary-sql-catalogue-reads-pass-1",
+    "outcome": "fixed"
+  }
+}
