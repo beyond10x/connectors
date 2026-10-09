@@ -61,7 +61,7 @@ result envelope does not make native query/continuation semantics shared.
 | Zendesk | Served by the catalog provider: pinned Support API document in zendesk/upstream/, bundle and shipped read-only selection set under catalog/; see [the Zendesk guide](../docs/catalog-zendesk.md) |
 | Runpod | Served by the catalog provider: pinned REST API v1 document in runpod/upstream/, bundle and shipped selection set (one read, two approved writes) under catalog/; see [the Runpod guide](../docs/catalog-runpod.md) |
 | GitLab | Served by the catalog provider: pinned upstream in gitlab/upstream/, bundle and shipped selection set under catalog/; the native adapter was retired in 0.11.0 |
-| SQL | Existing declaration, native runtime and tests live in sql/ |
+| SQL | [Read profiles](sql/contracts/reads/v1alpha1/semantics.md) for PostgreSQL and MySQL, [ESS](sql/spec/ess/system.yaml); declaration, native runtime and tests live in sql/ |
 | Tavily | [Websearch profile `tavily/2026-10`](tavily/contracts/websearch/v1alpha1/semantics.md), pinned OpenAPI in tavily/upstream/, [ESS](tavily/spec/ess/system.yaml); native runtime and tests in tavily/; see [the Tavily guide](../docs/local-tavily.md) |
 | [Catalog](catalog/design.md) | Optional catalog adapter design |
 | [SIP](sip/design.md) | [Dial/effect/media binding](sip/contracts/dial/v1alpha1/semantics.md), native configuration and protocol obligations |

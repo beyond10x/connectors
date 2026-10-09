@@ -1,0 +1,118 @@
+domain: connectors_sql.connection
+summary: The SQL local connection — the engine it speaks, its native configuration and the one password profile each engine advertises.
+
+# Normative owner: adapters/sql/contracts/reads/v1alpha1/semantics.md and
+# docs/local-postgres-cli.md / docs/local-mysql-cli.md. The executable composition
+# (adapters/sql/src/local.rs) reads `LocalConfiguration` from its owner-only file and
+# advertises exactly one `PasswordProfile`, chosen by the engine; tests/ess_model.rs checks
+# both against the schemas this model generates.
+types:
+  # The database engine a connection speaks. `postgresql` is the default: a configuration
+  # that names no engine selects it, so every configuration written before the engine
+  # existed keeps its meaning and its configuration revision.
+  - name: connectors_sql.connection.Engine
+    kind: enum
+    variants: [postgresql, mysql]
+
+  # A connection instance id: the host's identifier alphabet, 1–128 characters.
+  - name: connectors_sql.connection.InstanceId
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"
+    invariants:
+      - value.count: {gte: 1, lte: 128}
+
+  # The owner-only native file named by `--local-config`. No credential is a member.
+  # `host` is a network host: a leading `/` would select a Unix socket directory, which
+  # carries no TLS and no host authority, and is refused. The port is required for both
+  # engines; no default is taken from the engine. `allow_plaintext` defaults to false, so
+  # TLS is required unless the file says otherwise; `ca_file`, when present, is an
+  # owner-only PEM bundle that replaces the public roots for this connection. The bounds of
+  # `host`, `database` and `user` count characters (Unicode scalar values), not bytes, and
+  # the executable counts them the same way.
+  - name: connectors_sql.connection.LocalConfiguration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: instance, type: connectors_sql.connection.InstanceId}
+      - {name: engine, type: "Optional<connectors_sql.connection.Engine>"}
+      - {name: host, type: String}
+      - {name: port, type: Integer}
+      - {name: database, type: String}
+      - {name: user, type: String}
+      - {name: allow_plaintext, type: "Optional<Boolean>"}
+      - {name: ca_file, type: "Optional<connectors_sql.connection.CaFile>"}
+    invariants:
+      - format == "connectors-sql-local/1"
+      - host.count: {gte: 1, lte: 512}
+      - not: {host: {starts_with: "/"}}
+      - port >= 1
+      - port <= 65535
+      - database.count: {gte: 1, lte: 512}
+      - user.count: {gte: 1, lte: 512}
+
+  # The path of an owner-only PEM bundle, 1–4,096 characters. The file may name it, write
+  # `null` for none, or omit it; `null` and absence mean the same thing.
+  - name: connectors_sql.connection.CaFile
+    kind: newtype
+    of: "Optional<String>"
+    invariants:
+      - value.count: {gte: 1, lte: 4096}
+
+  # A database password: 1–8,192 bytes. It enters through the host's protected entry and
+  # custody, never the configuration, and is held only for the session handshake.
+  - name: connectors_sql.connection.Password
+    kind: newtype
+    of: String
+    invariants:
+      - value.count: {gte: 1, lte: 8192}
+
+  # The protected entry of the password profile, for either engine.
+  - name: connectors_sql.connection.PasswordEntry
+    kind: struct
+    fields:
+      - {name: password, type: connectors_sql.connection.Password}
+
+  # The one authentication profile the executable advertises. The authenticated session is
+  # the credential check for both engines: the server accepts or rejects the password during
+  # its handshake, before any statement runs, so there is no probe. A password carries no
+  # scope grant, and validation evidence lasts 60 seconds. The engine names the profile id,
+  # its entry label, the identity kind of the validated principal and the scheme of the
+  # provider authority (`<scheme>://<host>:<port>/<database>`).
+  - name: connectors_sql.connection.PasswordProfile
+    kind: struct
+    fields:
+      - {name: engine, type: connectors_sql.connection.Engine}
+      - {name: id, type: String}
+      - {name: label, type: String}
+      - {name: scheme, type: String}
+      - {name: capability, type: String}
+      - {name: purpose, type: String}
+      - {name: subject, type: String}
+      - {name: minimum_scopes, type: "List<String>"}
+      - {name: evidence_lifetime_ms, type: Integer}
+      - {name: identity_kind, type: String}
+      - {name: authority_scheme, type: String}
+    invariants:
+      - scheme == "session_authority"
+      - capability == "session-authority"
+      - purpose == "delegated_user"
+      - subject == "user"
+      - minimum_scopes.count == 0
+      - evidence_lifetime_ms == 60000
+      - any: [engine != postgresql, id == "postgres.password"]
+      - any: [engine != postgresql, label == "PostgreSQL password"]
+      - any: [engine != postgresql, identity_kind == "postgresql.role"]
+      - any: [engine != postgresql, authority_scheme == "postgresql"]
+      - any: [engine != mysql, id == "mysql.password"]
+      - any: [engine != mysql, label == "MySQL password"]
+      - any: [engine != mysql, identity_kind == "mysql.user"]
+      - any: [engine != mysql, authority_scheme == "mysql"]
+
+# ESS-LIMIT: these are checked by the composition, not expressible as invariants here, and
+# the composition only ever refuses more than the model on them: that `ca_file` names an
+# existing owner-only file holding at least one PEM certificate; that a password holds no
+# NUL byte; and that the effective configuration omits `engine` for PostgreSQL (so its
+# revision is the one computed before the engine existed) and carries it for MySQL.
+# `alphabet:` is carried into the generated schemas as `x-ess-alphabet`, not as a JSON
+# Schema keyword, so a JSON Schema validator alone does not enforce it.

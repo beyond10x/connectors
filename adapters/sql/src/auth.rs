@@ -1,8 +1,10 @@
-//! Native protected entry for a PostgreSQL password. The host owns acquisition,
-//! custody, publication, clocks and the credential capability; this module owns
-//! only the document shape and the native failure vocabulary.
+//! Native protected entry for a database password, PostgreSQL or MySQL. The
+//! entry document is the same for both engines; only the profile id differs.
+//! The host owns acquisition, custody, publication, clocks and the credential
+//! capability; this module owns only the document shape and the native failure
+//! vocabulary.
 //!
-//! There is no probe here, and deliberately so. For PostgreSQL the authenticated
+//! There is no probe here, and deliberately so. On either engine the authenticated
 //! session *is* the credential check: the server accepts or rejects the password
 //! during the startup exchange, before any statement can run. Inventing a
 //! validation query would add a business read that proves less than the
@@ -12,6 +14,7 @@ use serde::{Deserialize, Deserializer};
 use zeroize::Zeroizing;
 
 pub const PROFILE_ID: &str = "postgres.password";
+pub const MYSQL_PROFILE_ID: &str = "mysql.password";
 pub const DOCUMENT_LIMIT: usize = 64 * 1024;
 /// A session credential carries no expiry the client can read, so evidence is
 /// bounded by the same short lifetime the other local profiles use.
@@ -32,7 +35,7 @@ pub struct ProtectedEntry {
 
 fn password<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Zeroizing<String>, D::Error> {
     let value = Zeroizing::new(String::deserialize(deserializer)?);
-    // PostgreSQL accepts an empty password, but a saved connection that carries
+    // Both engines accept an empty password, but a saved connection that carries
     // one is indistinguishable from a missing field, so it is refused here.
     if value.is_empty() || value.len() > 8192 || value.bytes().any(|b| b == 0) {
         return Err(serde::de::Error::custom("invalid protected field"));
