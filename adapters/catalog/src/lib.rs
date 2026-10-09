@@ -167,7 +167,9 @@ pub struct Selection {
     /// types it, which the bundle does not record. A typed key present in a
     /// body must be a JSON value of exactly that type (no string spelling of
     /// a boolean or an integer, and no `null`), or the write is refused before
-    /// any request; the declaration types it the same. Omitted when empty.
+    /// any request; the declaration types it the same, except that an
+    /// `integer` key admits only an integer literal in the i64 or u64 range,
+    /// where JSON Schema also counts `3.0` or `1e2`. Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub body_types: BTreeMap<String, ValueType>,
     /// Closed body keys the provider's request body schema requires, each

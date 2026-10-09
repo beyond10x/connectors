@@ -40,7 +40,7 @@
   request body schema gives it, and `body_required`, the keys that schema requires. A typed key
   must be a JSON value of exactly that type, with no string spelling and no `null`, and a body
   without a required key is refused; both as `invalid_input` before any request, and the declared
-  input schema says the same. Either naming a key `body_keys` does not admit, a repeated required
+  input schema says the same (an `integer` key also refuses `3.0` or `1e2`, which the schema admits). Either naming a key `body_keys` does not admit, a repeated required
   key, or a guard reading a path nested under a typed key is refused when the selection loads
   (`docs/local-catalog-provider.md`). Selections without them are unchanged.
 
