@@ -298,8 +298,15 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Native adapters",
         "PostgreSQL reads",
-        "schema.list and query.read in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query.",
+        "schema.list, query.read, database.list, table.list, table.describe and index.list in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query.",
         "adapters/sql/tests/protocol.rs::dropping_the_invocation_still_cancels_the_database",
+        "/docs/reference/adapters/sql",
+    ),
+    shipped(
+        "Native adapters",
+        "MySQL reads",
+        "The same six reads on a connection whose engine is mysql, in a read-only session bound to the configured database, over TLS unless plaintext is allowed.",
+        "adapters/sql/tests/mysql_local.rs::mysql_connects_revalidates_and_reads_through_the_private_runtime",
         "/docs/reference/adapters/sql",
     ),
     shipped(

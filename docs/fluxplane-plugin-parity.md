@@ -38,6 +38,17 @@ Sources:
   scripted MySQL wire fixture, not a live server. The `adapters/sql/spec/adapter.json` line
   citations in the [sql](#sql) section moved with that file. The per-plugin and verdict tables
   below and the [Gap units](#gap-units) table were not recounted for this change.
+- **SQL catalogue reads, 2026-10-09 (unreleased).** `sql.table.show`, `sql.table.list`,
+  `sql.database.list` and `sql.index.list` moved from partial to covered when the SQL adapter
+  gained `table.describe`, `table.list`, `database.list` and `index.list` on both engines
+  (`adapters/sql/contracts/reads/v1alpha1/semantics.md`), verified against scripted
+  PostgreSQL and MySQL wire fixtures, not a live server. All six `sql` operations are now
+  covered, so the `sql` row of the per-plugin table reads 6 / 703 covered, the plugin moves from
+  partial only to covered, and the summary and total rows move by the same 6 operations and
+  703 calls (the earlier `sql.query` and `sql.test` change above had not been carried into
+  them). The plugin verdict in the 2026-10-08 recount table follows; its call counts are
+  unchanged. The `adapters/sql/spec/adapter.json` line citations in the [sql](#sql) section
+  moved with that file. The [Gap units](#gap-units) table still shows the 2026-10-07 baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -49,7 +60,7 @@ Sources:
   | gitlab | 2,541 | covered |
   | jira | 1,415 | covered |
   | slack | 710 | covered |
-  | sql | 663 | partial only |
+  | sql | 663 | covered |
   | grafana | 394 | covered |
   | loki | 334 | covered |
   | kubernetes | 81 | covered |
@@ -64,8 +75,8 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 49 | 4,233 | 38 | 4,233 |
-| partial | 23 | 924 | 16 | 924 |
+| covered | 55 | 4,936 | 44 | 4,936 |
+| partial | 17 | 221 | 10 | 221 |
 | missing | 229 | 1,199 | 55 | 1,199 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
@@ -82,7 +93,7 @@ Per plugin (operations / calls):
 | gitlab | 64 | 38 | 2,670 | 15 / 2,183 | 8 / 206 | 41 / 281 |
 | jira | 21 | 13 | 1,364 | 6 / 796 | 1 / 5 | 14 / 563 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
-| sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
+| sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 5 / 358 | 0 / 0 | 15 / 67 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
 | kubernetes | 24 | 14 | 72 | 6 / 31 | 6 / 10 | 12 / 31 |
@@ -104,15 +115,15 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **49 / 4,233** | **23 / 924** | **229 / 1,199** |
+| **total** | **301** | **109** | **6,356** | **55 / 4,936** | **17 / 221** | **229 / 1,199** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
 
 | verdict | plugins | count |
 |---|---|---:|
-| covered | gitlab, jira, confluence, grafana, kubernetes, loki, slack, tavily | 8 |
-| partial only | sql, websearch | 2 |
+| covered | gitlab, jira, confluence, grafana, kubernetes, loki, slack, sql, tavily | 9 |
+| partial only | websearch | 1 |
 | missing | homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 14 |
 | no operations declared | clock | 1 |
 
@@ -302,12 +313,12 @@ Connectors native adapter: `adapters/sql/spec/adapter.json`. It serves PostgreSQ
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `sql.query` | 647 | 24 | 2026-10-06 | `query.read` (:266) on a PostgreSQL or MySQL connection | covered | No SQLite engine. MySQL is verified against a scripted wire fixture, not a live server (`docs/local-mysql-cli.md`). |
-| `sql.table.show` | 32 | 5 | 2026-09-28 | `schema.list` (:154) | partial | PostgreSQL only. Gives column names and native types; no primary keys, foreign keys or nullability. |
-| `sql.table.list` | 14 | 4 | 2026-09-28 | `schema.list` (:154) | partial | PostgreSQL only. Tables are derived from column metadata; no views flag and no row estimates. |
+| `sql.query` | 647 | 24 | 2026-10-06 | `query.read` (:274) on a PostgreSQL or MySQL connection | covered | No SQLite engine. MySQL is verified against a scripted wire fixture, not a live server (`docs/local-mysql-cli.md`). |
+| `sql.table.show` | 32 | 5 | 2026-09-28 | `table.describe` (:618) on a PostgreSQL or MySQL connection | covered | Fixture-verified only: scripted wire fixtures of both engines, not a live server. |
+| `sql.table.list` | 14 | 4 | 2026-09-28 | `table.list` (:507) on a PostgreSQL or MySQL connection: kind (table or view) and the engine's row estimate | covered | Fixture-verified only, as above. |
 | `sql.test` | 5 | 5 | 2026-09-28 | `connections revalidate` on a PostgreSQL or MySQL connection (the session is the credential check, `adapters/sql/src/auth.rs:8`) | covered | — |
-| `sql.database.list` | 4 | 3 | 2026-09-15 | `schema.list` (:154) | partial | PostgreSQL only. Lists the schemas of the one connected database; there is no database listing. |
-| `sql.index.list` | 1 | 1 | 2026-09-16 | `query.read` (:266) against `pg_indexes` | partial | PostgreSQL only. No dedicated index read. |
+| `sql.database.list` | 4 | 3 | 2026-09-15 | `database.list` (:401) on a PostgreSQL or MySQL connection | covered | Names only; fixture-verified only, as above. |
+| `sql.index.list` | 1 | 1 | 2026-09-16 | `index.list` (:735) on a PostgreSQL or MySQL connection | covered | Fixture-verified only, as above. |
 
 **Engines.** The fluxplane `sql` plugin (skill reference `sql.md`, version 0.20.0) describes
 itself as "Read-only SQL query operations for MySQL, PostgreSQL, SQLite, and compatible

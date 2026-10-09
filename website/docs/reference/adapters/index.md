@@ -17,7 +17,7 @@ an installed capability: the runtime column says what runs.
 | [GitLab](./gitlab/index.md) | catalog provider | 18 reads and 4 approved writes from the pinned OpenAPI document, and the two merge-request feed reads |
 | [Catalog provider](./catalog/index.md) | `connectors-catalog-provider` | Jira, Confluence, HubSpot, Zendesk, Google, Runpod and Slack, from pinned API documents |
 | [Kubernetes](./kubernetes/index.md) | `connectors-kubernetes` | `resources.list`, `endpoints.discover`, optionally `hosts.discover` and the Helm release reads |
-| [SQL / PostgreSQL](./sql/index.md) | `connectors-sql` | `schema.list`, `query.read` |
+| [SQL (PostgreSQL and MySQL)](./sql/index.md) | `connectors-sql` | `query.read`, `schema.list`, `database.list`, `table.list`, `table.describe`, `index.list` |
 | [Tavily](./tavily/index.md) | `connectors-tavily` | `websearch.search`, `websearch.fetch`, `websearch.crawl` |
 | [Loki](./loki/index.md) | `connectors-loki` | `logs.query_range`, `logs.query_metric`, `logs.labels`, directly or through Grafana's data-source proxy |
 | [Grafana](./grafana/index.md) | `connectors-grafana` | `datasources.list`; discovery and the mediated route are specified only |

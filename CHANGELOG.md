@@ -26,6 +26,30 @@
   `mysql_async` 0.37.1 on rustls with the ring provider (no native-tls/OpenSSL). Modeled in
   `adapters/sql/spec/ess` (engine, configuration, password profile, read binding and the MySQL
   cell rules); the operator guide is `docs/local-mysql-cli.md`.
+- Four catalogue reads in the SQL adapter, on PostgreSQL and MySQL: `database.list` (the
+  databases the role may connect to, or the user may see; names only), `table.list` (tables and
+  views of a schema with `table_kind` and the engine's `row_estimate`), `table.describe` (one
+  table's columns with `native_type`, `is_nullable`, `column_default`, `ordinal_position`,
+  `primary_key_position` and the foreign key each column belongs to) and `index.list` (the
+  indexes of one table, or of every table of a schema, one row per key column with
+  `is_unique` and `is_primary`). Each is a declared read (`effect: read`) running one fixed
+  statement, with the schema and table bound as parameters, in the same read-only transaction
+  or session, row limit, byte limit and `truncated` flag as `query.read`, and answers the
+  relational result shape with native-text cells. `schema` follows `schema.list` (required on
+  PostgreSQL; on MySQL only the connected database, any other refused as `invalid_input`
+  before a session is opened). `table.describe` of a table that does not exist, or whose
+  columns cannot be seen, is `not_found`. A generated column's `column_default` is `null`. On
+  PostgreSQL a foreign key into a schema, table or column the role cannot see is left out, a
+  key into a partitioned table is reported once (not once more per partition), and
+  `index.list` leaves out an index built on a column `table.describe` hides, a whole-row
+  reference and an index on expressions alone counting as every column; MySQL keeps its
+  own `KEY_COLUMN_USAGE` visibility for foreign keys. On MySQL a table name MySQL cannot hold
+  (ending in a space, or not representable in its `utf8mb3` metadata, error 3988) is
+  `not_found` on `table.describe` and `index.list`. Modeled in `adapters/sql/spec/ess`
+  (`connectors_sql.reads.CatalogScope` and the row types); specified in
+  `adapters/sql/contracts/reads/v1alpha1/semantics.md`. Verified against scripted PostgreSQL
+  and MySQL wire fixtures; the visibility and name rules also against disposable PostgreSQL
+  17 and MySQL 8.0 servers (2026-10-09).
 
 ### Compatibility
 
@@ -43,9 +67,16 @@
   (`maxLength`) do. This is the shared check, so it applies to PostgreSQL connections too: a
   value of up to 512 non-ASCII characters that was refused for exceeding 512 bytes is now
   admitted.
+- The SQL descriptor gains `database.list`, `table.list`, `table.describe` and `index.list`, so
+  its revision changes again on both engines. An existing local adapter entry keeps working
+  with the operations it names; add the new ones to its `operations` permission to use them.
 
 ### Limits
 
+- The catalogue reads' statements are checked on scripted PostgreSQL and MySQL wire fixtures,
+  which script the server's answers; neither engine has parsed or run them on a live server
+  yet. A PostgreSQL table with no column is reported as `not_found` by `table.describe`, and
+  `index.list` answers an empty result alike for a table without indexes and a missing table.
 - MySQL is verified against a scripted MySQL wire fixture on loopback (handshake, TLS,
   `caching_sha2_password`, session statements, prepared statements with typed binary rows,
   `information_schema` reads, `KILL QUERY`), not a live server; there is no real-provider

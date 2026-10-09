@@ -78,7 +78,7 @@ restart = "never"
 
 [adapters.warehouse.permissions]
 profiles = ["postgres.password"]
-operations = ["schema.list", "query.read"]
+operations = ["schema.list", "query.read", "database.list", "table.list", "table.describe", "index.list"]
 
 [adapters.warehouse.executable]
 path = "/absolute/path/connectors-sql"
@@ -162,11 +162,62 @@ cancellation.
 Writes are not refused by a keyword filter: the transaction is `READ ONLY`, so
 PostgreSQL itself rejects any statement that would write.
 
+## Catalogue reads
+
+Four reads describe the catalogue without a hand-written query. Each runs one fixed
+statement in the same read-only transaction, with the same deadlines, `limit` of 1 to 1000
+rows and `truncated` flag as `query.read`; the schema and table you pass are bound as
+parameters, never written into the statement. Every answer is the `query.read` shape —
+`columns`, `rows` of text or `null`, `truncated` and `provenance` — with fixed columns:
+
+```sh
+target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation database.list --schema SCHEMA --revision REVISION --input-json '{"limit":100}'
+target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation table.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","limit":200}'
+target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation table.describe --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
+target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation index.list --schema SCHEMA --revision REVISION --input-json '{"schema":"public","table":"incidents","limit":200}'
+```
+
+| operation | columns |
+|---|---|
+| `database.list` | `database_name`: the databases the role may connect to (`pg_database`, without templates) |
+| `table.list` | `table_name`, `table_kind` (`table` or `view`), `row_estimate` (`pg_class.reltuples`; `null` for a view or a table never analysed) |
+| `table.describe` | `column_name`, `native_type` (`format_type`, such as `character varying(64)`), `is_nullable` (`YES`/`NO`), `column_default`, `ordinal_position`, `primary_key_position`, `foreign_key`, `referenced_schema`, `referenced_table`, `referenced_column` |
+| `index.list` | `index_name`, `table_name`, `column_position`, `column_name`, `is_unique` (`YES`/`NO`), `is_primary` (`YES`/`NO`) |
+
+For example, `table.describe` of a table whose `team_id` references `teams(id)` answers
+rows such as:
+
+```json
+[["id","bigint","NO","nextval('incidents_id_seq'::regclass)","1","1",null,null,null,null],
+ ["team_id","integer","YES",null,"2",null,"incidents_team_fk","public","teams","id"]]
+```
+
+`schema` is required for the table and index reads, as for `schema.list`. `index.list`
+without `table` lists the indexes of every table of the schema, one row per key column.
+`table.describe` of a table that does not exist, or whose columns the role cannot see, is
+`not_found`; `table.list` and `index.list` answer an empty `rows` instead.
+
+The reads hide what the role cannot see, as `information_schema` does. A generated column's
+`column_default` is `null` (its generation expression is not a default). A foreign key is
+reported only when the role holds `USAGE` on the referenced schema, a privilege on the
+referenced table and a column privilege on every referenced column; otherwise each of its
+columns is described without it, so `table.describe` never names a referenced column that
+`table.describe` of the referenced table hides. A key into a partitioned table is one row per
+column, not one more per partition, and a partition reports the key it inherits. `index.list`
+leaves out an index built on any column `table.describe` hides: a key, INCLUDE or expression
+column, or a column in a partial index's predicate. A whole-row reference such as
+`(t IS NOT NULL)` counts as every column, and so does an index on expressions alone, such as
+`((pub + 1))`: a role granted only some columns of a table does not see it.
+
+Add the operations you grant to `operations` in the adapter entry. These reads are checked
+against a scripted PostgreSQL wire fixture; their visibility rules were also run against a
+disposable PostgreSQL 17 server on 2026-10-09.
+
 ## Limitations
 
 MySQL is served by the same adapter; see [the MySQL guide](local-mysql-cli.md). No write,
 DDL, transaction control, cursor, stored procedure or connection pooling is
-exposed. `schema.list` and `query.read` are the whole surface.
+exposed. `schema.list`, `query.read` and the four catalogue reads are the whole surface.
 
 The [retained real-provider restart evidence](evidence/provider-restarts-20261002/README.md)
 covers a disposable PostgreSQL server and saved-credential reuse. Wire-protocol

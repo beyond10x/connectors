@@ -198,10 +198,10 @@
     },
     {
       "route": "/adapters/sql/contracts/reads",
-      "title": "PostgreSQL bounded reads",
+      "title": "SQL bounded reads",
       "source": "adapters/sql/contracts/reads/v1alpha1/semantics.md",
       "owner": "sql",
-      "status": "First-slice reads implemented; extensions specified"
+      "status": "Reads and catalogue reads implemented on PostgreSQL and MySQL"
     },
     {
       "route": "/adapters/tavily/contracts/websearch",

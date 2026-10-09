@@ -138,3 +138,185 @@ types:
       - any: [family != text_string, rendering == utf8_text]
       - any: [family != json, rendering == utf8_text]
       - any: [family != null_type, rendering == json_null]
+
+  # The catalogue reads: `database.list`, `table.list`, `table.describe` and `index.list`.
+  # Each is one fixed statement per engine, with the caller's names bound as parameters and
+  # never written into the statement text, run through the same read-only session, row
+  # limit, byte limit and truncation flag as `query.read`. Each returns the relational
+  # result shape: its columns are the members of its row type below, in that order, and
+  # every cell is native text or null.
+  - name: connectors_sql.reads.CatalogRead
+    kind: enum
+    variants: [database_list, table_list, table_describe, index_list]
+
+  # `read` answered rows (possibly none); `invalid_input` was refused before any session
+  # was opened; `not_found` found no table: `table.describe` ran its statement and found no
+  # column to describe, or, on MySQL, `table.describe` or `index.list` named a table MySQL
+  # cannot hold (refused before any session when the name ends in a space; answered by the
+  # server's error 3988 when the metadata character set cannot represent it).
+  - name: connectors_sql.reads.CatalogOutcome
+    kind: enum
+    variants: [read, invalid_input, not_found]
+
+  # One catalogue call: which read, the engine and database the connection is bound to,
+  # the `schema` and `table` inputs (absent when the caller gave none), the outcome, the
+  # schema and table bound to the statement (absent when nothing was sent, or when the
+  # read binds none), and the answer's provenance resource.
+  - name: connectors_sql.reads.CatalogCall
+    kind: struct
+    fields:
+      - {name: read, type: connectors_sql.reads.CatalogRead}
+      - {name: engine, type: connectors_sql.reads.Engine}
+      - {name: connected_database, type: String}
+      - {name: requested_schema, type: "Optional<String>"}
+      - {name: requested_table, type: "Optional<String>"}
+      - {name: outcome, type: connectors_sql.reads.CatalogOutcome}
+      - {name: schema_read, type: "Optional<String>"}
+      - {name: table_read, type: "Optional<String>"}
+      - {name: provenance_resource, type: "Optional<String>"}
+
+  # What a catalogue read reads. `database.list` binds nothing and lists the databases the
+  # configured role may connect to (PostgreSQL) or the user may see (MySQL); it opens no
+  # other database. The table and index reads follow `SchemaListScope`: on PostgreSQL the
+  # caller names a schema of the connected database and an input without one is refused;
+  # on MySQL a schema is a database, so only the connected one is read, an input without a
+  # schema reads it, and any other is refused before a session is opened. `table.describe`
+  # names one table and answers `not_found` when that table has no column the configured
+  # role or user can see; `index.list` names a table or none (every table of the schema).
+  # MySQL cannot hold a table name that ends in a space, and its metadata collation pads,
+  # so `TABLE_NAME = ?` would match the unpadded table: on MySQL such a name is `not_found`
+  # on `table.describe` and `index.list` before any session is opened and nothing is bound.
+  # A name MySQL's metadata character set cannot represent makes the server answer error
+  # 3988 to the bound statement; the catalogue reads classify it as `not_found` (on
+  # `query.read` the shared classifier keeps it `unavailable`). On PostgreSQL such names are
+  # ordinary and are bound. The provenance of an answer names the connected database.
+  - name: connectors_sql.reads.CatalogScope
+    kind: struct
+    fields:
+      - {name: call, type: connectors_sql.reads.CatalogCall}
+    invariants:
+      - any: [call.outcome != read, "defined(call.provenance_resource)"]
+      - any: [call.outcome != read, call.provenance_resource == call.connected_database]
+      - any: [call.outcome == read, "missing(call.provenance_resource)"]
+      - any: [call.outcome != invalid_input, "missing(call.schema_read)"]
+      - any: [call.outcome != invalid_input, "missing(call.table_read)"]
+      - any: [call.outcome != not_found, call.read == table_describe, call.read == index_list]
+      - any: [call.read != index_list, call.outcome != not_found, call.engine == mysql]
+      - any: [call.engine != mysql, call.read == database_list, call.read == table_list, call.outcome == invalid_input, "missing(call.requested_table)", not: {call.requested_table: {ends_with: " "}}, call.outcome == not_found]
+      - any: [call.engine != mysql, "missing(call.requested_table)", not: {call.requested_table: {ends_with: " "}}, "missing(call.schema_read)"]
+      - any: [call.engine != mysql, "missing(call.requested_table)", not: {call.requested_table: {ends_with: " "}}, "missing(call.table_read)"]
+      - any: [call.engine != postgresql, call.read == database_list, call.outcome == invalid_input, "defined(call.schema_read)"]
+      - any: [call.read != database_list, "missing(call.requested_schema)"]
+      - any: [call.read != database_list, "missing(call.requested_table)"]
+      - any: [call.read != database_list, "missing(call.schema_read)"]
+      - any: [call.read != database_list, "missing(call.table_read)"]
+      - any: [call.read != table_list, "missing(call.requested_table)"]
+      - any: [call.read != table_list, "missing(call.table_read)"]
+      - any: [call.read != table_describe, "defined(call.requested_table)", call.outcome == invalid_input]
+      - any: [call.read == database_list, call.outcome == invalid_input, "defined(call.schema_read)", {call.requested_table: {ends_with: " "}}]
+      - any: [call.read == database_list, call.outcome == invalid_input, call.table_read == call.requested_table]
+      - any: [call.read == database_list, call.engine != mysql, call.outcome == invalid_input, call.schema_read == call.connected_database]
+      - any: [call.read == database_list, call.engine != mysql, "defined(call.requested_schema)", call.outcome != invalid_input]
+      - any: [call.read == database_list, call.engine != mysql, "missing(call.requested_schema)", call.requested_schema == call.connected_database, call.outcome == invalid_input]
+      - any: [call.read == database_list, call.engine != postgresql, "defined(call.requested_schema)", call.outcome == invalid_input]
+      - any: [call.read == database_list, call.engine != postgresql, call.outcome == invalid_input, call.schema_read == call.requested_schema]
+
+  # An integer written as its decimal digits, never a JSON number.
+  - name: connectors_sql.reads.DecimalText
+    kind: newtype
+    of: String
+    alphabet: "0123456789"
+    invariants:
+      - value.count: {gte: 1, lte: 20}
+
+  # `YES` or `NO`, as `information_schema` writes a flag on both engines.
+  - name: connectors_sql.reads.Flag
+    kind: enum
+    variants: [YES, NO]
+
+  # A relation `table.list` reports: `table` (PostgreSQL ordinary and partitioned tables,
+  # MySQL base tables) or `view` (PostgreSQL views and materialized views, MySQL views).
+  - name: connectors_sql.reads.TableKind
+    kind: enum
+    variants: [table, view]
+
+  # One `database.list` row.
+  - name: connectors_sql.reads.DatabaseRow
+    kind: struct
+    fields:
+      - {name: database_name, type: String}
+
+  # One `table.list` row. `row_estimate` is the engine's own estimate (PostgreSQL
+  # `pg_class.reltuples`, MySQL `information_schema.TABLES.TABLE_ROWS`), not a count; it is
+  # null for a view and when the engine has none (a PostgreSQL table never analysed).
+  - name: connectors_sql.reads.TableRow
+    kind: struct
+    fields:
+      - {name: table_name, type: String}
+      - {name: table_kind, type: connectors_sql.reads.TableKind}
+      - {name: row_estimate, type: "Optional<connectors_sql.reads.DecimalText>"}
+    invariants:
+      - any: [table_kind != view, "missing(row_estimate)"]
+
+  # One `table.describe` row: one per column, in ordinal order, and one more for each
+  # further foreign key the column belongs to. `native_type` is the engine's full type
+  # (PostgreSQL `format_type`, MySQL `COLUMN_TYPE`); `column_default` is the engine's own
+  # text of the default, null when there is none; a generated column has none (on
+  # PostgreSQL its generation expression is not a default, as in
+  # `information_schema.columns`). `primary_key_position` is the column's 1-based place in
+  # the primary key, null when it is not part of it. A foreign key names the constraint and
+  # the referenced schema, table and column paired with this one; its members are all
+  # present or all null. A row is one declared foreign key: on PostgreSQL the internal
+  # clones of a key into the partitions of a referenced partitioned table (constraints whose
+  # parent constraint is on the same referencing table) are not keys of their own, while a
+  # key a partition inherits from its partitioned parent is the partition's and is reported.
+  # On PostgreSQL a foreign key is reported only when the role holds `USAGE` on the
+  # referenced schema, a privilege on the referenced table (or is a member of its owner), as
+  # `information_schema` does, and a column privilege on every referenced column, so the
+  # read never names a column `table.describe` of the referenced table hides; otherwise the
+  # column is described without that key, on every column of the key. On MySQL
+  # `KEY_COLUMN_USAGE` decides, which names the referenced table and column whatever the
+  # user may see of them.
+  - name: connectors_sql.reads.ColumnRow
+    kind: struct
+    fields:
+      - {name: column_name, type: String}
+      - {name: native_type, type: String}
+      - {name: is_nullable, type: connectors_sql.reads.Flag}
+      - {name: column_default, type: "Optional<String>"}
+      - {name: ordinal_position, type: connectors_sql.reads.DecimalText}
+      - {name: primary_key_position, type: "Optional<connectors_sql.reads.DecimalText>"}
+      - {name: foreign_key, type: "Optional<String>"}
+      - {name: referenced_schema, type: "Optional<String>"}
+      - {name: referenced_table, type: "Optional<String>"}
+      - {name: referenced_column, type: "Optional<String>"}
+    invariants:
+      - any: ["missing(foreign_key)", "defined(referenced_schema)"]
+      - any: ["missing(foreign_key)", "defined(referenced_table)"]
+      - any: ["missing(foreign_key)", "defined(referenced_column)"]
+      - any: ["defined(foreign_key)", "missing(referenced_schema)"]
+      - any: ["defined(foreign_key)", "missing(referenced_table)"]
+      - any: ["defined(foreign_key)", "missing(referenced_column)"]
+
+  # One `index.list` row: one per key column of an index, in index order. Expression key
+  # parts carry the engine's text of the expression as `column_name`. A primary key is
+  # unique. On PostgreSQL an index follows column visibility: it is left out when any
+  # column it is built on (a key column, an INCLUDE column, or a column in a key expression
+  # or in its predicate, as `pg_depend` records them) is one the role neither owns (through
+  # the table's owner) nor holds a column privilege on, the rule that hides the column from
+  # `table.describe`. A whole-row reference counts as every column of the table, wherever
+  # the index makes it (key expression or predicate); so does the whole-table dependency
+  # (`pg_depend`, `refobjsubid = 0`) PostgreSQL records for an index with no plain key
+  # column. Such an index is listed only to a role that owns the table or holds a column
+  # privilege on every column.
+  - name: connectors_sql.reads.IndexRow
+    kind: struct
+    fields:
+      - {name: index_name, type: String}
+      - {name: table_name, type: String}
+      - {name: column_position, type: connectors_sql.reads.DecimalText}
+      - {name: column_name, type: String}
+      - {name: is_unique, type: connectors_sql.reads.Flag}
+      - {name: is_primary, type: connectors_sql.reads.Flag}
+    invariants:
+      - any: [is_primary != YES, is_unique == YES]

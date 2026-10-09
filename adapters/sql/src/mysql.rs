@@ -37,6 +37,25 @@ pub const SESSION_BOUNDS: &str = "SET SESSION max_execution_time = 10000, SESSIO
 /// names. `udt_name` carries MySQL's full `COLUMN_TYPE`.
 pub const SCHEMA_QUERY: &str = "SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name, COLUMN_NAME AS column_name, DATA_TYPE AS data_type, COLUMN_TYPE AS udt_name, IS_NULLABLE AS is_nullable, ORDINAL_POSITION AS ordinal_position FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME, ORDINAL_POSITION";
 
+// The catalogue reads on MySQL, in the PostgreSQL path's column names and
+// order. Each is fixed text: the schema (always the connected database) and
+// the table are bound positionally, never written into the statement.
+// `information_schema` shows only what the configured user holds a privilege on.
+
+/// `database.list`: the databases the configured user may see.
+pub const DATABASE_QUERY: &str =
+    "SELECT SCHEMA_NAME AS database_name FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME";
+/// `table.list`: base tables (`table`) and views (`view`) of the connected
+/// database, with `TABLE_ROWS` as the row estimate (null for a view).
+pub const TABLE_QUERY: &str = "SELECT TABLE_NAME AS table_name, CASE WHEN TABLE_TYPE = 'VIEW' THEN 'view' ELSE 'table' END AS table_kind, CASE WHEN TABLE_TYPE = 'VIEW' THEN NULL ELSE TABLE_ROWS END AS row_estimate FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_TYPE IN ('BASE TABLE', 'VIEW') ORDER BY TABLE_NAME";
+/// `table.describe`: the columns of one table in ordinal order, each with its
+/// place in the primary key and one row per foreign key it belongs to.
+pub const DESCRIBE_QUERY: &str = "SELECT c.COLUMN_NAME AS column_name, c.COLUMN_TYPE AS native_type, c.IS_NULLABLE AS is_nullable, c.COLUMN_DEFAULT AS column_default, c.ORDINAL_POSITION AS ordinal_position, pk.ORDINAL_POSITION AS primary_key_position, fk.CONSTRAINT_NAME AS foreign_key, fk.REFERENCED_TABLE_SCHEMA AS referenced_schema, fk.REFERENCED_TABLE_NAME AS referenced_table, fk.REFERENCED_COLUMN_NAME AS referenced_column FROM information_schema.COLUMNS c LEFT JOIN information_schema.KEY_COLUMN_USAGE pk ON pk.TABLE_SCHEMA = c.TABLE_SCHEMA AND pk.TABLE_NAME = c.TABLE_NAME AND pk.COLUMN_NAME = c.COLUMN_NAME AND pk.CONSTRAINT_NAME = 'PRIMARY' LEFT JOIN information_schema.KEY_COLUMN_USAGE fk ON fk.TABLE_SCHEMA = c.TABLE_SCHEMA AND fk.TABLE_NAME = c.TABLE_NAME AND fk.COLUMN_NAME = c.COLUMN_NAME AND fk.REFERENCED_TABLE_NAME IS NOT NULL WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ? ORDER BY c.ORDINAL_POSITION, fk.CONSTRAINT_NAME";
+/// `index.list`: one row per key part of each index of one table, or of every
+/// table of the connected database when the table is null. A functional key
+/// part is written as its expression.
+pub const INDEX_QUERY: &str = "SELECT INDEX_NAME AS index_name, TABLE_NAME AS table_name, SEQ_IN_INDEX AS column_position, COALESCE(COLUMN_NAME, EXPRESSION) AS column_name, CASE WHEN NON_UNIQUE = 0 THEN 'YES' ELSE 'NO' END AS is_unique, CASE WHEN INDEX_NAME = 'PRIMARY' THEN 'YES' ELSE 'NO' END AS is_primary FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = COALESCE(?, TABLE_NAME) ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX";
+
 /// The binary character set: a string column in it holds bytes, not text.
 const BINARY_CHARSET: u16 = 63;
 
@@ -443,16 +462,22 @@ async fn close(conn: Conn, opts: Opts, kill: bool) {
 }
 
 async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> Result<Value> {
-    conn.query_drop(SESSION_READ_ONLY)
-        .await
-        .map_err(mysql_error)?;
-    conn.query_drop(SESSION_BOUNDS).await.map_err(mysql_error)?;
+    let catalogue = args.catalogue;
+    let classify = move |error| {
+        if catalogue {
+            catalogue_error(error)
+        } else {
+            mysql_error(error)
+        }
+    };
+    conn.query_drop(SESSION_READ_ONLY).await.map_err(classify)?;
+    conn.query_drop(SESSION_BOUNDS).await.map_err(classify)?;
     let query = args
         .query
         .trim()
         .strip_suffix(';')
         .unwrap_or(args.query.trim());
-    let original = conn.prep(query).await.map_err(mysql_error)?;
+    let original = conn.prep(query).await.map_err(classify)?;
     column_bounds(original.columns().len())?;
     if original.num_params() as usize != args.parameters.len() {
         return Err(Error::invalid("parameter count does not match query"));
@@ -465,7 +490,7 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
             native_type: native_type(c),
         })
         .collect::<Vec<_>>();
-    conn.close(original).await.map_err(mysql_error)?;
+    conn.close(original).await.map_err(classify)?;
     let aliases = (0..columns.len())
         .map(|i| format!("c{i}"))
         .collect::<Vec<_>>()
@@ -479,7 +504,7 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
         "SELECT * FROM ({query}\n) AS result ({aliases}) LIMIT {}",
         u32::from(args.limit) + 1
     );
-    let statement = conn.prep(&wrapped).await.map_err(mysql_error)?;
+    let statement = conn.prep(&wrapped).await.map_err(classify)?;
     let parameters = if args.parameters.is_empty() {
         Params::Empty
     } else {
@@ -496,11 +521,11 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
     let mut result = conn
         .exec_iter(&statement, parameters)
         .await
-        .map_err(mysql_error)?;
+        .map_err(classify)?;
     let mut truncated = false;
     let mut rows = Vec::new();
     let mut total = 0;
-    while let Some(row) = result.next().await.map_err(mysql_error)? {
+    while let Some(row) = result.next().await.map_err(classify)? {
         if rows.len() == args.limit as usize {
             truncated = true;
             break;
@@ -523,8 +548,8 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
         }
         rows.push(values);
     }
-    result.drop_result().await.map_err(mysql_error)?;
-    conn.close(statement).await.map_err(mysql_error)?;
+    result.drop_result().await.map_err(classify)?;
+    conn.close(statement).await.map_err(classify)?;
     encode(QueryResult {
         columns,
         rows,
@@ -537,6 +562,18 @@ fn mysql_error(error: mysql_async::Error) -> Error {
     match error {
         mysql_async::Error::Server(error) => server_error(error.code, &error.state),
         _ => sqlstate_error(None),
+    }
+}
+/// A catalogue read binds the caller's table name against `information_schema`,
+/// whose metadata is `utf8mb3`. A name that character set cannot represent
+/// makes the server answer error 3988 (`HY000`, a conversion it finds
+/// impossible): no table can carry that name, so the read is `not_found`, not
+/// a server fault to retry. Every other error, and 3988 on `query.read`, is
+/// classified by `mysql_error`.
+fn catalogue_error(error: mysql_async::Error) -> Error {
+    match &error {
+        mysql_async::Error::Server(server) if server.code == 3988 => super::table_not_found(),
+        _ => mysql_error(error),
     }
 }
 /// Classify a MySQL server error by its error number where the SQLSTATE class

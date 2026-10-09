@@ -8,7 +8,7 @@ mod fixture;
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
-    runtime::{Bootstrap, Child, Failure},
+    runtime::{Bootstrap, Child, Effect, Failure},
 };
 use connectors_sdk::Secret;
 use serde_json::{Value, json};
@@ -89,10 +89,7 @@ fn an_existing_postgresql_configuration_without_an_engine_is_unchanged() {
     let profile = existing.profile("postgres.password").unwrap();
     assert_eq!(profile.fields[0].label, "PostgreSQL password");
     assert_eq!(existing.profiles.len(), 1);
-    assert_eq!(
-        profiles(&existing),
-        ["postgresql-native-text", "postgresql-native-text"]
-    );
+    assert_eq!(profiles(&existing), ["postgresql-native-text"; 6]);
     // Naming the default engine is the same configuration, not a new one.
     let explicit = bootstrap(&directory, &document(Some("postgresql"), 5432)).unwrap();
     assert_eq!(
@@ -127,7 +124,7 @@ fn a_mysql_configuration_bootstraps_its_own_profile_and_authority() {
             .iter()
             .all(|r| r.profile == "mysql.password")
     );
-    assert_eq!(profiles(&mysql), ["mysql-native-text", "mysql-native-text"]);
+    assert_eq!(profiles(&mysql), ["mysql-native-text"; 6]);
     // An engine the adapter does not implement is refused, not defaulted.
     for engine in ["sqlite", "MySQL", ""] {
         assert!(
@@ -139,6 +136,41 @@ fn a_mysql_configuration_bootstraps_its_own_profile_and_authority() {
     let mut portless = document(Some("mysql"), 3306);
     portless.as_object_mut().unwrap().remove("port");
     assert!(bootstrap(&directory, &portless).is_none());
+}
+
+/// Every operation either engine advertises is a declared read: the
+/// catalogue reads run in the same read-only transaction or session as
+/// `schema.list` and `query.read`.
+#[test]
+fn every_operation_is_a_declared_read_on_both_engines() {
+    let (_root, directory) = private_directory();
+    for engine in [None, Some("mysql")] {
+        let bootstrap = bootstrap(&directory, &document(engine, 5432)).unwrap();
+        let operations: Vec<_> = bootstrap
+            .requirements
+            .iter()
+            .map(|r| r.operation.as_str())
+            .collect();
+        assert_eq!(
+            operations,
+            [
+                "schema.list",
+                "query.read",
+                "database.list",
+                "table.list",
+                "table.describe",
+                "index.list"
+            ],
+            "{engine:?}"
+        );
+        assert!(
+            bootstrap
+                .requirements
+                .iter()
+                .all(|r| r.effect == Effect::Read),
+            "{engine:?}: an operation is not a declared read"
+        );
+    }
 }
 
 fn selection(directory: &Path, port: u16) -> Adapter {
