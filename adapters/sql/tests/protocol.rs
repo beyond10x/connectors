@@ -24,6 +24,7 @@ impl Credential for Password {
 }
 fn adapter(port: u16, resolutions: Arc<AtomicUsize>) -> Sql {
     let config = Config {
+        engine: connectors_sql::Engine::Postgresql,
         host: "127.0.0.1".into(),
         port,
         database: "fixture".into(),
@@ -308,13 +309,14 @@ async fn parsing_and_limits_refuse_before_credentials_or_connection() {
             ErrorCode::InvalidInput
         );
     }
-    assert_eq!(
-        sql.invoke("schema.list", json!({"schema":"","limit":1}))
-            .await
-            .unwrap_err()
-            .code,
-        ErrorCode::InvalidInput
-    );
+    // On PostgreSQL the caller names the schema: an empty one or none at all
+    // is refused before any credential or connection.
+    for input in [json!({"schema":"","limit":1}), json!({"limit":1})] {
+        assert_eq!(
+            sql.invoke("schema.list", input).await.unwrap_err().code,
+            ErrorCode::InvalidInput
+        );
+    }
     assert_eq!(
         sql.invoke("missing", json!({})).await.unwrap_err().code,
         ErrorCode::NotFound

@@ -1,5 +1,62 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The SQL adapter (`connectors-sql`) serves MySQL as well as PostgreSQL, chosen per connection
+  by a new `engine` member of its configuration (`postgresql` or `mysql`). `schema.list` and
+  `query.read` keep their input bounds, deadlines and output shape on MySQL. Each read opens a
+  fresh session made `READ ONLY`, bounded (`max_execution_time` 10 s, lock waits 2 s) and set
+  to `time_zone = '+00:00'` before the caller's statement is prepared; a statement that returns
+  no columns, such as any write, is refused as `unsupported` before execution, and a write the
+  read-only session refuses is `forbidden`. The descriptor of a MySQL connection names the
+  profile `mysql-native-text`: every cell is a JSON string or null — integers and `DECIMAL` as
+  text, floats as the shortest text that reads back (`1e300`), `DATE` as ISO 8601, `DATETIME`
+  as an ISO 8601 naive local date-time without offset, `TIMESTAMP` as its instant in UTC in
+  ISO 8601 with a trailing `Z` (`2026-10-25T00:30:00Z`), `TIME` as a signed elapsed time,
+  binary strings, `BIT` and geometry as base64. `schema.list` on MySQL reads only the
+  connected database (a MySQL schema is a database): `schema` may be omitted or name it, and
+  any other value is refused as `invalid_input` before a session is opened. A MySQL
+  connection uses the profile `mysql.password`; connect, repair and `connections revalidate`
+  prove the password with the handshake, and the identity is
+  `mysql.user` (`user@database`). TLS is required unless `allow_plaintext`, and `ca_file`
+  replaces the public roots, as on PostgreSQL. The adapter's own deadline or a dropped
+  invocation kills the statement with `KILL QUERY` from a second session. The wire binding is
+  `mysql_async` 0.37.1 on rustls with the ring provider (no native-tls/OpenSSL). Modeled in
+  `adapters/sql/spec/ess` (engine, configuration, password profile, read binding and the MySQL
+  cell rules); the operator guide is `docs/local-mysql-cli.md`.
+
+### Compatibility
+
+- A configuration without `engine` is PostgreSQL, unchanged: its effective configuration, and
+  so its configuration revision, carries no `engine` member, and existing saved connections
+  keep working. `engine: "postgresql"` yields the same revision. The library's `Config` gains
+  a public `engine` field, so Rust code that builds a `Config` literal must set it
+  (`Engine::Postgresql`). The descriptor's operation descriptions now name both engines.
+- `schema.list`'s input schema no longer requires `schema`, so that a MySQL connection can omit
+  it. PostgreSQL behaviour is unchanged: the PostgreSQL path still requires it and refuses an
+  input without it as `invalid_input`, before any credential or connection. The SQL descriptor,
+  and so its revision, changes for both engines.
+- The local configuration's `host`, `database` and `user` bounds (1 to 512) now count
+  characters, not bytes, as the adapter's ESS model and the published configuration schema
+  (`maxLength`) do. This is the shared check, so it applies to PostgreSQL connections too: a
+  value of up to 512 non-ASCII characters that was refused for exceeding 512 bytes is now
+  admitted.
+
+### Limits
+
+- MySQL is verified against a scripted MySQL wire fixture on loopback (handshake, TLS,
+  `caching_sha2_password`, session statements, prepared statements with typed binary rows,
+  `information_schema` reads, `KILL QUERY`), not a live server; there is no real-provider
+  evidence yet. MySQL 8.0 or later is assumed; MariaDB is not tested. SQLite is not served.
+  `schema.list` remains column metadata only on both engines.
+- The MySQL read guarantee is a read-only session plus one result-returning statement: table
+  writes are refused (1792), but a routine the configured user may `EXECUTE` keeps its side
+  effects (on a live MySQL 8.0.46 a definer-rights function ran `SET PERSIST` through
+  `query.read`). Grant the user `SELECT` only, with no `EXECUTE` on routines that have side
+  effects.
+
 ## 0.39.0 — 2026-10-09
 
 ### Added
