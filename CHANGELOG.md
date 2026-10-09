@@ -43,8 +43,31 @@
   input schema says the same (an `integer` key also refuses `3.0` or `1e2`, which the schema admits). Either naming a key `body_keys` does not admit, a repeated required
   key, or a guard reading a path nested under a typed key is refused when the selection loads
   (`docs/local-catalog-provider.md`). Selections without them are unchanged.
+- GitLab through the catalog provider reads a repository's tree, single commits, commit diffs
+  and branches, from the pinned OpenAPI document (`docs/local-catalog-provider.md`, *The shipped
+  selection set*):
+  - `repository.tree` (`getApiV4ProjectsIdRepositoryTree`) lists the entries under `path` at
+    `ref`, `recursive` to descend. Offset paging only: `pagination` and `page_token` are
+    withheld and refused before any request, as on `commits.list`.
+  - `commit.get` (`getApiV4ProjectsIdRepositoryCommitsSha`) reads one commit by id, branch or
+    tag name, with `stats`; `commit.diff` (`getApiV4ProjectsIdRepositoryCommitsShaDiff`) lists
+    its file diffs, with `unidiff`. A sha GitLab does not find is refused as `not_found`.
+  - `branches.list` (`getApiV4ProjectsIdRepositoryBranches`) lists branches with their head
+    commits, filtered by `search` or `regex` and ordered by `sort`; `page_token` is withheld.
+  The three paged reads bound `per_page` to 1 through 100, as every GitLab list read does.
+  Verified against local fixtures written in the pinned document's shapes, through the engine
+  and through the owned provider process, not a live GitLab. The GitLab example configuration
+  in `docs/local-catalog-provider.md` therefore has a new configuration revision.
 
 ### Limits
+
+- GitLab code search within a project (`getApiV4ProjectsIdDashSearch`, scope `blobs`) is not
+  selected. The pinned document declares its path as `/api/v4/projects/{id}/(-/)search`, GitLab's
+  notation for an optional `-/` segment, and the catalog engine sends a declared path literally,
+  so it would request `/projects/{id}/(-/)search`. A cited source amendment can add only an
+  optional query parameter, not correct a path, and a selection bound is an integer range, so
+  it cannot hold the required `scope` to `blobs`. The group search and project semantic search
+  operations in the bundle carry the same `(-/)` path.
 
 - A merge-when-pipeline-succeeds variant of `merge_request.merge` and a reopen variant of
   `merge_request.update` are not selected; both guards stay unchanged. Each needs a selection to

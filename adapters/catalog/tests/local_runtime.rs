@@ -655,6 +655,44 @@ fn repository_page(route: &str, path: &str) -> Option<Value> {
         } else {
             vec![event(503, "pushed to"), event(502, "pushed new")]
         }
+    } else if route.ends_with("/repository/tree") {
+        let entry = |name: &str, kind: &str| {
+            json!({"id": format!("7ee0{:0>12}", name.len()), "name": name, "type": kind,
+                   "path": format!("crates/{name}"),
+                   "mode": if kind == "tree" { "040000" } else { "100644" }})
+        };
+        if second {
+            vec![entry("Cargo.toml", "blob")]
+        } else {
+            vec![entry("src", "tree"), entry("README.md", "blob")]
+        }
+    } else if route.ends_with("/diff") && route.contains("/repository/commits/") {
+        let diff = |path: &str| {
+            json!({"diff": "@@ -1 +1 @@\n-old\n+new\n", "new_path": path, "old_path": path,
+                   "a_mode": "100644", "b_mode": "100644", "new_file": false,
+                   "renamed_file": false, "deleted_file": false})
+        };
+        if second {
+            vec![diff("c.rs")]
+        } else {
+            vec![diff("a.rs"), diff("b.rs")]
+        }
+    } else if route.ends_with("/repository/branches") {
+        let branch = |name: &str, commit: &str| {
+            json!({"name": name, "commit": {"id": commit}, "merged": false,
+                   "protected": name == "main", "default": name == "main",
+                   "can_push": true, "developers_can_push": false,
+                   "developers_can_merge": false,
+                   "web_url": format!("https://gitlab.example.test/org/project/-/tree/{name}")})
+        };
+        if second {
+            vec![branch("renovate/x", "c0ffee01")]
+        } else {
+            vec![
+                branch("main", "c0ffee03"),
+                branch("release/v0.3", "c0ffee02"),
+            ]
+        }
     } else {
         return None;
     };
@@ -1204,6 +1242,106 @@ fn repository_list_reads_walk_two_pages_and_stop_on_a_short_page() {
             "`{operation}` requests"
         );
     }
+}
+
+/// `repository.tree`, `commit.diff` and `branches.list` through the owned
+/// child and the TLS fixture: the exact first request each sends, in the
+/// pinned source's parameter order, and a walk that stops on the short second
+/// page with the recorded entries unchanged; then `commit.get`'s exact request,
+/// and a sha in a project the token cannot see answered as GitLab's `404` is
+/// answered for `project.get`.
+#[test]
+fn repository_browsing_reads_send_the_declared_request_and_walk_to_a_short_page() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, first, expected) in [
+        (
+            "repository.tree",
+            json!({"id": "org/project", "ref": "v0.3.0", "path": "crates",
+                   "recursive": true, "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/repository/tree?ref=v0.3.0&path=crates\
+             &recursive=true&page=1&per_page=2",
+        ),
+        (
+            "commit.diff",
+            json!({"id": "org/project", "sha": "c0ffee03", "unidiff": true,
+                   "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/repository/commits/c0ffee03/diff\
+             ?page=1&per_page=2&unidiff=true",
+        ),
+        (
+            "branches.list",
+            json!({"id": "org/project", "search": "re", "sort": "name_asc",
+                   "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/repository/branches\
+             ?page=1&per_page=2&search=re&sort=name_asc",
+        ),
+    ] {
+        let before = provider.count();
+        let mut items = Vec::new();
+        let mut page = 1;
+        loop {
+            let mut input = first.clone();
+            input["page"] = json!(page);
+            let result = invoke(&mut child, operation, "one", &token(true), input)
+                .unwrap_or_else(|failure| panic!("`{operation}` page {page}: {failure:?}"));
+            assert_eq!(result["status"], 200, "`{operation}` status");
+            let calls = provider.calls.lock().unwrap().clone();
+            let sent = &calls[calls.len() - 1];
+            assert_eq!(
+                Some(&result["body"]),
+                repository_page(sent.split('?').next().unwrap(), sent).as_ref(),
+                "`{operation}` page {page} body"
+            );
+            let body = result["body"].as_array().unwrap().clone();
+            let short = body.len() < 2;
+            items.extend(body);
+            if short {
+                break;
+            }
+            page += 1;
+            assert!(page <= 3, "`{operation}` did not stop");
+        }
+        assert_eq!(page, 2, "`{operation}` pages walked");
+        assert_eq!(items.len(), 3, "`{operation}` items");
+        let calls = provider.calls.lock().unwrap().clone();
+        assert_eq!(
+            calls[before..],
+            [expected.to_owned(), expected.replace("page=1", "page=2")],
+            "`{operation}` requests"
+        );
+    }
+
+    let before = provider.count();
+    let result = invoke(
+        &mut child,
+        "commit.get",
+        "one",
+        &token(true),
+        json!({"id": "org/project", "sha": "c0ffee03", "stats": true}),
+    )
+    .unwrap();
+    assert_eq!(result["status"], 200);
+    let calls = provider.calls.lock().unwrap().clone();
+    assert_eq!(
+        calls[before..],
+        ["/api/v4/projects/org%2Fproject/repository/commits/c0ffee03?stats=true".to_owned()]
+    );
+
+    let mut missing = |operation: &str, input: Value| {
+        let before = provider.count();
+        let failure =
+            invoke(&mut child, operation, "one", &token(true), input).expect_err("a refusal");
+        assert_eq!(provider.count(), before + 1, "`{operation}`");
+        failure
+    };
+    let project = missing("project.get", json!({"id": "fixture-missing"}));
+    let commit = missing(
+        "commit.get",
+        json!({"id": "fixture-missing", "sha": "deadbeef"}),
+    );
+    assert!(matches!(commit, Failure::ProviderNotFound), "{commit:?}");
+    assert_eq!(commit, project);
 }
 
 /// The recorded GitLab commit graph the fixture serves: `commits.list` pages
