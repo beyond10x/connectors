@@ -24,6 +24,7 @@ pinned source under a local id with a declared effect:
 | `project.get`, `issues.list`, `file.get`, `branch.get` | read | one GET each on the project, its issues, a repository file, a branch |
 | `projects.list`, `project.events` | read | visible projects, one project's events |
 | `tags.list`, `releases.list`, `commits.list`, `repository.compare` | read | repository tags, releases, commits for a ref, comparison of two refs |
+| `repository.tree`, `commit.get`, `commit.diff`, `branches.list` | read | the files under a path at a ref, one commit, its file diffs, the branches with their head commits |
 | `deployments.list` | read | a project's deployments with their environment |
 | `merge_requests.list`, `merge_request.get` | read | the project's merge requests, one merge request by IID |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | read | pipelines, one pipeline, its jobs, one job |
