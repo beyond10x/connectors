@@ -2,12 +2,15 @@
 format: aep.planning-md/3
 id: story:parity-mysql-reads
 kind: story
-status: draft
+status: active
 title: MySQL query and schema reads through the SQL adapter
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-09T18:43:36Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-09T18:43:37Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
