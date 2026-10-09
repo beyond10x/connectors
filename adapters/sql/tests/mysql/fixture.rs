@@ -573,3 +573,51 @@ async fn session(io: Box<dyn Io>, script: Script, log: Arc<Mutex<Log>>, killed: 
         }
     }
 }
+
+/// Text columns in `utf8mb4`, as `information_schema` sends names and flags.
+pub fn strings(names: &[&'static str]) -> Vec<Col> {
+    names
+        .iter()
+        .map(|name| col(name, VAR_STRING, 0, UTF8MB4, 0))
+        .collect()
+}
+/// The columns of the catalogue answers, as the server describes them.
+pub fn database_columns() -> Vec<Col> {
+    strings(&["database_name"])
+}
+pub fn table_columns() -> Vec<Col> {
+    vec![
+        col("table_name", VAR_STRING, 0, UTF8MB4, 0),
+        col("table_kind", VAR_STRING, 0, UTF8MB4, 0),
+        col("row_estimate", LONGLONG, UNSIGNED, BINARY_CHARSET, 0),
+    ]
+}
+pub fn describe_columns() -> Vec<Col> {
+    let mut columns = strings(&[
+        "column_name",
+        "native_type",
+        "is_nullable",
+        "column_default",
+    ]);
+    columns.push(col("ordinal_position", LONG, UNSIGNED, BINARY_CHARSET, 0));
+    columns.push(col(
+        "primary_key_position",
+        LONG,
+        UNSIGNED,
+        BINARY_CHARSET,
+        0,
+    ));
+    columns.extend(strings(&[
+        "foreign_key",
+        "referenced_schema",
+        "referenced_table",
+        "referenced_column",
+    ]));
+    columns
+}
+pub fn index_columns() -> Vec<Col> {
+    let mut columns = strings(&["index_name", "table_name"]);
+    columns.push(col("column_position", LONG, UNSIGNED, BINARY_CHARSET, 0));
+    columns.extend(strings(&["column_name", "is_unique", "is_primary"]));
+    columns
+}
