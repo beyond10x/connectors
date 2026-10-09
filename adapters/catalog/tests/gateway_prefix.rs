@@ -128,7 +128,7 @@ fn refusal(config: &Value) -> String {
 /// (`feed.containers`, `feed.items`), which the configuration revision carries.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
-/// `users.search`.
+/// `users.search`, and again when it gained `issue.transitions`.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
@@ -139,8 +139,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "catalog-jira.md",
         "jira",
-        "629e9f44b62b10aa30387df0301a7eed68cee22a9957ec5935716cd7e24bfc2a",
-        "81ba9d0d549266dd9ec07e310f90a30a3ff78cbacb5c79d0813d392980f80ac7",
+        "0f714ef84b4bb5a56dd4a85d61006f84664e48fc033e5d585f7bac97a361b300",
+        "27fbc9e9690b7e46189d8ea1d1bc0f4acca778a8629bef260f306a65eadb64c4",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision.
