@@ -957,11 +957,17 @@ async fn postgresql_catalogue_inputs_are_refused_before_credentials_or_connectio
 /// in `catalogue_adversary.rs` measure the behaviour on a server.
 /// - A generated column (`attgenerated <> ''`) has no default: its expression
 ///   in `pg_attrdef` is not `column_default`, as in `information_schema.columns`.
+/// - A foreign key is one declared key: an internal clone into a partition of
+///   a referenced partitioned table (its parent constraint is on the same
+///   referencing table) is not reported.
 /// - A foreign key is reported only when the role holds `USAGE` on the
-///   referenced schema and some privilege on the referenced table.
+///   referenced schema, some privilege on the referenced table and a column
+///   privilege on every referenced column.
 /// - An index is left out when any column it depends on (key, INCLUDE,
 ///   expression or predicate, `pg_depend`) is one the role holds no column
-///   privilege on, the rule that hides the column from `table.describe`.
+///   privilege on, the rule that hides the column from `table.describe`. A
+///   whole-row reference in an expression or the predicate, and the
+///   whole-table dependency (`refobjsubid = 0`), count as every column.
 /// A name ending in a space is an ordinary PostgreSQL name and is bound.
 #[tokio::test]
 async fn postgresql_catalogue_statements_hide_what_the_role_cannot_see() {
@@ -1004,6 +1010,14 @@ async fn postgresql_catalogue_statements_hide_what_the_role_cannot_see() {
         describe.contains("pg_catalog.has_table_privilege(rc.oid, "),
         "{describe}"
     );
+    assert!(
+        describe.contains("NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint pf WHERE pf.oid = f.conparentid AND pf.conrelid = f.conrelid)"),
+        "{describe}"
+    );
+    assert!(
+        describe.contains("NOT EXISTS (SELECT 1 FROM pg_catalog.unnest(f.confkey) AS rk(attnum) WHERE NOT (pg_catalog.pg_has_role(rc.relowner, 'USAGE') OR pg_catalog.has_column_privilege(rc.oid, rk.attnum, 'SELECT, INSERT, UPDATE, REFERENCES')))"),
+        "{describe}"
+    );
     let scenario = Scenario {
         columns: INDEX_COLUMNS.to_vec(),
         rows: vec![],
@@ -1024,6 +1038,11 @@ async fn postgresql_catalogue_statements_hide_what_the_role_cannot_see() {
     assert!(index.contains("FROM pg_catalog.pg_depend"), "{index}");
     assert!(
         index.contains("pg_catalog.has_column_privilege(c.oid, "),
+        "{index}"
+    );
+    assert!(index.contains("wt.refobjsubid = 0"), "{index}");
+    assert!(
+        index.contains("pg_catalog.strpos(COALESCE(i.indexprs::pg_catalog.text, '') || COALESCE(i.indpred::pg_catalog.text, ''), ':varattno 0 ') > 0"),
         "{index}"
     );
 }

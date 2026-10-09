@@ -199,10 +199,15 @@ without `table` lists the indexes of every table of the schema, one row per key 
 
 The reads hide what the role cannot see, as `information_schema` does. A generated column's
 `column_default` is `null` (its generation expression is not a default). A foreign key is
-reported only when the role holds `USAGE` on the referenced schema and a privilege on the
-referenced table; otherwise the column is described without it. `index.list` leaves out an
-index built on any column `table.describe` hides: a key, INCLUDE or expression column, or a
-column in a partial index's predicate.
+reported only when the role holds `USAGE` on the referenced schema, a privilege on the
+referenced table and a column privilege on every referenced column; otherwise each of its
+columns is described without it, so `table.describe` never names a referenced column that
+`table.describe` of the referenced table hides. A key into a partitioned table is one row per
+column, not one more per partition, and a partition reports the key it inherits. `index.list`
+leaves out an index built on any column `table.describe` hides: a key, INCLUDE or expression
+column, or a column in a partial index's predicate. A whole-row reference such as
+`(t IS NOT NULL)` counts as every column, and so does an index on expressions alone, such as
+`((pub + 1))`: a role granted only some columns of a table does not see it.
 
 Add the operations you grant to `operations` in the adapter entry. These reads are checked
 against a scripted PostgreSQL wire fixture; their visibility rules were also run against a
