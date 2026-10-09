@@ -2,13 +2,17 @@
 format: aep.planning-md/3
 id: story:parity-grafana-datasource-loki
 kind: story
-status: draft
+status: implemented
 title: Grafana datasource discovery and Loki through Grafana
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:parity-loki-query
-revision: 1
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-09T04:56:04Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1}}}
+- {from: "proposed", to: "active", at: "2026-10-09T04:56:04Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
+- {from: "active", to: "implemented", at: "2026-10-09T04:56:04Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
@@ -33,3 +37,11 @@ new native adapter; `adapters/grafana` holds a design and an ESS model; the `gra
 ## Note
 
 Different operations from `story:catalog-grafana-reads` (alert rules, annotations, dashboards: 0 calls).
+
+## Wave 20261009a result
+
+Written on wave/20261009a (unit commit 4781dc49f, merged 0ff9b3310): new native adapter `connectors-grafana` with `datasources.list` and the bearer profile `grafana.service_account` (configured identity probe `GET /api/datasources`); Loki through Grafana is a Loki connection whose `base_url` is the data source's Grafana proxy path, held by new Loki tests. Spec: `adapters/grafana/spec/ess` (connection, records), validated with ess 0.56.0.
+
+Decisions: the profile is the keyring-entered `grafana.service_account` (not the design's deployment-configured one); data-source `uid` is returned, because a Loki-through-Grafana connection needs it until story:grafana-mediated-datasource-route seals it. `loki.recent_logs` stays a documented `logs.query_range` with no end.
+
+Not yet compiled or run: the descriptor generation, Cargo.lock entry and package gates of connectors-grafana and connectors-loki are owed to the build.

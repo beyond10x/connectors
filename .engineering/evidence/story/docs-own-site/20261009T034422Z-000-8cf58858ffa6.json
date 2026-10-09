@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-09T03:44:22Z",
+  "actor": "human:timo",
+  "artifact": "story:docs-own-site",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/37879491600"
+  }
+}

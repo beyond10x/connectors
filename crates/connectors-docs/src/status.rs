@@ -222,8 +222,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Jira Cloud",
-        "Issue search by JQL, comments and changelogs over HTTP basic authentication.",
-        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_exactly_the_three_reads",
+        "Issue search by JQL, one issue by key, comments, changelogs, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search unreleased).",
+        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_exactly_the_six_reads",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -272,7 +272,7 @@ pub const CAPABILITIES: &[Capability] = &[
         "Catalog provider",
         "Slack conversations",
         "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0); verified against a local fixture only.",
-        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_three_conversation_reads",
+        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_the_user_search",
         "/docs/reference/adapters/catalog",
     ),
     decided(
@@ -316,6 +316,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "adapters/loki/tests/local_runtime.rs::each_read_answers_through_the_private_runtime_from_the_recorded_answers",
         "/docs/reference/adapters/loki",
     ),
+    shipped(
+        "Native adapters",
+        "Grafana data sources",
+        "datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (unreleased).",
+        "adapters/grafana/tests/local_runtime.rs::the_datasource_list_answers_through_the_private_runtime_from_the_recorded_answer",
+        "/docs/reference/adapters/grafana",
+    ),
     planned(
         "Native adapters",
         "Kubernetes permission checks",
@@ -331,7 +338,7 @@ pub const CAPABILITIES: &[Capability] = &[
     decided(
         "Native adapters",
         "Specification-only adapters",
-        "Atlassian native documents, Docker, Grafana, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime.",
+        "Atlassian native documents, Docker, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
         "/docs/reference/adapters",
     ),
     planned(

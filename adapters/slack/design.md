@@ -4,8 +4,13 @@ The provider records are typed in the [adapter-owned ESS model](spec/ess/domains
 Conversation, Message, User, File and Emoji. No relation is declared: every edge is an
 `UNMAPPED:` marker there, with a census at the foot of the file.
 
-- **Status:** proposed; not implemented. Beside this page and the ESS model, `upstream/` holds
-  the pinned Swagger 2.0 document; no bundle, selection set, fixture or runtime exists.
+- **Status:** partly implemented through the catalog provider
+  ([docs/catalog-slack.md](../../docs/catalog-slack.md)): `conversations.list`,
+  `conversations.history`, `conversations.replies` and `users.list` are selected from the pinned
+  Swagger 2.0 document in `upstream/`. `auth.test`, `team.info`, `emoji.list` and
+  `search.messages` declare a required `token` parameter the catalog engine cannot withhold;
+  the guide's *Methods that cannot be selected yet* names the engine change. Writes and files
+  are not started.
 - **Serves:** parity units U02, U08 and U13 of
   [the parity page](../../docs/fluxplane-plugin-parity.md#gap-units) (`:777`, `:783`, `:788`);
   stories `story:catalog-slack-reads`, `story:parity-slack-discovery-reads`,
@@ -28,7 +33,7 @@ names (`:777`).
 | Does the pinned document carry every unit method? | Required only for `conversations.list`, `.history` and `.replies` (`story:catalog-swagger2-projection:32`). Not checked for the other 14 methods in § 2: the document is not in this tree. | A missing method is a `decision-blocker` (`story:catalog-slack-reads:32`); enough of them select the native route. |
 | Is an archived document acceptable? | The parity page asks for "a current Slack Web API document" (`:777`); the planned pin comes from an archived repository (`story:catalog-slack-reads:32`). Not checked. | Owner decision. |
 | Binary download and multi-step upload (U13) | A catalog engine change (`:788`). | Whether U13 stays on the catalog route. |
-| Bot and user tokens on one provider | A catalog connection holds one `AuthConfig` with one `profile` (`adapters/catalog/src/local.rs:115-121`). Not checked further. | Whether search uses a second connection or a second profile. |
+| Bot and user tokens on one provider | A catalog connection holds one `AuthConfig` with one `profile` (`adapters/catalog/src/local.rs`, `struct AuthConfig`), and nothing in the local configuration ties it to the bundle's recorded `auth_profile` (checked 2026-10-09). | Search is a second connection under `slack.user` with its own operations file; no host change. Blocked first by the required `token` (the guide's *Methods that cannot be selected yet*). |
 
 ## 2. Operations
 

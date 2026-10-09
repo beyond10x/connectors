@@ -19,7 +19,8 @@ an installed capability: the runtime column says what runs.
 | [Kubernetes](./kubernetes/index.md) | `connectors-kubernetes` | `resources.list`, `endpoints.discover`, optionally `hosts.discover` and the Helm release reads |
 | [SQL / PostgreSQL](./sql/index.md) | `connectors-sql` | `schema.list`, `query.read` |
 | [Tavily](./tavily/index.md) | `connectors-tavily` | `websearch.search`, `websearch.fetch`, `websearch.crawl` |
-| [Loki](./loki/index.md) | `connectors-loki` | `logs.query_range`, `logs.query_metric`, `logs.labels` |
+| [Loki](./loki/index.md) | `connectors-loki` | `logs.query_range`, `logs.query_metric`, `logs.labels`, directly or through Grafana's data-source proxy |
+| [Grafana](./grafana/index.md) | `connectors-grafana` | `datasources.list`; discovery and the mediated route are specified only |
 
 ## Specification or design only
 
@@ -27,7 +28,6 @@ an installed capability: the runtime column says what runs.
 |---|---|
 | [Atlassian](./atlassian/index.md) | native document contracts and an ESS model for Jira and Confluence; Jira and Confluence reads run through the catalog provider instead |
 | [Docker](./docker/index.md) | native log and mutation contracts and an ESS model |
-| [Grafana](./grafana/index.md) | native discovery and mediated-route contracts and an ESS model |
 | [Prometheus](./prometheus/index.md) | a native PromQL series contract |
 | [Alertmanager](./alertmanager/index.md) | a design |
 | [SIP](./sip/index.md) | a native dial contract |

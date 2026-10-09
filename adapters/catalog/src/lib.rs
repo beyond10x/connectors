@@ -132,6 +132,21 @@ pub struct Selection {
     /// carrying it is refused before any request. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub withhold: Vec<String>,
+    /// Parameters through which the pinned document passes the credential
+    /// that the connection already sends in its authentication header, such
+    /// as Slack's `token`. Each must be a parameter of the operation, in the
+    /// query or a header, that is not bounded, not listed in `required` or
+    /// `withhold`, that no guard reads as an input, that `body_keys` does not
+    /// admit and that no guard's preflight sends as a probe parameter, the
+    /// last two compared without regard to ASCII case. It is left out of the
+    /// declaration whether or not the document requires it, before the
+    /// required-header check, and out of a guard's probe operation, so an
+    /// input carrying it is refused before any request, a write's body
+    /// carrying it as a top-level key under any ASCII case is refused before
+    /// any request, and the credential travels in the header alone. Omitted
+    /// when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub credential: Vec<String>,
     /// The reasons a provider gives in a `403` answer when it means a quota,
     /// not a permission: a `403` whose JSON body carries one of them in
     /// `error.errors[].reason` or `error.status` is `rate_limited`. Every other
@@ -267,6 +282,7 @@ pub struct Engine {
     base_segments: Vec<String>,
     source_revision: String,
     exposed: Vec<Exposed>,
+    /// Each guarded selection's probe, keyed by the selection id.
     probes: BTreeMap<String, Probe>,
     feed: Option<feed::Feed>,
 }
@@ -356,6 +372,76 @@ impl Engine {
                     )));
                 }
             }
+            // The names a guard reads as input, through its preflight values
+            // and the expectations of its checks.
+            let guard_inputs: Vec<&str> = selection
+                .guard
+                .iter()
+                .flat_map(|guard| {
+                    guard.preflight.values.values().chain(
+                        guard
+                            .preflight
+                            .checks
+                            .iter()
+                            .chain(&guard.postflight.checks)
+                            .filter_map(|check| match &check.expect {
+                                Expectation::Input(path) => Some(path),
+                                Expectation::Literal(_) => None,
+                            }),
+                    )
+                })
+                .map(|path| path.split('.').next().unwrap_or(path))
+                .collect();
+            // A credential the document passes as a parameter travels in the
+            // connection's authentication header instead: it leaves the
+            // operation before anything reads its parameters, whether or not
+            // the document requires it, so a required `token` header no longer
+            // refuses the selection below.
+            for name in &selection.credential {
+                let declared: Vec<_> = operation
+                    .parameters
+                    .iter()
+                    .filter(|p| &p.name == name)
+                    .collect();
+                let reason = if declared.is_empty()
+                    || declared
+                        .iter()
+                        .any(|p| !matches!(p.location, Location::Query | Location::Header))
+                {
+                    Some("which is not only a query or header parameter of its operation")
+                } else if selection.bounds.contains_key(name) {
+                    Some("which it also bounds")
+                } else if selection.required.contains(name) || selection.withhold.contains(name) {
+                    Some("which it also marks required or withholds")
+                } else if guard_inputs.contains(&name.as_str()) {
+                    Some("which its guard reads as an input")
+                } else if selection
+                    .body_keys
+                    .iter()
+                    .any(|key| key.eq_ignore_ascii_case(name))
+                {
+                    Some("which its body_keys admit")
+                } else if selection.guard.as_ref().is_some_and(|guard| {
+                    guard
+                        .preflight
+                        .values
+                        .keys()
+                        .any(|key| key.eq_ignore_ascii_case(name))
+                }) {
+                    Some("which its guard's preflight sends as a probe parameter")
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    return Err(refuse(format!(
+                        "selection `{}` passes `{name}` as the credential, {reason}",
+                        selection.id
+                    )));
+                }
+            }
+            operation
+                .parameters
+                .retain(|p| !selection.credential.contains(&p.name));
             if operation
                 .parameters
                 .iter()
@@ -416,24 +502,6 @@ impl Engine {
             // A withheld parameter leaves the operation this selection
             // exposes: undeclared, so the closed input schema refuses it, and
             // absent from the template, so it is never bound into a request.
-            let guard_inputs: Vec<&str> = selection
-                .guard
-                .iter()
-                .flat_map(|guard| {
-                    guard.preflight.values.values().chain(
-                        guard
-                            .preflight
-                            .checks
-                            .iter()
-                            .chain(&guard.postflight.checks)
-                            .filter_map(|check| match &check.expect {
-                                Expectation::Input(path) => Some(path),
-                                Expectation::Literal(_) => None,
-                            }),
-                    )
-                })
-                .map(|path| path.split('.').next().unwrap_or(path))
-                .collect();
             for name in &selection.withhold {
                 let declared: Vec<_> = operation
                     .parameters
@@ -476,7 +544,13 @@ impl Engine {
                         selection.id
                     )));
                 }
-                let probe = find(&guard.preflight.operation_id)?.clone();
+                let mut probe = find(&guard.preflight.operation_id)?.clone();
+                // The probe passes the credential the way the selected
+                // operation does: through the connection's header alone, never
+                // as a parameter bound from caller input.
+                probe
+                    .parameters
+                    .retain(|p| !selection.credential.contains(&p.name));
                 if probe.method != "get" || !path_within(&probe.path, &base_segments) {
                     return Err(refuse(format!(
                         "guard of `{}` must read through a GET under the base path",
@@ -500,7 +574,9 @@ impl Engine {
                 }
                 let template =
                     Template::from_operation(&probe).map_err(|refusal| refuse(refusal.reason()))?;
-                probes.insert(guard.preflight.operation_id.clone(), Probe { template });
+                // Keyed by the selection: two selections may read one probe
+                // operation with different credential parameters removed.
+                probes.insert(selection.id.clone(), Probe { template });
             }
             if !selection.body_keys.is_empty() {
                 let mut names = std::collections::BTreeSet::new();
@@ -737,6 +813,20 @@ impl Engine {
         {
             return Err(refuse("body carries a key its selection does not admit"));
         }
+        // The credential is never sent from caller input, so a body naming
+        // it under any ASCII case is refused here as well as in the
+        // declaration.
+        if let Some(body) = input.get("body").and_then(Value::as_object)
+            && body.keys().any(|key| {
+                exposed
+                    .selection
+                    .credential
+                    .iter()
+                    .any(|name| key.eq_ignore_ascii_case(name))
+            })
+        {
+            return Err(refuse("body carries its selection's credential parameter"));
+        }
         let values = Self::parameter_values(&exposed.operation, &input)?;
         check_bounds(&exposed.selection, &values)?;
         let (segments, query) = self.resolve(&exposed.template, values)?;
@@ -769,7 +859,7 @@ impl Engine {
             postflight = expected(&guard.postflight.checks)?;
             let probe = self
                 .probes
-                .get(&guard.preflight.operation_id)
+                .get(&exposed.selection.id)
                 .ok_or_else(Error::internal)?;
             let mut values = BTreeMap::new();
             for (parameter, path) in &guard.preflight.values {
@@ -1109,6 +1199,31 @@ fn declared_type(value_type: Option<ValueType>) -> Value {
     }
 }
 
+/// A pattern matching exactly any of `names`, each ASCII letter in either case
+/// and every other character literal, written without inline flags so every
+/// JSON Schema reader of the declaration reads it the same way.
+fn caseless_pattern(names: &[String]) -> String {
+    let alternatives: Vec<String> = names
+        .iter()
+        .map(|name| {
+            name.chars()
+                .map(|c| {
+                    if c.is_ascii_alphabetic() {
+                        format!("[{}{}]", c.to_ascii_lowercase(), c.to_ascii_uppercase())
+                    } else if "^$\\.*+?()[]{}|/".contains(c) {
+                        // The syntax characters, the only identity escapes
+                        // both ECMA-262 and Rust's regex accept.
+                        format!("\\{c}")
+                    } else {
+                        c.to_string()
+                    }
+                })
+                .collect()
+        })
+        .collect();
+    format!("^(?:{})$", alternatives.join("|"))
+}
+
 /// The descriptor operation for a selection: one property per declared path or
 /// query parameter, a `body` object when the operation takes one, and one string
 /// property per input reference a guard reads that no parameter covers.
@@ -1149,7 +1264,15 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
     }
     if !operation.request_media_types.is_empty() {
         let body = if selection.body_keys.is_empty() {
-            json!({"type": "object"})
+            let mut body = json!({"type": "object"});
+            if !selection.credential.is_empty() {
+                // An open body still never names a credential parameter,
+                // under any ASCII case. A closed body cannot: `body_keys`
+                // admitting one is refused when the selection loads.
+                body["propertyNames"] =
+                    json!({"not": {"pattern": caseless_pattern(&selection.credential)}});
+            }
+            body
         } else {
             // A closed body: exactly these keys. A key a guard reads directly
             // is declared as the scalar the guard compares; any other key takes

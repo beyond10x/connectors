@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-09T04:55:57Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-jira-issue-reads",
+  "kind": "story",
+  "revision": 2,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test --locked -p connectors-catalog-provider on wave/20261009a f935679ef: 458 passed, 0 failed"
+  }
+}

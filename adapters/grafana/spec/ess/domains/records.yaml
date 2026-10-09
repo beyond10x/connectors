@@ -1,0 +1,54 @@
+domain: connectors_grafana.records
+summary: The bounded data-source records `datasources.list` returns, read from Grafana's `GET /api/datasources`.
+
+# Normative owner: adapters/grafana/design.md (Operations: datasources.list, records /
+# grafana-datasources) and adapters/grafana/README.md. The executable
+# (adapters/grafana/src/lib.rs) projects each Grafana data source onto
+# `DatasourceRecord`; tests/ess_model.rs checks the records it returns against the schema
+# this model generates.
+types:
+  # Grafana's access mode of a data source: `proxy` is served through Grafana's
+  # data-source proxy, `direct` is reached by the browser and has no proxy route.
+  - name: connectors_grafana.records.DatasourceAccess
+    kind: enum
+    variants: [proxy, direct]
+
+  # A data-source uid: Grafana's short-uid alphabet, 1–40 characters.
+  - name: connectors_grafana.records.DatasourceUid
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+    invariants:
+      - value.count: {gte: 1, lte: 40}
+
+  # One data source as `datasources.list` returns it. Only these members are read from
+  # Grafana's answer: its numeric `id`, `orgId`, the backend `url`, `user`, `database`,
+  # `basicAuth*`, `jsonData`, `secureJsonFields` and every other member stay private.
+  - name: connectors_grafana.records.DatasourceRecord
+    kind: struct
+    fields:
+      - {name: uid, type: connectors_grafana.records.DatasourceUid}
+      - {name: name, type: String}
+      - {name: type, type: String}
+      - {name: access, type: connectors_grafana.records.DatasourceAccess}
+      - {name: is_default, type: Boolean}
+    invariants:
+      - name.count: {gte: 1, lte: 190}
+      - type.count: {gte: 1, lte: 128}
+
+  # The answer of `datasources.list`: at most 1,000 records in Grafana's order. Grafana
+  # answers the whole list unpaged, so there is never a cursor; more than 1,000 data
+  # sources leaves the list incomplete.
+  - name: connectors_grafana.records.DatasourceList
+    kind: struct
+    fields:
+      - {name: items, type: "List<connectors_grafana.records.DatasourceRecord>"}
+      - {name: complete, type: Boolean}
+    invariants:
+      - items.count: {lte: 1000}
+
+# ESS-LIMIT: `next_cursor` is always null and `provenance` is the shared records
+# envelope; neither is modelled here because ESS 0.56 has no required-null codec rule.
+# That `complete` is false exactly when Grafana listed more than 1,000 data sources is a
+# relation between the answer and the provider's, which no invariant can read; the
+# binding's tests assert it.
