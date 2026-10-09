@@ -59,8 +59,8 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 50 | 4,238 | 39 | 4,238 |
-| partial | 22 | 919 | 15 | 919 |
+| covered | 49 | 4,233 | 38 | 4,233 |
+| partial | 23 | 924 | 16 | 924 |
 | missing | 229 | 1,199 | 55 | 1,199 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
@@ -75,7 +75,7 @@ Per plugin (operations / calls):
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 15 / 2,183 | 8 / 206 | 41 / 281 |
-| jira | 21 | 13 | 1,364 | 7 / 801 | 0 / 0 | 14 / 563 |
+| jira | 21 | 13 | 1,364 | 6 / 796 | 1 / 5 | 14 / 563 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 5 / 358 | 0 / 0 | 15 / 67 |
@@ -99,7 +99,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **50 / 4,238** | **22 / 919** | **229 / 1,199** |
+| **total** | **301** | **109** | **6,356** | **49 / 4,233** | **23 / 924** | **229 / 1,199** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -228,7 +228,7 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 | `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | — | missing | `doTransition` is not selected. It would run by transition id only: no by-name run and no walk to a target status. |
 | `jira.issue.link.add` | 40 | 11 | 2026-09-28 | — | missing | `linkIssues` is not selected. |
 | `jira.issue.edit` | 26 | 10 | 2026-09-24 | — | missing | `editIssue` is not selected. |
-| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:13) | covered | The issue types a project can create, by project id or key. The fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not selected; it is not established whether fluxplane returns them. |
+| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:13) | partial | The issue types a project can create, by project id or key. fluxplane takes an `issue_type` filter (`fluxplane-plugin operation describe jira jira.issue.create_meta`, 2026-10-09) for that type's create fields; the fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not selected. |
 | `jira.issue.delete` | 3 | 1 | 2026-09-16 | — | missing | `deleteIssue` is not selected. |
 | `jira.issue.attachment.get` | 2 | 1 | 2026-09-17 | — | missing | A binary download (`getAttachmentContent`). The catalog reads only JSON or text responses. |
 | `jira.user.search` | 2 | 2 | 2026-09-28 | `users.search` (:15) | covered | By `query` or exact `accountId`, over the first 1,000 matches; privacy controls may withhold email addresses. |
