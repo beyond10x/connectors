@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:docs-own-site
 kind: story
-status: active
+status: implemented
 title: Connectors documentation on its own site with the shared look and feel
 relations:
 - serves: vision:independent-contract-adapters
@@ -27,10 +27,11 @@ scope:
   path: crates/connectors-docs
 - confidence: cited
   path: website
-revision: 6
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T20:00:37Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-08T20:00:37Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-09T04:32:12Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
@@ -77,4 +78,6 @@ Open: the organisation side of the move (website redirects and independent-site 
 
 ## Stage C and D result
 
-Stage C and D, 2026-10-09: https://github.com/beyond10x/connectors/pull/140 merged as ff6e43cb1. On that merge commit `Documentation validation` (run 37878739263) and `Documentation site` (run 37879491600) concluded success. At 03:43:57Z https://beyond10x.github.io/connectors/, `/docs/`, `/docs/status/` and `/docs/getting-started` answered 200 with this site, and `/.well-known/b10x-site.json` named commit ff6e43cb1. The repository homepage is https://beyond10x.github.io/connectors/. The former unified pages under `/docs/connectors/` move with the organization root publication.
+Stage C and D, 2026-10-09: https://github.com/beyond10x/connectors/pull/140 merged as ff6e43cb1. On that merge commit `Documentation validation` (run 37878739263) and `Documentation site` (run 37879491600) concluded success. At 03:43:57Z https://beyond10x.github.io/connectors/, `/docs/`, `/docs/status/` and `/docs/getting-started` answered 200 with this site, and `/.well-known/b10x-site.json` named commit ff6e43cb1. The repository homepage is https://beyond10x.github.io/connectors/.
+
+After the organization root publication (https://github.com/beyond10x/atlas/actions/runs/37880642863, success 04:16:02Z), https://beyond10x.github.io/docs/connectors/ answered at 04:32:05Z with "Documentation moved" and a meta refresh to `/connectors/docs/`.
