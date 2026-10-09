@@ -13,8 +13,35 @@
   Verified against a local fixture written in the pinned document's shapes, not a live site
   (`docs/catalog-jira.md`). The Jira guide's example configuration therefore has a new
   configuration revision.
+- GitLab through the catalog provider writes merge-request notes and discussions, from the pinned
+  OpenAPI document, each a required-approval mutation (`docs/local-gitlab-merge.md`, *Notes and
+  discussions*):
+  - `merge_request.note.create` (`postApiV4ProjectsIdMergeRequestsNoteableIdNotes`) adds one
+    note to a merge request, and `merge_request.discussion.reply`
+    (`postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes`) one reply to a
+    discussion. Both are unguarded, as creates: the same approved input sent twice adds a second
+    note. Their bodies are closed: `body` and `internal` for a note, `body` for a reply, so
+    `created_at`, the deprecated `confidential` and `merge_request_diff_head_sha` are refused
+    before any request. GitLab runs quick actions written in the text, so the approver reads it
+    whole.
+  - `merge_request.discussion.resolve`
+    (`putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`) resolves or unresolves
+    one discussion. Its guard reads the discussion first through the new read
+    `merge_request.discussion.get` and refuses unless it is resolvable; GitLab's answer must
+    carry the requested `resolved`, or the outcome is unknown.
+  Verified against a local fixture written in the pinned document's shapes, not a live GitLab.
+  The GitLab example configuration in `docs/local-catalog-provider.md` therefore has a new
+  configuration revision.
 
 ### Limits
+
+- A merge-when-pipeline-succeeds variant of `merge_request.merge` and a reopen variant of
+  `merge_request.update` are not selected; both guards stay unchanged. Each needs a selection to
+  fix a body member to a literal (`auto_merge: true`, `state_event: reopen`), which the catalog
+  engine cannot declare; without it the auto-merge variant would merge at once without the
+  pipeline check. Proving auto-merge afterwards also needs a postflight check that accepts
+  either of two observations (`docs/local-gitlab-merge.md`, *Not selected: auto-merge and
+  reopen*).
 
 - Running a Jira transition (`doTransition`) is not selected. Jira answers it `204` with no body,
   and the catalog guard's postflight checks only the write's own response body, so it cannot

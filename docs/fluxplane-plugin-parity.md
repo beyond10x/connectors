@@ -62,6 +62,19 @@ Sources:
   The `issue.create_meta` and `users.search` citations in the [jira](#jira) section moved with
   `adapters/catalog/providers/jira/operations.json`. The [Gap units](#gap-units) table still
   shows the 2026-10-07 baseline.
+- **GitLab merge-request notes and discussions, 2026-10-10 (unreleased).**
+  `gitlab.mr.note.create`, `gitlab.mr.discussion.reply` and `gitlab.mr.discussion.resolve` moved
+  from missing to covered when `merge_request.note.create`, `merge_request.discussion.reply` and
+  the guarded `merge_request.discussion.resolve` were selected, with `merge_request.discussion.get`
+  as the resolve guard's read, verified against a hand-written fixture in the pinned document's
+  shapes, not a live GitLab. The `gitlab` row of the per-plugin table now reads 18 / 2,205
+  covered and 38 / 259 missing, and the summary and total rows move by the same 3 operations and
+  22 calls. No mapped call of [Used but not declared](#used-but-not-declared) lands on them.
+  `gitlab.mr.merge` and `gitlab.mr.update` stay partial: a merge-when-pipeline-succeeds variant
+  and a reopen variant are not selected, because each needs a selection to send a fixed body
+  member, which the catalog engine cannot declare
+  ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). The
+  [Gap units](#gap-units) table still shows the 2026-10-07 baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -88,9 +101,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 56 | 5,063 | 45 | 5,063 |
+| covered | 59 | 5,085 | 48 | 5,085 |
 | partial | 17 | 221 | 10 | 221 |
-| missing | 228 | 1,072 | 54 | 1,072 |
+| missing | 225 | 1,050 | 51 | 1,050 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -103,7 +116,7 @@ Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
-| gitlab | 64 | 38 | 2,670 | 15 / 2,183 | 8 / 206 | 41 / 281 |
+| gitlab | 64 | 38 | 2,670 | 18 / 2,205 | 8 / 206 | 38 / 259 |
 | jira | 21 | 13 | 1,364 | 7 / 923 | 1 / 5 | 13 / 436 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
@@ -128,7 +141,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **56 / 5,063** | **17 / 221** | **228 / 1,072** |
+| **total** | **301** | **109** | **6,356** | **59 / 5,085** | **17 / 221** | **225 / 1,050** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -171,17 +184,17 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.mr.create` | 184 | 21 | 2026-10-06 | `merge_request.create` (:55) | covered | Needs the source-branch head `sha` for the guard, and an approval. |
 | `gitlab.mr.list` | 122 | 23 | 2026-10-05 | `merge_requests.list` (:14) | covered | Project-scoped only. It is not established whether fluxplane also lists across projects. |
 | `gitlab.repository.commit.list` | 81 | 17 | 2026-10-06 | `commits.list` (:44) | covered | — |
-| `gitlab.mr.merge` | 77 | 10 | 2026-10-06 | `merge_request.merge` (:70) | partial | The guard requires `mergeable` and a succeeded pinned head pipeline, so it refuses merge-when-pipeline-succeeds and projects without a pipeline. |
+| `gitlab.mr.merge` | 77 | 10 | 2026-10-06 | `merge_request.merge` (:70) | partial | The guard requires `mergeable` and a succeeded pinned head pipeline, so it refuses merge-when-pipeline-succeeds and projects without a pipeline. A merge-when-pipeline-succeeds variant is not selected (2026-10-10): its request must always carry `auto_merge: true`, or the same request merges at once without the pipeline check, and a selection cannot fix a body member to a value; proving it afterwards also needs one check that accepts either auto-merge set or merged ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). |
 | `gitlab.compare` | 76 | 19 | 2026-09-30 | `repository.compare` (:48) | covered | No per-file diff bound. |
 | `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | — | missing | Code search is not selected (`/projects/:id/search`, scope `blobs`). |
 | `gitlab.repository.tag.list` | 71 | 23 | 2026-10-03 | `tags.list` (:35) | covered | — |
-| `gitlab.mr.update` | 60 | 12 | 2026-10-04 | `merge_request.update` (:62) | partial | The guard requires state `opened`, so reopening a closed merge request is refused. |
+| `gitlab.mr.update` | 60 | 12 | 2026-10-04 | `merge_request.update` (:62) | partial | The guard requires state `opened`, so reopening a closed merge request is refused. A reopen variant is not selected (2026-10-10): its request must carry exactly `state_event: reopen`, and a selection cannot fix a body member to a value ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). |
 | `gitlab.mr.changes` | 58 | 13 | 2026-10-03 | `merge_request.get` (:17) + `repository.compare` (:48) | partial | No merge-request diffs read (`/merge_requests/:iid/diffs` is not selected). The diffs can only be had by comparing the request's `diff_refs`. |
 | `gitlab.project.list` | 45 | 12 | 2026-10-03 | `projects.list` (:32) | covered | — |
-| `gitlab.mr.discussion.list` | 43 | 11 | 2026-10-06 | — | missing | Merge-request discussions are not selected. |
+| `gitlab.mr.discussion.list` | 43 | 11 | 2026-10-06 | — | missing | The discussion list is not selected. One discussion by id is read by `merge_request.discussion.get` (:85) since 2026-10-10, which needs the id the list would give. |
 | `gitlab.project.show` | 36 | 19 | 2026-10-03 | `project.get` (:5) | covered | — |
 | `gitlab.repository.tree` | 35 | 13 | 2026-10-06 | — | missing | Repository tree is not selected. |
-| `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | — | missing | The merge-request note write is not selected. |
+| `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | `merge_request.note.create` (:82) | covered | One note by merge-request IID, optionally `internal`. Unguarded, as a create: the same approved input sent twice adds a second note. GitLab runs quick actions in the text; `/merge` is cut off because the body does not admit `merge_request_diff_head_sha` (2026-10-10). |
 | `gitlab.pipeline.retry` | 19 | 5 | 2026-10-05 | — | missing | Pipeline retry is not selected. |
 | `gitlab.release.create` | 16 | 3 | 2026-10-02 | — | missing | The release write is not selected. |
 | `gitlab.repository.tag.create` | 16 | 5 | 2026-09-20 | — | missing | The tag write is not selected. |
@@ -198,8 +211,8 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.release.link.list` | 2 | 1 | 2026-10-02 | `releases.list` (:38) | partial | Links appear only inside each release's `assets`. There is no per-release link list. |
 | `gitlab.deployment.list` | 1 | 1 | 2026-09-28 | `deployments.list` (:50) | covered | — |
 | `gitlab.environment.list` | 1 | 1 | 2026-09-28 | — | missing | Environments are not selected. |
-| `gitlab.mr.discussion.reply` | 1 | 1 | 2026-09-24 | — | missing | The discussion write is not selected. |
-| `gitlab.mr.discussion.resolve` | 1 | 1 | 2026-09-24 | — | missing | The discussion write is not selected. |
+| `gitlab.mr.discussion.reply` | 1 | 1 | 2026-09-24 | `merge_request.discussion.reply` (:87) | covered | One reply by discussion id. Unguarded, as a create (2026-10-10). |
+| `gitlab.mr.discussion.resolve` | 1 | 1 | 2026-09-24 | `merge_request.discussion.resolve` (:90) | covered | Resolve or unresolve by discussion id. Guarded: refused before the write unless the discussion is resolvable; GitLab's answer must carry the requested state, or the outcome is unknown (2026-10-10). |
 | `gitlab.release.update` | 1 | 1 | 2026-09-29 | — | missing | The release write is not selected. |
 | `gitlab.repository.tag.delete` | 1 | 1 | 2026-09-20 | — | missing | Tag delete is not selected. |
 | `gitlab.branch.delete_merged` | 0 | 0 | - | — | missing | Not selected. |

@@ -32,6 +32,9 @@ pinned source under a local id with a declared effect:
 | `merge_request.create` | write | one POST, guarded on the pinned source head |
 | `merge_request.update` | write | one PUT, guarded on the pinned source head |
 | `merge_request.merge` | write | one PUT, guarded on five checks |
+| `merge_request.discussion.get` | read | one discussion of a merge request by id |
+| `merge_request.note.create`, `merge_request.discussion.reply` | write | one POST adding a note or a discussion reply, unguarded |
+| `merge_request.discussion.resolve` | write | one PUT resolving or unresolving a discussion, guarded on it being resolvable and on the answered state |
 | `feed.containers`, `feed.items` | read | the merge-request feed: member projects, then one project's merge requests changed since a watermark |
 
 Input is one property per declared path or query parameter, named as GitLab names it, plus a
@@ -72,6 +75,19 @@ the outcome uncertain.
 sent as approved. The same input approved and sent again opens a second issue. GitLab requires
 `body.title`; every other body member, such as `assignee_ids` or `confidential`, is sent as
 supplied, so read the whole input before approving.
+
+`merge_request.note.create` and `merge_request.discussion.reply` are creates too, and unguarded
+for the same reason: the same input approved and sent again adds a second note. Their bodies are
+closed to the note text (`body`, plus `internal` for a merge-request note). GitLab runs quick
+actions written in a note, such as `/close` or `/approve`, so read the text before approving.
+Any other body key, such as `created_at` or `merge_request_diff_head_sha`, is refused before any
+request.
+`merge_request.discussion.resolve` reads the discussion first and refuses unless it is
+resolvable, sends exactly `resolved`, and requires GitLab's answer to carry the requested state.
+These four are checked against a fixture in the pinned document's shapes, not against a running
+GitLab. A merge-when-pipeline-succeeds variant of the merge and a reopen variant of the update are
+not selected: each needs a selection to fix a body member to a value, which the engine cannot
+declare.
 
 ## Against a live GitLab
 
