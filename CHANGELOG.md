@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Jira Cloud through the catalog provider reads the transitions open on one issue:
+  `issue.transitions` selects `getTransitions` (`GET /rest/api/3/issue/{issueIdOrKey}/transitions`)
+  from the pinned platform REST v3 document. Each transition carries its `id`, its `name` and its
+  target status in `to`. It takes every optional parameter the pinned document declares:
+  `transitionId`, `expand` (`transitions.fields` for the transition screen's fields),
+  `includeUnavailableTransitions`, `sortByOpsBarAndStatus` and `skipRemoteOnlyCondition`.
+  Verified against a local fixture written in the pinned document's shapes, not a live site
+  (`docs/catalog-jira.md`). The Jira guide's example configuration therefore has a new
+  configuration revision.
+
+### Limits
+
+- Running a Jira transition (`doTransition`) is not selected. Jira answers it `204` with no body,
+  and the catalog guard's postflight checks only the write's own response body, so it cannot
+  prove the issue reached the target status; its single preflight read cannot check both the
+  issue's current status and the transition's availability. Both are guard capabilities the
+  engine lacks (`docs/catalog-jira.md`, *Running a transition: not selected*).
+
 ## 0.40.0 — 2026-10-09
 
 ### Added

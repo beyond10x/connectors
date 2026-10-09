@@ -1,10 +1,11 @@
 # Jira Cloud through the catalog provider
 
 The catalog provider reads Jira Cloud issues by JQL or one by key, their comments
-and their changelog, the issue types a project can create, and users, from the
+and their changelog, the transitions open on an issue, the issue types a project
+can create, and users, from the
 pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
 Jira-specific code: the pinned document is compiled into a bundle, a reviewed
-selection set exposes six reads, and the engine described in
+selection set exposes seven reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work exactly as described
 there; this page covers what differs for Jira.
@@ -33,7 +34,7 @@ fresh run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/jira/operations.json`](../adapters/catalog/providers/jira/operations.json)
-exposes six reads and nothing else. Each is `effect: read`; there are no
+exposes seven reads and nothing else. Each is `effect: read`; there are no
 writes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
 `operationId` and path in the pinned document, so a renamed or dropped id, or a
 source operation that moved, fails the gate. The bundle refuses at load any
@@ -49,6 +50,7 @@ the end of a walk are in it.
 | `issue.comments` | `getComments` | `GET /rest/api/3/issue/{issueIdOrKey}/comment` | `startAt`, `maxResults` | `startAt + len(comments) >= total` | none; deltas come from `issues.search` |
 | `issue.changelog` | `getChangeLogs` | `GET /rest/api/3/issue/{issueIdOrKey}/changelog` | `startAt`, `maxResults` | `isLast: true` | none; deltas come from `issues.search` |
 | `issue.get` | `getIssue` | `GET /rest/api/3/issue/{issueIdOrKey}` | none | one issue per call | none; deltas come from `issues.search` |
+| `issue.transitions` | `getTransitions` | `GET /rest/api/3/issue/{issueIdOrKey}/transitions` | none | one issue per call | none |
 | `issue.create_meta` | `getCreateIssueMetaIssueTypes` | `GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes` | `startAt`, `maxResults` | `startAt + len(issueTypes) >= total` | none |
 | `users.search` | `findUsers` | `GET /rest/api/3/user/search` | `startAt`, `maxResults` | an empty page | none |
 
@@ -83,6 +85,41 @@ the end of a walk are in it.
   `updateHistory`, which adds the issue's project to the account's recently
   viewed list; it is accepted by name like every declared parameter, so leave it
   out for a read with no such effect.
+- **`issue.transitions`** takes `issueIdOrKey` and lists the transitions the
+  account may run on that issue in its current status. Each transition carries
+  its `id`, which a transition request names, its `name`, and in `to` the
+  status it leads to (`id`, `name`, `statusCategory`); `isAvailable` says
+  whether it passes its conditions now. The answer is not paged. The selection
+  keeps all five optional parameters the pinned document declares; each only
+  narrows, expands or orders the answer:
+  - `transitionId` narrows the answer to that one transition, to check it
+    before running it.
+  - `expand=transitions.fields` adds each transition screen's fields, with
+    `required` and `allowedValues`, the input a transition with a screen needs.
+  - `includeUnavailableTransitions=true` adds transitions that fail a
+    condition, with `isAvailable: false`, to show why one is not offered.
+  - `sortByOpsBarAndStatus=true` orders by the issue view's ops bar, then by
+    status category, instead of by ops bar alone.
+  - `skipRemoteOnlyCondition=true` includes transitions hidden by the *Hide
+    From User Condition*. The pinned document gives it effect only for Connect
+    and Forge apps with the *Administer Jira* permission, which an account
+    connection (basic or bearer) is not; it is accepted by name, like every
+    declared parameter, and Jira decides whether it applies. This has not been
+    checked against a live site.
+
+  A parameter the pinned document does not declare for `getTransitions`, a
+  missing `issueIdOrKey`, or a boolean given as anything but `true` or `false`
+  is refused as `invalid_input` before any request. An issue Jira does not
+  find, or that the account may not see, is refused as the provider's
+  not-found.
+
+  ```sh
+  connectors operations invoke --adapter jira-cloud --connection "$connection" \
+    --operation issue.transitions --schema "$schema" --revision "$revision" \
+    --input-json '{"issueIdOrKey":"FIX-1","expand":"transitions.fields"}'
+  ```
+
+  sends `GET /rest/api/3/issue/FIX-1/transitions?expand=transitions.fields`.
 - **`issue.create_meta`** takes `projectIdOrKey` and lists the issue types the
   account can create in that project, the input a create request needs. The next
   page starts at `startAt` plus the number of `issueTypes`; the walk ends when
@@ -105,6 +142,31 @@ returned issue. Whether a given kind of change moves an issue's `updated` is
 Jira's behaviour and has not been checked against a live site here.
 Every other query parameter the pinned document declares for an operation is
 accepted by name; one it does not declare is refused before any request.
+
+## Running a transition: not selected
+
+`doTransition` (`POST /rest/api/3/issue/{issueIdOrKey}/transitions`) is in the
+bundle but not in the selection set, because the catalog guard cannot yet
+guard it the way every selected write is guarded (as `merge_request.merge` is in
+[the guarded merge guide](local-gitlab-merge.md)):
+
+- **No postflight re-read.** A guard's postflight compares values in the write's
+  own response body. Jira answers a transition with `204` and no body, so a
+  check that the issue reached the transition's target status always leaves the
+  outcome uncertain, and a guard without that check proves nothing after the
+  write. The guard would need a postflight that reads the issue again
+  (`getIssue`) and checks `/fields/status/id`.
+- **One preflight read.** A guard reads once before the write. Refusing unless
+  the issue is in the status the caller names needs `getIssue`
+  (`/fields/status/id`); refusing unless the transition is open needs
+  `getTransitions` with `transitionId` (`/transitions/0/id`). The guard cannot do
+  both, and a check cannot pick an array element by its `id` without that
+  filter.
+
+Until the guard can, read `issue.transitions` for the transition's `id` and its
+target status, and run the transition outside Connectors. Running a transition
+by name, or walking several transitions to reach a status, is composition over
+these operations and stays outside the catalog in any case.
 
 ## Authentication
 
@@ -209,17 +271,17 @@ An OAuth 2.0 (3LO) access token is sent as a bearer token. **Not verified live.*
 The credential document is `{"token": "<access token>"}`, sent as
 `Authorization: Bearer <access token>`. The provider does not refresh an OAuth
 token; connect again when it expires. The token must carry the read scopes the
-six reads and `myself` need; Atlassian names them per operation.
+seven reads and `myself` need; Atlassian names them per operation.
 
 ## Limits
 
 - Verified against a local HTTPS fixture (`adapters/catalog/tests/jira.rs`):
   the exact request of each read, including the JQL time filter and the basic
   header, the returned body as JSON, and a walk of each list to the end
-  condition above. The fixture answers of `issue.get`, `issue.create_meta` and
-  `users.search` are written by hand in the shapes the pinned document gives
-  (`IssueBean`, `PageOfCreateMetaIssueTypes`, an array of `User`), not recorded
-  from a site. Live, only the basic gateway form has been run: a
+  condition above. The fixture answers of `issue.get`, `issue.transitions`,
+  `issue.create_meta` and `users.search` are written by hand in the shapes the
+  pinned document gives (`IssueBean`, `Transitions`, `PageOfCreateMetaIssueTypes`,
+  an array of `User`), not recorded from a site. Live, only the basic gateway form has been run: a
   service-account API token connected and `issues.search` returned issues
   (2026-09-30). The site form, the other reads and the OAuth form have not been
   run against a live site.
