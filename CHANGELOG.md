@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.40.0 — 2026-10-09
 
 ### Added
 
@@ -79,8 +79,9 @@
   `index.list` answers an empty result alike for a table without indexes and a missing table.
 - MySQL is verified against a scripted MySQL wire fixture on loopback (handshake, TLS,
   `caching_sha2_password`, session statements, prepared statements with typed binary rows,
-  `information_schema` reads, `KILL QUERY`), not a live server; there is no real-provider
-  evidence yet. MySQL 8.0 or later is assumed; MariaDB is not tested. SQLite is not served.
+  `information_schema` reads, `KILL QUERY`) in the default suite; ignored live cases ran the
+  catalogue reads and the TIMESTAMP rule against disposable MySQL 8.0.46 and PostgreSQL 17.11
+  servers. There is no real-provider evidence yet. MySQL 8.0 or later is assumed; MariaDB is not tested. SQLite is not served.
   `schema.list` remains column metadata only on both engines.
 - The MySQL read guarantee is a read-only session plus one result-returning statement: table
   writes are refused (1792), but a routine the configured user may `EXECUTE` keeps its side
