@@ -3,9 +3,9 @@
 The Docusaurus site for Connectors, built on the shared `@beyond10x/docs-system` product shell:
 a product landing page, hand-written concepts, guides and adapter pages, generated reference
 pages and status, and two bounded Rust/WASM examples. It builds for
-`https://beyond10x.github.io/connectors/` (`baseUrl: '/connectors/'`). Until the organisation
-side moves the repository off the unified site, the public documentation is still the unified
-site's `/docs/connectors/` pages, built from the files `b10x.docs.yaml` declares.
+`https://beyond10x.github.io/connectors/` (`baseUrl: '/connectors/'`) and is served there:
+`pages.yml` builds it, and on a bot push to `main` `b10x-docs-site.yml` deploys that build
+through Website's `project-site.yml`.
 
 ## Start the preview
 
