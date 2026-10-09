@@ -213,6 +213,11 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "local_runtime",
             "cli_journey::loki_cli_connects_with_a_bearer_token_and_answers_each_read_on_the_saved_connection",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
+        (
+            "connectors-grafana",
+            "local_runtime",
+            "cli_journey::grafana_cli_connects_with_a_service_account_token_and_lists_datasources_on_the_saved_connection",
+        ) => Some((Disposable, vec![CUSTODY, CLI])),
         ("connectors-kubernetes", "local_runtime", name) => match name {
             "cli_journey::persistent_kubernetes_cli_owner_and_keyring_restart"
             | "cli_journey::kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_credential"

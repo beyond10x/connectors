@@ -1,0 +1,10 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "slack",
+  "operations": [
+    {"id": "search.messages", "operation_id": "search_messages", "effect": "read",
+     "description": "Search the workspace's messages that the user token can see for query, one page per call of at most count (1 to 100) results, page selecting which page; sort by score or timestamp, sort_dir asc or desc. Needs a user token with search:read, not a bot token. Slack reports a failed read as status 200 with ok false",
+     "bounds": {"count": {"minimum": 1, "maximum": 100}},
+     "credential": ["token"]}
+  ]
+}

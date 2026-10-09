@@ -66,14 +66,24 @@ struct Provider {
     probe_status: Arc<AtomicU16>,
 }
 
-/// The answer to one request: the recorded fixture its route and query select.
-fn answer(method: &str, target: &str, authorization: &str, probe: u16) -> (u16, Vec<u8>) {
+/// The answer to one request: the recorded fixture its route and query select. Loki is
+/// served below `prefix` (`/` for a direct Loki); a request outside it is not found.
+fn answer(
+    method: &str,
+    target: &str,
+    authorization: &str,
+    probe: u16,
+    prefix: &str,
+) -> (u16, Vec<u8>) {
     if authorization != format!("Bearer {TOKEN_ONE}")
         && authorization != format!("Bearer {TOKEN_TWO}")
     {
         return (401, b"authentication failure\n".to_vec());
     }
-    let (route, query) = target.split_once('?').unwrap_or((target, ""));
+    let Some(target) = target.strip_prefix(prefix).map(|rest| format!("/{rest}")) else {
+        return (404, b"404 page not found\n".to_vec());
+    };
+    let (route, query) = target.split_once('?').unwrap_or((&target, ""));
     match (method, route) {
         ("GET", "/loki/api/v1/labels") if probe != 0 => (probe, b"{}".to_vec()),
         ("GET", "/loki/api/v1/labels") => (200, fixture("labels.json")),
@@ -90,6 +100,11 @@ fn answer(method: &str, target: &str, authorization: &str, probe: u16) -> (u16, 
 
 impl Provider {
     fn new() -> Self {
+        Self::under("/")
+    }
+    /// A Loki whose HTTP API is served below `prefix`, as Grafana's data-source proxy
+    /// serves it; `base_url` carries the prefix.
+    fn under(prefix: &'static str) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -146,7 +161,13 @@ impl Provider {
                         .map(|(_, value)| value.trim().to_owned())
                         .unwrap_or_default();
                     let (status, body) =
-                        answer(&method, &target, &authorization, forced.load(Ordering::SeqCst));
+                        answer(
+                        &method,
+                        &target,
+                        &authorization,
+                        forced.load(Ordering::SeqCst),
+                        prefix,
+                    );
                     observed.lock().unwrap().push(Call {
                         method,
                         target,
@@ -169,7 +190,7 @@ impl Provider {
             &serde_json::to_vec(&json!({
                 "format": "connectors-loki-local/1",
                 "instance": INSTANCE,
-                "base_url": format!("https://localhost:{port}/"),
+                "base_url": format!("https://localhost:{port}{prefix}"),
                 "ca_file": ca,
                 "query_scope": {"required_equalities": []},
             }))
@@ -470,4 +491,55 @@ fn a_changed_configuration_refuses_the_cached_selection_before_provider_work() {
         Err(Failure::ReadinessMismatch)
     ));
     assert_eq!(provider.count(), 0);
+}
+
+/// Loki through Grafana: Grafana's data-source proxy serves a Loki data source's HTTP API
+/// below `/api/datasources/proxy/uid/<uid>/` and authenticates the Grafana
+/// service-account token itself. A Loki connection whose `base_url` is that proxy path
+/// sends its probe and every read below the prefix, with the token as its bearer.
+#[test]
+fn a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix() {
+    const PROXY: &str = "/api/datasources/proxy/uid/P8E80F9AEF21F6940/";
+    let provider = Provider::under(PROXY);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let baseline = child
+        .validate("loki.bearer", &token(TOKEN_ONE), deadline())
+        .unwrap();
+    assert_eq!(baseline.identity.kind, "loki.connection");
+    assert_eq!(baseline.identity.subject, INSTANCE);
+
+    let logs = invoke(
+        &mut child,
+        "logs.query_range",
+        json!({"query": LOGQL, "start_unix_ns": START, "end_unix_ns": END, "limit": 100}),
+    )
+    .unwrap();
+    assert_eq!(logs["lines"][0]["line"], "boom", "{logs}");
+    let names = invoke(&mut child, "logs.labels", json!({})).unwrap();
+    assert_eq!(names["values"], json!(["app", "level", "namespace"]));
+    let values = invoke(
+        &mut child,
+        "logs.labels",
+        json!({"label": "app", "start_unix_ns": START, "end_unix_ns": END}),
+    )
+    .unwrap();
+    assert_eq!(values["values"], json!(["api", "web"]));
+
+    assert_eq!(
+        provider.routes(),
+        [
+            format!("{PROXY}loki/api/v1/labels"),
+            format!("{PROXY}loki/api/v1/query_range"),
+            format!("{PROXY}loki/api/v1/labels"),
+            format!("{PROXY}loki/api/v1/label/app/values"),
+        ]
+    );
+    assert!(
+        provider
+            .calls
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|c| c.method == "GET" && c.authorization == format!("Bearer {TOKEN_ONE}"))
+    );
 }

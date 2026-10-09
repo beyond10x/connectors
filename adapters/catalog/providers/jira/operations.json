@@ -7,6 +7,12 @@
     {"id": "issue.comments", "operation_id": "getComments", "effect": "read",
      "description": "List one issue's comments, one page per call; the walk ends when startAt plus the page's comments reaches total"},
     {"id": "issue.changelog", "operation_id": "getChangeLogs", "effect": "read",
-     "description": "List one issue's changelog, one page per call; the walk ends on a page with isLast true"}
+     "description": "List one issue's changelog, one page per call; the walk ends on a page with isLast true"},
+    {"id": "issue.get", "operation_id": "getIssue", "effect": "read",
+     "description": "Read one issue by id or key, with the fields named in fields (default all fields, attachment among them) and the expansions named in expand, such as renderedFields,names"},
+    {"id": "issue.create_meta", "operation_id": "getCreateIssueMetaIssueTypes", "effect": "read",
+     "description": "List the issue types the account can create in one project, by id or key, one page per call; the walk ends when startAt plus the page's issueTypes reaches total"},
+    {"id": "users.search", "operation_id": "findUsers", "effect": "read",
+     "description": "Find active users whose display name or email address starts with query, or by exact accountId, one page per call of the first 1,000 matches; the walk ends on an empty page"}
   ]
 }

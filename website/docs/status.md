@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-09: 31 capabilities are shipped, 3 are decided and 4 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-09: 32 capabilities are shipped, 3 are decided and 4 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -44,7 +44,7 @@ As of 2026-10-09: 31 capabilities are shipped, 3 are decided and 4 are planned. 
 | [Guarded writes as data](./concepts/catalog-provider.md) | ● shipped | A selection's guard reads before the one request and refuses unless every check holds; after it, a failed check leaves the outcome uncertain, never refused. |
 | [GitLab](./reference/adapters/gitlab/index.md) | ● shipped | Projects, issues, files, branches, tags, releases, commits, compares, deployments, pipelines, jobs, traces and merge requests as reads; issue and merge-request writes under approval. |
 | [GitLab merge-request feed](./reference/adapters/catalog/contracts/feed.md) | ● shipped | GitLab binds datasource.feed/v1alpha1 as profile gitlab-merge-requests/1, checked against recorded GitLab answers (since 0.32.0). |
-| [Jira Cloud](./reference/adapters/catalog/index.md) | ● shipped | Issue search by JQL, comments and changelogs over HTTP basic authentication. |
+| [Jira Cloud](./reference/adapters/catalog/index.md) | ● shipped | Issue search by JQL, one issue by key, comments, changelogs, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search unreleased). |
 | [Confluence Cloud](./reference/adapters/catalog/index.md) | ● shipped | Changed pages, a space's pages, one page with its body and a page's comments; exercised against local fixtures only. |
 | [HubSpot CRM](./reference/adapters/catalog/index.md) | ● shipped | One object type's records, paged, and one record by id; exercised against local fixtures only. |
 | [Zendesk Support](./reference/adapters/catalog/index.md) | ● shipped | Tickets, users and organizations changed since a start time, one of each by id, and a ticket's comments, with OAuth client credentials or an API token. |
@@ -63,9 +63,10 @@ As of 2026-10-09: 31 capabilities are shipped, 3 are decided and 4 are planned. 
 | [PostgreSQL reads](./reference/adapters/sql/index.md) | ● shipped | schema.list and query.read in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query. |
 | [Tavily web search](./reference/adapters/tavily/index.md) | ● shipped | websearch.search, websearch.fetch and websearch.crawl through the shared websearch family; the key is checked without spending a search. |
 | [Loki LogQL reads](./reference/adapters/loki/index.md) | ● shipped | logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0). |
+| [Grafana data sources](./reference/adapters/grafana/index.md) | ● shipped | datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (unreleased). |
 | [Kubernetes permission checks](./reference/adapters/kubernetes/index.md) | ○ planned | Per-operation SelfSubjectAccessReview checks and the remaining Kubernetes and Helm workflows. |
 | [Loki tenants and other authentication](./reference/adapters/loki/index.md) | ○ planned | An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected. |
-| [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Atlassian native documents, Docker, Grafana, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime. |
+| [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Atlassian native documents, Docker, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built. |
 | [MCP](./reference/adapters/index.md) | ○ planned | MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime. |
 
 ## Distribution

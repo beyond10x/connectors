@@ -25,6 +25,14 @@ Sources:
   ids are the same 80 as at `fef5e36f7` (every `adapters/catalog/providers/*/operations.json` and
   `adapters/*/spec/adapter.json`), so no verdict below changes. The call counts are still those
   of 2026-10-07; they were not recounted.
+- **Slack, 2026-10-09 (unreleased).** `slack.search`, `slack.info` and `slack.emoji.list` moved
+  from missing to covered when `team.info`, `emoji.list`, `auth.test` and, on a user-token
+  connection, `search.messages` were selected. `slack.user.info`, `slack.user.lookup` and
+  `slack.user.show` were lowered from covered to partial: `users.list` lists users but reads no
+  single user. The mapped-call split is recounted from the
+  [Used but not declared](#used-but-not-declared) table: 51 covered and 73 to gap units (the
+  earlier 55 and 69 did not match that table). The [Gap units](#gap-units) table still shows
+  the 2026-10-07 baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -37,7 +45,7 @@ Sources:
   | jira | 1,415 | covered |
   | slack | 710 | covered |
   | sql | 663 | partial only |
-  | grafana | 394 | missing |
+  | grafana | 394 | covered |
   | loki | 334 | covered |
   | kubernetes | 81 | covered |
   | homer | 33 | missing |
@@ -51,26 +59,26 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 37 | 3,389 | 28 | 3,389 |
-| partial | 23 | 1,273 | 16 | 1,273 |
-| missing | 241 | 1,694 | 65 | 1,694 |
+| covered | 49 | 4,233 | 38 | 4,233 |
+| partial | 23 | 924 | 16 | 924 |
+| missing | 229 | 1,199 | 55 | 1,199 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
 are mapped to the operation they most likely meant in [Used but not declared](#used-but-not-declared):
 
 - 122 calls are mapped from §4a and §4b, and 2 more from §4d.
-- 50 of them land on covered capabilities. The other 74 are added to the gap units.
+- 89 of them land on covered capabilities. The other 35 are added to the gap units.
 
 Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 15 / 2,183 | 8 / 206 | 41 / 281 |
-| jira | 21 | 13 | 1,364 | 3 / 440 | 1 / 354 | 17 / 570 |
-| slack | 30 | 16 | 704 | 4 / 360 | 0 / 0 | 26 / 344 |
+| jira | 21 | 13 | 1,364 | 6 / 796 | 1 / 5 | 14 / 563 |
+| slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
-| grafana | 20 | 7 | 425 | 0 / 0 | 0 / 0 | 20 / 425 |
+| grafana | 20 | 7 | 425 | 5 / 358 | 0 / 0 | 15 / 67 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
 | kubernetes | 24 | 14 | 72 | 6 / 31 | 6 / 10 | 12 / 31 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
@@ -91,16 +99,16 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **37 / 3,389** | **23 / 1,273** | **241 / 1,694** |
+| **total** | **301** | **109** | **6,356** | **49 / 4,233** | **23 / 924** | **229 / 1,199** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
 
 | verdict | plugins | count |
 |---|---|---:|
-| covered | gitlab, jira, confluence, kubernetes, loki, slack, tavily | 7 |
+| covered | gitlab, jira, confluence, grafana, kubernetes, loki, slack, tavily | 8 |
 | partial only | sql, websearch | 2 |
-| missing | grafana, homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 15 |
+| missing | homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 14 |
 | no operations declared | clock | 1 |
 
 ## Verdict rules
@@ -205,11 +213,13 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 `adapters/atlassian/upstream/jira-platform-v3.json` carries `getIssue`, `createIssue`,
 `editIssue`, `deleteIssue`, `addComment`, `updateComment`, `deleteComment`, `getTransitions`,
 `doTransition`, `linkIssues`, `getCreateIssueMetaIssueTypes`, `getEditIssueMeta`, `findUsers`,
-`getAttachmentContent`, `addAttachment` and `removeAttachment`. None of them is selected.
+`getAttachmentContent`, `addAttachment` and `removeAttachment`. Since 2026-10-09 `getIssue`,
+`getCreateIssueMetaIssueTypes` and `findUsers` are selected, as `issue.get`,
+`issue.create_meta` and `users.search` (`docs/catalog-jira.md`); none of the others is.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `jira.issue.show` | 354 | 49 | 2026-10-07 | `issues.search` (:5) | partial | No single-issue read (`getIssue` is not selected). JQL `key = <KEY>` returns the issue. Bodies stay in ADF, not Markdown. |
+| `jira.issue.show` | 354 | 49 | 2026-10-07 | `issue.get` (:11) | covered | Takes `issueIdOrKey`, `fields` and `expand`. Bodies stay in ADF, not Markdown; `expand=renderedFields` adds HTML. |
 | `jira.issue.search` | 310 | 34 | 2026-10-06 | `issues.search` (:5) | covered | JQL only. Rich-text fields come back as ADF, not Markdown. |
 | `jira.issue.comment.add` | 141 | 24 | 2026-10-05 | — | missing | `addComment` is not selected. Its body would be ADF; nothing converts Markdown. |
 | `jira.issue.comment.list` | 130 | 20 | 2026-10-05 | `issue.comments` (:7) | covered | Bodies come back as ADF, not Markdown. |
@@ -218,14 +228,14 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 | `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | — | missing | `doTransition` is not selected. It would run by transition id only: no by-name run and no walk to a target status. |
 | `jira.issue.link.add` | 40 | 11 | 2026-09-28 | — | missing | `linkIssues` is not selected. |
 | `jira.issue.edit` | 26 | 10 | 2026-09-24 | — | missing | `editIssue` is not selected. |
-| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | — | missing | `getCreateIssueMetaIssueTypes` is not selected. |
+| `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:13) | partial | The issue types a project can create, by project id or key. fluxplane takes an `issue_type` filter (`fluxplane-plugin operation describe jira jira.issue.create_meta`, 2026-10-09) for that type's create fields; the fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not selected. |
 | `jira.issue.delete` | 3 | 1 | 2026-09-16 | — | missing | `deleteIssue` is not selected. |
 | `jira.issue.attachment.get` | 2 | 1 | 2026-09-17 | — | missing | A binary download (`getAttachmentContent`). The catalog reads only JSON or text responses. |
-| `jira.user.search` | 2 | 2 | 2026-09-28 | — | missing | `findUsers` is not selected. |
+| `jira.user.search` | 2 | 2 | 2026-09-28 | `users.search` (:15) | covered | By `query` or exact `accountId`, over the first 1,000 matches; privacy controls may withhold email addresses. |
 | `jira.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
 | `jira.issue.attachment.add` | 0 | 0 | - | — | missing | A multipart upload (`addAttachment`). It is not established whether the catalog can send a non-JSON request body. |
 | `jira.issue.attachment.delete` | 0 | 0 | - | — | missing | `removeAttachment` is not selected. |
-| `jira.issue.attachment.list` | 0 | 0 | - | — | missing | Attachments come with `getIssue`, which is not selected. |
+| `jira.issue.attachment.list` | 0 | 0 | - | `issue.get` (:11) | covered | Attachment metadata is the issue's `attachment` field (`fields=attachment`); downloading one is `jira.issue.attachment.get`. |
 | `jira.issue.comment.delete` | 0 | 0 | - | — | missing | `deleteComment` is not selected. |
 | `jira.issue.comment.edit` | 0 | 0 | - | — | missing | `updateComment` is not selected. |
 | `jira.issue.edit_meta` | 0 | 0 | - | — | missing | `getEditIssueMeta` is not selected. |
@@ -239,7 +249,10 @@ Connectors serves Slack through the catalog provider since 2026-10-08,
 `adapters/catalog/providers/slack/operations.json` (line numbers below), from the pinned Slack
 Web API document (`docs/catalog-slack.md`). A saved connection uses the profile `slack.bot`: a
 bot token as `Authorization: Bearer`, proved by `GET /api/auth.test`. The three conversation
-reads are selected; every other row is still missing. The 2026-09-09 baseline listed Slack as
+reads, `users.list`, `team.info`, `emoji.list` and `auth.test` are selected there; search is a
+second connection under the user-token profile `slack.user`, whose selection set
+`adapters/catalog/providers/slack/user-operations.json` selects `search.messages` alone. Every
+other row is still missing. The 2026-09-09 baseline listed Slack as
 uncovered (`docs/recent-adapter-usage-20260909.md`, U12). The gap column of a missing row names
 the Slack Web API method that would back it.
 
@@ -248,19 +261,19 @@ the Slack Web API method that would back it.
 | `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13) | covered | One page per call; the caller follows `response_metadata.next_cursor`. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.message.send` | 132 | 30 | 2026-10-05 | — | missing | No provider. Would be backed by `chat.postMessage`, plus `conversations.open` for a direct message. |
 | `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9) | covered | One page per call, windowed by `oldest` and `latest`. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.search` | 73 | 19 | 2026-10-05 | — | missing | No provider. Would be backed by `search.messages`, which needs a user token. |
-| `slack.user.list` | 41 | 17 | 2026-10-05 | — | missing | No provider. Would be backed by `users.list`. |
+| `slack.search` | 73 | 19 | 2026-10-05 | `search.messages` (`adapters/catalog/providers/slack/user-operations.json:5`) | covered | On a second connection with a user token (`slack.user`, scope `search:read`); a bot token cannot search. Pages by `page` and `count` (1–100), not by cursor. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5) | covered | One page of at most 1,000 per call; no lookup by channel name. |
 | `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | No provider. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload. |
 | `slack.message.edit` | 20 | 8 | 2026-10-03 | — | missing | No provider. Would be backed by `chat.update`. |
-| `slack.info` | 15 | 8 | 2026-09-25 | — | missing | No provider. Would be backed by `auth.test` and `team.info`. |
+| `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:20) and `auth.test` (:26) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
 | `slack.file.download` | 11 | 8 | 2026-09-29 | — | missing | No provider. A binary fetch of `url_private`. |
 | `slack.message.delete` | 10 | 6 | 2026-09-29 | — | missing | No provider. Would be backed by `chat.delete`. |
 | `slack.file.delete` | 7 | 4 | 2026-09-29 | — | missing | No provider. Would be backed by `files.delete`. |
 | `slack.file.info` | 7 | 2 | 2026-09-29 | — | missing | No provider. Would be backed by `files.info`. |
 | `slack.file.list` | 3 | 1 | 2026-09-29 | — | missing | No provider. Would be backed by `files.list`. |
 | `slack.test` | 3 | 3 | 2026-09-26 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/auth.test` probe with the saved bot token. |
-| `slack.emoji.list` | 1 | 1 | 2026-09-28 | — | missing | No provider. Would be backed by `emoji.list`. |
+| `slack.emoji.list` | 1 | 1 | 2026-09-28 | `emoji.list` (:23) | covered | The workspace's custom emoji, in one call; the pinned document states no member of the answer, which is returned as Slack sent it. |
 | `slack.bookmark.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.add`. |
 | `slack.bookmark.delete` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.remove`. |
 | `slack.bookmark.edit` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.edit`. |
@@ -269,7 +282,7 @@ the Slack Web API method that would back it.
 | `slack.channel.mark-read` | 0 | 0 | - | — | missing | No provider. Would be backed by `conversations.mark`. |
 | `slack.download` | 0 | 0 | - | — | missing | No provider. A binary fetch of `url_private`. |
 | `slack.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
-| `slack.mentions` | 0 | 0 | - | — | missing | No provider. Would be backed by `search.messages`, plus classification done on the fluxplane side. |
+| `slack.mentions` | 0 | 0 | - | — | missing | Not selected as its own operation. `search.messages` on the user-token connection is selected; the mention classification is done on the fluxplane side. |
 | `slack.presence.get` | 0 | 0 | - | — | missing | No provider. Would be backed by `users.getPresence`. |
 | `slack.presence.set` | 0 | 0 | - | — | missing | No provider. Would be backed by `users.setPresence`. |
 | `slack.reaction.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `reactions.add`. |
@@ -308,19 +321,29 @@ this is inference and was not verified:
 
 Source: fluxplane inventory §2 grafana.
 
-Connectors has no Grafana runtime. `adapters/grafana` holds only `design.md` and an ESS model.
-That design makes Grafana a mediated route: `grafana-datasource-proxy`
-(`adapters/grafana/design.md:16`) forwards a child adapter's GET for Loki, Prometheus or
-Alertmanager. So a Grafana-proxied query needs both the Grafana route and the child adapter.
+Connectors runs Grafana as the native executable `connectors-grafana` since 2026-10-09, on
+`main` and not yet released (`adapters/grafana/README.md`). A saved connection uses the profile
+`grafana.service_account`: a service-account token, proved by `GET /api/datasources`, with the
+configured instance as its identity (`adapters/grafana/spec/ess/domains/connection.yaml`).
+
+Loki through Grafana needs no Grafana route: a Loki connection whose `base_url` is the data
+source's proxy path, `https://<grafana>/api/datasources/proxy/uid/<uid>/`, with the Grafana
+token as its `loki.bearer` token, sends its probe and every read below that prefix
+(`adapters/loki/tests/local_runtime.rs`,
+`a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). The uid
+comes from `datasources.list`. The mediated route of the design, `grafana-datasource-proxy`
+(`adapters/grafana/design.md:19`), which would seal the uid and allowlist targets, is not
+built; Prometheus and Alertmanager through Grafana still need their own adapters. Each read is
+tested against fixture answers in Grafana and Loki API shapes, not a live Grafana.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `grafana.loki.query` | 320 | 12 | 2026-09-28 | — | missing | A LogQL range query through the datasource proxy. Needs the Grafana route and a Loki adapter. |
+| `grafana.loki.query` | 320 | 12 | 2026-09-28 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) on a Loki connection through the Grafana proxy | covered | Unpaged: at most 1,000 lines per call over at most 24 hours. A metric expression is `logs.query_metric` (`adapters/loki/spec/adapter.json:259`). The connection names the data source uid in its `base_url`. |
 | `grafana.prometheus.query` | 49 | 7 | 2026-10-06 | — | missing | An instant PromQL query through the proxy. Needs the Grafana route and a Prometheus adapter. |
-| `grafana.datasource.list` | 31 | 12 | 2026-10-06 | — | missing | Datasource discovery is designed but not implemented. |
+| `grafana.datasource.list` | 31 | 12 | 2026-10-06 | `datasources.list` (`adapters/grafana/spec/adapter.json:45`) | covered | uid, name, type, access mode and default flag only; backend URLs and settings are withheld. Unpaged, at most 1,000 records. |
 | `grafana.prometheus.range` | 17 | 3 | 2026-10-06 | — | missing | A range PromQL query through the proxy. |
-| `grafana.loki.labels` | 6 | 4 | 2026-09-22 | — | missing | Loki label discovery through the proxy. |
-| `grafana.loki.recent_logs` | 1 | 1 | 2026-09-15 | — | missing | Recent Loki logs through the proxy. |
+| `grafana.loki.labels` | 6 | 4 | 2026-09-22 | `logs.labels` (`adapters/loki/spec/adapter.json:429`) on a Loki connection through the Grafana proxy | covered | Label names, or one label's values. |
+| `grafana.loki.recent_logs` | 1 | 1 | 2026-09-15 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) with a start and no end, on a Loki connection through the Grafana proxy | covered | The caller computes the start (now minus N minutes); an omitted `end_unix_ns` is the receiver clock (`adapters/loki/tests/protocol.rs`, `recent_logs_through_the_grafana_proxy_end_at_the_receiver_clock_below_the_prefix`). |
 | `grafana.prometheus.rules` | 1 | 1 | 2026-09-23 | — | missing | Prometheus rules through the proxy. |
 | `grafana.alerts.active` | 0 | 0 | - | — | missing | Alertmanager through the proxy. |
 | `grafana.alerts.silences.create` | 0 | 0 | - | — | missing | An Alertmanager write through the proxy. |
@@ -334,7 +357,7 @@ Alertmanager. So a Grafana-proxied query needs both the Grafana route and the ch
 | `grafana.folder.list` | 0 | 0 | - | — | missing | No Grafana runtime. |
 | `grafana.tempo.search` | 0 | 0 | - | — | missing | No Tempo adapter. |
 | `grafana.tempo.trace.get` | 0 | 0 | - | — | missing | No Tempo adapter. |
-| `grafana.test` | 0 | 0 | - | — | missing | No Grafana connection. |
+| `grafana.test` | 0 | 0 | - | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/datasources` probe with the saved token. |
 
 ## loki
 
@@ -737,7 +760,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 
 | name as written (plugin as written) | calls | sessions | most likely meant | Connectors verdict | unit |
 |---|---:|---:|---|---|---|
-| `jira.issue.get` (jira) | 27 | 13 | `jira.issue.show` | partial | U03 |
+| `jira.issue.get` (jira) | 27 | 13 | `jira.issue.show` | covered | — |
 | `gitlab.commit.show` (gitlab) | 6 | 4 | none declared (a single-commit read); nearest is `gitlab.repository.commit.list` | missing (`/repository/commits/:sha` is not selected) | U10 |
 | `gitlab.mr.get` (gitlab) | 6 | 2 | `gitlab.mr.show` | covered | — |
 | `gitlab.repository.branch.list` (gitlab) | 4 | 3 | none declared (a branch list) | missing (only `branch.get` is served) | U10 |
@@ -747,8 +770,8 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.pipeline.show` (gitlab) | 3 | 3 | none declared (a single-pipeline read) | covered by `pipeline.get` (`adapters/catalog/providers/gitlab/operations.json:22`) | — |
 | `jira.search` (jira) | 3 | 1 | `jira.issue.search` | covered | — |
 | `slack.thread.replies` (slack) | 3 | 3 | `slack.thread` | covered | — |
-| `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | missing | U02 |
-| `jira.issue.show` (atlassian) | 2 | 1 | `jira.issue.show` | partial | U03 |
+| `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
+| `jira.issue.show` (atlassian) | 2 | 1 | `jira.issue.show` | covered | — |
 | `gitlab.commit.list` (gitlab) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
 | `gitlab.pipeline.job.list` (gitlab) | 2 | 2 | `gitlab.job.list` | covered | — |
 | `gitlab.pipeline.jobs` (gitlab) | 2 | 1 | `gitlab.job.list` | covered | — |
@@ -767,30 +790,30 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `job.list` (gitlab) | 1 | 1 | `gitlab.job.list` | covered | — |
 | `mr.create` (gitlab) | 1 | 1 | `gitlab.mr.create` | covered | — |
 | `project.show` (gitlab) | 1 | 1 | `gitlab.project.show` | covered | — |
-| `grafana.loki.metric` (grafana) | 1 | 1 | `grafana.loki.query` (a metric LogQL query) | missing | U05 |
+| `grafana.loki.metric` (grafana) | 1 | 1 | `grafana.loki.query` (a metric LogQL query) | covered (`logs.query_metric` through the Grafana proxy) | — |
 | `call.list` (homer) | 1 | 1 | `homer.call.list` | missing | U17 |
-| `get_issue` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
-| `issue.get` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
+| `get_issue` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
+| `issue.get` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
 | `jira.issue.comment.create` (jira) | 1 | 1 | `jira.issue.comment.add` | missing | U06 |
-| `jira.issue.view` (jira) | 1 | 1 | `jira.issue.show` | partial | U03 |
+| `jira.issue.view` (jira) | 1 | 1 | `jira.issue.show` | covered | — |
 | `k8s.pod.list` (kubernetes) | 1 | 1 | `kubernetes.pod.list` | covered | — |
 | `loki.query_range` (loki) | 1 | 1 | `loki.query` | covered | — |
 | `slack.conversation.list` (slack) | 1 | 1 | `slack.channel.list` | covered | — |
 | `slack.conversations.history` (slack) | 1 | 1 | `slack.message.list` | covered | — |
-| `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | missing | U02 |
-| `slack.user.show` (slack) | 1 | 1 | `slack.user.list` | missing | U02 |
+| `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
+| `slack.user.show` (slack) | 1 | 1 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
 | `sql.endpoints` (sql) | 1 | 1 | the `endpoint list` verb | covered (`adapters list`, `connections list`) | — |
 | `slack.message.list` (operation id in the plugin position, §4b) | 6 | 2 | `slack.message.list` | covered | — |
 | `slack.thread` (§4b) | 4 | 3 | `slack.thread` | covered | — |
 | `gitlab.repository.commit.list` (§4b) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
-| `jira.issue.show` (§4b) | 2 | 2 | `jira.issue.show` | partial | U03 |
-| `jira.issue.get` (§4b) | 1 | 1 | `jira.issue.show` | partial | U03 |
+| `jira.issue.show` (§4b) | 2 | 2 | `jira.issue.show` | covered | — |
+| `jira.issue.get` (§4b) | 1 | 1 | `jira.issue.show` | covered | — |
 | `confluence.test` (§4b) | 1 | 1 | `confluence.test` | covered | — |
 | `gitlab.mr.show` (§4b) | 1 | 1 | `gitlab.mr.show` | covered | — |
 | `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | missing | U10 |
-| `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | partial | U03 |
+| `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | covered | — |
 
-In total, 124 calls are mapped: 50 covered and 74 to gap units. The rest of §4 is not
+In total, 124 calls are mapped: 89 covered and 35 to gap units. The rest of §4 is not
 attributed:
 
 - **§4c:** 55 calls whose operation sat in a variable with no literal id in the same command.
@@ -868,15 +891,15 @@ waits for any unit it depends on: U05 after U04, U12 after U05, U08 and U13 afte
 
 ## Not planned until used
 
-183 operations with 0 calls are partial or missing: 176 missing and 7 partial. They belong to
-no unit until a session uses them. The other 9 operations with 0 calls are already covered.
+182 operations with 0 calls are partial or missing: 175 missing and 7 partial. They belong to
+no unit until a session uses them. The other 10 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
 | gitlab | 24 | `branch.delete_merged`, `ci.variable.create`, `ci.variable.delete`, `ci.variable.update`, `index.build`, `issue.list` (partial), `issue.note.create`, `issue.note.list`, `issue.show` (partial), `issue.update`, `mr.approve`, `mr.diff.lines`, `mr.discussion.create`, `release.delete`, `release.link.create`, `release.link.delete`, `release.link.update`, `repository.archive`, `repository.changelog.add`, `repository.changelog.generate`, `repository.file.create`, `repository.file.delete`, `snippet.create`, `snippet.delete` |
-| jira | 7 | `index.build`, `issue.attachment.add`, `issue.attachment.delete`, `issue.attachment.list`, `issue.comment.delete`, `issue.comment.edit`, `issue.edit_meta` |
+| jira | 6 | `index.build`, `issue.attachment.add`, `issue.attachment.delete`, `issue.comment.delete`, `issue.comment.edit`, `issue.edit_meta` |
 | slack | 14 | `bookmark.add`, `bookmark.delete`, `bookmark.edit`, `bookmark.list`, `channel.join`, `channel.mark-read`, `download`, `index.build`, `mentions`, `presence.get`, `presence.set`, `reaction.add`, `reaction.remove`, `unreads` |
-| grafana | 13 | `alerts.active`, `alerts.silences.create`, `alerts.silences.delete`, `alerts.silences.list`, `annotation.add`, `annotation.list`, `dashboard.get`, `dashboard.list`, `datasource.health`, `folder.list`, `tempo.search`, `tempo.trace.get`, `test` |
+| grafana | 12 | `alerts.active`, `alerts.silences.create`, `alerts.silences.delete`, `alerts.silences.list`, `annotation.add`, `annotation.list`, `dashboard.get`, `dashboard.list`, `datasource.health`, `folder.list`, `tempo.search`, `tempo.trace.get` |
 | loki | 1 | `recent_logs` |
 | kubernetes | 7 | `container.show` (partial), `deployment.restart`, `deployment.scale`, `ingress.list`, `node.list` (partial), `portforward.list`, `service.show` (partial) |
 | homer | 3 | `alias.list`, `call.analyze`, `pcap.export` |

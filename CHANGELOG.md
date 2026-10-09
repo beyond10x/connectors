@@ -2,6 +2,66 @@
 
 ## Unreleased
 
+### Added
+
+- `connectors-grafana`, a native Grafana adapter executable for the local CLI with one read,
+  `datasources.list`: the data sources a service account can read, each as its `uid`, `name`,
+  plugin `type`, `access` mode and `is_default`, from one `GET /api/datasources`, unpaged and
+  at most 1,000 records. Backend URLs, users, databases, `jsonData` and secure fields never
+  reach a result. A connection uses the profile `grafana.service_account`: connect, repair and
+  `connections revalidate` prove the token with `GET /api/datasources`, and the identity is the
+  configured connection (`grafana.connection`, subject the configuration's `instance`). The
+  configuration is HTTPS-only, may carry the sub-path Grafana is served under, and takes an
+  optional private CA file. Modeled in `adapters/grafana/spec/ess`; the operator guide is
+  `adapters/grafana/README.md`.
+- Loki through Grafana: a Loki connection whose `base_url` is a data source's Grafana proxy
+  path (`https://<grafana>/api/datasources/proxy/uid/<uid>/`), with a Grafana service-account
+  token as its `loki.bearer` token, answers `logs.query_range`, `logs.query_metric` and
+  `logs.labels` through Grafana. No code change: the tests now hold it, and
+  `adapters/loki/README.md` documents it.
+- Limits: verified against hand-written fixtures in the Grafana and Loki API shapes only, not a
+  live Grafana. Grafana decides which data sources a token reaches; the design's mediated route
+  (sealed uid, type allowlist), dashboards and datasource discovery are not built.
+- The catalog provider's Jira selection gains three reads from the pinned platform REST v3
+  document: `issue.get` (`getIssue`, one issue by id or key with `fields` and `expand`; its
+  `attachment` field lists the issue's attachments), `issue.create_meta`
+  (`getCreateIssueMetaIssueTypes`, the issue types a project can create, paged by `startAt`
+  to `total`) and `users.search` (`findUsers`, by `query` or `accountId`, paged by `startAt`
+  to an empty page). The bundle already carried all three; no bundle changes. Limits:
+  verified against hand-written fixtures in the pinned document's shapes only; `getIssue`'s
+  `updateHistory` parameter, which records a project view, is accepted like every declared
+  parameter; the fields of one issue type are not selected. See `docs/catalog-jira.md`.
+- The catalog provider reads Slack users: `users.list` (`users_list` in the pinned Slack Web
+  API document), one page per call under `members`, ending on an empty
+  `response_metadata.next_cursor`, with the optional `include_locale`. It needs the bot
+  token's `users:read` scope. The document's `token` query parameter is withheld, as for the
+  conversation reads, and `limit` carries no bound because the document states none. The
+  Slack ESS model (`adapters/slack/spec/ess`) now cites the pinned document for `User` and
+  declares `Workspace` from `team.info`'s `objs_team`. Limits: verified against a local
+  fixture only; no lookup by id or e-mail. See `docs/catalog-slack.md`.
+- A catalog selection may name `credential`: the parameters through which the pinned
+  document passes the credential the connection already sends in its authentication
+  header, such as Slack's `token`. Each is removed from the operation even when the
+  document requires it, before the required-header refusal, so it is never declared,
+  required or sent, and an input carrying it under any spelling is refused before any
+  request. A name that is not a query or header parameter of the operation, or that the
+  selection also bounds, marks required, withholds or reads through a guard, is refused
+  when the selection loads. `withhold` is unchanged and still refuses a required
+  parameter. Selection files without `credential` load, and keep their configuration
+  revision, as before; one with it is refused by an older reader. See
+  `docs/local-catalog-provider.md`.
+- The catalog provider reads Slack's workspace, custom emoji and token identity:
+  `team.info` (scope `team:read`), `emoji.list` (scope `emoji:read`) and `auth.test`, each
+  one call with `token` named as the selection's credential. `auth.test` is the read
+  connecting already makes, now also an operation a caller reads.
+- Slack message search on a second connection with a user token: `search.messages` (scope
+  `search:read`), the only selection of the new
+  `adapters/catalog/providers/slack/user-operations.json`, under the profile `slack.user`
+  with the same `auth.test` identity read. It pages by `page` and `count`, which is bounded
+  to 1–100 as the pinned document states. No change to the local host. Limits: verified
+  against a local fixture only; the pinned document states no member of the search or
+  emoji answers, which are returned as Slack sent them. See `docs/catalog-slack.md`.
+
 ### Changed
 
 - The documentation is served at its own address, <https://beyond10x.github.io/connectors/>:

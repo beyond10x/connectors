@@ -720,6 +720,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-grafana"
+version = "0.38.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "connectors-core",
+ "connectors-host",
+ "connectors-sdk",
+ "connectors-spec",
+ "hex",
+ "jsonschema",
+ "rcgen",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "zeroize",
+]
+
+[[package]]
 name = "connectors-host"
 version = "0.38.0"
 dependencies = [

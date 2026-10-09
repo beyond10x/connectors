@@ -1,8 +1,15 @@
 domain: connectors_slack.records
 summary: Slack-owned provider records the parity units read or write — conversations,
-  messages, users, files and emoji — with the relations no source answers marked.
+  messages, users, files, emoji and the workspace — with the relations no source
+  answers marked.
 
-# Status: proposed draft for parity units U02, U08 and U13; not implemented.
+# Status: draft for parity units U02, U08 and U13. Read through the catalog provider
+# (docs/catalog-slack.md): Conversation (`conversations.list`), Message
+# (`conversations.history`, `conversations.replies`; found by `search.messages` on a
+# user-token connection), User (`users.list`), Emoji (`emoji.list`) and Workspace
+# (`team.info`). File is not read by any selection. The selections of the four
+# methods whose pinned `token` is required name it as their `credential`, so the
+# token travels only in the connection's header.
 # Normative owner: adapters/slack/design.md. Shared ESS includes none of this root
 # and imports none of its types (adapters/README.md:70-74).
 #
@@ -12,10 +19,13 @@ summary: Slack-owned provider records the parity units read or write — convers
 #                 operation inputs only, never an output shape.
 #   parity:<line> docs/fluxplane-plugin-parity.md (2026-10-07), § slack and § Gap units.
 #   usage:<line>  docs/recent-adapter-usage-20260909.md.
+#   src:<line>    adapters/slack/upstream/slack_web_openapi_v2_without_examples.json,
+#                 the pinned Slack Web API Swagger 2.0 document (bc08db49, SHA-256
+#                 8b92da26…936bc3a), adopted by story:catalog-slack-reads.
 #
-# Field names below are this model's. The wire members come from the pinned upstream
-# document once one is adopted (adapters/slack/design.md); no wire name is declared
-# here because no source in reach states one.
+# Field names below are this model's. Where the pinned document states a member, the
+# comment names it; a noun whose method answers only the document's "Default success
+# template" (src: `ok` alone, additionalProperties true) keeps its members UNMAPPED.
 #
 # Every lifecycle has one terminal state: the repository's idiom for "the record
 # exists; no transition is selected" (ess/domains/auth_bindings.yaml:85-88). This
@@ -61,20 +71,29 @@ entities:
       terminal: [Present]
 
   # `slack.user.list` (fx:159-162, parity:214 `users.list`); fluxplane entity
-  # `slack.user` (fx:174).
+  # `slack.user` (fx:174). Read by the catalog selection `users.list`
+  # (operationId `users_list`, src:21877): its 200 answer requires `members`, an
+  # array of `objs_user` (src:2304), paged by `cursor` and
+  # `response_metadata.next_cursor`.
   - name: connectors_slack.records.User
-    # fx:120 "a user id (U…/W…)"; passed as a JSON string (fx:126). The U/W prefix
-    # is fluxplane's rule for telling an id from a name on input, not a stated
-    # guarantee about every id, so it is not declared as an invariant.
+    # Wire member `id`, required in both `objs_user` variants (src:2304), typed
+    # `defs_user_id` (src:128): a string matching ^[UW][A-Z0-9]{2,}$. The same
+    # type backs auth.test's `user_id` (src:9289), the connection's subject. The
+    # pattern is the document's, not declared here as an invariant: the
+    # projection keeps no pattern and the provider does not check it.
     identity:
       name: user_id
       type: String
     fields:
-      # fx:120 "or @name": every user is addressable by name.
-      # UNMAPPED: which provider member backs @name (a handle, a display name or a
-      # real name) is not stated.
+      # Wire member `name`, a required string in both `objs_user` variants
+      # (src:2304). fx:120 "or @name" addresses a user by name; that `@name`
+      # means this member rather than `profile.display_name` or `real_name` is
+      # not stated by either source.
       - name: name
         type: String
+    # UNMAPPED: a deactivated user. `objs_user` declares `deleted` (boolean) but
+    # does not require it, and no source states whether `users.list` omits or
+    # flags removed users; no lifecycle state is declared for it.
     lifecycle:
       initial: Present
       states: [Present]
@@ -110,7 +129,10 @@ entities:
     # carry a user at all.
     # UNMAPPED: a search result's address. fx:170 says search returns messages; no
     # source states that each result carries the conversation id and ts MessageRef
-    # needs.
+    # needs. `search.messages` (src:18823) answers only the default success
+    # template, so the pinned document does not state it either. The catalog
+    # selection `search.messages` (operationId `search_messages`, scope
+    # `search:read`, a user token) returns Slack's answer unread.
     lifecycle:
       initial: Present
       states: [Present]
@@ -145,8 +167,12 @@ entities:
   - name: connectors_slack.records.Emoji
     # The only address an emoji has in reach is the JSON string `emoji` that the
     # reaction operations take (fx:135-136).
-    # UNMAPPED: whether emoji.list identifies each entry by that same string, and
-    # whether it lists the standard set or only the workspace's own.
+    # The pinned `emoji.list` (src:15064) is described "Lists custom emoji for a
+    # team": the workspace's own set, not the standard one. Read by the catalog
+    # selection `emoji.list` (operationId `emoji_list`, scope `emoji:read`).
+    # UNMAPPED: whether emoji.list identifies each entry by that same string. Its
+    # 200 answer is the default success template, so the document states no
+    # member of the answer.
     identity:
       name: emoji
       type: String
@@ -157,15 +183,40 @@ entities:
       states: [Present]
       terminal: [Present]
 
+  # `slack.info` shows "token identity and workspace information" (fx:97-99,
+  # parity:218 `auth.test` and `team.info`). The pinned `team.info` (src:19735)
+  # answers `{ok, team}` with `team` an `objs_team` (src:2079), which requires
+  # `id`, `name`, `domain`, `email_domain` and `icon`. Read by the catalog
+  # selection `team.info` (operationId `team_info`, scope `team:read`).
+  - name: connectors_slack.records.Workspace
+    # Wire member `id`, typed `defs_workspace_id` (src:133): "Team or Enterprise
+    # ID", a string matching ^[TE][A-Z0-9]{8,}$. auth.test's `team_id` (src:9289)
+    # names the token's workspace with the same kind of id.
+    identity:
+      name: workspace_id
+      type: String
+    fields:
+      # Wire members `name` and `domain`, required strings of `objs_team`.
+      - name: name
+        type: String
+      - name: domain
+        type: String
+    # UNMAPPED: Workspace → Conversation, User and Emoji. Every list method reads
+    # the token's own workspace; no source states owns versus references, and an
+    # externally shared channel (team.info's `team` parameter) belongs to more
+    # than one workspace.
+    lifecycle:
+      initial: Present
+      states: [Present]
+      terminal: [Present]
+
 # ── Nouns the units touch that are not declared ────────────────────────────────
 #
-# UNMAPPED: Workspace. `slack.info` shows "token identity and workspace information"
-#   (fx:97-99, parity:218 `auth.test` and `team.info`). No source states its identity
-#   or any member, and ESS refuses an entity without an identity, so it is absent.
-#   Its edges to Conversation, User and Emoji are UNMAPPED with it.
 # Token identity (`slack.info`, `slack.test`, fx:147-149) is not a record of this
 #   domain: a `*.test` operation is answered by `connections revalidate`, which
-#   re-runs the auth profile's identity probe (parity:81-83).
+#   re-runs the auth profile's identity probe (parity:81-83). The catalog selection
+#   `auth.test` also returns the probe's answer as Slack sent it, for `slack.info`;
+#   it is read by the caller, not modelled here.
 # UNMAPPED: Conversation ↔ User membership. fluxplane's `slack.channel_member`
 #   datasource lists a channel's members (fx:166) and usage:155 requires membership;
 #   no unit operation reads it, and no source states the cardinality on the user side.
@@ -185,4 +236,4 @@ entities:
 #   Conversation(direct) → User UNMAPPED
 #   File → Conversation         UNMAPPED
 #   File → Message              UNMAPPED
-#   Workspace → *               UNMAPPED (Workspace not declared)
+#   Workspace → *               UNMAPPED (Workspace declared; ownership unstated)
