@@ -75,6 +75,24 @@ Sources:
   member, which the catalog engine cannot declare
   ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). The
   [Gap units](#gap-units) table still shows the 2026-10-07 baseline.
+- **GitLab repository reads, 2026-10-10 (unreleased).** `gitlab.repository.tree` moved from
+  missing to covered when `repository.tree` was selected, with `commit.get`, `commit.diff` and
+  `branches.list` beside it, verified against hand-written fixtures in the pinned document's
+  shapes, not a live GitLab. The `gitlab` row of the per-plugin table now reads 19 / 2,240
+  covered and 37 / 224 missing, and the summary and total rows move by the same 1 operation and
+  35 calls. The 14 mapped calls of `gitlab.commit.show`, `gitlab.repository.branch.list`,
+  `gitlab.commit.diff` and `gitlab.repository.commit.diff` in
+  [Used but not declared](#used-but-not-declared) now land on covered, so the mapped-call split
+  moves from 55 covered and 69 to gap units to 69 and 55; the sentence under
+  [Summary](#summary) still gives the 2026-10-07 split. `gitlab.search.blobs` stays missing: the
+  pinned source declares the project search path as `/api/v4/projects/{id}/(-/)search`, which
+  the catalog engine sends literally as `/projects/{id}/(-/)search`; a
+  `connectors-source-amendments/1` file can add only an optional query parameter, not correct a
+  path; and a selection bound is an integer range, so it cannot hold the required `scope` to
+  `blobs`. Selecting it needs one of those capabilities first. The selections were appended to
+  `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
+  [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
+  baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -101,9 +119,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 59 | 5,085 | 48 | 5,085 |
+| covered | 60 | 5,120 | 49 | 5,120 |
 | partial | 17 | 221 | 10 | 221 |
-| missing | 225 | 1,050 | 51 | 1,050 |
+| missing | 224 | 1,015 | 50 | 1,015 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -116,7 +134,7 @@ Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
-| gitlab | 64 | 38 | 2,670 | 18 / 2,205 | 8 / 206 | 38 / 259 |
+| gitlab | 64 | 38 | 2,670 | 19 / 2,240 | 8 / 206 | 37 / 224 |
 | jira | 21 | 13 | 1,364 | 7 / 923 | 1 / 5 | 13 / 436 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
@@ -141,7 +159,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **59 / 5,085** | **17 / 221** | **225 / 1,050** |
+| **total** | **301** | **109** | **6,356** | **60 / 5,120** | **17 / 221** | **224 / 1,015** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -186,14 +204,14 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.repository.commit.list` | 81 | 17 | 2026-10-06 | `commits.list` (:44) | covered | — |
 | `gitlab.mr.merge` | 77 | 10 | 2026-10-06 | `merge_request.merge` (:70) | partial | The guard requires `mergeable` and a succeeded pinned head pipeline, so it refuses merge-when-pipeline-succeeds and projects without a pipeline. A merge-when-pipeline-succeeds variant is not selected (2026-10-10): its request must always carry `auto_merge: true`, or the same request merges at once without the pipeline check, and a selection cannot fix a body member to a value; proving it afterwards also needs one check that accepts either auto-merge set or merged ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). |
 | `gitlab.compare` | 76 | 19 | 2026-09-30 | `repository.compare` (:48) | covered | No per-file diff bound. |
-| `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | — | missing | Code search is not selected (`/projects/:id/search`, scope `blobs`). |
+| `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | — | missing | Code search is not selected (`/projects/:id/search`, scope `blobs`). Not selectable as of 2026-10-10: the pinned source declares the path as `/projects/{id}/(-/)search`, which the catalog engine sends literally, a source amendment can only add a query parameter, and a selection bound cannot hold the required `scope` to `blobs` ([GitLab catalog guide](local-catalog-provider.md#the-shipped-selection-set)). |
 | `gitlab.repository.tag.list` | 71 | 23 | 2026-10-03 | `tags.list` (:35) | covered | — |
 | `gitlab.mr.update` | 60 | 12 | 2026-10-04 | `merge_request.update` (:62) | partial | The guard requires state `opened`, so reopening a closed merge request is refused. A reopen variant is not selected (2026-10-10): its request must carry exactly `state_event: reopen`, and a selection cannot fix a body member to a value ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). |
 | `gitlab.mr.changes` | 58 | 13 | 2026-10-03 | `merge_request.get` (:17) + `repository.compare` (:48) | partial | No merge-request diffs read (`/merge_requests/:iid/diffs` is not selected). The diffs can only be had by comparing the request's `diff_refs`. |
 | `gitlab.project.list` | 45 | 12 | 2026-10-03 | `projects.list` (:32) | covered | — |
 | `gitlab.mr.discussion.list` | 43 | 11 | 2026-10-06 | — | missing | The discussion list is not selected. One discussion by id is read by `merge_request.discussion.get` (:85) since 2026-10-10, which needs the id the list would give. |
 | `gitlab.project.show` | 36 | 19 | 2026-10-03 | `project.get` (:5) | covered | — |
-| `gitlab.repository.tree` | 35 | 13 | 2026-10-06 | — | missing | Repository tree is not selected. |
+| `gitlab.repository.tree` | 35 | 13 | 2026-10-06 | `repository.tree` (:100) | covered | `path`, `ref` and `recursive`, offset paging only (keyset `pagination` and `page_token` are withheld) (2026-10-10). |
 | `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | `merge_request.note.create` (:82) | covered | One note by merge-request IID, its text required, optionally `internal`. Unguarded, as a create: the same approved input sent twice adds a second note. GitLab runs quick actions in the text; `/merge` is cut off because the body does not admit `merge_request_diff_head_sha` (2026-10-10). |
 | `gitlab.pipeline.retry` | 19 | 5 | 2026-10-05 | — | missing | Pipeline retry is not selected. |
 | `gitlab.release.create` | 16 | 3 | 2026-10-02 | — | missing | The release write is not selected. |
@@ -245,7 +263,10 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 Connectors also serves four GitLab reads that fluxplane does not declare: `pipeline.get` (:22),
 `job.get` (:27), `job.trace` (:29) and `branch.get` (:12). The sessions tried two of them under
 undeclared names, `gitlab.pipeline.show` and `gitlab.repository.branch.show` (see
-[Used but not declared](#used-but-not-declared)).
+[Used but not declared](#used-but-not-declared)). Since 2026-10-10 it also serves `commit.get`
+(:104), `commit.diff` (:106) and `branches.list` (:109), which the sessions tried as
+`gitlab.commit.show`, `gitlab.commit.diff`, `gitlab.repository.commit.diff` and
+`gitlab.repository.branch.list`.
 
 ## jira
 
@@ -806,11 +827,11 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | name as written (plugin as written) | calls | sessions | most likely meant | Connectors verdict | unit |
 |---|---:|---:|---|---|---|
 | `jira.issue.get` (jira) | 27 | 13 | `jira.issue.show` | covered | — |
-| `gitlab.commit.show` (gitlab) | 6 | 4 | none declared (a single-commit read); nearest is `gitlab.repository.commit.list` | missing (`/repository/commits/:sha` is not selected) | U10 |
+| `gitlab.commit.show` (gitlab) | 6 | 4 | none declared (a single-commit read); nearest is `gitlab.repository.commit.list` | covered by `commit.get` (`adapters/catalog/providers/gitlab/operations.json:104`) since 2026-10-10 | — |
 | `gitlab.mr.get` (gitlab) | 6 | 2 | `gitlab.mr.show` | covered | — |
-| `gitlab.repository.branch.list` (gitlab) | 4 | 3 | none declared (a branch list) | missing (only `branch.get` is served) | U10 |
+| `gitlab.repository.branch.list` (gitlab) | 4 | 3 | none declared (a branch list) | covered by `branches.list` (`adapters/catalog/providers/gitlab/operations.json:109`) since 2026-10-10 | — |
 | `jira.issue.transitions` (jira) | 4 | 4 | `jira.issue.transition.list` | covered | — |
-| `gitlab.commit.diff` (gitlab) | 3 | 2 | none declared (a single-commit diff); nearest is `gitlab.compare` | partial (`repository.compare` from the parent commit) | U10 |
+| `gitlab.commit.diff` (gitlab) | 3 | 2 | none declared (a single-commit diff); nearest is `gitlab.compare` | covered by `commit.diff` (`adapters/catalog/providers/gitlab/operations.json:106`) since 2026-10-10 | — |
 | `gitlab.mr.note.list` (gitlab) | 3 | 2 | `gitlab.mr.discussion.list` | missing | U11 |
 | `gitlab.pipeline.show` (gitlab) | 3 | 3 | none declared (a single-pipeline read) | covered by `pipeline.get` (`adapters/catalog/providers/gitlab/operations.json:22`) | — |
 | `jira.search` (jira) | 3 | 1 | `jira.issue.search` | covered | — |
@@ -831,7 +852,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.mr.discussions` (gitlab) | 1 | 1 | `gitlab.mr.discussion.list` | missing | U11 |
 | `gitlab.mr.pipelines` (gitlab) | 1 | 1 | none declared (a merge request's pipelines); nearest is `gitlab.pipeline.list` | covered (`merge_request.get` carries `head_pipeline`; `pipelines.list` filters by `ref` and `sha`) | — |
 | `gitlab.repository.branch.show` (gitlab) | 1 | 1 | none declared (a single-branch read) | covered by `branch.get` (`adapters/catalog/providers/gitlab/operations.json:12`) | — |
-| `gitlab.repository.commit.diff` (gitlab) | 1 | 1 | none declared (a single-commit diff) | partial (`repository.compare` from the parent commit) | U10 |
+| `gitlab.repository.commit.diff` (gitlab) | 1 | 1 | none declared (a single-commit diff) | covered by `commit.diff` (`adapters/catalog/providers/gitlab/operations.json:106`) since 2026-10-10 | — |
 | `job.list` (gitlab) | 1 | 1 | `gitlab.job.list` | covered | — |
 | `mr.create` (gitlab) | 1 | 1 | `gitlab.mr.create` | covered | — |
 | `project.show` (gitlab) | 1 | 1 | `gitlab.project.show` | covered | — |

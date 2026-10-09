@@ -96,7 +96,20 @@
                      "checks": [{"pointer": "/id", "expect": {"input": "discussion_id"}},
                                 {"pointer": "/resolvable", "expect": {"literal": "true"}}]},
        "postflight": {"checks": [{"pointer": "/id", "expect": {"input": "discussion_id"}},
-                                 {"pointer": "/resolved", "expect": {"input": "body.resolved"}}]}}}
+                                 {"pointer": "/resolved", "expect": {"input": "body.resolved"}}]}}},
+    {"id": "repository.tree", "operation_id": "getApiV4ProjectsIdRepositoryTree", "effect": "read",
+     "description": "List the files and directories under path at ref, recursive to descend, one page per call",
+     "bounds": {"per_page": {"minimum": 1, "maximum": 100}},
+     "withhold": ["pagination", "page_token"]},
+    {"id": "commit.get", "operation_id": "getApiV4ProjectsIdRepositoryCommitsSha", "effect": "read",
+     "description": "Read one commit by sha, a commit id, branch or tag name; stats adds its line counts"},
+    {"id": "commit.diff", "operation_id": "getApiV4ProjectsIdRepositoryCommitsShaDiff", "effect": "read",
+     "description": "List one commit's file diffs, one page per call; unidiff selects the unified format",
+     "bounds": {"per_page": {"minimum": 1, "maximum": 100}}},
+    {"id": "branches.list", "operation_id": "getApiV4ProjectsIdRepositoryBranches", "effect": "read",
+     "description": "List a project's branches with their head commits, one page per call; search and regex filter by name",
+     "bounds": {"per_page": {"minimum": 1, "maximum": 100}},
+     "withhold": ["page_token"]}
   ],
   "feed": {
     "profile": "gitlab-merge-requests/1",
