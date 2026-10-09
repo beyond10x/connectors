@@ -58,7 +58,8 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
 serves the provider from the pinned source alone, plus seven repository reads
-and one unguarded write, `issue.create`:
+and one unguarded write, `issue.create`, and the merge-request note and discussion
+operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)):
 
 | id | source operation | effect |
 |---|---|---|
@@ -70,6 +71,9 @@ and one unguarded write, `issue.create`:
 | `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
+| `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | read |
+| `merge_request.note.create`, `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes`, `…DiscussionsDiscussionIdNotes`, unguarded | write |
+| `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`, guarded | write |
 
 The GitLab set also declares the merge request feed, a `datasource.feed/v1alpha1`
 binding under profile `gitlab-merge-requests/1`: `feed.containers` lists the
@@ -368,6 +372,24 @@ The complete configuration used against the sandbox is
   a `body.<key>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
+- `body_types` is optional, beside `body_keys`: `{"<key>": "string" | "integer"
+  | "boolean"}` gives a closed body key the JSON type the provider's request
+  body schema gives it. A typed key present in a body must be a JSON value of
+  exactly that type, with no string spelling of a boolean or an integer and no
+  `null`, or the write is refused as `invalid_input` before any request; the
+  declared input schema types it the same, also where a guard reads it. One
+  difference: an `integer` key admits only an integer literal in the 64-bit
+  range, while JSON Schema's `integer` also admits `3.0` or `1e2`, so such a
+  value passes the declaration and is still refused.
+  `body_required` is optional too: `["<key>", …]` names the closed body keys
+  that schema requires, and a body without one is refused as `invalid_input`
+  before any request and declared required (keys a guard reads are required
+  already). GitLab's note and reply type `body` as a string and require it; its
+  discussion resolve types `resolved` as a boolean. A key either names that
+  `body_keys` does not admit (so either one without `body_keys`), a key
+  `body_required` repeats, or a guard reading a path nested under a typed key
+  is refused when the selection loads. Like `body_keys`, they are declared by
+  the selection from the pinned document and not checked against it.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
