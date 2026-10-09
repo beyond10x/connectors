@@ -11,7 +11,8 @@
   the caller's statement is prepared; a statement that returns no columns, such as any write,
   is refused as `unsupported` before execution, and a write the read-only session refuses is
   `forbidden`. The descriptor of a MySQL connection names the profile `mysql-native-text`:
-  every cell is a JSON string or null — integers, `DECIMAL` and floats as text, `DATE` and
+  every cell is a JSON string or null — integers and `DECIMAL` as text,
+  floats as the shortest text that reads back (`1e300`), `DATE` and
   `DATETIME`/`TIMESTAMP` as ISO 8601, `TIME` as a signed elapsed time, binary strings, `BIT`
   and geometry as base64. `schema.list` reads `information_schema.COLUMNS` for the named
   database. A MySQL connection uses the profile `mysql.password`; connect, repair and
@@ -38,6 +39,11 @@
   `information_schema` reads, `KILL QUERY`), not a live server; there is no real-provider
   evidence yet. MySQL 8.0 or later is assumed; MariaDB is not tested. SQLite is not served.
   `schema.list` remains column metadata only on both engines.
+- The MySQL read guarantee is a read-only session plus one result-returning statement: table
+  writes are refused (1792), but a routine the configured user may `EXECUTE` keeps its side
+  effects (on a live MySQL 8.0.46 a definer-rights function ran `SET PERSIST` through
+  `query.read`). Grant the user `SELECT` only, with no `EXECUTE` on routines that have side
+  effects.
 
 ## 0.39.0 — 2026-10-09
 

@@ -121,11 +121,21 @@ count. A statement that returns no columns — any `INSERT`, `UPDATE`, `DELETE`,
 PostgreSQL; so is one returning more than 256 columns. A parameter count the
 statement does not take is `invalid_input`. The statement then runs as a derived
 table, `SELECT * FROM (<query>) AS result (c0,…) LIMIT <limit+1>`, so the server
-sends at most one row past the limit and only a query can run at all. The
-derived table closes on a line of its own, so a trailing `--` or `#` comment in
-the statement cannot reach the aliases or the limit. A write
-reached any other way, such as through a stored function, is refused by the
-server in the read-only session (error 1792, reported as `forbidden`).
+sends at most one row past the limit and only one result-returning statement
+runs. The derived table closes on a line of its own, so a trailing `--` or `#`
+comment in the statement cannot reach the aliases or the limit.
+
+What this guarantees is a read-only session plus one result-returning
+statement. A write to a table, including one inside a stored function, is
+refused by the server (error 1792, reported as `forbidden`). It does **not**
+stop the side effects of a routine the statement calls: a function the user may
+execute runs with its own rights, and on a live MySQL 8.0.46 a definer-rights
+function called as `SELECT f()` through `query.read` ran `SET PERSIST`
+(`SET GLOBAL` likewise) and the change persisted. The adapter cannot tell such a
+call from a built-in function. **Grant the configured user `SELECT` only, and no
+`EXECUTE` on any routine with side effects** (server variables, external
+calls, definer-rights writes); the user's grants, not the adapter, are the
+boundary for routines.
 
 The input bounds, the 1,000-row limit and the 5 s / 10 s / 15 s deadlines with 2 s
 reserved for cleanup are the PostgreSQL path's. When the adapter's own deadline
@@ -154,7 +164,7 @@ descriptor of a MySQL connection names the profile `mysql-native-text`:
 | any NULL | JSON `null` | `null` |
 | integers, signed or unsigned, and `YEAR` | decimal text, never a JSON number | `"18446744073709551615"` |
 | `DECIMAL` | the server's exact decimal text | `"12345678901234567890.0123"` |
-| `FLOAT`, `DOUBLE` | shortest text that reads back as the same value | `"1.5"` |
+| `FLOAT`, `DOUBLE` | the shortest text that reads back as the same value: positional on a tie, otherwise exponent form (PostgreSQL writes `1e+300`) | `"1.5"`, `"1e300"`, `"1e-4"` |
 | `DATE` | ISO 8601 date | `"2026-10-09"` |
 | `DATETIME`, `TIMESTAMP` | ISO 8601 date-time with `T`, fraction to the column's precision | `"2026-10-09T08:07:06.000123"` |
 | `TIME` | `[-]HH:MM:SS[.ffffff]`, hours unbounded (an elapsed time of up to 838 hours, not a time of day) | `"-26:03:04"` |
@@ -184,6 +194,9 @@ columns are those of the PostgreSQL path (`table_schema`, `table_name`,
   `max_execution_time` are MySQL features. MariaDB is not tested.
 - `schema.list` gives column metadata only: no primary keys, indexes, foreign keys,
   views flag or row estimates, and no database listing.
+- The read-only session does not stop a routine's side effects: a function the user
+  may execute can change server variables (`SET PERSIST`, `SET GLOBAL`) or write with
+  definer rights. Grant `SELECT` only, and no `EXECUTE` on such routines.
 - No write, DDL, transaction control, cursor, stored procedure, `LOAD DATA LOCAL`
   or connection pooling is exposed. The adapter never follows a server-named Unix
   socket and installs no local-file handler.
