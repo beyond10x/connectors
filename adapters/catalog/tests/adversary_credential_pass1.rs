@@ -332,8 +332,7 @@ async fn the_user_connection_cannot_reach_bot_operations_nor_the_bot_search() {
     let error = bot
         .read(&http, "one", "search.messages", json!({"query": "fixture"}))
         .await
-        .err()
-        .expect("the bot connection reached search.messages");
+        .expect_err("the bot connection reached search.messages");
     assert_eq!(error.code, ErrorCode::NotFound);
     assert!(http.calls().is_empty());
 }
@@ -374,7 +373,10 @@ async fn withhold_and_bounds_on_other_parameters_still_hold_beside_a_credential(
     .err()
     .expect("withholding the required query loaded")
     .message;
-    assert!(message.contains("withholds `query`, which is required"), "{message}");
+    assert!(
+        message.contains("withholds `query`, which is required"),
+        "{message}"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -434,20 +436,23 @@ fn load(selection: Value) -> Result<Engine> {
 /// and neither the declaration nor the request carries it.
 #[tokio::test]
 async fn a_credential_in_the_query_and_a_header_leaves_from_both() {
-    let engine = load(json!({"id": "both", "operation_id": "both", "effect": "read",
-                            "credential": ["token"]}))
+    let engine = load(
+        json!({"id": "both", "operation_id": "both", "effect": "read",
+                            "credential": ["token"]}),
+    )
     .unwrap();
     let declaration = engine.declarations(&[Effect::Read]).remove(0);
-    assert!(declaration.input_schema["properties"].get("token").is_none());
+    assert!(
+        declaration.input_schema["properties"]
+            .get("token")
+            .is_none()
+    );
     let http = Reads::default();
     engine
         .read(&http, "one", "both", json!({"q": "x"}))
         .await
         .unwrap();
-    assert_eq!(
-        http.calls()[0].1,
-        vec![("q".to_string(), "x".to_string())]
-    );
+    assert_eq!(http.calls()[0].1, vec![("q".to_string(), "x".to_string())]);
 }
 
 /// A credential frees only its own header: another required header still
@@ -455,8 +460,10 @@ async fn a_credential_in_the_query_and_a_header_leaves_from_both() {
 /// as not a query or header parameter.
 #[test]
 fn a_credential_frees_only_its_own_header() {
-    let message = load(json!({"id": "two", "operation_id": "twoHeaders", "effect": "read",
-                             "credential": ["token"]}))
+    let message = load(
+        json!({"id": "two", "operation_id": "twoHeaders", "effect": "read",
+                             "credential": ["token"]}),
+    )
     .err()
     .expect("a second required header loaded")
     .message;
@@ -464,8 +471,10 @@ fn a_credential_frees_only_its_own_header() {
         message.contains("needs a header parameter this transport does not carry"),
         "{message}"
     );
-    let message = load(json!({"id": "cookie", "operation_id": "cookie", "effect": "read",
-                             "credential": ["token"]}))
+    let message = load(
+        json!({"id": "cookie", "operation_id": "cookie", "effect": "read",
+                             "credential": ["token"]}),
+    )
     .err()
     .expect("a cookie credential loaded")
     .message;
@@ -503,7 +512,9 @@ async fn a_credential_in_a_writes_body_is_refused_before_any_request() {
     assert!(
         sent.is_empty(),
         "a body carrying the credential was sent: {:?}",
-        sent.iter().map(|(_, body)| body.clone()).collect::<Vec<_>>()
+        sent.iter()
+            .map(|(_, body)| body.clone())
+            .collect::<Vec<_>>()
     );
 }
 

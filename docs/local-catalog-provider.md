@@ -338,9 +338,16 @@ The complete configuration used against the sandbox is
   not a query or header parameter of the operation (a path parameter of the
   same name included), one the selection also bounds, marks `required` or
   withholds, or one its guard reads as an input is refused when the selection
-  loads. It applies to the selected operation only, not to a guard's
-  preflight read. `withhold` keeps its meaning: it still refuses a parameter
-  the source requires.
+  loads. A write's JSON body is caller input too: a top-level body key equal to
+  a credential name, compared without regard to ASCII case, is refused as
+  `invalid_input` before any request, and the declared input schema says the
+  same of an open body; `body_keys` admitting such a name is refused when the
+  selection loads. It applies to a guard's preflight read as well: each name
+  leaves the probe operation, so the probe's request never carries it from
+  caller input and the connection's header carries the credential, and a
+  guard whose `preflight.values` names one as a probe parameter, under any
+  ASCII case, is refused when the selection loads. `withhold` keeps its
+  meaning: it still refuses a parameter the source requires.
 - `rate_limit_reasons` is optional: `["<reason>", …]` names the reasons a
   provider gives in a `403` when it means a quota rather than a permission. A
   `403` whose JSON body carries one of them in `error.errors[].reason` or
