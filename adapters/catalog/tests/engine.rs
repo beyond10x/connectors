@@ -120,6 +120,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         bounds: BTreeMap::new(),
         required: Vec::new(),
         withhold: Vec::new(),
+        credential: Vec::new(),
         rate_limit_reasons: Vec::new(),
         body_keys: Vec::new(),
     }

@@ -272,7 +272,7 @@ pub const CAPABILITIES: &[Capability] = &[
         "Catalog provider",
         "Slack conversations",
         "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0); verified against a local fixture only.",
-        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_three_conversation_reads",
+        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_conversation_and_user_reads",
         "/docs/reference/adapters/catalog",
     ),
     decided(
