@@ -5,8 +5,11 @@ summary: Slack-owned provider records the parity units read or write — convers
 
 # Status: draft for parity units U02, U08 and U13. Read through the catalog provider
 # (docs/catalog-slack.md): Conversation (`conversations.list`), Message
-# (`conversations.history`, `conversations.replies`) and User (`users.list`). The
-# other nouns are not read by any selection.
+# (`conversations.history`, `conversations.replies`; found by `search.messages` on a
+# user-token connection), User (`users.list`), Emoji (`emoji.list`) and Workspace
+# (`team.info`). File is not read by any selection. The selections of the four
+# methods whose pinned `token` is required name it as their `credential`, so the
+# token travels only in the connection's header.
 # Normative owner: adapters/slack/design.md. Shared ESS includes none of this root
 # and imports none of its types (adapters/README.md:70-74).
 #
@@ -127,7 +130,9 @@ entities:
     # UNMAPPED: a search result's address. fx:170 says search returns messages; no
     # source states that each result carries the conversation id and ts MessageRef
     # needs. `search.messages` (src:18823) answers only the default success
-    # template, so the pinned document does not state it either.
+    # template, so the pinned document does not state it either. The catalog
+    # selection `search.messages` (operationId `search_messages`, scope
+    # `search:read`, a user token) returns Slack's answer unread.
     lifecycle:
       initial: Present
       states: [Present]
@@ -163,7 +168,8 @@ entities:
     # The only address an emoji has in reach is the JSON string `emoji` that the
     # reaction operations take (fx:135-136).
     # The pinned `emoji.list` (src:15064) is described "Lists custom emoji for a
-    # team": the workspace's own set, not the standard one.
+    # team": the workspace's own set, not the standard one. Read by the catalog
+    # selection `emoji.list` (operationId `emoji_list`, scope `emoji:read`).
     # UNMAPPED: whether emoji.list identifies each entry by that same string. Its
     # 200 answer is the default success template, so the document states no
     # member of the answer.
@@ -180,7 +186,8 @@ entities:
   # `slack.info` shows "token identity and workspace information" (fx:97-99,
   # parity:218 `auth.test` and `team.info`). The pinned `team.info` (src:19735)
   # answers `{ok, team}` with `team` an `objs_team` (src:2079), which requires
-  # `id`, `name`, `domain`, `email_domain` and `icon`.
+  # `id`, `name`, `domain`, `email_domain` and `icon`. Read by the catalog
+  # selection `team.info` (operationId `team_info`, scope `team:read`).
   - name: connectors_slack.records.Workspace
     # Wire member `id`, typed `defs_workspace_id` (src:133): "Team or Enterprise
     # ID", a string matching ^[TE][A-Z0-9]{8,}$. auth.test's `team_id` (src:9289)
@@ -207,7 +214,9 @@ entities:
 #
 # Token identity (`slack.info`, `slack.test`, fx:147-149) is not a record of this
 #   domain: a `*.test` operation is answered by `connections revalidate`, which
-#   re-runs the auth profile's identity probe (parity:81-83).
+#   re-runs the auth profile's identity probe (parity:81-83). The catalog selection
+#   `auth.test` also returns the probe's answer as Slack sent it, for `slack.info`;
+#   it is read by the caller, not modelled here.
 # UNMAPPED: Conversation ↔ User membership. fluxplane's `slack.channel_member`
 #   datasource lists a channel's members (fx:166) and usage:155 requires membership;
 #   no unit operation reads it, and no source states the cardinality on the user side.

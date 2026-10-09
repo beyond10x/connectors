@@ -25,6 +25,14 @@ Sources:
   ids are the same 80 as at `fef5e36f7` (every `adapters/catalog/providers/*/operations.json` and
   `adapters/*/spec/adapter.json`), so no verdict below changes. The call counts are still those
   of 2026-10-07; they were not recounted.
+- **Slack, 2026-10-09 (unreleased).** `slack.search`, `slack.info` and `slack.emoji.list` moved
+  from missing to covered when `team.info`, `emoji.list`, `auth.test` and, on a user-token
+  connection, `search.messages` were selected. `slack.user.info`, `slack.user.lookup` and
+  `slack.user.show` were lowered from covered to partial: `users.list` lists users but reads no
+  single user. The mapped-call split is recounted from the
+  [Used but not declared](#used-but-not-declared) table: 51 covered and 73 to gap units (the
+  earlier 55 and 69 did not match that table). The [Gap units](#gap-units) table still shows
+  the 2026-10-07 baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -51,16 +59,16 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 38 | 3,430 | 29 | 3,430 |
+| covered | 41 | 3,519 | 32 | 3,519 |
 | partial | 23 | 1,273 | 16 | 1,273 |
-| missing | 240 | 1,653 | 64 | 1,653 |
+| missing | 237 | 1,564 | 61 | 1,564 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
 are mapped to the operation they most likely meant in [Used but not declared](#used-but-not-declared):
 
 - 122 calls are mapped from §4a and §4b, and 2 more from §4d.
-- 55 of them land on covered capabilities. The other 69 are added to the gap units.
+- 51 of them land on covered capabilities. The other 73 are added to the gap units.
 
 Per plugin (operations / calls):
 
@@ -68,7 +76,7 @@ Per plugin (operations / calls):
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 15 / 2,183 | 8 / 206 | 41 / 281 |
 | jira | 21 | 13 | 1,364 | 3 / 440 | 1 / 354 | 17 / 570 |
-| slack | 30 | 16 | 704 | 5 / 401 | 0 / 0 | 25 / 303 |
+| slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 0 / 0 | 6 / 703 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 0 / 0 | 0 / 0 | 20 / 425 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
@@ -91,7 +99,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **38 / 3,430** | **23 / 1,273** | **240 / 1,653** |
+| **total** | **301** | **109** | **6,356** | **41 / 3,519** | **23 / 1,273** | **237 / 1,564** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -239,7 +247,10 @@ Connectors serves Slack through the catalog provider since 2026-10-08,
 `adapters/catalog/providers/slack/operations.json` (line numbers below), from the pinned Slack
 Web API document (`docs/catalog-slack.md`). A saved connection uses the profile `slack.bot`: a
 bot token as `Authorization: Bearer`, proved by `GET /api/auth.test`. The three conversation
-reads and `users.list` are selected; every other row is still missing. The 2026-09-09 baseline listed Slack as
+reads, `users.list`, `team.info`, `emoji.list` and `auth.test` are selected there; search is a
+second connection under the user-token profile `slack.user`, whose selection set
+`adapters/catalog/providers/slack/user-operations.json` selects `search.messages` alone. Every
+other row is still missing. The 2026-09-09 baseline listed Slack as
 uncovered (`docs/recent-adapter-usage-20260909.md`, U12). The gap column of a missing row names
 the Slack Web API method that would back it.
 
@@ -248,19 +259,19 @@ the Slack Web API method that would back it.
 | `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13) | covered | One page per call; the caller follows `response_metadata.next_cursor`. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.message.send` | 132 | 30 | 2026-10-05 | — | missing | No provider. Would be backed by `chat.postMessage`, plus `conversations.open` for a direct message. |
 | `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9) | covered | One page per call, windowed by `oldest` and `latest`. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.search` | 73 | 19 | 2026-10-05 | — | missing | Not selectable yet: the pinned `search.messages` requires its `token` parameter, which the engine cannot withhold. Needs the catalog engine change in `docs/catalog-slack.md#methods-that-cannot-be-selected-yet`, then a second connection under a user-token profile `slack.user`; no host change. |
+| `slack.search` | 73 | 19 | 2026-10-05 | `search.messages` (`adapters/catalog/providers/slack/user-operations.json:5`) | covered | On a second connection with a user token (`slack.user`, scope `search:read`); a bot token cannot search. Pages by `page` and `count` (1–100), not by cursor. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5) | covered | One page of at most 1,000 per call; no lookup by channel name. |
 | `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | No provider. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload. |
 | `slack.message.edit` | 20 | 8 | 2026-10-03 | — | missing | No provider. Would be backed by `chat.update`. |
-| `slack.info` | 15 | 8 | 2026-09-25 | — | missing | Not selectable yet: the pinned `team.info` requires its `token` query parameter and `auth.test` its `token` header (`docs/catalog-slack.md#methods-that-cannot-be-selected-yet`). `connections revalidate` re-reads `auth.test` but keeps only its `user_id`, as the connection's subject; no workspace name, domain or id. |
+| `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:20) and `auth.test` (:26) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
 | `slack.file.download` | 11 | 8 | 2026-09-29 | — | missing | No provider. A binary fetch of `url_private`. |
 | `slack.message.delete` | 10 | 6 | 2026-09-29 | — | missing | No provider. Would be backed by `chat.delete`. |
 | `slack.file.delete` | 7 | 4 | 2026-09-29 | — | missing | No provider. Would be backed by `files.delete`. |
 | `slack.file.info` | 7 | 2 | 2026-09-29 | — | missing | No provider. Would be backed by `files.info`. |
 | `slack.file.list` | 3 | 1 | 2026-09-29 | — | missing | No provider. Would be backed by `files.list`. |
 | `slack.test` | 3 | 3 | 2026-09-26 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/auth.test` probe with the saved bot token. |
-| `slack.emoji.list` | 1 | 1 | 2026-09-28 | — | missing | Not selectable yet: the pinned `emoji.list` requires its `token` query parameter (`docs/catalog-slack.md#methods-that-cannot-be-selected-yet`). |
+| `slack.emoji.list` | 1 | 1 | 2026-09-28 | `emoji.list` (:23) | covered | The workspace's custom emoji, in one call; the pinned document states no member of the answer, which is returned as Slack sent it. |
 | `slack.bookmark.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.add`. |
 | `slack.bookmark.delete` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.remove`. |
 | `slack.bookmark.edit` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.edit`. |
@@ -269,7 +280,7 @@ the Slack Web API method that would back it.
 | `slack.channel.mark-read` | 0 | 0 | - | — | missing | No provider. Would be backed by `conversations.mark`. |
 | `slack.download` | 0 | 0 | - | — | missing | No provider. A binary fetch of `url_private`. |
 | `slack.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
-| `slack.mentions` | 0 | 0 | - | — | missing | No provider. Would be backed by `search.messages`, plus classification done on the fluxplane side. |
+| `slack.mentions` | 0 | 0 | - | — | missing | Not selected as its own operation. `search.messages` on the user-token connection is selected; the mention classification is done on the fluxplane side. |
 | `slack.presence.get` | 0 | 0 | - | — | missing | No provider. Would be backed by `users.getPresence`. |
 | `slack.presence.set` | 0 | 0 | - | — | missing | No provider. Would be backed by `users.setPresence`. |
 | `slack.reaction.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `reactions.add`. |
@@ -747,7 +758,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.pipeline.show` (gitlab) | 3 | 3 | none declared (a single-pipeline read) | covered by `pipeline.get` (`adapters/catalog/providers/gitlab/operations.json:22`) | — |
 | `jira.search` (jira) | 3 | 1 | `jira.issue.search` | covered | — |
 | `slack.thread.replies` (slack) | 3 | 3 | `slack.thread` | covered | — |
-| `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | covered | — |
+| `slack.user.info` (slack) | 3 | 2 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
 | `jira.issue.show` (atlassian) | 2 | 1 | `jira.issue.show` | partial | U03 |
 | `gitlab.commit.list` (gitlab) | 2 | 1 | `gitlab.repository.commit.list` | covered | — |
 | `gitlab.pipeline.job.list` (gitlab) | 2 | 2 | `gitlab.job.list` | covered | — |
@@ -777,8 +788,8 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `loki.query_range` (loki) | 1 | 1 | `loki.query` | covered | — |
 | `slack.conversation.list` (slack) | 1 | 1 | `slack.channel.list` | covered | — |
 | `slack.conversations.history` (slack) | 1 | 1 | `slack.message.list` | covered | — |
-| `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | covered | — |
-| `slack.user.show` (slack) | 1 | 1 | `slack.user.list` | covered | — |
+| `slack.user.lookup` (slack) | 1 | 1 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
+| `slack.user.show` (slack) | 1 | 1 | `slack.user.list` | partial (`users.list` only: no single-user read by id or e-mail; `users.info` and `users.lookupByEmail` are not selected) | U02 |
 | `sql.endpoints` (sql) | 1 | 1 | the `endpoint list` verb | covered (`adapters list`, `connections list`) | — |
 | `slack.message.list` (operation id in the plugin position, §4b) | 6 | 2 | `slack.message.list` | covered | — |
 | `slack.thread` (§4b) | 4 | 3 | `slack.thread` | covered | — |
@@ -790,7 +801,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | missing | U10 |
 | `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | partial | U03 |
 
-In total, 124 calls are mapped: 55 covered and 69 to gap units. The rest of §4 is not
+In total, 124 calls are mapped: 51 covered and 73 to gap units. The rest of §4 is not
 attributed:
 
 - **§4c:** 55 calls whose operation sat in a variable with no literal id in the same command.
