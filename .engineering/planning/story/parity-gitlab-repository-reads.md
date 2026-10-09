@@ -2,12 +2,15 @@
 format: aep.planning-md/3
 id: story:parity-gitlab-repository-reads
 kind: story
-status: draft
+status: active
 title: GitLab code search and repository tree
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-09T22:50:37Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-09T22:50:38Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
