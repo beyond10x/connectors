@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- The documentation is served at its own address, <https://beyond10x.github.io/connectors/>:
+  the `Documentation site` workflow deploys the `Documentation validation` build through
+  Website's `project-site.yml`. The unified-site bundle (`b10x.docs.yaml` and its bundle, check
+  and redirect-façade workflows) is removed.
+
 ## 0.38.0 — 2026-10-09
 
 ### Added
