@@ -30,7 +30,7 @@ separate steps.
 
 ## Where the project stands
 
-Source release **v0.39.0** keeps connection metadata in Entity Runtime over an
+Source release **v0.40.0** keeps connection metadata in Entity Runtime over an
 Eventlog SQLite store, specified at ESS source format `ess/15`, with GitLab, Jira Cloud, Confluence Cloud, HubSpot CRM and Zendesk Support served from their pinned OpenAPI sources, and Google Drive, Slides, Calendar and Gmail from pinned Discovery documents projected to OpenAPI, through
 the catalog provider. The [changelog](CHANGELOG.md) records its scope and
 remaining work.
@@ -116,7 +116,7 @@ The current services provide:
 |---|---|---|
 | GitLab (catalog provider) | `projects.list`, `project.get`, `project.events`, `issues.list`, `file.get`, `branch.get`, `tags.list`, `releases.list`, `commits.list`, `repository.compare`, `deployments.list`, `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get`, `job.trace`, `merge_request.get`, `merge_requests.list`, `issue.create`, `merge_request.create`, `merge_request.update`, `merge_request.merge` | GitLab API v4 from the pinned OpenAPI source; one bound request per operation, the provider's body unchanged; merge guarded by five declared checks, issue creation unguarded; the host's permitted operation ids are the scope |
 | Kubernetes | `resources.list`, `endpoints.discover`, optionally `hosts.discover`, and optionally the `helm_releases.*` release reads | Kubernetes API, with namespace and resource-kind restrictions; saved bearer token through the local CLI. Helm release values and manifests are disclosed only as redacted projections |
-| SQL | `schema.list`, `query.read` | PostgreSQL or MySQL, chosen per connection by `engine` (PostgreSQL by default), with read-only transactions or sessions and execution deadlines; saved password through the local CLI; see [the PostgreSQL guide](docs/local-postgres-cli.md) and [the MySQL guide](docs/local-mysql-cli.md) |
+| SQL | `schema.list`, `query.read`, `database.list`, `table.list`, `table.describe`, `index.list` | PostgreSQL or MySQL, chosen per connection by `engine` (PostgreSQL by default), with read-only transactions or sessions and execution deadlines; saved password through the local CLI; see [the PostgreSQL guide](docs/local-postgres-cli.md) and [the MySQL guide](docs/local-mysql-cli.md) |
 | Tavily | `websearch.search`, `websearch.fetch`, `websearch.crawl` | Tavily API from the pinned OpenAPI source, profile `tavily/2026-10`; API key from keyring custody, checked with `GET /usage`; every operation is a read Tavily serves as a POST; see [the Tavily guide](docs/local-tavily.md) |
 | Loki | `logs.query_range`, `logs.query_metric`, `logs.labels` | Loki HTTP API, one GET each; bearer token from keyring custody, proved with `GET /loki/api/v1/labels`; no tenant header is sent; see [the Loki guide](adapters/loki/README.md) |
 | Grafana | `datasources.list` | Grafana HTTP API, one `GET /api/datasources`; service-account token from keyring custody, proved with that same GET; records carry uid, name, type, access and default flag only. A Loki data source is read through Grafana as a Loki connection on its proxy path; see [the Grafana guide](adapters/grafana/README.md) |

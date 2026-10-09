@@ -1,6 +1,6 @@
 # Grafana adapter design
 
-**Status:** native executable `connectors-grafana` (2026-10-09, unreleased). It serves
+**Status:** native executable `connectors-grafana` (since 0.39.0). It serves
 `datasources.list` (records / `grafana-datasources`) through the local host under the profile
 `grafana.service_account`; see [README.md](README.md). Dashboards, datasource discovery and
 the parent route below are not implemented.
