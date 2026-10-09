@@ -27,7 +27,7 @@ scope:
   path: crates/connectors-docs
 - confidence: cited
   path: website
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-08T20:00:37Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-08T20:00:37Z", actor: "human:timo", revision: 3}
@@ -74,3 +74,7 @@ which other repositories own; the GitHub website field, which follows stage D.
 Stages A and B on wave/20261008e (unit commit 87265871c): the site builds for /connectors/ on Docs System 9d35e63; connectors-docs (34 tests) generates the derivable pages and the gate runs its generate --check; pages.yml (Documentation validation) added. Site build, test:examples (15), test:browser and test:ui passed; docs-system check-source passed.
 
 Open: the organisation side of the move (website redirects and independent-site record, root caller, catalog listing), then deleting the unified-site files and adding the project-site caller, then the live checks and the repository website field. This story stays active until the Documentation validation and Documentation site runs on main succeed.
+
+## Stage C and D result
+
+Stage C and D, 2026-10-09: https://github.com/beyond10x/connectors/pull/140 merged as ff6e43cb1. On that merge commit `Documentation validation` (run 37878739263) and `Documentation site` (run 37879491600) concluded success. At 03:43:57Z https://beyond10x.github.io/connectors/, `/docs/`, `/docs/status/` and `/docs/getting-started` answered 200 with this site, and `/.well-known/b10x-site.json` named commit ff6e43cb1. The repository homepage is https://beyond10x.github.io/connectors/. The former unified pages under `/docs/connectors/` move with the organization root publication.
