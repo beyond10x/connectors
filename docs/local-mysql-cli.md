@@ -79,7 +79,7 @@ args = ["--local-config", "/absolute/path/mysql.json"]
 ```sh
 target/release/connectors --output json connections connect --adapter incidents --profile mysql.password --credential-prompt
 target/release/connectors --output json connections revalidate --adapter incidents --connection CONNECTION --expected-revision CONNECTION_REVISION
-target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation schema.list --schema SCHEMA --revision REVISION --input-json '{"schema":"incidents","limit":200}'
+target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation schema.list --schema SCHEMA --revision REVISION --input-json '{"limit":200}'
 target/release/connectors --output json operations invoke --adapter incidents --connection CONNECTION --operation query.read --schema SCHEMA --revision REVISION --input-json '{"query":"SELECT id, opened_at FROM incidents WHERE severity = ? ORDER BY opened_at DESC","parameters":["critical"],"limit":100}'
 ```
 
@@ -112,8 +112,13 @@ prepared runs:
 
 ```sql
 SET SESSION TRANSACTION READ ONLY
-SET SESSION max_execution_time = 10000, SESSION lock_wait_timeout = 2, SESSION innodb_lock_wait_timeout = 2
+SET SESSION max_execution_time = 10000, SESSION lock_wait_timeout = 2, SESSION innodb_lock_wait_timeout = 2, SESSION time_zone = '+00:00'
 ```
+
+The session time zone is UTC so that a `TIMESTAMP` reaches the adapter as its
+instant in UTC whatever the server's own `time_zone` is (see below). It also
+means that time functions evaluated in the session, such as `NOW()` or
+`CURRENT_TIMESTAMP`, answer in UTC.
 
 The caller's statement is then prepared once to read its columns and parameter
 count. A statement that returns no columns — any `INSERT`, `UPDATE`, `DELETE`,
@@ -166,7 +171,8 @@ descriptor of a MySQL connection names the profile `mysql-native-text`:
 | `DECIMAL` | the server's exact decimal text | `"12345678901234567890.0123"` |
 | `FLOAT`, `DOUBLE` | the shortest text that reads back as the same value: positional on a tie, otherwise exponent form (PostgreSQL writes `1e+300`) | `"1.5"`, `"1e300"`, `"1e-4"` |
 | `DATE` | ISO 8601 date | `"2026-10-09"` |
-| `DATETIME`, `TIMESTAMP` | ISO 8601 date-time with `T`, fraction to the column's precision | `"2026-10-09T08:07:06.000123"` |
+| `DATETIME` | ISO 8601 naive local date-time with `T`, fraction to the column's precision, no offset: `DATETIME` records no time zone | `"2026-10-09T08:07:06.000123"` |
+| `TIMESTAMP` | the instant in UTC: ISO 8601 date-time with `T`, fraction to the column's precision, then `Z` | `"2026-10-25T00:30:00Z"` |
 | `TIME` | `[-]HH:MM:SS[.ffffff]`, hours unbounded (an elapsed time of up to 838 hours, not a time of day) | `"-26:03:04"` |
 | binary strings and BLOBs, `BIT`, geometry | standard base64 with padding | `"AAEC/w=="` |
 | text strings, `ENUM`, `SET`, `JSON` | the text itself | `"snow 雪"` |
@@ -177,9 +183,12 @@ values to JSON numbers, so a 64-bit value cannot lose digits. These rules are
 modeled in `adapters/sql/spec/ess` (`connectors_sql.reads.MysqlCellRule`) and
 checked on the wire by `adapters/sql/tests/mysql_protocol.rs`.
 
-`schema.list` reads `information_schema.COLUMNS` for the named schema, which on
-MySQL is a database: pass the connected database's name to list its columns. The
-columns are those of the PostgreSQL path (`table_schema`, `table_name`,
+A connection is bound to one database, and on MySQL a schema is a database, so
+`schema.list` reads only the connected database: omit `schema`, or pass the
+connected database's exact name. Any other name is refused as `invalid_input`
+before a session is opened; to read another database, configure a connection for
+it. The answer's provenance resource is the connected database. It reads
+`information_schema.COLUMNS` for that database, and the columns are those of the PostgreSQL path (`table_schema`, `table_name`,
 `column_name`, `data_type`, `udt_name`, `is_nullable`, `ordinal_position`);
 `udt_name` carries MySQL's full `COLUMN_TYPE`, such as `bigint unsigned` or
 `varchar(255)`.

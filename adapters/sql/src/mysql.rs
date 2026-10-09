@@ -28,8 +28,10 @@ use tokio::{sync::oneshot, time::Instant};
 /// statement, is read-only: the server refuses a write with error 1792.
 pub const SESSION_READ_ONLY: &str = "SET SESSION TRANSACTION READ ONLY";
 /// Server-side guards inside the adapter's own deadline: a SELECT runs for at
-/// most 10 s, and a metadata or row lock is waited on for at most 2 s.
-pub const SESSION_BOUNDS: &str = "SET SESSION max_execution_time = 10000, SESSION lock_wait_timeout = 2, SESSION innodb_lock_wait_timeout = 2";
+/// most 10 s, and a metadata or row lock is waited on for at most 2 s. The
+/// session time zone is UTC, so the server sends each TIMESTAMP, an instant, in
+/// UTC whatever its own `time_zone` is; DATETIME carries no zone and is unchanged.
+pub const SESSION_BOUNDS: &str = "SET SESSION max_execution_time = 10000, SESSION lock_wait_timeout = 2, SESSION innodb_lock_wait_timeout = 2, SESSION time_zone = '+00:00'";
 /// `schema.list` on MySQL: the column metadata of one schema (a MySQL database)
 /// visible to the configured user, in the PostgreSQL path's column order and
 /// names. `udt_name` carries MySQL's full `COLUMN_TYPE`.
@@ -65,6 +67,7 @@ pub enum Rendering {
     FloatText,
     Iso8601Date,
     Iso8601Datetime,
+    Iso8601InstantUtc,
     SignedElapsedTime,
     Base64,
     Utf8Text,
@@ -79,6 +82,7 @@ impl Rendering {
             Rendering::FloatText => "float_text",
             Rendering::Iso8601Date => "iso8601_date",
             Rendering::Iso8601Datetime => "iso8601_datetime",
+            Rendering::Iso8601InstantUtc => "iso8601_instant_utc",
             Rendering::SignedElapsedTime => "signed_elapsed_time",
             Rendering::Base64 => "base64",
             Rendering::Utf8Text => "utf8_text",
@@ -133,7 +137,8 @@ impl Family {
             Family::Decimal => Rendering::DecimalText,
             Family::Floating => Rendering::FloatText,
             Family::Date => Rendering::Iso8601Date,
-            Family::Datetime | Family::Timestamp => Rendering::Iso8601Datetime,
+            Family::Datetime => Rendering::Iso8601Datetime,
+            Family::Timestamp => Rendering::Iso8601InstantUtc,
             Family::Time => Rendering::SignedElapsedTime,
             Family::BinaryString | Family::Bit | Family::Geometry => Rendering::Base64,
             Family::TextString | Family::Json => Rendering::Utf8Text,
@@ -294,11 +299,18 @@ fn cell(value: Cell, column: &mysql_async::Column) -> Result<Value> {
             format!("{year:04}-{month:02}-{day:02}")
         }
         (
-            Rendering::Iso8601Datetime,
+            rendering @ (Rendering::Iso8601Datetime | Rendering::Iso8601InstantUtc),
             Cell::Date(year, month, day, hour, minute, second, micros),
         ) => format!(
-            "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{}",
-            fraction(micros, column.decimals())
+            "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}{}{}",
+            fraction(micros, column.decimals()),
+            // The session time zone is UTC (`SESSION_BOUNDS`), so a TIMESTAMP
+            // arrives as its instant in UTC.
+            if rendering == Rendering::Iso8601InstantUtc {
+                "Z"
+            } else {
+                ""
+            }
         ),
         (
             Rendering::SignedElapsedTime,

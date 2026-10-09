@@ -152,7 +152,7 @@
   "operations": [
     {
       "id": "schema.list",
-      "description": "Read column metadata of one schema (a PostgreSQL schema, or a MySQL database) visible to the configured role or user.",
+      "description": "Read column metadata of one schema of the connected database visible to the configured role or user. On PostgreSQL schema is required and names a schema inside the connected database. On MySQL a schema is a database: schema may be omitted or name the connected database, and any other is refused as invalid_input.",
       "contract": "datasource.relational/v1alpha1",
       "profile": "postgresql-native-text",
       "input_schema": {
@@ -170,7 +170,6 @@
           }
         },
         "required": [
-          "schema",
           "limit"
         ],
         "additionalProperties": false

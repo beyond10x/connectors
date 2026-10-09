@@ -27,7 +27,9 @@ types:
   # carries no TLS and no host authority, and is refused. The port is required for both
   # engines; no default is taken from the engine. `allow_plaintext` defaults to false, so
   # TLS is required unless the file says otherwise; `ca_file`, when present, is an
-  # owner-only PEM bundle that replaces the public roots for this connection.
+  # owner-only PEM bundle that replaces the public roots for this connection. The bounds of
+  # `host`, `database` and `user` count characters (Unicode scalar values), not bytes, and
+  # the executable counts them the same way.
   - name: connectors_sql.connection.LocalConfiguration
     kind: struct
     fields:

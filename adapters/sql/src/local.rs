@@ -53,18 +53,20 @@ impl Local {
         .map_err(|_| Failure::InvalidConfiguration)?;
         let config: Configuration =
             connectors_core::read_json(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
+        // The bounds count characters, as the ESS model (`connection.yaml`) and
+        // the configuration schema's `maxLength` do, not bytes.
         if config.format != "connectors-sql-local/1"
             || !connectors_core::valid_id(&config.instance)
             || config.host.is_empty()
-            || config.host.len() > 512
+            || config.host.chars().count() > 512
             // A leading slash selects a Unix socket directory, which carries no
             // TLS and no host authority this binding can record.
             || config.host.starts_with('/')
             || config.port == 0
             || config.database.is_empty()
-            || config.database.len() > 512
+            || config.database.chars().count() > 512
             || config.user.is_empty()
-            || config.user.len() > 512
+            || config.user.chars().count() > 512
         {
             return Err(Failure::InvalidConfiguration);
         }

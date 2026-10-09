@@ -462,17 +462,33 @@ impl Adapter for Sql {
                 #[derive(Deserialize)]
                 #[serde(deny_unknown_fields)]
                 struct Schema {
-                    schema: String,
+                    #[serde(default)]
+                    schema: Option<String>,
                     limit: u16,
                 }
                 let args: Schema = decode(input)?;
-                let query = match self.config.engine {
-                    Engine::Postgresql => POSTGRESQL_SCHEMA_QUERY,
-                    Engine::Mysql => mysql::SCHEMA_QUERY,
+                // A connection is bound to one database on both engines. On
+                // PostgreSQL the caller names a schema inside it; on MySQL a
+                // schema is a database, so only the connected one is read and
+                // any other is refused before a session is opened.
+                let (query, schema) = match (self.config.engine, args.schema) {
+                    (Engine::Postgresql, Some(schema)) => (POSTGRESQL_SCHEMA_QUERY, schema),
+                    (Engine::Postgresql, None) => {
+                        return Err(Error::invalid("schema is required on PostgreSQL"));
+                    }
+                    (Engine::Mysql, None) => (mysql::SCHEMA_QUERY, self.config.database.clone()),
+                    (Engine::Mysql, Some(schema)) if schema == self.config.database => {
+                        (mysql::SCHEMA_QUERY, schema)
+                    }
+                    (Engine::Mysql, Some(_)) => {
+                        return Err(Error::invalid(
+                            "schema must be the connected database on MySQL",
+                        ));
+                    }
                 };
                 Query {
                     query: query.into(),
-                    parameters: vec![Some(args.schema)],
+                    parameters: vec![Some(schema)],
                     limit: args.limit,
                 }
             }

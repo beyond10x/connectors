@@ -70,7 +70,8 @@ instance descriptor names the profile `mysql-native-text` for both operations.
 
 Each request uses a fresh session made `READ ONLY` (`SET SESSION TRANSACTION READ
 ONLY`) and bounded (`max_execution_time` 10 s, `lock_wait_timeout` and
-`innodb_lock_wait_timeout` 2 s) before the caller's statement is prepared. A
+`innodb_lock_wait_timeout` 2 s), with its `time_zone` set to `+00:00`, before the
+caller's statement is prepared. A
 statement must return between one and 256 columns, so a statement that returns no
 rows is refused as `unsupported` before execution; it then runs as a derived table
 with positional column aliases and `LIMIT <limit+1>`, so only one result-returning
@@ -90,8 +91,12 @@ family, never coercing a database value to a JSON number: integers (signed,
 unsigned, `YEAR`) as decimal text; `DECIMAL` as the server's exact text; floating
 values as the shortest text that reads back as the same value (positional on a
 tie, otherwise the exponent form `1e300`, `1e-4`; PostgreSQL writes `1e+300`); `DATE` as
-`YYYY-MM-DD`; `DATETIME` and `TIMESTAMP` as `YYYY-MM-DDTHH:MM:SS` with as many
-fractional digits as the column declares; `TIME` as `[-]HH:MM:SS[.ffffff]` with
+`YYYY-MM-DD`; `DATETIME`, which records no time zone, as the naive local
+date-time `YYYY-MM-DDTHH:MM:SS` with as many fractional digits as the column
+declares and no offset; `TIMESTAMP`, an instant, as that instant in UTC in the same
+form followed by `Z` (the session time zone is UTC, so the server converts it
+before sending it, whatever its own `time_zone`; two distinct instants are never
+written alike across a daylight-saving change); `TIME` as `[-]HH:MM:SS[.ffffff]` with
 unbounded hours (an elapsed time, not a time of day); binary-charset strings,
 `BIT` and geometry as padded standard base64; other strings, `ENUM`, `SET` and
 `JSON` as their text. A text cell that is not valid UTF-8 is refused as
@@ -99,9 +104,14 @@ unbounded hours (an elapsed time, not a time of day); binary-charset strings,
 lower-case type name, with ` unsigned` for unsigned integers. The adapter's ESS
 model (`adapters/sql/spec/ess`, `connectors_sql.reads`) fixes these rules.
 
-`schema.list` reads `information_schema.COLUMNS` for the named schema, which on
-MySQL is a database, returning the PostgreSQL path's seven columns; `udt_name`
-carries MySQL's `COLUMN_TYPE`.
+A connection is bound to one database on both engines, and on MySQL a schema is a
+database, so `schema.list` on MySQL reads only the connected database: `schema`
+may be omitted, which reads it, or name it exactly; any other value is refused as
+`invalid_input` before a session is opened or any query sent. It reads
+`information_schema.COLUMNS` for that database, returning the PostgreSQL path's
+seven columns, and the provenance resource names it; `udt_name` carries MySQL's
+`COLUMN_TYPE`. On PostgreSQL `schema` remains required (an input without it is
+`invalid_input`) and names a schema inside the connected database.
 
 The connection uses only its configured endpoint (never a server-named Unix
 socket), installs no local-file handler, and without `allow_plaintext` requires TLS
