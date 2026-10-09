@@ -260,6 +260,16 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "postgresql_generated_column_is_not_reported_as_a_default"
             | "postgresql_index_list_does_not_name_a_column_the_role_cannot_see"
             | "postgresql_index_list_leaves_out_every_index_over_a_hidden_column",
+        )
+        | (
+            "connectors-sql",
+            "catalogue_adversary_2",
+            "postgresql_a_composite_foreign_key_with_one_hidden_referenced_column_is_left_out"
+            | "postgresql_a_foreign_key_does_not_name_a_referenced_column_describe_hides"
+            | "postgresql_a_foreign_key_into_a_partitioned_table_is_reported_once"
+            | "postgresql_a_partition_keeps_the_foreign_key_it_inherits"
+            | "postgresql_index_list_leaves_out_a_whole_row_expression_over_a_hidden_column"
+            | "postgresql_index_list_leaves_out_a_whole_row_predicate_over_a_hidden_column",
         ) => Some((Live, vec![PG_ADVERSARY])),
         (
             "connectors-sql",

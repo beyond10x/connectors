@@ -174,17 +174,23 @@ key or null. A generated column has no default: on PostgreSQL its generation exp
 not report it, and MySQL's `COLUMN_DEFAULT` is null for it. A column in a foreign key carries
 the constraint name and the referenced schema, table and column paired with it, so a
 composite key appears on each of its columns; a column in several foreign keys has one row
-per key, ordered by constraint name. A table with no row is refused as `not_found`, whether
+per key, ordered by constraint name. A row is one declared key: on PostgreSQL a key into a
+partitioned table is reported once, not once more per referenced partition (the internal
+clone constraints PostgreSQL keeps on the referencing table, whose parent constraint is on
+that same table, are left out), and a partition reports the key it inherits from its
+partitioned parent as its own. A table with no row is refused as `not_found`, whether
 it does not exist or the configured role or user can see none of its columns: the two are
 not told apart.
 
 Foreign keys into what the caller cannot see differ by engine. On PostgreSQL a foreign key is
 reported only when the role holds `USAGE` on the referenced schema and some privilege on the
-referenced table (or is a member of its owner), as `information_schema` decides; otherwise the
-column is still described, without that key. On MySQL `information_schema.KEY_COLUMN_USAGE`
-decides: it lists a foreign key of a table the user can see and names its referenced schema,
-table and column even when the user holds no privilege on them, so `table.describe` can name
-a referenced database that `database.list` does not list.
+referenced table (or is a member of its owner), as `information_schema` decides, and a column
+privilege on every referenced column, so no row names a column that `table.describe` of the
+referenced table hides; otherwise each column of the key is still described, without that
+key. On MySQL `information_schema.KEY_COLUMN_USAGE` decides: it lists a foreign key of a
+table the user can see and names its referenced schema, table and column even when the user
+holds no privilege on them, so `table.describe` can name a referenced database that
+`database.list` does not list, and a referenced column the user cannot read.
 
 `index.list` answers one row per key column of each index, in index order, for one table or,
 without `table`, for every table of the schema; included (non-key) columns are not listed. An
@@ -194,7 +200,14 @@ index follows column visibility: it is left out when any column it is built on i
 `table.describe` hides (one the role holds no column privilege on and does not own through
 the table's owner). That covers a key column, an INCLUDE column and a column used in a key
 expression; a column used only in a partial index's predicate counts too, because PostgreSQL
-records expression and predicate columns alike (`pg_depend`).
+records expression and predicate columns alike (`pg_depend`). A whole-row reference (such
+as `(t IS NOT NULL)`, in a key expression or the predicate) is built on every column of the
+table, so it counts as every column; PostgreSQL records no dependency for it, and the read
+finds it in the stored expression and predicate. PostgreSQL gives an index with no plain key
+column a dependency on the whole table (`refobjsubid = 0`), which counts as every column as
+well: an index on expressions alone, such as `((pub + 1))`, is listed only to a role that
+owns the table or holds a column privilege on every column, even when the expression uses
+only visible columns.
 
 MySQL cannot hold a table name that ends in a space, and its metadata collation
 (`utf8mb3_bin`) pads, so a lookup of `orders ` would match `orders`. On MySQL,
@@ -212,7 +225,8 @@ model (`connectors_sql.reads.CatalogScope` and the row types `DatabaseRow`, `Tab
 `ColumnRow` and `IndexRow`) fixes these rules. The statements are checked on scripted wire
 fixtures of both engines. On 2026-10-09 the generated-column, foreign-key, index-visibility
 and MySQL name rules were also run against disposable PostgreSQL 17 and MySQL 8.0.46
-servers (`adapters/sql/tests/catalogue_adversary.rs`, ignored by default).
+servers (`adapters/sql/tests/catalogue_adversary.rs` and `catalogue_adversary_2.rs`, ignored by
+default).
 Source facts: https://www.postgresql.org/docs/current/catalog-pg-database.html,
 https://www.postgresql.org/docs/current/catalog-pg-class.html,
 https://www.postgresql.org/docs/current/catalog-pg-attribute.html,

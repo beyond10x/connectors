@@ -266,11 +266,17 @@ types:
   # `information_schema.columns`). `primary_key_position` is the column's 1-based place in
   # the primary key, null when it is not part of it. A foreign key names the constraint and
   # the referenced schema, table and column paired with this one; its members are all
-  # present or all null. On PostgreSQL a foreign key is reported only when the role holds
-  # `USAGE` on the referenced schema and a privilege on the referenced table (or is a
-  # member of its owner), as `information_schema` does; otherwise the column is described
-  # without it. On MySQL `KEY_COLUMN_USAGE` decides, which names the referenced table
-  # whatever the user may see of it.
+  # present or all null. A row is one declared foreign key: on PostgreSQL the internal
+  # clones of a key into the partitions of a referenced partitioned table (constraints whose
+  # parent constraint is on the same referencing table) are not keys of their own, while a
+  # key a partition inherits from its partitioned parent is the partition's and is reported.
+  # On PostgreSQL a foreign key is reported only when the role holds `USAGE` on the
+  # referenced schema, a privilege on the referenced table (or is a member of its owner), as
+  # `information_schema` does, and a column privilege on every referenced column, so the
+  # read never names a column `table.describe` of the referenced table hides; otherwise the
+  # column is described without that key, on every column of the key. On MySQL
+  # `KEY_COLUMN_USAGE` decides, which names the referenced table and column whatever the
+  # user may see of them.
   - name: connectors_sql.reads.ColumnRow
     kind: struct
     fields:
@@ -298,7 +304,11 @@ types:
   # column it is built on (a key column, an INCLUDE column, or a column in a key expression
   # or in its predicate, as `pg_depend` records them) is one the role neither owns (through
   # the table's owner) nor holds a column privilege on, the rule that hides the column from
-  # `table.describe`.
+  # `table.describe`. A whole-row reference counts as every column of the table, wherever
+  # the index makes it (key expression or predicate); so does the whole-table dependency
+  # (`pg_depend`, `refobjsubid = 0`) PostgreSQL records for an index with no plain key
+  # column. Such an index is listed only to a role that owns the table or holds a column
+  # privilege on every column.
   - name: connectors_sql.reads.IndexRow
     kind: struct
     fields:

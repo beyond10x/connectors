@@ -39,8 +39,10 @@
   PostgreSQL; on MySQL only the connected database, any other refused as `invalid_input`
   before a session is opened). `table.describe` of a table that does not exist, or whose
   columns cannot be seen, is `not_found`. A generated column's `column_default` is `null`. On
-  PostgreSQL a foreign key into a schema or table the role cannot see is left out, and
-  `index.list` leaves out an index built on a column `table.describe` hides; MySQL keeps its
+  PostgreSQL a foreign key into a schema, table or column the role cannot see is left out, a
+  key into a partitioned table is reported once (not once more per partition), and
+  `index.list` leaves out an index built on a column `table.describe` hides, a whole-row
+  reference and an index on expressions alone counting as every column; MySQL keeps its
   own `KEY_COLUMN_USAGE` visibility for foreign keys. On MySQL a table name MySQL cannot hold
   (ending in a space, or not representable in its `utf8mb3` metadata, error 3988) is
   `not_found` on `table.describe` and `index.list`. Modeled in `adapters/sql/spec/ess`

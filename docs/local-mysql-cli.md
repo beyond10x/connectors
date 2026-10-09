@@ -224,7 +224,9 @@ target/release/connectors --output json operations invoke --adapter incidents --
 - Foreign keys follow MySQL's own `KEY_COLUMN_USAGE` visibility, which differs from
   PostgreSQL: a foreign key of a table the user can see names its referenced schema, table
   and column even when the user holds no privilege on them, so `table.describe` can name a
-  database that `database.list` does not list. On PostgreSQL such a key is left out.
+  database that `database.list` does not list, or a column the user cannot read. On
+  PostgreSQL such a key is left out, as is a key into a column the role holds no privilege
+  on.
 - `index.list` reads `STATISTICS`: one row per key part, `PRIMARY` as the primary key's
   name, and a functional key part's expression as `column_name`. Without `table` it lists
   every table's indexes; a table that does not exist is an empty answer.
