@@ -272,3 +272,130 @@ fn a_credential_name_the_selection_cannot_drop_is_refused() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// A write and its guard: the pinned Slack document passes `token` as a
+// required header on `chat_postMessage` and as a required query parameter on
+// `team_info`.
+
+/// A write's open body is caller input: a top-level key equal to the
+/// credential under any ASCII case is refused before any request, by the
+/// engine and by the declared input schema alike, and a body without it is
+/// admitted by both.
+#[tokio::test]
+async fn a_writes_body_never_carries_the_credential_under_any_case() {
+    let engine = slack(
+        json!({"id": "chat.postMessage", "operation_id": "chat_postMessage",
+                             "effect": "write", "credential": ["token"]}),
+    )
+    .unwrap();
+    let schema = engine.declarations(&[Effect::Write]).remove(0).input_schema;
+    for spelling in ["token", "Token", "TOKEN", "tOkEn"] {
+        let input = json!({"body": {"channel": "C0FIXTURE01", spelling: "fixture-token"}});
+        assert!(
+            connectors_sdk::validate(&schema, &input).is_err(),
+            "the declaration admits `{spelling}`"
+        );
+        let http = Reads::default();
+        let error = engine
+            .prepare(&http, "one", "chat.postMessage", input)
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("a body carrying `{spelling}` was prepared"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "`{spelling}`");
+        assert!(http.calls.lock().unwrap().is_empty(), "`{spelling}`");
+    }
+    let input = json!({"body": {"channel": "C0FIXTURE01", "text": "fixture", "tokens": 1}});
+    connectors_sdk::validate(&schema, &input).unwrap();
+    engine
+        .prepare(&Reads::default(), "one", "chat.postMessage", input)
+        .await
+        .unwrap();
+}
+
+/// `body_keys` admitting the credential, or a guard's preflight sending a
+/// probe parameter of its name, is refused at load under any ASCII case.
+#[test]
+fn body_keys_and_preflight_values_naming_the_credential_are_refused() {
+    let guard = |key: &str| {
+        json!({
+            "preflight": {"operation_id": "team_info", "values": {key: "team_ref"},
+                          "checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]},
+            "postflight": {"checks": []}
+        })
+    };
+    for (case, selection, reason) in [
+        (
+            "body_keys",
+            json!({"id": "chat.postMessage", "operation_id": "chat_postMessage",
+                   "effect": "write", "credential": ["token"],
+                   "body_keys": ["channel", "text", "token"]}),
+            "which its body_keys admit",
+        ),
+        (
+            "body_keys case variant",
+            json!({"id": "chat.postMessage", "operation_id": "chat_postMessage",
+                   "effect": "write", "credential": ["token"], "body_keys": ["Token"]}),
+            "which its body_keys admit",
+        ),
+        (
+            "preflight value",
+            json!({"id": "chat.postMessage", "operation_id": "chat_postMessage",
+                   "effect": "write", "credential": ["token"], "guard": guard("token")}),
+            "which its guard's preflight sends as a probe parameter",
+        ),
+        (
+            "preflight value case variant",
+            json!({"id": "chat.postMessage", "operation_id": "chat_postMessage",
+                   "effect": "write", "credential": ["token"], "guard": guard("TOKEN")}),
+            "which its guard's preflight sends as a probe parameter",
+        ),
+    ] {
+        let message = slack(selection)
+            .err()
+            .unwrap_or_else(|| panic!("`{case}` loaded"));
+        assert!(
+            message.contains(&format!("passes `token` as the credential, {reason}")),
+            "{case}: {message}"
+        );
+    }
+}
+
+/// The credential leaves the guard's probe as well: a preflight on
+/// `team_info`, which requires `token`, loads, and its request carries only
+/// the probe parameters the guard binds; the connection's header carries the
+/// credential. Without `credential` the write itself does not load.
+#[tokio::test]
+async fn the_credential_leaves_the_guards_probe() {
+    let selection = |credential: Value| {
+        json!({"id": "chat.postMessage", "operation_id": "chat_postMessage",
+        "effect": "write", "credential": credential,
+        "guard": {
+            "preflight": {"operation_id": "team_info", "values": {"team": "team_ref"},
+                          "checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]},
+            "postflight": {"checks": []}
+        }})
+    };
+    let input = json!({"team_ref": "T0FIXTURE",
+                       "body": {"channel": "C0FIXTURE01", "text": "fixture"}});
+    let engine = slack(selection(json!(["token"]))).unwrap();
+    let http = Reads::default();
+    let _ = engine
+        .prepare(&http, "one", "chat.postMessage", input.clone())
+        .await;
+    let calls = http.calls.lock().unwrap().clone();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(
+        calls[0].1,
+        vec![("team".to_string(), "T0FIXTURE".to_string())]
+    );
+    // Without `credential` the selected write's required `token` header
+    // refuses the selection at load, so the probe is never built.
+    let message = slack(selection(json!([])))
+        .err()
+        .expect("loaded without credential");
+    assert!(
+        message.contains("needs a header parameter this transport does not carry"),
+        "{message}"
+    );
+}
