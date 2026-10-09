@@ -9,6 +9,7 @@ use serde_json::Value;
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 pub mod auth;
+pub mod mysql;
 use tokio::{sync::oneshot, time::Instant};
 use tokio_postgres::{
     CancelToken, Client, NoTls,
@@ -21,9 +22,162 @@ const QUERY_TIMEOUT: Duration = Duration::from_secs(10);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(2);
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
+/// The database engine a connection speaks. PostgreSQL is the default, so a
+/// configuration written before the engine existed selects it unchanged; the
+/// field is omitted from the effective configuration for PostgreSQL so that
+/// configuration revisions recorded earlier keep their value.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Engine {
+    #[default]
+    Postgresql,
+    Mysql,
+}
+impl Engine {
+    pub const ALL: [Engine; 2] = [Engine::Postgresql, Engine::Mysql];
+    pub fn is_postgresql(&self) -> bool {
+        *self == Engine::Postgresql
+    }
+    /// The engine's configuration name, which is also the scheme of its
+    /// provider authority (`<scheme>://<host>:<port>/<database>`).
+    pub fn name(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "postgresql",
+            Engine::Mysql => "mysql",
+        }
+    }
+    /// The one password profile a connection on this engine advertises.
+    pub fn profile_id(self) -> &'static str {
+        match self {
+            Engine::Postgresql => auth::PROFILE_ID,
+            Engine::Mysql => auth::MYSQL_PROFILE_ID,
+        }
+    }
+    pub fn profile_label(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "PostgreSQL password",
+            Engine::Mysql => "MySQL password",
+        }
+    }
+    /// The kind of the principal a validated session authenticates.
+    pub fn identity_kind(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "postgresql.role",
+            Engine::Mysql => "mysql.user",
+        }
+    }
+    /// The result profile the engine's operations carry in its descriptor.
+    pub fn result_profile(self) -> &'static str {
+        match self {
+            Engine::Postgresql => "postgresql-native-text",
+            Engine::Mysql => "mysql-native-text",
+        }
+    }
+    /// The statements that bound a read's session before the caller's
+    /// statement is prepared.
+    pub fn session_statements(self) -> &'static [&'static str] {
+        match self {
+            Engine::Postgresql => &[POSTGRESQL_SESSION],
+            Engine::Mysql => &[mysql::SESSION_READ_ONLY, mysql::SESSION_BOUNDS],
+        }
+    }
+}
+
+/// A read must return at least one and at most this many columns on either
+/// engine, so a statement that returns no rows, such as any write, is refused
+/// before it is executed.
+pub const MAX_COLUMNS: usize = 256;
+const POSTGRESQL_SESSION: &str = "SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog";
+/// `schema.list` on PostgreSQL: the column metadata of one schema of the
+/// connected database visible to the configured role.
+const POSTGRESQL_SCHEMA_QUERY: &str = "SELECT table_schema, table_name, column_name, data_type, udt_name, is_nullable, ordinal_position FROM information_schema.columns WHERE table_schema = $1 ORDER BY table_name, ordinal_position";
+
+// The catalogue reads on PostgreSQL. Each is fixed text: the caller's schema
+// and table are bound as `$1` and `$2`, never written into the statement. A
+// relation is visible as `information_schema` makes it visible: the role owns
+// it (or is a member of its owner) or holds a privilege on it or one of its
+// columns.
+
+/// `database.list`: the databases the configured role may connect to.
+const POSTGRESQL_DATABASE_QUERY: &str = "SELECT d.datname AS database_name FROM pg_catalog.pg_database d WHERE d.datallowconn AND NOT d.datistemplate AND pg_catalog.has_database_privilege(d.oid, 'CONNECT') ORDER BY d.datname";
+/// `table.list`: ordinary and partitioned tables (`table`), views and
+/// materialized views (`view`) of one schema, with `pg_class.reltuples` as the
+/// row estimate (null for a view and for a table never analysed).
+const POSTGRESQL_TABLE_QUERY: &str = "SELECT c.relname AS table_name, CASE WHEN c.relkind IN ('v', 'm') THEN 'view' ELSE 'table' END AS table_kind, CASE WHEN c.relkind IN ('v', 'm') OR c.reltuples < 0 THEN NULL ELSE c.reltuples::bigint END AS row_estimate FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = $1 AND c.relkind IN ('r', 'p', 'v', 'm') AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES')) ORDER BY c.relname";
+/// `table.describe`: the visible columns of one relation in ordinal order, each
+/// with its place in the primary key and one row per foreign key it belongs to.
+/// A generated column has no default (its expression in `pg_attrdef` is not
+/// one, as in `information_schema.columns`). A foreign key is reported only when
+/// the role holds `USAGE` on the referenced schema and a privilege on the
+/// referenced table, as `information_schema` decides, and a column privilege on
+/// every referenced column, so no row names a column the referenced table's
+/// `table.describe` hides. A row is one declared key: the internal clones
+/// PostgreSQL makes of a key into each partition of a referenced partitioned
+/// table (`conparentid` names a constraint on the same referencing table) are
+/// left out; a key a partition inherits from its parent (`conparentid` on the
+/// parent) is the partition's own and is reported.
+const POSTGRESQL_DESCRIBE_QUERY: &str = "SELECT a.attname AS column_name, pg_catalog.format_type(a.atttypid, a.atttypmod) AS native_type, CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable, CASE WHEN a.attgenerated <> '' THEN NULL ELSE pg_catalog.pg_get_expr(d.adbin, d.adrelid) END AS column_default, a.attnum AS ordinal_position, pk.key_position AS primary_key_position, fk.conname AS foreign_key, fk.referenced_schema, fk.referenced_table, fk.referenced_column FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = c.oid AND d.adnum = a.attnum LEFT JOIN LATERAL (SELECT k.key_position FROM pg_catalog.pg_constraint p CROSS JOIN LATERAL pg_catalog.unnest(p.conkey) WITH ORDINALITY AS k(attnum, key_position) WHERE p.conrelid = c.oid AND p.contype = 'p' AND k.attnum = a.attnum) pk ON true LEFT JOIN LATERAL (SELECT f.conname, rn.nspname AS referenced_schema, rc.relname AS referenced_table, ra.attname AS referenced_column FROM pg_catalog.pg_constraint f CROSS JOIN LATERAL ROWS FROM (pg_catalog.unnest(f.conkey), pg_catalog.unnest(f.confkey)) AS k(attnum, referenced) JOIN pg_catalog.pg_class rc ON rc.oid = f.confrelid JOIN pg_catalog.pg_namespace rn ON rn.oid = rc.relnamespace JOIN pg_catalog.pg_attribute ra ON ra.attrelid = f.confrelid AND ra.attnum = k.referenced WHERE f.conrelid = c.oid AND f.contype = 'f' AND k.attnum = a.attnum AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint pf WHERE pf.oid = f.conparentid AND pf.conrelid = f.conrelid) AND NOT EXISTS (SELECT 1 FROM pg_catalog.unnest(f.confkey) AS rk(attnum) WHERE NOT (pg_catalog.pg_has_role(rc.relowner, 'USAGE') OR pg_catalog.has_column_privilege(rc.oid, rk.attnum, 'SELECT, INSERT, UPDATE, REFERENCES'))) AND pg_catalog.has_schema_privilege(rn.oid, 'USAGE') AND (pg_catalog.pg_has_role(rc.relowner, 'USAGE') OR pg_catalog.has_table_privilege(rc.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') OR pg_catalog.has_any_column_privilege(rc.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))) fk ON true WHERE n.nspname = $1 AND c.relname = $2 AND c.relkind IN ('r', 'p', 'v', 'm') AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_column_privilege(c.oid, a.attnum, 'SELECT, INSERT, UPDATE, REFERENCES')) ORDER BY a.attnum, fk.conname";
+/// `index.list`: one row per key column of each index of one table, or of
+/// every visible table of the schema when `$2` is null. An expression key part
+/// is written as the server's own text of the expression. An index follows
+/// column visibility: it is left out when a column it is built on (a key or
+/// INCLUDE column in `indkey`, or a column of an expression or the predicate,
+/// which `pg_depend` records) is one `table.describe` hides. A whole-row
+/// reference counts as every column: PostgreSQL records no `pg_depend` row for
+/// it, so it is read from the stored expression and predicate trees (a `Var`
+/// with `varattno 0`); the whole-table dependency (`refobjsubid = 0`) of an
+/// index with no plain key column counts as every column too. Such an index is
+/// listed only when the role owns the table or holds a column privilege on
+/// every column.
+const POSTGRESQL_INDEX_QUERY: &str = "SELECT ic.relname AS index_name, c.relname AS table_name, k.key_position AS column_position, COALESCE(a.attname::pg_catalog.text, pg_catalog.pg_get_indexdef(i.indexrelid, k.key_position::integer, true)) AS column_name, CASE WHEN i.indisunique THEN 'YES' ELSE 'NO' END AS is_unique, CASE WHEN i.indisprimary THEN 'YES' ELSE 'NO' END AS is_primary FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class c ON c.oid = i.indrelid JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace JOIN pg_catalog.pg_class ic ON ic.oid = i.indexrelid CROSS JOIN LATERAL pg_catalog.unnest(i.indkey::smallint[]) WITH ORDINALITY AS k(attnum, key_position) LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum = k.attnum AND k.attnum > 0 WHERE n.nspname = $1 AND c.relname = COALESCE($2::pg_catalog.name, c.relname) AND k.key_position <= i.indnkeyatts AND (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER') OR pg_catalog.has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES')) AND NOT EXISTS (SELECT 1 FROM pg_catalog.unnest(i.indkey::smallint[]) AS u(attnum) WHERE u.attnum > 0 AND NOT (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_column_privilege(c.oid, u.attnum, 'SELECT, INSERT, UPDATE, REFERENCES'))) AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend dep WHERE dep.classid = 'pg_catalog.pg_class'::pg_catalog.regclass AND dep.objid = i.indexrelid AND dep.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass AND dep.refobjid = c.oid AND dep.refobjsubid > 0 AND NOT (pg_catalog.pg_has_role(c.relowner, 'USAGE') OR pg_catalog.has_column_privilege(c.oid, dep.refobjsubid::smallint, 'SELECT, INSERT, UPDATE, REFERENCES'))) AND NOT ((EXISTS (SELECT 1 FROM pg_catalog.pg_depend wt WHERE wt.classid = 'pg_catalog.pg_class'::pg_catalog.regclass AND wt.objid = i.indexrelid AND wt.refclassid = 'pg_catalog.pg_class'::pg_catalog.regclass AND wt.refobjid = c.oid AND wt.refobjsubid = 0) OR pg_catalog.strpos(COALESCE(i.indexprs::pg_catalog.text, '') || COALESCE(i.indpred::pg_catalog.text, ''), ':varattno 0 ') > 0) AND NOT pg_catalog.pg_has_role(c.relowner, 'USAGE') AND EXISTS (SELECT 1 FROM pg_catalog.pg_attribute wa WHERE wa.attrelid = c.oid AND wa.attnum > 0 AND NOT wa.attisdropped AND NOT pg_catalog.has_column_privilege(c.oid, wa.attnum, 'SELECT, INSERT, UPDATE, REFERENCES'))) ORDER BY c.relname, ic.relname, k.key_position";
+
+/// A catalogue read: one fixed statement per engine.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Catalogue {
+    Databases,
+    Tables,
+    Describe,
+    Indexes,
+}
+impl Catalogue {
+    fn of(operation: &str) -> Option<Self> {
+        Some(match operation {
+            "database.list" => Catalogue::Databases,
+            "table.list" => Catalogue::Tables,
+            "table.describe" => Catalogue::Describe,
+            "index.list" => Catalogue::Indexes,
+            _ => return None,
+        })
+    }
+    fn statement(self, engine: Engine) -> &'static str {
+        match (engine, self) {
+            (Engine::Postgresql, Catalogue::Databases) => POSTGRESQL_DATABASE_QUERY,
+            (Engine::Postgresql, Catalogue::Tables) => POSTGRESQL_TABLE_QUERY,
+            (Engine::Postgresql, Catalogue::Describe) => POSTGRESQL_DESCRIBE_QUERY,
+            (Engine::Postgresql, Catalogue::Indexes) => POSTGRESQL_INDEX_QUERY,
+            (Engine::Mysql, Catalogue::Databases) => mysql::DATABASE_QUERY,
+            (Engine::Mysql, Catalogue::Tables) => mysql::TABLE_QUERY,
+            (Engine::Mysql, Catalogue::Describe) => mysql::DESCRIBE_QUERY,
+            (Engine::Mysql, Catalogue::Indexes) => mysql::INDEX_QUERY,
+        }
+    }
+}
+
+fn column_bounds(columns: usize) -> Result<()> {
+    if columns == 0 || columns > MAX_COLUMNS {
+        return Err(Error::new(
+            ErrorCode::Unsupported,
+            "query must return between one and 256 columns",
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    #[serde(default, skip_serializing_if = "Engine::is_postgresql")]
+    pub engine: Engine,
     pub host: String,
     pub port: u16,
     pub database: String,
@@ -53,12 +207,27 @@ impl Sql {
         {
             return Err(Error::invalid("invalid database binding"));
         }
-        let descriptor = instance_descriptor(
+        let mut descriptor = instance_descriptor(
             include_str!("../generated/descriptor.json"),
             instance,
             &effective_configuration,
         )?;
-        connectors_sdk::verify_handlers(&descriptor, &["schema.list", "query.read"])?;
+        // The operations are the same on both engines; the profile names how a
+        // cell is written, which is the engine's own.
+        for operation in &mut descriptor.operations {
+            operation.profile = config.engine.result_profile().into();
+        }
+        connectors_sdk::verify_handlers(
+            &descriptor,
+            &[
+                "schema.list",
+                "query.read",
+                "database.list",
+                "table.list",
+                "table.describe",
+                "index.list",
+            ],
+        )?;
         Ok(Self {
             descriptor,
             config,
@@ -120,6 +289,9 @@ impl Sql {
     /// whole check: no statement runs and no business read is performed. A
     /// rejected password surfaces as the provider's own authentication failure.
     pub async fn validate_session(&self) -> Result<()> {
+        if self.config.engine == Engine::Mysql {
+            return mysql::validate_session(&self.config, &*self.password).await;
+        }
         let (client, connection) = tokio::time::timeout(CONNECT_TIMEOUT, self.connect())
             .await
             .map_err(|_| query_timeout())??;
@@ -137,6 +309,15 @@ impl Sql {
             return Err(Error::invalid(
                 "query, parameters or row limit exceed bounds",
             ));
+        }
+        if self.config.engine == Engine::Mysql {
+            return mysql::query(
+                &self.config,
+                &*self.password,
+                &self.descriptor.instance,
+                args,
+            )
+            .await;
         }
         let deadline = Instant::now() + REQUEST_TIMEOUT;
         let (mut client, connection) = tokio::time::timeout(CONNECT_TIMEOUT, self.connect())
@@ -179,19 +360,17 @@ impl Sql {
             .start()
             .await
             .map_err(database_error)?;
-        transaction.batch_execute("SET LOCAL statement_timeout = '10s'; SET LOCAL lock_timeout = '2s'; SET LOCAL search_path = public, pg_catalog").await.map_err(database_error)?;
+        transaction
+            .batch_execute(POSTGRESQL_SESSION)
+            .await
+            .map_err(database_error)?;
         let query = args
             .query
             .trim()
             .strip_suffix(';')
             .unwrap_or(args.query.trim());
         let original = transaction.prepare(query).await.map_err(database_error)?;
-        if original.columns().is_empty() || original.columns().len() > 256 {
-            return Err(Error::new(
-                ErrorCode::Unsupported,
-                "query must return between one and 256 columns",
-            ));
-        }
+        column_bounds(original.columns().len())?;
         if original.params().len() != args.parameters.len() {
             return Err(Error::invalid("parameter count does not match query"));
         }
@@ -349,6 +528,47 @@ struct Query {
     #[serde(default)]
     parameters: Vec<Option<String>>,
     limit: u16,
+    /// Set by the adapter for a catalogue read, never by the caller: its
+    /// statement binds a table name, so on MySQL a name the metadata character
+    /// set cannot represent (error 3988) names no table.
+    #[serde(skip)]
+    catalogue: bool,
+}
+
+/// A table the read cannot find: it does not exist, the configured role or
+/// user cannot see it, or (on MySQL) its name is one MySQL cannot hold.
+fn table_not_found() -> Error {
+    Error::new(ErrorCode::NotFound, "table not found or not visible")
+}
+
+/// The input of `schema.list` and of the catalogue reads; the descriptor's
+/// input schema has already admitted the members each one takes.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Scope {
+    #[serde(default)]
+    schema: Option<String>,
+    #[serde(default)]
+    table: Option<String>,
+    limit: u16,
+}
+
+impl Sql {
+    /// The schema a read binds. A connection is bound to one database on both
+    /// engines. On PostgreSQL the caller names a schema inside it; on MySQL a
+    /// schema is a database, so only the connected one is read and any other
+    /// is refused before a session is opened.
+    fn scoped_schema(&self, schema: Option<String>) -> Result<String> {
+        match (self.config.engine, schema) {
+            (Engine::Postgresql, Some(schema)) => Ok(schema),
+            (Engine::Postgresql, None) => Err(Error::invalid("schema is required on PostgreSQL")),
+            (Engine::Mysql, None) => Ok(self.config.database.clone()),
+            (Engine::Mysql, Some(schema)) if schema == self.config.database => Ok(schema),
+            (Engine::Mysql, Some(_)) => Err(Error::invalid(
+                "schema must be the connected database on MySQL",
+            )),
+        }
+    }
 }
 
 #[async_trait]
@@ -358,17 +578,57 @@ impl Adapter for Sql {
     }
     async fn invoke(&self, operation: &str, input: Value) -> Result<Value> {
         connectors_sdk::validate(&self.descriptor.operation(operation)?.input_schema, &input)?;
-        let query = match operation {
-            "query.read" => decode(input)?,
-            "schema.list" => {
-                #[derive(Deserialize)]
-                #[serde(deny_unknown_fields)]
-                struct Schema {
-                    schema: String,
-                    limit: u16,
+        let engine = self.config.engine;
+        let query = match (operation, Catalogue::of(operation)) {
+            ("query.read", _) => decode(input)?,
+            ("schema.list", _) => {
+                let args: Scope = decode(input)?;
+                Query {
+                    query: match engine {
+                        Engine::Postgresql => POSTGRESQL_SCHEMA_QUERY,
+                        Engine::Mysql => mysql::SCHEMA_QUERY,
+                    }
+                    .into(),
+                    parameters: vec![Some(self.scoped_schema(args.schema)?)],
+                    limit: args.limit,
+                    catalogue: false,
                 }
-                let args: Schema = decode(input)?;
-                Query{query:"SELECT table_schema, table_name, column_name, data_type, udt_name, is_nullable, ordinal_position FROM information_schema.columns WHERE table_schema = $1 ORDER BY table_name, ordinal_position".into(),parameters:vec![Some(args.schema)],limit:args.limit}
+            }
+            (_, Some(read)) => {
+                let args: Scope = decode(input)?;
+                let parameters = match read {
+                    Catalogue::Databases => vec![],
+                    Catalogue::Tables => vec![Some(self.scoped_schema(args.schema)?)],
+                    Catalogue::Describe | Catalogue::Indexes => {
+                        let schema = self.scoped_schema(args.schema)?;
+                        // MySQL cannot hold a table name that ends in a space,
+                        // and its metadata collation pads, so `TABLE_NAME = ?`
+                        // would answer the unpadded table under this name.
+                        if engine == Engine::Mysql
+                            && args.table.as_deref().is_some_and(|t| t.ends_with(' '))
+                        {
+                            return Err(table_not_found());
+                        }
+                        vec![Some(schema), args.table]
+                    }
+                };
+                let result = self
+                    .query(Query {
+                        query: read.statement(engine).into(),
+                        parameters,
+                        limit: args.limit,
+                        catalogue: true,
+                    })
+                    .await?;
+                // Every table has at least one column, so a description with
+                // no row is a table that does not exist or that the configured
+                // role or user cannot see; the two are not told apart.
+                if read == Catalogue::Describe
+                    && result["rows"].as_array().is_some_and(Vec::is_empty)
+                {
+                    return Err(table_not_found());
+                }
+                return Ok(result);
             }
             _ => {
                 return Err(Error::new(
@@ -387,20 +647,29 @@ fn database_roots(path: Option<&std::path::Path>) -> Result<rustls::RootCertStor
             webpki_roots::TLS_SERVER_ROOTS.iter().cloned(),
         ));
     };
-    let bytes =
-        std::fs::read(path).map_err(|_| Error::invalid("configured database CA unavailable"))?;
     let mut roots = rustls::RootCertStore::empty();
-    for cert in CertificateDer::pem_slice_iter(&bytes) {
+    for cert in database_certificates(path)? {
         roots
-            .add(cert.map_err(|_| Error::invalid("invalid database CA"))?)
+            .add(cert)
             .map_err(|_| Error::invalid("invalid database CA"))?;
     }
-    if roots.is_empty() {
+    Ok(roots)
+}
+
+/// The certificates of a configured CA bundle, read once per session. Both
+/// engines refuse an unreadable, malformed or empty bundle the same way.
+fn database_certificates(path: &std::path::Path) -> Result<Vec<CertificateDer<'static>>> {
+    let bytes =
+        std::fs::read(path).map_err(|_| Error::invalid("configured database CA unavailable"))?;
+    let certificates = CertificateDer::pem_slice_iter(&bytes)
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(|_| Error::invalid("invalid database CA"))?;
+    if certificates.is_empty() {
         return Err(Error::invalid(
             "configured database CA contains no certificates",
         ));
     }
-    Ok(roots)
+    Ok(certificates)
 }
 
 fn database_error(error: tokio_postgres::Error) -> Error {

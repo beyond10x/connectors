@@ -1,0 +1,6 @@
+format: ess/14
+system: connectors_sql
+version: v1
+domains:
+  - connectors_sql.connection
+  - connectors_sql.reads

@@ -36,7 +36,7 @@ Each adapter owns its provider behaviour and builds a standalone executable. Wit
 | `connectors-grafana` | [`adapters/grafana`](https://github.com/beyond10x/connectors/tree/main/adapters/grafana) | `use connectors_grafana`, binary `connectors-grafana` | Grafana adapter: bounded data-source records from the Grafana HTTP API, one GET. |
 | `connectors-kubernetes` | [`adapters/kubernetes`](https://github.com/beyond10x/connectors/tree/main/adapters/kubernetes) | `use connectors_kubernetes`, binary `connectors-kubernetes` | Kubernetes adapter: resource inventory, endpoint and host discovery, and Helm release reads. |
 | `connectors-loki` | [`adapters/loki`](https://github.com/beyond10x/connectors/tree/main/adapters/loki) | `use connectors_loki`, binary `connectors-loki` | Loki adapter: LogQL range and metric queries and label reads, one GET each. |
-| `connectors-sql` | [`adapters/sql`](https://github.com/beyond10x/connectors/tree/main/adapters/sql) | `use connectors_sql`, binary `connectors-sql` | PostgreSQL adapter: schema listing and bounded read-only queries. |
+| `connectors-sql` | [`adapters/sql`](https://github.com/beyond10x/connectors/tree/main/adapters/sql) | `use connectors_sql`, binary `connectors-sql` | SQL adapter (PostgreSQL and MySQL): bounded read-only queries and catalogue reads (databases, tables, columns and keys, indexes). |
 | `connectors-tavily` | [`adapters/tavily`](https://github.com/beyond10x/connectors/tree/main/adapters/tavily) | `use connectors_tavily`, binary `connectors-tavily` | Tavily adapter: web search, page fetch and site crawl through the shared websearch family. |
 
 ## Repository tooling

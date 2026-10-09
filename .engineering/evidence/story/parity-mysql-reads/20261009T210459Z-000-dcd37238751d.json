@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-09T21:04:59Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-mysql-reads",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "cargo test -p connectors-sql --locked on wave/20261009b 2b984c20b: 66 passed, 0 failed, 21 ignored; live lane (disposable PostgreSQL 17.11, MySQL 8.0.46): catalogue_adversary 8 passed, catalogue_adversary_2 6 passed"
+  }
+}

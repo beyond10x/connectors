@@ -68,7 +68,7 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 
 | Adapter | Contract | Status |
 |---|---|---|
-| sql | [PostgreSQL bounded reads](../adapters/sql/contracts/reads.md) | First-slice reads implemented; extensions specified |
+| sql | [SQL bounded reads](../adapters/sql/contracts/reads.md) | Reads and catalogue reads implemented on PostgreSQL and MySQL |
 | tavily | [Tavily websearch profile](../adapters/tavily/contracts/websearch.md) | Implemented: search, fetch and crawl |
 | kubernetes | [Kubernetes reads](../adapters/kubernetes/contracts/reads.md) | First-slice reads implemented; extensions specified |
 | kubernetes | [Kubernetes authentication](../adapters/kubernetes/contracts/auth.md) | Specified; runtime pending |
