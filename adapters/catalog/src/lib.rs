@@ -1649,6 +1649,10 @@ fn values_enum(values: &[String]) -> Value {
             && number.to_string() == *value
         {
             allowed.push(json!(number));
+        } else if let Ok(number) = value.parse::<u64>()
+            && number.to_string() == *value
+        {
+            allowed.push(json!(number));
         }
     }
     Value::Array(allowed)

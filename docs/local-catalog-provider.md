@@ -45,7 +45,8 @@ is one of:
   operation's path as the source declares it and `to` is that path with each
   parenthesised optional segment either removed or kept without its
   parentheses, such as GitLab's `/api/v4/projects/{id}/(-/)search` to
-  `/api/v4/projects/{id}/search`. The method and every path parameter stay as
+  `/api/v4/projects/{id}/search`; a segment holding a path parameter can only be
+  kept. The method and every path parameter stay as
   declared.
 
 The file must carry the source's SHA-256. An operation that is missing or
