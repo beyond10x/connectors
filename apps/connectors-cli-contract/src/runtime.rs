@@ -253,28 +253,33 @@ pub struct ProcessOutput {
 
 /// Build the generated Clap command tree.
 pub fn command(plan: &Plan) -> clap::Command {
+    // A global the binding omits is no flag at all: not parsed, not in help, not completed.
     let mut root = clap::Command::new(plan.binary.clone())
         .about(plan.about.clone())
-        .subcommand_required(true)
-        .arg(
+        .subcommand_required(true);
+    if let Some(config) = &plan.globals.config {
+        root = root.arg(
             Arg::new("global_config")
-                .long(plan.globals.config.clone())
+                .long(config.clone())
                 .global(true)
                 .value_parser(clap::value_parser!(PathBuf)),
-        )
-        .arg(
-            Arg::new("global_state")
-                .long(plan.globals.state.clone())
-                .global(true)
-                .value_parser(clap::value_parser!(PathBuf)),
-        )
-        .arg(
+        );
+    }
+    root = root.arg(
+        Arg::new("global_state")
+            .long(plan.globals.state.clone())
+            .global(true)
+            .value_parser(clap::value_parser!(PathBuf)),
+    );
+    if let Some(output) = &plan.globals.output {
+        root = root.arg(
             Arg::new("global_output")
-                .long(plan.globals.output.clone())
+                .long(output.clone())
                 .global(true)
                 .value_parser(["human", "json"])
                 .default_value("human"),
         );
+    }
     let mut roots = BTreeMap::new();
     let mut groups = BTreeMap::<String, BTreeMap<String, clap::Command>>::new();
     for declaration in &plan.commands {
@@ -420,8 +425,13 @@ fn leaf_command(name: &str, declaration: &Command, callable: &Callable) -> clap:
     command
 }
 
+/// Whether the arguments select JSON before they are parsed. A CLI without an output flag writes
+/// JSON only, so it always does.
 fn selected_json(plan: &Plan, args: &[OsString]) -> bool {
-    let flag = format!("--{}", plan.globals.output);
+    let Some(output) = &plan.globals.output else {
+        return true;
+    };
+    let flag = format!("--{output}");
     let equals = format!("{flag}=json");
     let mut previous = false;
     for arg in args.iter().skip(1) {
@@ -680,6 +690,29 @@ fn payload(
     Ok(value)
 }
 
+/// The process context the parsed globals select. A CLI without an output flag writes JSON only.
+fn context(plan: &Plan, matches: &ArgMatches) -> Context {
+    let output = if plan.globals.output.is_none()
+        || matches
+            .get_one::<String>("global_output")
+            .is_some_and(|v| v == "json")
+    {
+        OutputMode::Json
+    } else {
+        OutputMode::Human
+    };
+    Context {
+        // An undefined argument cannot be asked for: clap panics on an unknown id.
+        config: plan
+            .globals
+            .config
+            .as_ref()
+            .and_then(|_| matches.get_one::<PathBuf>("global_config").cloned()),
+        state_dir: matches.get_one::<PathBuf>("global_state").cloned(),
+        output,
+    }
+}
+
 /// Parse, acquire, validate, invoke once and validate/render the reply.
 pub fn run(
     plan: &Plan,
@@ -710,19 +743,8 @@ pub fn run(
             };
         }
     };
-    let output = if matches
-        .get_one::<String>("global_output")
-        .is_some_and(|v| v == "json")
-    {
-        OutputMode::Json
-    } else {
-        OutputMode::Human
-    };
-    let context = Context {
-        config: matches.get_one::<PathBuf>("global_config").cloned(),
-        state_dir: matches.get_one::<PathBuf>("global_state").cloned(),
-        output,
-    };
+    let context = context(plan, &matches);
+    let output = context.output;
     let mut path = Vec::new();
     let mut leaf = &matches;
     while let Some((name, next)) = leaf.subcommand() {
