@@ -208,8 +208,15 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "GitLab",
-        "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and their diffs and discussions as reads; issue, merge-request (auto-merge and reopen included), note and discussion writes under approval.",
+        "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, code search, deployments, environments, pipelines, jobs, traces, merge requests and their diffs and discussions as reads; issue, merge-request (auto-merge and reopen included), note, discussion, tag and release writes under approval.",
         "adapters/catalog/tests/shipped.rs::shipped_gitlab_selections_resolve_and_cover_the_former_native_surface",
+        "/docs/reference/adapters/gitlab",
+    ),
+    shipped(
+        "Catalog provider",
+        "GitLab CI, branch, commit and project writes",
+        "pipeline.retry, pipeline.cancel, pipeline.create, commit.create, file.update, branch.create, branch.delete and project.create under approval, each guarded on the caller's commit (project.create on the namespace path and id) and proven by GitLab's answer or a read after it; environments.list as a read; verified against fixtures, not a live GitLab.",
+        "adapters/catalog/tests/gitlab_ci_project_writes.rs::the_ci_and_project_operations_are_shipped_as_reviewed",
         "/docs/reference/adapters/gitlab",
     ),
     shipped(
@@ -286,6 +293,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "Kubernetes reads and discovery",
         "resources.list, endpoints.discover and optionally hosts.discover, scoped to configured namespaces and kinds, with a saved bearer token.",
         "adapters/kubernetes/tests/local_runtime.rs::private_kubernetes_validates_through_selfsubjectreview_and_reads_scoped_resources",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
+        "Kubernetes single objects, namespaces and rollout history",
+        "resources.get reads one object by name, namespaces.list the configured namespaces the cluster has, deployments.history the ReplicaSets a Deployment controls; replicasets and events are configurable kinds; verified against API-shaped fixtures.",
+        "adapters/kubernetes/tests/parity_reads.rs::the_new_kinds_are_configurable_and_the_new_reads_are_advertised",
         "/docs/reference/adapters/kubernetes",
     ),
     shipped(

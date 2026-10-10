@@ -229,11 +229,72 @@ fn release_collection(path: &str) -> Value {
     )
 }
 
+/// Recorded objects for the namespace, single-object, event and rollout-history
+/// reads. `backendless` is configured but absent from the cluster, so a
+/// namespace read of it is the provider's 404.
+fn parity_object(route: &str) -> Option<(u16, Value)> {
+    let replicaset = |name: &str, revision: &str, owner: &str| {
+        json!({"kind":"ReplicaSet","apiVersion":"apps/v1","metadata":{"name":name,"namespace":"fixture","uid":format!("{name}-uid"),"resourceVersion":"61",
+            "labels":{"app":"api"},"annotations":{"deployment.kubernetes.io/revision":revision},
+            "ownerReferences":[{"apiVersion":"apps/v1","kind":"Deployment","name":"api","uid":owner,"controller":true}]},"spec":{"replicas":0}})
+    };
+    let list = |kind: &str, items: Vec<Value>| json!({"kind":kind,"apiVersion":"v1","metadata":{"resourceVersion":"62","continue":""},"items":items});
+    match route {
+        "/api/v1/namespaces/denied"
+        | "/api/v1/namespaces/fixture"
+        | "/api/v1/namespaces/foreign" => {
+            let name = route.rsplit('/').next().unwrap();
+            Some((
+                200,
+                json!({"kind":"Namespace","apiVersion":"v1","metadata":{"name":name,"uid":format!("ns-{name}"),"resourceVersion":"5"},"status":{"phase":"Active"}}),
+            ))
+        }
+        "/api/v1/namespaces/fixture/pods/pod-0" => Some((
+            200,
+            json!({"kind":"Pod","apiVersion":"v1","metadata":{"name":"pod-0","namespace":"fixture","uid":"pod-uid-0","resourceVersion":"41"},"status":{"phase":"Running"}}),
+        )),
+        "/apis/apps/v1/namespaces/fixture/deployments/api" => Some((
+            200,
+            json!({"kind":"Deployment","apiVersion":"apps/v1","metadata":{"name":"api","namespace":"fixture","uid":"deployment-uid","resourceVersion":"60"},
+                "spec":{"selector":{"matchLabels":{"app":"api"}}},"status":{"readyReplicas":1}}),
+        )),
+        "/apis/apps/v1/namespaces/fixture/replicasets" => Some((
+            200,
+            list(
+                "ReplicaSetList",
+                vec![
+                    replicaset("api-1", "1", "deployment-uid"),
+                    replicaset("api-2", "2", "deployment-uid"),
+                    replicaset("api-other", "9", "other-uid"),
+                ],
+            ),
+        )),
+        "/api/v1/namespaces/fixture/events" => Some((
+            200,
+            list(
+                "EventList",
+                vec![
+                    json!({"kind":"Event","apiVersion":"v1","metadata":{"name":"pod-0.1","namespace":"fixture","resourceVersion":"63"},
+                    "involvedObject":{"kind":"Pod","name":"pod-0","namespace":"fixture"},"reason":"Pulled","type":"Normal"}),
+                ],
+            ),
+        )),
+        _ => None,
+    }
+}
+
 impl Cluster {
     fn new(discover_hosts: bool) -> Self {
         Self::with(discover_hosts, "off")
     }
     fn with(discover_hosts: bool, helm_release_reads: &str) -> Self {
+        Self::with_kinds(
+            discover_hosts,
+            helm_release_reads,
+            &["pods", "endpointslices"],
+        )
+    }
+    fn with_kinds(discover_hosts: bool, helm_release_reads: &str, kinds: &[&str]) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -383,6 +444,8 @@ impl Cluster {
                             Some(item) => (200, item),
                             None => (404, json!({"kind":"Status","code":404})),
                         }
+                    } else if let Some(object) = parity_object(&route) {
+                        object
                     } else {
                         (404, json!({"kind":"Status","code":404}))
                     };
@@ -404,7 +467,7 @@ impl Cluster {
             "api_base":format!("https://localhost:{}/", address.port()),
             "ca_file":ca,
             "namespaces":["backendless","denied","fixture","foreign"],
-            "resource_kinds":["pods","endpointslices"],
+            "resource_kinds":kinds,
             "discover_hosts":discover_hosts
         });
         // The field is optional on disk and defaults to no Helm release read at
@@ -682,6 +745,90 @@ fn private_kubernetes_validates_through_selfsubjectreview_and_reads_scoped_resou
             .subject,
         USER_ONE
     );
+}
+
+#[test]
+fn private_runtime_reads_namespaces_single_objects_events_and_rollout_history() {
+    let cluster = Cluster::with_kinds(
+        false,
+        "off",
+        &["pods", "deployments", "replicasets", "events"],
+    );
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+    let mut read =
+        |operation: &str, input: Value| invoke(&mut child, operation, "one", &token(true), input);
+
+    // The configured namespaces that exist, each read by name: backendless is
+    // configured and absent, and the cluster's namespace collection is never
+    // listed.
+    let namespaces = read("namespaces.list", json!({"limit":10})).unwrap();
+    let names: Vec<&str> = namespaces["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["metadata"]["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["denied", "fixture", "foreign"]);
+    assert_eq!(namespaces["complete"], true);
+    assert!(!cluster.routes().iter().any(|r| r == "/api/v1/namespaces"));
+
+    let pod = read(
+        "resources.get",
+        json!({"namespace":"fixture","kind":"pods","name":"pod-0"}),
+    )
+    .unwrap();
+    assert_eq!(pod["items"][0]["status"]["phase"], "Running");
+    assert_eq!(pod["provenance"]["resource"], "fixture/pods/pod-0");
+    let deployment = read(
+        "resources.get",
+        json!({"namespace":"fixture","kind":"deployments","name":"api"}),
+    )
+    .unwrap();
+    assert_eq!(deployment["items"][0]["status"]["readyReplicas"], 1);
+
+    // An absent object is the provider's answer, not an empty page.
+    assert_eq!(
+        read(
+            "resources.get",
+            json!({"namespace":"fixture","kind":"pods","name":"gone"}),
+        ),
+        Err(Failure::ProviderNotFound)
+    );
+    // A name outside the configured namespaces never reaches the cluster.
+    let before = cluster.count();
+    assert_eq!(
+        read(
+            "resources.get",
+            json!({"namespace":"kube-system","kind":"pods","name":"pod-0"}),
+        ),
+        Err(Failure::Forbidden)
+    );
+    assert_eq!(cluster.count(), before);
+
+    let events = read(
+        "resources.list",
+        json!({"namespace":"fixture","kind":"events","limit":10}),
+    )
+    .unwrap();
+    assert_eq!(events["items"][0]["reason"], "Pulled");
+
+    let history = read(
+        "deployments.history",
+        json!({"namespace":"fixture","name":"api","limit":10}),
+    )
+    .unwrap();
+    let revisions: Vec<&str> = history["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| {
+            item["metadata"]["annotations"]["deployment.kubernetes.io/revision"]
+                .as_str()
+                .unwrap()
+        })
+        .collect();
+    assert_eq!(revisions, ["1", "2"]);
+    assert_eq!(history["complete"], true);
 }
 
 #[test]

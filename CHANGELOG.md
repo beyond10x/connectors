@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- GitLab CI/CD and project writes through the catalog provider (`docs/local-catalog-provider.md`):
+  `pipeline.retry`, `pipeline.cancel`, `pipeline.create`, `environments.list`, `commit.create`,
+  `file.update`, `branch.create`, `branch.delete` and `project.create`. Each write is guarded on
+  the caller's commit `sha` (`project.create` on the namespace path and id) by a read before it
+  and a read or answer after it; `branch.delete` proves the branch before and its absence after.
+  Write bodies are closed: no `force` or `start_*` on commits, no `start_branch` on file updates,
+  no `import_url` or templates on projects. `commit.create` and `file.update` write onto an
+  existing branch only. A retry or cancel of a pipeline with nothing to retry or cancel is
+  reported applied; the answer's `status` says what happened. Verified against local fixtures in
+  GitLab's shapes, not a live instance. The GitLab selection set has 51 operations, and a GitLab
+  configuration has a new configuration revision.
+- A `connectors-source-amendments/1` entry can correct an operation's request media type
+  (`correct_media_type`, `{"from", "to"}`): `from` is the one type the source declares and `to`
+  must be `application/json`. GitLab's amendment file uses it for commit create, file update and
+  project create, which the pinned document declares as `multipart/form-data`.
+- Kubernetes reads (`docs/local-kubernetes-cli.md`): `resources.get` reads one object by name
+  (a missing object answers `not_found`); `namespaces.list` reads each configured namespace by
+  name, never the cluster's list; `deployments.history` returns the ReplicaSets a Deployment
+  controls, with their revisions; `resource_kinds` admits `replicasets` and `events`. Every read
+  stays inside the configured namespaces and kinds.
+
 ## 0.43.0 — 2026-10-10
 
 ### Added

@@ -8,10 +8,12 @@ summary: A `connectors-source-amendments/1` file, the cited corrections the bund
 # What the pipeline refuses beyond these invariants is stated in the owner and pinned by its
 # tests: a digest other than the pinned source's, an operation the source does not declare exactly
 # once, a parameter the operation already declares, a citation that is not an https URL, a blank
-# reason, and a path correction whose `from` is not the operation's path as the source declares it
+# reason, a path correction whose `from` is not the operation's path as the source declares it
 # or whose `to` is not `from` with each parenthesised optional segment either removed or kept
-# without its parentheses. ESS 0.57 has no string-prefix or string-derivation constraint to state
-# those by. Nothing is applied when any amendment is refused.
+# without its parentheses, and a media type correction whose `from` is not the one request media
+# type the operation declares, or that names an operation declaring none or several. ESS 0.57 has
+# no string-prefix, string-derivation or cross-document constraint to state those by. Nothing is
+# applied when any amendment is refused.
 
 types:
   # The one place an added parameter may travel.
@@ -55,22 +57,41 @@ types:
       - from.count >= 1
       - to.count >= 1
 
-  # One cited amendment: exactly one of `add_parameter` and `correct_path`, the vendor page that
-  # documents it (https) and why the pinned document needs it, in a sentence.
+  # The request media type the provider reads (`to`) where the source declares another (`from`).
+  # It is for a write the vendor's reference documents, and the provider serves, with a JSON body
+  # while its published document declares only a form media type, such as GitLab's commit create,
+  # file update and project create, which the pinned document declares `multipart/form-data`.
+  # `from` is the one request media type the operation declares; `to` is `application/json`, the
+  # only request body the engine sends, so a correction can only make the bundle say what the
+  # engine already does. The method, path and parameters are never changed.
+  - name: connectors_catalog.amendment.MediaTypeCorrection
+    kind: struct
+    fields:
+      - {name: from, type: String}
+      - {name: to, type: String}
+    invariants:
+      - from.count >= 1
+      - {to: application/json}
+
+  # One cited amendment: exactly one of `add_parameter`, `correct_path` and `correct_media_type`,
+  # the vendor page that documents it (https) and why the pinned document needs it, in a sentence.
   - name: connectors_catalog.amendment.Amendment
     kind: struct
     fields:
       - {name: operation_id, type: String}
       - {name: add_parameter, type: "Optional<connectors_catalog.amendment.AddedParameter>"}
       - {name: correct_path, type: "Optional<connectors_catalog.amendment.PathCorrection>"}
+      - {name: correct_media_type, type: "Optional<connectors_catalog.amendment.MediaTypeCorrection>"}
       - {name: cite, type: String}
       - {name: reason, type: String}
     invariants:
       - operation_id.count >= 1
       - cite.count >= 1
       - reason.count >= 1
-      - any: [defined(add_parameter), defined(correct_path)]
+      - any: [defined(add_parameter), defined(correct_path), defined(correct_media_type)]
       - any: [{not: defined(add_parameter)}, {not: defined(correct_path)}]
+      - any: [{not: defined(add_parameter)}, {not: defined(correct_media_type)}]
+      - any: [{not: defined(correct_path)}, {not: defined(correct_media_type)}]
 
   # The file: its format, the SHA-256 of the pinned source it is written against, and at least one
   # amendment.

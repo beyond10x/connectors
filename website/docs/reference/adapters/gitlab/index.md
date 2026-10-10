@@ -35,6 +35,13 @@ pinned source under a local id with a declared effect:
 | `release.create`, `release.update` | write | one POST or PUT on an existing tag at the caller's `sha`; proven by the release at that tag and commit |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | read | pipelines, one pipeline, its jobs, one job |
 | `job.trace` | read | a job's log, answered as text |
+| `environments.list` | read | a project's environments, by name, search or state |
+| `pipeline.retry`, `pipeline.cancel` | write | one POST, guarded on the pipeline at the caller's `sha`; proven by the answer naming that pipeline at `sha`. A pipeline with nothing to retry or cancel is reported applied: its `status` says what happened |
+| `pipeline.create` | write | one POST running a pipeline for `body.ref`, guarded on that ref at the caller's `sha`; proven by a pipeline for that ref at `sha` |
+| `commit.create`, `file.update` | write | one commit onto an existing branch, guarded on its head at the caller's `sha`; proven by the new commit's first parent being `sha`. Neither creates a branch: use `branch.create` first |
+| `branch.create` | write | one POST, guarded on `body.ref` at the caller's `sha`; proven by the branch at that commit |
+| `branch.delete` | write | one DELETE, guarded on the branch at the caller's `sha`; proven by a read answering 404 |
+| `project.create` | write | one POST, guarded on the namespace path and `body.namespace_id` naming the same namespace; proven by the project in it. No namespace read is selected, so the caller supplies the id |
 | `issue.create` | write | one POST opening an issue, unguarded |
 | `merge_request.create` | write | one POST, guarded on the pinned source head |
 | `merge_request.update` | write | one PUT, guarded on the pinned source head |
@@ -97,9 +104,8 @@ refused before any request), reads the discussion first and refuses unless it is
 discussion and resolvable, sends exactly `resolved`, and requires GitLab's answer to carry the
 requested discussion id and state.
 These four are checked against a fixture in the pinned document's shapes, not against a running
-GitLab. A merge-when-pipeline-succeeds variant of the merge and a reopen variant of the update are
-not selected: each needs a selection to fix a body member to a value, which the engine cannot
-declare.
+GitLab. The merge-when-pipeline-succeeds variant of the merge and the reopen variant of the
+update are `merge_request.auto_merge` and `merge_request.reopen`, each with its body member fixed.
 
 ## Against a live GitLab
 
@@ -140,6 +146,10 @@ GitLab.
   schemas: a `body` is passed through and validated only by GitLab.
 - Operations that need a header or cookie parameter, a multipart or form body, or that answer
   binary content are not served; a selection naming one is refused at load or fails at request
-  time with a safe error.
+  time with a safe error. The pinned source declares `commit.create`, `file.update` and
+  `project.create` as multipart only; a cited media-type correction in
+  `adapters/gitlab/upstream/openapi_v3.amendments.json` sends them as JSON, as GitLab's reference
+  documents them.
 - One token-header authentication profile. OAuth is not offered.
-- A guard compares scalars for equality; it cannot express ranges or absence.
+- A guard compares scalars for equality; it cannot express ranges. Absence is expressed only as a
+  read after the write answering 404 (`tag.delete`, `branch.delete`).

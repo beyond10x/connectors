@@ -1,20 +1,25 @@
-//! Cited amendments to a pinned source, of two kinds: an optional query
+//! Cited amendments to a pinned source, of three kinds: an optional query
 //! parameter the vendor's own reference documents for an operation that its
-//! published OpenAPI document leaves out, and a path correction that resolves
+//! published OpenAPI document leaves out, a path correction that resolves
 //! a vendor notation in the operation's path template which the template
 //! reader would otherwise send literally, such as GitLab's `(-/)` marking an
-//! optional segment. The pinned bytes stay the vendor's (and their digest stays
-//! the one the source record and the hash manifest name); the amendment file
-//! sits beside them, is bound to their digest, and is applied to the inventory
-//! the pipeline extracts, so the bundle carries the change and records the file
-//! it came from.
+//! optional segment, and a request media type correction for a write the
+//! vendor documents with a JSON body while its document declares only a form
+//! media type, such as GitLab's commit create. The pinned bytes stay the
+//! vendor's (and their digest stays the one the source record and the hash
+//! manifest name); the amendment file sits beside them, is bound to their
+//! digest, and is applied to the inventory the pipeline extracts, so the bundle
+//! carries the change and records the file it came from.
 //!
-//! Neither kind can retarget an operation or change its method. An added
+//! No kind can retarget an operation or change its method. An added
 //! parameter only widens what a caller may send: it is one optional,
 //! unrepeated query parameter. A corrected path must be the operation's
 //! current path with each parenthesised group either removed or kept without
 //! its parentheses, so it keeps every path parameter and literal segment the
-//! source declares outside those groups. Everything else is refused.
+//! source declares outside those groups. A media type correction replaces the
+//! one request media type the operation declares with `application/json`, the
+//! only body the engine sends, so it makes the bundle say what the engine
+//! does. Everything else is refused.
 
 use crate::SourceRecord;
 use crate::inventory::{Inventory, Location, Operation, Parameter};
@@ -34,7 +39,8 @@ struct Amendments {
     amendments: Vec<Amendment>,
 }
 
-/// One cited amendment: exactly one of `add_parameter` and `correct_path`.
+/// One cited amendment: exactly one of `add_parameter`, `correct_path` and
+/// `correct_media_type`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Amendment {
@@ -43,6 +49,8 @@ struct Amendment {
     add_parameter: Option<Parameter>,
     #[serde(default)]
     correct_path: Option<PathCorrection>,
+    #[serde(default)]
+    correct_media_type: Option<MediaTypeCorrection>,
     /// The vendor page that documents the change, https.
     cite: String,
     /// Why the pinned document needs it, in a sentence.
@@ -57,6 +65,19 @@ struct PathCorrection {
     from: String,
     to: String,
 }
+
+/// The one request media type an operation declares, and the one the provider
+/// reads.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MediaTypeCorrection {
+    from: String,
+    to: String,
+}
+
+/// The only request media type a correction may name: the body the engine
+/// sends.
+const JSON: &str = "application/json";
 
 /// What a bundle records about the amendments applied to its source.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,7 +104,10 @@ fn invalid(message: impl Into<String>) -> Error {
 /// for an added parameter, one that is not an optional, unrepeated query
 /// parameter or that the operation already declares; for a path correction, a
 /// `from` other than the operation's current path, or a `to` equal to `from` or
-/// not derived from it by removing or unwrapping each parenthesised group.
+/// not derived from it by removing or unwrapping each parenthesised group; for
+/// a media type correction, an operation that does not declare exactly one
+/// request media type, a `from` other than that one, or a `to` that is not
+/// `application/json` or equals `from`.
 /// Nothing is applied when any amendment is refused.
 pub fn apply(
     file_name: &str,
@@ -121,12 +145,17 @@ pub fn apply(
                 "`{file_name}` amends `{id}`, which the source does not declare exactly once"
             )));
         };
-        match (&amendment.add_parameter, &amendment.correct_path) {
-            (Some(parameter), None) => add_parameter(id, parameter, operation)?,
-            (None, Some(correction)) => correct_path(id, correction, operation)?,
+        match (
+            &amendment.add_parameter,
+            &amendment.correct_path,
+            &amendment.correct_media_type,
+        ) {
+            (Some(parameter), None, None) => add_parameter(id, parameter, operation)?,
+            (None, Some(correction), None) => correct_path(id, correction, operation)?,
+            (None, None, Some(correction)) => correct_media_type(id, correction, operation)?,
             _ => {
                 return Err(invalid(format!(
-                    "`{file_name}` amends `{id}` with neither or both of `add_parameter` and `correct_path`; an amendment makes exactly one change"
+                    "`{file_name}` amends `{id}` with none or several of `add_parameter`, `correct_path` and `correct_media_type`; an amendment makes exactly one change"
                 )));
             }
         }
@@ -183,6 +212,27 @@ fn correct_path(
         )));
     }
     operation.path.clone_from(&correction.to);
+    Ok(())
+}
+
+fn correct_media_type(
+    id: &str,
+    correction: &MediaTypeCorrection,
+    operation: &mut Operation,
+) -> Result<(), Error> {
+    if operation.request_media_types != [correction.from.as_str()] {
+        return Err(invalid(format!(
+            "`{id}` declares the request media types {:?}, not only `{}`; the correction is stale",
+            operation.request_media_types, correction.from
+        )));
+    }
+    if correction.to != JSON || correction.to == correction.from {
+        return Err(invalid(format!(
+            "`{id}`: a media type correction replaces `{}` with `{JSON}`, the body the engine sends",
+            correction.from
+        )));
+    }
+    operation.request_media_types = vec![correction.to.clone()];
     Ok(())
 }
 
@@ -510,6 +560,127 @@ mod tests {
                 String::from_utf8_lossy(&bytes)
             );
             assert_eq!(inventory, search_inventory());
+        }
+    }
+
+    /// An inventory holding one write whose source declares its body only as
+    /// `multipart/form-data`, as GitLab's commit create does, beside the
+    /// Zendesk export, which declares no body.
+    fn form_inventory() -> Inventory {
+        let mut inventory = inventory();
+        inventory.operations.push(Operation {
+            method: "post".into(),
+            path: "/api/v4/projects/{id}/repository/commits".into(),
+            operation_id: Some("postApiV4ProjectsIdRepositoryCommits".into()),
+            parameters: vec![Parameter {
+                name: "id".into(),
+                location: Location::Path,
+                required: true,
+                value_type: None,
+                repeated: false,
+            }],
+            request_media_types: vec!["multipart/form-data".into()],
+            responses: Vec::new(),
+        });
+        inventory
+    }
+
+    fn media(sha: &str, entries: &[(&str, &str, &str)]) -> Vec<u8> {
+        let entries: Vec<String> = entries
+            .iter()
+            .map(|(operation, from, to)| {
+                format!(
+                    r#"{{"operation_id":"{operation}","correct_media_type":{{"from":"{from}","to":"{to}"}},
+                    "cite":"https://docs.gitlab.example.test/api/commits/","reason":"documented as JSON"}}"#
+                )
+            })
+            .collect();
+        format!(
+            r#"{{"format":"{FORMAT}","source_sha256":"{sha}","amendments":[{}]}}"#,
+            entries.join(",")
+        )
+        .into_bytes()
+    }
+
+    /// A cited media type correction replaces the one declared request media
+    /// type with `application/json` and changes nothing else; it is recorded
+    /// like the other kinds.
+    #[test]
+    fn a_media_type_correction_declares_json_and_is_recorded() {
+        let source = source();
+        let mut inventory = form_inventory();
+        let bytes = media(
+            &source.source_sha256,
+            &[(
+                "postApiV4ProjectsIdRepositoryCommits",
+                "multipart/form-data",
+                "application/json",
+            )],
+        );
+        let record = apply("amendments.json", &bytes, &source, &mut inventory).unwrap();
+        assert_eq!(record.count, 1);
+        assert_eq!(record.sha256, hex::encode(Sha256::digest(&bytes)));
+        let mut expected = form_inventory();
+        expected.operations[1].request_media_types = vec!["application/json".into()];
+        assert_eq!(inventory, expected);
+    }
+
+    /// A media type correction can only make a form-declared body JSON: a
+    /// stale `from`, a `to` other than `application/json`, a `to` equal to
+    /// `from`, an operation that declares no body, a second correction of the
+    /// same operation and an entry naming it beside another change are each
+    /// refused, and nothing is applied.
+    #[test]
+    fn every_media_type_correction_refusal_leaves_the_inventory_unchanged() {
+        let source = source();
+        let sha = source.source_sha256.clone();
+        let op = "postApiV4ProjectsIdRepositoryCommits";
+        let mut refused: Vec<Vec<u8>> = [
+            (op, "application/x-www-form-urlencoded", "application/json"),
+            (op, "multipart/form-data", "text/plain"),
+            (op, "multipart/form-data", "multipart/form-data"),
+            (op, "multipart/form-data", "application/json; charset=utf-8"),
+            (
+                "IncrementalTicketExportCursor",
+                "multipart/form-data",
+                "application/json",
+            ),
+        ]
+        .iter()
+        .map(|entry| media(&sha, &[*entry]))
+        .collect();
+        refused.push(media(
+            &sha,
+            &[
+                (op, "multipart/form-data", "application/json"),
+                (op, "multipart/form-data", "application/json"),
+            ],
+        ));
+        refused.push(
+            format!(
+                r#"{{"format":"{FORMAT}","source_sha256":"{sha}","amendments":[{{"operation_id":"{op}",
+                "add_parameter":{PER_PAGE},"correct_media_type":{{"from":"multipart/form-data","to":"application/json"}},
+                "cite":"https://docs.gitlab.example.test/api/commits/","reason":"both"}}]}}"#
+            )
+            .into_bytes(),
+        );
+        refused.push(
+            format!(
+                r#"{{"format":"{FORMAT}","source_sha256":"{sha}","amendments":[{{"operation_id":"{op}",
+                "correct_path":{{"from":"/api/v4/projects/{{id}}/repository/commits","to":"/api/v4/projects/{{id}}/commits"}},
+                "correct_media_type":{{"from":"multipart/form-data","to":"application/json"}},
+                "cite":"https://docs.gitlab.example.test/api/commits/","reason":"both"}}]}}"#
+            )
+            .into_bytes(),
+        );
+        for bytes in refused {
+            let mut inventory = form_inventory();
+            assert!(
+                apply("amendments.json", &bytes, &source, &mut inventory).is_err(),
+                "{}",
+                String::from_utf8_lossy(&bytes)
+            );
+            assert_eq!(inventory, form_inventory());
         }
     }
 }

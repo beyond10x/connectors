@@ -1,8 +1,9 @@
 //! Every committed `connectors-source-amendments/1` file is a value of the catalog adapter's own
 //! model in `adapters/catalog/spec/ess` (`connectors_catalog.amendment.Amendments`, compiled to
-//! JSON Schema by the pinned `ess`), and the model names both kinds of amendment, an added
-//! optional query parameter and a path correction, each of which a committed file uses
-//! (story:catalog-path-correction-and-value-bound).
+//! JSON Schema by the pinned `ess`), and the model names every kind of amendment, an added
+//! optional query parameter, a path correction and a request media type correction, each of
+//! which a committed file uses (story:catalog-path-correction-and-value-bound,
+//! story:parity-gitlab-project-writes).
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
@@ -64,7 +65,8 @@ fn every_committed_amendment_file_is_a_value_of_the_catalog_amendment_model() {
         schema["$defs"]["connectors_catalog.amendment.Amendment"]["x-ess-invariants"].to_string();
     assert!(
         invariants.contains("defined(add_parameter)")
-            && invariants.contains("defined(correct_path)"),
+            && invariants.contains("defined(correct_path)")
+            && invariants.contains("defined(correct_media_type)"),
         "the model no longer requires exactly one change per amendment: {invariants}"
     );
     let validator = jsonschema::validator_for(&schema).unwrap();
@@ -78,7 +80,7 @@ fn every_committed_amendment_file_is_a_value_of_the_catalog_amendment_model() {
             .collect();
         assert!(errors.is_empty(), "{}: {errors:?}", file.display());
         for amendment in raw["amendments"].as_array().unwrap() {
-            for kind in ["add_parameter", "correct_path"] {
+            for kind in ["add_parameter", "correct_media_type", "correct_path"] {
                 if amendment.get(kind).is_some() {
                     kinds.insert(kind);
                 }
@@ -87,7 +89,7 @@ fn every_committed_amendment_file_is_a_value_of_the_catalog_amendment_model() {
     }
     assert_eq!(
         kinds.into_iter().collect::<Vec<_>>(),
-        ["add_parameter", "correct_path"],
+        ["add_parameter", "correct_media_type", "correct_path"],
         "a committed file must use each kind of amendment, or this check would not cover it: {files:?}"
     );
 }
