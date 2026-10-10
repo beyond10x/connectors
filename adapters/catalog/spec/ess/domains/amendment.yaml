@@ -43,7 +43,8 @@ types:
   # (`to`). It is for a vendor notation the template reader does not read, such as GitLab's
   # `/api/v4/projects/{id}/(-/)search`, whose `(-/)` marks an optional segment: written literally,
   # the request would go to `projects/7/(-/)search`. `to` must be `from` with each parenthesised
-  # optional segment removed or kept without its parentheses, so it keeps every path parameter and
+  # optional segment removed or kept without its parentheses (a segment holding a path parameter is
+  # only kept), so it keeps every path parameter and
   # cannot retarget the operation elsewhere; the method is never changed.
   - name: connectors_catalog.amendment.PathCorrection
     kind: struct

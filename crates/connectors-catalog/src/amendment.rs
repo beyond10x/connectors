@@ -178,7 +178,7 @@ fn correct_path(
     }
     if correction.to == correction.from || !resolves(&correction.from, &correction.to) {
         return Err(invalid(format!(
-            "`{id}`: `{}` is not `{}` with each parenthesised optional segment removed or kept without its parentheses",
+            "`{id}`: `{}` is not `{}` with each parenthesised optional segment removed or kept without its parentheses (a segment holding a path parameter is kept)",
             correction.to, correction.from
         )));
     }
@@ -215,7 +215,8 @@ fn pieces(path: &str) -> Option<Vec<Piece<'_>>> {
 }
 
 /// Whether `to` is `from` with each parenthesised group either removed or kept
-/// without its parentheses.
+/// without its parentheses. A group holding a path parameter may only be kept,
+/// so a correction never drops a parameter and cannot retarget the operation.
 fn resolves(from: &str, to: &str) -> bool {
     fn matches(pieces: &[Piece<'_>], to: &str) -> bool {
         match pieces.split_first() {
@@ -224,7 +225,8 @@ fn resolves(from: &str, to: &str) -> bool {
                 to.strip_prefix(text).is_some_and(|to| matches(rest, to))
             }
             Some((Piece::Optional(text), rest)) => {
-                matches(rest, to) || to.strip_prefix(text).is_some_and(|to| matches(rest, to))
+                (!text.contains('{') && matches(rest, to))
+                    || to.strip_prefix(text).is_some_and(|to| matches(rest, to))
             }
         }
     }
