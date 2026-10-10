@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.43.0 — 2026-10-10
 
 ### Added
 
@@ -79,6 +79,11 @@
   configuration format is unchanged for range bounds.
 - `connectors_catalog_provider::Postflight` gains `absent: Option<bool>`; Rust code that builds a
   postflight with a struct literal adds `absent: None`.
+- The GitLab selection set grows from 34 to 42 operations, so the GitLab descriptor and the
+  configuration revision of its guide change. An existing local adapter entry keeps working with
+  the operations it names; add the new ones to its `operations` permission to use them.
+- A `connectors-source-amendments/1` entry may now hold `correct_path` instead of
+  `add_parameter`; files with `add_parameter` entries read as before.
 
 ## 0.42.0 — 2026-10-10
 

@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:parity-gitlab-tags-releases
 kind: story
-status: active
+status: implemented
 title: GitLab tags and releases
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-10T04:32:49Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-10T04:32:50Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-10T09:10:39Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 

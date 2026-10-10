@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-10T09:10:38Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-gitlab-tags-releases",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/151 repository gate pass; package gates on a5aa181c6: 1045 passed 0 failed; adapters/catalog/tests/gitlab_tags_releases.rs",
+    "reference": "a5aa181c6"
+  }
+}

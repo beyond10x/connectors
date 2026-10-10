@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-10T09:10:39Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-prometheus-query",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/151 repository gate pass; package gates on a5aa181c6: 1045 passed 0 failed; adapters/prometheus/tests/protocol.rs, adapters/prometheus/tests/local_runtime.rs",
+    "reference": "a5aa181c6"
+  }
+}
