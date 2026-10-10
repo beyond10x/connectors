@@ -14,12 +14,14 @@ summary: The binary response of a selected read in a `connectors-catalog-operati
 # transport limit (4 MiB).
 #
 # What the engine refuses when a selection loads beyond these invariants (`binary` on a write, an
-# origin that is not `https://<host>[:<port>]` in lower case, a repeated host, a download whose
-# `path_prefix` does not start and end with `/` or that binds parameters or a body), and what the
-# composition refuses when a connection loads (an admitted host no selected binary read names, or
-# a non-canonical or repeated one), is stated in the owner and pinned by the tests; ESS 0.57 has
-# no set-membership constraint between a selection and a connection, and no pattern constraint on
-# a string.
+# origin that is not `https://<host>[:<port>]` in lower case with a hostname as its host, a
+# repeated host, a download whose `path_prefix` does not start and end with `/` or that binds
+# parameters or a body), and what the composition refuses when a connection loads (an admitted
+# host no selected binary read names, or a non-canonical or repeated one), is stated in the owner
+# and pinned by the tests, as are the answer-time refusals stated on `Download` and `Body` (a
+# download path segment that decodes to a separator or a dot segment, an answer naming two media
+# types); ESS 0.57 has no set-membership constraint between a selection and a connection, and no
+# pattern constraint on a string.
 
 types:
   # How a 2xx body is read. Absent: the bundle's declared media types decide between `json` and
@@ -31,7 +33,10 @@ types:
     variants: [json, text, binary]
 
   # An origin, `https://<host>` or `https://<host>:<port>`, the host in lower case, with no path,
-  # query, fragment or user information.
+  # query, fragment or user information. The host is a hostname: dot-separated labels, each
+  # one to 63 letters, digits and hyphens, none starting or ending with a hyphen, at most 253
+  # bytes in all (a dotted IPv4 literal is one); `..`, `a..b`, `.`, `-` and a trailing dot name
+  # no host and are refused.
   - name: connectors_catalog.binary.Origin
     kind: newtype
     of: String
@@ -58,7 +63,10 @@ types:
   # A read of a URL the provider itself handed out, such as Slack's `url_private` of a file: the
   # caller gives it as the input `url`, and it must be an `https` URL on an origin in the
   # selection's `binary.hosts` whose path starts with `path_prefix`. It is sent as a GET to that
-  # origin with no other input. A selection with `download` names no bundle operation.
+  # origin with no other input. A selection with `download` names no bundle operation. A `url`
+  # with a path segment that, percent-decoded, holds `/` or `\` is refused as `forbidden` with
+  # nothing sent: the raw prefix check does not bound where such a path lands. One with an empty
+  # segment, or one that decodes to `.` or `..`, is refused as `invalid_input` with nothing sent.
   - name: connectors_catalog.binary.Download
     kind: struct
     fields:
@@ -107,7 +115,11 @@ types:
       - any: [{not: defined(hosts)}, {hosts.count: {lte: 8}}]
 
   # The `body` of a binary read's result. `media_type` is the answer's `Content-Type` without its
-  # parameters, in lower case, or `application/octet-stream` when the answer names none.
+  # parameters, in lower case, or `application/octet-stream` when the answer names none or
+  # carries a `Content-Encoding` other than `identity`: no coding is requested and none is
+  # decoded, so coded bytes are not of the type `Content-Type` names. An answer naming more than
+  # one media type (repeated `Content-Type` lines, which the transport joins with `, `) is
+  # refused as `upstream_protocol` by name, never answered as one of them.
   # `length` is the body's length in bytes, `sha256` the lower-case hex SHA-256 of those bytes,
   # and `content_base64` the bytes in standard base64 with padding. The result's `status` is the
   # status of the answer that carried the body, after any redirect.
