@@ -61,8 +61,10 @@ const SOURCE_SHA256: &str = "8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471bab
 
 /// The bot selection set's ids, their pinned `operationId` and the path the
 /// bundle records. A renamed, dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 7] = [
+const SHIPPED: [(&str, &str, &str); 9] = [
     ("auth.test", "auth_test", "/api/auth.test"),
+    ("files.info", "files_info", "/api/files.info"),
+    ("files.list", "files_list", "/api/files.list"),
     (
         "conversations.history",
         "conversations_history",
@@ -128,7 +130,13 @@ fn shipped_slack_selections_are_exactly_the_bot_reads_and_the_user_search() {
             .map(|o| o.id)
             .collect();
         declared.sort();
-        let expected: Vec<&str> = shipped.iter().map(|(id, _, _)| *id).collect();
+        // The bot set's file download names no bundle operation; it is pinned
+        // in `tests/slack_files.rs`.
+        let mut expected: Vec<&str> = shipped.iter().map(|(id, _, _)| *id).collect();
+        if shipped.len() == SHIPPED.len() {
+            expected.push("file.download");
+        }
+        expected.sort();
         assert_eq!(declared, expected);
         assert!(engine.declarations(&[Effect::Write]).is_empty());
         for (id, operation_id, path) in shipped.iter().copied() {
@@ -598,9 +606,31 @@ fn page(path: &str) -> Option<Value> {
             "ok": true, "cache_ts": "1780000600.000000",
             "emoji": {"fixture-alias": "alias:fixture-party",
                       "fixture-party": "https://emoji.fixture.example.test/fixture-party.png"}}),
+        // `files.list` pages by `page` and `count`, with `paging` (`objs_paging`).
+        "/api/files.list" if has("page=2") => json!({
+            "ok": true, "files": [file(3)],
+            "paging": {"count": 2, "page": 2, "pages": 2, "total": 3}}),
+        "/api/files.list" => json!({
+            "ok": true, "files": [file(1), file(2)],
+            "paging": {"count": 2, "page": 1, "pages": 2, "total": 3}}),
+        "/api/files.info" if has("file=F0FIXTURE01") => json!({
+            "ok": true, "file": file(1), "comments": []}),
+        "/api/files.info" => json!({"ok": false, "error": "file_not_found"}),
         _ => return None,
     })
 }
+
+/// An `objs_file` with the members the file record models.
+fn file(n: u64) -> Value {
+    json!({"id": format!("F0FIXTURE{n:02}"), "name": format!("fixture-{n}.pdf"),
+           "filetype": "pdf", "mimetype": "application/pdf", "size": FILE_BYTES.len(),
+           "url_private": format!("https://files.slack.com/files-pri/T0FIXTURE01-F0FIXTURE{n:02}/fixture-{n}.pdf")})
+}
+/// A file's content: not UTF-8, so only a binary read can answer it.
+const FILE_BYTES: &[u8] = b"%PDF-1.7\n\xff\xfe\x00\x01 fixture slack file\n";
+/// Where the fixture serves file content, as Slack's file host serves
+/// `url_private`.
+const FILE_PATH: &str = "/files-pri/T0FIXTURE01-F0FIXTURE01/fixture-1.pdf";
 
 /// What the fixture answers the user token: its own identity, and search.
 /// `None` for anything else, which the fixture answers 404.
@@ -636,6 +666,8 @@ struct Provider {
     _root: tempfile::TempDir,
     config: PathBuf,
     requests: Requests,
+    /// The fixture's own origin, `https://localhost:<port>`.
+    origin: String,
 }
 impl Provider {
     fn new() -> Self {
@@ -644,14 +676,22 @@ impl Provider {
     /// The search connection: the guide's `slack.user` configuration and the
     /// user selection set.
     fn user() -> Self {
-        Self::start(false, true)
+        Self::start(false, true, None)
     }
     /// `refuse_identity`: answer `auth.test` as Slack answers a revoked
     /// token, `200` with `ok: false` and no `user_id`.
     fn serving(refuse_identity: bool) -> Self {
-        Self::start(refuse_identity, false)
+        Self::start(refuse_identity, false, None)
     }
-    fn start(refuse_identity: bool, user: bool) -> Self {
+    /// The bot connection admitting the fixture's own origin as a file host,
+    /// with or without the credential, beside the shipped set: one more
+    /// selection, `fixture.download`, shaped as the shipped `file.download`
+    /// but reaching that origin, since the fixture cannot serve
+    /// `files.slack.com`.
+    fn files(credential: bool) -> Self {
+        Self::start(false, false, Some(credential))
+    }
+    fn start(refuse_identity: bool, user: bool, files: Option<bool>) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -710,6 +750,29 @@ impl Provider {
                         line.split_once(':')
                             .is_some_and(|(name, _)| name.eq_ignore_ascii_case("token"))
                     });
+                    // The file host: the content to the bot token alone, a
+                    // `403` without it, as bytes that are not JSON.
+                    if path.starts_with("/files-pri/") {
+                        let bot = authorization.as_deref() == Some(HEADER);
+                        let (status, kind, bytes) = if !bot {
+                            (403, "text/plain", b"fixture forbidden".to_vec())
+                        } else if path.trim_end_matches('?') == FILE_PATH {
+                            (200, "application/pdf", FILE_BYTES.to_vec())
+                        } else {
+                            (404, "text/plain", b"no fixture".to_vec())
+                        };
+                        observed
+                            .lock()
+                            .unwrap()
+                            .push((path, authorization, token_header));
+                        let header = format!(
+                            "HTTP/1.1 {status} fixture\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                            bytes.len()
+                        );
+                        let _ = stream.write_all(header.as_bytes()).await;
+                        let _ = stream.write_all(&bytes).await;
+                        continue;
+                    }
                     // Slack answers a bad token `200` with `ok: false`; only
                     // the two fictional headers are accepted, each answered
                     // as its token, and raw headers are compared, never
@@ -754,6 +817,17 @@ impl Provider {
         document["api_base"] = json!(format!("https://localhost:{}/api", address.port()));
         document["ca_file"] = json!(ca);
         document["operations_file"] = json!(root_path(operations));
+        let origin = format!("https://localhost:{}", address.port());
+        if let Some(credential) = files {
+            let mut download = shipped()
+                .into_iter()
+                .find(|s| s.id == "file.download")
+                .expect("the shipped file download");
+            download.id = "fixture.download".into();
+            download.binary.as_mut().unwrap().hosts = vec![origin.clone()];
+            document["operations"] = json!([download]);
+            document["hosts"] = json!([{"origin": origin, "credential": credential}]);
+        }
         private(&config, &serde_json::to_vec(&document).unwrap());
         Self {
             stop: Some(stop),
@@ -761,6 +835,7 @@ impl Provider {
             _root: root,
             config,
             requests,
+            origin,
         }
     }
     fn selection(&self) -> Adapter {
@@ -1267,4 +1342,195 @@ fn users_list_walks_two_pages_and_stops_on_an_empty_next_cursor() {
             "/api/users.list?limit=2&cursor=fixture-users-2",
         ]
     );
+}
+
+/// The file reads: `files.list` and `files.info` select the pinned
+/// `files_list` and `files_info` (`objs_file` carries the record's name,
+/// filetype, mimetype, size and url_private), withhold `token`, and
+/// `files.info` requires `file`. The download names no bundle operation: it is
+/// a binary read of `url_private` on `https://files.slack.com` alone, under
+/// `/files-pri/`, bounded at 2 MiB.
+#[test]
+fn the_file_reads_and_the_download_are_shipped_as_reviewed() {
+    let document = pinned();
+    let file = &document["definitions"]["objs_file"]["properties"];
+    for (member, kind) in [
+        ("name", "string"),
+        ("filetype", "string"),
+        ("mimetype", "string"),
+        ("size", "integer"),
+        ("url_private", "string"),
+    ] {
+        assert_eq!(file[member]["type"], kind, "objs_file `{member}`");
+    }
+    let selections = shipped();
+    let info = selections.iter().find(|s| s.id == "files.info").unwrap();
+    assert_eq!(info.required, ["file"]);
+    let download = selections.iter().find(|s| s.id == "file.download").unwrap();
+    assert!(download.operation_id.is_empty());
+    assert_eq!(download.effect, Effect::Read);
+    assert_eq!(
+        download.response,
+        Some(connectors_catalog_provider::ResponseKind::Binary)
+    );
+    let binary = download.binary.as_ref().unwrap();
+    assert_eq!(binary.hosts, ["https://files.slack.com"]);
+    assert_eq!(binary.max_bytes, connectors_catalog_provider::BINARY_LIMIT);
+    assert_eq!(
+        download.download.as_ref().unwrap().path_prefix,
+        "/files-pri/"
+    );
+    let engine = Engine::new(&committed(), BASE, &selections).unwrap();
+    assert_eq!(
+        engine.reached_hosts().into_iter().collect::<Vec<_>>(),
+        ["https://files.slack.com"]
+    );
+    // The user token's connection reaches no other host.
+    let engine = Engine::new(&committed(), BASE, &user_shipped()).unwrap();
+    assert!(engine.reached_hosts().is_empty());
+}
+
+#[test]
+fn files_list_walks_two_pages_by_page_and_files_info_reads_one_file() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let first = invoke(&mut child, "files.list", &json!({"count": "2"}));
+    let second = invoke(
+        &mut child,
+        "files.list",
+        &json!({"count": "2", "page": "2"}),
+    );
+    let ids: Vec<&str> = [&first, &second]
+        .iter()
+        .flat_map(|page| page["body"]["files"].as_array().unwrap())
+        .map(|file| file["id"].as_str().unwrap())
+        .collect();
+    assert_eq!(ids, ["F0FIXTURE01", "F0FIXTURE02", "F0FIXTURE03"]);
+    assert_eq!(
+        second["body"]["paging"]["page"],
+        second["body"]["paging"]["pages"]
+    );
+    let info = invoke(&mut child, "files.info", &json!({"file": "F0FIXTURE01"}));
+    assert_eq!(info["body"]["file"], file(1));
+    assert_eq!(
+        info["body"]["file"]["url_private"],
+        "https://files.slack.com/files-pri/T0FIXTURE01-F0FIXTURE01/fixture-1.pdf"
+    );
+    let requests = provider.requests();
+    let routes: Vec<&str> = requests.iter().map(|(path, _, _)| path.as_str()).collect();
+    assert_eq!(
+        routes,
+        [
+            "/api/files.list?count=2",
+            "/api/files.list?count=2&page=2",
+            "/api/files.info?file=F0FIXTURE01",
+        ]
+    );
+    for (_, authorization, token) in &requests {
+        assert_eq!(authorization.as_deref(), Some(HEADER));
+        assert!(!token);
+    }
+    // `file` is required, and `token` is never input.
+    for input in [json!({}), json!({"file": "F0FIXTURE01", "token": TOKEN})] {
+        assert!(matches!(
+            attempt(&mut child, "files.info", &input),
+            Err(Failure::InvalidInput)
+        ));
+    }
+    assert_eq!(provider.requests().len(), 3);
+}
+
+/// The download through the provider child on a connection that admits the
+/// fixture's origin as a file host with the credential: `url_private` is read
+/// with the bot token, and the bytes come back with their media type, length
+/// and SHA-256.
+#[test]
+fn the_download_reads_url_private_with_the_token_on_an_admitted_host() {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let provider = Provider::files(true);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let url = format!("{}{FILE_PATH}", provider.origin);
+    let result = invoke(&mut child, "fixture.download", &json!({"url": url}));
+    assert_eq!(result["status"], 200);
+    let body = &result["body"];
+    assert_eq!(body["media_type"], "application/pdf");
+    assert_eq!(body["length"], FILE_BYTES.len());
+    assert_eq!(body["sha256"], hex::encode(Sha256::digest(FILE_BYTES)));
+    assert_eq!(
+        STANDARD
+            .decode(body["content_base64"].as_str().unwrap())
+            .unwrap(),
+        FILE_BYTES
+    );
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0.trim_end_matches('?'), FILE_PATH);
+    assert_eq!(requests[0].1.as_deref(), Some(HEADER));
+    // Off the prefix, or on a host the selection does not reach: refused, unsent.
+    for url in [
+        format!("{}/api/auth.test", provider.origin),
+        format!("https://files.slack.com{FILE_PATH}"),
+    ] {
+        let outcome = attempt(&mut child, "fixture.download", &json!({"url": url}));
+        assert!(outcome.is_err(), "{url}: {outcome:?}");
+    }
+    assert_eq!(provider.requests().len(), 1);
+}
+
+/// A file host admitted without the credential is sent none: the fixture's
+/// file host refuses it, and that answer is the provider's `403`.
+#[test]
+fn a_host_admitted_without_the_credential_is_sent_none() {
+    let provider = Provider::files(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let url = format!("{}{FILE_PATH}", provider.origin);
+    let outcome = attempt(&mut child, "fixture.download", &json!({"url": url}));
+    assert!(
+        matches!(outcome, Err(Failure::ProviderForbidden)),
+        "{outcome:?}"
+    );
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].1, None);
+}
+
+/// The shipped download on a connection that does not admit
+/// `https://files.slack.com` (the guide's bot configuration without `hosts`)
+/// still loads, and the download is refused as `forbidden` with nothing sent.
+#[test]
+fn the_download_is_refused_on_a_connection_that_does_not_admit_the_file_host() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let outcome = attempt(
+        &mut child,
+        "file.download",
+        &json!({"url": format!("https://files.slack.com{FILE_PATH}")}),
+    );
+    assert!(matches!(outcome, Err(Failure::Forbidden)), "{outcome:?}");
+    assert!(provider.requests().is_empty());
+}
+
+/// A connection may admit only hosts a selected binary read names, each a
+/// distinct canonical https origin: anything else does not load.
+#[test]
+fn a_connection_admitting_a_host_no_selection_reaches_does_not_load() {
+    let provider = Provider::files(true);
+    let original: Value = serde_json::from_slice(&fs::read(&provider.config).unwrap()).unwrap();
+    for hosts in [
+        json!([{"origin": "https://media.example.test", "credential": true}]),
+        json!([{"origin": format!("{}/", provider.origin)}]),
+        json!([{"origin": provider.origin}, {"origin": provider.origin}]),
+        json!([{"origin": provider.origin, "credential": true, "extra": 1}]),
+    ] {
+        let mut document = original.clone();
+        document["hosts"] = hosts.clone();
+        private(&provider.config, &serde_json::to_vec(&document).unwrap());
+        let output = Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
+            .arg("--local-config")
+            .arg(&provider.config)
+            .arg("--print-local-bootstrap")
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{hosts} loaded");
+    }
 }

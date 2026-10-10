@@ -106,12 +106,108 @@ pub struct Postflight {
 
 /// How a 2xx body is read. The bundle's declared media types decide by default;
 /// `text` is the reviewed exception for a source that declares JSON where the
-/// provider answers with plain text.
+/// provider answers with plain text. `binary` reads the body as bytes and
+/// answers with their media type, length, SHA-256 and base64, bounded by the
+/// selection's [`Binary`] (`connectors_catalog.binary.ResponseKind`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResponseKind {
     Json,
     Text,
+    Binary,
+}
+
+/// The largest `max_bytes` a binary read may declare: its base64 body and the
+/// result envelope stay under the served result limit (4 MiB less 1 KiB) and
+/// the provider transport limit (4 MiB).
+pub const BINARY_LIMIT: u64 = 2 * 1024 * 1024;
+/// The most redirects one binary read follows.
+pub const REDIRECT_LIMIT: usize = 3;
+/// The most hosts one binary read may reach besides the API base.
+const BINARY_HOSTS: usize = 4;
+
+/// The bound and the reach of a binary read (`connectors_catalog.binary.Binary`).
+/// A body longer than `max_bytes` is refused as `capacity`, never truncated.
+/// `hosts` are the origins, besides the API base, that the read may reach: a
+/// `download` URL's origin and a redirect's target. A redirect is followed only
+/// to one of them that the connection also admits ([`Hosts`]); with none, a
+/// redirect is refused. Omitted when empty, as the model omits it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Binary {
+    pub max_bytes: u64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hosts: Vec<String>,
+}
+
+/// A read of a URL the provider handed out, such as Slack's `url_private`
+/// (`connectors_catalog.binary.Download`): the caller gives it as `url`, and it
+/// must be an `https` URL on an origin in the selection's `binary.hosts` whose
+/// path starts with `path_prefix`. Such a selection names no bundle operation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Download {
+    pub path_prefix: String,
+}
+
+/// The ports for the origins a connection admits besides its API base, each
+/// carrying the connection's credential or none, as the connection declares.
+/// Trusted composition builds them; the engine only looks one up by origin.
+pub trait Hosts: Send + Sync {
+    fn port(&self, origin: &str) -> Option<&dyn AuthenticatedHttp>;
+}
+
+/// A connection that admits no host besides its API base.
+pub struct NoHosts;
+impl Hosts for NoHosts {
+    fn port(&self, _origin: &str) -> Option<&dyn AuthenticatedHttp> {
+        None
+    }
+}
+
+impl Hosts for BTreeMap<String, std::sync::Arc<dyn AuthenticatedHttp>> {
+    fn port(&self, origin: &str) -> Option<&dyn AuthenticatedHttp> {
+        self.get(origin).map(|port| port.as_ref())
+    }
+}
+
+/// The canonical origin of an `https` origin or URL: `https://<host>` or
+/// `https://<host>:<port>`, the host in lower case, the default port dropped.
+/// `None` for anything else: another scheme, user information, an empty or
+/// bracketed host, a host with characters outside letters, digits, `-` and
+/// `.`, or a port that is not a decimal number in range.
+pub fn origin(text: &str) -> Option<String> {
+    if !text.get(..8)?.eq_ignore_ascii_case("https://") {
+        return None;
+    }
+    let rest = &text[8..];
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let authority = &rest[..end];
+    let (host, port) = match authority.rsplit_once(':') {
+        Some((host, port)) => (host, Some(port)),
+        None => (authority, None),
+    };
+    if host.is_empty()
+        || !host
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'.')
+    {
+        return None;
+    }
+    let host = host.to_ascii_lowercase();
+    match port {
+        None => Some(format!("https://{host}")),
+        Some(port) => {
+            if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            match port.parse::<u16>().ok()? {
+                0 => None,
+                443 => Some(format!("https://{host}")),
+                number => Some(format!("https://{host}:{number}")),
+            }
+        }
+    }
 }
 
 /// The declarative head guard: a preflight read that refuses before any write
@@ -221,6 +317,10 @@ impl TryFrom<WrittenBound> for Bound {
 #[serde(deny_unknown_fields)]
 pub struct Selection {
     pub id: String,
+    /// The bundle operation this selection exposes. Empty, and omitted, only
+    /// for a `download`, which names none; any other selection without one is
+    /// refused when it loads.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub operation_id: String,
     pub effect: Effect,
     #[serde(default)]
@@ -229,6 +329,14 @@ pub struct Selection {
     pub guard: Option<Guard>,
     #[serde(default)]
     pub response: Option<ResponseKind>,
+    /// Declared exactly when `response` is `binary`. Omitted when absent, so a
+    /// selection without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binary: Option<Binary>,
+    /// A read of a provider-issued URL instead of a bundle operation. Omitted
+    /// when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download: Option<Download>,
     /// Bounds keyed by query parameter name; omitted when there are none, so an
     /// unbounded selection serialises as it did before bounds existed.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -454,6 +562,12 @@ struct Exposed {
     text: bool,
 }
 
+/// A `download` selection: no bundle operation, one declared input `url`.
+struct Downloaded {
+    selection: Selection,
+    declaration: connectors_core::Operation,
+}
+
 /// The templates of a guard's reads.
 struct Probe {
     /// Each read before the write, in the order it is issued.
@@ -468,6 +582,8 @@ pub struct Engine {
     base_segments: Vec<String>,
     source_revision: String,
     exposed: Vec<Exposed>,
+    /// The `download` selections, in the order they were selected.
+    downloads: Vec<Downloaded>,
     /// Each guarded selection's probe, keyed by the selection id.
     probes: BTreeMap<String, Probe>,
     feed: Option<feed::Feed>,
@@ -536,6 +652,7 @@ impl Engine {
             Ok(operation)
         };
         let mut exposed = Vec::new();
+        let mut downloads = Vec::new();
         let mut probes = BTreeMap::new();
         let mut ids = std::collections::BTreeSet::new();
         for selection in selections {
@@ -549,6 +666,21 @@ impl Engine {
             if [feed::CONTAINERS, feed::ITEMS].contains(&selection.id.as_str()) {
                 return Err(refuse(format!(
                     "selection `{}` takes an id of the feed family",
+                    selection.id
+                )));
+            }
+            check_binary(selection)?;
+            if let Some(download) = &selection.download {
+                check_download(selection, download)?;
+                downloads.push(Downloaded {
+                    selection: selection.clone(),
+                    declaration: declare_download(selection, download),
+                });
+                continue;
+            }
+            if selection.operation_id.is_empty() {
+                return Err(refuse(format!(
+                    "selection `{}` names no operation_id and declares no download",
                     selection.id
                 )));
             }
@@ -937,7 +1069,10 @@ impl Engine {
                     selection.id
                 )));
             }
-            let declaration = declare(selection, &operation);
+            let mut declaration = declare(selection, &operation);
+            if selection.binary.is_some() {
+                declaration.output_schema["properties"]["body"] = binary_body_schema();
+            }
             let text = expects_text(selection, &operation);
             exposed.push(Exposed {
                 selection: selection.clone(),
@@ -954,9 +1089,23 @@ impl Engine {
             base_segments,
             source_revision: bundle.source.source_sha256.clone(),
             exposed,
+            downloads,
             probes,
             feed,
         })
+    }
+
+    /// Every origin a selected binary read may reach besides the API base. A
+    /// connection admits only these; a read reaching one it does not admit is
+    /// refused before anything is sent there.
+    pub fn reached_hosts(&self) -> BTreeSet<&str> {
+        self.exposed
+            .iter()
+            .map(|e| &e.selection)
+            .chain(self.downloads.iter().map(|d| &d.selection))
+            .filter_map(|selection| selection.binary.as_ref())
+            .flat_map(|binary| binary.hosts.iter().map(String::as_str))
+            .collect()
     }
 
     /// The declarations for the selected operations with these effects, then the feed's two
@@ -968,6 +1117,9 @@ impl Engine {
             .filter(|e| effects.contains(&e.selection.effect))
             .map(|e| e.declaration.clone())
             .collect();
+        if effects.contains(&Effect::Read) {
+            declarations.extend(self.downloads.iter().map(|d| d.declaration.clone()));
+        }
         if let Some(feed) = self
             .feed
             .as_ref()
@@ -982,6 +1134,9 @@ impl Engine {
         if self.feed.is_some() && [feed::CONTAINERS, feed::ITEMS].contains(&id) {
             return Some(Effect::Read);
         }
+        if self.download(id).is_some() {
+            return Some(Effect::Read);
+        }
         self.exposed
             .iter()
             .find(|e| e.selection.id == id)
@@ -993,6 +1148,10 @@ impl Engine {
             .iter()
             .find(|e| e.selection.id == id)
             .ok_or_else(|| Error::new(ErrorCode::NotFound, "operation is not provided"))
+    }
+
+    fn download(&self, id: &str) -> Option<&Downloaded> {
+        self.downloads.iter().find(|d| d.selection.id == id)
     }
 
     /// Bind an operation's parameters from the input. Path and query values
@@ -1071,10 +1230,25 @@ impl Engine {
             .ok_or_else(|| refuse(format!("parameter `{}` is not a scalar", parameter.name)))
     }
 
-    /// One GET, projected as an observation.
+    /// One GET, projected as an observation. A connection that admits no host
+    /// besides its API base: [`Engine::read_reaching`] with [`NoHosts`].
     pub async fn read(
         &self,
         http: &dyn AuthenticatedHttp,
+        instance: &str,
+        id: &str,
+        input: Value,
+    ) -> Result<Value> {
+        self.read_reaching(http, &NoHosts, instance, id, input)
+            .await
+    }
+
+    /// One GET, projected as an observation, where a binary read may reach
+    /// the origins `hosts` admits besides the API base `http`.
+    pub async fn read_reaching(
+        &self,
+        http: &dyn AuthenticatedHttp,
+        hosts: &dyn Hosts,
         instance: &str,
         id: &str,
         input: Value,
@@ -1085,6 +1259,9 @@ impl Engine {
                 feed::ITEMS => return feed.items(http, instance, input).await,
                 _ => {}
             }
+        }
+        if let Some(download) = self.download(id) {
+            return self.read_download(download, hosts, instance, input).await;
         }
         let exposed = self.exposed(id)?;
         if exposed.selection.effect != Effect::Read {
@@ -1098,6 +1275,15 @@ impl Engine {
         let query: Vec<(&str, String)> =
             query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
         let response = http.get(&borrowed, &query).await?;
+        if let Some(binary) = &exposed.selection.binary {
+            let (status, body) =
+                read_binary(response, None, binary, hosts, &exposed.selection).await?;
+            return Ok(json!({
+                "status": status,
+                "body": body,
+                "provenance": provenance(instance, &exposed.operation.path, &self.source_revision),
+            }));
+        }
         let body = read_body(
             &response,
             exposed.text,
@@ -1110,6 +1296,71 @@ impl Engine {
         }))
     }
 
+    /// A `download`: the caller's `url`, held to an origin the selection reaches
+    /// and the connection admits and to the selection's path prefix, read once
+    /// as a binary body through that origin's port.
+    async fn read_download(
+        &self,
+        download: &Downloaded,
+        hosts: &dyn Hosts,
+        instance: &str,
+        input: Value,
+    ) -> Result<Value> {
+        let selection = &download.selection;
+        let (Some(binary), Some(declared)) = (&selection.binary, &selection.download) else {
+            return Err(Error::internal());
+        };
+        connectors_sdk::validate(&download.declaration.input_schema, &input)?;
+        let url = input
+            .get("url")
+            .and_then(Value::as_str)
+            .ok_or_else(|| refuse("`url` is not a string"))?;
+        let target = Target::absolute(url)
+            .ok_or_else(|| refuse("`url` is not an https URL this engine can send"))?;
+        if !binary.hosts.contains(&target.origin) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                format!(
+                    "`url` is on `{}`, which this download does not reach",
+                    target.origin
+                ),
+            ));
+        }
+        if !target.raw_path.starts_with(&declared.path_prefix) {
+            return Err(refuse(format!(
+                "`url` is not under `{}`",
+                declared.path_prefix
+            )));
+        }
+        let port = hosts.port(&target.origin).ok_or_else(|| {
+            Error::new(
+                ErrorCode::Forbidden,
+                format!(
+                    "`url` is on `{}`, which the connection does not admit",
+                    target.origin
+                ),
+            )
+        })?;
+        let response = target.get(port).await?;
+        let (status, body) = read_binary(
+            response,
+            Some(target.origin.clone()),
+            binary,
+            hosts,
+            selection,
+        )
+        .await?;
+        Ok(json!({
+            "status": status,
+            "body": body,
+            "provenance": provenance(
+                instance,
+                &format!("{}{}", target.origin, declared.path_prefix),
+                &self.source_revision,
+            ),
+        }))
+    }
+
     /// Bind a write and run its declared preflight. The returned request holds
     /// no read capability and sends exactly once.
     pub async fn prepare(
@@ -1119,6 +1370,9 @@ impl Engine {
         id: &str,
         input: Value,
     ) -> Result<Prepared> {
+        if self.download(id).is_some() {
+            return Err(Error::new(ErrorCode::Forbidden, "operation is a read"));
+        }
         let exposed = self.exposed(id)?;
         let method = match (
             exposed.selection.effect,
@@ -1886,25 +2140,372 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
             "required": required,
             "additionalProperties": false,
         }),
-        output_schema: json!({
+        output_schema: result_schema(),
+    }
+}
+
+/// The output schema of every selected read and write: the status, the body
+/// (any JSON value) and the provenance.
+fn result_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "status": {"type": "integer", "minimum": 100, "maximum": 599},
+            "body": {},
+            "provenance": {
+                "type": "object",
+                "properties": {
+                    "instance": {"type": "string", "minLength": 1, "maxLength": 512},
+                    "resource": {"type": "string"},
+                    "observed_at_unix_ms": {"type": "integer", "minimum": 0},
+                    "source_revision": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+                },
+                "required": ["instance", "resource", "observed_at_unix_ms", "source_revision"],
+                "additionalProperties": false
+            }
+        },
+        "required": ["status", "body", "provenance"],
+        "additionalProperties": false,
+    })
+}
+
+/// The `body` of a binary read's result (`connectors_catalog.binary.Body`).
+fn binary_body_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "media_type": {"type": "string", "minLength": 1},
+            "length": {"type": "integer", "minimum": 0, "maximum": BINARY_LIMIT},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "content_base64": {"type": "string"}
+        },
+        "required": ["media_type", "length", "sha256", "content_base64"],
+        "additionalProperties": false,
+    })
+}
+
+/// The descriptor operation for a `download`: one required input, `url`.
+fn declare_download(selection: &Selection, download: &Download) -> connectors_core::Operation {
+    let mut output_schema = result_schema();
+    output_schema["properties"]["body"] = binary_body_schema();
+    let hosts = selection
+        .binary
+        .as_ref()
+        .map(|binary| binary.hosts.join(", "))
+        .unwrap_or_default();
+    connectors_core::Operation {
+        id: selection.id.clone(),
+        description: selection.description.clone().unwrap_or_else(|| {
+            format!(
+                "GET a provider file URL under {} on {hosts}",
+                download.path_prefix
+            )
+        }),
+        contract: "operations/v1alpha1".into(),
+        profile: "generic-http".into(),
+        input_schema: json!({
             "type": "object",
-            "properties": {
-                "status": {"type": "integer", "minimum": 100, "maximum": 599},
-                "body": {},
-                "provenance": {
-                    "type": "object",
-                    "properties": {
-                        "instance": {"type": "string", "minLength": 1, "maxLength": 512},
-                        "resource": {"type": "string"},
-                        "observed_at_unix_ms": {"type": "integer", "minimum": 0},
-                        "source_revision": {"anyOf": [{"type": "string"}, {"type": "null"}]}
-                    },
-                    "required": ["instance", "resource", "observed_at_unix_ms", "source_revision"],
-                    "additionalProperties": false
-                }
-            },
-            "required": ["status", "body", "provenance"],
+            "properties": {"url": {"type": "string", "minLength": 1, "maxLength": 4096}},
+            "required": ["url"],
             "additionalProperties": false,
         }),
+        output_schema,
     }
+}
+
+/// What a selection's binary members must be, whatever it reads: `binary`
+/// exactly when `response` is `binary`, on a read, with `max_bytes` from one
+/// to [`BINARY_LIMIT`] and at most four distinct canonical `https` origins.
+fn check_binary(selection: &Selection) -> Result<()> {
+    let declared = selection.response == Some(ResponseKind::Binary);
+    let Some(binary) = &selection.binary else {
+        if declared || selection.download.is_some() {
+            return Err(refuse(format!(
+                "selection `{}` declares a binary response or a download without binary",
+                selection.id
+            )));
+        }
+        return Ok(());
+    };
+    let mut seen = BTreeSet::new();
+    let problem = if !declared {
+        Some("beside a response that is not binary")
+    } else if selection.effect != Effect::Read {
+        Some("for a write")
+    } else if binary.max_bytes == 0 || binary.max_bytes > BINARY_LIMIT {
+        Some("with max_bytes outside 1 to 2097152")
+    } else if binary.hosts.len() > BINARY_HOSTS {
+        Some("reaching more than four hosts")
+    } else if binary
+        .hosts
+        .iter()
+        .any(|host| origin(host).as_deref() != Some(host.as_str()) || !seen.insert(host))
+    {
+        Some("with a host that is not a distinct canonical https origin")
+    } else {
+        None
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares binary {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// What a `download` selection must be beyond its binary members: no bundle
+/// operation, at least one host, a path prefix bounded by `/`, and none of the
+/// members that bind a bundle operation's parameters or body.
+fn check_download(selection: &Selection, download: &Download) -> Result<()> {
+    let prefix = &download.path_prefix;
+    let problem = if !selection.operation_id.is_empty() {
+        Some("beside an operation_id")
+    } else if selection.binary.as_ref().is_none_or(|b| b.hosts.is_empty()) {
+        Some("that reaches no host")
+    } else if prefix.len() < 2
+        || !prefix.starts_with('/')
+        || !prefix.ends_with('/')
+        || prefix.contains(['?', '#', '%', '\\'])
+        || prefix
+            .split('/')
+            .any(|segment| segment == "." || segment == "..")
+    {
+        Some("whose path_prefix is not a plain path starting and ending with `/`")
+    } else if selection.guard.is_some()
+        || !selection.bounds.is_empty()
+        || !selection.required.is_empty()
+        || !selection.withhold.is_empty()
+        || !selection.credential.is_empty()
+        || !selection.body_keys.is_empty()
+        || !selection.body_types.is_empty()
+        || !selection.body_required.is_empty()
+        || !selection.body_fixed.is_empty()
+    {
+        Some("beside members that bind a bundle operation")
+    } else {
+        None
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares a download {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// One GET to an origin besides the API base: the canonical origin, the raw
+/// path as written (for a prefix check), and the decoded segments and query
+/// pairs the origin's port sends, each re-encoded by the port.
+struct Target {
+    origin: String,
+    raw_path: String,
+    segments: Vec<String>,
+    query: Vec<(String, String)>,
+}
+
+impl Target {
+    /// An absolute `https` URL; `None` for anything else.
+    fn absolute(url: &str) -> Option<Self> {
+        let origin = origin(url)?;
+        let rest = &url["https://".len()..];
+        let start = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+        Self::reference(origin, &rest[start..])
+    }
+
+    /// A redirect's `Location`, absolute or a path on `from`, the origin of the
+    /// request it answered; `None` when it is neither, or when it is a path
+    /// and `from` is the API base, whose origin the engine does not hold.
+    fn location(location: &str, from: Option<&str>) -> Option<Self> {
+        if location.starts_with('/') && !location.starts_with("//") {
+            return Self::reference(from?.to_owned(), location);
+        }
+        Self::absolute(location)
+    }
+
+    /// The path and query after an origin, the fragment dropped. The path is
+    /// at least one segment, none empty, `.` or `..` once decoded.
+    fn reference(origin: String, reference: &str) -> Option<Self> {
+        let reference = reference.split('#').next().unwrap_or_default();
+        let (raw_path, raw_query) = reference.split_once('?').unwrap_or((reference, ""));
+        let path = raw_path.strip_prefix('/')?;
+        let segments = path
+            .split('/')
+            .map(|segment| percent_decode(segment, false))
+            .collect::<Option<Vec<String>>>()?;
+        if segments
+            .iter()
+            .any(|s| s.is_empty() || s == "." || s == "..")
+        {
+            return None;
+        }
+        let query = raw_query
+            .split('&')
+            .filter(|pair| !pair.is_empty())
+            .map(|pair| {
+                let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+                Some((percent_decode(name, true)?, percent_decode(value, true)?))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self {
+            origin,
+            raw_path: raw_path.to_owned(),
+            segments,
+            query,
+        })
+    }
+
+    async fn get(&self, port: &dyn AuthenticatedHttp) -> Result<HttpResponse> {
+        let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
+        let query: Vec<(&str, String)> = self
+            .query
+            .iter()
+            .map(|(name, value)| (name.as_str(), value.clone()))
+            .collect();
+        port.get(&segments, &query).await
+    }
+}
+
+/// `%XX` escapes decoded, and in a query `+` as a space; `None` for a
+/// malformed escape or bytes that are not UTF-8.
+fn percent_decode(text: &str, query: bool) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' => {
+                let hex = text.get(index + 1..index + 3)?;
+                if !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return None;
+                }
+                decoded.push(u8::from_str_radix(hex, 16).ok()?);
+                index += 3;
+            }
+            b'+' if query => {
+                decoded.push(b' ');
+                index += 1;
+            }
+            byte => {
+                decoded.push(byte);
+                index += 1;
+            }
+        }
+    }
+    String::from_utf8(decoded).ok()
+}
+
+/// Whether a status is a redirect this engine may follow.
+fn redirect(status: u16) -> bool {
+    matches!(status, 301 | 302 | 303 | 307 | 308)
+}
+
+/// The answer of a binary read, after following at most [`REDIRECT_LIMIT`]
+/// redirects, each only to an origin the selection reaches and the connection
+/// admits: its status and its body. `from` is the origin of the first request,
+/// `None` for the API base.
+async fn read_binary(
+    mut response: HttpResponse,
+    mut from: Option<String>,
+    binary: &Binary,
+    hosts: &dyn Hosts,
+    selection: &Selection,
+) -> Result<(u16, Value)> {
+    let mut followed = 0;
+    while redirect(response.status) {
+        let location = response
+            .headers
+            .iter()
+            .find(|(name, _)| name.eq_ignore_ascii_case("location"))
+            .map(|(_, value)| value.trim().to_owned())
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "provider redirected without a location",
+                )
+            })?;
+        if binary.hosts.is_empty() {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "provider redirected, and this read reaches no other host",
+            ));
+        }
+        followed += 1;
+        if followed > REDIRECT_LIMIT {
+            return Err(Error::new(
+                ErrorCode::UpstreamProtocol,
+                "provider redirected more than three times",
+            ));
+        }
+        let target = Target::location(&location, from.as_deref()).ok_or_else(|| {
+            Error::new(
+                ErrorCode::Forbidden,
+                "provider redirected to a location that is not an https URL this engine can send",
+            )
+        })?;
+        if !binary.hosts.contains(&target.origin) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                format!(
+                    "provider redirected to `{}`, which this read does not reach",
+                    target.origin
+                ),
+            ));
+        }
+        let port = hosts.port(&target.origin).ok_or_else(|| {
+            Error::new(
+                ErrorCode::Forbidden,
+                format!(
+                    "provider redirected to `{}`, which the connection does not admit",
+                    target.origin
+                ),
+            )
+        })?;
+        response = target.get(port).await?;
+        from = Some(target.origin);
+    }
+    if !(200..300).contains(&response.status) {
+        // Classified exactly as any other read's refusal; never `Ok`.
+        read_body(&response, false, &selection.rate_limit_reasons)?;
+        return Err(Error::new(
+            ErrorCode::UpstreamProtocol,
+            "provider answered outside 2xx",
+        ));
+    }
+    let length = response.body.len() as u64;
+    if length > binary.max_bytes {
+        return Err(Error::new(
+            ErrorCode::Capacity,
+            format!(
+                "binary response of {length} bytes exceeds max_bytes of {}",
+                binary.max_bytes
+            ),
+        ));
+    }
+    Ok((response.status, binary_body(&response)))
+}
+
+/// A binary body: its media type, length, SHA-256 and standard base64.
+fn binary_body(response: &HttpResponse) -> Value {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use sha2::{Digest as _, Sha256};
+    let media_type = response
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
+        .and_then(|(_, value)| value.split(';').next())
+        .map(|value| value.trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "application/octet-stream".to_owned());
+    let sha256: String = Sha256::digest(&response.body)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    json!({
+        "media_type": media_type,
+        "length": response.body.len(),
+        "sha256": sha256,
+        "content_base64": STANDARD.encode(&response.body),
+    })
 }

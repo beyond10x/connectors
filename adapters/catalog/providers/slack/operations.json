@@ -25,6 +25,18 @@
      "credential": ["token"]},
     {"id": "auth.test", "operation_id": "auth_test", "effect": "read",
      "description": "Read who the connection's token is: user_id, user, team_id, team and url, plus bot_id for a bot token. Slack reports a token it does not accept as status 200 with ok false",
-     "credential": ["token"]}
+     "credential": ["token"]},
+    {"id": "files.list", "operation_id": "files_list", "effect": "read",
+     "description": "List the files the token can see under files, each with its id, name, filetype, mimetype, size and url_private, optionally narrowed by channel, user, types and ts_from and ts_to (Slack ts); one page per call of count files, page counting from 1, each answer with paging.page and paging.total, and paging.pages where Slack states it; the walk ends on the page numbered paging.pages, or on one that lists no file. Needs files:read. Slack reports a failed read as status 200 with ok false",
+     "withhold": ["token"]},
+    {"id": "files.info", "operation_id": "files_info", "effect": "read",
+     "description": "Read one file by its id under file: its name, filetype, mimetype, size and url_private, which file.download reads. Needs files:read. Slack reports a failed read as status 200 with ok false",
+     "required": ["file"],
+     "withhold": ["token"]},
+    {"id": "file.download", "effect": "read",
+     "description": "Read a file's content from its url_private or url_private_download, as files.info and files.list give it: an https URL on files.slack.com under /files-pri/, sent with the connection's token. Answers the bytes in base64 with their media_type, length and sha256, refused above 2 MiB",
+     "response": "binary",
+     "binary": {"max_bytes": 2097152, "hosts": ["https://files.slack.com"]},
+     "download": {"path_prefix": "/files-pri/"}}
   ]
 }
