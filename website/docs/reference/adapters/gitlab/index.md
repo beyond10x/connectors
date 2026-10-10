@@ -27,12 +27,15 @@ pinned source under a local id with a declared effect:
 | `repository.tree`, `commit.get`, `commit.diff`, `branches.list` | read | the files under a path at a ref, one commit, its file diffs, the branches with their head commits |
 | `deployments.list` | read | a project's deployments with their environment |
 | `merge_requests.list`, `merge_request.get` | read | the project's merge requests, one merge request by IID |
+| `merge_request.diffs`, `merge_request.discussions` | read | one merge request's file diffs, its discussions with their notes, each by IID and one page per call |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | read | pipelines, one pipeline, its jobs, one job |
 | `job.trace` | read | a job's log, answered as text |
 | `issue.create` | write | one POST opening an issue, unguarded |
 | `merge_request.create` | write | one POST, guarded on the pinned source head |
 | `merge_request.update` | write | one PUT, guarded on the pinned source head |
 | `merge_request.merge` | write | one PUT, guarded on five checks |
+| `merge_request.auto_merge` | write | one PUT with `auto_merge` fixed to `true`, guarded on the pinned head and an open merge request; proven by auto-merge set or merged |
+| `merge_request.reopen` | write | one PUT with `state_event` fixed to `reopen`, guarded on a closed merge request at the pinned head; proven opened at that head |
 | `merge_request.discussion.get` | read | one discussion of a merge request by id |
 | `merge_request.note.create`, `merge_request.discussion.reply` | write | one POST adding a note or a discussion reply, unguarded |
 | `merge_request.discussion.resolve` | write | one PUT resolving or unresolving a discussion, guarded on it being the requested, resolvable discussion and on the answered id and state |

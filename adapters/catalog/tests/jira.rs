@@ -90,20 +90,28 @@ fn shipped() -> Vec<Selection> {
     serde_json::from_value(file["operations"].clone()).unwrap()
 }
 
+/// The seven reads, and one write: `issue.transition.run`, `doTransition`,
+/// whose guard `tests/jira_transition_run.rs` pins.
 #[test]
-fn shipped_jira_selections_are_exactly_the_seven_reads() {
+fn shipped_jira_selections_are_the_seven_reads_and_the_transition_run() {
     let selections = shipped();
     let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
     let mut declared: Vec<String> = engine
-        .declarations(&[Effect::Read, Effect::Write])
+        .declarations(&[Effect::Read])
         .into_iter()
         .map(|o| o.id)
         .collect();
     declared.sort();
     let expected: Vec<&str> = SHIPPED.iter().map(|(id, _, _)| *id).collect();
     assert_eq!(declared, expected);
-    assert!(engine.declarations(&[Effect::Write]).is_empty());
+    let writes: Vec<String> = engine
+        .declarations(&[Effect::Write])
+        .into_iter()
+        .map(|o| o.id)
+        .collect();
+    assert_eq!(writes, ["issue.transition.run"]);
+    assert_eq!(selections.len(), SHIPPED.len() + 1);
     for (id, operation_id, path) in SHIPPED {
         let selection = selections.iter().find(|s| s.id == id).unwrap();
         assert_eq!(selection.operation_id, operation_id, "`{id}`");

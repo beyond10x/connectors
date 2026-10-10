@@ -62,11 +62,36 @@ pub struct Preflight {
     pub checks: Vec<Check>,
 }
 
-/// Comparisons against the write's own response body after dispatch.
+/// A read a guard issues after the write: a GET of the bundle, its parameter
+/// keys bound to input references as a preflight's `values` are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Read {
+    pub operation_id: String,
+    pub values: BTreeMap<String, String>,
+}
+
+/// Comparisons after dispatch: against the write's own response body, or,
+/// when `read` is declared, against the answer of that read, issued once after
+/// a 2xx, for a write that answers without a body.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Postflight {
     pub checks: Vec<Check>,
+    /// Omitted when absent, so a guard without it keeps its bytes. An explicit
+    /// `null` is refused, as the model refuses it.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_read"
+    )]
+    pub read: Option<Read>,
+    /// One check that accepts one of several observations: it holds when at
+    /// least one of these comparisons holds, beside every check in `checks`,
+    /// for a write whose success has more than one shape. At least two when
+    /// declared; omitted when empty, so a guard without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub any_of: Vec<Check>,
 }
 
 /// How a 2xx body is read. The bundle's declared media types decide by default;
@@ -88,7 +113,46 @@ pub enum ResponseKind {
 #[serde(deny_unknown_fields)]
 pub struct Guard {
     pub preflight: Preflight,
+    /// Up to three more reads before the write, run in order after
+    /// `preflight`, each with its own checks, for preconditions that live in
+    /// more than one answer. Omitted when empty, so a guard without them keeps
+    /// its bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub further_preflights: Vec<Preflight>,
     pub postflight: Postflight,
+}
+
+impl Guard {
+    /// Every read before the write, in the order it is issued.
+    fn preflights(&self) -> impl Iterator<Item = &Preflight> {
+        std::iter::once(&self.preflight).chain(&self.further_preflights)
+    }
+
+    /// Every check, before the write and after it.
+    fn checks(&self) -> impl Iterator<Item = &Check> {
+        self.preflights()
+            .flat_map(|preflight| &preflight.checks)
+            .chain(&self.postflight.checks)
+            .chain(&self.postflight.any_of)
+    }
+
+    /// Every parameter a read binds, with the input reference it binds.
+    fn bound(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.preflights()
+            .flat_map(|preflight| &preflight.values)
+            .chain(self.postflight.read.iter().flat_map(|read| &read.values))
+    }
+
+    /// Every input reference the guard reads: each read's values, then each
+    /// check's expected input.
+    fn references(&self) -> impl Iterator<Item = &String> {
+        self.bound()
+            .map(|(_, reference)| reference)
+            .chain(self.checks().filter_map(|check| match &check.expect {
+                Expectation::Input(path) => Some(path),
+                Expectation::Literal(_) => None,
+            }))
+    }
 }
 
 /// A narrower range for one query parameter than the pinned source declares,
@@ -178,6 +242,28 @@ pub struct Selection {
     /// required already. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_required: Vec<String>,
+    /// Closed body keys fixed to one value each: a string, an integer or a
+    /// boolean, of the key's `body_types` type when it has one. The engine
+    /// sends exactly that value under that key on every write, and a caller's
+    /// body carrying the key at all is refused before any request; the key is
+    /// not declared in the input schema. When every key `body_keys` admits is
+    /// fixed, the caller's `body` may be omitted. A fixed key must be admitted
+    /// by `body_keys`, and no guard may read it or `body_required` name it.
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_fixed: BTreeMap<String, Value>,
+}
+
+impl Selection {
+    /// Whether the caller's `body` may be omitted: every key the closed body
+    /// admits is fixed, so a caller has nothing to send in it.
+    fn body_fixed_whole(&self) -> bool {
+        !self.body_fixed.is_empty()
+            && self
+                .body_keys
+                .iter()
+                .all(|key| self.body_fixed.contains_key(key))
+    }
 }
 
 /// The declared schema of a body key typed by `body_types`: exactly that JSON
@@ -202,20 +288,7 @@ fn fits_body_type(value_type: ValueType, value: &Value) -> bool {
 /// The body paths a guard reads, each the part after `body.` of a reference.
 fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
     guard
-        .preflight
-        .values
-        .values()
-        .chain(
-            guard
-                .preflight
-                .checks
-                .iter()
-                .chain(&guard.postflight.checks)
-                .filter_map(|check| match &check.expect {
-                    Expectation::Input(path) => Some(path),
-                    Expectation::Literal(_) => None,
-                }),
-        )
+        .references()
         .filter_map(|path| path.strip_prefix("body."))
 }
 
@@ -251,6 +324,13 @@ fn scalar(value: &Value) -> Option<String> {
         Value::Bool(flag) => Some(flag.to_string()),
         _ => None,
     }
+}
+
+fn present_read<'de, D>(deserializer: D) -> std::result::Result<Option<Read>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Read::deserialize(deserializer).map(Some)
 }
 
 fn refuse(message: impl Into<String>) -> Error {
@@ -307,8 +387,12 @@ struct Exposed {
     text: bool,
 }
 
+/// The templates of a guard's reads.
 struct Probe {
-    template: Template,
+    /// Each read before the write, in the order it is issued.
+    preflights: Vec<Template>,
+    /// The read after the write, when the guard declares one.
+    postflight: Option<Template>,
 }
 
 /// The engine over one bundle. Built once per process; every selection is
@@ -329,6 +413,10 @@ pub struct Prepared {
     query: Vec<(String, String)>,
     body: Value,
     postflight: Vec<(String, String)>,
+    /// The postflight's `any_of`: at least one must hold, when declared.
+    alternatives: Vec<(String, String)>,
+    /// The bound read the postflight checks, when the guard declares one.
+    reread: Option<Request>,
     resource: String,
     instance: String,
     source_revision: String,
@@ -412,19 +500,7 @@ impl Engine {
             let guard_inputs: Vec<&str> = selection
                 .guard
                 .iter()
-                .flat_map(|guard| {
-                    guard.preflight.values.values().chain(
-                        guard
-                            .preflight
-                            .checks
-                            .iter()
-                            .chain(&guard.postflight.checks)
-                            .filter_map(|check| match &check.expect {
-                                Expectation::Input(path) => Some(path),
-                                Expectation::Literal(_) => None,
-                            }),
-                    )
-                })
+                .flat_map(Guard::references)
                 .map(|path| path.split('.').next().unwrap_or(path))
                 .collect();
             // A credential the document passes as a parameter travels in the
@@ -457,11 +533,7 @@ impl Engine {
                 {
                     Some("which its body_keys admit")
                 } else if selection.guard.as_ref().is_some_and(|guard| {
-                    guard
-                        .preflight
-                        .values
-                        .keys()
-                        .any(|key| key.eq_ignore_ascii_case(name))
+                    guard.bound().any(|(key, _)| key.eq_ignore_ascii_case(name))
                 }) {
                     Some("which its guard's preflight sends as a probe parameter")
                 } else {
@@ -579,25 +651,24 @@ impl Engine {
                         selection.id
                     )));
                 }
-                let mut probe = find(&guard.preflight.operation_id)?.clone();
-                // The probe passes the credential the way the selected
-                // operation does: through the connection's header alone, never
-                // as a parameter bound from caller input.
-                probe
-                    .parameters
-                    .retain(|p| !selection.credential.contains(&p.name));
-                if probe.method != "get" || !path_within(&probe.path, &base_segments) {
-                    return Err(refuse(format!(
-                        "guard of `{}` must read through a GET under the base path",
-                        selection.id
-                    )));
-                }
-                let checks = guard
-                    .preflight
-                    .checks
-                    .iter()
-                    .chain(&guard.postflight.checks)
-                    .collect::<Vec<_>>();
+                let probe_operation = |operation_id: &str| -> Result<Operation> {
+                    let mut probe = find(operation_id)?.clone();
+                    // The probe passes the credential the way the selected
+                    // operation does: through the connection's header alone,
+                    // never as a parameter bound from caller input.
+                    probe
+                        .parameters
+                        .retain(|p| !selection.credential.contains(&p.name));
+                    if probe.method != "get" || !path_within(&probe.path, &base_segments) {
+                        return Err(refuse(format!(
+                            "guard of `{}` must read through a GET under the base path",
+                            selection.id
+                        )));
+                    }
+                    Ok(probe)
+                };
+                let mut reads = vec![probe_operation(&guard.preflight.operation_id)?];
+                let checks = guard.checks().collect::<Vec<_>>();
                 if guard.preflight.checks.is_empty()
                     || checks.len() > 16
                     || checks.iter().any(|c| !c.pointer.starts_with('/'))
@@ -607,11 +678,51 @@ impl Engine {
                         selection.id
                     )));
                 }
-                let template =
-                    Template::from_operation(&probe).map_err(|refusal| refuse(refusal.reason()))?;
+                if guard.further_preflights.len() > 3
+                    || guard
+                        .further_preflights
+                        .iter()
+                        .any(|preflight| preflight.checks.is_empty())
+                {
+                    return Err(refuse(format!(
+                        "guard of `{}` declares more than three further preflights, or one without checks",
+                        selection.id
+                    )));
+                }
+                if guard.postflight.read.is_some() && guard.postflight.checks.is_empty() {
+                    return Err(refuse(format!(
+                        "guard of `{}` declares a postflight read without checks",
+                        selection.id
+                    )));
+                }
+                if guard.postflight.any_of.len() == 1 {
+                    return Err(refuse(format!(
+                        "guard of `{}` declares an any_of of one comparison",
+                        selection.id
+                    )));
+                }
+                for preflight in &guard.further_preflights {
+                    reads.push(probe_operation(&preflight.operation_id)?);
+                }
+                let template = |operation: &Operation| {
+                    Template::from_operation(operation).map_err(|refusal| refuse(refusal.reason()))
+                };
+                let preflights = reads.iter().map(template).collect::<Result<Vec<_>>>()?;
+                let postflight = guard
+                    .postflight
+                    .read
+                    .as_ref()
+                    .map(|read| template(&probe_operation(&read.operation_id)?))
+                    .transpose()?;
                 // Keyed by the selection: two selections may read one probe
                 // operation with different credential parameters removed.
-                probes.insert(selection.id.clone(), Probe { template });
+                probes.insert(
+                    selection.id.clone(),
+                    Probe {
+                        preflights,
+                        postflight,
+                    },
+                );
             }
             if !selection.body_keys.is_empty() {
                 let mut names = std::collections::BTreeSet::new();
@@ -660,6 +771,40 @@ impl Engine {
                     "selection `{}` declares body_required that do not name distinct keys its body_keys admit",
                     selection.id
                 )));
+            }
+            // A fixed key is a closed body key the caller never sends: its value
+            // is a scalar of the key's type, and nothing may also require it
+            // from the caller or compare it as caller input.
+            for (key, value) in &selection.body_fixed {
+                let scalar_value =
+                    value.is_string() || value.is_boolean() || value.is_i64() || value.is_u64();
+                let reason = if !admitted(key) {
+                    Some("which its body_keys do not admit")
+                } else if !scalar_value {
+                    Some("to a value that is not a string, an integer or a boolean")
+                } else if selection
+                    .body_types
+                    .get(key)
+                    .is_some_and(|value_type| !fits_body_type(*value_type, value))
+                {
+                    Some("to a value that is not of its declared type")
+                } else if selection.body_required.contains(key) {
+                    Some("which its body_required also names")
+                } else if selection
+                    .guard
+                    .as_ref()
+                    .is_some_and(|guard| guarded_body_keys(guard).contains(key.as_str()))
+                {
+                    Some("which its guard reads as an input")
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    return Err(refuse(format!(
+                        "selection `{}` fixes body key `{key}`, {reason}",
+                        selection.id
+                    )));
+                }
             }
             // A guard path nested under a key typed as a scalar could never
             // resolve: refused here, not at every write.
@@ -874,13 +1019,28 @@ impl Engine {
         // The closed body is held here as well as in the declaration, so it
         // does not rest on the schema validator alone.
         let body_keys = &exposed.selection.body_keys;
+        let omitted = input.get("body").is_none() && exposed.selection.body_fixed_whole();
         if !body_keys.is_empty()
+            && !omitted
             && !input
                 .get("body")
                 .and_then(Value::as_object)
                 .is_some_and(|body| body.keys().all(|key| body_keys.contains(key)))
         {
             return Err(refuse("body carries a key its selection does not admit"));
+        }
+        // A fixed key is never the caller's, whatever value it carries.
+        if let Some(key) = input
+            .get("body")
+            .and_then(Value::as_object)
+            .and_then(|body| {
+                body.keys()
+                    .find(|key| exposed.selection.body_fixed.contains_key(key.as_str()))
+            })
+        {
+            return Err(refuse(format!(
+                "body key `{key}` is fixed by its selection and is not caller input"
+            )));
         }
         // So are the closed body's requirements and types.
         if let Some(body) = input.get("body").and_then(Value::as_object) {
@@ -923,12 +1083,20 @@ impl Engine {
         let values = Self::parameter_values(&exposed.operation, &input)?;
         check_bounds(&exposed.selection, &values)?;
         let (segments, query) = self.resolve(&exposed.template, values)?;
-        let body = if exposed.operation.request_media_types.is_empty() {
+        let mut body = if exposed.operation.request_media_types.is_empty() {
             Value::Null
         } else {
             input.get("body").cloned().unwrap_or(Value::Null)
         };
+        // The fixed values are always sent, into a body the caller may omit.
+        if !exposed.selection.body_fixed.is_empty() {
+            let mut members = body.as_object().cloned().unwrap_or_default();
+            members.extend(exposed.selection.body_fixed.clone());
+            body = Value::Object(members);
+        }
         let mut postflight = Vec::new();
+        let mut alternatives = Vec::new();
+        let mut reread = None;
         if let Some(guard) = &exposed.selection.guard {
             // Every expectation resolves before any request: an absent input is
             // a refusal with nothing sent, not a surprise after the preflight.
@@ -948,47 +1116,69 @@ impl Engine {
                     })
                     .collect()
             };
-            let preflight = expected(&guard.preflight.checks)?;
+            let preflights = guard
+                .preflights()
+                .map(|preflight| expected(&preflight.checks))
+                .collect::<Result<Vec<_>>>()?;
             postflight = expected(&guard.postflight.checks)?;
+            alternatives = expected(&guard.postflight.any_of)?;
             let probe = self
                 .probes
                 .get(&exposed.selection.id)
                 .ok_or_else(Error::internal)?;
-            let mut values = BTreeMap::new();
-            for (parameter, path) in &guard.preflight.values {
-                let value = reference(&input, path)
-                    .and_then(scalar)
-                    .ok_or_else(|| refuse(format!("guard value `{path}` is absent")))?;
-                values.insert(parameter.clone(), Supplied::One(value));
-            }
-            let (segments, query) = self.resolve(&probe.template, values)?;
-            let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
-            let query: Vec<(&str, String)> =
-                query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-            let response = http.get(&borrowed, &query).await?;
-            // A target the preflight cannot find is a definite refusal: nothing
-            // has been sent.
-            if response.status == 404 {
-                return Err(Error::new(
-                    ErrorCode::Forbidden,
-                    "guard target was not found before dispatch",
-                ));
-            }
-            let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
-            for (pointer, expected) in &preflight {
-                let current = observed.pointer(pointer).and_then(scalar).ok_or_else(|| {
-                    Error::new(
-                        ErrorCode::UpstreamProtocol,
-                        format!("guard preflight answered without a value at `{pointer}`"),
-                    )
-                })?;
-                // The only point at which a difference is definite. After
-                // dispatch the same difference is uncertainty, not a refusal.
-                if current != *expected {
+            // So does every read's request, the one after the write included.
+            let bind =
+                |values: &BTreeMap<String, String>, template: &Template| -> Result<Request> {
+                    let mut bound = BTreeMap::new();
+                    for (parameter, path) in values {
+                        let value = reference(&input, path)
+                            .and_then(scalar)
+                            .ok_or_else(|| refuse(format!("guard value `{path}` is absent")))?;
+                        bound.insert(parameter.clone(), Supplied::One(value));
+                    }
+                    self.resolve(template, bound)
+                };
+            let requests = guard
+                .preflights()
+                .zip(&probe.preflights)
+                .map(|(preflight, template)| bind(&preflight.values, template))
+                .collect::<Result<Vec<_>>>()?;
+            reread = match (&guard.postflight.read, &probe.postflight) {
+                (Some(read), Some(template)) => Some(bind(&read.values, template)?),
+                (None, None) => None,
+                _ => return Err(Error::internal()),
+            };
+            for ((segments, query), preflight) in requests.iter().zip(&preflights) {
+                let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
+                let query: Vec<(&str, String)> =
+                    query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+                let response = http.get(&borrowed, &query).await?;
+                // A target the preflight cannot find is a definite refusal:
+                // nothing has been sent.
+                if response.status == 404 {
                     return Err(Error::new(
                         ErrorCode::Forbidden,
-                        format!("value at `{pointer}` differs from the pinned one before dispatch"),
+                        "guard target was not found before dispatch",
                     ));
+                }
+                let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
+                for (pointer, expected) in preflight {
+                    let current = observed.pointer(pointer).and_then(scalar).ok_or_else(|| {
+                        Error::new(
+                            ErrorCode::UpstreamProtocol,
+                            format!("guard preflight answered without a value at `{pointer}`"),
+                        )
+                    })?;
+                    // The only point at which a difference is definite. After
+                    // dispatch the same difference is uncertainty, not a refusal.
+                    if current != *expected {
+                        return Err(Error::new(
+                            ErrorCode::Forbidden,
+                            format!(
+                                "value at `{pointer}` differs from the pinned one before dispatch"
+                            ),
+                        ));
+                    }
                 }
             }
         }
@@ -998,6 +1188,8 @@ impl Engine {
             query,
             body,
             postflight,
+            alternatives,
+            reread,
             resource: exposed.operation.path.clone(),
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
@@ -1007,9 +1199,36 @@ impl Engine {
 }
 
 impl Prepared {
+    /// Whether the guard reads after the write, so [`Prepared::execute_reading`]
+    /// needs a read capability.
+    pub fn reads_after(&self) -> bool {
+        self.reread.is_some()
+    }
+
+    /// Whether the observed answer satisfies the postflight's `any_of`: at
+    /// least one of its comparisons holds, or it declares none.
+    fn accepts_one(&self, observed: &Value) -> bool {
+        self.alternatives.is_empty()
+            || self.alternatives.iter().any(|(pointer, expected)| {
+                observed.pointer(pointer).and_then(scalar).as_deref() == Some(expected.as_str())
+            })
+    }
+
     /// Send once and classify. Only documented definite refusals are refused;
-    /// everything else that is not a success leaves the effect possible.
+    /// everything else that is not a success leaves the effect possible. A
+    /// guard that reads after the write has no read capability here, so its
+    /// success is unknown; use [`Prepared::execute_reading`].
     pub async fn execute(self, capability: Box<dyn AuthenticatedWrite>) -> WriteOutcome<Value> {
+        self.execute_reading(capability, None).await
+    }
+
+    /// [`Prepared::execute`], with the capability the guard's read after the
+    /// write is issued through, once, after a 2xx.
+    pub async fn execute_reading(
+        self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Value> {
         let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> = self
             .query
@@ -1061,15 +1280,65 @@ impl Prepared {
         // a pinned value that differs in the acknowledgement leaves the effect
         // possible. It is never reported as refused, and no corrective request
         // is issued. The comparison is best effort, not detection.
-        for (pointer, expected) in &self.postflight {
-            if body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+        let Some((segments, query)) = &self.reread else {
+            for (pointer, expected) in &self.postflight {
+                if body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+                    return WriteOutcome::Unknown(Error::new(
+                        ErrorCode::UpstreamProtocol,
+                        format!(
+                            "write acknowledged with a value at `{pointer}` other than the pinned one; the effect is possible"
+                        ),
+                    ));
+                }
+            }
+            if !self.accepts_one(&body) {
                 return WriteOutcome::Unknown(Error::new(
                     ErrorCode::UpstreamProtocol,
-                    format!(
-                        "write acknowledged with a value at `{pointer}` other than the pinned one; the effect is possible"
-                    ),
+                    "write acknowledged with none of the accepted values; the effect is possible",
                 ));
             }
+            return WriteOutcome::Applied(Ok(json!({
+                "status": response.status,
+                "body": body,
+                "provenance": provenance(&self.instance, &self.resource, &self.source_revision),
+            })));
+        };
+        // A write that answers without a body is proved by the read the guard
+        // declares, issued once. The same boundary holds: a read that fails,
+        // or answers with another value, leaves the effect possible.
+        let unknown = |message: String| {
+            WriteOutcome::Unknown(Error::new(ErrorCode::UpstreamProtocol, message))
+        };
+        let Some(reader) = reader else {
+            return unknown(
+                "the guard reads after the write and no read capability was given; the effect is possible"
+                    .into(),
+            );
+        };
+        let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
+        let query: Vec<(&str, String)> =
+            query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+        let observed = match reader.get(&borrowed, &query).await {
+            Ok(answer) => read_body(&answer, false, &self.rate_limit_reasons),
+            Err(error) => Err(error),
+        };
+        let Ok(observed) = observed else {
+            return unknown(
+                "the guard's read after the write failed; the effect is possible".into(),
+            );
+        };
+        for (pointer, expected) in &self.postflight {
+            if observed.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+                return unknown(format!(
+                    "the guard's read after the write answered with a value at `{pointer}` other than the pinned one; the effect is possible"
+                ));
+            }
+        }
+        if !self.accepts_one(&observed) {
+            return unknown(
+                "the guard's read after the write answered with none of the accepted values; the effect is possible"
+                    .into(),
+            );
         }
         WriteOutcome::Applied(Ok(json!({
             "status": response.status,
@@ -1377,9 +1646,11 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
                 .as_ref()
                 .map(scalar_body_keys)
                 .unwrap_or_default();
+            // A fixed key is the selection's, never the caller's: undeclared.
             let keys: serde_json::Map<String, Value> = selection
                 .body_keys
                 .iter()
+                .filter(|key| !selection.body_fixed.contains_key(*key))
                 .map(|key| {
                     let schema = if let Some(value_type) = selection.body_types.get(key) {
                         body_type_schema(*value_type)
@@ -1408,22 +1679,12 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
             body
         };
         properties.insert("body".into(), body);
-        required.push("body".into());
+        if !selection.body_fixed_whole() {
+            required.push("body".into());
+        }
     }
     if let Some(guard) = &selection.guard {
-        let mut references: Vec<&String> = guard.preflight.values.values().collect();
-        references.extend(
-            guard
-                .preflight
-                .checks
-                .iter()
-                .chain(&guard.postflight.checks)
-                .filter_map(|check| match &check.expect {
-                    Expectation::Input(path) => Some(path),
-                    Expectation::Literal(_) => None,
-                }),
-        );
-        for reference in references {
+        for reference in guard.references() {
             if reference
                 .split_once('.')
                 .is_some_and(|(head, _)| head == "body")
