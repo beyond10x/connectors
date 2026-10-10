@@ -92,6 +92,16 @@ pub struct Postflight {
     /// declared; omitted when empty, so a guard without it keeps its bytes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub any_of: Vec<Check>,
+    /// Only `true`, beside `read`: the read after the write must answer 404,
+    /// proving a delete, and nothing else is compared. Omitted when absent, so
+    /// a guard without it keeps its bytes; an explicit `null` is refused, as
+    /// the model refuses it, and `false` is refused when the selection loads.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_flag"
+    )]
+    pub absent: Option<bool>,
 }
 
 /// How a 2xx body is read. The bundle's declared media types decide by default;
@@ -373,6 +383,13 @@ where
     Read::deserialize(deserializer).map(Some)
 }
 
+fn present_flag<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    bool::deserialize(deserializer).map(Some)
+}
+
 fn refuse(message: impl Into<String>) -> Error {
     Error::invalid(message)
 }
@@ -467,6 +484,8 @@ pub struct Prepared {
     alternatives: Vec<(String, String)>,
     /// The bound read the postflight checks, when the guard declares one.
     reread: Option<Request>,
+    /// Whether the read after the write must answer 404 (`postflight.absent`).
+    absent: bool,
     resource: String,
     instance: String,
     source_revision: String,
@@ -766,7 +785,23 @@ impl Engine {
                         selection.id
                     )));
                 }
-                if guard.postflight.read.is_some() && guard.postflight.checks.is_empty() {
+                match guard.postflight.absent {
+                    None => {}
+                    Some(true)
+                        if guard.postflight.read.is_some()
+                            && guard.postflight.checks.is_empty()
+                            && guard.postflight.any_of.is_empty() => {}
+                    Some(_) => {
+                        return Err(refuse(format!(
+                            "guard of `{}` declares absent other than true beside a read with no checks",
+                            selection.id
+                        )));
+                    }
+                }
+                if guard.postflight.read.is_some()
+                    && guard.postflight.checks.is_empty()
+                    && guard.postflight.absent.is_none()
+                {
                     return Err(refuse(format!(
                         "guard of `{}` declares a postflight read without checks",
                         selection.id
@@ -1267,6 +1302,11 @@ impl Engine {
             postflight,
             alternatives,
             reread,
+            absent: exposed
+                .selection
+                .guard
+                .as_ref()
+                .is_some_and(|guard| guard.postflight.absent == Some(true)),
             resource: exposed.operation.path.clone(),
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
@@ -1395,7 +1435,27 @@ impl Prepared {
         let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> =
             query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-        let observed = match reader.get(&borrowed, &query).await {
+        let answer = reader.get(&borrowed, &query).await;
+        // A delete is proved by its target no longer being found: only a 404
+        // to the read after it. The target still found, or a read that fails
+        // otherwise, leaves the effect possible.
+        if self.absent {
+            return match answer {
+                Ok(answer) if answer.status == 404 => WriteOutcome::Applied(Ok(json!({
+                    "status": response.status,
+                    "body": body,
+                    "provenance": provenance(&self.instance, &self.resource, &self.source_revision),
+                }))),
+                Ok(answer) if (200..300).contains(&answer.status) => unknown(
+                    "the guard's read after the write still found its target; the effect is possible"
+                        .into(),
+                ),
+                _ => unknown(
+                    "the guard's read after the write failed; the effect is possible".into(),
+                ),
+            };
+        }
+        let observed = match answer {
             Ok(answer) => read_body(&answer, false, &self.rate_limit_reasons),
             Err(error) => Err(error),
         };

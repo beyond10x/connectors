@@ -168,6 +168,20 @@ Sources:
   of `prometheus` moves to covered, and [Not planned until used](#not-planned-until-used) loses
   `query_range` and `rules`. The [Gap units](#gap-units) table still shows the 2026-10-07
   baseline.
+- **GitLab tags and releases, 2026-10-10 (unreleased).** `gitlab.release.create`,
+  `gitlab.repository.tag.create`, `gitlab.release.update` and `gitlab.repository.tag.delete`
+  moved from missing to covered, and `gitlab.repository.tag.show`, `gitlab.release.show` and
+  `gitlab.release.link.list` from partial to covered, when `tag.get`, `tag.create`, `tag.delete`,
+  `release.get`, `release.links`, `release.create` and `release.update` were selected from the
+  pinned source. The writes are guarded on the caller's commit `sha`; the delete is proved by a
+  read answering 404 afterwards (`postflight.absent`, a new guard capability in the catalog ESS
+  model). Verified against fixtures through the engine and the owned provider process, not a live
+  GitLab. The `gitlab` row of the per-plugin table now reads 31 / 2,598 covered, 2 / 0 partial
+  and 31 / 72 missing, and the summary and total rows move by the same 7 operations and 45 calls
+  (11 from partial, 34 from missing). The selections were appended to
+  `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
+  [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
+  baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -194,9 +208,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 73 | 5,611 | 60 | 5,611 |
-| partial | 14 | 26 | 7 | 26 |
-| missing | 214 | 719 | 42 | 719 |
+| covered | 80 | 5,656 | 67 | 5,656 |
+| partial | 11 | 15 | 4 | 15 |
+| missing | 210 | 685 | 38 | 685 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -209,7 +223,7 @@ Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
-| gitlab | 64 | 38 | 2,670 | 24 / 2,553 | 5 / 11 | 35 / 106 |
+| gitlab | 64 | 38 | 2,670 | 31 / 2,598 | 2 / 0 | 31 / 72 |
 | jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
@@ -234,7 +248,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **73 / 5,611** | **14 / 26** | **214 / 719** |
+| **total** | **301** | **109** | **6,356** | **80 / 5,656** | **11 / 15** | **210 / 685** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -289,25 +303,25 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.repository.tree` | 35 | 13 | 2026-10-06 | `repository.tree` (:100) | covered | `path`, `ref` and `recursive`, offset paging only (keyset `pagination` and `page_token` are withheld) (2026-10-10). |
 | `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | `merge_request.note.create` (:82) | covered | One note by merge-request IID, its text required, optionally `internal`. Unguarded, as a create: the same approved input sent twice adds a second note. GitLab runs quick actions in the text; `/merge` is cut off because the body does not admit `merge_request_diff_head_sha` (2026-10-10). |
 | `gitlab.pipeline.retry` | 19 | 5 | 2026-10-05 | — | missing | Pipeline retry is not selected. |
-| `gitlab.release.create` | 16 | 3 | 2026-10-02 | — | missing | The release write is not selected. |
-| `gitlab.repository.tag.create` | 16 | 5 | 2026-09-20 | — | missing | The tag write is not selected. |
+| `gitlab.release.create` | 16 | 3 | 2026-10-02 | `release.create` (:172) | covered | Releases an existing tag only (no `ref` or `tag_message`); creating the tag and the release takes `tag.create` then `release.create`. The tag must be at the caller's `sha`. |
+| `gitlab.repository.tag.create` | 16 | 5 | 2026-09-20 | `tag.create` (:146) | covered | The `ref` must resolve to the caller's `sha`; a branch name is checked, not trusted. |
 | `gitlab.pipeline.cancel` | 13 | 5 | 2026-10-06 | — | missing | Pipeline cancel is not selected. |
 | `gitlab.repository.commit.create` | 12 | 2 | 2026-09-20 | — | missing | The commit write is not selected. |
 | `gitlab.project.create` | 11 | 7 | 2026-10-02 | — | missing | The project write is not selected. fluxplane also resolves the group namespace by path. |
 | `gitlab.repository.file.update` | 6 | 2 | 2026-09-20 | — | missing | The file write is not selected. |
 | `gitlab.release.list` | 5 | 3 | 2026-10-02 | `releases.list` (:38) | covered | — |
-| `gitlab.repository.tag.show` | 5 | 3 | 2026-09-28 | `tags.list` (:35) | partial | No single-tag read. `tags.list` with `search` finds the tag. |
+| `gitlab.repository.tag.show` | 5 | 3 | 2026-09-28 | `tag.get` (:144) | covered | — |
 | `gitlab.branch.create` | 4 | 1 | 2026-09-20 | — | missing | The branch write is not selected. |
-| `gitlab.release.show` | 4 | 3 | 2026-10-02 | `releases.list` (:38) | partial | No single-release read. |
+| `gitlab.release.show` | 4 | 3 | 2026-10-02 | `release.get` (:167) | covered | — |
 | `gitlab.branch.delete` | 3 | 2 | 2026-10-01 | — | missing | Branch delete is not selected. |
 | `gitlab.pipeline.create` | 3 | 2 | 2026-10-06 | — | missing | The CI trigger is not selected. |
-| `gitlab.release.link.list` | 2 | 1 | 2026-10-02 | `releases.list` (:38) | partial | Links appear only inside each release's `assets`. There is no per-release link list. |
+| `gitlab.release.link.list` | 2 | 1 | 2026-10-02 | `release.links` (:169) | covered | — |
 | `gitlab.deployment.list` | 1 | 1 | 2026-09-28 | `deployments.list` (:50) | covered | — |
 | `gitlab.environment.list` | 1 | 1 | 2026-09-28 | — | missing | Environments are not selected. |
 | `gitlab.mr.discussion.reply` | 1 | 1 | 2026-09-24 | `merge_request.discussion.reply` (:87) | covered | One reply by discussion id, its text required. Unguarded, as a create (2026-10-10). |
 | `gitlab.mr.discussion.resolve` | 1 | 1 | 2026-09-24 | `merge_request.discussion.resolve` (:90) | covered | Resolve or unresolve by discussion id, `resolved` a JSON boolean. Guarded: refused before the write unless the read answers with that discussion and it is resolvable; GitLab's answer must carry the same discussion id and the requested state, or the outcome is unknown (2026-10-10). |
-| `gitlab.release.update` | 1 | 1 | 2026-09-29 | — | missing | The release write is not selected. |
-| `gitlab.repository.tag.delete` | 1 | 1 | 2026-09-20 | — | missing | Tag delete is not selected. |
+| `gitlab.release.update` | 1 | 1 | 2026-09-29 | `release.update` (:182) | covered | The release must be at the tag and `sha` before and after. |
+| `gitlab.repository.tag.delete` | 1 | 1 | 2026-09-20 | `tag.delete` (:156) | covered | The tag must be at the caller's `sha` before; only a 404 on the read after counts as deleted. |
 | `gitlab.branch.delete_merged` | 0 | 0 | - | — | missing | Not selected. |
 | `gitlab.ci.variable.create` | 0 | 0 | - | — | missing | CI variables are not selected. |
 | `gitlab.ci.variable.delete` | 0 | 0 | - | — | missing | CI variables are not selected. |

@@ -27,6 +27,27 @@
   does not type as a string, an empty set and an empty or repeated value are refused when the
   selection loads. Range bounds serialise as before, so every other selection keeps its bytes.
   The form is modelled as `connectors_catalog.selection.Bound`.
+- GitLab tags and releases through the catalog provider (`docs/local-catalog-provider.md`,
+  *Tags and releases*): the reads `tag.get` (one tag), `release.get` (one release) and
+  `release.links` (one release's asset links, one page per call, `per_page` 1 through 100), and
+  four guarded writes, each pinned to a commit `sha` the caller supplies. `tag.create` reads the
+  commit `body.ref` names and refuses before any request unless it is `sha`, and is applied when
+  GitLab answers the tag at `sha`. `tag.delete` reads the tag and refuses unless it exists at
+  `sha`, then reads it again after GitLab's `204` and is applied only when that read answers
+  `404`. `release.create` reads the tag `body.tag_name` and refuses unless it exists at `sha`;
+  its body admits neither `ref` nor `tag_message`, so it releases an existing tag and never
+  creates one (create it with `tag.create` first). `release.update` reads the release and refuses
+  unless it is at `sha`, before and after. The write bodies are closed to the keys of the pinned
+  request schemas, their string keys typed. Verified against a local fixture in the pinned
+  document's tag, release, link and commit shapes, through the engine and the provider process,
+  not a live instance. The GitLab selection set has 42 operations, and a GitLab configuration has
+  a new configuration revision.
+- A catalog guard's postflight can prove a delete: `postflight.absent`, only `true` and only
+  beside a postflight `read` with no `checks` or `any_of`, requires that read to answer `404`
+  after the write; the target still found, or a read that fails, leaves the outcome `unknown`.
+  It is refused when the selection loads in any other form. Modelled as
+  `connectors_catalog.guard.Postflight` in `adapters/catalog/spec/ess`; every other guard keeps
+  its bytes.
 - `connectors-prometheus`, a native Prometheus adapter executable for the local CLI:
   `series.query` (one PromQL expression at one instant, default now: a vector, matrix, scalar or
   string, at most 500 series), `series.query_range` (over at most seven days at an explicit
@@ -56,6 +77,8 @@
 - `connectors_catalog_provider::Bound` is no longer `Copy`, its `maximum` is `Option<u64>`, and it
   gains `values: Vec<String>`; Rust code that builds or reads a bound changes accordingly. The
   configuration format is unchanged for range bounds.
+- `connectors_catalog_provider::Postflight` gains `absent: Option<bool>`; Rust code that builds a
+  postflight with a struct literal adds `absent: None`.
 
 ## 0.42.0 — 2026-10-10
 
