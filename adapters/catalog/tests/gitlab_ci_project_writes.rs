@@ -17,8 +17,9 @@
 //!   `force`.
 //! - `file.update`, `putApiV4ProjectsIdRepositoryFilesFilePath`: guarded on the
 //!   branch head being `sha`; GitLab answers only the file path and branch, so
-//!   the proof is a read of the branch's commit after the write, whose first
-//!   parent must be `sha`.
+//!   the proof is a read of the branch itself after the write, whose head's
+//!   first parent must be `sha`; `commits/{branch}` would resolve a same-named
+//!   tag first.
 //! - `branch.create`, `postApiV4ProjectsIdRepositoryBranches`: guarded on
 //!   `body.ref` resolving to `sha`; proven by the answer naming the branch at it.
 //! - `branch.delete`, `deleteApiV4ProjectsIdRepositoryBranchesBranch`: guarded
@@ -257,8 +258,10 @@ impl Fixture {
                 DENIED => 403,
                 _ => 410,
             };
-            self.failing
-                .push((format!("repository/commits/{name}"), status));
+            for route in ["commits", "branches"] {
+                self.failing
+                    .push((format!("repository/{route}/{name}"), status));
+            }
         }
         id
     }
@@ -827,9 +830,10 @@ fn the_ci_and_project_operations_are_shipped_as_reviewed() {
                               "last_commit_id": "string"},
                "body_required": ["content", "commit_message"],
                "guard": {"preflight": branch_head,
-                         "postflight": {"checks": first_parent,
-                                        "read": {"operation_id": "getApiV4ProjectsIdRepositoryCommitsSha",
-                                                 "values": {"id": "id", "sha": "body.branch"}}}}})
+                         "postflight": {"checks": [{"pointer": "/commit/parent_ids/0",
+                                                    "expect": {"input": "sha"}}],
+                                        "read": {"operation_id": "getApiV4ProjectsIdRepositoryBranchesBranch",
+                                                 "values": {"id": "id", "branch": "body.branch"}}}}})
     );
     assert_eq!(
         selection(BRANCH_CREATE),
@@ -1205,8 +1209,8 @@ fn commit_create_lands_on_the_pinned_head_as_json() {
 }
 
 /// Approved, `file.update` reads the branch, sends one JSON PUT, then reads the
-/// commit the branch names, and is applied only when that commit's first
-/// parent is the pinned head: GitLab's answer names only the file and branch.
+/// branch again, and is applied only when its head's first parent is the
+/// pinned head: GitLab's answer names only the file and branch.
 /// A branch moved between the first read and the write, or a read after the
 /// write that answers 500, 403 or 410, leaves the effect unknown; a file GitLab
 /// cannot update is its definite 400.
@@ -1232,7 +1236,7 @@ fn file_update_proves_its_commit_on_the_pinned_head_by_a_read_after() {
                 "repository/files/docs%2Fguide.md",
                 input["body"].clone()
             ),
-            get_commit("feature"),
+            get_branch("feature"),
         ]
     );
     assert_eq!(
@@ -1262,7 +1266,7 @@ fn file_update_proves_its_commit_on_the_pinned_head_by_a_read_after() {
                     "repository/files/docs%2Fguide.md",
                     file_update_input("docs/guide.md", name, HEAD)["body"].clone()
                 ),
-                get_commit(name),
+                get_branch(name),
             ],
             "{name}"
         );

@@ -141,7 +141,9 @@ fn refusal(config: &Value) -> String {
 /// and again when it gained `pipeline.retry`, `pipeline.cancel`,
 /// `pipeline.create`, `environments.list`, `commit.create`, `file.update`,
 /// `branch.create`, `branch.delete` and `project.create`, whose cited media
-/// type corrections also rebuilt the GitLab bundle.
+/// type corrections also rebuilt the GitLab bundle, and again when
+/// `file.update` proved its write by reading the branch, not the revision
+/// `commits/{branch}` that a same-named tag wins.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
 /// `users.search`, again when it gained `issue.transitions`, and again when it
@@ -150,8 +152,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "95fe5445fd0f0a68553dfd6b93586fc1b60a09686c2019704c0dfad51a809e38",
-        "834a8a40e972d98225ad1bb006664fa59ae155d1be6fa8f9b0c2e2d22630c717",
+        "f1e56d54ab3acdbedb01b9683bc7ea002e92e20714ed89168a3b782a838e720d",
+        "222bce75c9f8307b93515556b95694e198ef9e0929005c5357443c63ec2438d4",
     ),
     (
         "catalog-jira.md",
