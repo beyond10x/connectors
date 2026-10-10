@@ -1,0 +1,1 @@
+{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"up","job":"api","instance":"api-0"},"value":[1788825600.25,"1"]},{"metric":{"__name__":"up","job":"api","instance":"api-1"},"value":[1788825600.25,"NaN"]}]}}

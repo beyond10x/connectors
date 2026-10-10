@@ -142,6 +142,46 @@ Sources:
   [gitlab](#gitlab) section moved; the GitLab example configuration in
   `docs/local-catalog-provider.md` has a new configuration revision. The [Gap units](#gap-units)
   table still shows the 2026-10-07 baseline.
+- **GitLab code search, 2026-10-10 (unreleased).** `gitlab.search.blobs` moved from missing to
+  covered when `search.blobs` (`getApiV4ProjectsIdDashSearch`) was selected. Two catalog
+  capabilities made it selectable: a `connectors-source-amendments/1` file can now carry a cited
+  path correction (`adapters/gitlab/upstream/openapi_v3.amendments.json` corrects
+  `/api/v4/projects/{id}/(-/)search` to `/api/v4/projects/{id}/search`; the pinned document is
+  unchanged), and a selection bound can hold a string parameter to a set of values (`scope` to
+  `blobs`, so the search reaches no issues, users or wiki text). Verified against fixtures
+  through the engine, not a live GitLab. The `gitlab` row of the per-plugin table now reads
+  24 / 2,553 covered and 35 / 106 missing, and the summary and total rows move by the same
+  operation and 75 calls. The mapped call of `gitlab.search.blobs` in
+  [Used but not declared](#used-but-not-declared) now lands on covered, so the mapped-call split
+  moves from 76 covered and 48 to gap units to 77 and 47; the sentence under
+  [Summary](#summary) still gives the 2026-10-07 split. The selection was appended to
+  `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
+  [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
+  baseline.
+- **Prometheus, 2026-10-10 (unreleased).** `prometheus.query`, `prometheus.query_range`,
+  `prometheus.rules` and `prometheus.test` moved from missing to covered, and so did
+  `grafana.prometheus.query`, `grafana.prometheus.range` and `grafana.prometheus.rules`, when the
+  native Prometheus adapter shipped `series.query`, `series.query_range` and `rules.list`, direct
+  and through the Grafana data-source proxy. The `prometheus` row of the per-plugin table now
+  reads 4 / 2 covered and 4 / 0 missing, the `grafana` row 8 / 425 covered and 12 / 0 missing,
+  and the summary and total rows move by the same 7 operations and 69 calls; the plugin verdict
+  of `prometheus` moves to covered, and [Not planned until used](#not-planned-until-used) loses
+  `query_range` and `rules`. The [Gap units](#gap-units) table still shows the 2026-10-07
+  baseline.
+- **GitLab tags and releases, 2026-10-10 (unreleased).** `gitlab.release.create`,
+  `gitlab.repository.tag.create`, `gitlab.release.update` and `gitlab.repository.tag.delete`
+  moved from missing to covered, and `gitlab.repository.tag.show`, `gitlab.release.show` and
+  `gitlab.release.link.list` from partial to covered, when `tag.get`, `tag.create`, `tag.delete`,
+  `release.get`, `release.links`, `release.create` and `release.update` were selected from the
+  pinned source. The writes are guarded on the caller's commit `sha`; the delete is proved by a
+  read answering 404 afterwards (`postflight.absent`, a new guard capability in the catalog ESS
+  model). Verified against fixtures through the engine and the owned provider process, not a live
+  GitLab. The `gitlab` row of the per-plugin table now reads 31 / 2,598 covered, 2 / 0 partial
+  and 31 / 72 missing, and the summary and total rows move by the same 7 operations and 45 calls
+  (11 from partial, 34 from missing). The selections were appended to
+  `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
+  [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
+  baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -160,7 +200,7 @@ Sources:
   | homer | 33 | missing |
   | confluence | 13 | covered |
   | alertmanager | 2 | missing |
-  | prometheus | 2 | missing |
+  | prometheus | 2 | covered |
   | the other 11 missing plugins | 0 | missing |
   | **total** | **6,191** (148 operation names) | |
 
@@ -168,9 +208,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 65 | 5,467 | 54 | 5,467 |
-| partial | 14 | 26 | 7 | 26 |
-| missing | 222 | 863 | 48 | 863 |
+| covered | 80 | 5,656 | 67 | 5,656 |
+| partial | 11 | 15 | 4 | 15 |
+| missing | 210 | 685 | 38 | 685 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -183,16 +223,16 @@ Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
-| gitlab | 64 | 38 | 2,670 | 23 / 2,478 | 5 / 11 | 36 / 181 |
+| gitlab | 64 | 38 | 2,670 | 31 / 2,598 | 2 / 0 | 31 / 72 |
 | jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
-| grafana | 20 | 7 | 425 | 5 / 358 | 0 / 0 | 15 / 67 |
+| grafana | 20 | 7 | 425 | 8 / 425 | 0 / 0 | 12 / 0 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
 | kubernetes | 24 | 14 | 72 | 6 / 31 | 6 / 10 | 12 / 31 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
 | confluence | 15 | 3 | 13 | 4 / 5 | 0 / 0 | 11 / 8 |
-| prometheus | 8 | 2 | 2 | 0 / 0 | 0 / 0 | 8 / 2 |
+| prometheus | 8 | 2 | 2 | 4 / 2 | 0 / 0 | 4 / 0 |
 | alertmanager | 5 | 1 | 1 | 0 / 0 | 0 / 0 | 5 / 1 |
 | asterisk | 8 | 0 | 0 | 0 / 0 | 0 / 0 | 8 / 0 |
 | aws | 11 | 0 | 0 | 0 / 0 | 0 / 0 | 11 / 0 |
@@ -208,16 +248,16 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **65 / 5,467** | **14 / 26** | **222 / 863** |
+| **total** | **301** | **109** | **6,356** | **80 / 5,656** | **11 / 15** | **210 / 685** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
 
 | verdict | plugins | count |
 |---|---|---:|
-| covered | gitlab, jira, confluence, grafana, kubernetes, loki, slack, sql, tavily | 9 |
+| covered | gitlab, jira, confluence, grafana, kubernetes, loki, prometheus, slack, sql, tavily | 10 |
 | partial only | websearch | 1 |
-| missing | homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 14 |
+| missing | homer, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 13 |
 | no operations declared | clock | 1 |
 
 ## Verdict rules
@@ -253,7 +293,7 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.repository.commit.list` | 81 | 17 | 2026-10-06 | `commits.list` (:44) | covered | — |
 | `gitlab.mr.merge` | 77 | 10 | 2026-10-06 | `merge_request.merge` (:70) + `merge_request.auto_merge` (:113) | covered | `merge_request.merge` merges at once and requires `mergeable` and a succeeded pinned head pipeline. `merge_request.auto_merge` sets merge-when-pipeline-succeeds: its selection fixes `auto_merge: true`, its guard pins the head and the open state but not the pipeline, and it is applied when GitLab answers with auto-merge set or merged (2026-10-10, [Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)). Neither takes `squash` or `should_remove_source_branch` beside auto-merge. |
 | `gitlab.compare` | 76 | 19 | 2026-09-30 | `repository.compare` (:48) | covered | No per-file diff bound. |
-| `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | — | missing | Code search is not selected (`/projects/:id/search`, scope `blobs`). Not selectable as of 2026-10-10: the pinned source declares the path as `/projects/{id}/(-/)search`, which the catalog engine sends literally, a source amendment can only add a query parameter, and a selection bound cannot hold the required `scope` to `blobs` ([GitLab catalog guide](local-catalog-provider.md#the-shipped-selection-set)). |
+| `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | `search.blobs` (:113) | covered | `scope` is held to `blobs`; the path comes from a cited source correction. |
 | `gitlab.repository.tag.list` | 71 | 23 | 2026-10-03 | `tags.list` (:35) | covered | — |
 | `gitlab.mr.update` | 60 | 12 | 2026-10-04 | `merge_request.update` (:62) + `merge_request.reopen` (:124) | covered | `merge_request.update` requires state `opened`. `merge_request.reopen` reopens a closed merge request at the pinned head: its selection fixes `state_event: reopen`, and GitLab must answer it `opened` (2026-10-10, [Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)). |
 | `gitlab.mr.changes` | 58 | 13 | 2026-10-03 | `merge_request.diffs` (:134) + `merge_request.get` (:17) | covered | `merge_request.diffs` lists the merge request's file diffs by IID, each with `old_path`, `new_path`, `diff` and the new, renamed, deleted and `too_large` flags, offset-paged (`per_page` 1 through 100), `unidiff` for the unified format; `merge_request.get` gives the request itself and its `diff_refs` (2026-10-10). |
@@ -263,25 +303,25 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.repository.tree` | 35 | 13 | 2026-10-06 | `repository.tree` (:100) | covered | `path`, `ref` and `recursive`, offset paging only (keyset `pagination` and `page_token` are withheld) (2026-10-10). |
 | `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | `merge_request.note.create` (:82) | covered | One note by merge-request IID, its text required, optionally `internal`. Unguarded, as a create: the same approved input sent twice adds a second note. GitLab runs quick actions in the text; `/merge` is cut off because the body does not admit `merge_request_diff_head_sha` (2026-10-10). |
 | `gitlab.pipeline.retry` | 19 | 5 | 2026-10-05 | — | missing | Pipeline retry is not selected. |
-| `gitlab.release.create` | 16 | 3 | 2026-10-02 | — | missing | The release write is not selected. |
-| `gitlab.repository.tag.create` | 16 | 5 | 2026-09-20 | — | missing | The tag write is not selected. |
+| `gitlab.release.create` | 16 | 3 | 2026-10-02 | `release.create` (:172) | covered | Releases an existing tag only (no `ref` or `tag_message`); creating the tag and the release takes `tag.create` then `release.create`. The tag must be at the caller's `sha`. |
+| `gitlab.repository.tag.create` | 16 | 5 | 2026-09-20 | `tag.create` (:146) | covered | The `ref` must resolve to the caller's `sha`; a branch name is checked, not trusted. |
 | `gitlab.pipeline.cancel` | 13 | 5 | 2026-10-06 | — | missing | Pipeline cancel is not selected. |
 | `gitlab.repository.commit.create` | 12 | 2 | 2026-09-20 | — | missing | The commit write is not selected. |
 | `gitlab.project.create` | 11 | 7 | 2026-10-02 | — | missing | The project write is not selected. fluxplane also resolves the group namespace by path. |
 | `gitlab.repository.file.update` | 6 | 2 | 2026-09-20 | — | missing | The file write is not selected. |
 | `gitlab.release.list` | 5 | 3 | 2026-10-02 | `releases.list` (:38) | covered | — |
-| `gitlab.repository.tag.show` | 5 | 3 | 2026-09-28 | `tags.list` (:35) | partial | No single-tag read. `tags.list` with `search` finds the tag. |
+| `gitlab.repository.tag.show` | 5 | 3 | 2026-09-28 | `tag.get` (:144) | covered | — |
 | `gitlab.branch.create` | 4 | 1 | 2026-09-20 | — | missing | The branch write is not selected. |
-| `gitlab.release.show` | 4 | 3 | 2026-10-02 | `releases.list` (:38) | partial | No single-release read. |
+| `gitlab.release.show` | 4 | 3 | 2026-10-02 | `release.get` (:167) | covered | — |
 | `gitlab.branch.delete` | 3 | 2 | 2026-10-01 | — | missing | Branch delete is not selected. |
 | `gitlab.pipeline.create` | 3 | 2 | 2026-10-06 | — | missing | The CI trigger is not selected. |
-| `gitlab.release.link.list` | 2 | 1 | 2026-10-02 | `releases.list` (:38) | partial | Links appear only inside each release's `assets`. There is no per-release link list. |
+| `gitlab.release.link.list` | 2 | 1 | 2026-10-02 | `release.links` (:169) | covered | — |
 | `gitlab.deployment.list` | 1 | 1 | 2026-09-28 | `deployments.list` (:50) | covered | — |
 | `gitlab.environment.list` | 1 | 1 | 2026-09-28 | — | missing | Environments are not selected. |
 | `gitlab.mr.discussion.reply` | 1 | 1 | 2026-09-24 | `merge_request.discussion.reply` (:87) | covered | One reply by discussion id, its text required. Unguarded, as a create (2026-10-10). |
 | `gitlab.mr.discussion.resolve` | 1 | 1 | 2026-09-24 | `merge_request.discussion.resolve` (:90) | covered | Resolve or unresolve by discussion id, `resolved` a JSON boolean. Guarded: refused before the write unless the read answers with that discussion and it is resolvable; GitLab's answer must carry the same discussion id and the requested state, or the outcome is unknown (2026-10-10). |
-| `gitlab.release.update` | 1 | 1 | 2026-09-29 | — | missing | The release write is not selected. |
-| `gitlab.repository.tag.delete` | 1 | 1 | 2026-09-20 | — | missing | Tag delete is not selected. |
+| `gitlab.release.update` | 1 | 1 | 2026-09-29 | `release.update` (:182) | covered | The release must be at the tag and `sha` before and after. |
+| `gitlab.repository.tag.delete` | 1 | 1 | 2026-09-20 | `tag.delete` (:156) | covered | The tag must be at the caller's `sha` before; only a 404 on the read after counts as deleted. |
 | `gitlab.branch.delete_merged` | 0 | 0 | - | — | missing | Not selected. |
 | `gitlab.ci.variable.create` | 0 | 0 | - | — | missing | CI variables are not selected. |
 | `gitlab.ci.variable.delete` | 0 | 0 | - | — | missing | CI variables are not selected. |
@@ -448,18 +488,19 @@ token as its `loki.bearer` token, sends its probe and every read below that pref
 `a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). The uid
 comes from `datasources.list`. The mediated route of the design, `grafana-datasource-proxy`
 (`adapters/grafana/design.md:19`), which would seal the uid and allowlist targets, is not
-built; Prometheus and Alertmanager through Grafana still need their own adapters. Each read is
+built. Prometheus, like Loki, runs on a connection whose base URL is the proxy path
+([prometheus](#prometheus)); Alertmanager through Grafana still needs its own adapter. Each read is
 tested against fixture answers in Grafana and Loki API shapes, not a live Grafana.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
 | `grafana.loki.query` | 320 | 12 | 2026-09-28 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) on a Loki connection through the Grafana proxy | covered | Unpaged: at most 1,000 lines per call over at most 24 hours. A metric expression is `logs.query_metric` (`adapters/loki/spec/adapter.json:259`). The connection names the data source uid in its `base_url`. |
-| `grafana.prometheus.query` | 49 | 7 | 2026-10-06 | — | missing | An instant PromQL query through the proxy. Needs the Grafana route and a Prometheus adapter. |
+| `grafana.prometheus.query` | 49 | 7 | 2026-10-06 | `series.query` (`adapters/prometheus/spec/adapter.json:60`) on a Prometheus connection through the Grafana proxy | covered | No tenant header and no `timeout` parameter; "too many samples" is reported as an execution error, not a capacity error. |
 | `grafana.datasource.list` | 31 | 12 | 2026-10-06 | `datasources.list` (`adapters/grafana/spec/adapter.json:45`) | covered | uid, name, type, access mode and default flag only; backend URLs and settings are withheld. Unpaged, at most 1,000 records. |
-| `grafana.prometheus.range` | 17 | 3 | 2026-10-06 | — | missing | A range PromQL query through the proxy. |
+| `grafana.prometheus.range` | 17 | 3 | 2026-10-06 | `series.query_range` (`adapters/prometheus/spec/adapter.json:222`) on a Prometheus connection through the Grafana proxy | covered | As `grafana.prometheus.query`. |
 | `grafana.loki.labels` | 6 | 4 | 2026-09-22 | `logs.labels` (`adapters/loki/spec/adapter.json:429`) on a Loki connection through the Grafana proxy | covered | Label names, or one label's values. |
 | `grafana.loki.recent_logs` | 1 | 1 | 2026-09-15 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) with a start and no end, on a Loki connection through the Grafana proxy | covered | The caller computes the start (now minus N minutes); an omitted `end_unix_ns` is the receiver clock (`adapters/loki/tests/protocol.rs`, `recent_logs_through_the_grafana_proxy_end_at_the_receiver_clock_below_the_prefix`). |
-| `grafana.prometheus.rules` | 1 | 1 | 2026-09-23 | — | missing | Prometheus rules through the proxy. |
+| `grafana.prometheus.rules` | 1 | 1 | 2026-09-23 | `rules.list` (`adapters/prometheus/spec/adapter.json:407`) on a Prometheus connection through the Grafana proxy | covered | Each alerting rule carries its count of active alerts, not the alerts. |
 | `grafana.alerts.active` | 0 | 0 | - | — | missing | Alertmanager through the proxy. |
 | `grafana.alerts.silences.create` | 0 | 0 | - | — | missing | An Alertmanager write through the proxy. |
 | `grafana.alerts.silences.delete` | 0 | 0 | - | — | missing | An Alertmanager write through the proxy. |
@@ -584,20 +625,24 @@ v2 has no CQL search and no user search.
 
 Source: fluxplane inventory §2 prometheus.
 
-Connectors has no Prometheus runtime. `adapters/prometheus` holds `design.md` and the
-`promql-range` contract. The baseline notes that instant queries are not specified
-(`docs/recent-adapter-usage-20260909.md`, U08).
+Connectors serves Prometheus through the native adapter `adapters/prometheus` (line numbers
+below are `adapters/prometheus/spec/adapter.json`): instant and range PromQL queries and the rule
+list, on a bearer-token connection whose probe is `GET /api/v1/status/buildinfo`. Through Grafana
+the same adapter runs on a connection whose base URL is Grafana's data-source proxy path, as Loki
+does. Each read is tested against recorded answers in Prometheus API shapes, through the private
+runtime and the CLI, not a live Prometheus. Limits: no tenant header, no `timeout` parameter, a
+"too many samples" answer is reported as an execution error, and only the bearer profile is built.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `prometheus.query` | 1 | 1 | 2026-09-16 | — | missing | No runtime. Instant queries are not specified. |
-| `prometheus.test` | 1 | 1 | 2026-09-24 | — | missing | No Prometheus connection. |
-| `prometheus.alerts` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.labels` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.query_range` | 0 | 0 | - | — | missing | No runtime. A range query is specified but not implemented. |
-| `prometheus.rules` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.series` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.targets` | 0 | 0 | - | — | missing | No runtime. |
+| `prometheus.query` | 1 | 1 | 2026-09-16 | `series.query` (`adapters/prometheus/spec/adapter.json:60`) | covered | No tenant header and no `timeout` parameter. |
+| `prometheus.test` | 1 | 1 | 2026-09-24 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/v1/status/buildinfo` probe with the saved token. |
+| `prometheus.alerts` | 0 | 0 | - | — | missing | Not selected. |
+| `prometheus.labels` | 0 | 0 | - | — | missing | Not selected. |
+| `prometheus.query_range` | 0 | 0 | - | `series.query_range` (`adapters/prometheus/spec/adapter.json:222`) | covered | — |
+| `prometheus.rules` | 0 | 0 | - | `rules.list` (`adapters/prometheus/spec/adapter.json:407`) | covered | Each alerting rule carries its count of active alerts, not the alerts. |
+| `prometheus.series` | 0 | 0 | - | — | missing | Not selected. |
+| `prometheus.targets` | 0 | 0 | - | — | missing | Not selected. |
 
 ## alertmanager
 
@@ -925,7 +970,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `jira.issue.get` (§4b) | 1 | 1 | `jira.issue.show` | covered | — |
 | `confluence.test` (§4b) | 1 | 1 | `confluence.test` | covered | — |
 | `gitlab.mr.show` (§4b) | 1 | 1 | `gitlab.mr.show` | covered | — |
-| `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | missing | U10 |
+| `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | covered | — |
 | `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | covered | — |
 
 In total, 124 calls are mapped: 89 covered and 35 to gap units. The rest of §4 is not
@@ -1006,8 +1051,8 @@ waits for any unit it depends on: U05 after U04, U12 after U05, U08 and U13 afte
 
 ## Not planned until used
 
-182 operations with 0 calls are partial or missing: 175 missing and 7 partial. They belong to
-no unit until a session uses them. The other 10 operations with 0 calls are already covered.
+180 operations with 0 calls are partial or missing: 173 missing and 7 partial. They belong to
+no unit until a session uses them. The other 12 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
@@ -1019,7 +1064,7 @@ no unit until a session uses them. The other 10 operations with 0 calls are alre
 | kubernetes | 7 | `container.show` (partial), `deployment.restart`, `deployment.scale`, `ingress.list`, `node.list` (partial), `portforward.list`, `service.show` (partial) |
 | homer | 3 | `alias.list`, `call.analyze`, `pcap.export` |
 | confluence | 10 | `attachment.delete`, `attachment.get`, `index.build`, `page.attachment.add`, `page.attachment.list`, `page.comment.add`, `page.create`, `page.delete`, `page.update`, `user.search` |
-| prometheus | 6 | `alerts`, `labels`, `query_range`, `rules`, `series`, `targets` |
+| prometheus | 4 | `alerts`, `labels`, `series`, `targets` |
 | alertmanager | 4 | `silence.create`, `silence.delete`, `silence.list`, `test` |
 | asterisk | 8 | all |
 | aws | 11 | all |

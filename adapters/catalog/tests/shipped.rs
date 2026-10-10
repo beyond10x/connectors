@@ -33,7 +33,9 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
     // note, discussion read, reply and guarded resolve, and the repository
     // tree, single commit, commit diff and branch list reads, and the
     // auto-merge and reopen variants of merge and update, and the
-    // merge-request diff and discussion list reads. A renamed, dropped or
+    // merge-request diff and discussion list reads, and code search, and the
+    // single tag and release reads, the release link list and the guarded tag
+    // create and delete and release create and update. A renamed, dropped or
     // added id fails here.
     let mut expected = vec![
         "project.get",
@@ -70,10 +72,26 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "merge_request.reopen",
         "merge_request.diffs",
         "merge_request.discussions",
+        "search.blobs",
+        "tag.get",
+        "tag.create",
+        "tag.delete",
+        "release.get",
+        "release.links",
+        "release.create",
+        "release.update",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 34);
+    assert_eq!(declared.len(), 42);
+    for write in [
+        "tag.create",
+        "tag.delete",
+        "release.create",
+        "release.update",
+    ] {
+        assert_eq!(engine.effect(write), Some(Effect::Write), "`{write}`");
+    }
     assert_eq!(engine.effect("merge_request.merge"), Some(Effect::Write));
     assert_eq!(engine.effect("job.trace"), Some(Effect::Read));
     assert_eq!(engine.effect("issue.create"), Some(Effect::Write));
@@ -99,6 +117,13 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         (
             "merge_request.discussions",
             "getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions",
+        ),
+        ("search.blobs", "getApiV4ProjectsIdDashSearch"),
+        ("tag.get", "getApiV4ProjectsIdRepositoryTagsTagName"),
+        ("release.get", "getApiV4ProjectsIdReleasesTagName"),
+        (
+            "release.links",
+            "getApiV4ProjectsIdReleasesTagNameAssetsLinks",
         ),
     ] {
         let selection = selections
@@ -138,7 +163,12 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
             .any(|p| p.name == "per_page" && p.location == Location::Query);
         let expected = if pages {
             paged.push(id);
-            serde_json::json!({"per_page": {"minimum": 1, "maximum": 100}})
+            if id == "search.blobs" {
+                // Code search also holds its required `scope` to `blobs`.
+                serde_json::json!({"scope": {"values": ["blobs"]}, "per_page": {"minimum": 1, "maximum": 100}})
+            } else {
+                serde_json::json!({"per_page": {"minimum": 1, "maximum": 100}})
+            }
         } else {
             Value::Null
         };
@@ -160,8 +190,10 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
             "pipelines.list",
             "project.events",
             "projects.list",
+            "release.links",
             "releases.list",
             "repository.tree",
+            "search.blobs",
             "tags.list",
         ]
     );

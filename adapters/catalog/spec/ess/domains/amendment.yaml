@@ -1,0 +1,86 @@
+domain: connectors_catalog.amendment
+summary: A `connectors-source-amendments/1` file, the cited corrections the bundle pipeline applies to the inventory it extracts from a pinned source, which stays byte for byte the vendor's.
+
+# Normative owner: docs/local-catalog-provider.md, "Build the bundle" (`--amendments`). The
+# pipeline reads the file (`crates/connectors-catalog/src/amendment.rs`) and the bundle's source
+# record names it and its SHA-256, beside the unchanged digest of the pinned source.
+#
+# What the pipeline refuses beyond these invariants is stated in the owner and pinned by its
+# tests: a digest other than the pinned source's, an operation the source does not declare exactly
+# once, a parameter the operation already declares, a citation that is not an https URL, a blank
+# reason, and a path correction whose `from` is not the operation's path as the source declares it
+# or whose `to` is not `from` with each parenthesised optional segment either removed or kept
+# without its parentheses. ESS 0.57 has no string-prefix or string-derivation constraint to state
+# those by. Nothing is applied when any amendment is refused.
+
+types:
+  # The one place an added parameter may travel.
+  - name: connectors_catalog.amendment.QueryLocation
+    kind: enum
+    variants: [query]
+
+  # A parameter's scalar type, as the inventory records it.
+  - name: connectors_catalog.amendment.ValueType
+    kind: enum
+    variants: [string, integer, boolean]
+
+  # One optional, unrepeated query parameter the vendor's reference documents for the operation and
+  # its published document leaves out. It only widens what a caller may send.
+  - name: connectors_catalog.amendment.AddedParameter
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: location, type: connectors_catalog.amendment.QueryLocation}
+      - {name: required, type: Boolean}
+      - {name: type, type: "Optional<connectors_catalog.amendment.ValueType>"}
+      - {name: repeated, type: "Optional<Boolean>"}
+    invariants:
+      - name.count >= 1
+      - {required: false}
+      - any: [{not: defined(repeated)}, {repeated: false}]
+
+  # The operation's path template as the source declares it (`from`) and as the provider serves it
+  # (`to`). It is for a vendor notation the template reader does not read, such as GitLab's
+  # `/api/v4/projects/{id}/(-/)search`, whose `(-/)` marks an optional segment: written literally,
+  # the request would go to `projects/7/(-/)search`. `to` must be `from` with each parenthesised
+  # optional segment removed or kept without its parentheses (a segment holding a path parameter is
+  # only kept), so it keeps every path parameter and
+  # cannot retarget the operation elsewhere; the method is never changed.
+  - name: connectors_catalog.amendment.PathCorrection
+    kind: struct
+    fields:
+      - {name: from, type: String}
+      - {name: to, type: String}
+    invariants:
+      - from.count >= 1
+      - to.count >= 1
+
+  # One cited amendment: exactly one of `add_parameter` and `correct_path`, the vendor page that
+  # documents it (https) and why the pinned document needs it, in a sentence.
+  - name: connectors_catalog.amendment.Amendment
+    kind: struct
+    fields:
+      - {name: operation_id, type: String}
+      - {name: add_parameter, type: "Optional<connectors_catalog.amendment.AddedParameter>"}
+      - {name: correct_path, type: "Optional<connectors_catalog.amendment.PathCorrection>"}
+      - {name: cite, type: String}
+      - {name: reason, type: String}
+    invariants:
+      - operation_id.count >= 1
+      - cite.count >= 1
+      - reason.count >= 1
+      - any: [defined(add_parameter), defined(correct_path)]
+      - any: [{not: defined(add_parameter)}, {not: defined(correct_path)}]
+
+  # The file: its format, the SHA-256 of the pinned source it is written against, and at least one
+  # amendment.
+  - name: connectors_catalog.amendment.Amendments
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: source_sha256, type: String}
+      - {name: amendments, type: "List<connectors_catalog.amendment.Amendment>"}
+    invariants:
+      - {format: connectors-source-amendments/1}
+      - source_sha256.count >= 1
+      - amendments.count >= 1

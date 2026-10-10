@@ -106,8 +106,10 @@ enum Action {
         /// the bundle then records the derivation.
         #[arg(long)]
         derived_from: Option<PathBuf>,
-        /// A `connectors-source-amendments/1` file of cited parameters the pinned
-        /// source leaves out, applied to its inventory and recorded in the bundle.
+        /// A `connectors-source-amendments/1` file of cited corrections to the
+        /// pinned source (a query parameter it leaves out, or a path template it
+        /// writes in a vendor notation), applied to its inventory and recorded in
+        /// the bundle.
         #[arg(long)]
         amendments: Option<PathBuf>,
     },

@@ -1,0 +1,73 @@
+{
+  "status": "success",
+  "data": {
+    "groups": [
+      {
+        "name": "api.alerts",
+        "file": "/etc/prometheus/rules/fixture.yml",
+        "interval": 30,
+        "limit": 0,
+        "evaluationTime": 0.000812,
+        "lastEvaluation": "2026-09-08T12:00:00.000000000Z",
+        "rules": [
+          {
+            "state": "firing",
+            "name": "ApiDown",
+            "query": "up{job=\"api\"} == 0",
+            "duration": 300,
+            "keepFiringFor": 0,
+            "labels": {"severity": "page"},
+            "annotations": {"summary": "fixture api instance down"},
+            "alerts": [
+              {
+                "labels": {"alertname": "ApiDown", "instance": "api-1", "job": "api", "severity": "page"},
+                "annotations": {"summary": "fixture api instance down"},
+                "state": "firing",
+                "activeAt": "2026-09-08T11:55:00.000000000Z",
+                "value": "0e+00"
+              }
+            ],
+            "health": "ok",
+            "evaluationTime": 0.000401,
+            "lastEvaluation": "2026-09-08T12:00:00.000000000Z",
+            "type": "alerting"
+          },
+          {
+            "state": "inactive",
+            "name": "ApiSlow",
+            "query": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job=\"api\"}[5m]))) > 1.5",
+            "duration": 600.5,
+            "keepFiringFor": 0,
+            "labels": {"severity": "ticket"},
+            "annotations": {},
+            "alerts": [],
+            "health": "err",
+            "lastError": "fixture evaluation failure",
+            "evaluationTime": 0.000102,
+            "lastEvaluation": "2026-09-08T12:00:00.000000000Z",
+            "type": "alerting"
+          }
+        ]
+      },
+      {
+        "name": "api.recording",
+        "file": "/etc/prometheus/rules/fixture.yml",
+        "interval": 60,
+        "limit": 0,
+        "evaluationTime": 0.000301,
+        "lastEvaluation": "2026-09-08T12:00:00.000000000Z",
+        "rules": [
+          {
+            "name": "job:http_requests:rate5m",
+            "query": "sum by (job) (rate(http_requests_total[5m]))",
+            "labels": {},
+            "health": "ok",
+            "evaluationTime": 0.000201,
+            "lastEvaluation": "2026-09-08T12:00:00.000000000Z",
+            "type": "recording"
+          }
+        ]
+      }
+    ]
+  }
+}

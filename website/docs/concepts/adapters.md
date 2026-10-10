@@ -57,5 +57,6 @@ A parent adapter may discover what a child adapter could use. Grafana can report
 Kubernetes can report a database endpoint, but a discovery result grants no access. A host binds
 the child's target, credential and authority deliberately, and the child consumes shared mediated
 capabilities without knowing its concrete parent. Grafana, Prometheus, Alertmanager and the media
-adapters are specified this way and have no runtime yet; [Adapters](../reference/adapters/index.md)
-lists which ones run.
+adapters are specified this way, and no such mediated binding runs yet: Loki and Prometheus reach
+Grafana only through a configured proxy path. [Adapters](../reference/adapters/index.md) lists
+which ones run.

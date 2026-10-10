@@ -1,0 +1,7 @@
+format: ess/23
+system: connectors_prometheus
+version: v1
+domains:
+  - connectors_prometheus.reads
+  - connectors_prometheus.rules
+  - connectors_prometheus.connection

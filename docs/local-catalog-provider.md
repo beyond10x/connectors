@@ -35,15 +35,31 @@ committed bundle that a fresh run would not reproduce byte for byte. Nothing
 here reaches the network.
 
 `--amendments <file>` applies a `connectors-source-amendments/1` file to the
-extracted inventory: each entry names an `operation_id`, one optional query
-parameter to add (`name`, `location: query`, `required: false`, `type`), the
-https page that documents it and why the pinned document lacks it. The file
-must carry the source's SHA-256, and an operation that is missing or declared
-twice, a parameter it already declares, or anything other than an optional,
-unrepeated query parameter is refused before any bundle is written. The
-bundle's source record then names the file and its SHA-256
-(`crates/connectors-catalog/src/amendment.rs`). Zendesk uses it for the ticket
-export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)).
+extracted inventory: each entry names an `operation_id`, exactly one change, the
+https page that documents it and why the pinned document needs it. The change
+is one of:
+
+- `add_parameter`: one optional query parameter to add (`name`,
+  `location: query`, `required: false`, `type`) that the pinned document lacks;
+- `correct_path`: `{"from": "<path>", "to": "<path>"}`, where `from` is the
+  operation's path as the source declares it and `to` is that path with each
+  parenthesised optional segment either removed or kept without its
+  parentheses, such as GitLab's `/api/v4/projects/{id}/(-/)search` to
+  `/api/v4/projects/{id}/search`; a segment holding a path parameter can only be
+  kept. The method and every path parameter stay as
+  declared.
+
+The file must carry the source's SHA-256. An operation that is missing or
+declared twice, an entry with both changes or neither, a citation that is not
+https or a blank reason, a parameter the operation already declares or anything
+other than an optional, unrepeated query parameter, and a correction whose
+`from` is not the operation's current path or whose `to` equals `from` or is not
+derived from it that way are each refused before any bundle is written, and
+nothing is applied. The bundle's source record then names the file and its
+SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
+`connectors_catalog.amendment` in `adapters/catalog/spec/ess`). Zendesk uses it
+for the ticket export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)),
+GitLab for the project search path ([Project code search](#project-code-search)).
 
 ## The shipped selection set
 
@@ -61,8 +77,9 @@ serves the provider from the pinned source alone, plus eleven repository reads
 and one unguarded write, `issue.create`, the merge-request note and discussion
 operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)), the
 auto-merge and reopen variants of merge and update
-([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)), and two
-merge-request list reads, its diffs and its discussions:
+([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)), two
+merge-request list reads, its diffs and its discussions, project code
+search, and tags and releases ([below](#tags-and-releases)):
 
 | id | source operation | effect |
 |---|---|---|
@@ -77,8 +94,12 @@ merge-request list reads, its diffs and its discussions:
 | `merge_request.auto_merge`, `merge_request.reopen` | `…MergeRequestIidMerge` and `…MergeRequestIid`, guarded, each with one fixed body value ([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)) | write |
 | `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | read |
 | `merge_request.diffs`, `merge_request.discussions` | `getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs`, `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions`, each one page per call ([below](#merge-request-diffs-and-discussions)) | read |
+| `search.blobs` | `getApiV4ProjectsIdDashSearch`, path corrected by a cited amendment, `scope` held to `blobs` ([below](#project-code-search)) | read |
 | `merge_request.note.create`, `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes`, `…DiscussionsDiscussionIdNotes`, unguarded | write |
 | `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`, guarded | write |
+| `tag.get`, `release.get`, `release.links` | `getApiV4ProjectsIdRepositoryTagsTagName`, `getApiV4ProjectsIdReleasesTagName`, `getApiV4ProjectsIdReleasesTagNameAssetsLinks` ([below](#tags-and-releases)) | read |
+| `tag.create`, `tag.delete` | `postApiV4ProjectsIdRepositoryTags`, `deleteApiV4ProjectsIdRepositoryTagsTagName`, guarded on the pinned commit | write |
+| `release.create`, `release.update` | `postApiV4ProjectsIdReleases`, `putApiV4ProjectsIdReleasesTagName`, guarded on the pinned commit | write |
 
 The GitLab set also declares the merge request feed, a `datasource.feed/v1alpha1`
 binding under profile `gitlab-merge-requests/1`: `feed.containers` lists the
@@ -98,7 +119,7 @@ GitLab serves at most 100 items per page, so with a larger value every page
 would be short and the walk would stop after page one. The pinned source
 declares no range, so the shipped selection bounds `per_page` to 1 through 100
 on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
-`pipeline.jobs`, `merge_request.diffs`, `merge_request.discussions` and these nine): a value of zero or below never ends a walk on a
+`pipeline.jobs`, `merge_request.diffs`, `merge_request.discussions`, `release.links` and these nine): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares,
@@ -128,13 +149,32 @@ refused as `invalid_input` before any request.
 `created_at`, `last_activity_at` and `path_with_namespace`. All eleven need only
 the `read_api` token scope.
 
-Code search within a project (`getApiV4ProjectsIdDashSearch`, scope `blobs`) is
-not selected. The pinned source declares its path as
-`/api/v4/projects/{id}/(-/)search`, GitLab's notation for an optional `-/`
-segment; the engine reads the template literally and would send
-`/projects/{id}/(-/)search`, and a `connectors-source-amendments/1` file can add
-an optional query parameter but cannot correct a path. A selection bound is an
-integer range, so it also cannot hold the required `scope` to `blobs`.
+### Project code search
+
+`search.blobs` selects `getApiV4ProjectsIdDashSearch`, GitLab's project search,
+held to code: it needs `read_api` and sends
+`GET /projects/{id}/search?scope=blobs&search=…`, one page per call.
+
+| id | source operation | request | effect |
+|---|---|---|---|
+| `search.blobs` | `getApiV4ProjectsIdDashSearch` | `GET /projects/{id}/search` with `search` (the expression, required), `scope` (required, and only `blobs`), `ref` (a branch or tag), `page` and `per_page` (1 through 100). The body is GitLab's list of blob matches, unchanged, such as `path`, `ref`, `startline` and `data` (the matching lines). Example: `{"id": "org/project", "scope": "blobs", "search": "connect(", "ref": "main", "per_page": 20, "page": 1}` sends `GET` to the segments `projects`, `org/project`, `search` with the query pairs `scope=blobs`, `search=connect(`, `ref=main`, `per_page=20` and `page=1` | read |
+
+The pinned source declares the path as `/api/v4/projects/{id}/(-/)search`,
+GitLab's notation for an optional `-/` segment, which the engine would send
+literally. The pinned document stays as GitLab published it; the cited
+`adapters/gitlab/upstream/openapi_v3.amendments.json` corrects the bundle's
+path to `/api/v4/projects/{id}/search`, the route GitLab's search reference
+documents (see `--amendments` in [Build the bundle](#build-the-bundle)). The
+same notation on group search and project semantic search is not corrected,
+and neither is selected.
+
+The selection bounds `scope` to the one value `blobs`, so the search cannot
+reach issues, merge requests, commits, notes, wiki text or users: any other
+scope, a case or whitespace variant, a comma-joined list or an absent `scope` is
+refused as `invalid_input` before any request, and the declared input schema
+lists `scope` with `"enum": ["blobs"]`. It withholds `type`, `state`,
+`confidential` and `fields`, which apply only to other scopes, so an input
+carrying any of them is refused the same way.
 
 ### Merge-request diffs and discussions
 
@@ -151,6 +191,32 @@ A merge request GitLab does not find answers its `404`, refused as
 `not_found`; one the token may not read answers `403`, refused as `forbidden`.
 The flat note list (`getApiV4ProjectsIdMergeRequestsNoteableIdNotes`) is not
 selected: every note is in the discussion list, inside its discussion.
+
+### Tags and releases
+
+Three reads, each by tag name sent as one path segment (`release/v2` is encoded,
+never a second segment), and four writes, each guarded on a commit `sha` the
+caller pins as a top-level input. The reads need `read_api`; the writes need
+`api` and at least GitLab's Developer role. Each write's body is closed to the
+keys of the pinned request schema, its string keys typed `string`; any other
+key, or a missing `sha`, is refused as `invalid_input` before any request.
+
+| id | source operation | request | effect |
+|---|---|---|---|
+| `tag.get` | `getApiV4ProjectsIdRepositoryTagsTagName` | `GET /projects/{id}/repository/tags/{tag_name}`; GitLab's tag, unchanged: `name`, `message`, `target`, `commit`, `release`, `protected` | read |
+| `release.get` | `getApiV4ProjectsIdReleasesTagName` | `GET /projects/{id}/releases/{tag_name}`, `include_html_description`; the release with its `commit`, `description` and `assets` | read |
+| `release.links` | `getApiV4ProjectsIdReleasesTagNameAssetsLinks` | `GET /projects/{id}/releases/{tag_name}/assets/links`, one page per call, `per_page` 1 through 100; each link's `id`, `name`, `url`, `direct_asset_url` and `link_type` | read |
+| `tag.create` | `postApiV4ProjectsIdRepositoryTags` | body `tag_name`, `ref` (a branch, tag or commit) and `message` (annotates). The guard reads `GET …/repository/commits/{body.ref}` and refuses unless its `/id` is `sha`; GitLab's answer must name `/name` `body.tag_name` at `/commit/id` `sha`. Example: `{"id": "org/project", "sha": "<head of main>", "body": {"tag_name": "v1.2.0", "ref": "main"}}` | write |
+| `tag.delete` | `deleteApiV4ProjectsIdRepositoryTagsTagName` | The guard reads the tag and refuses unless its `/name` is `tag_name` and its `/commit/id` is `sha`; GitLab answers `204` with no body, so the guard reads the tag again and the delete is applied only when that read answers `404` (`postflight.absent`). GitLab has no conditional delete, so a tag deleted and recreated at another commit between the first read and the delete is deleted and still reported applied | write |
+| `release.create` | `postApiV4ProjectsIdReleases` | body `tag_name`, `name`, `description`, `released_at`, `milestones`, `milestone_ids`, `assets`. The guard reads the tag `body.tag_name` and refuses unless its `/commit/id` is `sha`; GitLab's answer must name `/tag_name` and `/commit/id` the same. The body admits neither `ref` nor `tag_message`, so the release is of an existing tag and never creates one: create the tag with `tag.create` first | write |
+| `release.update` | `putApiV4ProjectsIdReleasesTagName` | body `name`, `description`, `released_at`, `milestones`, `milestone_ids`, each replacing the stored value. The guard reads the release and refuses unless its `/tag_name` is `tag_name` and its `/commit/id` is `sha`, and the answer must carry both | write |
+
+A guard read that GitLab answers `404` refuses the write before dispatch. A
+differing value after the write (a ref moved between the read and the create,
+say) leaves the outcome `unknown`, never refused, and no corrective request is
+sent. A tag that already exists is GitLab's own `400`, a second release of one
+tag its `409`; both are definite refusals. Release deletion and the release-link
+writes are not selected.
 
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
 and pins the complete list of shipped ids, so a renamed, dropped or added id
@@ -345,14 +411,28 @@ The complete configuration used against the sandbox is
   the provider answers plain text, as GitLab does for a job trace. Without it the
   bundle decides: a 2xx declared only as `text/…` is read as text, anything else
   as JSON. A write never carries it.
-- `bounds` is optional: `{"<parameter>": {"minimum": <n>, "maximum": <n>}}`
-  narrows a query parameter the source declares, such as a provider's page-size
-  cap; `minimum` may be omitted. The value, whether sent as a number or a
-  string, must be a decimal integer no greater than `maximum` and no less than
-  `minimum` (`-0` is zero); anything else is refused as `invalid_input` before
-  any request. A bound on a parameter the operation does not declare as a query
-  parameter, or with a `minimum` above its `maximum`, is refused when the
-  selection loads. The declared input schema carries both limits as well.
+- `bounds` is optional and narrows query parameters the source declares, each
+  by exactly one of two forms:
+  - a range, `{"<parameter>": {"minimum": <n>, "maximum": <n>}}`, such as a
+    provider's page-size cap; `minimum` may be omitted. The value, whether sent
+    as a number or a string, must be a decimal integer no greater than `maximum`
+    and no less than `minimum` (`-0` is zero). The declared input schema
+    carries both limits.
+  - a set, `{"<parameter>": {"values": ["<value>", …]}}`, for a parameter the
+    source types as a string, such as GitLab's search `scope` held to `blobs`.
+    The text the value is sent as must be exactly one of the values (a JSON
+    integer is compared as its decimal text); case, whitespace and
+    comma-joined variants are not. The declared input schema lists the set as
+    the parameter's `enum`.
+
+  A value outside its bound is refused as `invalid_input` before any request;
+  a repeated parameter's bound holds for each element. When the selection
+  loads, a bound is refused on a parameter the operation does not declare as a
+  query parameter, with both forms or neither, with a `minimum` above its
+  `maximum` or beside `values`, with `values` on a parameter the source does not
+  type as a string, or with an empty set or an empty or repeated value. The
+  form is modelled as `connectors_catalog.selection.Bound` in
+  `adapters/catalog/spec/ess`.
 - `required` is optional: `["<query parameter>", …]` marks query parameters the
   provider requires although the pinned source does not. Each is then declared
   required and refused as `invalid_input` when absent, before any request. A
@@ -471,11 +551,19 @@ The complete configuration used against the sandbox is
     `true` or, when the pipeline had already succeeded, with `state` `merged`.
     An answer with none of them leaves the outcome uncertain. Its checks count
     toward the sixteen.
+  - `postflight.absent` is optional, only `true` and only beside a postflight
+    `read` with no `checks` and no `any_of`: that read must answer `404` after
+    the write, proving a delete whose provider answers without a body, such as
+    GitLab's tag delete (`204`). The target still found, or a read that fails
+    otherwise, leaves the outcome uncertain. The write's own status and body
+    are what the operation returns.
   - Every read binds every value, and every check resolves its input, before
     the first request; a missing one is refused as `invalid_input` with nothing
     sent. A read that is not a GET under the base path, more than sixteen checks
     in all, a further preflight without checks, more than three of them, a
-    postflight read without checks and an `any_of` of one check are refused
+    postflight read without checks and without `absent`, an `absent` that is
+    not `true`, lacks a read or sits beside a check, and an `any_of` of one
+    check are refused
     when the selection loads, as is a credential parameter bound by any read's
     `values`. The format is modelled as `connectors_catalog.guard.Guard` in
     `adapters/catalog/spec/ess`, and every shipped guard is checked against it.

@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0420-catalog-guard-reads
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.42.0: catalog guard reads and fixed body values; Jira transition run, GitLab auto-merge, reopen and merge-request reads'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261010b-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-10T03:47:14Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-10T05:00:15Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 

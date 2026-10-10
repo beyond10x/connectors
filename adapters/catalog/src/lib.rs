@@ -23,7 +23,7 @@ use connectors_sdk::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// What a selected operation does to the provider. Declared, not inferred from
 /// the method: an imported verb alone establishes no effect knowledge.
@@ -92,6 +92,16 @@ pub struct Postflight {
     /// declared; omitted when empty, so a guard without it keeps its bytes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub any_of: Vec<Check>,
+    /// Only `true`, beside `read`: the read after the write must answer 404,
+    /// proving a delete, and nothing else is compared. Omitted when absent, so
+    /// a guard without it keeps its bytes; an explicit `null` is refused, as
+    /// the model refuses it, and `false` is refused when the selection loads.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_flag"
+    )]
+    pub absent: Option<bool>,
 }
 
 /// How a 2xx body is read. The bundle's declared media types decide by default;
@@ -155,15 +165,55 @@ impl Guard {
     }
 }
 
-/// A narrower range for one query parameter than the pinned source declares,
-/// such as a provider's page-size cap. The value is read as an integer.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// A narrower bound for one query parameter than the pinned source declares,
+/// in exactly one of two forms: a range, `maximum` and an optional `minimum`,
+/// within which the value must be a decimal integer, such as a provider's
+/// page-size cap; or `values`, the allowed strings, one of which the value's
+/// sent text must be, such as GitLab's project search held to `scope` `blobs`.
+/// A bound naming neither `maximum` nor `values` is not read; the engine
+/// refuses one with both forms, or neither, when it loads.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, try_from = "WrittenBound")]
 pub struct Bound {
     /// Omitted when absent, so a maximum-only bound serialises unchanged.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub minimum: Option<u64>,
-    pub maximum: u64,
+    /// Omitted when absent, so a `values` bound carries no range.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maximum: Option<u64>,
+    /// Omitted when empty, so a range bound serialises as it did before
+    /// `values` existed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub values: Vec<String>,
+}
+
+/// A bound as written, before it is read: `values` absent is told apart from
+/// `values` empty, so `{}` and a lone `minimum` are refused as they were before
+/// `values` existed, while an empty set reaches the engine's load check.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WrittenBound {
+    #[serde(default)]
+    minimum: Option<u64>,
+    #[serde(default)]
+    maximum: Option<u64>,
+    #[serde(default)]
+    values: Option<Vec<String>>,
+}
+
+impl TryFrom<WrittenBound> for Bound {
+    type Error = String;
+
+    fn try_from(written: WrittenBound) -> std::result::Result<Self, String> {
+        if written.maximum.is_none() && written.values.is_none() {
+            return Err("a bound names a `maximum` or `values`".to_owned());
+        }
+        Ok(Bound {
+            minimum: written.minimum,
+            maximum: written.maximum,
+            values: written.values.unwrap_or_default(),
+        })
+    }
 }
 
 /// One operation exposed from the bundle under a local id.
@@ -333,13 +383,21 @@ where
     Read::deserialize(deserializer).map(Some)
 }
 
+fn present_flag<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    bool::deserialize(deserializer).map(Some)
+}
+
 fn refuse(message: impl Into<String>) -> Error {
     Error::invalid(message)
 }
 
-/// Every bounded value present must be a decimal integer within its bound; a
-/// repeated parameter's bound holds for each element. Checked on the bound
-/// value strings, before any request.
+/// Every bounded value present must be a decimal integer within its range, or,
+/// under a `values` bound, exactly one of the allowed strings; a repeated
+/// parameter's bound holds for each element. Checked on the bound value
+/// strings, the text each is sent as, before any request.
 fn check_bounds(selection: &Selection, values: &BTreeMap<String, Supplied>) -> Result<()> {
     for (name, bound) in &selection.bounds {
         let texts = match values.get(name) {
@@ -355,15 +413,24 @@ fn check_bounds(selection: &Selection, values: &BTreeMap<String, Supplied>) -> R
 }
 
 fn check_bound(name: &str, bound: &Bound, text: &str) -> Result<()> {
+    if !bound.values.is_empty() {
+        if bound.values.iter().any(|allowed| allowed == text) {
+            return Ok(());
+        }
+        return Err(refuse(format!(
+            "parameter `{name}` is not one of its allowed values"
+        )));
+    }
     let digits = text.strip_prefix('-').unwrap_or(text);
     let value = (!digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
         .then(|| text.parse::<i128>().ok())
         .flatten()
         .ok_or_else(|| refuse(format!("parameter `{name}` is not an integer")))?;
-    if value > i128::from(bound.maximum) {
+    if let Some(maximum) = bound.maximum
+        && value > i128::from(maximum)
+    {
         return Err(refuse(format!(
-            "parameter `{name}` is above its maximum of {}",
-            bound.maximum
+            "parameter `{name}` is above its maximum of {maximum}"
         )));
     }
     if let Some(minimum) = bound.minimum
@@ -417,6 +484,8 @@ pub struct Prepared {
     alternatives: Vec<(String, String)>,
     /// The bound read the postflight checks, when the guard declares one.
     reread: Option<Request>,
+    /// Whether the read after the write must answer 404 (`postflight.absent`).
+    absent: bool,
     resource: String,
     instance: String,
     source_revision: String,
@@ -576,15 +645,42 @@ impl Engine {
                     selection.id
                 )));
             }
-            if let Some((name, _)) = selection
-                .bounds
-                .iter()
-                .find(|(_, bound)| bound.minimum.is_some_and(|minimum| minimum > bound.maximum))
-            {
-                return Err(refuse(format!(
-                    "selection `{}` bounds `{name}` with a minimum above its maximum",
-                    selection.id
-                )));
+            for (name, bound) in &selection.bounds {
+                let problem = match (bound.maximum, bound.values.is_empty()) {
+                    (Some(_), false) => Some("with both a range and `values`"),
+                    (None, true) => Some("with neither a `maximum` nor `values`"),
+                    (Some(maximum), true) => bound
+                        .minimum
+                        .is_some_and(|minimum| minimum > maximum)
+                        .then_some("with a minimum above its maximum"),
+                    (None, false) => {
+                        let string = operation.parameters.iter().any(|p| {
+                            &p.name == name
+                                && p.location == Location::Query
+                                && p.value_type == Some(ValueType::String)
+                        });
+                        let mut seen = BTreeSet::new();
+                        if bound.minimum.is_some() {
+                            Some("with a `minimum` beside `values`")
+                        } else if !string {
+                            Some("with `values`, but the source does not type it as a string")
+                        } else if bound
+                            .values
+                            .iter()
+                            .any(|value| value.is_empty() || !seen.insert(value))
+                        {
+                            Some("with an empty or repeated value")
+                        } else {
+                            None
+                        }
+                    }
+                };
+                if let Some(problem) = problem {
+                    return Err(refuse(format!(
+                        "selection `{}` bounds `{name}` {problem}",
+                        selection.id
+                    )));
+                }
             }
             // The provider's requirement, where the document omits it: marked on
             // the operation this selection exposes, so the declaration lists it
@@ -689,7 +785,23 @@ impl Engine {
                         selection.id
                     )));
                 }
-                if guard.postflight.read.is_some() && guard.postflight.checks.is_empty() {
+                match guard.postflight.absent {
+                    None => {}
+                    Some(true)
+                        if guard.postflight.read.is_some()
+                            && guard.postflight.checks.is_empty()
+                            && guard.postflight.any_of.is_empty() => {}
+                    Some(_) => {
+                        return Err(refuse(format!(
+                            "guard of `{}` declares absent other than true beside a read with no checks",
+                            selection.id
+                        )));
+                    }
+                }
+                if guard.postflight.read.is_some()
+                    && guard.postflight.checks.is_empty()
+                    && guard.postflight.absent.is_none()
+                {
                     return Err(refuse(format!(
                         "guard of `{}` declares a postflight read without checks",
                         selection.id
@@ -1190,6 +1302,11 @@ impl Engine {
             postflight,
             alternatives,
             reread,
+            absent: exposed
+                .selection
+                .guard
+                .as_ref()
+                .is_some_and(|guard| guard.postflight.absent == Some(true)),
             resource: exposed.operation.path.clone(),
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
@@ -1318,7 +1435,27 @@ impl Prepared {
         let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> =
             query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-        let observed = match reader.get(&borrowed, &query).await {
+        let answer = reader.get(&borrowed, &query).await;
+        // A delete is proved by its target no longer being found: only a 404
+        // to the read after it. The target still found, or a read that fails
+        // otherwise, leaves the effect possible.
+        if self.absent {
+            return match answer {
+                Ok(answer) if answer.status == 404 => WriteOutcome::Applied(Ok(json!({
+                    "status": response.status,
+                    "body": body,
+                    "provenance": provenance(&self.instance, &self.resource, &self.source_revision),
+                }))),
+                Ok(answer) if (200..300).contains(&answer.status) => unknown(
+                    "the guard's read after the write still found its target; the effect is possible"
+                        .into(),
+                ),
+                _ => unknown(
+                    "the guard's read after the write failed; the effect is possible".into(),
+                ),
+            };
+        }
+        let observed = match answer {
             Ok(answer) => read_body(&answer, false, &self.rate_limit_reasons),
             Err(error) => Err(error),
         };
@@ -1561,6 +1698,26 @@ fn declared_type(value_type: Option<ValueType>) -> Value {
     }
 }
 
+/// The declared `enum` of a `values` bound: each allowed string, and beside one
+/// that is the decimal text of an integer, that integer, which a string
+/// parameter also takes and sends as exactly that text.
+fn values_enum(values: &[String]) -> Value {
+    let mut allowed = Vec::new();
+    for value in values {
+        allowed.push(json!(value));
+        if let Ok(number) = value.parse::<i64>()
+            && number.to_string() == *value
+        {
+            allowed.push(json!(number));
+        } else if let Ok(number) = value.parse::<u64>()
+            && number.to_string() == *value
+        {
+            allowed.push(json!(number));
+        }
+    }
+    Value::Array(allowed)
+}
+
 /// A pattern matching exactly any of `names`, each ASCII letter in either case
 /// and every other character literal, written without inline flags so every
 /// JSON Schema reader of the declaration reads it the same way.
@@ -1596,13 +1753,20 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
         if parameter.location == Location::Header || parameter.location == Location::Cookie {
             continue;
         }
-        let bounded = |schema: &mut Value| {
+        // Advisory for callers: the engine checks the bound itself on every
+        // value. A range constrains only numbers, so it is declared on a
+        // repeated parameter's array too; `values` is declared as the `enum` of
+        // a single value, and of each element of a repeated one.
+        let bounded = |schema: &mut Value, element: bool| {
             if let Some(bound) = selection.bounds.get(&parameter.name) {
-                // Advisory for callers: it constrains only numbers, so the engine
-                // checks the bound itself on every value.
-                schema["maximum"] = json!(bound.maximum);
+                if let Some(maximum) = bound.maximum {
+                    schema["maximum"] = json!(maximum);
+                }
                 if let Some(minimum) = bound.minimum {
                     schema["minimum"] = json!(minimum);
+                }
+                if element && !bound.values.is_empty() {
+                    schema["enum"] = values_enum(&bound.values);
                 }
             }
         };
@@ -1611,12 +1775,12 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
             // element; or one value typed like its elements, a comma-joined
             // list of them included, sent as it was given.
             let mut schema = repeated_schema(parameter.value_type, parameter.required);
-            bounded(&mut schema["items"]);
-            bounded(&mut schema);
+            bounded(&mut schema["items"], true);
+            bounded(&mut schema, false);
             schema
         } else {
             let mut schema = declared_type(parameter.value_type);
-            bounded(&mut schema);
+            bounded(&mut schema, true);
             schema
         };
         properties.insert(parameter.name.clone(), schema);

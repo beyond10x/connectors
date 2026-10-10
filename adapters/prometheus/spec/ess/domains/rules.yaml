@@ -1,0 +1,72 @@
+domain: connectors_prometheus.rules
+summary: Prometheus-owned alerting and recording rules as `rules.list` returns them, one record per rule.
+
+# Normative owner: adapters/prometheus/contracts/series/v1alpha1/semantics.md §11.2
+# (profile `prometheus-rules` of datasource.records/v1alpha1). Native source: GET
+# api/v1/rules, whose `data.groups[].rules[]` this flattens, carrying the group name.
+#
+# A rule is a value, not an entity: Prometheus admits two rules of one name in one group,
+# and neither the API nor this binding names a stable rule identity.
+types:
+  - name: connectors_prometheus.rules.RuleKind
+    kind: enum
+    variants: [alerting, recording]
+
+  # An alerting rule's state; a recording rule has none.
+  - name: connectors_prometheus.rules.AlertState
+    kind: enum
+    variants: [inactive, pending, firing]
+
+  - name: connectors_prometheus.rules.RuleHealth
+    kind: enum
+    variants: [ok, err, unknown]
+
+  # The input: which kind of rule to list; absent lists both.
+  - name: connectors_prometheus.rules.RulesSelection
+    kind: struct
+    fields:
+      - {name: kind, type: "Optional<connectors_prometheus.rules.RuleKind>"}
+
+  # One rule. `state` and `active_alerts` are present exactly on an alerting rule, and
+  # `duration_ms` (the `for:` hold) only there; `last_error` only when Prometheus reported
+  # one. Prometheus reports durations in decimal seconds at millisecond precision; they are
+  # carried as exact whole milliseconds.
+  - name: connectors_prometheus.rules.Rule
+    kind: struct
+    fields:
+      - {name: group, type: String}
+      - {name: group_interval_ms, type: "Optional<Integer>"}
+      - {name: name, type: String}
+      - {name: kind, type: connectors_prometheus.rules.RuleKind}
+      - {name: query, type: String}
+      - {name: labels, type: "Map<String, String>"}
+      - {name: annotations, type: "Map<String, String>"}
+      - {name: health, type: connectors_prometheus.rules.RuleHealth}
+      - {name: last_error, type: "Optional<String>"}
+      - {name: state, type: "Optional<connectors_prometheus.rules.AlertState>"}
+      - {name: duration_ms, type: "Optional<Integer>"}
+      - {name: active_alerts, type: "Optional<Integer>"}
+    invariants:
+      - group.count: {gte: 1, lte: 1024}
+      - name.count: {gte: 1, lte: 1024}
+      - query.count: {gte: 1, lte: 16384}
+      - last_error.count: {gte: 1, lte: 256}
+      - active_alerts: {gte: 0}
+      - duration_ms: {gte: 0}
+      - group_interval_ms: {gte: 0}
+      - any:
+          - all:
+              - kind == "alerting"
+              - defined(state)
+              - defined(active_alerts)
+          - all:
+              - kind == "recording"
+              - not defined(state)
+              - not defined(duration_ms)
+              - not defined(active_alerts)
+
+# ESS-LIMIT: `labels` and `annotations` hold at most 128 entries each, names of at most
+# 128 bytes and values of at most 4,096 bytes (the label bounds of §5); spec/adapter.json
+# declares the entry count and the adapter refuses a larger answer as Unavailable. A map
+# entry bound is not an ESS invariant here. `last_error` is the provider's
+# text clipped to 256 bytes on a character boundary; byte length is not an ESS predicate.

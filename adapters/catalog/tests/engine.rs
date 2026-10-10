@@ -143,6 +143,7 @@ fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Chec
             checks: postflight,
             read: None,
             any_of: vec![],
+            absent: None,
         },
     }
 }
@@ -166,6 +167,7 @@ fn selections() -> Vec<Selection> {
                     checks: vec![input_check("/sha", "sha")],
                     read: None,
                     any_of: vec![],
+                    absent: None,
                 },
             }),
             ..select("merge_request.create", "createMergeRequest", Effect::Write)

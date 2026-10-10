@@ -1,6 +1,10 @@
 # prometheus adapter design
 
-**Status:** proposed independent service `connectors.prometheus`, not implemented.
+**Status:** proposed independent service `connectors.prometheus`. Since 2026-10-10 the
+executable `connectors-prometheus` implements `series.query`, `series.query_range` and
+`rules.list` on a `prometheus.bearer` connection, directly or through Grafana's data-source
+proxy ([contract §11](contracts/series/v1alpha1/semantics.md#11-instant-queries-rules-and-the-bearer-connection)).
+The profiles and placement below remain the design; §11 records what is built.
 
 ## Scope and dependencies
 
@@ -78,4 +82,4 @@ review archives are historical context, not a packaged native dependency.
 The planned Connectors adapter-kind v2 owns request mapping; response interpretation
 is an adapter obligation. Unimplemented stubs cannot be advertised. Native query,
 auth, decoding, byte/deadline and disclosure fixtures belong here; composition
-tests do not replace them. Deferred: instant and label profiles.
+tests do not replace them. Deferred: the label profile.

@@ -99,9 +99,19 @@ fn every_shipped_guard_is_a_value_of_the_catalog_guard_model() {
         invariants.contains("any_of.count"),
         "the model no longer requires two comparisons of an any_of: {invariants}"
     );
+    assert!(
+        invariants.contains("absent == true")
+            && invariants.contains("not (defined(absent)) or defined(read)"),
+        "the model no longer holds absent to true beside a read: {invariants}"
+    );
     let validator = jsonschema::validator_for(&schema).unwrap();
     let guarded = guarded();
-    for member in ["further_preflights", "postflight/read", "postflight/any_of"] {
+    for member in [
+        "further_preflights",
+        "postflight/read",
+        "postflight/any_of",
+        "postflight/absent",
+    ] {
         assert!(
             guarded
                 .iter()
@@ -157,7 +167,7 @@ fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
 
 /// Adversary: the engine's reader and the compiled model agree on the shape of a guard. For each
 /// variation of the shipped Jira guard, the reader admits it exactly when the compiled schema
-/// does. A postflight `read` written as `null` is not a value of the model (`read` is an
+/// does. A postflight `read`, or `absent`, written as `null` is not a value of the model (`read` is an
 /// `Optional<Read>`, compiled as an object or absent), and the reader admits it as absent.
 #[test]
 fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
@@ -168,7 +178,7 @@ fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
         .find(|(_, guard)| guard["postflight"].get("read").is_some())
         .expect("a shipped guard with a postflight read");
     type Change<'a> = &'a dyn Fn(&mut Value);
-    let variations: [(&str, Change); 4] = [
+    let variations: [(&str, Change); 5] = [
         ("as shipped", &|_| {}),
         ("postflight read null", &|g| {
             g["postflight"]["read"] = Value::Null
@@ -177,6 +187,7 @@ fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
             g["further_preflights"] = Value::Null
         }),
         ("any_of null", &|g| g["postflight"]["any_of"] = Value::Null),
+        ("absent null", &|g| g["postflight"]["absent"] = Value::Null),
     ];
     for (name, change) in variations {
         let mut raw = shipped.clone();
@@ -187,5 +198,45 @@ fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
             reader, model,
             "{name}: reader admits {reader}, model admits {model}"
         );
+    }
+}
+
+/// Every shipped selection's `bounds` is a value of `connectors_catalog.selection.QueryBounds`:
+/// a range (`maximum`, optional `minimum`) or a `values` set, never both, and both forms are
+/// shipped, so the check covers each (story:catalog-path-correction-and-value-bound).
+#[test]
+fn every_shipped_bound_is_a_value_of_the_catalog_selection_model() {
+    let schema = compiled("connectors_catalog.selection.QueryBounds");
+    let invariants =
+        schema["$defs"]["connectors_catalog.selection.Bound"]["x-ess-invariants"].to_string();
+    for clause in ["defined(maximum)", "defined(values)", "values.count"] {
+        assert!(
+            invariants.contains(clause),
+            "the model no longer states `{clause}` of a bound: {invariants}"
+        );
+    }
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let bounded: Vec<(String, Value)> = shipped()
+        .into_iter()
+        .filter_map(|(name, s)| Some((name, s.get("bounds")?.clone())))
+        .collect();
+    for form in ["maximum", "values"] {
+        assert!(
+            bounded.iter().any(|(_, bounds)| bounds
+                .as_object()
+                .unwrap()
+                .values()
+                .any(|bound| bound.get(form).is_some())),
+            "no shipped bound declares `{form}`, so this check would not cover it"
+        );
+    }
+    for (name, bounds) in &bounded {
+        assert_valid(&validator, name, &serde_json::json!({"bounds": bounds}));
+        for (parameter, bound) in bounds.as_object().unwrap() {
+            assert!(
+                bound.get("maximum").is_some() != bound.get("values").is_some(),
+                "{name}: `{parameter}` is not exactly one form of bound"
+            );
+        }
     }
 }
