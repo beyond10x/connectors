@@ -11,7 +11,7 @@
     {
       "provider": "gitlab",
       "file_name": "gitlab.bundle.json",
-      "bundle_sha256": "89090cc0a41c921afe9fc2d93480a493a33731e8017a1232fac32aa5478a3788",
+      "bundle_sha256": "b5b3cc99d3fbbcfa340878f4566d89587b0487cde5bfec38eb98e4f9581beec7",
       "source_sha256": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530",
       "operations": 1847,
       "unsupported": 67

@@ -195,6 +195,14 @@ fn base_gitlab(directory: &Path) {
         }
     }
     gitlab.inventory.unsupported.clear();
+    // The base predates the cited correction of the project search path: undo
+    // it and the record of its amendment file.
+    gitlab.source.amendments = None;
+    for operation in &mut gitlab.inventory.operations {
+        if operation.operation_id.as_deref() == Some("getApiV4ProjectsIdDashSearch") {
+            operation.path = "/api/v4/projects/{id}/(-/)search".into();
+        }
+    }
     let entry = bundle::write(directory, &gitlab, false).unwrap();
     // `git show 81b509745:adapters/catalog/generated/bundles/index.json`.
     assert_eq!(

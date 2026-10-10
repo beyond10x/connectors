@@ -1,7 +1,7 @@
 domain: connectors_catalog.selection
-summary: The members of a selected write in a `connectors-catalog-operations/1` selection file that close, type, require and fix its JSON body, which the engine holds before it sends the write.
+summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, and those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request.
 
-# Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`body_keys`,
+# Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`bounds`, `body_keys`,
 # `body_types`, `body_required`, `body_fixed`). The engine reads these as members of a
 # selection; each is omitted when empty, so a selection without it keeps its serialised form.
 #
@@ -41,3 +41,33 @@ types:
       - any: [{not: defined(body_types)}, defined(body_keys)]
       - any: [{not: defined(body_required)}, defined(body_keys)]
       - any: [{not: defined(body_fixed)}, defined(body_keys)]
+
+  # `bounds` narrows a query parameter the source declares, keyed by its name. Exactly one form per
+  # parameter:
+  # - a range, `maximum` and an optional `minimum`: the value, sent as a number or a decimal
+  #   string, must be a decimal integer within it, such as a provider's page-size cap;
+  # - `values`, a set of allowed strings: the value, as the text it is sent as, must be one of them,
+  #   such as GitLab's project search held to `scope` `blobs` so it cannot reach issues, users or
+  #   wiki text. The declared input schema lists them as the parameter's `enum`.
+  # A value outside its bound is refused as `invalid_input` before any request; a repeated
+  # parameter's bound holds for each element. What the engine refuses when the selection loads
+  # (a bound on a parameter that is not a query parameter of the operation, `values` on a parameter
+  # the source does not type as a string, a `minimum` above its `maximum`, an empty
+  # or repeated value) is stated in the owner and pinned by the engine's tests.
+  - name: connectors_catalog.selection.Bound
+    kind: struct
+    fields:
+      - {name: minimum, type: "Optional<Integer>"}
+      - {name: maximum, type: "Optional<Integer>"}
+      - {name: values, type: "Optional<List<String>>"}
+    invariants:
+      - any: [defined(maximum), defined(values)]
+      - any: [{not: defined(maximum)}, {not: defined(values)}]
+      - any: [{not: defined(minimum)}, defined(maximum)]
+      - any: [{not: defined(values)}, {values.count: {gte: 1}}]
+
+  # The member of a selection that bounds its query parameters.
+  - name: connectors_catalog.selection.QueryBounds
+    kind: struct
+    fields:
+      - {name: bounds, type: "Optional<Map<String, connectors_catalog.selection.Bound>>"}

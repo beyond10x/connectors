@@ -103,10 +103,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 11] = [
 
 /// The cited amendments applied to a provider's pinned source, relative to this
 /// crate. A provider absent here is built from its source as written.
-const AMENDMENTS: [(&str, &str); 1] = [(
-    "zendesk",
-    "../zendesk/upstream/zendesk-support.amendments.json",
-)];
+const AMENDMENTS: [(&str, &str); 2] = [
+    ("gitlab", "../gitlab/upstream/openapi_v3.amendments.json"),
+    (
+        "zendesk",
+        "../zendesk/upstream/zendesk-support.amendments.json",
+    ),
+];
 
 /// The committed projection at `source` and its record beside it are exactly
 /// what projecting the pinned document at `from` produces now, with the

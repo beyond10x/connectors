@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- GitLab through the catalog provider searches a project's code: `search.blobs` selects
+  `getApiV4ProjectsIdDashSearch` and sends `GET /projects/{id}/search` with `scope=blobs`, the
+  required `search` expression and optional `ref`, one page per call with `per_page` 1 through 100
+  (`docs/local-catalog-provider.md`, *Project code search*). Its `scope` is held to `blobs`, so
+  the search cannot reach issues, merge requests, commits, notes, wiki text or users; any other
+  scope, and the parameters that apply only to other scopes, are refused as `invalid_input`
+  before any request. Verified against a local fixture in GitLab's blob search shape, not a live
+  instance. The GitLab selection set has 35 operations, and a GitLab configuration has a new
+  configuration revision.
+- A `connectors-source-amendments/1` entry can correct an operation's path template
+  (`correct_path`, `{"from", "to"}`) instead of adding a query parameter; each entry makes
+  exactly one change. `to` must be `from` with each parenthesised optional segment removed or
+  kept without its parentheses, so a correction keeps the method and every path parameter and
+  cannot retarget the operation. GitLab's pinned document is unchanged: its cited amendment file
+  corrects `/api/v4/projects/{id}/(-/)search` to `/api/v4/projects/{id}/search`, and the GitLab
+  bundle records that file and its SHA-256. The format is modelled as `connectors_catalog.amendment`
+  in `adapters/catalog/spec/ess`.
+- A catalog selection bound can hold a string query parameter to a set of allowed values
+  (`bounds`, `{"values": [...]}`), checked on the text the value is sent as and declared as the
+  parameter's `enum`. A bound is a range or a set, never both; a set on a parameter the source
+  does not type as a string, an empty set and an empty or repeated value are refused when the
+  selection loads. Range bounds serialise as before, so every other selection keeps its bytes.
+  The form is modelled as `connectors_catalog.selection.Bound`.
+
+### Compatibility
+
+- `connectors_catalog_provider::Bound` is no longer `Copy`, its `maximum` is `Option<u64>`, and it
+  gains `values: Vec<String>`; Rust code that builds or reads a bound changes accordingly. The
+  configuration format is unchanged for range bounds.
+
 ## 0.42.0 — 2026-10-10
 
 ### Added

@@ -70,10 +70,11 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "merge_request.reopen",
         "merge_request.diffs",
         "merge_request.discussions",
+        "search.blobs",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 34);
+    assert_eq!(declared.len(), 35);
     assert_eq!(engine.effect("merge_request.merge"), Some(Effect::Write));
     assert_eq!(engine.effect("job.trace"), Some(Effect::Read));
     assert_eq!(engine.effect("issue.create"), Some(Effect::Write));
@@ -100,6 +101,7 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
             "merge_request.discussions",
             "getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions",
         ),
+        ("search.blobs", "getApiV4ProjectsIdDashSearch"),
     ] {
         let selection = selections
             .iter()
@@ -138,7 +140,12 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
             .any(|p| p.name == "per_page" && p.location == Location::Query);
         let expected = if pages {
             paged.push(id);
-            serde_json::json!({"per_page": {"minimum": 1, "maximum": 100}})
+            if id == "search.blobs" {
+                // Code search also holds its required `scope` to `blobs`.
+                serde_json::json!({"scope": {"values": ["blobs"]}, "per_page": {"minimum": 1, "maximum": 100}})
+            } else {
+                serde_json::json!({"per_page": {"minimum": 1, "maximum": 100}})
+            }
         } else {
             Value::Null
         };
@@ -162,6 +169,7 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
             "projects.list",
             "releases.list",
             "repository.tree",
+            "search.blobs",
             "tags.list",
         ]
     );
