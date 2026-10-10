@@ -71,15 +71,27 @@ types:
   # comparisons, since one is an ordinary check; absent when unused, so a postflight without it
   # keeps its serialised form. An empty list is the same as an absent one and is not written
   # back. Its comparisons count toward the sixteen checks.
+  #
+  # `absent`, only `true` and only beside `read`, proves a delete: the read after the write must
+  # answer 404, the target no longer found, and nothing else is compared, so `checks` and
+  # `any_of` are empty. Any other answer to that read, the target still found or the read
+  # failing, leaves the effect possible, as a differing value does. It is for a write that
+  # removes what the preflight proved present, such as GitLab's tag delete (204, no body).
+  # Absent when unused, so a postflight without it keeps its serialised form.
   - name: connectors_catalog.guard.Postflight
     kind: struct
     fields:
       - {name: checks, type: "List<connectors_catalog.guard.Check>"}
       - {name: read, type: "Optional<connectors_catalog.guard.Read>"}
       - {name: any_of, type: "Optional<List<connectors_catalog.guard.Check>>"}
+      - {name: absent, type: "Optional<Boolean>"}
     invariants:
-      - any: [{not: defined(read)}, {checks.count: {gte: 1}}]
+      - any: [{not: defined(read)}, {checks.count: {gte: 1}}, defined(absent)]
       - any: [{not: defined(any_of)}, {any_of.count: {lte: 0}}, {any_of.count: {gte: 2}}]
+      - any: [{not: defined(absent)}, absent == true]
+      - any: [{not: defined(absent)}, defined(read)]
+      - any: [{not: defined(absent)}, {checks.count: {lte: 0}}]
+      - any: [{not: defined(absent)}, {not: defined(any_of)}, {any_of.count: {lte: 0}}]
 
   # `preflight` is the first read; `further_preflights` are read after it, in order, each with its
   # own checks, and the first that refuses stops the guard with the write unsent: for a write

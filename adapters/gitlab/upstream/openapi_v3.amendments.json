@@ -1,0 +1,15 @@
+{
+  "format": "connectors-source-amendments/1",
+  "source_sha256": "f9e830bd3d2b99c49d60a7713fe1a64f5164418aca24b559287daab075beb530",
+  "amendments": [
+    {
+      "operation_id": "getApiV4ProjectsIdDashSearch",
+      "correct_path": {
+        "from": "/api/v4/projects/{id}/(-/)search",
+        "to": "/api/v4/projects/{id}/search"
+      },
+      "cite": "https://docs.gitlab.com/api/search/#project-search-api",
+      "reason": "The search reference documents project search as GET /projects/:id/search; the pinned document writes the route with GitLab's (-/) notation for an optional segment, which read as a template would send the parentheses literally."
+    }
+  ]
+}

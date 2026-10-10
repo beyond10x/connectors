@@ -1,0 +1,1 @@
+{"status":"success","data":{"resultType":"matrix","result":[{"metric":{"__name__":"up","job":"api"},"values":[[1788825300,"1"],[1788825450.5,"1"],[1788825600,"0"]]}]}}

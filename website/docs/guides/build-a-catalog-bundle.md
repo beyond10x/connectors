@@ -75,8 +75,10 @@ so a bundle can only change with its source.
 - A Swagger 2.0 document is projected to OpenAPI 3.1.0 with `connectors-build swagger` and
   ingested the same way (since 0.37.0). A construct the projection has no exact row for is
   refused by its JSON pointer.
-- `--amendments` adds cited optional query parameters a pinned source leaves out, and the bundle
-  records the amendment file's SHA-256.
+- `--amendments` applies cited corrections to the pinned source's inventory: an optional query
+  parameter it leaves out, or a path template written in a vendor notation, such as GitLab's
+  `(-/)` optional segment, resolved without retargeting the operation. The pinned document is
+  unchanged, and the bundle records the amendment file's SHA-256.
 
 A bundle alone exposes nothing. A reviewed selection set under
 `adapters/catalog/providers/<provider>/operations.json` names which operations a configured

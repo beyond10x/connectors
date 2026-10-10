@@ -28,6 +28,11 @@ pinned source under a local id with a declared effect:
 | `deployments.list` | read | a project's deployments with their environment |
 | `merge_requests.list`, `merge_request.get` | read | the project's merge requests, one merge request by IID |
 | `merge_request.diffs`, `merge_request.discussions` | read | one merge request's file diffs, its discussions with their notes, each by IID and one page per call |
+| `search.blobs` | read | project code search, `scope` held to `blobs`; the path comes from a cited source correction (`adapters/gitlab/upstream/openapi_v3.amendments.json`) |
+| `tag.get`, `release.get`, `release.links` | read | one tag, one release, a release's asset links, each by tag name |
+| `tag.create` | write | one POST, guarded: the `ref` must resolve to the caller's `sha`; proven by the tag at that commit |
+| `tag.delete` | write | one DELETE, guarded on the tag at the caller's `sha`; proven by a read answering 404 |
+| `release.create`, `release.update` | write | one POST or PUT on an existing tag at the caller's `sha`; proven by the release at that tag and commit |
 | `pipelines.list`, `pipeline.get`, `pipeline.jobs`, `job.get` | read | pipelines, one pipeline, its jobs, one job |
 | `job.trace` | read | a job's log, answered as text |
 | `issue.create` | write | one POST opening an issue, unguarded |

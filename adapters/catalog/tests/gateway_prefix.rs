@@ -132,7 +132,12 @@ fn refusal(config: &Value) -> String {
 /// `repository.tree`, `commit.get`, `commit.diff` and `branches.list`, and
 /// again when it gained the fixed-body variants `merge_request.auto_merge` and
 /// `merge_request.reopen`, and again when it gained the merge-request list
-/// reads `merge_request.diffs` and `merge_request.discussions`.
+/// reads `merge_request.diffs` and `merge_request.discussions`, and again when
+/// it gained `search.blobs`, whose cited path correction also rebuilt the
+/// GitLab bundle (its digest is in the revision;
+/// `gitlab_commit_reads_adversary.rs` reconstructs the bundle before it),
+/// and again when it gained `tag.get`, `tag.create`, `tag.delete`,
+/// `release.get`, `release.links`, `release.create` and `release.update`.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
 /// `users.search`, again when it gained `issue.transitions`, and again when it
@@ -141,8 +146,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "24ab7ee4544284937627a21f56abfadcfc50427589bbf2b12dfdb9502f704727",
-        "6ce04b3ce8dcedbd855b5169f8ddfabd270310bfce3ddcab62a92bebbfd3a09e",
+        "d1e7b79277411d43fd82eac0335551e7d70ff6d11c5bb601372738e90d01ff66",
+        "718476af7f0a5aae70741f777e7dd7640e6f77aecbd66a1caf334718cbb80c21",
     ),
     (
         "catalog-jira.md",

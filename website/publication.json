@@ -306,7 +306,7 @@
       "title": "Prometheus PromQL",
       "source": "adapters/prometheus/contracts/series/v1alpha1/semantics.md",
       "owner": "prometheus",
-      "status": "Specified; runtime pending"
+      "status": "Implemented by the prometheus adapter: instant, range and rules reads"
     },
     {
       "route": "/adapters/sip/contracts/dial",
@@ -360,6 +360,11 @@
       "source": "adapters/loki/spec/ess",
       "route": "/adapters/loki/model",
       "owner": "loki"
+    },
+    {
+      "source": "adapters/prometheus/spec/ess",
+      "route": "/adapters/prometheus/model",
+      "owner": "prometheus"
     }
   ]
 }

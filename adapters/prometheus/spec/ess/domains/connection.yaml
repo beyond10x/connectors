@@ -1,0 +1,120 @@
+domain: connectors_prometheus.connection
+summary: The Prometheus local connection — its native configuration, the `prometheus.bearer` profile and the configured identity probe that proves a credential.
+
+# Normative owner: adapters/prometheus/contracts/series/v1alpha1/semantics.md §11.4. The
+# executable composition (adapters/prometheus/src/local.rs) reads `LocalConfiguration` from
+# its owner-only file and advertises exactly one `BearerProfile`; tests/ess_model.rs checks
+# both against the schemas this model generates. The same connection reaches Prometheus
+# through Grafana's data-source proxy when `base_url` is the proxy path
+# (`https://<grafana>/api/datasources/proxy/uid/<uid>/`) and the token is a Grafana
+# service-account token: no mediated profile is needed for that placement.
+types:
+  # The query scope the configuration selects. Only the explicit entire deployment (an
+  # empty list) is admitted: no reviewed PromQL parser exists to enforce a nonempty one.
+  - name: connectors_prometheus.connection.QueryScope
+    kind: struct
+    fields:
+      - {name: allowed_matchers, type: "List<String>"}
+    invariants:
+      - allowed_matchers.count == 0
+
+  # A connection instance id: the host's identifier alphabet, 1–128 characters.
+  - name: connectors_prometheus.connection.InstanceId
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-"
+    invariants:
+      - value.count: {gte: 1, lte: 128}
+
+  # The owner-only native file named by `--local-config`. No credential is a member.
+  # `base_url` is an HTTPS origin, optionally with a path prefix, written in its canonical
+  # form; `ca_file`, when present, is an absolute path to an owner-only PEM bundle that
+  # replaces the system roots for this connection (absent, never null).
+  - name: connectors_prometheus.connection.LocalConfiguration
+    kind: struct
+    fields:
+      - {name: format, type: String}
+      - {name: instance, type: connectors_prometheus.connection.InstanceId}
+      - {name: base_url, type: String}
+      - {name: ca_file, type: "Optional<String>"}
+      - {name: query_scope, type: connectors_prometheus.connection.QueryScope}
+    invariants:
+      - format == "connectors-prometheus-local/1"
+      - base_url.count: {gte: 8, lte: 512}
+      - base_url: {starts_with: "https://"}
+      - ca_file.count: {gte: 1, lte: 4096}
+
+  # A bearer token: 1–8,192 visible ASCII characters (0x21–0x7E), so no space, control
+  # or non-ASCII character.
+  - name: connectors_prometheus.connection.BearerToken
+    kind: newtype
+    of: String
+    alphabet: '!"#$%&''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~'
+    invariants:
+      - value.count: {gte: 1, lte: 8192}
+
+  # The protected entry of `prometheus.bearer`: the token sent as
+  # `Authorization: Bearer <token>`. It enters through the host's protected entry and
+  # custody, never the configuration.
+  - name: connectors_prometheus.connection.BearerEntry
+    kind: struct
+    fields:
+      - {name: token, type: connectors_prometheus.connection.BearerToken}
+
+  # Where the identity subject comes from. Prometheus has no user or account read, so the
+  # only source is `configuration`: the probe's 200 proves the credential, its body is not
+  # used, and the subject is the configured `instance`.
+  - name: connectors_prometheus.connection.IdentitySource
+    kind: enum
+    variants: [configuration]
+
+  # The identity probe: one GET of `path` relative to `base_url`. 200 admits the
+  # credential; 401 and 403 refuse it as invalid; 429 and 5xx are unavailable; anything
+  # else is a protocol failure.
+  - name: connectors_prometheus.connection.IdentityProbe
+    kind: struct
+    fields:
+      - {name: method, type: String}
+      - {name: path, type: String}
+      - {name: source, type: connectors_prometheus.connection.IdentitySource}
+      - {name: kind, type: String}
+    invariants:
+      - method == "GET"
+      - path == "api/v1/status/buildinfo"
+      - kind == "prometheus.connection"
+
+  # The one authentication profile the executable advertises: a static bearer token held
+  # by a service account of the deployment (or of the Grafana that proxies it). Prometheus
+  # grants no scopes, so `minimum_scopes` is empty; validation evidence lasts 60 seconds.
+  - name: connectors_prometheus.connection.BearerProfile
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: scheme, type: String}
+      - {name: capability, type: String}
+      - {name: purpose, type: String}
+      - {name: subject, type: String}
+      - {name: minimum_scopes, type: "List<String>"}
+      - {name: evidence_lifetime_ms, type: Integer}
+      - {name: entry, type: String}
+      - {name: identity, type: connectors_prometheus.connection.IdentityProbe}
+    invariants:
+      - id == "prometheus.bearer"
+      - scheme == "http_bearer"
+      - capability == "http-bearer"
+      - purpose == "service_account"
+      - subject == "app"
+      - minimum_scopes.count == 0
+      - evidence_lifetime_ms == 60000
+      - entry == "connectors_prometheus.connection.BearerEntry"
+
+# ESS-LIMIT: these are checked by the composition, not expressible as invariants here, and
+# the composition only ever refuses more than the model on them (tests/ess_model.rs asserts
+# each): that `ca_file` names an existing absolute owner-only file; that `base_url` is
+# already its own canonical form (WHATWG URL serialization: lowercase scheme and host, a
+# path ending in `/`, no credentials, query or fragment); and that the subject equals the
+# sibling `instance`. `alphabet:` is carried into the generated schemas as
+# `x-ess-alphabet`, not as a JSON Schema keyword, so a JSON Schema validator alone does not
+# enforce it. The design's `prometheus.anonymous`, `prometheus.basic` and
+# `prometheus.via_parent` profiles are not modelled: the local host admits no profile
+# without a credential, and no route materialization exists.

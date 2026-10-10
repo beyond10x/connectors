@@ -330,6 +330,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "adapters/grafana/tests/local_runtime.rs::the_datasource_list_answers_through_the_private_runtime_from_the_recorded_answer",
         "/docs/reference/adapters/grafana",
     ),
+    shipped(
+        "Native adapters",
+        "Prometheus PromQL reads",
+        "series.query, series.query_range and rules.list through a saved bearer connection, directly or through Grafana's data-source proxy.",
+        "adapters/prometheus/tests/local_runtime.rs::each_read_answers_through_the_private_runtime_from_the_recorded_answers",
+        "/docs/reference/adapters/prometheus",
+    ),
     planned(
         "Native adapters",
         "Kubernetes permission checks",
@@ -342,10 +349,16 @@ pub const CAPABILITIES: &[Capability] = &[
         "An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected.",
         "/docs/reference/adapters/loki",
     ),
+    planned(
+        "Native adapters",
+        "Prometheus tenants, timeouts and other authentication",
+        "An X-Scope-OrgID tenant header, an adapter-set query timeout, a Capacity error for too many samples apart from other execution errors, and profiles other than a bearer token.",
+        "/docs/reference/adapters/prometheus",
+    ),
     decided(
         "Native adapters",
         "Specification-only adapters",
-        "Atlassian native documents, Docker, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+        "Atlassian native documents, Docker, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
         "/docs/reference/adapters",
     ),
     planned(

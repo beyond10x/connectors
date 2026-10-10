@@ -1,5 +1,85 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- GitLab through the catalog provider searches a project's code: `search.blobs` selects
+  `getApiV4ProjectsIdDashSearch` and sends `GET /projects/{id}/search` with `scope=blobs`, the
+  required `search` expression and optional `ref`, one page per call with `per_page` 1 through 100
+  (`docs/local-catalog-provider.md`, *Project code search*). Its `scope` is held to `blobs`, so
+  the search cannot reach issues, merge requests, commits, notes, wiki text or users; any other
+  scope, and the parameters that apply only to other scopes, are refused as `invalid_input`
+  before any request. Verified against a local fixture in GitLab's blob search shape, not a live
+  instance. The GitLab selection set has 35 operations, and a GitLab configuration has a new
+  configuration revision.
+- A `connectors-source-amendments/1` entry can correct an operation's path template
+  (`correct_path`, `{"from", "to"}`) instead of adding a query parameter; each entry makes
+  exactly one change. `to` must be `from` with each parenthesised optional segment removed or
+  kept without its parentheses, so a correction keeps the method and every path parameter and
+  cannot retarget the operation. GitLab's pinned document is unchanged: its cited amendment file
+  corrects `/api/v4/projects/{id}/(-/)search` to `/api/v4/projects/{id}/search`, and the GitLab
+  bundle records that file and its SHA-256. The format is modelled as `connectors_catalog.amendment`
+  in `adapters/catalog/spec/ess`.
+- A catalog selection bound can hold a string query parameter to a set of allowed values
+  (`bounds`, `{"values": [...]}`), checked on the text the value is sent as and declared as the
+  parameter's `enum`. A bound is a range or a set, never both; a set on a parameter the source
+  does not type as a string, an empty set and an empty or repeated value are refused when the
+  selection loads. Range bounds serialise as before, so every other selection keeps its bytes.
+  The form is modelled as `connectors_catalog.selection.Bound`.
+- GitLab tags and releases through the catalog provider (`docs/local-catalog-provider.md`,
+  *Tags and releases*): the reads `tag.get` (one tag), `release.get` (one release) and
+  `release.links` (one release's asset links, one page per call, `per_page` 1 through 100), and
+  four guarded writes, each pinned to a commit `sha` the caller supplies. `tag.create` reads the
+  commit `body.ref` names and refuses before any request unless it is `sha`, and is applied when
+  GitLab answers the tag at `sha`. `tag.delete` reads the tag and refuses unless it exists at
+  `sha`, then reads it again after GitLab's `204` and is applied only when that read answers
+  `404`. `release.create` reads the tag `body.tag_name` and refuses unless it exists at `sha`;
+  its body admits neither `ref` nor `tag_message`, so it releases an existing tag and never
+  creates one (create it with `tag.create` first). `release.update` reads the release and refuses
+  unless it is at `sha`, before and after. The write bodies are closed to the keys of the pinned
+  request schemas, their string keys typed. Verified against a local fixture in the pinned
+  document's tag, release, link and commit shapes, through the engine and the provider process,
+  not a live instance. The GitLab selection set has 42 operations, and a GitLab configuration has
+  a new configuration revision.
+- A catalog guard's postflight can prove a delete: `postflight.absent`, only `true` and only
+  beside a postflight `read` with no `checks` or `any_of`, requires that read to answer `404`
+  after the write; the target still found, or a read that fails, leaves the outcome `unknown`.
+  It is refused when the selection loads in any other form. Modelled as
+  `connectors_catalog.guard.Postflight` in `adapters/catalog/spec/ess`; every other guard keeps
+  its bytes.
+- `connectors-prometheus`, a native Prometheus adapter executable for the local CLI:
+  `series.query` (one PromQL expression at one instant, default now: a vector, matrix, scalar or
+  string, at most 500 series), `series.query_range` (over at most seven days at an explicit
+  step, at most 2,000 points per series) and `rules.list` (alerting and recording rules, with
+  each alerting rule's state, at most 2,000 rules), each one GET and each answered through
+  `operations invoke` on a saved connection. A connection uses the bearer profile
+  `prometheus.bearer`: connect, repair and `connections revalidate` prove the token with
+  `GET api/v1/status/buildinfo`, which runs no query, and the identity is the configured
+  connection (`prometheus.connection`, subject the configuration's `instance`). The
+  configuration is HTTPS-only, may carry a path prefix and takes an optional private CA file.
+  The instant and rules profiles and the connection are new in
+  `adapters/prometheus/contracts/series/v1alpha1/semantics.md` §11 and modelled in
+  `adapters/prometheus/spec/ess`; the operator guide is `adapters/prometheus/README.md`.
+- Prometheus through Grafana: a Prometheus connection whose `base_url` is a data source's
+  Grafana proxy path (`https://<grafana>/api/datasources/proxy/uid/<uid>/`), with a Grafana
+  service-account token as its `prometheus.bearer` token, answers the same three reads through
+  Grafana. No Grafana adapter or host change.
+- Limits: verified against hand-written fixtures in the Prometheus and Grafana API shapes only,
+  not a live provider. No `X-Scope-OrgID` tenant header is sent; no query `timeout` parameter is
+  sent, so the host transport deadline bounds a call; too many samples reaches the caller as
+  `upstream_protocol`, not told apart from other execution errors; every query reads everything
+  the token reaches; and a Prometheus without authentication cannot be connected, because the
+  local host admits no credential-less profile.
+
+### Compatibility
+
+- `connectors_catalog_provider::Bound` is no longer `Copy`, its `maximum` is `Option<u64>`, and it
+  gains `values: Vec<String>`; Rust code that builds or reads a bound changes accordingly. The
+  configuration format is unchanged for range bounds.
+- `connectors_catalog_provider::Postflight` gains `absent: Option<bool>`; Rust code that builds a
+  postflight with a struct literal adds `absent: None`.
+
 ## 0.42.0 — 2026-10-10
 
 ### Added

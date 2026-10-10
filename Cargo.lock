@@ -849,6 +849,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-prometheus"
+version = "0.42.0"
+dependencies = [
+ "async-trait",
+ "clap",
+ "connectors-core",
+ "connectors-host",
+ "connectors-sdk",
+ "connectors-spec",
+ "hex",
+ "jsonschema",
+ "rcgen",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "tokio",
+ "tokio-rustls",
+ "zeroize",
+]
+
+[[package]]
 name = "connectors-sdk"
 version = "0.42.0"
 dependencies = [

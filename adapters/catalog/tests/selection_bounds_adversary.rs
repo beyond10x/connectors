@@ -298,7 +298,8 @@ fn bounds_round_trip_and_unbounded_selections_serialise_as_before() {
         bounded.bounds["per_page"],
         Bound {
             minimum: None,
-            maximum: 10
+            maximum: Some(10),
+            values: vec![],
         }
     );
     let written = serde_json::to_value(&bounded).unwrap();
