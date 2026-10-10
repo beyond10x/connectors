@@ -137,7 +137,11 @@ fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Chec
                 .collect(),
             checks: preflight,
         },
-        postflight: Postflight { checks: postflight },
+        further_preflights: vec![],
+        postflight: Postflight {
+            checks: postflight,
+            read: None,
+        },
     }
 }
 
@@ -155,8 +159,10 @@ fn selections() -> Vec<Selection> {
                     ]),
                     checks: vec![input_check("/commit/id", "sha")],
                 },
+                further_preflights: vec![],
                 postflight: Postflight {
                     checks: vec![input_check("/sha", "sha")],
+                    read: None,
                 },
             }),
             ..select("merge_request.create", "createMergeRequest", Effect::Write)

@@ -58,7 +58,7 @@ Sources:
   split recounted on 2026-10-09 moves from 51 covered and 73 to gap units to 55 and 69; the
   sentence under [Summary](#summary) still gives the 2026-10-07 split.
   `jira.issue.transition.run` stays missing: `doTransition` is not selected because the catalog
-  guard cannot yet guard it ([Running a transition](catalog-jira.md#running-a-transition-not-selected)).
+  guard cannot yet guard it ([Running a transition](catalog-jira.md#running-a-transition)).
   The `issue.create_meta` and `users.search` citations in the [jira](#jira) section moved with
   `adapters/catalog/providers/jira/operations.json`. The [Gap units](#gap-units) table still
   shows the 2026-10-07 baseline.
@@ -93,6 +93,20 @@ Sources:
   `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
   [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
   baseline.
+- **Jira transition run, 2026-10-10 (unreleased).** `jira.issue.transition.run` moved from
+  missing to covered when `doTransition` was selected as the guarded write
+  `issue.transition.run`, verified against a hand-written fixture in the pinned document's
+  shapes, not a live site. Selecting it needed two catalog guard capabilities: a read after the
+  write, for Jira's `204` without body, and further reads before it, to check the issue's
+  status and the transition's availability together
+  ([Running a transition](catalog-jira.md#running-a-transition)). The `jira` row of the
+  per-plugin table now reads 8 / 1,032 covered and 12 / 327 missing, and the summary and total
+  rows move by the same 1 operation and 109 calls. The 2 mapped calls of `jira.issue.transition`
+  in [Used but not declared](#used-but-not-declared) now land on covered, so the mapped-call
+  split moves from 69 covered and 55 to gap units to 71 and 53; the sentence under
+  [Summary](#summary) still gives the 2026-10-07 split. The selection was appended to
+  `adapters/catalog/providers/jira/operations.json`, so no earlier citation in the [jira](#jira)
+  section moved. The [Gap units](#gap-units) table still shows the 2026-10-07 baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -119,9 +133,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 60 | 5,120 | 49 | 5,120 |
+| covered | 61 | 5,229 | 50 | 5,229 |
 | partial | 17 | 221 | 10 | 221 |
-| missing | 224 | 1,015 | 50 | 1,015 |
+| missing | 223 | 906 | 49 | 906 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -135,7 +149,7 @@ Per plugin (operations / calls):
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 19 / 2,240 | 8 / 206 | 37 / 224 |
-| jira | 21 | 13 | 1,364 | 7 / 923 | 1 / 5 | 13 / 436 |
+| jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 5 / 358 | 0 / 0 | 15 / 67 |
@@ -159,7 +173,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **60 / 5,120** | **17 / 221** | **224 / 1,015** |
+| **total** | **301** | **109** | **6,356** | **61 / 5,229** | **17 / 221** | **223 / 906** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -279,9 +293,9 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 `getAttachmentContent`, `addAttachment` and `removeAttachment`. Since 2026-10-09 `getIssue`,
 `getCreateIssueMetaIssueTypes` and `findUsers` are selected, as `issue.get`,
 `issue.create_meta` and `users.search` (`docs/catalog-jira.md`). Since 2026-10-10
-`getTransitions` is selected as `issue.transitions`. None of the others is: `doTransition` waits
-on a guard the catalog engine cannot yet express
-([Running a transition](catalog-jira.md#running-a-transition-not-selected)).
+`getTransitions` is selected as `issue.transitions`, and `doTransition` as the guarded write
+`issue.transition.run` ([Running a transition](catalog-jira.md#running-a-transition)). None of
+the others is.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
@@ -291,7 +305,7 @@ on a guard the catalog engine cannot yet express
 | `jira.issue.comment.list` | 130 | 20 | 2026-10-05 | `issue.comments` (:7) | covered | Bodies come back as ADF, not Markdown. |
 | `jira.issue.transition.list` | 127 | 20 | 2026-10-01 | `issue.transitions` (:13) | covered | The transitions open on one issue, each with its target status in `to`. Every declared filter is kept: `transitionId`, `expand=transitions.fields`, `includeUnavailableTransitions` and the ordering and remote-condition flags (2026-10-10). |
 | `jira.issue.create` | 115 | 24 | 2026-10-06 | — | missing | `createIssue` is not selected. There is no read-back check for fields Jira dropped. |
-| `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | — | missing | `doTransition` is not selected (2026-10-10): the catalog guard has no postflight re-read for its `204` without body and one preflight read only, so it cannot refuse on the current status and the transition's availability together or prove the target status after the write ([Running a transition](catalog-jira.md#running-a-transition-not-selected)). Once selected it would run by transition id only: a by-name run or a walk to a target status is composition outside the catalog. |
+| `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | `issue.transition.run` (:19) | covered | By transition id, with the issue's current and the transition's target status ids, and an approval. Guarded: refused before the `POST` unless the issue is in the current status and the transition is open with that target; Jira's `204` is proved by reading the issue again, whose status must be the target, or the outcome is unknown. A by-name run or a walk to a target status is composition outside the catalog ([Running a transition](catalog-jira.md#running-a-transition)) (2026-10-10). |
 | `jira.issue.link.add` | 40 | 11 | 2026-09-28 | — | missing | `linkIssues` is not selected. |
 | `jira.issue.edit` | 26 | 10 | 2026-09-24 | — | missing | `editIssue` is not selected. |
 | `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:15) | partial | The issue types a project can create, by project id or key. fluxplane takes an `issue_type` filter (`fluxplane-plugin operation describe jira jira.issue.create_meta`, 2026-10-09) for that type's create fields; the fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not selected. |
@@ -842,7 +856,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.pipeline.job.list` (gitlab) | 2 | 2 | `gitlab.job.list` | covered | — |
 | `gitlab.pipeline.jobs` (gitlab) | 2 | 1 | `gitlab.job.list` | covered | — |
 | `gitlab.repository.compare` (gitlab) | 2 | 1 | `gitlab.compare` | covered | — |
-| `jira.issue.transition` (jira) | 2 | 2 | `jira.issue.transition.run` | missing | U07 |
+| `jira.issue.transition` (jira) | 2 | 2 | `jira.issue.transition.run` | covered | — |
 | `slack.auth.test` (slack) | 2 | 2 | `slack.test` | covered | — |
 | `alertmanager.alerts.list` (alertmanager) | 1 | 1 | `alertmanager.alerts` | missing | U24 |
 | `sql` (fluxplane-plugin) | 1 | 1 | `sql.query` (inferred) | partial | U01 |

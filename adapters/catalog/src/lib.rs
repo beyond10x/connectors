@@ -62,11 +62,25 @@ pub struct Preflight {
     pub checks: Vec<Check>,
 }
 
-/// Comparisons against the write's own response body after dispatch.
+/// A read a guard issues after the write: a GET of the bundle, its parameter
+/// keys bound to input references as a preflight's `values` are.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Read {
+    pub operation_id: String,
+    pub values: BTreeMap<String, String>,
+}
+
+/// Comparisons after dispatch: against the write's own response body, or,
+/// when `read` is declared, against the answer of that read, issued once after
+/// a 2xx, for a write that answers without a body.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Postflight {
     pub checks: Vec<Check>,
+    /// Omitted when absent, so a guard without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub read: Option<Read>,
 }
 
 /// How a 2xx body is read. The bundle's declared media types decide by default;
@@ -88,7 +102,45 @@ pub enum ResponseKind {
 #[serde(deny_unknown_fields)]
 pub struct Guard {
     pub preflight: Preflight,
+    /// Up to three more reads before the write, run in order after
+    /// `preflight`, each with its own checks, for preconditions that live in
+    /// more than one answer. Omitted when empty, so a guard without them keeps
+    /// its bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub further_preflights: Vec<Preflight>,
     pub postflight: Postflight,
+}
+
+impl Guard {
+    /// Every read before the write, in the order it is issued.
+    fn preflights(&self) -> impl Iterator<Item = &Preflight> {
+        std::iter::once(&self.preflight).chain(&self.further_preflights)
+    }
+
+    /// Every check, before the write and after it.
+    fn checks(&self) -> impl Iterator<Item = &Check> {
+        self.preflights()
+            .flat_map(|preflight| &preflight.checks)
+            .chain(&self.postflight.checks)
+    }
+
+    /// Every parameter a read binds, with the input reference it binds.
+    fn bound(&self) -> impl Iterator<Item = (&String, &String)> {
+        self.preflights()
+            .flat_map(|preflight| &preflight.values)
+            .chain(self.postflight.read.iter().flat_map(|read| &read.values))
+    }
+
+    /// Every input reference the guard reads: each read's values, then each
+    /// check's expected input.
+    fn references(&self) -> impl Iterator<Item = &String> {
+        self.bound()
+            .map(|(_, reference)| reference)
+            .chain(self.checks().filter_map(|check| match &check.expect {
+                Expectation::Input(path) => Some(path),
+                Expectation::Literal(_) => None,
+            }))
+    }
 }
 
 /// A narrower range for one query parameter than the pinned source declares,
@@ -202,20 +254,7 @@ fn fits_body_type(value_type: ValueType, value: &Value) -> bool {
 /// The body paths a guard reads, each the part after `body.` of a reference.
 fn guarded_body_paths(guard: &Guard) -> impl Iterator<Item = &str> {
     guard
-        .preflight
-        .values
-        .values()
-        .chain(
-            guard
-                .preflight
-                .checks
-                .iter()
-                .chain(&guard.postflight.checks)
-                .filter_map(|check| match &check.expect {
-                    Expectation::Input(path) => Some(path),
-                    Expectation::Literal(_) => None,
-                }),
-        )
+        .references()
         .filter_map(|path| path.strip_prefix("body."))
 }
 
@@ -307,8 +346,12 @@ struct Exposed {
     text: bool,
 }
 
+/// The templates of a guard's reads.
 struct Probe {
-    template: Template,
+    /// Each read before the write, in the order it is issued.
+    preflights: Vec<Template>,
+    /// The read after the write, when the guard declares one.
+    postflight: Option<Template>,
 }
 
 /// The engine over one bundle. Built once per process; every selection is
@@ -329,6 +372,8 @@ pub struct Prepared {
     query: Vec<(String, String)>,
     body: Value,
     postflight: Vec<(String, String)>,
+    /// The bound read the postflight checks, when the guard declares one.
+    reread: Option<Request>,
     resource: String,
     instance: String,
     source_revision: String,
@@ -412,19 +457,7 @@ impl Engine {
             let guard_inputs: Vec<&str> = selection
                 .guard
                 .iter()
-                .flat_map(|guard| {
-                    guard.preflight.values.values().chain(
-                        guard
-                            .preflight
-                            .checks
-                            .iter()
-                            .chain(&guard.postflight.checks)
-                            .filter_map(|check| match &check.expect {
-                                Expectation::Input(path) => Some(path),
-                                Expectation::Literal(_) => None,
-                            }),
-                    )
-                })
+                .flat_map(Guard::references)
                 .map(|path| path.split('.').next().unwrap_or(path))
                 .collect();
             // A credential the document passes as a parameter travels in the
@@ -457,11 +490,7 @@ impl Engine {
                 {
                     Some("which its body_keys admit")
                 } else if selection.guard.as_ref().is_some_and(|guard| {
-                    guard
-                        .preflight
-                        .values
-                        .keys()
-                        .any(|key| key.eq_ignore_ascii_case(name))
+                    guard.bound().any(|(key, _)| key.eq_ignore_ascii_case(name))
                 }) {
                     Some("which its guard's preflight sends as a probe parameter")
                 } else {
@@ -579,25 +608,24 @@ impl Engine {
                         selection.id
                     )));
                 }
-                let mut probe = find(&guard.preflight.operation_id)?.clone();
-                // The probe passes the credential the way the selected
-                // operation does: through the connection's header alone, never
-                // as a parameter bound from caller input.
-                probe
-                    .parameters
-                    .retain(|p| !selection.credential.contains(&p.name));
-                if probe.method != "get" || !path_within(&probe.path, &base_segments) {
-                    return Err(refuse(format!(
-                        "guard of `{}` must read through a GET under the base path",
-                        selection.id
-                    )));
-                }
-                let checks = guard
-                    .preflight
-                    .checks
-                    .iter()
-                    .chain(&guard.postflight.checks)
-                    .collect::<Vec<_>>();
+                let probe_operation = |operation_id: &str| -> Result<Operation> {
+                    let mut probe = find(operation_id)?.clone();
+                    // The probe passes the credential the way the selected
+                    // operation does: through the connection's header alone,
+                    // never as a parameter bound from caller input.
+                    probe
+                        .parameters
+                        .retain(|p| !selection.credential.contains(&p.name));
+                    if probe.method != "get" || !path_within(&probe.path, &base_segments) {
+                        return Err(refuse(format!(
+                            "guard of `{}` must read through a GET under the base path",
+                            selection.id
+                        )));
+                    }
+                    Ok(probe)
+                };
+                let mut reads = vec![probe_operation(&guard.preflight.operation_id)?];
+                let checks = guard.checks().collect::<Vec<_>>();
                 if guard.preflight.checks.is_empty()
                     || checks.len() > 16
                     || checks.iter().any(|c| !c.pointer.starts_with('/'))
@@ -607,11 +635,45 @@ impl Engine {
                         selection.id
                     )));
                 }
-                let template =
-                    Template::from_operation(&probe).map_err(|refusal| refuse(refusal.reason()))?;
+                if guard.further_preflights.len() > 3
+                    || guard
+                        .further_preflights
+                        .iter()
+                        .any(|preflight| preflight.checks.is_empty())
+                {
+                    return Err(refuse(format!(
+                        "guard of `{}` declares more than three further preflights, or one without checks",
+                        selection.id
+                    )));
+                }
+                if guard.postflight.read.is_some() && guard.postflight.checks.is_empty() {
+                    return Err(refuse(format!(
+                        "guard of `{}` declares a postflight read without checks",
+                        selection.id
+                    )));
+                }
+                for preflight in &guard.further_preflights {
+                    reads.push(probe_operation(&preflight.operation_id)?);
+                }
+                let template = |operation: &Operation| {
+                    Template::from_operation(operation).map_err(|refusal| refuse(refusal.reason()))
+                };
+                let preflights = reads.iter().map(template).collect::<Result<Vec<_>>>()?;
+                let postflight = guard
+                    .postflight
+                    .read
+                    .as_ref()
+                    .map(|read| template(&probe_operation(&read.operation_id)?))
+                    .transpose()?;
                 // Keyed by the selection: two selections may read one probe
                 // operation with different credential parameters removed.
-                probes.insert(selection.id.clone(), Probe { template });
+                probes.insert(
+                    selection.id.clone(),
+                    Probe {
+                        preflights,
+                        postflight,
+                    },
+                );
             }
             if !selection.body_keys.is_empty() {
                 let mut names = std::collections::BTreeSet::new();
@@ -929,6 +991,7 @@ impl Engine {
             input.get("body").cloned().unwrap_or(Value::Null)
         };
         let mut postflight = Vec::new();
+        let mut reread = None;
         if let Some(guard) = &exposed.selection.guard {
             // Every expectation resolves before any request: an absent input is
             // a refusal with nothing sent, not a surprise after the preflight.
@@ -948,47 +1011,68 @@ impl Engine {
                     })
                     .collect()
             };
-            let preflight = expected(&guard.preflight.checks)?;
+            let preflights = guard
+                .preflights()
+                .map(|preflight| expected(&preflight.checks))
+                .collect::<Result<Vec<_>>>()?;
             postflight = expected(&guard.postflight.checks)?;
             let probe = self
                 .probes
                 .get(&exposed.selection.id)
                 .ok_or_else(Error::internal)?;
-            let mut values = BTreeMap::new();
-            for (parameter, path) in &guard.preflight.values {
-                let value = reference(&input, path)
-                    .and_then(scalar)
-                    .ok_or_else(|| refuse(format!("guard value `{path}` is absent")))?;
-                values.insert(parameter.clone(), Supplied::One(value));
-            }
-            let (segments, query) = self.resolve(&probe.template, values)?;
-            let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
-            let query: Vec<(&str, String)> =
-                query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-            let response = http.get(&borrowed, &query).await?;
-            // A target the preflight cannot find is a definite refusal: nothing
-            // has been sent.
-            if response.status == 404 {
-                return Err(Error::new(
-                    ErrorCode::Forbidden,
-                    "guard target was not found before dispatch",
-                ));
-            }
-            let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
-            for (pointer, expected) in &preflight {
-                let current = observed.pointer(pointer).and_then(scalar).ok_or_else(|| {
-                    Error::new(
-                        ErrorCode::UpstreamProtocol,
-                        format!("guard preflight answered without a value at `{pointer}`"),
-                    )
-                })?;
-                // The only point at which a difference is definite. After
-                // dispatch the same difference is uncertainty, not a refusal.
-                if current != *expected {
+            // So does every read's request, the one after the write included.
+            let bind =
+                |values: &BTreeMap<String, String>, template: &Template| -> Result<Request> {
+                    let mut bound = BTreeMap::new();
+                    for (parameter, path) in values {
+                        let value = reference(&input, path)
+                            .and_then(scalar)
+                            .ok_or_else(|| refuse(format!("guard value `{path}` is absent")))?;
+                        bound.insert(parameter.clone(), Supplied::One(value));
+                    }
+                    self.resolve(template, bound)
+                };
+            let requests = guard
+                .preflights()
+                .zip(&probe.preflights)
+                .map(|(preflight, template)| bind(&preflight.values, template))
+                .collect::<Result<Vec<_>>>()?;
+            reread = match (&guard.postflight.read, &probe.postflight) {
+                (Some(read), Some(template)) => Some(bind(&read.values, template)?),
+                (None, None) => None,
+                _ => return Err(Error::internal()),
+            };
+            for ((segments, query), preflight) in requests.iter().zip(&preflights) {
+                let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
+                let query: Vec<(&str, String)> =
+                    query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+                let response = http.get(&borrowed, &query).await?;
+                // A target the preflight cannot find is a definite refusal:
+                // nothing has been sent.
+                if response.status == 404 {
                     return Err(Error::new(
                         ErrorCode::Forbidden,
-                        format!("value at `{pointer}` differs from the pinned one before dispatch"),
+                        "guard target was not found before dispatch",
                     ));
+                }
+                let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
+                for (pointer, expected) in preflight {
+                    let current = observed.pointer(pointer).and_then(scalar).ok_or_else(|| {
+                        Error::new(
+                            ErrorCode::UpstreamProtocol,
+                            format!("guard preflight answered without a value at `{pointer}`"),
+                        )
+                    })?;
+                    // The only point at which a difference is definite. After
+                    // dispatch the same difference is uncertainty, not a refusal.
+                    if current != *expected {
+                        return Err(Error::new(
+                            ErrorCode::Forbidden,
+                            format!(
+                                "value at `{pointer}` differs from the pinned one before dispatch"
+                            ),
+                        ));
+                    }
                 }
             }
         }
@@ -998,6 +1082,7 @@ impl Engine {
             query,
             body,
             postflight,
+            reread,
             resource: exposed.operation.path.clone(),
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
@@ -1007,9 +1092,27 @@ impl Engine {
 }
 
 impl Prepared {
+    /// Whether the guard reads after the write, so [`Prepared::execute_reading`]
+    /// needs a read capability.
+    pub fn reads_after(&self) -> bool {
+        self.reread.is_some()
+    }
+
     /// Send once and classify. Only documented definite refusals are refused;
-    /// everything else that is not a success leaves the effect possible.
+    /// everything else that is not a success leaves the effect possible. A
+    /// guard that reads after the write has no read capability here, so its
+    /// success is unknown; use [`Prepared::execute_reading`].
     pub async fn execute(self, capability: Box<dyn AuthenticatedWrite>) -> WriteOutcome<Value> {
+        self.execute_reading(capability, None).await
+    }
+
+    /// [`Prepared::execute`], with the capability the guard's read after the
+    /// write is issued through, once, after a 2xx.
+    pub async fn execute_reading(
+        self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Value> {
         let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> = self
             .query
@@ -1061,13 +1164,51 @@ impl Prepared {
         // a pinned value that differs in the acknowledgement leaves the effect
         // possible. It is never reported as refused, and no corrective request
         // is issued. The comparison is best effort, not detection.
+        let Some((segments, query)) = &self.reread else {
+            for (pointer, expected) in &self.postflight {
+                if body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+                    return WriteOutcome::Unknown(Error::new(
+                        ErrorCode::UpstreamProtocol,
+                        format!(
+                            "write acknowledged with a value at `{pointer}` other than the pinned one; the effect is possible"
+                        ),
+                    ));
+                }
+            }
+            return WriteOutcome::Applied(Ok(json!({
+                "status": response.status,
+                "body": body,
+                "provenance": provenance(&self.instance, &self.resource, &self.source_revision),
+            })));
+        };
+        // A write that answers without a body is proved by the read the guard
+        // declares, issued once. The same boundary holds: a read that fails,
+        // or answers with another value, leaves the effect possible.
+        let unknown = |message: String| {
+            WriteOutcome::Unknown(Error::new(ErrorCode::UpstreamProtocol, message))
+        };
+        let Some(reader) = reader else {
+            return unknown(
+                "the guard reads after the write and no read capability was given; the effect is possible"
+                    .into(),
+            );
+        };
+        let borrowed: Vec<&str> = segments.iter().map(String::as_str).collect();
+        let query: Vec<(&str, String)> =
+            query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+        let observed = match reader.get(&borrowed, &query).await {
+            Ok(answer) => read_body(&answer, false, &self.rate_limit_reasons),
+            Err(error) => Err(error),
+        };
+        let Ok(observed) = observed else {
+            return unknown(
+                "the guard's read after the write failed; the effect is possible".into(),
+            );
+        };
         for (pointer, expected) in &self.postflight {
-            if body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
-                return WriteOutcome::Unknown(Error::new(
-                    ErrorCode::UpstreamProtocol,
-                    format!(
-                        "write acknowledged with a value at `{pointer}` other than the pinned one; the effect is possible"
-                    ),
+            if observed.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+                return unknown(format!(
+                    "the guard's read after the write answered with a value at `{pointer}` other than the pinned one; the effect is possible"
                 ));
             }
         }
@@ -1411,19 +1552,7 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
         required.push("body".into());
     }
     if let Some(guard) = &selection.guard {
-        let mut references: Vec<&String> = guard.preflight.values.values().collect();
-        references.extend(
-            guard
-                .preflight
-                .checks
-                .iter()
-                .chain(&guard.postflight.checks)
-                .filter_map(|check| match &check.expect {
-                    Expectation::Input(path) => Some(path),
-                    Expectation::Literal(_) => None,
-                }),
-        );
-        for reference in references {
+        for reference in guard.references() {
             if reference
                 .split_once('.')
                 .is_some_and(|(head, _)| head == "body")

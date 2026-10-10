@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A catalog guard can read after the write and read more than once before it, so a write whose
+  answer carries no body can be proved (`docs/local-catalog-provider.md`, `guard`):
+  - `postflight.read` names a GET of the bundle, bound from the write's input like a preflight.
+    The engine issues it once after a `2xx`, and the postflight's checks apply to its answer
+    instead of the write's. A read that fails, or answers with another value, leaves the outcome
+    `unknown`. The write's own status and body are still what the operation returns.
+  - `further_preflights` adds up to three reads before the write, each with its own checks, read
+    in order after `preflight`; the first that refuses stops the write unsent.
+  - The guard format is modelled as `connectors_catalog.guard` in `adapters/catalog/spec/ess`,
+    and every shipped guard is checked against it. A guard without either member serialises as
+    before, so every existing selection keeps its bytes and its configuration revision.
+- Jira Cloud through the catalog provider runs a transition: `issue.transition.run` selects
+  `doTransition` (`POST /rest/api/3/issue/{issueIdOrKey}/transitions`), a required-approval
+  write by transition id (`docs/catalog-jira.md`, *Running a transition*). Its input names the
+  issue's current status id and the transition's target status id; its body is closed to
+  `transition`, `fields` and `update`. Before the `POST` the guard reads the issue (its status
+  must be `current_status`) and the transition narrowed by `transitionId` (it must be open, with
+  target `target_status`); after Jira's `204` it reads the issue again, whose status must be
+  `target_status`, or the outcome is `unknown`. Verified against a local fixture written in the
+  pinned document's shapes, not a live site. The Jira guide's example configuration therefore
+  has a new configuration revision.
+
+### Limits
+
+- A transition that is not open on the issue is refused before the `POST` as `protocol`, not
+  `forbidden`: Jira's narrowed answer has no transition, and a preflight answer without the
+  checked value is read as a protocol failure for every guard.
+
 ## 0.41.0 — 2026-10-10
 
 ### Added

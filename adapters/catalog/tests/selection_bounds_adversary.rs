@@ -324,7 +324,8 @@ fn bounds_round_trip_and_unbounded_selections_serialise_as_before() {
     }
     // Jira carries no bound: every selection serialises exactly the six fields
     // a selection had at the base commit, so its configuration digest is the
-    // same bytes as before.
+    // same bytes as before. The one write, `issue.transition.run`, adds only
+    // the `body_keys` that close its body, and no `bounds`.
     let before: BTreeSet<&str> = [
         "id",
         "operation_id",
@@ -343,7 +344,11 @@ fn bounds_round_trip_and_unbounded_selections_serialise_as_before() {
             .keys()
             .map(String::as_str)
             .collect();
-        assert_eq!(keys, before, "{}", selection.id);
+        let mut expected = before.clone();
+        if selection.id == "issue.transition.run" {
+            expected.insert("body_keys");
+        }
+        assert_eq!(keys, expected, "{}", selection.id);
     }
     let _ = BTreeMap::<String, Bound>::new();
 }

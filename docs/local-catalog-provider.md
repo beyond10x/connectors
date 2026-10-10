@@ -412,6 +412,27 @@ The complete configuration used against the sandbox is
   never refused, because the provider may already have applied the write. No
   corrective request is ever issued. This is the C14 boundary the operator
   accepted for create and update, written as data.
+  - `further_preflights` is optional: up to three more reads before the write,
+    each `{"operation_id", "values", "checks"}` like `preflight`, read in order
+    after it; the first that refuses stops the guard with nothing written. It
+    is for preconditions that live in two answers, such as a Jira issue's status
+    and whether a transition is open on it.
+  - `postflight.read` is optional: `{"operation_id", "values"}`, a GET of the
+    bundle bound from the write's input like a preflight. With it, the engine
+    issues that read once after the write is answered with a `2xx`, and the
+    postflight's checks, at least one, apply to the read's answer instead of the
+    write's. It is for a write that answers without a body, such as Jira's
+    `doTransition` (`204`). A read that fails, or answers without the pinned
+    value, leaves the outcome uncertain as a differing value does. The write's
+    own status and body are still what the operation returns.
+  - Every read binds every value, and every check resolves its input, before
+    the first request; a missing one is refused as `invalid_input` with nothing
+    sent. A read that is not a GET under the base path, more than sixteen checks
+    in all, a further preflight without checks, more than three of them, and a
+    postflight read without checks are refused when the selection loads, as is
+    a credential parameter bound by any read's `values`. The format is modelled
+    as `connectors_catalog.guard.Guard` in `adapters/catalog/spec/ess`, and
+    every shipped guard is checked against it.
 
 The merge guard in the shipped set reads the merge request and requires, before
 the one PUT: `/sha` equal to the pinned `body.sha`, `/state` literally `opened`,
