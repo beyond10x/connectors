@@ -2,15 +2,16 @@
 format: aep.planning-md/3
 id: story:catalog-path-correction-and-value-bound
 kind: story
-status: active
+status: implemented
 title: Path corrections and string value bounds, for GitLab code search
 relations:
 - serves: vision:independent-contract-adapters
 - decomposes: epic:fluxplane-plugin-parity
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-10T04:32:49Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-10T04:32:49Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-10T09:10:39Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 
