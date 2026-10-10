@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.45.0 — 2026-10-10
 
 ### Added
 
@@ -11,7 +11,9 @@
   `capacity`, never truncated. A redirect is followed at most three times, only to an origin the
   selection's `binary.hosts` names and the connection admits; any other target is refused as
   `forbidden` with nothing sent there. A `download` selection (`{"path_prefix"}`) reads a URL the
-  provider handed out, given as the input `url`.
+  provider handed out, given as the input `url`. A URL or redirect target whose decoded path
+  segment holds `/` or `\` is refused as `forbidden`; a body with a content coding other than
+  `identity` is answered as `application/octet-stream`, and a repeated `Content-Type` is refused.
 - Slack files (`docs/catalog-slack.md`, *Files*): `files.list` (paged by `page` and `count`),
   `files.info`, and `file.download`, which reads a file's `url_private` on
   `https://files.slack.com` under `/files-pri/` with the bot token. The file record gains
