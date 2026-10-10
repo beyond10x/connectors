@@ -27,6 +27,29 @@
   does not type as a string, an empty set and an empty or repeated value are refused when the
   selection loads. Range bounds serialise as before, so every other selection keeps its bytes.
   The form is modelled as `connectors_catalog.selection.Bound`.
+- `connectors-prometheus`, a native Prometheus adapter executable for the local CLI:
+  `series.query` (one PromQL expression at one instant, default now: a vector, matrix, scalar or
+  string, at most 500 series), `series.query_range` (over at most seven days at an explicit
+  step, at most 2,000 points per series) and `rules.list` (alerting and recording rules, with
+  each alerting rule's state, at most 2,000 rules), each one GET and each answered through
+  `operations invoke` on a saved connection. A connection uses the bearer profile
+  `prometheus.bearer`: connect, repair and `connections revalidate` prove the token with
+  `GET api/v1/status/buildinfo`, which runs no query, and the identity is the configured
+  connection (`prometheus.connection`, subject the configuration's `instance`). The
+  configuration is HTTPS-only, may carry a path prefix and takes an optional private CA file.
+  The instant and rules profiles and the connection are new in
+  `adapters/prometheus/contracts/series/v1alpha1/semantics.md` §11 and modelled in
+  `adapters/prometheus/spec/ess`; the operator guide is `adapters/prometheus/README.md`.
+- Prometheus through Grafana: a Prometheus connection whose `base_url` is a data source's
+  Grafana proxy path (`https://<grafana>/api/datasources/proxy/uid/<uid>/`), with a Grafana
+  service-account token as its `prometheus.bearer` token, answers the same three reads through
+  Grafana. No Grafana adapter or host change.
+- Limits: verified against hand-written fixtures in the Prometheus and Grafana API shapes only,
+  not a live provider. No `X-Scope-OrgID` tenant header is sent; no query `timeout` parameter is
+  sent, so the host transport deadline bounds a call; too many samples reaches the caller as
+  `upstream_protocol`, not told apart from other execution errors; every query reads everything
+  the token reaches; and a Prometheus without authentication cannot be connected, because the
+  local host admits no credential-less profile.
 
 ### Compatibility
 

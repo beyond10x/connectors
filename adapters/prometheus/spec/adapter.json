@@ -1,0 +1,562 @@
+{
+  "kind": "connectors.adapter/v1",
+  "id": "prometheus",
+  "version": "0.1.0",
+  "sources": [
+    "https://prometheus.io/docs/prometheus/3.5/querying/api/",
+    "https://grafana.com/docs/grafana/latest/developers/http_api/data_source/"
+  ],
+  "configuration_schema": {
+    "title": "effective local configuration",
+    "description": "The document the adapter composition builds and validates at bootstrap, not the file an operator writes. The file (connectors_prometheus.connection.LocalConfiguration in spec/ess) carries ca_file; this resolved form reduces the CA to ca_digest and carries the canonical base_url. See adapters/prometheus/contracts/series/v1alpha1/semantics.md §11.4.",
+    "type": "object",
+    "properties": {
+      "format": {
+        "const": "connectors-prometheus-local/1"
+      },
+      "instance": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9_.-]+$"
+      },
+      "base_url": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 512
+      },
+      "ca_digest": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "pattern": "^[a-f0-9]{64}$"
+      },
+      "query_scope": {
+        "type": "object",
+        "properties": {
+          "allowed_matchers": {
+            "type": "array",
+            "maxItems": 0
+          }
+        },
+        "required": [
+          "allowed_matchers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "format",
+      "instance",
+      "base_url",
+      "ca_digest",
+      "query_scope"
+    ],
+    "additionalProperties": false
+  },
+  "operations": [
+    {
+      "id": "series.query",
+      "description": "Evaluate one PromQL expression at one instant (time_unix_s, default now) and return its result: a vector, a matrix for a range-vector selector, a scalar or a string. One GET api/v1/query; at most 500 series.",
+      "contract": "datasource.series/v1alpha1",
+      "profile": "promql-instant",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "time_unix_s": {
+            "$ref": "#/$defs/unix_s"
+          },
+          "max_series": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_samples_per_series": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "unix_s": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "result_type": {
+            "enum": [
+              "vector",
+              "matrix",
+              "scalar",
+              "string"
+            ]
+          },
+          "series": {
+            "$ref": "#/$defs/series"
+          },
+          "series_truncated": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "$ref": "#/$defs/notes"
+          },
+          "infos": {
+            "$ref": "#/$defs/notes"
+          },
+          "time_unix_s": {
+            "type": "integer"
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "result_type",
+          "series",
+          "series_truncated",
+          "complete",
+          "warnings",
+          "infos",
+          "time_unix_s",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "series": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "properties": {
+                "labels": {
+                  "type": "object",
+                  "maxProperties": 128,
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "samples": {
+                  "type": "array",
+                  "maxItems": 2000,
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "prefixItems": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "samples_truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "labels",
+                "samples",
+                "samples_truncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "notes": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "resource": {
+                "const": "prometheus:query"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "series.query_range",
+      "description": "Evaluate one PromQL expression over a window of at most seven days at an explicit step and return its series. One GET api/v1/query_range; at most 500 series of at most 2,000 samples each.",
+      "contract": "datasource.series/v1alpha1",
+      "profile": "promql-range",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16384
+          },
+          "start_unix_s": {
+            "$ref": "#/$defs/unix_s"
+          },
+          "end_unix_s": {
+            "$ref": "#/$defs/unix_s"
+          },
+          "step_s": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 604800
+          },
+          "max_series": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500
+          },
+          "max_samples_per_series": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2000
+          }
+        },
+        "required": [
+          "query",
+          "start_unix_s",
+          "end_unix_s",
+          "step_s"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "unix_s": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9999999999
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "result_type": {
+            "const": "matrix"
+          },
+          "series": {
+            "$ref": "#/$defs/series"
+          },
+          "series_truncated": {
+            "type": "boolean"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "$ref": "#/$defs/notes"
+          },
+          "infos": {
+            "$ref": "#/$defs/notes"
+          },
+          "window": {
+            "type": "object",
+            "properties": {
+              "start_unix_s": {
+                "type": "integer"
+              },
+              "end_unix_s": {
+                "type": "integer"
+              },
+              "step_s": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "start_unix_s",
+              "end_unix_s",
+              "step_s"
+            ],
+            "additionalProperties": false
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "result_type",
+          "series",
+          "series_truncated",
+          "complete",
+          "warnings",
+          "infos",
+          "window",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "series": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+              "type": "object",
+              "properties": {
+                "labels": {
+                  "type": "object",
+                  "maxProperties": 128,
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "samples": {
+                  "type": "array",
+                  "maxItems": 2000,
+                  "items": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "prefixItems": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "samples_truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "labels",
+                "samples",
+                "samples_truncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "notes": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "maxLength": 256
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "resource": {
+                "const": "prometheus:query_range"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "rules.list",
+      "description": "List the alerting and recording rules Prometheus evaluates, one record per rule with its group, expression, health and, for an alerting rule, its state and number of active alerts. One GET api/v1/rules; unpaged, at most 2,000 rules.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "prometheus-rules",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "alerting",
+              "recording"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 2000,
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "group_interval_ms": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                },
+                "kind": {
+                  "enum": [
+                    "alerting",
+                    "recording"
+                  ]
+                },
+                "query": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16384
+                },
+                "labels": {
+                  "$ref": "#/$defs/labels"
+                },
+                "annotations": {
+                  "$ref": "#/$defs/labels"
+                },
+                "health": {
+                  "enum": [
+                    "ok",
+                    "err",
+                    "unknown"
+                  ]
+                },
+                "last_error": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "state": {
+                  "enum": [
+                    "inactive",
+                    "pending",
+                    "firing"
+                  ]
+                },
+                "duration_ms": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "active_alerts": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "group",
+                "name",
+                "kind",
+                "query",
+                "labels",
+                "annotations",
+                "health"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "rule_limit"
+              ]
+            }
+          },
+          "next_cursor": {
+            "type": "null"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "resource": {
+                "const": "prometheus:rules"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "complete",
+          "truncation",
+          "next_cursor",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "labels": {
+            "type": "object",
+            "maxProperties": 128,
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

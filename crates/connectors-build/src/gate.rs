@@ -127,7 +127,14 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         return Err("incomplete Cargo formatting selection".into());
     }
     execute(format.args(["--", "--check"]))?;
-    for adapter in ["grafana", "kubernetes", "loki", "sql", "tavily"] {
+    for adapter in [
+        "grafana",
+        "kubernetes",
+        "loki",
+        "prometheus",
+        "sql",
+        "tavily",
+    ] {
         let source = root.join(format!("adapters/{adapter}/spec/adapter.json"));
         let descriptor = connectors_spec::compile(&std::fs::read(source)?)?;
         if connectors_spec::descriptor_bytes(&descriptor)?
@@ -155,6 +162,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "grafana",
         "kubernetes",
         "loki",
+        "prometheus",
         "sql",
         "tavily",
         "catalog-provider",
@@ -188,6 +196,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-grafana",
             "connectors-kubernetes",
             "connectors-loki",
+            "connectors-prometheus",
             "connectors-sql",
             "connectors-tavily",
         ] {
@@ -220,6 +229,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
                 "connectors-grafana"
                     | "connectors-kubernetes"
                     | "connectors-loki"
+                    | "connectors-prometheus"
                     | "connectors-sql"
                     | "connectors-tavily"
                     | "tokio-postgres"
@@ -260,6 +270,7 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
             "connectors-grafana",
             "connectors-kubernetes",
             "connectors-loki",
+            "connectors-prometheus",
             "connectors-sql",
             "connectors-tavily",
         ] {

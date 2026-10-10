@@ -249,6 +249,13 @@
     },
     {
       "area": "Native adapters",
+      "detail": "series.query, series.query_range and rules.list through a saved bearer connection, directly or through Grafana's data-source proxy.",
+      "href": "/docs/reference/adapters/prometheus",
+      "label": "Prometheus PromQL reads",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
       "detail": "Per-operation SelfSubjectAccessReview checks and the remaining Kubernetes and Helm workflows.",
       "href": "/docs/reference/adapters/kubernetes",
       "label": "Kubernetes permission checks",
@@ -263,7 +270,14 @@
     },
     {
       "area": "Native adapters",
-      "detail": "Atlassian native documents, Docker, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
+      "detail": "An X-Scope-OrgID tenant header, an adapter-set query timeout, a Capacity error for too many samples apart from other execution errors, and profiles other than a bearer token.",
+      "href": "/docs/reference/adapters/prometheus",
+      "label": "Prometheus tenants, timeouts and other authentication",
+      "status": "planned"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "Atlassian native documents, Docker, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built.",
       "href": "/docs/reference/adapters",
       "label": "Specification-only adapters",
       "status": "decided"

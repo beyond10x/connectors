@@ -83,7 +83,7 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 | grafana | [Grafana datasource discovery](../adapters/grafana/contracts/discovery.md) | Specified; runtime pending |
 | grafana | [Grafana mediated routes](../adapters/grafana/contracts/routes.md) | Specified; runtime pending |
 | loki | [Loki LogQL](../adapters/loki/contracts/logs.md) | Implemented by the loki adapter since 0.38.0: range, metric and label reads |
-| prometheus | [Prometheus PromQL](../adapters/prometheus/contracts/series.md) | Specified; runtime pending |
+| prometheus | [Prometheus PromQL](../adapters/prometheus/contracts/series.md) | Implemented by the prometheus adapter: instant, range and rules reads |
 | sip | [SIP dial](../adapters/sip/contracts/dial.md) | Specified; runtime pending |
 | rtvbp | [RTVBP sessions](../adapters/rtvbp/contracts/session.md) | Specified; runtime pending |
 | catalog | [GitLab merge-request feed](../adapters/catalog/contracts/feed.md) | Implemented by the catalog provider; checked against recorded GitLab answers |
@@ -98,3 +98,4 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 | grafana | [Model overview](../adapters/grafana/model/index.md) |
 | kubernetes | [Model overview](../adapters/kubernetes/model/index.md) |
 | loki | [Model overview](../adapters/loki/model/index.md) |
+| prometheus | [Model overview](../adapters/prometheus/model/index.md) |
