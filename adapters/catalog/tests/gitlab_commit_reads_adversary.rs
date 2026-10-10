@@ -380,7 +380,27 @@ fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
     };
     let operations = private.join("operations.json");
     write(&operations, &serde_json::to_vec(&selection).unwrap());
-    config["bundle_directory"] = json!(root.join("generated/bundles").canonicalize().unwrap());
+    // The base pin predates the cited correction of the project search path,
+    // which rebuilt the GitLab bundle (and so its digest in the revision): load
+    // the bundle with the correction and its record undone, which is exactly
+    // the bundle committed before it.
+    let bundles = directory.path().join("bundles");
+    filesystem::directory(&bundles, true, true).unwrap();
+    let mut gitlab =
+        connectors_catalog::bundle::load(&root.join("generated/bundles"), "gitlab").unwrap();
+    gitlab.source.amendments = None;
+    for operation in &mut gitlab.inventory.operations {
+        if operation.operation_id.as_deref() == Some("getApiV4ProjectsIdDashSearch") {
+            operation.path = "/api/v4/projects/{id}/(-/)search".into();
+        }
+    }
+    let entry = connectors_catalog::bundle::write(&bundles, &gitlab, false).unwrap();
+    // `git show cd754b86d:adapters/catalog/generated/bundles/index.json`.
+    assert_eq!(
+        entry.bundle_sha256, "89090cc0a41c921afe9fc2d93480a493a33731e8017a1232fac32aa5478a3788",
+        "the reconstruction is not the bundle before the correction"
+    );
+    config["bundle_directory"] = json!(bundles.canonicalize().unwrap());
     config["operations_file"] = json!(operations);
     config.as_object_mut().unwrap().remove("ca_file");
     let path = private.join("catalog.json");

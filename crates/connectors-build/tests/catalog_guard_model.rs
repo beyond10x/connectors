@@ -189,3 +189,43 @@ fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
         );
     }
 }
+
+/// Every shipped selection's `bounds` is a value of `connectors_catalog.selection.QueryBounds`:
+/// a range (`maximum`, optional `minimum`) or a `values` set, never both, and both forms are
+/// shipped, so the check covers each (story:catalog-path-correction-and-value-bound).
+#[test]
+fn every_shipped_bound_is_a_value_of_the_catalog_selection_model() {
+    let schema = compiled("connectors_catalog.selection.QueryBounds");
+    let invariants =
+        schema["$defs"]["connectors_catalog.selection.Bound"]["x-ess-invariants"].to_string();
+    for clause in ["defined(maximum)", "defined(values)", "values.count"] {
+        assert!(
+            invariants.contains(clause),
+            "the model no longer states `{clause}` of a bound: {invariants}"
+        );
+    }
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let bounded: Vec<(String, Value)> = shipped()
+        .into_iter()
+        .filter_map(|(name, s)| Some((name, s.get("bounds")?.clone())))
+        .collect();
+    for form in ["maximum", "values"] {
+        assert!(
+            bounded.iter().any(|(_, bounds)| bounds
+                .as_object()
+                .unwrap()
+                .values()
+                .any(|bound| bound.get(form).is_some())),
+            "no shipped bound declares `{form}`, so this check would not cover it"
+        );
+    }
+    for (name, bounds) in &bounded {
+        assert_valid(&validator, name, &serde_json::json!({"bounds": bounds}));
+        for (parameter, bound) in bounds.as_object().unwrap() {
+            assert!(
+                bound.get("maximum").is_some() != bound.get("values").is_some(),
+                "{name}: `{parameter}` is not exactly one form of bound"
+            );
+        }
+    }
+}

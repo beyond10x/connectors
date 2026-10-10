@@ -35,15 +35,30 @@ committed bundle that a fresh run would not reproduce byte for byte. Nothing
 here reaches the network.
 
 `--amendments <file>` applies a `connectors-source-amendments/1` file to the
-extracted inventory: each entry names an `operation_id`, one optional query
-parameter to add (`name`, `location: query`, `required: false`, `type`), the
-https page that documents it and why the pinned document lacks it. The file
-must carry the source's SHA-256, and an operation that is missing or declared
-twice, a parameter it already declares, or anything other than an optional,
-unrepeated query parameter is refused before any bundle is written. The
-bundle's source record then names the file and its SHA-256
-(`crates/connectors-catalog/src/amendment.rs`). Zendesk uses it for the ticket
-export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)).
+extracted inventory: each entry names an `operation_id`, exactly one change, the
+https page that documents it and why the pinned document needs it. The change
+is one of:
+
+- `add_parameter`: one optional query parameter to add (`name`,
+  `location: query`, `required: false`, `type`) that the pinned document lacks;
+- `correct_path`: `{"from": "<path>", "to": "<path>"}`, where `from` is the
+  operation's path as the source declares it and `to` is that path with each
+  parenthesised optional segment either removed or kept without its
+  parentheses, such as GitLab's `/api/v4/projects/{id}/(-/)search` to
+  `/api/v4/projects/{id}/search`. The method and every path parameter stay as
+  declared.
+
+The file must carry the source's SHA-256. An operation that is missing or
+declared twice, an entry with both changes or neither, a citation that is not
+https or a blank reason, a parameter the operation already declares or anything
+other than an optional, unrepeated query parameter, and a correction whose
+`from` is not the operation's current path or whose `to` equals `from` or is not
+derived from it that way are each refused before any bundle is written, and
+nothing is applied. The bundle's source record then names the file and its
+SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
+`connectors_catalog.amendment` in `adapters/catalog/spec/ess`). Zendesk uses it
+for the ticket export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)),
+GitLab for the project search path ([Project code search](#project-code-search)).
 
 ## The shipped selection set
 
@@ -61,8 +76,9 @@ serves the provider from the pinned source alone, plus eleven repository reads
 and one unguarded write, `issue.create`, the merge-request note and discussion
 operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)), the
 auto-merge and reopen variants of merge and update
-([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)), and two
-merge-request list reads, its diffs and its discussions:
+([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)), two
+merge-request list reads, its diffs and its discussions, and project code
+search:
 
 | id | source operation | effect |
 |---|---|---|
@@ -77,6 +93,7 @@ merge-request list reads, its diffs and its discussions:
 | `merge_request.auto_merge`, `merge_request.reopen` | `…MergeRequestIidMerge` and `…MergeRequestIid`, guarded, each with one fixed body value ([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)) | write |
 | `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | read |
 | `merge_request.diffs`, `merge_request.discussions` | `getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs`, `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions`, each one page per call ([below](#merge-request-diffs-and-discussions)) | read |
+| `search.blobs` | `getApiV4ProjectsIdDashSearch`, path corrected by a cited amendment, `scope` held to `blobs` ([below](#project-code-search)) | read |
 | `merge_request.note.create`, `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes`, `…DiscussionsDiscussionIdNotes`, unguarded | write |
 | `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`, guarded | write |
 
@@ -128,13 +145,32 @@ refused as `invalid_input` before any request.
 `created_at`, `last_activity_at` and `path_with_namespace`. All eleven need only
 the `read_api` token scope.
 
-Code search within a project (`getApiV4ProjectsIdDashSearch`, scope `blobs`) is
-not selected. The pinned source declares its path as
-`/api/v4/projects/{id}/(-/)search`, GitLab's notation for an optional `-/`
-segment; the engine reads the template literally and would send
-`/projects/{id}/(-/)search`, and a `connectors-source-amendments/1` file can add
-an optional query parameter but cannot correct a path. A selection bound is an
-integer range, so it also cannot hold the required `scope` to `blobs`.
+### Project code search
+
+`search.blobs` selects `getApiV4ProjectsIdDashSearch`, GitLab's project search,
+held to code: it needs `read_api` and sends
+`GET /projects/{id}/search?scope=blobs&search=…`, one page per call.
+
+| id | source operation | request | effect |
+|---|---|---|---|
+| `search.blobs` | `getApiV4ProjectsIdDashSearch` | `GET /projects/{id}/search` with `search` (the expression, required), `scope` (required, and only `blobs`), `ref` (a branch or tag), `page` and `per_page` (1 through 100). The body is GitLab's list of blob matches, unchanged, such as `path`, `ref`, `startline` and `data` (the matching lines). Example: `{"id": "org/project", "scope": "blobs", "search": "connect(", "ref": "main", "per_page": 20, "page": 1}` sends `GET` to the segments `projects`, `org/project`, `search` with the query pairs `scope=blobs`, `search=connect(`, `ref=main`, `per_page=20` and `page=1` | read |
+
+The pinned source declares the path as `/api/v4/projects/{id}/(-/)search`,
+GitLab's notation for an optional `-/` segment, which the engine would send
+literally. The pinned document stays as GitLab published it; the cited
+`adapters/gitlab/upstream/openapi_v3.amendments.json` corrects the bundle's
+path to `/api/v4/projects/{id}/search`, the route GitLab's search reference
+documents (see `--amendments` in [Build the bundle](#build-the-bundle)). The
+same notation on group search and project semantic search is not corrected,
+and neither is selected.
+
+The selection bounds `scope` to the one value `blobs`, so the search cannot
+reach issues, merge requests, commits, notes, wiki text or users: any other
+scope, a case or whitespace variant, a comma-joined list or an absent `scope` is
+refused as `invalid_input` before any request, and the declared input schema
+lists `scope` with `"enum": ["blobs"]`. It withholds `type`, `state`,
+`confidential` and `fields`, which apply only to other scopes, so an input
+carrying any of them is refused the same way.
 
 ### Merge-request diffs and discussions
 
@@ -345,14 +381,28 @@ The complete configuration used against the sandbox is
   the provider answers plain text, as GitLab does for a job trace. Without it the
   bundle decides: a 2xx declared only as `text/…` is read as text, anything else
   as JSON. A write never carries it.
-- `bounds` is optional: `{"<parameter>": {"minimum": <n>, "maximum": <n>}}`
-  narrows a query parameter the source declares, such as a provider's page-size
-  cap; `minimum` may be omitted. The value, whether sent as a number or a
-  string, must be a decimal integer no greater than `maximum` and no less than
-  `minimum` (`-0` is zero); anything else is refused as `invalid_input` before
-  any request. A bound on a parameter the operation does not declare as a query
-  parameter, or with a `minimum` above its `maximum`, is refused when the
-  selection loads. The declared input schema carries both limits as well.
+- `bounds` is optional and narrows query parameters the source declares, each
+  by exactly one of two forms:
+  - a range, `{"<parameter>": {"minimum": <n>, "maximum": <n>}}`, such as a
+    provider's page-size cap; `minimum` may be omitted. The value, whether sent
+    as a number or a string, must be a decimal integer no greater than `maximum`
+    and no less than `minimum` (`-0` is zero). The declared input schema
+    carries both limits.
+  - a set, `{"<parameter>": {"values": ["<value>", …]}}`, for a parameter the
+    source types as a string, such as GitLab's search `scope` held to `blobs`.
+    The text the value is sent as must be exactly one of the values (a JSON
+    integer is compared as its decimal text); case, whitespace and
+    comma-joined variants are not. The declared input schema lists the set as
+    the parameter's `enum`.
+
+  A value outside its bound is refused as `invalid_input` before any request;
+  a repeated parameter's bound holds for each element. When the selection
+  loads, a bound is refused on a parameter the operation does not declare as a
+  query parameter, with both forms or neither, with a `minimum` above its
+  `maximum` or beside `values`, with `values` on a parameter the source does not
+  type as a string, or with an empty set or an empty or repeated value. The
+  form is modelled as `connectors_catalog.selection.Bound` in
+  `adapters/catalog/spec/ess`.
 - `required` is optional: `["<query parameter>", …]` marks query parameters the
   provider requires although the pinned source does not. Each is then declared
   required and refused as `invalid_input` when absent, before any request. A

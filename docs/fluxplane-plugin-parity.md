@@ -142,6 +142,22 @@ Sources:
   [gitlab](#gitlab) section moved; the GitLab example configuration in
   `docs/local-catalog-provider.md` has a new configuration revision. The [Gap units](#gap-units)
   table still shows the 2026-10-07 baseline.
+- **GitLab code search, 2026-10-10 (unreleased).** `gitlab.search.blobs` moved from missing to
+  covered when `search.blobs` (`getApiV4ProjectsIdDashSearch`) was selected. Two catalog
+  capabilities made it selectable: a `connectors-source-amendments/1` file can now carry a cited
+  path correction (`adapters/gitlab/upstream/openapi_v3.amendments.json` corrects
+  `/api/v4/projects/{id}/(-/)search` to `/api/v4/projects/{id}/search`; the pinned document is
+  unchanged), and a selection bound can hold a string parameter to a set of values (`scope` to
+  `blobs`, so the search reaches no issues, users or wiki text). Verified against fixtures
+  through the engine, not a live GitLab. The `gitlab` row of the per-plugin table now reads
+  24 / 2,553 covered and 35 / 106 missing, and the summary and total rows move by the same
+  operation and 75 calls. The mapped call of `gitlab.search.blobs` in
+  [Used but not declared](#used-but-not-declared) now lands on covered, so the mapped-call split
+  moves from 76 covered and 48 to gap units to 77 and 47; the sentence under
+  [Summary](#summary) still gives the 2026-10-07 split. The selection was appended to
+  `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
+  [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
+  baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -168,9 +184,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 65 | 5,467 | 54 | 5,467 |
+| covered | 66 | 5,542 | 55 | 5,542 |
 | partial | 14 | 26 | 7 | 26 |
-| missing | 222 | 863 | 48 | 863 |
+| missing | 221 | 788 | 47 | 788 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -183,7 +199,7 @@ Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
-| gitlab | 64 | 38 | 2,670 | 23 / 2,478 | 5 / 11 | 36 / 181 |
+| gitlab | 64 | 38 | 2,670 | 24 / 2,553 | 5 / 11 | 35 / 106 |
 | jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
@@ -208,7 +224,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **65 / 5,467** | **14 / 26** | **222 / 863** |
+| **total** | **301** | **109** | **6,356** | **66 / 5,542** | **14 / 26** | **221 / 788** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -253,7 +269,7 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.repository.commit.list` | 81 | 17 | 2026-10-06 | `commits.list` (:44) | covered | — |
 | `gitlab.mr.merge` | 77 | 10 | 2026-10-06 | `merge_request.merge` (:70) + `merge_request.auto_merge` (:113) | covered | `merge_request.merge` merges at once and requires `mergeable` and a succeeded pinned head pipeline. `merge_request.auto_merge` sets merge-when-pipeline-succeeds: its selection fixes `auto_merge: true`, its guard pins the head and the open state but not the pipeline, and it is applied when GitLab answers with auto-merge set or merged (2026-10-10, [Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)). Neither takes `squash` or `should_remove_source_branch` beside auto-merge. |
 | `gitlab.compare` | 76 | 19 | 2026-09-30 | `repository.compare` (:48) | covered | No per-file diff bound. |
-| `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | — | missing | Code search is not selected (`/projects/:id/search`, scope `blobs`). Not selectable as of 2026-10-10: the pinned source declares the path as `/projects/{id}/(-/)search`, which the catalog engine sends literally, a source amendment can only add a query parameter, and a selection bound cannot hold the required `scope` to `blobs` ([GitLab catalog guide](local-catalog-provider.md#the-shipped-selection-set)). |
+| `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | `search.blobs` (:113) | covered | `scope` is held to `blobs`; the path comes from a cited source correction. |
 | `gitlab.repository.tag.list` | 71 | 23 | 2026-10-03 | `tags.list` (:35) | covered | — |
 | `gitlab.mr.update` | 60 | 12 | 2026-10-04 | `merge_request.update` (:62) + `merge_request.reopen` (:124) | covered | `merge_request.update` requires state `opened`. `merge_request.reopen` reopens a closed merge request at the pinned head: its selection fixes `state_event: reopen`, and GitLab must answer it `opened` (2026-10-10, [Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)). |
 | `gitlab.mr.changes` | 58 | 13 | 2026-10-03 | `merge_request.diffs` (:134) + `merge_request.get` (:17) | covered | `merge_request.diffs` lists the merge request's file diffs by IID, each with `old_path`, `new_path`, `diff` and the new, renamed, deleted and `too_large` flags, offset-paged (`per_page` 1 through 100), `unidiff` for the unified format; `merge_request.get` gives the request itself and its `diff_refs` (2026-10-10). |
@@ -925,7 +941,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `jira.issue.get` (§4b) | 1 | 1 | `jira.issue.show` | covered | — |
 | `confluence.test` (§4b) | 1 | 1 | `confluence.test` | covered | — |
 | `gitlab.mr.show` (§4b) | 1 | 1 | `gitlab.mr.show` | covered | — |
-| `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | missing | U10 |
+| `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | covered | — |
 | `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | covered | — |
 
 In total, 124 calls are mapped: 89 covered and 35 to gap units. The rest of §4 is not

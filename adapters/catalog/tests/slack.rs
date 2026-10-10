@@ -363,7 +363,7 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
     for selection in shipped() {
         let bound = selection.bounds.get("limit");
         if selection.id == "conversations.list" {
-            assert_eq!(bound.map(|b| b.maximum), Some(1000));
+            assert_eq!(bound.and_then(|b| b.maximum), Some(1000));
         } else {
             assert!(selection.bounds.is_empty(), "`{}`", selection.id);
         }
@@ -390,7 +390,7 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
     assert_eq!(bounds.len(), 1);
     assert_eq!(
         bounds.get("count").map(|b| (b.minimum, b.maximum)),
-        Some((Some(1), 100))
+        Some((Some(1), Some(100)))
     );
 }
 
