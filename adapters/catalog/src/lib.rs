@@ -78,8 +78,13 @@ pub struct Read {
 #[serde(deny_unknown_fields)]
 pub struct Postflight {
     pub checks: Vec<Check>,
-    /// Omitted when absent, so a guard without it keeps its bytes.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// Omitted when absent, so a guard without it keeps its bytes. An explicit
+    /// `null` is refused, as the model refuses it.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_read"
+    )]
     pub read: Option<Read>,
     /// One check that accepts one of several observations: it holds when at
     /// least one of these comparisons holds, beside every check in `checks`,
@@ -319,6 +324,13 @@ fn scalar(value: &Value) -> Option<String> {
         Value::Bool(flag) => Some(flag.to_string()),
         _ => None,
     }
+}
+
+fn present_read<'de, D>(deserializer: D) -> std::result::Result<Option<Read>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Read::deserialize(deserializer).map(Some)
 }
 
 fn refuse(message: impl Into<String>) -> Error {

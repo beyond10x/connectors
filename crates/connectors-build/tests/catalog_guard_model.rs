@@ -154,3 +154,38 @@ fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
         assert_eq!(&written, raw, "{name}");
     }
 }
+
+/// Adversary: the engine's reader and the compiled model agree on the shape of a guard. For each
+/// variation of the shipped Jira guard, the reader admits it exactly when the compiled schema
+/// does. A postflight `read` written as `null` is not a value of the model (`read` is an
+/// `Optional<Read>`, compiled as an object or absent), and the reader admits it as absent.
+#[test]
+fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
+    let schema = compiled("connectors_catalog.guard.Guard");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let (_, shipped) = guarded()
+        .into_iter()
+        .find(|(_, guard)| guard["postflight"].get("read").is_some())
+        .expect("a shipped guard with a postflight read");
+    type Change<'a> = &'a dyn Fn(&mut Value);
+    let variations: [(&str, Change); 4] = [
+        ("as shipped", &|_| {}),
+        ("postflight read null", &|g| {
+            g["postflight"]["read"] = Value::Null
+        }),
+        ("further_preflights null", &|g| {
+            g["further_preflights"] = Value::Null
+        }),
+        ("any_of null", &|g| g["postflight"]["any_of"] = Value::Null),
+    ];
+    for (name, change) in variations {
+        let mut raw = shipped.clone();
+        change(&mut raw);
+        let model = validator.is_valid(&raw);
+        let reader = serde_json::from_value::<Guard>(raw.clone()).is_ok();
+        assert_eq!(
+            reader, model,
+            "{name}: reader admits {reader}, model admits {model}"
+        );
+    }
+}
