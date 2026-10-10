@@ -182,6 +182,39 @@ Sources:
   `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
   [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
   baseline.
+- **GitLab CI, project and repository writes, 2026-10-10 (unreleased).** `gitlab.pipeline.retry`,
+  `gitlab.pipeline.cancel`, `gitlab.pipeline.create`, `gitlab.environment.list`,
+  `gitlab.repository.commit.create`, `gitlab.project.create`, `gitlab.repository.file.update`,
+  `gitlab.branch.create` and `gitlab.branch.delete` moved from missing to covered when
+  `pipeline.retry`, `pipeline.cancel`, `pipeline.create`, `environments.list`, `commit.create`,
+  `file.update`, `branch.create`, `branch.delete` and `project.create` were selected. Every write
+  is guarded on the caller's commit `sha` (`project.create` on the namespace path and id), and
+  `branch.delete` is proved by a read answering 404 afterwards. The pinned source declares the
+  commit, file and project bodies as multipart only; a new amendment kind, `correct_media_type`,
+  corrects each to JSON with a citation (`adapters/gitlab/upstream/openapi_v3.amendments.json`).
+  Verified against fixtures through the engine and the owned provider process, not a live
+  GitLab. The `gitlab` row of the per-plugin table now reads 40 / 2,670 covered, 2 / 0 partial
+  and 22 / 0 missing: every GitLab operation with calls is covered. The selections were appended
+  to `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
+  [gitlab](#gitlab) section moved.
+- **Kubernetes reads, 2026-10-10 (unreleased).** `kubernetes.namespace.list`,
+  `kubernetes.deployment.history` and `kubernetes.event.list` moved from missing to covered, and
+  `kubernetes.pod.show`, `kubernetes.deployment.show` and `kubernetes.service.show` from partial
+  to covered, when the native adapter shipped `resources.get`, `namespaces.list` and
+  `deployments.history` and admitted the kinds `replicasets` and `events`
+  ([Kubernetes CLI guide](local-kubernetes-cli.md#read-single-objects-namespaces-and-rollout-history)),
+  verified against API-shaped fixtures, not a live cluster. `kubernetes.container.show` stays
+  partial: `resources.get` reads the pod, not one container. The `kubernetes` row now reads
+  12 / 48 covered, 3 / 5 partial and 9 / 19 missing. The new operations were inserted after
+  `resources.list` in `adapters/kubernetes/spec/adapter.json`, so the [kubernetes](#kubernetes)
+  section's citations were re-read.
+- **Recount of the derived counts, 2026-10-10.** With the two changes above, the summary and
+  total rows move by 15 operations and 89 calls (5 from partial, 84 from missing). Every count
+  on this page is now the sum of its rows: the mapped-call split under [Summary](#summary) is
+  116 covered and 8 to gap units (the `sql` mapped call lands on `sql.query`, covered since
+  0.40.0), and [Gap units](#gap-units) and [Waves](#waves) gain an open column (619 calls open,
+  U15, U16 and U18 among the covered units) beside their 2026-10-07 baseline. The Confluence
+  CQL search (U20) is not in this change and stays missing.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -208,28 +241,29 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 80 | 5,656 | 67 | 5,656 |
-| partial | 11 | 15 | 4 | 15 |
-| missing | 210 | 685 | 38 | 685 |
+| covered | 95 | 5,745 | 81 | 5,745 |
+| partial | 8 | 10 | 2 | 10 |
+| missing | 198 | 601 | 26 | 601 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
 are mapped to the operation they most likely meant in [Used but not declared](#used-but-not-declared):
 
 - 122 calls are mapped from §4a and §4b, and 2 more from §4d.
-- 89 of them land on covered capabilities. The other 35 are added to the gap units.
+- 116 of them land on covered capabilities. The other 8 are added to the gap units. Both are
+  the sums of the rows of that table.
 
 Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
-| gitlab | 64 | 38 | 2,670 | 31 / 2,598 | 2 / 0 | 31 / 72 |
+| gitlab | 64 | 38 | 2,670 | 40 / 2,670 | 2 / 0 | 22 / 0 |
 | jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 8 / 425 | 0 / 0 | 12 / 0 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
-| kubernetes | 24 | 14 | 72 | 6 / 31 | 6 / 10 | 12 / 31 |
+| kubernetes | 24 | 14 | 72 | 12 / 48 | 3 / 5 | 9 / 19 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
 | confluence | 15 | 3 | 13 | 4 / 5 | 0 / 0 | 11 / 8 |
 | prometheus | 8 | 2 | 2 | 4 / 2 | 0 / 0 | 4 / 0 |
@@ -248,7 +282,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **80 / 5,656** | **11 / 15** | **210 / 685** |
+| **total** | **301** | **109** | **6,356** | **95 / 5,745** | **8 / 10** | **198 / 601** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -302,22 +336,22 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.project.show` | 36 | 19 | 2026-10-03 | `project.get` (:5) | covered | — |
 | `gitlab.repository.tree` | 35 | 13 | 2026-10-06 | `repository.tree` (:100) | covered | `path`, `ref` and `recursive`, offset paging only (keyset `pagination` and `page_token` are withheld) (2026-10-10). |
 | `gitlab.mr.note.create` | 20 | 10 | 2026-10-03 | `merge_request.note.create` (:82) | covered | One note by merge-request IID, its text required, optionally `internal`. Unguarded, as a create: the same approved input sent twice adds a second note. GitLab runs quick actions in the text; `/merge` is cut off because the body does not admit `merge_request_diff_head_sha` (2026-10-10). |
-| `gitlab.pipeline.retry` | 19 | 5 | 2026-10-05 | — | missing | Pipeline retry is not selected. |
+| `gitlab.pipeline.retry` | 19 | 5 | 2026-10-05 | `pipeline.retry` (:193) | covered | Guarded on the pipeline at the caller's `sha`. A pipeline with nothing to retry is reported applied; the answer's `status` says what happened. |
 | `gitlab.release.create` | 16 | 3 | 2026-10-02 | `release.create` (:172) | covered | Releases an existing tag only (no `ref` or `tag_message`); creating the tag and the release takes `tag.create` then `release.create`. The tag must be at the caller's `sha`. |
 | `gitlab.repository.tag.create` | 16 | 5 | 2026-09-20 | `tag.create` (:146) | covered | The `ref` must resolve to the caller's `sha`; a branch name is checked, not trusted. |
-| `gitlab.pipeline.cancel` | 13 | 5 | 2026-10-06 | — | missing | Pipeline cancel is not selected. |
-| `gitlab.repository.commit.create` | 12 | 2 | 2026-09-20 | — | missing | The commit write is not selected. |
-| `gitlab.project.create` | 11 | 7 | 2026-10-02 | — | missing | The project write is not selected. fluxplane also resolves the group namespace by path. |
-| `gitlab.repository.file.update` | 6 | 2 | 2026-09-20 | — | missing | The file write is not selected. |
+| `gitlab.pipeline.cancel` | 13 | 5 | 2026-10-06 | `pipeline.cancel` (:202) | covered | Guarded on the pipeline at the caller's `sha`. A pipeline that already finished is reported applied; the answer's `status` says what happened. |
+| `gitlab.repository.commit.create` | 12 | 2 | 2026-09-20 | `commit.create` (:224) | covered | Writes onto an existing branch only, its head at the caller's `sha` (create one with `branch.create`); no `start_branch`, `start_sha` or `force`. |
+| `gitlab.project.create` | 11 | 7 | 2026-10-02 | `project.create` (:267) | covered | The guard checks that the namespace path and `namespace_id` name the same namespace, but no namespace read is selected to look up the id: the caller supplies it, where fluxplane resolves the group namespace by path. No import or template settings. |
+| `gitlab.repository.file.update` | 6 | 2 | 2026-09-20 | `file.update` (:234) | covered | Writes onto an existing branch only, its head at the caller's `sha` (create one with `branch.create`). |
 | `gitlab.release.list` | 5 | 3 | 2026-10-02 | `releases.list` (:38) | covered | — |
 | `gitlab.repository.tag.show` | 5 | 3 | 2026-09-28 | `tag.get` (:144) | covered | — |
-| `gitlab.branch.create` | 4 | 1 | 2026-09-20 | — | missing | The branch write is not selected. |
+| `gitlab.branch.create` | 4 | 1 | 2026-09-20 | `branch.create` (:246) | covered | The `ref` must resolve to the caller's `sha`. |
 | `gitlab.release.show` | 4 | 3 | 2026-10-02 | `release.get` (:167) | covered | — |
-| `gitlab.branch.delete` | 3 | 2 | 2026-10-01 | — | missing | Branch delete is not selected. |
-| `gitlab.pipeline.create` | 3 | 2 | 2026-10-06 | — | missing | The CI trigger is not selected. |
+| `gitlab.branch.delete` | 3 | 2 | 2026-10-01 | `branch.delete` (:256) | covered | The branch must be at the caller's `sha` before; only a 404 on the read after counts as deleted. |
+| `gitlab.pipeline.create` | 3 | 2 | 2026-10-06 | `pipeline.create` (:211) | covered | The `ref` must be at the caller's `sha`; `variables` and `inputs` are passed. Not idempotent: the same approved input runs a second pipeline. |
 | `gitlab.release.link.list` | 2 | 1 | 2026-10-02 | `release.links` (:169) | covered | — |
 | `gitlab.deployment.list` | 1 | 1 | 2026-09-28 | `deployments.list` (:50) | covered | — |
-| `gitlab.environment.list` | 1 | 1 | 2026-09-28 | — | missing | Environments are not selected. |
+| `gitlab.environment.list` | 1 | 1 | 2026-09-28 | `environments.list` (:221) | covered | — |
 | `gitlab.mr.discussion.reply` | 1 | 1 | 2026-09-24 | `merge_request.discussion.reply` (:87) | covered | One reply by discussion id, its text required. Unguarded, as a create (2026-10-10). |
 | `gitlab.mr.discussion.resolve` | 1 | 1 | 2026-09-24 | `merge_request.discussion.resolve` (:90) | covered | Resolve or unresolve by discussion id, `resolved` a JSON boolean. Guarded: refused before the write unless the read answers with that discussion and it is resolvable; GitLab's answer must carry the same discussion id and the requested state, or the outcome is unknown (2026-10-10). |
 | `gitlab.release.update` | 1 | 1 | 2026-09-29 | `release.update` (:182) | covered | The release must be at the tag and `sha` before and after. |
@@ -543,38 +577,43 @@ Source: fluxplane inventory §2 kubernetes.
 
 Connectors native adapter: `adapters/kubernetes/spec/adapter.json`.
 
-- `resources.list` (:156) returns full provider objects. It covers four kinds: pods, services,
-  deployments and endpointslices (`adapters/kubernetes/src/lib.rs:66`).
-- Each instance configures the namespaces it may read (`adapters/kubernetes/src/lib.rs:55-70`).
-- The adapter has no single-object read and no name filter. Its input is `namespace`, `kind`,
-  `limit` and `cursor` (`adapters/kubernetes/src/lib.rs:387-393`).
-- It advertises no writes and no process execution (README.md:115-116).
+- `resources.list` (:164) returns full provider objects. It covers six kinds: pods, services,
+  deployments, endpointslices, replicasets and events (`adapters/kubernetes/src/lib.rs:564-578`).
+  Its input is `namespace`, `kind`, `limit` and `cursor`, with no name filter (:168-209).
+- `resources.get` (:278) reads one object of a configured kind by name, and answers `not_found`
+  when it is absent (2026-10-10).
+- Each instance configures the namespaces it may read (`adapters/kubernetes/src/lib.rs:55-69`).
+  `namespaces.list` (:376) reads each configured namespace by name and omits the ones the
+  cluster does not have; it never lists the cluster's namespaces (2026-10-10).
+- `deployments.history` (:473) returns the ReplicaSets one Deployment controls by owner uid, with
+  their rollout revisions (2026-10-10).
+- It advertises no writes and no process execution (README.md:126-129).
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `kubernetes.pod.list` | 17 | 7 | 2026-09-22 | `resources.list` kind `pods` (:156) | covered | Configured namespaces only. |
-| `kubernetes.container.list` | 10 | 2 | 2026-09-20 | `resources.list` kind `pods` (:156) | covered | Containers are read from the full pod objects; there is no derived container list. |
-| `kubernetes.namespace.list` | 10 | 4 | 2026-09-22 | — | missing | Namespaces are configured, not listed. Namespaces are not a kind. |
+| `kubernetes.pod.list` | 17 | 7 | 2026-09-22 | `resources.list` kind `pods` (:164) | covered | Configured namespaces only. |
+| `kubernetes.container.list` | 10 | 2 | 2026-09-20 | `resources.list` kind `pods` (:164) | covered | Containers are read from the full pod objects; there is no derived container list. |
+| `kubernetes.namespace.list` | 10 | 4 | 2026-09-22 | `namespaces.list` (:376) | covered | The configured namespaces the cluster has, each read by name; the cluster's namespace list is never read, so a namespace outside the configuration is not shown. |
 | `kubernetes.pod.exec` | 9 | 2 | 2026-09-15 | — | missing | Process execution is not advertised. |
 | `kubernetes.cluster.list` | 5 | 5 | 2026-09-18 | `connections list` (`apps/connectors/spec/cli.yaml:320`) | partial | Lists saved Kubernetes connections, not kubeconfig contexts. |
 | `kubernetes.pod.logs` | 5 | 1 | 2026-09-15 | — | missing | Specified in `adapters/kubernetes/contracts/logs` but not implemented. |
-| `kubernetes.service.list` | 4 | 1 | 2026-09-19 | `resources.list` kind `services` (:156) | covered | Configured namespaces only. |
-| `kubernetes.pod.show` | 3 | 2 | 2026-09-15 | `resources.list` kind `pods` (:156) | partial | No single-object read or name filter; the caller pages and matches. |
-| `kubernetes.deployment.show` | 2 | 2 | 2026-09-19 | `resources.list` kind `deployments` (:156) | partial | No single-object read or name filter. |
+| `kubernetes.service.list` | 4 | 1 | 2026-09-19 | `resources.list` kind `services` (:164) | covered | Configured namespaces only. |
+| `kubernetes.pod.show` | 3 | 2 | 2026-09-15 | `resources.get` kind `pods` (:278) | covered | Configured namespaces only; an absent pod answers `not_found`. |
+| `kubernetes.deployment.show` | 2 | 2 | 2026-09-19 | `resources.get` kind `deployments` (:278) | covered | Configured namespaces only. |
 | `kubernetes.portforward.start` | 2 | 1 | 2026-09-21 | — | missing | No port-forward. |
 | `kubernetes.portforward.stop` | 2 | 1 | 2026-09-21 | — | missing | No port-forward. |
-| `kubernetes.deployment.history` | 1 | 1 | 2026-09-11 | — | missing | ReplicaSets are not a kind. `helm_releases.history` (:550) lists Helm revisions, not rollout revisions. |
-| `kubernetes.event.list` | 1 | 1 | 2026-09-11 | — | missing | Events are not a kind. |
+| `kubernetes.deployment.history` | 1 | 1 | 2026-09-11 | `deployments.history` (:473) | covered | The ReplicaSets the Deployment controls, each with its revision annotation; needs `deployments` and `replicasets` configured. ReplicaSets pruned beyond `revisionHistoryLimit` are gone. |
+| `kubernetes.event.list` | 1 | 1 | 2026-09-11 | `resources.list` kind `events` (:164) | covered | Configured namespaces only, once `events` is a configured kind. |
 | `kubernetes.secret.read` | 1 | 1 | 2026-09-11 | — | missing | No Secret read. The Helm reads disclose redacted projections only. |
-| `kubernetes.container.show` | 0 | 0 | - | `resources.list` kind `pods` (:156) | partial | No single-object read. |
-| `kubernetes.deployment.list` | 0 | 0 | - | `resources.list` kind `deployments` (:156) | covered | Configured namespaces only. |
+| `kubernetes.container.show` | 0 | 0 | - | `resources.get` kind `pods` (:278) | partial | No container read: the container is read from the pod object. |
+| `kubernetes.deployment.list` | 0 | 0 | - | `resources.list` kind `deployments` (:164) | covered | Configured namespaces only. |
 | `kubernetes.deployment.restart` | 0 | 0 | - | — | missing | Restart is specified in `adapters/kubernetes/contracts/mutations`; no write is implemented. |
 | `kubernetes.deployment.scale` | 0 | 0 | - | — | missing | No write. |
-| `kubernetes.endpoint.discover` | 0 | 0 | - | `endpoints.discover` (:268) | covered | — |
+| `kubernetes.endpoint.discover` | 0 | 0 | - | `endpoints.discover` (:583) | covered | — |
 | `kubernetes.ingress.list` | 0 | 0 | - | — | missing | Ingresses are not a kind. |
-| `kubernetes.node.list` | 0 | 0 | - | `hosts.discover` (:453) | partial | Opt-in. Returns name, addresses and conditions (`adapters/kubernetes/src/lib.rs:580`); no roles, kubelet version or capacity. |
+| `kubernetes.node.list` | 0 | 0 | - | `hosts.discover` (:768) | partial | Opt-in. Returns name, addresses and conditions (`adapters/kubernetes/src/lib.rs:966`); no roles, kubelet version or capacity. |
 | `kubernetes.portforward.list` | 0 | 0 | - | — | missing | No port-forward. |
-| `kubernetes.service.show` | 0 | 0 | - | `resources.list` kind `services` (:156) | partial | No single-object read. |
+| `kubernetes.service.show` | 0 | 0 | - | `resources.get` kind `services` (:278) | covered | Configured namespaces only. |
 | `kubernetes.test` | 0 | 0 | - | `connections revalidate` (SelfSubjectReview probe, `adapters/kubernetes/src/auth.rs:16`) | covered | — |
 
 ## homer
@@ -939,7 +978,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `jira.issue.transition` (jira) | 2 | 2 | `jira.issue.transition.run` | covered | — |
 | `slack.auth.test` (slack) | 2 | 2 | `slack.test` | covered | — |
 | `alertmanager.alerts.list` (alertmanager) | 1 | 1 | `alertmanager.alerts` | missing | U24 |
-| `sql` (fluxplane-plugin) | 1 | 1 | `sql.query` (inferred) | partial | U01 |
+| `sql` (fluxplane-plugin) | 1 | 1 | `sql.query` (inferred) | covered (since 0.40.0) | — |
 | `gitlab.file.show` (gitlab) | 1 | 1 | `gitlab.repository.file.show` | covered | — |
 | `gitlab.merge_request.get` (gitlab) | 1 | 1 | `gitlab.mr.show` | covered | — |
 | `gitlab.mr.diff` (gitlab) | 1 | 1 | `gitlab.mr.changes` | covered by `merge_request.diffs` (`adapters/catalog/providers/gitlab/operations.json:134`) since 2026-10-10 | — |
@@ -973,7 +1012,7 @@ one. The unit column (see [Gap units](#gap-units)) shows where a gap call is cou
 | `gitlab.search.blobs` (§4b) | 1 | 1 | `gitlab.search.blobs` | covered | — |
 | `jira.issue.get` (in the verb position, §4d) | 2 | 1 | `jira.issue.show` | covered | — |
 
-In total, 124 calls are mapped: 89 covered and 35 to gap units. The rest of §4 is not
+In total, 124 calls are mapped: 116 covered and 8 to gap units. The rest of §4 is not
 attributed:
 
 - **§4c:** 55 calls whose operation sat in a variable with no literal id in the same command.
@@ -995,38 +1034,48 @@ The "provider in Connectors" column uses three values:
 - **native** — a native adapter exists.
 - **new** — no runtime exists; any design or ESS model is named.
 
-| unit | name | provider | provider in Connectors | likely surface | operations | declared calls | undeclared calls | total |
-|---|---|---|---|---|---|---:|---:|---:|
-| U01 | MySQL query and schema reads | sql | native (PostgreSQL only) | Extend the native adapter with a MySQL binding in `adapters/sql`: wire protocol, dialect, typed values. The baseline U06 already calls it required. | `sql.query`, `sql.table.show`, `sql.table.list`, `sql.test`, `sql.database.list`, `sql.index.list` | 703 | 1 | 704 |
-| U02 | Slack provider and conversation reads | slack | new | A new catalog provider with an OpenAPI source, if a current Slack Web API document can be pinned (not checked). Otherwise a new native adapter. Needs bot and user token profiles, because search needs a user token. | `slack.thread`, `slack.message.list`, `slack.search`, `slack.user.list`, `slack.channel.list`, `slack.info`, `slack.test`, `slack.emoji.list` | 490 | 22 | 512 |
-| U03 | Jira issue reads | jira | catalog | Catalog `operations.json` selection only: `getIssue`, `getCreateIssueMetaIssueTypes`, `findUsers`. | `jira.issue.show`, `jira.issue.create_meta`, `jira.user.search` | 361 | 37 | 398 |
-| U04 | Loki LogQL query, metric and labels | loki | new (`adapters/loki`: design, ESS model and `logql-range` contract) | A new native adapter. Metric queries and label discovery need contract additions. | `loki.query`, `loki.metric`, `loki.labels`, `loki.test` | 370 | 1 | 371 |
-| U05 | Grafana datasources and Loki through Grafana | grafana | new (`adapters/grafana`: design and ESS model) | A new native adapter: datasource discovery and the `grafana-datasource-proxy` mediated route. Depends on U04 for LogQL. | `grafana.loki.query`, `grafana.datasource.list`, `grafana.loki.labels`, `grafana.loki.recent_logs` | 358 | 1 | 359 |
-| U06 | Jira issue writes | jira | catalog | Catalog `operations.json` selection: `createIssue`, `editIssue`, `addComment`, `linkIssues`, `deleteIssue`, with guards to decide. Markdown-to-ADF conversion would be a catalog engine change. | `jira.issue.comment.add`, `jira.issue.create`, `jira.issue.link.add`, `jira.issue.edit`, `jira.issue.delete` | 325 | 1 | 326 |
-| U07 | Jira transitions | jira | catalog | Catalog `operations.json` selection: `getTransitions`, `doTransition`. A by-name run or a walk to a target status is composition outside the catalog. | `jira.issue.transition.list`, `jira.issue.transition.run` | 236 | 6 | 242 |
-| U08 | Slack message writes | slack | new (after U02) | Same provider surface as U02. | `slack.message.send`, `slack.message.edit`, `slack.message.delete` | 162 | 0 | 162 |
-| U09 | GitLab merge-request writes | gitlab | catalog | Catalog `operations.json` selection only: notes, discussion reply and resolve, plus guarded variants of merge (merge-when-pipeline-succeeds) and update (reopen). | `gitlab.mr.merge`, `gitlab.mr.update`, `gitlab.mr.note.create`, `gitlab.mr.discussion.reply`, `gitlab.mr.discussion.resolve` | 159 | 0 | 159 |
-| U10 | GitLab repository reads | gitlab | catalog | Catalog `operations.json` selection only: code search, tree, single commit, commit diff, branch list. | `gitlab.search.blobs`, `gitlab.repository.tree` | 110 | 15 | 125 |
-| U11 | GitLab merge-request reads | gitlab | catalog | Catalog `operations.json` selection only: merge-request diffs, discussions, notes. | `gitlab.mr.changes`, `gitlab.mr.discussion.list` | 101 | 5 | 106 |
-| U12 | Prometheus PromQL, direct and through Grafana | prometheus | new (`adapters/prometheus`: design and `promql-range` contract) | A new native adapter. Instant queries and rules need contract additions. The mediated placement depends on U05. | `grafana.prometheus.query`, `grafana.prometheus.range`, `grafana.prometheus.rules`, `prometheus.query`, `prometheus.test` | 69 | 0 | 69 |
-| U13 | Slack files | slack | new (after U02) | A catalog engine change: binary download and a multi-step external upload. | `slack.file.upload`, `slack.file.download`, `slack.file.delete`, `slack.file.info`, `slack.file.list` | 52 | 0 | 52 |
-| U14 | GitLab tags and releases | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.release.create`, `gitlab.repository.tag.create`, `gitlab.repository.tag.show`, `gitlab.release.show`, `gitlab.release.link.list`, `gitlab.release.update`, `gitlab.repository.tag.delete` | 45 | 0 | 45 |
-| U15 | GitLab CI/CD writes and environments | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.pipeline.retry`, `gitlab.pipeline.cancel`, `gitlab.pipeline.create`, `gitlab.environment.list` | 36 | 0 | 36 |
-| U16 | GitLab project and repository writes | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.repository.commit.create`, `gitlab.project.create`, `gitlab.repository.file.update`, `gitlab.branch.create`, `gitlab.branch.delete` | 36 | 0 | 36 |
-| U17 | Homer SIP capture reads | homer | new | A new catalog provider, if the Homer API's Swagger document can be pinned (not checked). Otherwise a new native adapter. | `homer.call.list`, `homer.call.show`, `homer.test`, `homer.call.qos`, `homer.search` | 32 | 1 | 33 |
-| U18 | Kubernetes reads: namespaces, single objects, events, rollout history | kubernetes | native | Change the native adapter: new kinds (namespaces, events, ReplicaSets) and a single-object read. | `kubernetes.namespace.list`, `kubernetes.pod.show`, `kubernetes.deployment.show`, `kubernetes.deployment.history`, `kubernetes.event.list` | 17 | 0 | 17 |
-| U19 | Kubernetes exec and port-forward | kubernetes | native | Change the native adapter: the streaming subresources. The execution profile is deferred (README.md:115-116). | `kubernetes.pod.exec`, `kubernetes.portforward.start`, `kubernetes.portforward.stop` | 13 | 0 | 13 |
-| U20 | Confluence CQL search | confluence | catalog | A new pinned OpenAPI source (Confluence REST v1) for the existing catalog provider. | `confluence.page.search` | 8 | 0 | 8 |
-| U21 | Kubernetes contexts | kubernetes | native | Change the native adapter and the CLI connection setup: discover kubeconfig contexts. | `kubernetes.cluster.list` | 5 | 0 | 5 |
-| U22 | Kubernetes pod logs | kubernetes | native | Change the native adapter: implement the specified `adapters/kubernetes/contracts/logs`. | `kubernetes.pod.logs` | 5 | 0 | 5 |
-| U23 | Jira attachment download | jira | catalog | A catalog engine change: binary responses. | `jira.issue.attachment.get` | 2 | 0 | 2 |
-| U24 | Alertmanager alerts | alertmanager | new (`adapters/alertmanager`: design only) | A new native adapter. The alert record schema is still unauthored. | `alertmanager.alerts` | 1 | 1 | 2 |
-| U25 | Kubernetes Secret read | kubernetes | native | Change the native adapter. It needs a disclosure decision first. | `kubernetes.secret.read` | 1 | 0 | 1 |
-| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** |
+| unit | name | provider | provider in Connectors | likely surface | operations | declared calls | undeclared calls | total | open |
+|---|---|---|---|---|---|---:|---:|---:|---:|
+| U01 | MySQL query and schema reads | sql | native (PostgreSQL only) | Extend the native adapter with a MySQL binding in `adapters/sql`: wire protocol, dialect, typed values. The baseline U06 already calls it required. | `sql.query`, `sql.table.show`, `sql.table.list`, `sql.test`, `sql.database.list`, `sql.index.list` | 703 | 1 | 704 | 0 |
+| U02 | Slack provider and conversation reads | slack | new | A new catalog provider with an OpenAPI source, if a current Slack Web API document can be pinned (not checked). Otherwise a new native adapter. Needs bot and user token profiles, because search needs a user token. | `slack.thread`, `slack.message.list`, `slack.search`, `slack.user.list`, `slack.channel.list`, `slack.info`, `slack.test`, `slack.emoji.list` | 490 | 22 | 512 | 5 |
+| U03 | Jira issue reads | jira | catalog | Catalog `operations.json` selection only: `getIssue`, `getCreateIssueMetaIssueTypes`, `findUsers`. | `jira.issue.show`, `jira.issue.create_meta`, `jira.user.search` | 361 | 37 | 398 | 5 |
+| U04 | Loki LogQL query, metric and labels | loki | new (`adapters/loki`: design, ESS model and `logql-range` contract) | A new native adapter. Metric queries and label discovery need contract additions. | `loki.query`, `loki.metric`, `loki.labels`, `loki.test` | 370 | 1 | 371 | 0 |
+| U05 | Grafana datasources and Loki through Grafana | grafana | new (`adapters/grafana`: design and ESS model) | A new native adapter: datasource discovery and the `grafana-datasource-proxy` mediated route. Depends on U04 for LogQL. | `grafana.loki.query`, `grafana.datasource.list`, `grafana.loki.labels`, `grafana.loki.recent_logs` | 358 | 1 | 359 | 0 |
+| U06 | Jira issue writes | jira | catalog | Catalog `operations.json` selection: `createIssue`, `editIssue`, `addComment`, `linkIssues`, `deleteIssue`, with guards to decide. Markdown-to-ADF conversion would be a catalog engine change. | `jira.issue.comment.add`, `jira.issue.create`, `jira.issue.link.add`, `jira.issue.edit`, `jira.issue.delete` | 325 | 1 | 326 | 326 |
+| U07 | Jira transitions | jira | catalog | Catalog `operations.json` selection: `getTransitions`, `doTransition`. A by-name run or a walk to a target status is composition outside the catalog. | `jira.issue.transition.list`, `jira.issue.transition.run` | 236 | 6 | 242 | 0 |
+| U08 | Slack message writes | slack | new (after U02) | Same provider surface as U02. | `slack.message.send`, `slack.message.edit`, `slack.message.delete` | 162 | 0 | 162 | 162 |
+| U09 | GitLab merge-request writes | gitlab | catalog | Catalog `operations.json` selection only: notes, discussion reply and resolve, plus guarded variants of merge (merge-when-pipeline-succeeds) and update (reopen). | `gitlab.mr.merge`, `gitlab.mr.update`, `gitlab.mr.note.create`, `gitlab.mr.discussion.reply`, `gitlab.mr.discussion.resolve` | 159 | 0 | 159 | 0 |
+| U10 | GitLab repository reads | gitlab | catalog | Catalog `operations.json` selection only: code search, tree, single commit, commit diff, branch list. | `gitlab.search.blobs`, `gitlab.repository.tree` | 110 | 15 | 125 | 0 |
+| U11 | GitLab merge-request reads | gitlab | catalog | Catalog `operations.json` selection only: merge-request diffs, discussions, notes. | `gitlab.mr.changes`, `gitlab.mr.discussion.list` | 101 | 5 | 106 | 0 |
+| U12 | Prometheus PromQL, direct and through Grafana | prometheus | new (`adapters/prometheus`: design and `promql-range` contract) | A new native adapter. Instant queries and rules need contract additions. The mediated placement depends on U05. | `grafana.prometheus.query`, `grafana.prometheus.range`, `grafana.prometheus.rules`, `prometheus.query`, `prometheus.test` | 69 | 0 | 69 | 0 |
+| U13 | Slack files | slack | new (after U02) | A catalog engine change: binary download and a multi-step external upload. | `slack.file.upload`, `slack.file.download`, `slack.file.delete`, `slack.file.info`, `slack.file.list` | 52 | 0 | 52 | 52 |
+| U14 | GitLab tags and releases | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.release.create`, `gitlab.repository.tag.create`, `gitlab.repository.tag.show`, `gitlab.release.show`, `gitlab.release.link.list`, `gitlab.release.update`, `gitlab.repository.tag.delete` | 45 | 0 | 45 | 0 |
+| U15 | GitLab CI/CD writes and environments | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.pipeline.retry`, `gitlab.pipeline.cancel`, `gitlab.pipeline.create`, `gitlab.environment.list` | 36 | 0 | 36 | 0 |
+| U16 | GitLab project and repository writes | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.repository.commit.create`, `gitlab.project.create`, `gitlab.repository.file.update`, `gitlab.branch.create`, `gitlab.branch.delete` | 36 | 0 | 36 | 0 |
+| U17 | Homer SIP capture reads | homer | new | A new catalog provider, if the Homer API's Swagger document can be pinned (not checked). Otherwise a new native adapter. | `homer.call.list`, `homer.call.show`, `homer.test`, `homer.call.qos`, `homer.search` | 32 | 1 | 33 | 33 |
+| U18 | Kubernetes reads: namespaces, single objects, events, rollout history | kubernetes | native | Change the native adapter: new kinds (namespaces, events, ReplicaSets) and a single-object read. | `kubernetes.namespace.list`, `kubernetes.pod.show`, `kubernetes.deployment.show`, `kubernetes.deployment.history`, `kubernetes.event.list` | 17 | 0 | 17 | 0 |
+| U19 | Kubernetes exec and port-forward | kubernetes | native | Change the native adapter: the streaming subresources. The execution profile is deferred (README.md:115-116). | `kubernetes.pod.exec`, `kubernetes.portforward.start`, `kubernetes.portforward.stop` | 13 | 0 | 13 | 13 |
+| U20 | Confluence CQL search | confluence | catalog | A new pinned OpenAPI source (Confluence REST v1) for the existing catalog provider. | `confluence.page.search` | 8 | 0 | 8 | 8 |
+| U21 | Kubernetes contexts | kubernetes | native | Change the native adapter and the CLI connection setup: discover kubeconfig contexts. | `kubernetes.cluster.list` | 5 | 0 | 5 | 5 |
+| U22 | Kubernetes pod logs | kubernetes | native | Change the native adapter: implement the specified `adapters/kubernetes/contracts/logs`. | `kubernetes.pod.logs` | 5 | 0 | 5 | 5 |
+| U23 | Jira attachment download | jira | catalog | A catalog engine change: binary responses. | `jira.issue.attachment.get` | 2 | 0 | 2 | 2 |
+| U24 | Alertmanager alerts | alertmanager | new (`adapters/alertmanager`: design only) | A new native adapter. The alert record schema is still unauthored. | `alertmanager.alerts` | 1 | 1 | 2 | 2 |
+| U25 | Kubernetes Secret read | kubernetes | native | Change the native adapter. It needs a disclosure decision first. | `kubernetes.secret.read` | 1 | 0 | 1 | 1 |
+| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** | **619** |
 
-The units cover exactly the 89 declared operations that have calls and are partial (16) or
-missing (73). Their 3,697 declared calls equal the partial (1,273) and missing (2,424) totals in
-the [Summary](#summary).
+The operation, declared, undeclared and total columns are the 2026-10-07 baseline: the units
+covered exactly the 89 declared operations that then had calls and were partial (16) or missing
+(73), and their 3,697 declared calls equalled the partial (1,273) and missing (2,424) totals of
+that baseline.
+
+The open column is recounted from the rows above: a unit's declared calls whose operation is
+still partial or missing, plus its mapped calls in [Used but not declared](#used-but-not-declared)
+that do not land on covered. A unit with 0 open is covered. The 28 operations still open are
+exactly the operations with calls that are partial (2) or missing (26) in the
+[Summary](#summary), and their 611 declared calls equal its partial (10) and missing (601)
+totals; the other 8 open calls are the mapped calls added to the gap units. On 2026-10-10,
+U01, U04, U05, U07, U09–U12, U14–U16 and U18 are covered. U02 keeps only its 5 mapped
+single-user reads open, and U03 only `jira.issue.create_meta` (partial).
 
 ## Waves
 
@@ -1038,21 +1087,24 @@ waits for any unit it depends on: U05 after U04, U12 after U05, U08 and U13 afte
 - **One unit moved forward.** U18 sits ahead of U17 so that the five Kubernetes units fit into
   those 7 waves.
 
-| wave | units | providers | calls |
-|---|---|---|---:|
-| W1 | U01 MySQL query and schema reads · U02 Slack provider and conversation reads · U03 Jira issue reads · U04 Loki LogQL | sql, slack, jira, loki | 1,985 |
-| W2 | U05 Grafana datasources and Loki through Grafana · U06 Jira issue writes · U08 Slack message writes · U09 GitLab merge-request writes | grafana, jira, slack, gitlab | 1,006 |
-| W3 | U07 Jira transitions · U10 GitLab repository reads · U12 Prometheus PromQL · U18 Kubernetes reads | jira, gitlab, prometheus, kubernetes | 453 |
-| W4 | U11 GitLab merge-request reads · U13 Slack files · U17 Homer SIP capture reads · U19 Kubernetes exec and port-forward | gitlab, slack, homer, kubernetes | 204 |
-| W5 | U14 GitLab tags and releases · U20 Confluence CQL search · U21 Kubernetes contexts · U23 Jira attachment download | gitlab, confluence, kubernetes, jira | 60 |
-| W6 | U15 GitLab CI/CD writes and environments · U22 Kubernetes pod logs · U24 Alertmanager alerts | gitlab, kubernetes, alertmanager | 43 |
-| W7 | U16 GitLab project and repository writes · U25 Kubernetes Secret read | gitlab, kubernetes | 37 |
-| | **total** | | **3,788** |
+The calls column is the 2026-10-07 baseline, the sum of its units' totals. The open column is
+the sum of its units' open calls in [Gap units](#gap-units); a wave with 0 open is covered.
+
+| wave | units | providers | calls | open |
+|---|---|---|---:|---:|
+| W1 | U01 MySQL query and schema reads · U02 Slack provider and conversation reads · U03 Jira issue reads · U04 Loki LogQL | sql, slack, jira, loki | 1,985 | 10 |
+| W2 | U05 Grafana datasources and Loki through Grafana · U06 Jira issue writes · U08 Slack message writes · U09 GitLab merge-request writes | grafana, jira, slack, gitlab | 1,006 | 488 |
+| W3 | U07 Jira transitions · U10 GitLab repository reads · U12 Prometheus PromQL · U18 Kubernetes reads | jira, gitlab, prometheus, kubernetes | 453 | 0 |
+| W4 | U11 GitLab merge-request reads · U13 Slack files · U17 Homer SIP capture reads · U19 Kubernetes exec and port-forward | gitlab, slack, homer, kubernetes | 204 | 98 |
+| W5 | U14 GitLab tags and releases · U20 Confluence CQL search · U21 Kubernetes contexts · U23 Jira attachment download | gitlab, confluence, kubernetes, jira | 60 | 15 |
+| W6 | U15 GitLab CI/CD writes and environments · U22 Kubernetes pod logs · U24 Alertmanager alerts | gitlab, kubernetes, alertmanager | 43 | 7 |
+| W7 | U16 GitLab project and repository writes · U25 Kubernetes Secret read | gitlab, kubernetes | 37 | 1 |
+| | **total** | | **3,788** | **619** |
 
 ## Not planned until used
 
-180 operations with 0 calls are partial or missing: 173 missing and 7 partial. They belong to
-no unit until a session uses them. The other 12 operations with 0 calls are already covered.
+178 operations with 0 calls are partial or missing: 172 missing and 6 partial. They belong to
+no unit until a session uses them. The other 14 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
@@ -1061,7 +1113,7 @@ no unit until a session uses them. The other 12 operations with 0 calls are alre
 | slack | 14 | `bookmark.add`, `bookmark.delete`, `bookmark.edit`, `bookmark.list`, `channel.join`, `channel.mark-read`, `download`, `index.build`, `mentions`, `presence.get`, `presence.set`, `reaction.add`, `reaction.remove`, `unreads` |
 | grafana | 12 | `alerts.active`, `alerts.silences.create`, `alerts.silences.delete`, `alerts.silences.list`, `annotation.add`, `annotation.list`, `dashboard.get`, `dashboard.list`, `datasource.health`, `folder.list`, `tempo.search`, `tempo.trace.get` |
 | loki | 1 | `recent_logs` |
-| kubernetes | 7 | `container.show` (partial), `deployment.restart`, `deployment.scale`, `ingress.list`, `node.list` (partial), `portforward.list`, `service.show` (partial) |
+| kubernetes | 6 | `container.show` (partial), `deployment.restart`, `deployment.scale`, `ingress.list`, `node.list` (partial), `portforward.list` |
 | homer | 3 | `alias.list`, `call.analyze`, `pcap.export` |
 | confluence | 10 | `attachment.delete`, `attachment.get`, `index.build`, `page.attachment.add`, `page.attachment.list`, `page.comment.add`, `page.create`, `page.delete`, `page.update`, `user.search` |
 | prometheus | 4 | `alerts`, `labels`, `series`, `targets` |
