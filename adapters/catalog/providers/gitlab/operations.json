@@ -130,7 +130,13 @@
                      "checks": [{"pointer": "/sha", "expect": {"input": "sha"}},
                                 {"pointer": "/state", "expect": {"literal": "closed"}}]},
        "postflight": {"checks": [{"pointer": "/sha", "expect": {"input": "sha"}},
-                                 {"pointer": "/state", "expect": {"literal": "opened"}}]}}}
+                                 {"pointer": "/state", "expect": {"literal": "opened"}}]}}},
+    {"id": "merge_request.diffs", "operation_id": "getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs", "effect": "read",
+     "description": "List one merge request's file diffs by its IID, one page per call; unidiff selects the unified format",
+     "bounds": {"per_page": {"minimum": 1, "maximum": 100}}},
+    {"id": "merge_request.discussions", "operation_id": "getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions", "effect": "read",
+     "description": "List the discussions of merge request noteable_id (its IID), each with its notes, id and resolvable and resolved state, one page per call",
+     "bounds": {"per_page": {"minimum": 1, "maximum": 100}}}
   ],
   "feed": {
     "profile": "gitlab-merge-requests/1",

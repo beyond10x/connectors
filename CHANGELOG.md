@@ -55,6 +55,21 @@
     fixture written in the pinned document's shapes, not a live GitLab. The GitLab example
     configuration in `docs/local-catalog-provider.md` therefore has a new configuration
     revision.
+- GitLab through the catalog provider lists a merge request's diffs and its discussions, two
+  reads from the pinned OpenAPI document as it stands (`docs/local-catalog-provider.md`,
+  *Merge-request diffs and discussions*):
+  - `merge_request.diffs` (`getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs`,
+    `GET /projects/{id}/merge_requests/{merge_request_iid}/diffs`) lists its file diffs, with
+    `unidiff`.
+  - `merge_request.discussions` (`getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions`,
+    `GET /projects/{id}/merge_requests/{noteable_id}/discussions`) lists its discussions, each
+    with its notes and the id `merge_request.discussion.get`, `.reply` and `.resolve` take.
+  Both are paged one page per call and bound `per_page` to 1 through 100, as every GitLab list
+  read does. A merge request GitLab does not find is refused as `not_found`, one the token may
+  not read as `forbidden`. Verified against local fixtures written in the pinned document's
+  shapes, through the engine and through the owned provider process, not a live GitLab. The
+  GitLab example configuration in `docs/local-catalog-provider.md` therefore has a new
+  configuration revision.
 
 ### Limits
 
@@ -65,6 +80,11 @@
   `squash` or `should_remove_source_branch` is refused before any request. The pinned document
   declares `merge_when_pipeline_succeeds` on GitLab's answer; that GitLab sets it `true` on an
   accepted auto-merge has not been observed against a running GitLab.
+- `merge_request.discussions` returns GitLab's discussions unfiltered, system notes included.
+  The flat merge-request note list (`getApiV4ProjectsIdMergeRequestsNoteableIdNotes`) is not
+  selected; every note is in the discussion list, inside its discussion. The
+  single-response `…/merge_requests/{merge_request_iid}/changes` is not selected; its unpaged
+  body carries every diff at once.
 
 ## 0.41.0 — 2026-10-10
 

@@ -693,6 +693,35 @@ fn repository_page(route: &str, path: &str) -> Option<Value> {
                 branch("release/v0.3", "c0ffee02"),
             ]
         }
+    } else if route.ends_with("/merge_requests/7/diffs") {
+        let diff = |path: &str| {
+            json!({"diff": "@@ -1 +1 @@\n-old\n+new\n", "new_path": path, "old_path": path,
+                   "a_mode": "100644", "b_mode": "100644", "new_file": false,
+                   "renamed_file": false, "deleted_file": false, "collapsed": false,
+                   "too_large": false, "generated_file": false})
+        };
+        if second {
+            vec![diff("README.md")]
+        } else {
+            vec![diff("src/lib.rs"), diff("src/main.rs")]
+        }
+    } else if route.ends_with("/merge_requests/7/discussions") {
+        let discussion = |id: &str, resolvable: bool, body: &str| {
+            json!({"id": id, "individual_note": !resolvable, "resolvable": resolvable,
+                   "resolved": false,
+                   "notes": [{"id": 901, "body": body, "system": false,
+                              "type": if resolvable { json!("DiffNote") } else { Value::Null },
+                              "noteable_type": "MergeRequest", "noteable_iid": 7,
+                              "resolvable": resolvable, "resolved": false}]})
+        };
+        if second {
+            vec![discussion("d3", true, "Rename this.")]
+        } else {
+            vec![
+                discussion("d1", true, "Why 3 retries?"),
+                discussion("d2", false, "Looks good."),
+            ]
+        }
     } else {
         return None;
     };
@@ -1342,6 +1371,94 @@ fn repository_browsing_reads_send_the_declared_request_and_walk_to_a_short_page(
     );
     assert!(matches!(commit, Failure::ProviderNotFound), "{commit:?}");
     assert_eq!(commit, project);
+}
+
+/// `merge_request.diffs` and `merge_request.discussions` through the owned
+/// child and the TLS fixture: the exact first request each sends, in the
+/// pinned source's parameter order, a walk that stops on the short second
+/// page with the recorded diffs and discussions unchanged, and a merge
+/// request in a project the token cannot see or read refused by name after
+/// one request, as `project.get` is.
+#[test]
+fn merge_request_list_reads_send_the_declared_request_and_walk_to_a_short_page() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (operation, first, expected) in [
+        (
+            "merge_request.diffs",
+            json!({"id": "org/project", "merge_request_iid": 7, "unidiff": true,
+                   "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/merge_requests/7/diffs\
+             ?page=1&per_page=2&unidiff=true",
+        ),
+        (
+            "merge_request.discussions",
+            json!({"id": "org/project", "noteable_id": 7, "page": 1, "per_page": 2}),
+            "/api/v4/projects/org%2Fproject/merge_requests/7/discussions\
+             ?page=1&per_page=2",
+        ),
+    ] {
+        let before = provider.count();
+        let mut items = Vec::new();
+        let mut page = 1;
+        loop {
+            let mut input = first.clone();
+            input["page"] = json!(page);
+            let result = invoke(&mut child, operation, "one", &token(true), input)
+                .unwrap_or_else(|failure| panic!("`{operation}` page {page}: {failure:?}"));
+            assert_eq!(result["status"], 200, "`{operation}` status");
+            let calls = provider.calls.lock().unwrap().clone();
+            let sent = &calls[calls.len() - 1];
+            assert_eq!(
+                Some(&result["body"]),
+                repository_page(sent.split('?').next().unwrap(), sent).as_ref(),
+                "`{operation}` page {page} body"
+            );
+            let body = result["body"].as_array().unwrap().clone();
+            let short = body.len() < 2;
+            items.extend(body);
+            if short {
+                break;
+            }
+            page += 1;
+            assert!(page <= 3, "`{operation}` did not stop");
+        }
+        assert_eq!(page, 2, "`{operation}` pages walked");
+        assert_eq!(items.len(), 3, "`{operation}` items");
+        let calls = provider.calls.lock().unwrap().clone();
+        assert_eq!(
+            calls[before..],
+            [expected.to_owned(), expected.replace("page=1", "page=2")],
+            "`{operation}` requests"
+        );
+    }
+
+    let mut refused = |operation: &str, input: Value| {
+        let before = provider.count();
+        let failure =
+            invoke(&mut child, operation, "one", &token(true), input).expect_err("a refusal");
+        assert_eq!(provider.count(), before + 1, "`{operation}`");
+        failure
+    };
+    for project in ["fixture-missing", "fixture-refused"] {
+        let expected = refused("project.get", json!({"id": project}));
+        let diffs = refused(
+            "merge_request.diffs",
+            json!({"id": project, "merge_request_iid": 7}),
+        );
+        let discussions = refused(
+            "merge_request.discussions",
+            json!({"id": project, "noteable_id": 7}),
+        );
+        let named = if project == "fixture-missing" {
+            Failure::ProviderNotFound
+        } else {
+            Failure::ProviderForbidden
+        };
+        assert_eq!(diffs, named, "{project}");
+        assert_eq!(diffs, expected, "{project}");
+        assert_eq!(discussions, expected, "{project}");
+    }
 }
 
 /// The recorded GitLab commit graph the fixture serves: `commits.list` pages

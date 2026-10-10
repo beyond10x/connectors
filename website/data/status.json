@@ -123,7 +123,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and merge-request discussions as reads; issue, merge-request (auto-merge and reopen included), note and discussion writes under approval.",
+      "detail": "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and their diffs and discussions as reads; issue, merge-request (auto-merge and reopen included), note and discussion writes under approval.",
       "href": "/docs/reference/adapters/gitlab",
       "label": "GitLab",
       "status": "shipped"

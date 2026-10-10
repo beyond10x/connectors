@@ -110,7 +110,7 @@ unchanged. They have not been re-run with the catalog provider as the child;
 
 ## Notes and discussions
 
-Three more merge-request writes and one read run the same way, from the same pinned source and
+Three more merge-request writes and two reads run the same way, from the same pinned source and
 selection set. Each write is a required-approval mutation: name it in the approval policy, prepare
 and issue an approval for the exact input, then invoke it with `--approval-file`, as above.
 
@@ -120,12 +120,16 @@ and issue an approval for the exact input, then invoke it with `--approval-file`
 
 In every input, `id` is the project path or numeric id and `noteable_id` is the merge request's
 project-local IID (GitLab's name for it on these routes). A discussion id is the string GitLab
-gives each discussion; `merge_request.discussion.get` reads one by that id.
+gives each discussion; `merge_request.discussions` lists every discussion of a merge request with
+its id, one page per call
+([Merge-request diffs and discussions](local-catalog-provider.md#merge-request-diffs-and-discussions)),
+and `merge_request.discussion.get` reads one by that id.
 
 | id | GitLab operation | request | guard |
 |---|---|---|---|
 | `merge_request.note.create` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes` | `POST /projects/{id}/merge_requests/{noteable_id}/notes`, body `body` (a string, required) and optionally `internal` (a boolean) | none |
 | `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes` | `POST …/discussions/{discussion_id}/notes`, body `body` (a string, required) | none |
+| `merge_request.discussions` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions` | `GET …/discussions`, `page` and `per_page` (1 through 100) (a read) | — |
 | `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | `GET …/discussions/{discussion_id}` (a read) | — |
 | `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | `PUT …/discussions/{discussion_id}`, body exactly `resolved`, a JSON boolean | preflight `id` equals `discussion_id` and `resolvable` is `true`; postflight `id` equals `discussion_id` and `resolved` equals `body.resolved` |
 
