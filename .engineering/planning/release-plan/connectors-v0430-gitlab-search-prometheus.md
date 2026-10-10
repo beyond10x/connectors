@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0430-gitlab-search-prometheus
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.43.0: GitLab code search, Prometheus, GitLab tags and releases'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261010c-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-10T09:10:52Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-10T12:13:51Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
