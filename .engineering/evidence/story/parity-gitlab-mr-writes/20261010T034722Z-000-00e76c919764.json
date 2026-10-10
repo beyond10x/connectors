@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-10T03:47:22Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-gitlab-mr-writes",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/149 repository gate pass; package gates on 557551493: 788 passed 0 failed; adapters/catalog/tests/gitlab_mr_variants.rs, gitlab_mr_writes.rs",
+    "reference": "557551493"
+  }
+}

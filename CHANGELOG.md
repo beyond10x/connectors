@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.42.0 — 2026-10-10
 
 ### Added
 
@@ -70,6 +70,15 @@
   shapes, through the engine and through the owned provider process, not a live GitLab. The
   GitLab example configuration in `docs/local-catalog-provider.md` therefore has a new
   configuration revision.
+
+### Compatibility
+
+- The Jira and GitLab catalog selections grow, so their descriptors and the configuration
+  revisions of their guides change. An existing local adapter entry keeps working with the
+  operations it names; add the new ones to its `operations` permission to use them.
+- `further_preflights`, `postflight.read`, `postflight.any_of` and `body_fixed` are optional
+  selection members, omitted when empty: a selection without them declares, prepares and
+  serialises exactly as before.
 
 ### Limits
 
