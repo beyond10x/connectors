@@ -2,17 +2,18 @@
 format: aep.planning-md/3
 id: story:parity-slack-file-reads
 kind: story
-status: active
+status: implemented
 title: Slack file list, info and download
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-binary-responses
 - depends_on: story:catalog-slack-reads
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-10T14:23:54Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-10T14:23:54Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-10T16:33:07Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 
