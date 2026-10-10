@@ -3,4 +3,5 @@ system: connectors_catalog
 version: v1
 domains:
   - connectors_catalog.feed
+  - connectors_catalog.guard
   - connectors_catalog.identity

@@ -222,8 +222,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Jira Cloud",
-        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
-        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_exactly_the_seven_reads",
+        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
+        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_seven_reads_and_the_transition_run",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
