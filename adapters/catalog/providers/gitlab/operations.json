@@ -109,7 +109,27 @@
     {"id": "branches.list", "operation_id": "getApiV4ProjectsIdRepositoryBranches", "effect": "read",
      "description": "List a project's branches with their head commits, one page per call; search and regex filter by name",
      "bounds": {"per_page": {"minimum": 1, "maximum": 100}},
-     "withhold": ["page_token"]}
+     "withhold": ["page_token"]},
+    {"id": "merge_request.auto_merge", "operation_id": "putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge", "effect": "write",
+     "description": "Set an open merge request at the pinned head to merge when its pipeline succeeds (auto_merge, fixed to true), or merge it at once when the pipeline already has",
+     "body_keys": ["auto_merge", "sha"], "body_fixed": {"auto_merge": true},
+     "guard": {
+       "preflight": {"operation_id": "getApiV4ProjectsIdMergeRequestsMergeRequestIid",
+                     "values": {"id": "id", "merge_request_iid": "merge_request_iid"},
+                     "checks": [{"pointer": "/sha", "expect": {"input": "body.sha"}},
+                                {"pointer": "/state", "expect": {"literal": "opened"}}]},
+       "postflight": {"checks": [{"pointer": "/sha", "expect": {"input": "body.sha"}}],
+                      "any_of": [{"pointer": "/merge_when_pipeline_succeeds", "expect": {"literal": "true"}},
+                                 {"pointer": "/state", "expect": {"literal": "merged"}}]}}},
+    {"id": "merge_request.reopen", "operation_id": "putApiV4ProjectsIdMergeRequestsMergeRequestIid", "effect": "write",
+     "description": "Reopen a closed merge request whose head is the pinned sha (state_event, fixed to reopen)",
+     "body_keys": ["state_event"], "body_fixed": {"state_event": "reopen"},
+     "guard": {
+       "preflight": {"operation_id": "getApiV4ProjectsIdMergeRequestsMergeRequestIid",
+                     "values": {"id": "id", "merge_request_iid": "merge_request_iid"},
+                     "checks": [{"pointer": "/sha", "expect": {"input": "sha"}},
+                                {"pointer": "/state", "expect": {"literal": "closed"}}]},
+       "postflight": {"checks": [{"pointer": "/state", "expect": {"literal": "opened"}}]}}}
   ],
   "feed": {
     "profile": "gitlab-merge-requests/1",

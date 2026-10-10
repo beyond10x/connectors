@@ -73,7 +73,7 @@ Sources:
   `gitlab.mr.merge` and `gitlab.mr.update` stay partial: a merge-when-pipeline-succeeds variant
   and a reopen variant are not selected, because each needs a selection to send a fixed body
   member, which the catalog engine cannot declare
-  ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). The
+  ([Not selected](local-gitlab-merge.md#auto-merge-and-reopen)). The
   [Gap units](#gap-units) table still shows the 2026-10-07 baseline.
 - **GitLab repository reads, 2026-10-10 (unreleased).** `gitlab.repository.tree` moved from
   missing to covered when `repository.tree` was selected, with `commit.get`, `commit.diff` and
@@ -107,6 +107,21 @@ Sources:
   [Summary](#summary) still gives the 2026-10-07 split. The selection was appended to
   `adapters/catalog/providers/jira/operations.json`, so no earlier citation in the [jira](#jira)
   section moved. The [Gap units](#gap-units) table still shows the 2026-10-07 baseline.
+- **GitLab auto-merge and reopen, 2026-10-10 (unreleased).** `gitlab.mr.merge` and
+  `gitlab.mr.update` moved from partial to covered when the guarded variants
+  `merge_request.auto_merge` and `merge_request.reopen` were selected, verified against a
+  hand-written fixture in the pinned document's shapes, not a live GitLab. Selecting them needed
+  two catalog capabilities: a selection that fixes a body member to one value (`auto_merge: true`,
+  `state_event: reopen`), so the caller cannot send another, and a postflight check that accepts
+  one of several observations, auto-merge set or merged
+  ([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)). The `gitlab` row of the
+  per-plugin table now reads 21 / 2,377 covered and 6 / 69 partial, and the summary and total
+  rows move by the same 2 operations and 137 calls. No mapped call of
+  [Used but not declared](#used-but-not-declared) lands on them. The selections were appended to
+  `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
+  [gitlab](#gitlab) section moved; the GitLab example configuration in
+  `docs/local-catalog-provider.md` has a new configuration revision. The [Gap units](#gap-units)
+  table still shows the 2026-10-07 baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -133,8 +148,8 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 61 | 5,229 | 50 | 5,229 |
-| partial | 17 | 221 | 10 | 221 |
+| covered | 63 | 5,366 | 52 | 5,366 |
+| partial | 15 | 84 | 8 | 84 |
 | missing | 223 | 906 | 49 | 906 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
@@ -148,7 +163,7 @@ Per plugin (operations / calls):
 
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
-| gitlab | 64 | 38 | 2,670 | 19 / 2,240 | 8 / 206 | 37 / 224 |
+| gitlab | 64 | 38 | 2,670 | 21 / 2,377 | 6 / 69 | 37 / 224 |
 | jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
@@ -173,7 +188,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **61 / 5,229** | **17 / 221** | **223 / 906** |
+| **total** | **301** | **109** | **6,356** | **63 / 5,366** | **15 / 84** | **223 / 906** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -216,11 +231,11 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.mr.create` | 184 | 21 | 2026-10-06 | `merge_request.create` (:55) | covered | Needs the source-branch head `sha` for the guard, and an approval. |
 | `gitlab.mr.list` | 122 | 23 | 2026-10-05 | `merge_requests.list` (:14) | covered | Project-scoped only. It is not established whether fluxplane also lists across projects. |
 | `gitlab.repository.commit.list` | 81 | 17 | 2026-10-06 | `commits.list` (:44) | covered | — |
-| `gitlab.mr.merge` | 77 | 10 | 2026-10-06 | `merge_request.merge` (:70) | partial | The guard requires `mergeable` and a succeeded pinned head pipeline, so it refuses merge-when-pipeline-succeeds and projects without a pipeline. A merge-when-pipeline-succeeds variant is not selected (2026-10-10): its request must always carry `auto_merge: true`, or the same request merges at once without the pipeline check, and a selection cannot fix a body member to a value; proving it afterwards also needs one check that accepts either auto-merge set or merged ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). |
+| `gitlab.mr.merge` | 77 | 10 | 2026-10-06 | `merge_request.merge` (:70) + `merge_request.auto_merge` (:113) | covered | `merge_request.merge` merges at once and requires `mergeable` and a succeeded pinned head pipeline. `merge_request.auto_merge` sets merge-when-pipeline-succeeds: its selection fixes `auto_merge: true`, its guard pins the head and the open state but not the pipeline, and it is applied when GitLab answers with auto-merge set or merged (2026-10-10, [Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)). Neither takes `squash` or `should_remove_source_branch` beside auto-merge. |
 | `gitlab.compare` | 76 | 19 | 2026-09-30 | `repository.compare` (:48) | covered | No per-file diff bound. |
 | `gitlab.search.blobs` | 75 | 12 | 2026-10-06 | — | missing | Code search is not selected (`/projects/:id/search`, scope `blobs`). Not selectable as of 2026-10-10: the pinned source declares the path as `/projects/{id}/(-/)search`, which the catalog engine sends literally, a source amendment can only add a query parameter, and a selection bound cannot hold the required `scope` to `blobs` ([GitLab catalog guide](local-catalog-provider.md#the-shipped-selection-set)). |
 | `gitlab.repository.tag.list` | 71 | 23 | 2026-10-03 | `tags.list` (:35) | covered | — |
-| `gitlab.mr.update` | 60 | 12 | 2026-10-04 | `merge_request.update` (:62) | partial | The guard requires state `opened`, so reopening a closed merge request is refused. A reopen variant is not selected (2026-10-10): its request must carry exactly `state_event: reopen`, and a selection cannot fix a body member to a value ([Not selected](local-gitlab-merge.md#not-selected-auto-merge-and-reopen)). |
+| `gitlab.mr.update` | 60 | 12 | 2026-10-04 | `merge_request.update` (:62) + `merge_request.reopen` (:124) | covered | `merge_request.update` requires state `opened`. `merge_request.reopen` reopens a closed merge request at the pinned head: its selection fixes `state_event: reopen`, and GitLab must answer it `opened` (2026-10-10, [Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)). |
 | `gitlab.mr.changes` | 58 | 13 | 2026-10-03 | `merge_request.get` (:17) + `repository.compare` (:48) | partial | No merge-request diffs read (`/merge_requests/:iid/diffs` is not selected). The diffs can only be had by comparing the request's `diff_refs`. |
 | `gitlab.project.list` | 45 | 12 | 2026-10-03 | `projects.list` (:32) | covered | — |
 | `gitlab.mr.discussion.list` | 43 | 11 | 2026-10-06 | — | missing | The discussion list is not selected. One discussion by id is read by `merge_request.discussion.get` (:85) since 2026-10-10, which needs the id the list would give. |

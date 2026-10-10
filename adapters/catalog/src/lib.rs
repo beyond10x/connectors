@@ -81,6 +81,12 @@ pub struct Postflight {
     /// Omitted when absent, so a guard without it keeps its bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read: Option<Read>,
+    /// One check that accepts one of several observations: it holds when at
+    /// least one of these comparisons holds, beside every check in `checks`,
+    /// for a write whose success has more than one shape. At least two when
+    /// declared; omitted when empty, so a guard without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub any_of: Vec<Check>,
 }
 
 /// How a 2xx body is read. The bundle's declared media types decide by default;
@@ -122,6 +128,7 @@ impl Guard {
         self.preflights()
             .flat_map(|preflight| &preflight.checks)
             .chain(&self.postflight.checks)
+            .chain(&self.postflight.any_of)
     }
 
     /// Every parameter a read binds, with the input reference it binds.
@@ -230,6 +237,28 @@ pub struct Selection {
     /// required already. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_required: Vec<String>,
+    /// Closed body keys fixed to one value each: a string, an integer or a
+    /// boolean, of the key's `body_types` type when it has one. The engine
+    /// sends exactly that value under that key on every write, and a caller's
+    /// body carrying the key at all is refused before any request; the key is
+    /// not declared in the input schema. When every key `body_keys` admits is
+    /// fixed, the caller's `body` may be omitted. A fixed key must be admitted
+    /// by `body_keys`, and no guard may read it or `body_required` name it.
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_fixed: BTreeMap<String, Value>,
+}
+
+impl Selection {
+    /// Whether the caller's `body` may be omitted: every key the closed body
+    /// admits is fixed, so a caller has nothing to send in it.
+    fn body_fixed_whole(&self) -> bool {
+        !self.body_fixed.is_empty()
+            && self
+                .body_keys
+                .iter()
+                .all(|key| self.body_fixed.contains_key(key))
+    }
 }
 
 /// The declared schema of a body key typed by `body_types`: exactly that JSON
@@ -372,6 +401,8 @@ pub struct Prepared {
     query: Vec<(String, String)>,
     body: Value,
     postflight: Vec<(String, String)>,
+    /// The postflight's `any_of`: at least one must hold, when declared.
+    alternatives: Vec<(String, String)>,
     /// The bound read the postflight checks, when the guard declares one.
     reread: Option<Request>,
     resource: String,
@@ -652,6 +683,12 @@ impl Engine {
                         selection.id
                     )));
                 }
+                if guard.postflight.any_of.len() == 1 {
+                    return Err(refuse(format!(
+                        "guard of `{}` declares an any_of of one comparison",
+                        selection.id
+                    )));
+                }
                 for preflight in &guard.further_preflights {
                     reads.push(probe_operation(&preflight.operation_id)?);
                 }
@@ -722,6 +759,40 @@ impl Engine {
                     "selection `{}` declares body_required that do not name distinct keys its body_keys admit",
                     selection.id
                 )));
+            }
+            // A fixed key is a closed body key the caller never sends: its value
+            // is a scalar of the key's type, and nothing may also require it
+            // from the caller or compare it as caller input.
+            for (key, value) in &selection.body_fixed {
+                let scalar_value =
+                    value.is_string() || value.is_boolean() || value.is_i64() || value.is_u64();
+                let reason = if !admitted(key) {
+                    Some("which its body_keys do not admit")
+                } else if !scalar_value {
+                    Some("to a value that is not a string, an integer or a boolean")
+                } else if selection
+                    .body_types
+                    .get(key)
+                    .is_some_and(|value_type| !fits_body_type(*value_type, value))
+                {
+                    Some("to a value that is not of its declared type")
+                } else if selection.body_required.contains(key) {
+                    Some("which its body_required also names")
+                } else if selection
+                    .guard
+                    .as_ref()
+                    .is_some_and(|guard| guarded_body_keys(guard).contains(key.as_str()))
+                {
+                    Some("which its guard reads as an input")
+                } else {
+                    None
+                };
+                if let Some(reason) = reason {
+                    return Err(refuse(format!(
+                        "selection `{}` fixes body key `{key}`, {reason}",
+                        selection.id
+                    )));
+                }
             }
             // A guard path nested under a key typed as a scalar could never
             // resolve: refused here, not at every write.
@@ -936,13 +1007,28 @@ impl Engine {
         // The closed body is held here as well as in the declaration, so it
         // does not rest on the schema validator alone.
         let body_keys = &exposed.selection.body_keys;
+        let omitted = input.get("body").is_none() && exposed.selection.body_fixed_whole();
         if !body_keys.is_empty()
+            && !omitted
             && !input
                 .get("body")
                 .and_then(Value::as_object)
                 .is_some_and(|body| body.keys().all(|key| body_keys.contains(key)))
         {
             return Err(refuse("body carries a key its selection does not admit"));
+        }
+        // A fixed key is never the caller's, whatever value it carries.
+        if let Some(key) = input
+            .get("body")
+            .and_then(Value::as_object)
+            .and_then(|body| {
+                body.keys()
+                    .find(|key| exposed.selection.body_fixed.contains_key(key.as_str()))
+            })
+        {
+            return Err(refuse(format!(
+                "body key `{key}` is fixed by its selection and is not caller input"
+            )));
         }
         // So are the closed body's requirements and types.
         if let Some(body) = input.get("body").and_then(Value::as_object) {
@@ -985,12 +1071,19 @@ impl Engine {
         let values = Self::parameter_values(&exposed.operation, &input)?;
         check_bounds(&exposed.selection, &values)?;
         let (segments, query) = self.resolve(&exposed.template, values)?;
-        let body = if exposed.operation.request_media_types.is_empty() {
+        let mut body = if exposed.operation.request_media_types.is_empty() {
             Value::Null
         } else {
             input.get("body").cloned().unwrap_or(Value::Null)
         };
+        // The fixed values are always sent, into a body the caller may omit.
+        if !exposed.selection.body_fixed.is_empty() {
+            let mut members = body.as_object().cloned().unwrap_or_default();
+            members.extend(exposed.selection.body_fixed.clone());
+            body = Value::Object(members);
+        }
         let mut postflight = Vec::new();
+        let mut alternatives = Vec::new();
         let mut reread = None;
         if let Some(guard) = &exposed.selection.guard {
             // Every expectation resolves before any request: an absent input is
@@ -1016,6 +1109,7 @@ impl Engine {
                 .map(|preflight| expected(&preflight.checks))
                 .collect::<Result<Vec<_>>>()?;
             postflight = expected(&guard.postflight.checks)?;
+            alternatives = expected(&guard.postflight.any_of)?;
             let probe = self
                 .probes
                 .get(&exposed.selection.id)
@@ -1082,6 +1176,7 @@ impl Engine {
             query,
             body,
             postflight,
+            alternatives,
             reread,
             resource: exposed.operation.path.clone(),
             instance: instance.to_owned(),
@@ -1096,6 +1191,15 @@ impl Prepared {
     /// needs a read capability.
     pub fn reads_after(&self) -> bool {
         self.reread.is_some()
+    }
+
+    /// Whether the observed answer satisfies the postflight's `any_of`: at
+    /// least one of its comparisons holds, or it declares none.
+    fn accepts_one(&self, observed: &Value) -> bool {
+        self.alternatives.is_empty()
+            || self.alternatives.iter().any(|(pointer, expected)| {
+                observed.pointer(pointer).and_then(scalar).as_deref() == Some(expected.as_str())
+            })
     }
 
     /// Send once and classify. Only documented definite refusals are refused;
@@ -1175,6 +1279,12 @@ impl Prepared {
                     ));
                 }
             }
+            if !self.accepts_one(&body) {
+                return WriteOutcome::Unknown(Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "write acknowledged with none of the accepted values; the effect is possible",
+                ));
+            }
             return WriteOutcome::Applied(Ok(json!({
                 "status": response.status,
                 "body": body,
@@ -1211,6 +1321,12 @@ impl Prepared {
                     "the guard's read after the write answered with a value at `{pointer}` other than the pinned one; the effect is possible"
                 ));
             }
+        }
+        if !self.accepts_one(&observed) {
+            return unknown(
+                "the guard's read after the write answered with none of the accepted values; the effect is possible"
+                    .into(),
+            );
         }
         WriteOutcome::Applied(Ok(json!({
             "status": response.status,
@@ -1518,9 +1634,11 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
                 .as_ref()
                 .map(scalar_body_keys)
                 .unwrap_or_default();
+            // A fixed key is the selection's, never the caller's: undeclared.
             let keys: serde_json::Map<String, Value> = selection
                 .body_keys
                 .iter()
+                .filter(|key| !selection.body_fixed.contains_key(*key))
                 .map(|key| {
                     let schema = if let Some(value_type) = selection.body_types.get(key) {
                         body_type_schema(*value_type)
@@ -1549,7 +1667,9 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
             body
         };
         properties.insert("body".into(), body);
-        required.push("body".into());
+        if !selection.body_fixed_whole() {
+            required.push("body".into());
+        }
     }
     if let Some(guard) = &selection.guard {
         for reference in guard.references() {

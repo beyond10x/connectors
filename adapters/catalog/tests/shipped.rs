@@ -31,8 +31,9 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
     // is two of these reads and a comparison the merge guard now makes itself;
     // then the repository reads, the unguarded issue create, and the merge-request
     // note, discussion read, reply and guarded resolve, and the repository
-    // tree, single commit, commit diff and branch list reads. A renamed,
-    // dropped or added id fails here.
+    // tree, single commit, commit diff and branch list reads, and the
+    // auto-merge and reopen variants of merge and update. A renamed, dropped
+    // or added id fails here.
     let mut expected = vec![
         "project.get",
         "issues.list",
@@ -64,10 +65,12 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "commit.get",
         "commit.diff",
         "branches.list",
+        "merge_request.auto_merge",
+        "merge_request.reopen",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 30);
+    assert_eq!(declared.len(), 32);
     assert_eq!(engine.effect("merge_request.merge"), Some(Effect::Write));
     assert_eq!(engine.effect("job.trace"), Some(Effect::Read));
     assert_eq!(engine.effect("issue.create"), Some(Effect::Write));

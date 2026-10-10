@@ -208,7 +208,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "GitLab",
-        "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and merge-request discussions as reads; issue, merge-request, note and discussion writes under approval.",
+        "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and merge-request discussions as reads; issue, merge-request (auto-merge and reopen included), note and discussion writes under approval.",
         "adapters/catalog/tests/shipped.rs::shipped_gitlab_selections_resolve_and_cover_the_former_native_surface",
         "/docs/reference/adapters/gitlab",
     ),

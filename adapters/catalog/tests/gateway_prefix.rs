@@ -129,7 +129,9 @@ fn refusal(config: &Value) -> String {
 /// again when it gained the merge-request note, discussion read, reply and
 /// resolve, and again when those writes typed and required their body keys
 /// and the resolve guard compared the discussion id, and again when it gained
-/// `repository.tree`, `commit.get`, `commit.diff` and `branches.list`.
+/// `repository.tree`, `commit.get`, `commit.diff` and `branches.list`, and
+/// again when it gained the fixed-body variants `merge_request.auto_merge` and
+/// `merge_request.reopen`.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
 /// `users.search`, again when it gained `issue.transitions`, and again when it
@@ -138,8 +140,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "76b335f641b5595e516031259b2d9048f70805ed0a3962a5934d8bd5b594838f",
-        "f031cac0faf72916cda75f1308ac74e7853ecf4d6b676db9640b2adb1a48a7dc",
+        "2e16cff412c7e839e531e3a338dbfff467df0588e339eb879c270ef59cfdcb2a",
+        "8fb210255c9b47607f76c4a2dd13d9a09b8153922331314027b29aba12b56f35",
     ),
     (
         "catalog-jira.md",
