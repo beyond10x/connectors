@@ -1,7 +1,7 @@
 ---
 title: Kubernetes
 sidebar_position: 3
-description: Kubernetes resource inventory, endpoint and host discovery and Helm release reads, and the native profiles specified beyond them.
+description: Kubernetes resource inventory, single-object, namespace and rollout-history reads, endpoint and host discovery and Helm release reads, and the native profiles specified beyond them.
 ---
 
 # Kubernetes
@@ -10,8 +10,20 @@ Inventory resources and discover candidate endpoints.
 
 ## Current capabilities
 
-The adapter implements `resources.list`, `endpoints.discover` and optionally `hosts.discover`.
-Configuration selects namespaces and resource kinds. A separate `helm_release_reads` selection
+The adapter implements `resources.list`, `resources.get`, `namespaces.list`,
+`deployments.history`, `endpoints.discover` and optionally `hosts.discover`. Configuration selects
+namespaces and resource kinds: `pods`, `services`, `deployments`, `endpointslices`, `replicasets`
+and `events`.
+
+| id | what it reads |
+|---|---|
+| `resources.list` | a bounded page of one configured kind in one configured namespace; events and ReplicaSets are kinds |
+| `resources.get` | one object of a configured kind by name; an absent object answers `not_found`, not an empty page |
+| `namespaces.list` | each configured namespace by its exact name, omitting the ones the cluster does not have; the cluster's namespace list is never read |
+| `deployments.history` | the ReplicaSets one Deployment controls by owner uid, each with its rollout revision; needs both `deployments` and `replicasets` configured |
+
+A namespace or kind outside the configured scope is refused before any request. These three
+reads are checked against API-shaped fixtures. A separate `helm_release_reads` selection
 additionally advertises the `helm_releases.*` release-state reads (history, status, values and
 manifest), whose values and manifests are disclosed only as redacted projections. It runs as a
 standalone service ([Getting started](../../../getting-started.md) starts one) or under the local
