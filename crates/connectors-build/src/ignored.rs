@@ -235,7 +235,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
         ("connectors-kubernetes", "local_runtime", name) => match name {
             "cli_journey::persistent_kubernetes_cli_owner_and_keyring_restart"
             | "cli_journey::kubernetes_cli_refuses_a_changed_cluster_identity_and_preserves_the_saved_credential"
-            | "cli_journey::kubernetes_cli_reads_helm_release_history_and_redacted_values" => {
+            | "cli_journey::kubernetes_cli_reads_helm_release_history_and_redacted_values"
+            | "cli_journey::kubernetes_cli_reads_namespaces_single_objects_events_and_rollout_history" => {
                 Some((Disposable, vec![CUSTODY, CLI]))
             }
             "cli_journey::a_real_cluster_session_persists_across_cli_and_owner_restart" => {
