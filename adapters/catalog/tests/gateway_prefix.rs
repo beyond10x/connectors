@@ -140,8 +140,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "2e16cff412c7e839e531e3a338dbfff467df0588e339eb879c270ef59cfdcb2a",
-        "8fb210255c9b47607f76c4a2dd13d9a09b8153922331314027b29aba12b56f35",
+        "b38402b08657d8bf598091af181881ac03f5991c9223149865518232125e8bd3",
+        "31cd1e50654869797bd5ac7e6d7420674a53ee82922b72b8bacad85083a8ba03",
     ),
     (
         "catalog-jira.md",

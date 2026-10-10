@@ -69,7 +69,8 @@ types:
   # answers either with auto-merge set (`/merge_when_pipeline_succeeds` `true`) or, when the
   # pipeline had already succeeded, merged at once (`/state` `merged`). At least two
   # comparisons, since one is an ordinary check; absent when unused, so a postflight without it
-  # keeps its serialised form. Its comparisons count toward the sixteen checks.
+  # keeps its serialised form. An empty list is the same as an absent one and is not written
+  # back. Its comparisons count toward the sixteen checks.
   - name: connectors_catalog.guard.Postflight
     kind: struct
     fields:
@@ -78,7 +79,7 @@ types:
       - {name: any_of, type: "Optional<List<connectors_catalog.guard.Check>>"}
     invariants:
       - any: [{not: defined(read)}, {checks.count: {gte: 1}}]
-      - any: [{not: defined(any_of)}, {any_of.count: {gte: 2}}]
+      - any: [{not: defined(any_of)}, {any_of.count: {lte: 0}}, {any_of.count: {gte: 2}}]
 
   # `preflight` is the first read; `further_preflights` are read after it, in order, each with its
   # own checks, and the first that refuses stops the guard with the write unsent: for a write

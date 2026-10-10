@@ -190,7 +190,7 @@ the approval policy as above:
 | id | GitLab operation | request | guard |
 |---|---|---|---|
 | `merge_request.auto_merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge` | `PUT /projects/{id}/merge_requests/{merge_request_iid}/merge`, body exactly the caller's `sha` and the fixed `auto_merge: true` | preflight `sha` equals `body.sha` and `state` is `opened`; postflight `sha` equals `body.sha`, and either `merge_when_pipeline_succeeds` is `true` or `state` is `merged` |
-| `merge_request.reopen` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid` | `PUT /projects/{id}/merge_requests/{merge_request_iid}`, body exactly the fixed `state_event: reopen` | preflight `sha` equals the input `sha` and `state` is `closed`; postflight `state` is `opened` |
+| `merge_request.reopen` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid` | `PUT /projects/{id}/merge_requests/{merge_request_iid}`, body exactly the fixed `state_event: reopen` | preflight `sha` equals the input `sha` and `state` is `closed`; postflight `sha` still equals the input `sha` and `state` is `opened` |
 
 **Merge when the pipeline succeeds.** GitLab waits for the pipeline only when the body carries
 `auto_merge: true` (`merge_when_pipeline_succeeds` in the pinned document is deprecated in its

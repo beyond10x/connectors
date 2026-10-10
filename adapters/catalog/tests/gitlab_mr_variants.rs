@@ -474,7 +474,8 @@ fn both_variants_are_shipped_as_guarded_writes_with_one_fixed_body_value() {
                               "values": {"id": "id", "merge_request_iid": "merge_request_iid"},
                               "checks": [{"pointer": "/sha", "expect": {"input": "sha"}},
                                          {"pointer": "/state", "expect": {"literal": "closed"}}]},
-                "postflight": {"checks": [{"pointer": "/state", "expect": {"literal": "opened"}}]}},
+                "postflight": {"checks": [{"pointer": "/sha", "expect": {"input": "sha"}},
+                                          {"pointer": "/state", "expect": {"literal": "opened"}}]}},
             "response": null,
             "body_keys": ["state_event"],
             "body_fixed": {"state_event": "reopen"}

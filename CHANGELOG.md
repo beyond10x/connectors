@@ -49,7 +49,8 @@
     must keep the head and show either auto-merge set or the merge request merged.
   - `merge_request.reopen` selects `putApiV4ProjectsIdMergeRequestsMergeRequestIid` with exactly
     `state_event: reopen`. The guard requires state `closed` at the pinned `sha` before, and
-    `opened` in GitLab's answer.
+    `opened` at that same `sha` in GitLab's answer: a branch pushed while the request was closed
+    reopens it at a new head, which is reported as an unknown effect, not applied.
   - `merge_request.merge` and `merge_request.update` keep their guards. Verified against a local
     fixture written in the pinned document's shapes, not a live GitLab. The GitLab example
     configuration in `docs/local-catalog-provider.md` therefore has a new configuration
