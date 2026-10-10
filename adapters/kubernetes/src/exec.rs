@@ -177,17 +177,30 @@ impl Retained {
         self.truncated |= keep < data.len();
     }
     /// The retained bytes as text. At a cut, an incomplete trailing scalar is
-    /// withheld rather than replaced; any other invalid byte is replaced.
+    /// withheld rather than replaced, wherever earlier invalid bytes are; any
+    /// other invalid byte is replaced.
     fn text(&self) -> String {
-        let mut end = self.bytes.len();
-        if self.truncated
-            && let Err(error) = std::str::from_utf8(&self.bytes)
-            && error.error_len().is_none()
-        {
-            end = error.valid_up_to();
-        }
+        let end = if self.truncated {
+            incomplete_tail(&self.bytes)
+        } else {
+            self.bytes.len()
+        };
         String::from_utf8_lossy(&self.bytes[..end]).into_owned()
     }
+}
+
+/// Where an incomplete trailing UTF-8 scalar starts, or the length when the
+/// bytes do not end inside one. A scalar is at most four bytes, so only the
+/// last three can begin an incomplete one; a start qualifies only when the
+/// bytes from it are a valid prefix of some scalar.
+fn incomplete_tail(bytes: &[u8]) -> usize {
+    (bytes.len().saturating_sub(3)..bytes.len())
+        .rev()
+        .find(|&start| {
+            matches!(std::str::from_utf8(&bytes[start..]),
+                Err(error) if error.valid_up_to() == 0 && error.error_len().is_none())
+        })
+        .unwrap_or(bytes.len())
 }
 
 fn unknown(code: ErrorCode, message: &str) -> WriteOutcome<Value> {
@@ -239,11 +252,14 @@ pub async fn settle(prepared: Prepared, upgrade: Upgrade) -> WriteOutcome<Value>
     let mut stderr = Retained::new(limit);
     let mut status = Vec::new();
     let mut consumed = 0_usize;
-    let lost = loop {
+    // How the stream ended when it did not close cleanly: the port's code
+    // (`connectors.transport.UpgradedStreamEnd`) is kept for the unknown
+    // outcome, so a deadline stays `timeout` and a host byte bound `capacity`.
+    let ended = loop {
         let message = match stream.next_message().await {
             Ok(Some(message)) => message,
-            Ok(None) => break false,
-            Err(_) => break true,
+            Ok(None) => break None,
+            Err(error) => break Some(error.code),
         };
         consumed = consumed.saturating_add(message.len());
         if consumed > MAX_CONSUMED_BYTES {
@@ -279,17 +295,32 @@ pub async fn settle(prepared: Prepared, upgrade: Upgrade) -> WriteOutcome<Value>
     // status that does not parse, leaves the command's completion unobserved.
     let exit_code = match exit_code(&status) {
         Some(code) => code,
-        None if lost => {
-            return unknown(
-                ErrorCode::Unavailable,
-                "exec stream was lost or reached a host bound before the command's status",
-            );
-        }
         None => {
-            return unknown(
-                ErrorCode::UpstreamProtocol,
-                "exec stream closed without a status this binding can settle",
-            );
+            let Some(code) = ended else {
+                return unknown(
+                    ErrorCode::UpstreamProtocol,
+                    "exec stream closed without a status this binding can settle",
+                );
+            };
+            return match code {
+                ErrorCode::Timeout => unknown(
+                    code,
+                    "exec stream reached its deadline before the command's status",
+                ),
+                ErrorCode::Capacity => unknown(
+                    code,
+                    "exec stream reached a host byte bound before the command's status",
+                ),
+                ErrorCode::UpstreamProtocol => unknown(
+                    code,
+                    "exec stream carried an invalid message before the command's status",
+                ),
+                // A loss, or any code the port does not declare for a stream end.
+                _ => unknown(
+                    ErrorCode::Unavailable,
+                    "exec stream was lost before the command's status",
+                ),
+            };
         }
     };
     WriteOutcome::Applied(Ok(json!({
