@@ -59,6 +59,18 @@
   and through the owned provider process, not a live GitLab. The GitLab example configuration
   in `docs/local-catalog-provider.md` therefore has a new configuration revision.
 
+### Changed
+
+- ESS 0.57.0 (from 0.56.0): the seven ESS crates and the pinned toolchain; it still brings
+  Entity Runtime Core 0.28.0 through `ess-entity-runtime`, and Entity Runtime stays 0.30.3.
+  Install ESS 0.57.0 (`b10x upgrade`) or select it with `--ess`/`CONNECTORS_ESS`. The
+  regenerated CLI contract runtime (`apps/connectors-cli-contract/src/runtime.rs`, `wire.rs`)
+  holds the `config` and `output` globals as optional, as `ess-cli-plan/2` allows; the binding
+  declares all three, so its plan, flags and output are unchanged. The local metadata
+  authority's scoped mutation emission still writes `ess-mutation-manifest/2` and leaves the
+  new `identical_answer` field unset. The shared and adapter models, the authored scenarios and
+  the generated documentation pages pass under 0.57.0's new validation rules unchanged.
+
 ### Limits
 
 - GitLab code search within a project (`getApiV4ProjectsIdDashSearch`, scope `blobs`) is not
