@@ -2,12 +2,15 @@
 format: aep.planning-md/3
 id: story:catalog-guard-postflight-read
 kind: story
-status: draft
+status: active
 title: A catalog guard proves a write that answers without a body by a read after it
 relations:
 - serves: vision:independent-contract-adapters
 - decomposes: epic:fluxplane-plugin-parity
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-10T02:00:36Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-10T02:00:36Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
