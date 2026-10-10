@@ -137,7 +137,11 @@ fn refusal(config: &Value) -> String {
 /// GitLab bundle (its digest is in the revision;
 /// `gitlab_commit_reads_adversary.rs` reconstructs the bundle before it),
 /// and again when it gained `tag.get`, `tag.create`, `tag.delete`,
-/// `release.get`, `release.links`, `release.create` and `release.update`.
+/// `release.get`, `release.links`, `release.create` and `release.update`,
+/// and again when it gained `pipeline.retry`, `pipeline.cancel`,
+/// `pipeline.create`, `environments.list`, `commit.create`, `file.update`,
+/// `branch.create`, `branch.delete` and `project.create`, whose cited media
+/// type corrections also rebuilt the GitLab bundle.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
 /// `users.search`, again when it gained `issue.transitions`, and again when it
@@ -146,8 +150,8 @@ const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "d1e7b79277411d43fd82eac0335551e7d70ff6d11c5bb601372738e90d01ff66",
-        "718476af7f0a5aae70741f777e7dd7640e6f77aecbd66a1caf334718cbb80c21",
+        "95fe5445fd0f0a68553dfd6b93586fc1b60a09686c2019704c0dfad51a809e38",
+        "834a8a40e972d98225ad1bb006664fa59ae155d1be6fa8f9b0c2e2d22630c717",
     ),
     (
         "catalog-jira.md",

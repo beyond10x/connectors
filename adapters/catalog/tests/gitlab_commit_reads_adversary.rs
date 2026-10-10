@@ -388,10 +388,21 @@ fn adversary_bootstrap_without_the_two_reads_is_the_base_pin() {
     filesystem::directory(&bundles, true, true).unwrap();
     let mut gitlab =
         connectors_catalog::bundle::load(&root.join("generated/bundles"), "gitlab").unwrap();
+    // The media type corrections of the JSON-bodied writes came later still;
+    // undo them too.
     gitlab.source.amendments = None;
     for operation in &mut gitlab.inventory.operations {
         if operation.operation_id.as_deref() == Some("getApiV4ProjectsIdDashSearch") {
             operation.path = "/api/v4/projects/{id}/(-/)search".into();
+        }
+        if [
+            "postApiV4ProjectsIdRepositoryCommits",
+            "putApiV4ProjectsIdRepositoryFilesFilePath",
+            "postApiV4Projects",
+        ]
+        .contains(&operation.operation_id.as_deref().unwrap_or_default())
+        {
+            operation.request_media_types = vec!["multipart/form-data".into()];
         }
     }
     let entry = connectors_catalog::bundle::write(&bundles, &gitlab, false).unwrap();
