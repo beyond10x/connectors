@@ -47,19 +47,41 @@ is one of:
   parentheses, such as GitLab's `/api/v4/projects/{id}/(-/)search` to
   `/api/v4/projects/{id}/search`; a segment holding a path parameter can only be
   kept. The method and every path parameter stay as
-  declared.
+  declared;
+- `correct_media_type`: `{"from": "<media type>", "to": "application/json"}`,
+  where `from` is the one request media type the operation declares, for a
+  write the vendor documents with a JSON body while its document declares only
+  a form media type, such as GitLab's commit create, which the pinned document
+  declares `multipart/form-data`. `to` can only be `application/json`, the one
+  body the engine sends, so the correction makes the bundle say what the engine
+  already does. The method, path and parameters stay as declared.
 
 The file must carry the source's SHA-256. An operation that is missing or
-declared twice, an entry with both changes or neither, a citation that is not
-https or a blank reason, a parameter the operation already declares or anything
-other than an optional, unrepeated query parameter, and a correction whose
-`from` is not the operation's current path or whose `to` equals `from` or is not
-derived from it that way are each refused before any bundle is written, and
-nothing is applied. The bundle's source record then names the file and its
+declared twice, an entry with more than one change or none, a citation that is
+not https or a blank reason, a parameter the operation already declares or
+anything other than an optional, unrepeated query parameter, a path correction
+whose `from` is not the operation's current path or whose `to` equals `from` or
+is not derived from it that way, and a media type correction for an operation
+that does not declare exactly one request media type, whose `from` is not that
+one or whose `to` is not `application/json` are each refused before any bundle
+is written, and nothing is applied. The bundle's source record then names the file and its
 SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
 `connectors_catalog.amendment` in `adapters/catalog/spec/ess`). Zendesk uses it
 for the ticket export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)),
-GitLab for the project search path ([Project code search](#project-code-search)).
+GitLab for the project search path ([Project code search](#project-code-search))
+and for the JSON bodies of commit create, file update and project create
+([Pipeline, commit, branch and project writes](#pipeline-commit-branch-and-project-writes)).
+The GitLab build passes it:
+
+```sh
+cargo run --locked -p connectors-build -- catalog \
+  --provider gitlab \
+  --source adapters/gitlab/upstream/openapi_v3.yaml \
+  --directory adapters/catalog/generated/bundles \
+  --auth-profile gitlab.pat \
+  --amendments adapters/gitlab/upstream/openapi_v3.amendments.json \
+  --replace
+```
 
 ## The shipped selection set
 
@@ -79,7 +101,9 @@ operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussion
 auto-merge and reopen variants of merge and update
 ([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)), two
 merge-request list reads, its diffs and its discussions, project code
-search, and tags and releases ([below](#tags-and-releases)):
+search, tags and releases ([below](#tags-and-releases)), and the environment list
+and the pipeline, commit, file, branch and project writes
+([below](#pipeline-commit-branch-and-project-writes)):
 
 | id | source operation | effect |
 |---|---|---|
@@ -100,6 +124,11 @@ search, and tags and releases ([below](#tags-and-releases)):
 | `tag.get`, `release.get`, `release.links` | `getApiV4ProjectsIdRepositoryTagsTagName`, `getApiV4ProjectsIdReleasesTagName`, `getApiV4ProjectsIdReleasesTagNameAssetsLinks` ([below](#tags-and-releases)) | read |
 | `tag.create`, `tag.delete` | `postApiV4ProjectsIdRepositoryTags`, `deleteApiV4ProjectsIdRepositoryTagsTagName`, guarded on the pinned commit | write |
 | `release.create`, `release.update` | `postApiV4ProjectsIdReleases`, `putApiV4ProjectsIdReleasesTagName`, guarded on the pinned commit | write |
+| `environments.list` | `getApiV4ProjectsIdEnvironments`, one page per call ([below](#pipeline-commit-branch-and-project-writes)) | read |
+| `pipeline.retry`, `pipeline.cancel`, `pipeline.create` | `postApiV4ProjectsIdPipelinesPipelineIdRetry`, `…Cancel`, `postApiV4ProjectsIdPipeline`, guarded on the pinned commit | write |
+| `commit.create`, `file.update` | `postApiV4ProjectsIdRepositoryCommits`, `putApiV4ProjectsIdRepositoryFilesFilePath`, guarded on the branch head, JSON body by a cited amendment | write |
+| `branch.create`, `branch.delete` | `postApiV4ProjectsIdRepositoryBranches`, `deleteApiV4ProjectsIdRepositoryBranchesBranch`, guarded on the pinned commit | write |
+| `project.create` | `postApiV4Projects`, guarded on the namespace, JSON body by a cited amendment | write |
 
 The GitLab set also declares the merge request feed, a `datasource.feed/v1alpha1`
 binding under profile `gitlab-merge-requests/1`: `feed.containers` lists the
@@ -119,7 +148,7 @@ GitLab serves at most 100 items per page, so with a larger value every page
 would be short and the walk would stop after page one. The pinned source
 declares no range, so the shipped selection bounds `per_page` to 1 through 100
 on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
-`pipeline.jobs`, `merge_request.diffs`, `merge_request.discussions`, `release.links` and these nine): a value of zero or below never ends a walk on a
+`pipeline.jobs`, `merge_request.diffs`, `merge_request.discussions`, `release.links`, `environments.list` and these nine): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares,
@@ -217,6 +246,40 @@ say) leaves the outcome `unknown`, never refused, and no corrective request is
 sent. A tag that already exists is GitLab's own `400`, a second release of one
 tag its `409`; both are definite refusals. Release deletion and the release-link
 writes are not selected.
+
+### Pipeline, commit, branch and project writes
+
+One read and eight writes. `environments.list` needs `read_api` and lists one
+page per call with `page` and `per_page` (1 through 100); the writes need `api`.
+Each write but `project.create` is guarded on a commit `sha` the caller pins as a
+top-level input; `project.create` is guarded on a namespace. Each write's body
+is closed to the keys listed below, its scalar keys typed as the selection
+declares them (`body_types`); any other key, a missing required one or, where
+the write is guarded on it, a missing `sha` is refused as `invalid_input` before
+any request.
+
+| id | source operation | request | effect |
+|---|---|---|---|
+| `environments.list` | `getApiV4ProjectsIdEnvironments` | `GET /projects/{id}/environments`, `name` (one by name), `search` (at least three characters), `states` (`available`, `stopping`, `stopped`); GitLab's environments, unchanged | read |
+| `pipeline.retry`, `pipeline.cancel` | `postApiV4ProjectsIdPipelinesPipelineIdRetry`, `postApiV4ProjectsIdPipelinesPipelineIdCancel` | `POST /projects/{id}/pipelines/{pipeline_id}/retry` or `/cancel`, no body. The guard reads the pipeline and refuses unless its `/id` is `pipeline_id` and its `/sha` is `sha`; the answer must name the same. A pipeline with nothing to retry, or one already finished, is answered unchanged: read the answer's `status` | write |
+| `pipeline.create` | `postApiV4ProjectsIdPipeline` | body `ref` (a branch or tag), `variables`, `inputs`. The guard reads `GET …/repository/commits/{body.ref}` and refuses unless its `/id` is `sha`; the answer must name `/ref` `body.ref` at `/sha` `sha`. Not idempotent: the same input sent again runs a second pipeline | write |
+| `commit.create` | `postApiV4ProjectsIdRepositoryCommits` | body `branch`, `commit_message` and `actions` (both required), `author_email`, `author_name`, `stats`. The guard reads the branch and refuses unless its `/commit/id` is `sha`; the new commit's `/parent_ids/0` must be `sha`. The body admits no `start_branch`, `start_sha`, `start_project` or `force`, so it never creates a branch or rewrites history; the same input sent again is refused by the guard, the head being the new commit | write |
+| `file.update` | `putApiV4ProjectsIdRepositoryFilesFilePath` | `file_path` sent as one path segment (`docs/guide.md` as `docs%2Fguide.md`), body `branch`, `content` and `commit_message` (both required), `encoding`, `author_email`, `author_name`, `last_commit_id`. The guard reads the branch and refuses unless its head is `sha`. GitLab answers only `file_path` and `branch`, so the provider then reads `GET …/repository/commits/{body.branch}` and the write is applied only when its `/parent_ids/0` is `sha`; that read answering anything else (`500`, `403`, `410`) leaves the outcome `unknown`. Content identical to the file's is GitLab's `400` | write |
+| `branch.create` | `postApiV4ProjectsIdRepositoryBranches` | body `branch`, `ref` (a branch, tag or commit). The guard reads the commit `body.ref` names and refuses unless its `/id` is `sha`; the answer must name `/name` `body.branch` at `/commit/id` `sha`. A branch that exists is GitLab's `400` | write |
+| `branch.delete` | `deleteApiV4ProjectsIdRepositoryBranchesBranch` | The guard reads the branch and refuses unless its `/name` is `branch` and its `/commit/id` is `sha`; GitLab answers `204`, so the guard reads the branch again and the delete is applied only when that read answers `404` (`postflight.absent`). A branch moved between the first read and the delete is deleted and still reported applied, as on `tag.delete`. GitLab refuses the default and protected branches itself | write |
+| `project.create` | `postApiV4Projects` | top-level `namespace` (the namespace's full path), body `name`, `path`, `namespace_id`, `description`, `visibility`, `default_branch`, `initialize_with_readme`. The guard reads `GET /namespaces/{namespace}` and refuses unless its `/id` is `body.namespace_id` and its `/full_path` is `namespace`; the answer must name `/path` `body.path` in `/namespace/id` `body.namespace_id`. The body admits no other setting, `import_url` and templates included. A path already taken is GitLab's `400` | write |
+
+The pinned document declares the bodies of `commit.create`, `file.update` and
+`project.create` only as `multipart/form-data`; GitLab's commits, repository
+files and projects references document them as JSON. The cited
+`adapters/gitlab/upstream/openapi_v3.amendments.json` corrects each one's request
+media type in the bundle to `application/json` (`correct_media_type` in
+[Build the bundle](#build-the-bundle)), and the engine sends it with
+`Content-Type: application/json`. As on the tag and release writes, a guard
+read GitLab answers `404` refuses the write before dispatch, and a differing
+value after the write leaves the outcome `unknown`, with no corrective request.
+`adapters/catalog/tests/gitlab_ci_project_writes.rs` holds each of these against
+a local HTTPS fixture; none has run against a live GitLab.
 
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
 and pins the complete list of shipped ids, so a renamed, dropped or added id

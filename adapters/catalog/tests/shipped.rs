@@ -35,8 +35,10 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
     // auto-merge and reopen variants of merge and update, and the
     // merge-request diff and discussion list reads, and code search, and the
     // single tag and release reads, the release link list and the guarded tag
-    // create and delete and release create and update. A renamed, dropped or
-    // added id fails here.
+    // create and delete and release create and update, and the guarded
+    // pipeline retry, cancel and create, the environment list, and the guarded
+    // commit create, file update, branch create and delete and project create.
+    // A renamed, dropped or added id fails here.
     let mut expected = vec![
         "project.get",
         "issues.list",
@@ -80,15 +82,32 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "release.links",
         "release.create",
         "release.update",
+        "pipeline.retry",
+        "pipeline.cancel",
+        "pipeline.create",
+        "environments.list",
+        "commit.create",
+        "file.update",
+        "branch.create",
+        "branch.delete",
+        "project.create",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 42);
+    assert_eq!(declared.len(), 51);
     for write in [
         "tag.create",
         "tag.delete",
         "release.create",
         "release.update",
+        "pipeline.retry",
+        "pipeline.cancel",
+        "pipeline.create",
+        "commit.create",
+        "file.update",
+        "branch.create",
+        "branch.delete",
+        "project.create",
     ] {
         assert_eq!(engine.effect(write), Some(Effect::Write), "`{write}`");
     }
@@ -125,6 +144,7 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
             "release.links",
             "getApiV4ProjectsIdReleasesTagNameAssetsLinks",
         ),
+        ("environments.list", "getApiV4ProjectsIdEnvironments"),
     ] {
         let selection = selections
             .iter()
@@ -182,6 +202,7 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
             "commit.diff",
             "commits.list",
             "deployments.list",
+            "environments.list",
             "issues.list",
             "merge_request.diffs",
             "merge_request.discussions",

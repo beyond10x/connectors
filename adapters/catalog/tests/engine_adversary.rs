@@ -195,12 +195,22 @@ fn base_gitlab(directory: &Path) {
         }
     }
     gitlab.inventory.unsupported.clear();
-    // The base predates the cited correction of the project search path: undo
-    // it and the record of its amendment file.
+    // The base predates every cited amendment, the project search path and the
+    // media types of the JSON-bodied writes: undo them and the record of their
+    // amendment file.
     gitlab.source.amendments = None;
     for operation in &mut gitlab.inventory.operations {
         if operation.operation_id.as_deref() == Some("getApiV4ProjectsIdDashSearch") {
             operation.path = "/api/v4/projects/{id}/(-/)search".into();
+        }
+        if [
+            "postApiV4ProjectsIdRepositoryCommits",
+            "putApiV4ProjectsIdRepositoryFilesFilePath",
+            "postApiV4Projects",
+        ]
+        .contains(&operation.operation_id.as_deref().unwrap_or_default())
+        {
+            operation.request_media_types = vec!["multipart/form-data".into()];
         }
     }
     let entry = bundle::write(directory, &gitlab, false).unwrap();

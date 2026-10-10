@@ -10,6 +10,33 @@
       },
       "cite": "https://docs.gitlab.com/api/search/#project-search-api",
       "reason": "The search reference documents project search as GET /projects/:id/search; the pinned document writes the route with GitLab's (-/) notation for an optional segment, which read as a template would send the parentheses literally."
+    },
+    {
+      "operation_id": "postApiV4ProjectsIdRepositoryCommits",
+      "correct_media_type": {
+        "from": "multipart/form-data",
+        "to": "application/json"
+      },
+      "cite": "https://docs.gitlab.com/api/commits/#create-a-commit",
+      "reason": "The commits reference documents a commit as a posted JSON payload of branch, commit_message and an actions array; the pinned document declares the body only as multipart/form-data holding one binary file, which no form of that request carries."
+    },
+    {
+      "operation_id": "putApiV4ProjectsIdRepositoryFilesFilePath",
+      "correct_media_type": {
+        "from": "multipart/form-data",
+        "to": "application/json"
+      },
+      "cite": "https://docs.gitlab.com/api/repository_files/#update-a-file-in-a-repository",
+      "reason": "The repository files reference documents the update as a JSON body of branch, content and commit_message; the pinned document declares the body only as multipart/form-data holding one binary file."
+    },
+    {
+      "operation_id": "postApiV4Projects",
+      "correct_media_type": {
+        "from": "multipart/form-data",
+        "to": "application/json"
+      },
+      "cite": "https://docs.gitlab.com/api/projects/#create-a-project",
+      "reason": "The projects reference documents project creation with a JSON body (Content-Type application/json); the pinned document declares the body only as multipart/form-data."
     }
   ]
 }
