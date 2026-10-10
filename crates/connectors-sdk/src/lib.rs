@@ -135,6 +135,113 @@ pub trait AuthenticatedWrite: Send {
         self.send_json(WriteMethod::Put, segments, query, body)
             .await
     }
+
+    /// One GET upgraded to a WebSocket offering `protocols`, for a write whose
+    /// effect runs over the upgraded stream (a Kubernetes exec subresource).
+    /// The capability is consumed whether or not the server switches
+    /// protocols. The implementation answers ping, reassembles fragments and
+    /// enforces the [`UpgradeBounds`] trusted composition fixed when it built
+    /// the capability; it never retries or follows a redirect. Ports composed
+    /// without upgrade bounds refuse with `NotSent` and no I/O. The model is
+    /// `connectors.transport.UpgradeOutcome` in `ess/domains/transport.yaml`.
+    ///
+    /// Only the consuming write capability carries this method; a read port
+    /// cannot open an upgraded stream:
+    ///
+    /// ```compile_fail
+    /// use connectors_sdk::AuthenticatedHttp;
+    /// async fn read_port(http: &dyn AuthenticatedHttp) {
+    ///     http.upgrade(&["exec"], &[], &["v5.channel.k8s.io"]).await;
+    /// }
+    /// ```
+    async fn upgrade(
+        self: Box<Self>,
+        _segments: &[&str],
+        _query: &[(&str, String)],
+        _protocols: &[&str],
+    ) -> Upgraded {
+        Upgraded::NotSent(Error::new(
+            ErrorCode::Unsupported,
+            "this write capability carries no upgraded stream",
+        ))
+    }
+}
+
+/// The bounds of one upgraded stream (`connectors.transport.UpgradeBounds`),
+/// fixed by trusted composition when it builds the write capability and
+/// enforced by the host, not only by the adapter reading the stream.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UpgradeBounds {
+    max_message_bytes: usize,
+    max_total_bytes: usize,
+    timeout: std::time::Duration,
+}
+/// The largest single message any upgraded stream admits.
+pub const UPGRADE_MAX_MESSAGE_BYTES: usize = 16 * 1024 * 1024;
+/// The most bytes of messages any upgraded stream delivers in all.
+pub const UPGRADE_MAX_TOTAL_BYTES: usize = 64 * 1024 * 1024;
+/// The longest deadline any upgraded stream is given.
+pub const UPGRADE_MAX_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+impl UpgradeBounds {
+    /// Refuses a zero or over-ceiling bound, and a message bound above the
+    /// total bound.
+    pub fn new(
+        max_message_bytes: usize,
+        max_total_bytes: usize,
+        timeout: std::time::Duration,
+    ) -> Result<Self> {
+        if !(1..=UPGRADE_MAX_MESSAGE_BYTES).contains(&max_message_bytes)
+            || !(1..=UPGRADE_MAX_TOTAL_BYTES).contains(&max_total_bytes)
+            || max_message_bytes > max_total_bytes
+            || timeout.is_zero()
+            || timeout > UPGRADE_MAX_TIMEOUT
+        {
+            return Err(Error::invalid(
+                "upgraded stream bounds are outside supported bounds",
+            ));
+        }
+        Ok(Self {
+            max_message_bytes,
+            max_total_bytes,
+            timeout,
+        })
+    }
+    pub fn max_message_bytes(&self) -> usize {
+        self.max_message_bytes
+    }
+    pub fn max_total_bytes(&self) -> usize {
+        self.max_total_bytes
+    }
+    pub fn timeout(&self) -> std::time::Duration {
+        self.timeout
+    }
+}
+
+/// The server half of an upgraded stream: whole binary messages. How it ends
+/// is `connectors.transport.UpgradedStreamEnd`: `Ok(None)` is a clean close;
+/// an error with `Capacity` is a byte bound reached (the stream is closed and
+/// truncated there), `Timeout` the deadline, and any other error a lost
+/// stream. After an error or `Ok(None)` nothing more is delivered.
+#[async_trait]
+pub trait MessageStream: Send {
+    /// The subprotocol the server selected.
+    fn protocol(&self) -> &str;
+    /// The next binary message; `Ok(None)` is a clean close and an error a
+    /// lost, truncated or expired stream.
+    async fn next_message(&mut self) -> Result<Option<Vec<u8>>>;
+}
+
+/// What became of one upgrade request (`connectors.transport.UpgradeOutcome`).
+/// Only `NotSent` and `Answered` prove the effect did not start.
+pub enum Upgraded {
+    /// Refused before any byte was sent.
+    NotSent(Error),
+    /// Answered with this status and no stream.
+    Answered(u16),
+    /// Sent; nothing more is known.
+    Lost(Error),
+    /// Switched protocols.
+    Accepted(Box<dyn MessageStream>),
 }
 
 /// A check-specific probe bound to one provider endpoint fixed by the trusted

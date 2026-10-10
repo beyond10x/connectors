@@ -10,7 +10,10 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 
 pub mod auth;
+pub mod exec;
 pub mod helm;
+pub mod kubeconfig;
+pub mod logs;
 
 /// How much of a Helm release this composition may read. `Off` advertises no
 /// release operation at all. `Metadata` advertises the two that read only
@@ -36,6 +39,23 @@ pub struct Config {
     pub discover_hosts: bool,
     #[serde(default)]
     pub helm_release_reads: HelmReleaseReads,
+    /// Advertises `pods.logs`. Serialized only when true, so a configuration
+    /// that does not enable it keeps the effective document, and the
+    /// revision, it had before the field existed.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pod_logs: bool,
+    /// Advertises `pods.exec`, a mutation. A composition enables it only when
+    /// it also supplies the approved write exchange and an exec transport.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pod_exec: bool,
+    /// Advertises `contexts.list`. Never read from a configuration document:
+    /// only a composition that itself holds the kubeconfig path its
+    /// configuration fixed sets it, so no service configuration can.
+    #[serde(skip)]
+    pub kubeconfig_contexts: bool,
+}
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 pub struct Kubernetes {
     http: Arc<dyn AuthenticatedHttp>,
@@ -85,11 +105,22 @@ impl Kubernetes {
                 "helm_releases.status",
                 "helm_releases.values",
                 "helm_releases.manifest",
+                "pods.logs",
+                "contexts.list",
+                "pods.exec",
             ],
         )?;
         if !config.discover_hosts {
             descriptor.operations.retain(|o| o.id != "hosts.discover");
         }
+        // Log content, the operator's kubeconfig and process execution are
+        // each advertised only where the configuration admitted them.
+        descriptor.operations.retain(|o| match o.id.as_str() {
+            "pods.logs" => config.pod_logs,
+            "contexts.list" => config.kubeconfig_contexts,
+            "pods.exec" => config.pod_exec,
+            _ => true,
+        });
         // An operation whose disclosure the configuration did not admit is not
         // advertised at all, so a caller cannot describe it, and the separate
         // guard in `invoke` still refuses it.
@@ -557,6 +588,133 @@ impl Kubernetes {
             ),
         })
     }
+    /// One bounded tail of one pod's log: the namespace and name checks
+    /// precede the single GET, and `max_bytes` is enforced while the response
+    /// is consumed. Admission is the configured namespace and the provider's
+    /// own RBAC answer to the GET, as for every read of this adapter; the
+    /// exact-target pre-check is deferred with theirs.
+    async fn pod_logs(&self, input: Value) -> Result<Value> {
+        if !self.config.pod_logs {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "pod logs are not configured for this connection",
+            ));
+        }
+        let selection = decode::<logs::Input>(input)?.selection()?;
+        self.namespace(&selection.namespace)?;
+        if !valid_name(&selection.pod) {
+            return Err(Error::invalid("pod is not a Kubernetes object name"));
+        }
+        if selection
+            .container
+            .as_deref()
+            .is_some_and(|container| !valid_label(container))
+        {
+            return Err(Error::invalid(
+                "container is not a Kubernetes container name",
+            ));
+        }
+        let response = self
+            .http
+            .get_prefix(
+                &[
+                    "api",
+                    "v1",
+                    "namespaces",
+                    selection.namespace.as_str(),
+                    "pods",
+                    selection.pod.as_str(),
+                    "log",
+                ],
+                &selection.query(),
+                selection.max_bytes as usize,
+            )
+            .await?;
+        if !(200..300).contains(&response.status) {
+            return Err(refusal(response.status, response.headers));
+        }
+        let decoded = logs::decode(&selection, &response.body, response.complete)?;
+        encode(json!({
+            "lines": decoded.lines,
+            "selection": decoded.selection,
+            "order": "provider",
+            "complete": decoded.complete,
+            "truncation": decoded.truncation,
+            "next_cursor": null,
+            "provenance": provenance(
+                &self.descriptor.instance,
+                format!("{}/pods/{}/log", selection.namespace, selection.pod),
+                None,
+            ),
+        }))
+    }
+    /// Prepare `pods.exec` for the host's approved write exchange: every
+    /// refusal here precedes any I/O, and the result carries no credential.
+    /// The read path (`invoke`) never reaches this; it refuses `pods.exec`.
+    pub fn prepare_exec(&self, input: Value) -> Result<exec::Prepared> {
+        if !self.config.pod_exec {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "pod exec is not configured for this connection",
+            ));
+        }
+        let input: exec::Input = decode(input)?;
+        self.namespace(&input.namespace)?;
+        exec::admit(&self.descriptor.instance, input)
+    }
+    /// The `contexts.list` page for the kubeconfig bytes the composition read
+    /// from the one path its configuration fixed. The business adapter holds
+    /// no file authority of its own; it only projects what it is handed.
+    pub fn contexts_page(&self, file: &[u8], input: Value) -> Result<Value> {
+        if !self.config.kubeconfig_contexts {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "kubeconfig contexts are not configured for this connection",
+            ));
+        }
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Contexts {
+            limit: u16,
+        }
+        let Contexts { limit } = decode(input)?;
+        if !(1..=256).contains(&limit) {
+            return Err(Error::invalid("limit must be between one and 256"));
+        }
+        let contexts = kubeconfig::contexts(file)?;
+        let complete = contexts.len() <= limit as usize;
+        let items: Vec<kubeconfig::Context> = contexts.into_iter().take(limit as usize).collect();
+        encode(Page {
+            items,
+            complete,
+            // The file has no continuation; a larger limit reads the rest.
+            next_cursor: None,
+            provenance: provenance(&self.descriptor.instance, "kubeconfig/contexts", None),
+        })
+    }
+}
+
+/// The safe error of a provider refusal, by status, with its named delay.
+fn refusal(status: u16, headers: std::collections::BTreeMap<String, String>) -> Error {
+    match upstream_json(&connectors_sdk::HttpResponse {
+        status,
+        headers,
+        body: Vec::new(),
+    }) {
+        Err(error) => error,
+        Ok(_) => Error::internal(),
+    }
+}
+
+/// A DNS-1123 label: the name rule of a container.
+pub(crate) fn valid_label(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 63
+        && !name.starts_with('-')
+        && !name.ends_with('-')
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 /// The one collection path each admissible kind binds. This match is the
@@ -586,7 +744,7 @@ fn collection<'a>(kind: &str, namespace: &'a str) -> Result<Vec<&'a str>> {
 }
 
 /// A DNS-1123 subdomain: the name rule of every kind this adapter reads.
-fn valid_name(name: &str) -> bool {
+pub(crate) fn valid_name(name: &str) -> bool {
     name.len() <= 253
         && name.split('.').all(|label| {
             !label.is_empty()
@@ -1025,6 +1183,19 @@ impl Adapter for Kubernetes {
                     ),
                 })
             }
+            "pods.logs" => self.pod_logs(input).await,
+            // The business adapter holds no file authority: only a local
+            // composition that read its own configured kubeconfig answers.
+            "contexts.list" => Err(Error::new(
+                ErrorCode::Forbidden,
+                "kubeconfig contexts are answered only by the local composition that holds them",
+            )),
+            // A mutation is never dispatched through the read path, which
+            // carries no approval and records no attempt. Zero requests.
+            "pods.exec" => Err(Error::new(
+                ErrorCode::Forbidden,
+                "pods.exec is a mutation and runs only through an approved write",
+            )),
             _ => Err(Error::new(
                 ErrorCode::NotFound,
                 "operation is not implemented",

@@ -33,6 +33,9 @@ fn adapter() -> (Kubernetes, Arc<AtomicUsize>) {
         resource_kinds: vec!["services".into()],
         discover_hosts: false,
         helm_release_reads: HelmReleaseReads::Off,
+        pod_logs: false,
+        pod_exec: false,
+        kubeconfig_contexts: false,
     };
     let effective = json!({"service":{"instance":"scoped","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED"}},"http":{"base_url":"https://fixture.invalid/"},"adapter":config});
     let adapter = Kubernetes::new(

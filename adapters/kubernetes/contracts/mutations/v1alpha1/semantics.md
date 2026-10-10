@@ -30,3 +30,83 @@ A definitive successful API acknowledgement must contain the exact Deployment na
 | Known-result key expires, or an unknown reservation remains quarantined | §5.1 retention and fresh-admission rules apply; expiry does not unspend approvals or reopen unknown reservations |
 
 The retained provider evidence (`restart-visibility-20260908`, `provider-evidence.md`) pins the old implementation at 81459ac4, official Kubernetes conditional update documentation, immutable-UID validation, unsigned version parsing, Deployment's unconditional-update strategy and the strategic PATCH/store path. The evidence supports the selected positive-version precondition mechanism; it does not execute a provider race or prove all server/admission-plugin behavior. The concrete binding must establish its exact success/no-effect evidence before advertisement. Existing AttemptRecord/KeyReservation lifecycles and the rule against reclassifying a settled Indeterminate attempt remain unchanged.
+
+### 4.2 Pod exec (`pods.exec`)
+
+**Status:** specified and implemented in the adapter library and the local
+composition, against recorded streams: with `pod_exec: true` the local runtime
+lists it on the `connectors-private/2` write exchange and runs it over the host's
+upgraded-stream write capability (below). The federated service never lists it.
+
+`pods.exec` runs one command in one named container of one pod, under the
+execution-family rules selected on 2026-10-03 for bounded process execution:
+it needs an approval the record names, produces one attempt, carries the command as an explicit argument vector
+with no shell added, is bounded in output bytes and in time, and reports an
+unknown outcome as unknown. Its types are `PodExecRequest`, `ExecChannel`,
+`PodExecResult` and `PodExecOutcome` in the
+[`mutations` ESS domain](../../../spec/ess/domains/mutations.yaml).
+
+Declaration: contract `operations/v1alpha1`, profile `mutation`, effects
+`[external_write, network, process]`, `idempotency: none` (running a command twice
+runs it twice; there is no receiver key and no replay), `approval: required`. It is
+advertised only when the configuration sets `pod_exec: true` and only on the
+`connectors-private/2` write exchange; the read exchange never lists it, and the
+read path refuses it (`forbidden`, zero requests) even when it is configured.
+
+**Input.** Closed: `namespace` (configured, checked before any I/O, `forbidden`
+otherwise), `pod` (DNS-1123 subdomain), `container` (DNS-1123 label, required:
+no default-container fallback), `command` (1–64 elements, each 1–4096 bytes, at
+most 16384 in all; element one is the executable), `timeout_seconds` (1–60,
+default 30) and `max_output_bytes` (1–1048576, default 65536, applied to stdout
+and stderr each). Approval and the fingerprint bind that exact input.
+
+**Dispatch.** After the host has spent the approval and anchored the attempt, one
+GET to `/api/v1/namespaces/{namespace}/pods/{pod}/exec` with `container`, one
+`command` term per element in order, `stdin=false`, `stdout=true`,
+`stderr=true`, `tty=false`, upgraded to a WebSocket offering
+`v5.channel.k8s.io` then `v4.channel.k8s.io`. Both frame each binary message
+with a channel byte (1 stdout, 2 stderr, 3 status) and end with a v1 `Status` on
+channel 3 for success too. Older subprotocols, which report errors as text, are
+not offered. The upgrade request is never resent.
+
+**Outcome.**
+
+| Observation | Outcome |
+|---|---|
+| Refused before sending | `refused` with that error |
+| Upgrade answered 400/422, 401, 403 or 404 with no stream | `refused` (`invalid_input`, `unauthorized`, `forbidden`, `not_found`): no process was started |
+| Upgrade answered 5xx or another status | `unknown` |
+| Request sent, answer lost | `unknown` |
+| Stream accepted with an unoffered subprotocol | `unknown` |
+| Status `Success` on channel 3 | `applied`, `exit_code: 0` |
+| Status `Failure`, reason `NonZeroExitCode`, one `ExitCode` cause 1–255 | `applied` with that `exit_code`: a completed attempt, not a refusal |
+| Any other status, a close or loss before a status, a message on channel 0, 4 or another channel, a status over 64 KiB, more than 16 MiB consumed, the deadline | `unknown` |
+
+`stdout` and `stderr` keep the first `max_output_bytes` bytes of their channel;
+the rest is read and discarded so the status is still observed, and
+`stdout_truncated`/`stderr_truncated` say so. A cut never splits a UTF-8 scalar
+(an incomplete trailing scalar is withheld); other invalid bytes are replaced
+with U+FFFD. The result is `{namespace, pod, container, exit_code, stdout,
+stderr, stdout_truncated, stderr_truncated, provenance}`. An `unknown` attempt is
+never retried or settled later by this binding; a caller who wants the command
+again obtains a fresh approval.
+
+**Transport.** The guard is the one every implemented mutation uses: the
+composition implements `prepare_write` for the `connectors-private/2` exchange
+and returns a prepared write that consumes the host's one-use write capability,
+built for one upgraded stream (`ScopedHttp::into_upgrade_write`). Preparation
+refuses before any I/O (namespace, input bounds, protected entry); the upgrade is
+sent only when the host commits the write it admitted, so the approval is spent
+and the attempt recorded first, and a cancelled preparation opens nothing. The
+upgrade (`connectors_sdk::AuthenticatedWrite::upgrade`, modelled as
+`connectors.transport.UpgradeOutcome` and `UpgradedStreamEnd` in the shared
+`ess/domains/transport.yaml`) goes through the host's admitted HTTP path: the
+configured API server only, the captured TLS roots and credential, no proxy, no
+redirect followed. Only the WebSocket framing is added (`tokio-tungstenite`, with
+no TLS or connect feature). The host answers ping, reassembles fragments and
+enforces the bounds the composition fixed: 1 MiB per message, 17 MiB in all
+(above this binding's 16 MiB consumable bound, which it reports itself) and the
+request's `timeout_seconds`. A bound reached closes the stream and is reported as
+truncation (`capacity`), the deadline as `timeout`; both are `unknown` here. The
+composition hands the host's message stream to `exec::settle` as an
+`ExecStream`. A read capability has no upgrade.
