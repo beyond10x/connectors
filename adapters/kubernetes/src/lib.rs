@@ -60,12 +60,10 @@ impl Kubernetes {
                         .bytes()
                         .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
             })
-            || config.resource_kinds.iter().any(|k| {
-                !matches!(
-                    k.as_str(),
-                    "pods" | "services" | "deployments" | "endpointslices"
-                )
-            })
+            || config
+                .resource_kinds
+                .iter()
+                .any(|k| collection(k, "scope").is_err())
         {
             return Err(Error::invalid("invalid namespace or resource-kind scope"));
         }
@@ -78,6 +76,9 @@ impl Kubernetes {
             &descriptor,
             &[
                 "resources.list",
+                "resources.get",
+                "namespaces.list",
+                "deployments.history",
                 "endpoints.discover",
                 "hosts.discover",
                 "helm_releases.history",
@@ -332,24 +333,10 @@ impl Kubernetes {
         if let Some(cursor) = self.admitted_cursor(cursor)? {
             query.push(("continue", self.cursors.read(&context, cursor)?));
         }
-        let segments = match kind {
-            "nodes" => vec!["api", "v1", "nodes"],
-            "endpointslices" => vec![
-                "apis",
-                "discovery.k8s.io",
-                "v1",
-                "namespaces",
-                namespace,
-                "endpointslices",
-            ],
-            "deployments" => vec!["apis", "apps", "v1", "namespaces", namespace, "deployments"],
-            "pods" | "services" => vec!["api", "v1", "namespaces", namespace, kind],
-            _ => {
-                return Err(Error::new(
-                    ErrorCode::Unsupported,
-                    "resource kind not supported",
-                ));
-            }
+        let segments = if kind == "nodes" {
+            vec!["api", "v1", "nodes"]
+        } else {
+            collection(kind, namespace)?
         };
         let response = self.http.get(&segments, &query).await?;
         let value = upstream_json(&response)?;
@@ -380,6 +367,358 @@ impl Kubernetes {
             ),
         })
     }
+    fn kind(&self, kind: &str) -> Result<()> {
+        if !self.config.resource_kinds.iter().any(|k| k == kind) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "resource kind is outside configured scope",
+            ));
+        }
+        Ok(())
+    }
+    /// Read one object of an admitted kind by name. The scope checks precede
+    /// the name check, and both precede the one provider request, so a name
+    /// outside the configured namespaces is refused, never looked up. An absent
+    /// object is the provider's 404, which answers not_found rather than an
+    /// empty page.
+    async fn get(&self, namespace: &str, kind: &str, name: &str) -> Result<Page> {
+        self.namespace(namespace)?;
+        self.kind(kind)?;
+        if !valid_name(name) {
+            return Err(Error::invalid("name is not a Kubernetes object name"));
+        }
+        let mut segments = collection(kind, namespace)?;
+        segments.push(name);
+        let response = self.http.get(&segments, &[]).await?;
+        let object = upstream_json(&response)?;
+        let revision = identity(&object, namespace, name)?;
+        Ok(Page {
+            items: vec![object],
+            complete: true,
+            next_cursor: None,
+            provenance: provenance(
+                &self.descriptor.instance,
+                format!("{namespace}/{kind}/{name}"),
+                revision,
+            ),
+        })
+    }
+    /// The configured namespaces that exist, each read by its exact name. The
+    /// cluster-scoped namespace collection is never listed, so no namespace
+    /// outside the configured set can be observed. A 404 is an absent
+    /// namespace and is omitted; any other refusal refuses the page, because a
+    /// denied namespace is not evidence that it does not exist. The
+    /// continuation is a position in the configured list, bound to that list.
+    async fn configured_namespaces(
+        &self,
+        operation: &str,
+        limit: u16,
+        cursor: Option<&str>,
+    ) -> Result<Page> {
+        if !(1..=100).contains(&limit) {
+            return Err(Error::invalid("limit must be between one and 100"));
+        }
+        let names = &self.config.namespaces;
+        let mut context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespaces":names,"limit":limit});
+        if let Some(partition) = &self.partition {
+            context["partition"] = json!(partition);
+        }
+        let start = match self.admitted_cursor(cursor)? {
+            Some(cursor) => self
+                .cursors
+                .read(&context, cursor)?
+                .parse::<usize>()
+                .ok()
+                .filter(|start| *start < names.len())
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorCode::StaleCursor,
+                        "cursor expired or does not belong to this request",
+                    )
+                })?,
+            None => 0,
+        };
+        let end = (start + limit as usize).min(names.len());
+        let mut items = Vec::new();
+        for name in &names[start..end] {
+            let response = self
+                .http
+                .get(&["api", "v1", "namespaces", name.as_str()], &[])
+                .await?;
+            if response.status == 404 {
+                continue;
+            }
+            let object = upstream_json(&response)?;
+            if object["metadata"]["name"].as_str() != Some(name.as_str()) {
+                return Err(Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "Kubernetes namespace reports a different name",
+                ));
+            }
+            items.push(object);
+        }
+        let next_cursor = if end < names.len() {
+            Some(self.cursors.issue(&context, end.to_string())?)
+        } else {
+            None
+        };
+        Ok(Page {
+            items,
+            complete: next_cursor.is_none(),
+            next_cursor,
+            provenance: provenance(&self.descriptor.instance, "namespaces", None),
+        })
+    }
+    /// One bounded page of a Deployment's rollout history: the ReplicaSets its
+    /// own selector matches, kept only when the Deployment is their controlling
+    /// owner by uid. A label match alone is not ownership. The Deployment's uid
+    /// binds the continuation, so a recreated Deployment of the same name
+    /// cannot resume its predecessor's page.
+    async fn history(
+        &self,
+        operation: &str,
+        namespace: &str,
+        name: &str,
+        limit: u16,
+        cursor: Option<&str>,
+    ) -> Result<Page> {
+        if !(1..=100).contains(&limit) {
+            return Err(Error::invalid("limit must be between one and 100"));
+        }
+        self.namespace(namespace)?;
+        self.kind("deployments")?;
+        self.kind("replicasets")?;
+        if !valid_name(name) {
+            return Err(Error::invalid("name is not a Kubernetes object name"));
+        }
+        let cursor = self.admitted_cursor(cursor)?;
+        let response = self
+            .http
+            .get(
+                &[
+                    "apis",
+                    "apps",
+                    "v1",
+                    "namespaces",
+                    namespace,
+                    "deployments",
+                    name,
+                ],
+                &[],
+            )
+            .await?;
+        let deployment = upstream_json(&response)?;
+        identity(&deployment, namespace, name)?;
+        let uid = deployment["metadata"]["uid"]
+            .as_str()
+            .filter(|uid| !uid.is_empty())
+            .ok_or_else(|| Error::new(ErrorCode::UpstreamProtocol, "Deployment lacks identity"))?
+            .to_owned();
+        let selector = label_selector(&deployment["spec"]["selector"])?;
+        let mut context = json!({"instance":self.descriptor.instance,"revision":self.descriptor.revision,"operation":operation,"namespace":namespace,"deployment":name,"uid":uid,"limit":limit});
+        if let Some(partition) = &self.partition {
+            context["partition"] = json!(partition);
+        }
+        let mut query = vec![("labelSelector", selector), ("limit", limit.to_string())];
+        if let Some(cursor) = cursor {
+            query.push(("continue", self.cursors.read(&context, cursor)?));
+        }
+        let response = self
+            .http
+            .get(&collection("replicasets", namespace)?, &query)
+            .await?;
+        let value = upstream_json(&response)?;
+        let listed = value["items"].as_array().ok_or_else(|| {
+            Error::new(
+                ErrorCode::UpstreamProtocol,
+                "invalid Kubernetes list response",
+            )
+        })?;
+        if listed.len() > limit as usize {
+            return Err(Error::new(
+                ErrorCode::UpstreamProtocol,
+                "Kubernetes exceeded requested page size",
+            ));
+        }
+        let items = listed
+            .iter()
+            .filter(|replicaset| controlled_by(replicaset, &uid))
+            .cloned()
+            .collect();
+        let (next_cursor, complete, revision) = self.envelope(&context, &value)?;
+        Ok(Page {
+            items,
+            complete,
+            next_cursor,
+            provenance: provenance(
+                &self.descriptor.instance,
+                format!("{namespace}/deployments/{name}/history"),
+                revision,
+            ),
+        })
+    }
+}
+
+/// The one collection path each admissible kind binds. This match is the
+/// closed set of kinds: configuration validation and dispatch both read it.
+fn collection<'a>(kind: &str, namespace: &'a str) -> Result<Vec<&'a str>> {
+    Ok(match kind {
+        "pods" => vec!["api", "v1", "namespaces", namespace, "pods"],
+        "services" => vec!["api", "v1", "namespaces", namespace, "services"],
+        "events" => vec!["api", "v1", "namespaces", namespace, "events"],
+        "deployments" => vec!["apis", "apps", "v1", "namespaces", namespace, "deployments"],
+        "replicasets" => vec!["apis", "apps", "v1", "namespaces", namespace, "replicasets"],
+        "endpointslices" => vec![
+            "apis",
+            "discovery.k8s.io",
+            "v1",
+            "namespaces",
+            namespace,
+            "endpointslices",
+        ],
+        _ => {
+            return Err(Error::new(
+                ErrorCode::Unsupported,
+                "resource kind not supported",
+            ));
+        }
+    })
+}
+
+/// A DNS-1123 subdomain: the name rule of every kind this adapter reads.
+fn valid_name(name: &str) -> bool {
+    name.len() <= 253
+        && name.split('.').all(|label| {
+            !label.is_empty()
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        })
+}
+
+/// A label value, and the name half of a label key.
+fn label_value(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    value.len() <= 63
+        && (bytes.is_empty()
+            || (bytes[0].is_ascii_alphanumeric()
+                && bytes[bytes.len() - 1].is_ascii_alphanumeric()
+                && bytes
+                    .iter()
+                    .all(|&b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))))
+}
+
+fn label_key(key: &str) -> bool {
+    let (prefix, name) = match key.split_once('/') {
+        Some((prefix, name)) => (Some(prefix), name),
+        None => (None, key),
+    };
+    prefix.is_none_or(valid_name) && !name.is_empty() && label_value(name)
+}
+
+/// Translate a Deployment's `spec.selector` to the label-selector query that
+/// selects the same objects. Every key and value is checked against the label
+/// grammar first, so no provider string can add a term. An empty selector
+/// would select every ReplicaSet in the namespace; apps/v1 forbids one, so it
+/// refuses rather than widening the read.
+fn label_selector(selector: &Value) -> Result<String> {
+    fn refused() -> Error {
+        Error::new(
+            ErrorCode::UpstreamProtocol,
+            "Deployment selector is not a label selector this binding can carry",
+        )
+    }
+    if !selector.is_object() {
+        return Err(refused());
+    }
+    let mut terms = Vec::new();
+    match &selector["matchLabels"] {
+        Value::Null => {}
+        Value::Object(labels) => {
+            for (key, value) in labels {
+                let value = value.as_str().ok_or_else(refused)?;
+                if !label_key(key) || !label_value(value) {
+                    return Err(refused());
+                }
+                terms.push(format!("{key}={value}"));
+            }
+        }
+        _ => return Err(refused()),
+    }
+    match &selector["matchExpressions"] {
+        Value::Null => {}
+        Value::Array(expressions) => {
+            for expression in expressions {
+                let key = expression["key"]
+                    .as_str()
+                    .filter(|key| label_key(key))
+                    .ok_or_else(refused)?;
+                let values = || -> Result<String> {
+                    let values = expression["values"]
+                        .as_array()
+                        .filter(|values| !values.is_empty())
+                        .ok_or_else(refused)?;
+                    let values = values
+                        .iter()
+                        .map(|value| {
+                            value
+                                .as_str()
+                                .filter(|value| label_value(value))
+                                .ok_or_else(refused)
+                        })
+                        .collect::<Result<Vec<_>>>()?;
+                    Ok(values.join(","))
+                };
+                terms.push(match expression["operator"].as_str() {
+                    Some("In") => format!("{key} in ({})", values()?),
+                    Some("NotIn") => format!("{key} notin ({})", values()?),
+                    Some("Exists") => key.to_owned(),
+                    Some("DoesNotExist") => format!("!{key}"),
+                    _ => return Err(refused()),
+                });
+            }
+        }
+        _ => return Err(refused()),
+    }
+    if terms.is_empty() {
+        return Err(refused());
+    }
+    Ok(terms.join(","))
+}
+
+/// The Deployment is a ReplicaSet's controlling owner, by uid.
+fn controlled_by(object: &Value, uid: &str) -> bool {
+    object["metadata"]["ownerReferences"]
+        .as_array()
+        .is_some_and(|owners| {
+            owners.iter().any(|owner| {
+                owner["controller"] == true && owner["kind"] == "Deployment" && owner["uid"] == uid
+            })
+        })
+}
+
+/// A single-object read must answer for the object it named: an object
+/// reporting another name or namespace is a protocol violation, not that
+/// object. Returns the object's own resourceVersion.
+fn identity(object: &Value, namespace: &str, name: &str) -> Result<Option<String>> {
+    let metadata = &object["metadata"];
+    if metadata["name"].as_str() != Some(name) || metadata["namespace"].as_str() != Some(namespace)
+    {
+        return Err(Error::new(
+            ErrorCode::UpstreamProtocol,
+            "Kubernetes object reports a different identity",
+        ));
+    }
+    Ok(helm::optional_string(metadata, "resourceVersion")
+        .ok_or_else(|| {
+            Error::new(
+                ErrorCode::UpstreamProtocol,
+                "Kubernetes object revision is not a string",
+            )
+        })?
+        .map(str::to_owned))
 }
 
 #[derive(Deserialize)]
@@ -387,6 +726,29 @@ impl Kubernetes {
 struct Resources {
     namespace: String,
     kind: String,
+    limit: u16,
+    #[serde(default)]
+    cursor: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Object {
+    namespace: String,
+    kind: String,
+    name: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Namespaces {
+    limit: u16,
+    #[serde(default)]
+    cursor: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct History {
+    namespace: String,
+    name: String,
     limit: u16,
     #[serde(default)]
     cursor: Option<String>,
@@ -465,6 +827,30 @@ impl Adapter for Kubernetes {
                         operation,
                         &args.namespace,
                         &args.kind,
+                        args.limit,
+                        args.cursor.as_deref(),
+                    )
+                    .await?,
+                )
+            }
+            "resources.get" => {
+                let args: Object = decode(input)?;
+                encode(self.get(&args.namespace, &args.kind, &args.name).await?)
+            }
+            "namespaces.list" => {
+                let args: Namespaces = decode(input)?;
+                encode(
+                    self.configured_namespaces(operation, args.limit, args.cursor.as_deref())
+                        .await?,
+                )
+            }
+            "deployments.history" => {
+                let args: History = decode(input)?;
+                encode(
+                    self.history(
+                        operation,
+                        &args.namespace,
+                        &args.name,
                         args.limit,
                         args.cursor.as_deref(),
                     )

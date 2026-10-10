@@ -123,9 +123,16 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and their diffs and discussions as reads; issue, merge-request (auto-merge and reopen included), note and discussion writes under approval.",
+      "detail": "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, code search, deployments, environments, pipelines, jobs, traces, merge requests and their diffs and discussions as reads; issue, merge-request (auto-merge and reopen included), note, discussion, tag and release writes under approval.",
       "href": "/docs/reference/adapters/gitlab",
       "label": "GitLab",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "pipeline.retry, pipeline.cancel, pipeline.create, commit.create, file.update, branch.create, branch.delete and project.create under approval, each guarded on the caller's commit (project.create on the namespace path and id) and proven by GitLab's answer or a read after it; environments.list as a read; verified against fixtures, not a live GitLab.",
+      "href": "/docs/reference/adapters/gitlab",
+      "label": "GitLab CI, branch, commit and project writes",
       "status": "shipped"
     },
     {
@@ -203,6 +210,13 @@
       "detail": "resources.list, endpoints.discover and optionally hosts.discover, scoped to configured namespaces and kinds, with a saved bearer token.",
       "href": "/docs/reference/adapters/kubernetes",
       "label": "Kubernetes reads and discovery",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "resources.get reads one object by name, namespaces.list the configured namespaces the cluster has, deployments.history the ReplicaSets a Deployment controls; replicasets and events are configurable kinds; verified against API-shaped fixtures.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes single objects, namespaces and rollout history",
       "status": "shipped"
     },
     {

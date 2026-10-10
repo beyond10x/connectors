@@ -6,3 +6,4 @@ domains:
   - connectors_kubernetes.helm
   - connectors_kubernetes.mutations
   - connectors_kubernetes.permissions
+  - connectors_kubernetes.reads

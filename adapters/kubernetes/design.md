@@ -10,7 +10,7 @@ Shared ESS retains only generic facts and references; this model does not implem
 
 ## 1. Scope and placement
 
-Implemented today (`adapters/kubernetes/spec/adapter.json`): `resources.list` (`datasource.records/v1alpha1`, profile `kubernetes-list`), `endpoints.discover` (`endpoint_discovery/v1alpha1`), `hosts.discover` (`host_discovery/v1alpha1`); configuration `namespaces`, `resource_kinds` (pods, services, deployments, endpointslices), `discover_hosts`; bearer token via `urn:connectors:config:v1:http` credential. Placement: in-cluster or wherever the API server is reachable (`contracts/service/v1alpha1/semantics.md`, Kubernetes paragraph).
+Implemented today (`adapters/kubernetes/spec/adapter.json`): `resources.list` (`datasource.records/v1alpha1`, profile `kubernetes-list`), `endpoints.discover` (`endpoint_discovery/v1alpha1`), `hosts.discover` (`host_discovery/v1alpha1`); `resources.get`, `namespaces.list` and `deployments.history` (`datasource.records/v1alpha1`, [reads binding](contracts/reads/v1alpha1/semantics.md)); configuration `namespaces`, `resource_kinds` (pods, services, deployments, endpointslices, replicasets, events), `discover_hosts`; bearer token via `urn:connectors:config:v1:http` credential. Placement: in-cluster or wherever the API server is reachable (`contracts/service/v1alpha1/semantics.md`, Kubernetes paragraph).
 
 Rebuild adds what the old integration had and the first slice did not: pod logs, deployment status and rollout restart, Service target recognition, the API-server service proxy route, exec-plugin and client-certificate authentication, and per-verb permission evidence. Kubeconfig context candidates (old design 10 §1-2) become host/CLI configuration tooling, not an adapter contract.
 
@@ -54,6 +54,9 @@ Rebuild adds what the old integration had and the first slice did not: pod logs,
 | New id | Contract / profile | Effects | Old id |
 |---|---|---|---|
 | `resources.list` (exists) | records `kubernetes-list` | read | `kubernetes.workloads`, `deployment.status` |
+| `resources.get` | records `kubernetes-get` | read | `kubernetes.pod.show`, `kubernetes.deployment.show` |
+| `namespaces.list` | records `kubernetes-configured-namespaces` | read | `kubernetes.namespace.list` |
+| `deployments.history` | records `kubernetes-rollout-history` | read | `kubernetes.deployment.history` |
 | `endpoints.discover` (exists) | endpoint_discovery | none | `kubernetes.databases` |
 | `hosts.discover` (exists) | host_discovery | none | — |
 | `pod.logs` | logs `kubernetes-pod-logs` | read | `kubernetes.pod.logs` |

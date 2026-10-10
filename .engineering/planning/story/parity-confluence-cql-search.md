@@ -2,12 +2,16 @@
 format: aep.planning-md/3
 id: story:parity-confluence-cql-search
 kind: story
-status: draft
+status: archived
 title: Confluence CQL search
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-10T09:55:32Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-10T09:55:32Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "archived", at: "2026-10-10T12:49:25Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 

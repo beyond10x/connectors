@@ -720,6 +720,140 @@ fn kubernetes_cli_reads_helm_release_history_and_redacted_values() {
     assert_eq!(empty["complete"], true);
 }
 
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn kubernetes_cli_reads_namespaces_single_objects_events_and_rollout_history() {
+    let cluster = Cluster::with_kinds(
+        false,
+        "off",
+        &["pods", "deployments", "replicasets", "events"],
+    );
+    let custody = Custody::new(cluster.root.path());
+    let cli = Cli::new(cluster.root.path());
+    configure_operations(
+        &cli,
+        &cluster,
+        &custody,
+        &[
+            "namespaces.list",
+            "resources.get",
+            "resources.list",
+            "deployments.history",
+        ],
+    );
+    let credential = cluster.root.path().join("private/credential.json");
+    private(&credential, &token(true).0);
+    let connected = success(cli.run(&[
+        "connections",
+        "connect",
+        "--adapter",
+        "cluster",
+        "--profile",
+        "kubernetes.token",
+        "--credential-file",
+        credential.to_str().unwrap(),
+    ]))["connection"]
+        .clone();
+    let reference = connected["summary"]["connection"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(connected["summary"]["state"], "ready");
+
+    let invoke = |operation: &str, input: &str| -> Output {
+        let describe = success(cli.run(&[
+            "operations",
+            "describe",
+            "--adapter",
+            "cluster",
+            "--operation",
+            operation,
+        ]));
+        cli.run(&[
+            "operations",
+            "invoke",
+            "--adapter",
+            "cluster",
+            "--connection",
+            &reference,
+            "--operation",
+            operation,
+            "--schema",
+            describe["schema"].as_str().unwrap(),
+            "--revision",
+            describe["revision"].as_str().unwrap(),
+            "--input-json",
+            input,
+        ])
+    };
+    let read = |operation: &str, input: &str| -> Value {
+        success(invoke(operation, input))["result"].clone()
+    };
+
+    // kubernetes.namespace.list: the configured namespaces that exist.
+    let namespaces = read("namespaces.list", r#"{"limit":10}"#);
+    let names: Vec<&str> = namespaces["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["metadata"]["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["denied", "fixture", "foreign"]);
+
+    // kubernetes.pod.show and kubernetes.deployment.show.
+    let pod = read(
+        "resources.get",
+        r#"{"namespace":"fixture","kind":"pods","name":"pod-0"}"#,
+    );
+    assert_eq!(pod["items"][0]["metadata"]["name"], "pod-0");
+    let deployment = read(
+        "resources.get",
+        r#"{"namespace":"fixture","kind":"deployments","name":"api"}"#,
+    );
+    assert_eq!(deployment["items"][0]["status"]["readyReplicas"], 1);
+    let missing = refusal(
+        invoke(
+            "resources.get",
+            r#"{"namespace":"fixture","kind":"pods","name":"gone"}"#,
+        ),
+        "service_failure",
+    );
+    assert_eq!(missing["service_code"], "not_found", "{missing}");
+    let before = cluster.count();
+    refusal(
+        invoke(
+            "resources.get",
+            r#"{"namespace":"kube-system","kind":"pods","name":"pod-0"}"#,
+        ),
+        "forbidden",
+    );
+    assert_eq!(cluster.count(), before);
+
+    // kubernetes.event.list.
+    let events = read(
+        "resources.list",
+        r#"{"namespace":"fixture","kind":"events","limit":10}"#,
+    );
+    assert_eq!(events["items"][0]["involvedObject"]["name"], "pod-0");
+
+    // kubernetes.deployment.history: only the ReplicaSets the Deployment controls.
+    let history = read(
+        "deployments.history",
+        r#"{"namespace":"fixture","name":"api","limit":10}"#,
+    );
+    let revisions: Vec<&str> = history["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| {
+            item["metadata"]["annotations"]["deployment.kubernetes.io/revision"]
+                .as_str()
+                .unwrap()
+        })
+        .collect();
+    assert_eq!(revisions, ["1", "2"]);
+}
+
 /// Opt-in real cluster: `CONNECTORS_K8S_SANDBOX=<api-base>` with
 /// `CONNECTORS_K8S_CA` and `CONNECTORS_K8S_TOKEN` naming owner-only files.
 /// Without them the test is skipped rather than silently passing.

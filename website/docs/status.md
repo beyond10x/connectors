@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-09: 34 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-09: 36 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -42,7 +42,8 @@ As of 2026-10-09: 34 capabilities are shipped, 3 are decided and 5 are planned. 
 |---|---|---|
 | [Bundles from pinned sources](./guides/build-a-catalog-bundle.md) | ● shipped | connectors-build catalog compiles a pinned OpenAPI document into a digest-verified bundle; every committed bundle matches a fresh run byte for byte. |
 | [Guarded writes as data](./concepts/catalog-provider.md) | ● shipped | A selection's guard reads before the one request and refuses unless every check holds; after it, a failed check leaves the outcome uncertain, never refused. |
-| [GitLab](./reference/adapters/gitlab/index.md) | ● shipped | Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and their diffs and discussions as reads; issue, merge-request (auto-merge and reopen included), note and discussion writes under approval. |
+| [GitLab](./reference/adapters/gitlab/index.md) | ● shipped | Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, code search, deployments, environments, pipelines, jobs, traces, merge requests and their diffs and discussions as reads; issue, merge-request (auto-merge and reopen included), note, discussion, tag and release writes under approval. |
+| [GitLab CI, branch, commit and project writes](./reference/adapters/gitlab/index.md) | ● shipped | pipeline.retry, pipeline.cancel, pipeline.create, commit.create, file.update, branch.create, branch.delete and project.create under approval, each guarded on the caller's commit (project.create on the namespace path and id) and proven by GitLab's answer or a read after it; environments.list as a read; verified against fixtures, not a live GitLab. |
 | [GitLab merge-request feed](./reference/adapters/catalog/contracts/feed.md) | ● shipped | GitLab binds datasource.feed/v1alpha1 as profile gitlab-merge-requests/1, checked against recorded GitLab answers (since 0.32.0). |
 | [Jira Cloud](./reference/adapters/catalog/index.md) | ● shipped | Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0). |
 | [Confluence Cloud](./reference/adapters/catalog/index.md) | ● shipped | Changed pages, a space's pages, one page with its body and a page's comments; exercised against local fixtures only. |
@@ -59,6 +60,7 @@ As of 2026-10-09: 34 capabilities are shipped, 3 are decided and 5 are planned. 
 | Capability | Status | What it means |
 |---|---|---|
 | [Kubernetes reads and discovery](./reference/adapters/kubernetes/index.md) | ● shipped | resources.list, endpoints.discover and optionally hosts.discover, scoped to configured namespaces and kinds, with a saved bearer token. |
+| [Kubernetes single objects, namespaces and rollout history](./reference/adapters/kubernetes/index.md) | ● shipped | resources.get reads one object by name, namespaces.list the configured namespaces the cluster has, deployments.history the ReplicaSets a Deployment controls; replicasets and events are configurable kinds; verified against API-shaped fixtures. |
 | [Helm release reads](./reference/adapters/kubernetes/index.md) | ● shipped | History, status, values and manifest of a named release, values and manifests disclosed only as redacted projections. |
 | [PostgreSQL reads](./reference/adapters/sql/index.md) | ● shipped | schema.list, query.read, database.list, table.list, table.describe and index.list in a read-only transaction with fixed statement and lock timeouts; a deadline or a dropped invocation cancels the query. |
 | [MySQL reads](./reference/adapters/sql/index.md) | ● shipped | The same six reads on a connection whose engine is mysql, in a read-only session bound to the configured database, over TLS unless plaintext is allowed. |
