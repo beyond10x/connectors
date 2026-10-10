@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0440-gitlab-ci-kubernetes-reads
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.44.0: GitLab CI and project writes, Kubernetes reads'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261010d-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-10T13:38:19Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-10T14:50:01Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 

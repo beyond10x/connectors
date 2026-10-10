@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-10T16:33:06Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-jira-attachment-download",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/155 repository gate pass; package gates on 89859c044: 1915 passed 0 failed; adapters/catalog/tests/jira_attachment.rs, adapters/catalog/tests/jira.rs (89859c044)"
+  }
+}

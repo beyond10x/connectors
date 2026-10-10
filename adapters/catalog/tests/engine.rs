@@ -117,6 +117,8 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         description: None,
         guard: None,
         response: None,
+        binary: None,
+        download: None,
         bounds: BTreeMap::new(),
         required: Vec::new(),
         withhold: Vec::new(),

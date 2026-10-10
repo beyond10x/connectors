@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-09",
+  "asOf": "2026-10-10",
   "format": "b10x-status/1",
   "items": [
     {
@@ -144,9 +144,23 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
+      "detail": "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, an attachment's content, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
       "href": "/docs/reference/adapters/catalog",
       "label": "Jira Cloud",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "A selection can read an answer as bytes: media type, length, SHA-256 and the bytes in base64, at most 2 MiB and refused as capacity above it, with at most three redirects, each only to an origin the selection names and the connection admits in its hosts; verified against fixtures only.",
+      "href": "/docs/concepts/catalog-provider",
+      "label": "Binary responses",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "attachment.content reads one attachment as a binary body, directly with redirect=false or through Jira's 303 to an admitted media host; that host, api.media.atlassian.com, is inferred and not verified against a live site.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Jira attachment content",
       "status": "shipped"
     },
     {
@@ -193,9 +207,16 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0); verified against a local fixture only.",
+      "detail": "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Slack conversations",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Slack files",
       "status": "shipped"
     },
     {
@@ -217,6 +238,27 @@
       "detail": "resources.get reads one object by name, namespaces.list the configured namespaces the cluster has, deployments.history the ReplicaSets a Deployment controls; replicasets and events are configurable kinds; verified against API-shaped fixtures.",
       "href": "/docs/reference/adapters/kubernetes",
       "label": "Kubernetes single objects, namespaces and rollout history",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "pods.logs reads a bounded tail of one container's log in a configured namespace, at most 1,000 lines and 128 KiB, when pod_logs is configured; verified against API-shaped fixtures.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes pod logs",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "contexts.list lists the contexts of the one kubeconfig a local configuration names, never its credentials or servers, with no cluster request.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes kubeconfig contexts",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "pods.exec runs one command as an argument vector in a named container, through the local CLI under approval, when pod_exec is configured; exit status and bounded output come back, and a lost stream is unknown and never resent; verified against recorded streams, not a live cluster.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes pod exec",
       "status": "shipped"
     },
     {

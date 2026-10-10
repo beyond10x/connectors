@@ -1,0 +1,137 @@
+domain: connectors_catalog.binary
+summary: The binary response of a selected read in a `connectors-catalog-operations/1` file, the download of a provider file URL, the hosts a `connectors-catalog-local/2` connection admits for them, and the body such a read answers with.
+
+# Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`response`, `binary`,
+# `download`, `hosts`). The engine reads `response`, `binary` and `download` as members of a
+# selection, and the local composition reads `hosts` as a member of the connection's
+# configuration; each is omitted when absent, so a selection or a configuration without it keeps
+# its serialised form and its configuration revision.
+#
+# A binary body travels inside the invoke result, base64-encoded, never written to a file: the
+# result stays one JSON document, the adapter process needs no filesystem authority, and the
+# existing result bounds hold. The ceiling of `max_bytes`, 2 MiB, is chosen so the encoded body
+# and its envelope stay under the served result limit (4 MiB less 1 KiB) and the provider
+# transport limit (4 MiB).
+#
+# What the engine refuses when a selection loads beyond these invariants (`binary` on a write, an
+# origin that is not `https://<host>[:<port>]` in lower case with a hostname as its host, a
+# repeated host, a download whose `path_prefix` does not start and end with `/` or that binds
+# parameters or a body), and what the composition refuses when a connection loads (an admitted
+# host no selected binary read names, or a non-canonical or repeated one), is stated in the owner
+# and pinned by the tests, as are the answer-time refusals stated on `Download` and `Body` (a
+# download path segment that decodes to a separator or a dot segment, an answer naming two media
+# types); ESS 0.57 has no set-membership constraint between a selection and a connection, and no
+# pattern constraint on a string.
+
+types:
+  # How a 2xx body is read. Absent: the bundle's declared media types decide between `json` and
+  # `text`. `text` is the reviewed exception for a source that declares JSON where the provider
+  # answers with plain text. `binary` reads the body as bytes, whatever media type it carries, and
+  # answers with a `Body`; it needs `binary`.
+  - name: connectors_catalog.binary.ResponseKind
+    kind: enum
+    variants: [json, text, binary]
+
+  # An origin, `https://<host>` or `https://<host>:<port>`, the host in lower case, with no path,
+  # query, fragment or user information. The host is a hostname: dot-separated labels, each
+  # one to 63 letters, digits and hyphens, none starting or ending with a hyphen, at most 253
+  # bytes in all (a dotted IPv4 literal is one); `..`, `a..b`, `.`, `-` and a trailing dot name
+  # no host and are refused.
+  - name: connectors_catalog.binary.Origin
+    kind: newtype
+    of: String
+
+  # The bound and the reach of a binary read.
+  #
+  # `max_bytes` bounds the body: a body longer than it is refused as `capacity` by name, never
+  # truncated. `hosts` names the origins, besides the connection's API base, that this read may
+  # reach: the origin of a `download` URL, and the target of a redirect. A redirect (301, 302,
+  # 303, 307 or 308 with a `Location`) is followed, at most three times, only to an origin in
+  # `hosts` that the connection also admits; a redirect to any other origin is refused by name
+  # with nothing sent there. Absent: no redirect is followed, and a 3xx is a refusal.
+  - name: connectors_catalog.binary.Binary
+    kind: struct
+    fields:
+      - {name: max_bytes, type: Integer}
+      - {name: hosts, type: "Optional<List<connectors_catalog.binary.Origin>>"}
+    invariants:
+      - max_bytes >= 1
+      - max_bytes <= 2097152
+      - any: [{not: defined(hosts)}, {hosts.count: {gte: 1}}]
+      - any: [{not: defined(hosts)}, {hosts.count: {lte: 4}}]
+
+  # A read of a URL the provider itself handed out, such as Slack's `url_private` of a file: the
+  # caller gives it as the input `url`, and it must be an `https` URL on an origin in the
+  # selection's `binary.hosts` whose path starts with `path_prefix`. It is sent as a GET to that
+  # origin with no other input. A selection with `download` names no bundle operation. A `url`
+  # with a path segment that, percent-decoded, holds `/` or `\` is refused as `forbidden` with
+  # nothing sent: the raw prefix check does not bound where such a path lands. One with an empty
+  # segment, or one that decodes to `.` or `..`, is refused as `invalid_input` with nothing sent.
+  - name: connectors_catalog.binary.Download
+    kind: struct
+    fields:
+      - {name: path_prefix, type: String}
+    invariants:
+      - path_prefix.count >= 2
+
+  # The members of a selection that make it a binary read. `binary` is declared exactly when the
+  # response is `binary`. A `download` selection is a binary read that reaches at least one host
+  # and names no `operation_id`; every other selection names one.
+  - name: connectors_catalog.binary.BinarySelection
+    kind: struct
+    fields:
+      - {name: operation_id, type: "Optional<String>"}
+      - {name: response, type: "Optional<connectors_catalog.binary.ResponseKind>"}
+      - {name: binary, type: "Optional<connectors_catalog.binary.Binary>"}
+      - {name: download, type: "Optional<connectors_catalog.binary.Download>"}
+    invariants:
+      - any: [{not: defined(binary)}, {response: binary}]
+      - any: [{not: {response: binary}}, defined(binary)]
+      - any: [{not: defined(download)}, {response: binary}]
+      - any: [{not: defined(download)}, defined(binary.hosts)]
+      - any: [{not: defined(download)}, {not: defined(operation_id)}]
+      - any: [defined(download), defined(operation_id)]
+
+  # One origin a connection admits besides its API base. `credential`, when `true`, sends the
+  # connection's credential header to it, as Slack's file host requires; otherwise requests to
+  # it carry no credential, as for a redirect to a host whose URL carries its own grant.
+  - name: connectors_catalog.binary.AdmittedHost
+    kind: struct
+    fields:
+      - {name: origin, type: connectors_catalog.binary.Origin}
+      - {name: credential, type: "Optional<Boolean>"}
+
+  # The member of a connection's configuration that admits hosts besides its API base. Only a
+  # binary read reaches them, and only those its selection names. The connection may admit only
+  # hosts some selected binary read names; a named host the connection does not admit is not a
+  # configuration failure, and the read that needs it is refused as `forbidden` with nothing sent
+  # there.
+  - name: connectors_catalog.binary.Hosts
+    kind: struct
+    fields:
+      - {name: hosts, type: "Optional<List<connectors_catalog.binary.AdmittedHost>>"}
+    invariants:
+      - any: [{not: defined(hosts)}, {hosts.count: {gte: 1}}]
+      - any: [{not: defined(hosts)}, {hosts.count: {lte: 8}}]
+
+  # The `body` of a binary read's result. `media_type` is the answer's `Content-Type` without its
+  # parameters, in lower case, or `application/octet-stream` when the answer names none or
+  # carries a `Content-Encoding` other than `identity`: no coding is requested and none is
+  # decoded, so coded bytes are not of the type `Content-Type` names. An answer naming more than
+  # one media type (repeated `Content-Type` lines, which the transport joins with `, `) is
+  # refused as `upstream_protocol` by name, never answered as one of them.
+  # `length` is the body's length in bytes, `sha256` the lower-case hex SHA-256 of those bytes,
+  # and `content_base64` the bytes in standard base64 with padding. The result's `status` is the
+  # status of the answer that carried the body, after any redirect.
+  - name: connectors_catalog.binary.Body
+    kind: struct
+    fields:
+      - {name: media_type, type: String}
+      - {name: length, type: Integer}
+      - {name: sha256, type: String}
+      - {name: content_base64, type: String}
+    invariants:
+      - media_type.count >= 1
+      - length >= 0
+      - length <= 2097152
+      - sha256.count == 64

@@ -7,7 +7,7 @@ title: Kubernetes exec and port-forward
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Outcome
 
@@ -32,3 +32,7 @@ native adapter change: streaming subresources; the execution profile is deferred
 ## Note
 
 Execution runs a remote process: it needs the bounded process family decided for Helm (`decision-blocker:helm-execution-family`, cleared 2026-10-03) or its own decision.
+
+## Split
+
+`kubernetes.pod.exec` (9 calls) moved to story:parity-kubernetes-exec on 2026-10-10. Port-forward start and stop (4 calls) stay here: a long-lived local listener needs its own design.

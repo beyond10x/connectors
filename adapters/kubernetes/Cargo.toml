@@ -27,6 +27,7 @@ connectors-host = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml_ng.workspace = true
 zeroize.workspace = true
 clap = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
@@ -38,3 +39,7 @@ axum.workspace = true
 tempfile.workspace = true
 rcgen = "0.14"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+# The exec fixture answers the WebSocket upgrade with the same framing library
+# the host uses; it never stands in for the host side under test.
+tokio-tungstenite.workspace = true
+futures-util.workspace = true

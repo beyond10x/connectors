@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-10T15:49:46Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-kubernetes-exec",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "review_outcome",
+    "source": "review-result:adversary-parity-kubernetes-exec-pass-1",
+    "review": "review-result:adversary-parity-kubernetes-exec-pass-1",
+    "outcome": "fixed"
+  }
+}

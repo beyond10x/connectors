@@ -1,0 +1,100 @@
+domain: connectors_kubernetes.logs
+summary: Kubernetes-owned pod log selection, line observations and truncation accounting of pods.logs.
+
+# Normative owner: adapters/kubernetes/contracts/logs/v1alpha1/semantics.md, profile
+# kubernetes-pod-logs of the shared datasource.logs/v1alpha1 contract. A pod's log is
+# provider-owned text this adapter only reads: nothing here is an entity with a
+# lifecycle, and an observed line has no state this system advances.
+types:
+  - name: connectors_kubernetes.logs.PodLogSelection
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: pod, type: String}
+      - {name: container, type: "Optional<String>"}
+      - {name: since_seconds, type: Integer}
+      - {name: tail_lines, type: Integer}
+      - {name: max_bytes, type: Integer}
+    invariants:
+      - namespace.count: {gte: 1, lte: 63}
+      - pod.count: {gte: 1, lte: 253}
+      - any:
+          - missing(container)
+          - container.count: {gte: 1, lte: 63}
+      - since_seconds: {gte: 1, lte: 86400}
+      - tail_lines: {gte: 1, lte: 1000}
+      - max_bytes: {gte: 1, lte: 131072}
+    # The closed input of pods.logs after defaults: since_seconds 86400, tail_lines
+    # 200 and max_bytes 131072 when omitted. namespace must be one of the configured
+    # namespaces, checked before any provider request (forbidden otherwise). pod is a
+    # DNS-1123 subdomain and container a DNS-1123 label, which String does not
+    # enforce; the binding does, before dispatch, so neither adds a path segment or a
+    # query term. An omitted container takes the provider's single-container default;
+    # a pod with several containers and no default answers the provider's refusal,
+    # never a fan-out over containers. There is no cursor, follow, previous-container,
+    # limitBytes, TLS override or absolute time bound: the contract closes them.
+  - name: connectors_kubernetes.logs.LogStream
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: pod, type: String}
+      - {name: container, type: "Optional<String>"}
+    # The one fixed stream of a read: the selection's own coordinates, with container
+    # absent exactly when the selection omitted it. The provider combines stdout and
+    # stderr, so a line carries no source.
+  - name: connectors_kubernetes.logs.LogLine
+    kind: struct
+    fields:
+      - {name: timestamp_unix_ns, type: "Optional<String>"}
+      - {name: stream, type: connectors_kubernetes.logs.LogStream}
+      - {name: line, type: String}
+      - {name: line_truncated, type: Boolean}
+      - {name: redacted, type: Boolean}
+    invariants:
+      - line.count: {lte: 8192}
+    # timestamp_unix_ns is the canonical decimal of the RFC 3339 prefix the provider
+    # wrote (timestamps=true), removed from line with its separating space; absent
+    # when the line does not start with a valid representable timestamp, and then
+    # line is the text as received. Lines keep provider order; nothing is sorted.
+    # line is clipped at 8192 bytes on a UTF-8 boundary, with line_truncated set.
+    # redacted is false: no redaction filter is admitted for this profile.
+  - name: connectors_kubernetes.logs.TruncationCause
+    kind: enum
+    variants: [provider_limit, source_bytes, line_bytes]
+    # The causes this profile selects, in the shared contract's order.
+    # provider_limit: at least tail_lines occurrences were observed. source_bytes:
+    # max_bytes source bytes were consumed and reading stopped there. line_bytes: an
+    # emitted line was clipped, including a pending prefix at the source cutoff.
+  - name: connectors_kubernetes.logs.LogTruncation
+    kind: struct
+    fields:
+      - {name: causes, type: "List<connectors_kubernetes.logs.TruncationCause>"}
+      - {name: occurrences_dropped, type: "Optional<Integer>"}
+      - {name: stream_groups_dropped, type: Integer}
+    invariants:
+      - causes.count: {lte: 3}
+      - stream_groups_dropped: {gte: 0, lte: 0}
+    # occurrences_dropped is absent whenever provider_limit or source_bytes leaves
+    # unseen occurrences unknown, and otherwise zero: this binding omits no observed
+    # occurrence. One fixed stream has no group to drop.
+  - name: connectors_kubernetes.logs.PodLogs
+    kind: struct
+    fields:
+      - {name: lines, type: "List<connectors_kubernetes.logs.LogLine>"}
+      - {name: since_seconds, type: Integer}
+      - {name: tail_lines, type: Integer}
+      - {name: complete, type: Boolean}
+      - {name: truncation, type: connectors_kubernetes.logs.LogTruncation}
+    invariants:
+      - lines.count: {lte: 1000}
+    # complete is true exactly when neither provider_limit nor source_bytes is a
+    # cause: a clean end of the response below both caps. line_bytes alone keeps it
+    # true. The wire result also carries selection {kind: kubernetes-relative-tail,
+    # since_seconds, tail_lines}, order provider, next_cursor null and provenance with
+    # a null source revision; those are fixed values of this profile.
+
+# ESS-LIMIT: the DNS-1123 predicates on pod and container, the RFC 3339 timestamp
+# grammar and its conversion, UTF-8 boundary clipping and the byte cutoff are
+# predicates over text ESS has no construct for; the binding enforces each around its
+# one provider request. The configured-namespace check is a cross-record read of the
+# connection's configuration, which ESS does not express either.

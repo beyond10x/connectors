@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-10T16:33:08Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-kubernetes-exec",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/155 repository gate pass; package gates on 89859c044: 1915 passed 0 failed; adapters/kubernetes/tests/pod_exec.rs, adapters/kubernetes/tests/local_exec.rs, adapters/kubernetes/tests/exec_adversary.rs, crates/connectors-host/tests/http_upgrade.rs, crates/connectors-host/tests/upgrade_adversary.rs (89859c044)"
+  }
+}

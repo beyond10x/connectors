@@ -1347,3 +1347,102 @@ fn an_uncompressed_release_body_reads_and_bounded_pages_report_their_own_complet
     );
     assert_eq!(cluster.count(), before);
 }
+
+/// Fictional fixture material only: a kubeconfig carrying a token, as a real
+/// one does. The token must never leave the composition.
+const KUBECONFIG_TOKEN: &str = "fixture-kubeconfig-token";
+fn kubeconfig(current: &str) -> String {
+    format!(
+        "apiVersion: v1\nkind: Config\ncurrent-context: {current}\n\
+         clusters:\n- name: fixture-cluster\n  cluster:\n    server: https://fixture.cluster.invalid\n\
+         contexts:\n- name: staging\n  context:\n    cluster: fixture-cluster\n    user: fixture-user\n    namespace: fixture\n\
+         - name: production\n  context:\n    cluster: fixture-cluster\n    user: fixture-user\n\
+         users:\n- name: fixture-user\n  user:\n    token: {KUBECONFIG_TOKEN}\n"
+    )
+}
+/// Rewrite the fixture's native configuration with one more field.
+fn configure(cluster: &Cluster, field: &str, value: Value) {
+    let mut document: Value = serde_json::from_slice(&fs::read(&cluster.config).unwrap()).unwrap();
+    document[field] = value;
+    private(&cluster.config, &serde_json::to_vec(&document).unwrap());
+}
+
+#[test]
+fn local_contexts_list_reads_only_the_configured_kubeconfig_without_credentials() {
+    let cluster = Cluster::new(false);
+    let unconfigured = cluster.selection();
+    let path = cluster.root.path().join("private").join("kubeconfig");
+    private(&path, kubeconfig("staging").as_bytes());
+    configure(&cluster, "kubeconfig", json!(path));
+    let selection = cluster.selection();
+    // The configured file is part of the admitted configuration.
+    assert_ne!(
+        selection.configuration_revision,
+        unconfigured.configuration_revision
+    );
+    let mut child = Child::spawn(&selection).unwrap();
+    let operations = child.bootstrap().descriptor().unwrap().operations;
+    assert!(operations.iter().any(|o| o.id == "contexts.list"));
+    // Logs and exec stay unadvertised unless configured.
+    assert!(
+        !operations
+            .iter()
+            .any(|o| o.id == "pods.logs" || o.id == "pods.exec")
+    );
+    let before = cluster.count();
+    let page = invoke(
+        &mut child,
+        "contexts.list",
+        "one",
+        &token(true),
+        json!({"limit":10}),
+    )
+    .unwrap();
+    assert_eq!(
+        page["items"],
+        json!([
+            {"name":"staging","cluster":"fixture-cluster","namespace":"fixture","current":true},
+            {"name":"production","cluster":"fixture-cluster","namespace":null,"current":false},
+        ])
+    );
+    let disclosed = page.to_string();
+    assert!(!disclosed.contains(KUBECONFIG_TOKEN));
+    assert!(!disclosed.contains("fixture.cluster.invalid"));
+    assert!(!disclosed.contains("fixture-user"));
+    // The page comes from the configured file alone: no provider request.
+    assert_eq!(cluster.count(), before);
+    // The file is read at invocation, so a changed current-context shows.
+    private(&path, kubeconfig("production").as_bytes());
+    let page = invoke(
+        &mut child,
+        "contexts.list",
+        "one",
+        &token(true),
+        json!({"limit":10}),
+    )
+    .unwrap();
+    assert_eq!(page["items"][0]["current"], false);
+    assert_eq!(page["items"][1]["current"], true);
+}
+
+#[test]
+fn local_pod_logs_are_advertised_only_when_configured() {
+    let cluster = Cluster::new(false);
+    let unconfigured = cluster.selection();
+    configure(&cluster, "pod_logs", json!(true));
+    let selection = cluster.selection();
+    assert_ne!(
+        selection.configuration_revision,
+        unconfigured.configuration_revision
+    );
+    let child = Child::spawn(&selection).unwrap();
+    assert!(
+        child
+            .bootstrap()
+            .descriptor()
+            .unwrap()
+            .operations
+            .iter()
+            .any(|o| o.id == "pods.logs")
+    );
+}

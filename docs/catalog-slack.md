@@ -2,11 +2,11 @@
 
 The catalog provider reads Slack conversations — the channels a bot token can
 see, a channel's messages and one thread — the workspace's users, the
-workspace itself, its custom emoji and the token's identity from the pinned
-Slack Web API document, and, on a second connection with a user token,
-searches messages. Nothing here is Slack-specific code: the Swagger 2.0
-document is projected into OpenAPI 3.1.0, the projection is compiled into a
-bundle, two reviewed selection sets expose seven reads for a bot token and
+workspace itself, its custom emoji, the token's identity and the files the token
+can see, with their content, from the pinned Slack Web API document, and, on a
+second connection with a user token, searches messages. Nothing here is
+Slack-specific code: the Swagger 2.0 document is projected into OpenAPI 3.1.0, the projection is compiled into a
+bundle, two reviewed selection sets expose ten reads for a bot token and
 search for a user token, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there;
@@ -51,12 +51,13 @@ run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/slack/operations.json`](../adapters/catalog/providers/slack/operations.json)
-exposes seven reads for a bot token, each `effect: read`, and nothing else;
+exposes ten reads for a bot token, each `effect: read`, and nothing else;
 there are no writes.
 [`adapters/catalog/providers/slack/user-operations.json`](../adapters/catalog/providers/slack/user-operations.json)
 exposes `search.messages` alone, for a user token
 ([Search](#search-on-a-user-token-connection)). A selection id is the Slack
-method name. `adapters/catalog/tests/slack.rs` pins both exact id lists and
+method name, except `file.download`, which names no method
+([Files](#files)). `adapters/catalog/tests/slack.rs` pins both exact id lists and
 each id's `operationId` and path in the pinned document, so a renamed or
 dropped id, or a source operation that moved, fails the gate. The bundle
 refuses at load any `operation_id` the projection lacks.
@@ -138,6 +139,45 @@ The three reads that are not lists each answer in one call:
   together with `team.info` it gives the token's identity and workspace.
   Connecting and `connections revalidate` keep only its `user_id`.
 
+## Files
+
+Three reads list files, read one file's record and read its content:
+
+| id | pinned `operationId` | request | scope | answer |
+|---|---|---|---|---|
+| `files.list` | `files_list` | `GET /api/files.list` | `files:read` | `files`, each with `id`, `name`, `filetype`, `mimetype`, `size` and `url_private`, and `paging` |
+| `files.info` | `files_info` | `GET /api/files.info` | `files:read` | `file`, the same record for one file |
+| `file.download` | none | `GET` of the file's `url_private` on `https://files.slack.com` | none stated: the pinned document has no download method | the content as a binary body |
+
+- **`files.list`** narrows by `channel`, `user`, `types` and `ts_from` and
+  `ts_to` (Slack `ts`). It pages by number, not by cursor: `page` counts from
+  1 and `count` sets the page size; each answer carries `paging.page`,
+  `paging.total` and, where Slack states it, `paging.pages`. The walk ends on
+  the page numbered `paging.pages`, or on one that lists no file.
+- **`files.info`** requires `file`, a file id from the list; an input without
+  it is refused before any request.
+- **`file.download`** takes one input, `url`: the file's `url_private` or
+  `url_private_download` as `files.list` or `files.info` gives it. It must be an
+  `https` URL on `files.slack.com` whose path starts with `/files-pri/`; any
+  other URL is refused before any request. It is sent as one GET with the bot
+  token in the `Authorization` header, which Slack's file host requires. The
+  answer is `{media_type, length, sha256, content_base64}`, the bytes in
+  base64; a file over 2 MiB is refused as `capacity`, never truncated
+  ([binary reads](local-catalog-provider.md#configure-the-provider)).
+
+The download reaches a host besides `api_base`, so the connection must admit it
+with the credential. Add `hosts` to the bot configuration
+([Authentication](#authentication)):
+
+```json
+"hosts": [{"origin": "https://files.slack.com", "credential": true}]
+```
+
+Without it the configuration still loads and every other read works, but
+`file.download` is refused as `forbidden` with nothing sent. Admitted without
+`credential`, the request carries no token and Slack's file host refuses it.
+Adding `hosts` changes the configuration revision.
+
 ## Errors are answers
 
 Slack reports most failures of a read — `channel_not_found`, `not_in_channel`,
@@ -158,8 +198,9 @@ operations need the read scopes the pinned document names:
 `channels:read`, `groups:read`, `im:read` and `mpim:read` for
 `conversations.list`, and `channels:history`, `groups:history`, `im:history` and
 `mpim:history` for the two message reads, each for the conversation types read,
-`users:read` for `users.list`, `team:read` for `team.info` and `emoji:read` for
-`emoji.list`; `auth.test` needs none.
+`users:read` for `users.list`, `team:read` for `team.info`, `emoji:read` for
+`emoji.list` and `files:read` for `files.list` and `files.info`; `auth.test` needs
+none.
 A bot reads a channel's history only after it has joined that channel.
 
 Connecting proves the token with `GET /api/auth.test` (`auth_test`). Its
@@ -246,7 +287,12 @@ Connect with the credential document `{"token": "<user token>"}`.
   parameter or header, the returned body bytes, a two-page walk of each list to
   an empty `next_cursor`, an `ok: false` answer returned as `200`, the
   `auth.test` identity read and its refusal, and search on a second connection
-  with a user token. No live Slack workspace has been called.
+  with a user token. The file reads are checked the same way: a two-page
+  `files.list` walk, `files.info` of one file, and the download of a
+  non-UTF-8 body from a fixture file host admitted with and without the
+  credential, refused when the connection does not admit the host or the URL
+  leaves `/files-pri/`; the fixture serves its own origin in place of
+  `files.slack.com`. No live Slack workspace has been called.
 - The engine parses and re-serialises the body. The fixture's bodies are
   compact JSON with sorted keys, and the test asserts the returned body is
   those exact bytes; a Slack body with other spacing or key order is returned
@@ -254,9 +300,10 @@ Connect with the credential document `{"token": "<user token>"}`.
 - The provider does not walk pages itself, and does not bound `limit` on the
   message reads or `users.list`: the pinned document states no maximum for
   them.
-- Only these eight reads are selected. One user by id or e-mail
-  (`users.info`, `users.lookupByEmail`), message writes, files, reactions and
-  every other method of the document are not selected.
+- Only these eleven reads are selected. One user by id or e-mail
+  (`users.info`, `users.lookupByEmail`), message writes, file upload and
+  delete, reactions and every other method of the document are not selected.
+  A file upload is a binary request body, which the catalog does not send.
 
 ## Credential parameters
 

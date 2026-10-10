@@ -48,7 +48,12 @@ const PROFILE: &str = "atlassian.basic";
 
 /// The shipped ids, their pinned `operationId` and their pinned path. A renamed,
 /// dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 7] = [
+const SHIPPED: [(&str, &str, &str); 8] = [
+    (
+        "attachment.content",
+        "getAttachmentContent",
+        "/rest/api/3/attachment/content/{id}",
+    ),
     (
         "issue.changelog",
         "getChangeLogs",
@@ -90,10 +95,11 @@ fn shipped() -> Vec<Selection> {
     serde_json::from_value(file["operations"].clone()).unwrap()
 }
 
-/// The seven reads, and one write: `issue.transition.run`, `doTransition`,
+/// The eight reads, the attachment content among them (a binary read,
+/// `tests/jira_attachment.rs`), and one write: `issue.transition.run`, `doTransition`,
 /// whose guard `tests/jira_transition_run.rs` pins.
 #[test]
-fn shipped_jira_selections_are_the_seven_reads_and_the_transition_run() {
+fn shipped_jira_selections_are_the_eight_reads_and_the_transition_run() {
     let selections = shipped();
     let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
