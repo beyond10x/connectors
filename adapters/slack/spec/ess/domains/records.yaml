@@ -6,8 +6,9 @@ summary: Slack-owned provider records the parity units read or write — convers
 # Status: draft for parity units U02, U08 and U13. Read through the catalog provider
 # (docs/catalog-slack.md): Conversation (`conversations.list`), Message
 # (`conversations.history`, `conversations.replies`; found by `search.messages` on a
-# user-token connection), User (`users.list`), Emoji (`emoji.list`) and Workspace
-# (`team.info`). File is not read by any selection. The selections of the four
+# user-token connection), User (`users.list`), Emoji (`emoji.list`), Workspace
+# (`team.info`) and File (`files.list`, `files.info`, and its content by the
+# download `file.download`). The selections of the four
 # methods whose pinned `token` is required name it as their `credential`, so the
 # token travels only in the connection's header.
 # Normative owner: adapters/slack/design.md. Shared ESS includes none of this root
@@ -142,22 +143,43 @@ entities:
   # (fx:69-91; parity:216, parity:219, parity:221-223).
   - name: connectors_slack.records.File
     # `file_id`, a JSON string, is the only address info, download and delete take
-    # (fx:72, fx:77, fx:82).
+    # (fx:72, fx:77, fx:82). Wire member `id` of `objs_file` (src:1237), typed
+    # `defs_file_id` (src:69), a string matching ^[F][A-Z0-9]{8,}$; `files.info`
+    # (operationId `files_info`, src:15350) takes it as `file`. Read by the catalog
+    # selections `files.info` (one file, under `file`) and `files.list` (pages of
+    # `files`), and its content by the download `file.download`.
+    #
+    # `objs_file` requires no member (src:1237), so every field below except
+    # url_private, which the download needs, is optional.
     identity:
       name: file_id
       type: String
     fields:
       # parity:219 "A binary fetch of `url_private`": the download reads this URL
-      # with the connection's token, so it is credential-scoped material.
+      # with the connection's token, so it is credential-scoped material. Wire
+      # member `url_private`, a string of format uri (src:1474), on the host
+      # `files.slack.com`, which a Slack connection admits for the download alone.
       - name: url_private
         type: String
+      # Wire member `name`, a string (src:1322): the file's name as uploaded.
+      - name: name
+        type: Optional<String>
+      # Wire member `filetype`, a string (src:1275): Slack's short file type, such as
+      # `pdf` or `png`.
+      - name: filetype
+        type: Optional<String>
+      # Wire member `mimetype`, a string (src:1316): the file's media type.
+      - name: mimetype
+        type: Optional<String>
+      # Wire member `size`, an integer (src:1381): the file's length in bytes. The
+      # download's answer states its own `length`, which is what was read.
+      - name: size
+        type: Optional<Integer>
     # UNMAPPED: File → Conversation. An upload targets "a Slack channel, DM, or
     # thread" (fx:90) and list filters by `channel` (fx:87); no source states
     # whether a file is in one conversation or many, or owns versus references.
     # UNMAPPED: File → Message. An upload into a thread (fx:90) implies a message;
     # no source states the link or its cardinality.
-    # UNMAPPED: the file's name, type and size. No source states any member beyond
-    # url_private.
     lifecycle:
       initial: Present
       states: [Present]
