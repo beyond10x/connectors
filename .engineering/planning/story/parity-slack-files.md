@@ -8,7 +8,8 @@ relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-slack-reads
-revision: 2
+- depends_on: story:parity-slack-file-reads
+revision: 3
 ---
 ## Outcome
 
@@ -33,3 +34,7 @@ catalog engine change: binary download and a multi-step external upload.
 ## Domain draft
 
 Drafted 2026-10-07 with `adapters/slack/spec/ess`; the file record (name, type, size) is UNMAPPED there. Binary download and the multi-step upload decide whether the catalog engine can carry this unit.
+
+## Split
+
+The reads (`slack.file.list`, `slack.file.info`, `slack.file.download`, 21 calls) moved to story:parity-slack-file-reads on 2026-10-10. Upload and delete (31 calls) stay here, held with the Slack message writes.
