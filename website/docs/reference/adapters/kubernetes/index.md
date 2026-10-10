@@ -1,7 +1,7 @@
 ---
 title: Kubernetes
 sidebar_position: 3
-description: Kubernetes resource inventory, single-object, namespace and rollout-history reads, endpoint and host discovery and Helm release reads, and the native profiles specified beyond them.
+description: Kubernetes resource inventory, single-object, namespace, rollout-history and pod-log reads, kubeconfig contexts, pod exec under approval, endpoint and host discovery and Helm release reads, and the native profiles specified beyond them.
 ---
 
 # Kubernetes
@@ -23,7 +23,19 @@ and `events`.
 | `deployments.history` | the ReplicaSets one Deployment controls by owner uid, each with its rollout revision; needs both `deployments` and `replicasets` configured |
 
 A namespace or kind outside the configured scope is refused before any request. These three
-reads are checked against API-shaped fixtures. A separate `helm_release_reads` selection
+reads are checked against API-shaped fixtures.
+
+Three more operations are each enabled by their own configuration field:
+
+| id | enabled by | what it does |
+|---|---|---|
+| `pods.logs` | `pod_logs: true` | reads a bounded tail of one container's log in a configured namespace: at most 1,000 lines, 128 KiB and one day back, timestamped, in the cluster's order; no follow |
+| `contexts.list` | `kubeconfig`, the absolute path of an owner-only kubeconfig, in the local configuration | lists that file's contexts (name, cluster, namespace, current flag), never credentials or servers; makes no cluster request and reads no other file |
+| `pods.exec` | `pod_exec: true`, local CLI only | runs one command, an argument vector with no shell, in a named container; a write on private protocol two that needs an approval and is recorded as an attempt; returns the exit status and stdout and stderr, each bounded, within at most 60 s; a lost stream is an unknown outcome and is never sent again |
+
+`pods.exec` is the adapter's only write; the read exchange and the standalone service never list
+it, and it has no stdin or terminal. The three are checked against recorded API answers and
+streams, not a live cluster. A separate `helm_release_reads` selection
 additionally advertises the `helm_releases.*` release-state reads (history, status, values and
 manifest), whose values and manifests are disclosed only as redacted projections. It runs as a
 standalone service ([Getting started](../../../getting-started.md) starts one) or under the local
@@ -43,7 +55,7 @@ connect to discovered addresses. A discovered database endpoint grants no access
 
 Resource discovery state, richer authentication, logs, mutations and mediated routes are
 described in native specifications. These profiles are not supported by the current binary
-unless the table above names them. The repository's
+unless the tables above name them. The repository's
 [Kubernetes CLI guide](https://github.com/beyond10x/connectors/blob/main/docs/local-kubernetes-cli.md)
 covers the local configuration and saved token.
 

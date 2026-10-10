@@ -70,12 +70,12 @@ Each page below renders its owner's contract source unchanged in meaning: shared
 |---|---|---|
 | sql | [SQL bounded reads](../adapters/sql/contracts/reads.md) | Reads and catalogue reads implemented on PostgreSQL and MySQL |
 | tavily | [Tavily websearch profile](../adapters/tavily/contracts/websearch.md) | Implemented: search, fetch and crawl |
-| kubernetes | [Kubernetes reads](../adapters/kubernetes/contracts/reads.md) | First-slice reads implemented; extensions specified |
+| kubernetes | [Kubernetes reads](../adapters/kubernetes/contracts/reads.md) | Reads and kubeconfig contexts implemented; extensions specified |
 | kubernetes | [Kubernetes authentication](../adapters/kubernetes/contracts/auth.md) | Specified; runtime pending |
 | kubernetes | [Kubernetes discovery](../adapters/kubernetes/contracts/discovery.md) | Specified; runtime pending |
-| kubernetes | [Kubernetes logs](../adapters/kubernetes/contracts/logs.md) | Specified; runtime pending |
+| kubernetes | [Kubernetes logs](../adapters/kubernetes/contracts/logs.md) | Implemented as pods.logs; permission pre-check open |
 | kubernetes | [Kubernetes Helm release reads](../adapters/kubernetes/contracts/helm.md) | Read-only observation; dedicated sandbox acceptance open |
-| kubernetes | [Kubernetes mutations](../adapters/kubernetes/contracts/mutations.md) | Specified; runtime pending |
+| kubernetes | [Kubernetes mutations](../adapters/kubernetes/contracts/mutations.md) | Pod exec implemented, local CLI only; rollout restart specified |
 | kubernetes | [Kubernetes mediated routes](../adapters/kubernetes/contracts/routes.md) | Specified; runtime pending |
 | atlassian | [Atlassian documents](../adapters/atlassian/contracts/documents.md) | Specified; runtime pending |
 | docker | [Docker logs](../adapters/docker/contracts/logs.md) | Specified; runtime pending |

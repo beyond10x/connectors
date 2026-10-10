@@ -18,7 +18,7 @@ approval, audit and attempt controls, with an optional guard declared as data.
 | Provider | Operations | Authentication | Verified against | Guide |
 |---|---|---|---|---|
 | GitLab | 18 reads, 4 approved writes, the merge-request feed | personal access token in a header | a live GitLab | [GitLab](../gitlab/index.md) |
-| Jira Cloud | issue search by JQL, issue comments, issue changelogs | HTTP basic, profile `atlassian.basic` | a live Jira, through the API gateway | [Jira guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) |
+| Jira Cloud | issue search by JQL, one issue, comments, changelogs, transitions, creatable issue types, user search, attachment content; a guarded transition run | HTTP basic, profile `atlassian.basic` | a live Jira through the API gateway (search); local fixtures (the rest) | [Jira guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-jira.md) |
 | Confluence Cloud | pages changed since a cutoff, a space's pages, one page with its body, a page's comments | HTTP basic, profile `atlassian.basic` | local fixtures | [Confluence guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-confluence.md) |
 | HubSpot CRM | one object type's records, paged, and one record by id | private-app access token | local fixtures | [HubSpot guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-hubspot.md) |
 | Zendesk Support | tickets, users and organizations changed since a start time, one of each by id, a ticket's comments | OAuth client credentials (`zendesk.oauth`) or an API token (`zendesk.basic`) | a live account | [Zendesk guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-zendesk.md) |
@@ -27,7 +27,7 @@ approval, audit and attempt controls, with an optional guard declared as data.
 | Google Calendar | calendar lists and events; guarded event writes | OAuth refresh token | local fixtures | [Calendar guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-calendar.md) |
 | Gmail | messages, threads, history and labels; guarded drafts, no direct `messages.send` | OAuth refresh token | local fixtures | [Gmail guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-gmail.md) |
 | Runpod | `pod.create`, `pods.list`, `pod.terminate` | API key as a bearer token; the identity is the configured connection | a local fixture | [Runpod guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-runpod.md) |
-| Slack | `conversations.list`, `conversations.history`, `conversations.replies` | bot token as a bearer token, identity from `auth.test` | a local fixture | `docs/catalog-slack.md` in the repository |
+| Slack | conversations, users, the workspace, custom emoji and the token's identity; files and their content; message search with a user token | bot token as a bearer token, identity from `auth.test`; a user token for search | a local fixture | `docs/catalog-slack.md` in the repository |
 
 Google consent and the shared OAuth client setup are in the
 [Google OAuth guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-oauth.md).
@@ -47,6 +47,15 @@ Jira and Confluence share one Atlassian profile, so one account and API token se
   successful invocation. Each list returns one page per call and ends on an empty
   `response_metadata.next_cursor`. Its pinned Swagger 2.0 document is projected to OpenAPI 3.1.0
   by `connectors-build swagger`, and the document's `token` query parameter is withheld.
+  `file.download` reads a file's `url_private` on `https://files.slack.com`, which the connection
+  must admit with the credential in its `hosts`.
+- **Binary reads.** A selection can read an answer as bytes: the result carries the media type,
+  length, SHA-256 and the bytes in base64, at most 2 MiB, refused as `capacity` above that and
+  never truncated. A redirect is followed at most three times, only to an origin the selection
+  names and the connection admits in `hosts`; anything else is refused as `forbidden` with
+  nothing sent there. Slack's file download and Jira's `attachment.content` use it. Jira's
+  redirect target, `https://api.media.atlassian.com`, is inferred and not verified against a live
+  site; without that host admitted, send `redirect` as `false`. Uploads are not served.
 - A connection follows a rebuilt bundle or selection on its next `connections revalidate`
   without credential re-entry, when its provider authority, profile and identity are unchanged.
   A profile can declare an `access` read that validation makes, so a credential that identifies
