@@ -1,5 +1,5 @@
-//! Jira Cloud issues, one issue, comments, changelog, create metadata and users
-//! through the catalog provider.
+//! Jira Cloud issues, one issue, comments, changelog, transitions, create metadata
+//! and users through the catalog provider.
 //!
 //! The shipped selection set is pinned by id and source operation, resolves
 //! against the committed bundle compiled from the pinned platform REST v3
@@ -48,7 +48,7 @@ const PROFILE: &str = "atlassian.basic";
 
 /// The shipped ids, their pinned `operationId` and their pinned path. A renamed,
 /// dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str); 6] = [
+const SHIPPED: [(&str, &str, &str); 7] = [
     (
         "issue.changelog",
         "getChangeLogs",
@@ -65,6 +65,11 @@ const SHIPPED: [(&str, &str, &str); 6] = [
         "/rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes",
     ),
     ("issue.get", "getIssue", "/rest/api/3/issue/{issueIdOrKey}"),
+    (
+        "issue.transitions",
+        "getTransitions",
+        "/rest/api/3/issue/{issueIdOrKey}/transitions",
+    ),
     (
         "issues.search",
         "searchAndReconsileIssuesUsingJql",
@@ -86,7 +91,7 @@ fn shipped() -> Vec<Selection> {
 }
 
 #[test]
-fn shipped_jira_selections_are_exactly_the_six_reads() {
+fn shipped_jira_selections_are_exactly_the_seven_reads() {
     let selections = shipped();
     let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
     let engine = Engine::new(&bundle, BASE, &selections).unwrap();
@@ -196,6 +201,14 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
             "`issues.search`",
         ),
         (
+            "issue.transitions",
+            "getTransitions",
+            "/rest/api/3/issue/{issueIdOrKey}/transitions",
+            "none",
+            "one issue per call",
+            "none",
+        ),
+        (
             "issue.create_meta",
             "getCreateIssueMetaIssueTypes",
             "/rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes",
@@ -272,8 +285,43 @@ fn page(path: &str) -> Option<Value> {
                "active": true, "displayName": format!("Fixture User {n}"),
                "self": format!("https://tracker.example.test/rest/api/3/user?accountId=fixture-user-{n}")})
     };
+    // An `IssueTransition` of `Transitions.transitions`, with its target
+    // status in `to` (a `StatusDetails`); `available` false is what
+    // `includeUnavailableTransitions=true` adds.
+    let transition = |id: &str, name: &str, to: (&str, &str), available: bool| {
+        json!({"id": id, "name": name,
+               "to": {"id": to.0, "name": to.1, "description": format!("fixture status {}", to.1),
+                      "iconUrl": "https://tracker.example.test/images/icons/status.png",
+                      "self": format!("https://tracker.example.test/rest/api/3/status/{}", to.0),
+                      "statusCategory": {"id": 4, "key": "indeterminate", "name": "In Progress"}},
+               "hasScreen": false, "isAvailable": available, "isConditional": false,
+               "isGlobal": true, "isInitial": false, "looped": false})
+    };
     Some(match route {
         "/rest/api/3/myself" => json!({"accountId": "fixture-account-id", "active": true}),
+        // `getTransitions`: one transition when `transitionId` names it, the
+        // transition screen's fields under `expand=transitions.fields`, and
+        // a transition that fails a condition only when asked for.
+        "/rest/api/3/issue/FIX-1/transitions" if has("transitionId=31") => json!({
+            "transitions": [transition("31", "Done", ("10002", "Done"), true)]}),
+        "/rest/api/3/issue/FIX-1/transitions" if has("expand=transitions.fields") => {
+            let mut done = transition("31", "Done", ("10002", "Done"), true);
+            done["hasScreen"] = json!(true);
+            done["fields"] = json!({"resolution": {
+                "key": "resolution", "name": "Resolution", "required": true,
+                "operations": ["set"], "schema": {"type": "resolution", "system": "resolution"},
+                "allowedValues": [{"id": "10000", "name": "Done"}]}});
+            json!({"expand": "transitions", "transitions": [done]})
+        }
+        "/rest/api/3/issue/FIX-1/transitions" if has("includeUnavailableTransitions=true") => {
+            json!({"transitions": [
+                transition("11", "To Do", ("10000", "To Do"), true),
+                transition("31", "Done", ("10002", "Done"), true),
+                transition("41", "Reopen", ("10003", "Reopened"), false)]})
+        }
+        "/rest/api/3/issue/FIX-1/transitions" => json!({"transitions": [
+            transition("11", "To Do", ("10000", "To Do"), true),
+            transition("31", "Done", ("10002", "Done"), true)]}),
         // `getIssue` with `fields` and `expand=renderedFields,names`: the
         // `IssueBean` keeps the ADF body in `fields` and the rendered HTML in
         // `renderedFields`; attachments come as the `attachment` field.
@@ -796,4 +844,203 @@ fn issue_create_meta_lists_the_issue_types_a_project_can_create() {
         .map(|t| t["name"].as_str().unwrap())
         .collect();
     assert_eq!(names, ["Task", "Story"]);
+}
+
+/// `issue.transitions` reads the transitions Jira offers the account on one
+/// issue, each with the status it leads to in `to`: one request to the pinned
+/// path, the basic header, and Jira's `Transitions` body unchanged.
+#[test]
+fn issue_transitions_lists_the_transitions_on_one_issue_with_their_target_status() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let result = invoke(
+        &mut child,
+        "issue.transitions",
+        json!({"issueIdOrKey": "FIX-1"}),
+    );
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-1/transitions?");
+    assert_eq!(requests[0].1.as_deref(), Some(HEADER));
+    assert_eq!(result["status"], 200);
+    assert_eq!(
+        Some(&result["body"]),
+        page("/rest/api/3/issue/FIX-1/transitions?").as_ref()
+    );
+    assert_eq!(result["provenance"]["instance"], "fixture-jira");
+    let offered: Vec<(&str, &str, &str)> = result["body"]["transitions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|t| {
+            (
+                t["id"].as_str().unwrap(),
+                t["name"].as_str().unwrap(),
+                t["to"]["name"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    assert_eq!(offered, [("11", "To Do", "To Do"), ("31", "Done", "Done")]);
+}
+
+/// The optional parameters travel by name, in the pinned document's order:
+/// `expand`, `transitionId`, `includeUnavailableTransitions` and
+/// `sortByOpsBarAndStatus` (`skipRemoteOnlyCondition` is in the next case).
+#[test]
+fn issue_transitions_sends_each_kept_parameter_by_name() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (input, expected) in [
+        (
+            json!({"issueIdOrKey": "FIX-1", "transitionId": "31"}),
+            "/rest/api/3/issue/FIX-1/transitions?transitionId=31",
+        ),
+        (
+            json!({"issueIdOrKey": "FIX-1", "expand": "transitions.fields"}),
+            "/rest/api/3/issue/FIX-1/transitions?expand=transitions.fields",
+        ),
+        (
+            json!({"issueIdOrKey": "FIX-1", "includeUnavailableTransitions": true}),
+            "/rest/api/3/issue/FIX-1/transitions?includeUnavailableTransitions=true",
+        ),
+        (
+            json!({"issueIdOrKey": "FIX-1", "sortByOpsBarAndStatus": true,
+                   "includeUnavailableTransitions": false, "transitionId": "31",
+                   "expand": "transitions.fields"}),
+            "/rest/api/3/issue/FIX-1/transitions?expand=transitions.fields&transitionId=31\
+             &includeUnavailableTransitions=false&sortByOpsBarAndStatus=true",
+        ),
+    ] {
+        let before = provider.requests().len();
+        let result = invoke(&mut child, "issue.transitions", input);
+        let requests = provider.requests();
+        assert_eq!(requests.len(), before + 1);
+        assert_eq!(requests[before].0, expected);
+        assert_eq!(Some(&result["body"]), page(expected).as_ref());
+    }
+    // One transition by id, the screen's fields, and one that fails a condition.
+    let one = invoke(
+        &mut child,
+        "issue.transitions",
+        json!({"issueIdOrKey": "FIX-1", "transitionId": "31"}),
+    );
+    assert_eq!(one["body"]["transitions"][0]["to"]["id"], "10002");
+    assert_eq!(one["body"]["transitions"].as_array().unwrap().len(), 1);
+    let fields = invoke(
+        &mut child,
+        "issue.transitions",
+        json!({"issueIdOrKey": "FIX-1", "expand": "transitions.fields"}),
+    );
+    assert_eq!(
+        fields["body"]["transitions"][0]["fields"]["resolution"]["required"],
+        true
+    );
+    let all = invoke(
+        &mut child,
+        "issue.transitions",
+        json!({"issueIdOrKey": "FIX-1", "includeUnavailableTransitions": true}),
+    );
+    assert_eq!(all["body"]["transitions"][2]["isAvailable"], false);
+}
+
+/// The selection keeps every parameter the pinned document declares, and
+/// nothing more: `skipRemoteOnlyCondition` too, which the document gives effect
+/// only for Connect and Forge apps with *Administer Jira*; Jira, not the
+/// provider, decides whether it applies to an account connection. A parameter
+/// the document does not declare for `getTransitions`, such as `startAt`, is
+/// refused before any request.
+#[test]
+fn issue_transitions_declares_the_pinned_parameters_and_refuses_any_other_before_a_request() {
+    let selections = shipped();
+    let selection = selections
+        .iter()
+        .find(|s| s.id == "issue.transitions")
+        .unwrap();
+    assert!(selection.withhold.is_empty() && selection.guard.is_none());
+    let bundle = bundle::load(&root().join("generated/bundles"), "jira").unwrap();
+    let engine = Engine::new(&bundle, BASE, &selections).unwrap();
+    let declaration = engine
+        .declarations(&[Effect::Read])
+        .into_iter()
+        .find(|o| o.id == "issue.transitions")
+        .unwrap();
+    let mut properties: Vec<String> = declaration.input_schema["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect();
+    properties.sort();
+    assert_eq!(
+        properties,
+        [
+            "expand",
+            "includeUnavailableTransitions",
+            "issueIdOrKey",
+            "skipRemoteOnlyCondition",
+            "sortByOpsBarAndStatus",
+            "transitionId"
+        ]
+    );
+    assert_eq!(
+        declaration.input_schema["required"],
+        json!(["issueIdOrKey"])
+    );
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    for input in [
+        json!({"issueIdOrKey": "FIX-1", "startAt": 0}),
+        json!({"transitionId": "31"}),
+        json!({"issueIdOrKey": "FIX-1", "includeUnavailableTransitions": "yes"}),
+    ] {
+        let outcome = child.invoke(
+            "issue.transitions",
+            &revision,
+            "one",
+            &secret(),
+            &serde_json::to_vec(&input).unwrap(),
+            connectors_sdk::now_ms() + 30_000,
+        );
+        assert!(
+            matches!(outcome, Err(Failure::InvalidInput)),
+            "{input}: {:?}",
+            outcome.map(|_| "an answer")
+        );
+    }
+    assert!(provider.requests().is_empty());
+    invoke(
+        &mut child,
+        "issue.transitions",
+        json!({"issueIdOrKey": "FIX-1", "skipRemoteOnlyCondition": true}),
+    );
+    assert_eq!(
+        provider.requests()[0].0,
+        "/rest/api/3/issue/FIX-1/transitions?skipRemoteOnlyCondition=true"
+    );
+}
+
+/// Jira answers `404` when the issue does not exist or the account may not
+/// see it; the read is refused as the provider's not-found after one request.
+#[test]
+fn transitions_of_an_issue_jira_does_not_find_are_refused_as_provider_not_found() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let outcome = child.invoke(
+        "issue.transitions",
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(&json!({"issueIdOrKey": "FIX-404"})).unwrap(),
+        connectors_sdk::now_ms() + 30_000,
+    );
+    assert!(
+        matches!(outcome, Err(Failure::ProviderNotFound)),
+        "{:?}",
+        outcome.map(|_| "an answer")
+    );
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].0, "/rest/api/3/issue/FIX-404/transitions?");
 }

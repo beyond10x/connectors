@@ -1,5 +1,100 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Jira Cloud through the catalog provider reads the transitions open on one issue:
+  `issue.transitions` selects `getTransitions` (`GET /rest/api/3/issue/{issueIdOrKey}/transitions`)
+  from the pinned platform REST v3 document. Each transition carries its `id`, its `name` and its
+  target status in `to`. It takes every optional parameter the pinned document declares:
+  `transitionId`, `expand` (`transitions.fields` for the transition screen's fields),
+  `includeUnavailableTransitions`, `sortByOpsBarAndStatus` and `skipRemoteOnlyCondition`.
+  Verified against a local fixture written in the pinned document's shapes, not a live site
+  (`docs/catalog-jira.md`). The Jira guide's example configuration therefore has a new
+  configuration revision.
+- GitLab through the catalog provider writes merge-request notes and discussions, from the pinned
+  OpenAPI document, each a required-approval mutation (`docs/local-gitlab-merge.md`, *Notes and
+  discussions*):
+  - `merge_request.note.create` (`postApiV4ProjectsIdMergeRequestsNoteableIdNotes`) adds one
+    note to a merge request, and `merge_request.discussion.reply`
+    (`postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes`) one reply to a
+    discussion. Both are unguarded, as creates: the same approved input sent twice adds a second
+    note. Their bodies are closed: `body` and `internal` for a note, `body` for a reply, so
+    `created_at`, the deprecated `confidential` and `merge_request_diff_head_sha` are refused
+    before any request. As the pinned request bodies require, `body` must be present and a JSON
+    string and `internal` a JSON boolean, so a note or reply without its text is refused before
+    any request. GitLab runs quick actions written in the text, so the approver reads it whole.
+  - `merge_request.discussion.resolve`
+    (`putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`) resolves or unresolves
+    one discussion. `resolved` must be a JSON boolean, as the pinned document types it; `"true"`,
+    `1` or `"yes"` is refused before any request. Its guard reads the discussion first through
+    the new read `merge_request.discussion.get` and refuses unless that answer is the discussion
+    `discussion_id` and it is resolvable; GitLab's answer must carry the same discussion id and
+    the requested `resolved`, or the outcome is unknown.
+  Verified against a local fixture written in the pinned document's shapes, not a live GitLab.
+  The GitLab example configuration in `docs/local-catalog-provider.md` therefore has a new
+  configuration revision.
+- A catalog selection that closes a write's body with `body_keys` may also declare
+  `body_types`, the JSON type (`string`, `integer` or `boolean`) of each key as the provider's
+  request body schema gives it, and `body_required`, the keys that schema requires. A typed key
+  must be a JSON value of exactly that type, with no string spelling and no `null`, and a body
+  without a required key is refused; both as `invalid_input` before any request, and the declared
+  input schema says the same (an `integer` key also refuses `3.0` or `1e2`, which the schema admits). Either naming a key `body_keys` does not admit, a repeated required
+  key, or a guard reading a path nested under a typed key is refused when the selection loads
+  (`docs/local-catalog-provider.md`). Selections without them are unchanged.
+- GitLab through the catalog provider reads a repository's tree, single commits, commit diffs
+  and branches, from the pinned OpenAPI document (`docs/local-catalog-provider.md`, *The shipped
+  selection set*):
+  - `repository.tree` (`getApiV4ProjectsIdRepositoryTree`) lists the entries under `path` at
+    `ref`, `recursive` to descend. Offset paging only: `pagination` and `page_token` are
+    withheld and refused before any request, as on `commits.list`.
+  - `commit.get` (`getApiV4ProjectsIdRepositoryCommitsSha`) reads one commit by id, branch or
+    tag name, with `stats`; `commit.diff` (`getApiV4ProjectsIdRepositoryCommitsShaDiff`) lists
+    its file diffs, with `unidiff`. A sha GitLab does not find is refused as `not_found`.
+  - `branches.list` (`getApiV4ProjectsIdRepositoryBranches`) lists branches with their head
+    commits, filtered by `search` or `regex` and ordered by `sort`; `page_token` is withheld.
+  The three paged reads bound `per_page` to 1 through 100, as every GitLab list read does.
+  Verified against local fixtures written in the pinned document's shapes, through the engine
+  and through the owned provider process, not a live GitLab. The GitLab example configuration
+  in `docs/local-catalog-provider.md` therefore has a new configuration revision.
+
+### Changed
+
+- ESS 0.57.0 (from 0.56.0): the seven ESS crates and the pinned toolchain; it still brings
+  Entity Runtime Core 0.28.0 through `ess-entity-runtime`, and Entity Runtime stays 0.30.3.
+  Install ESS 0.57.0 (`b10x upgrade`) or select it with `--ess`/`CONNECTORS_ESS`. The
+  regenerated CLI contract runtime (`apps/connectors-cli-contract/src/runtime.rs`, `wire.rs`)
+  holds the `config` and `output` globals as optional, as `ess-cli-plan/2` allows; the binding
+  declares all three, so its plan, flags and output are unchanged. The local metadata
+  authority's scoped mutation emission still writes `ess-mutation-manifest/2` and leaves the
+  new `identical_answer` field unset. The shared and adapter models, the authored scenarios and
+  the generated documentation pages pass under 0.57.0's new validation rules unchanged.
+
+### Limits
+
+- GitLab code search within a project (`getApiV4ProjectsIdDashSearch`, scope `blobs`) is not
+  selected. The pinned document declares its path as `/api/v4/projects/{id}/(-/)search`, GitLab's
+  notation for an optional `-/` segment, and the catalog engine sends a declared path literally,
+  so it would request `/projects/{id}/(-/)search`. A cited source amendment can add only an
+  optional query parameter, not correct a path, and a selection bound is an integer range, so
+  it cannot hold the required `scope` to `blobs`. The group search and project semantic search
+  operations in the bundle carry the same `(-/)` path.
+
+- A merge-when-pipeline-succeeds variant of `merge_request.merge` and a reopen variant of
+  `merge_request.update` are not selected; both guards stay unchanged. Each needs a selection to
+  fix a body member to a literal (`auto_merge: true`, `state_event: reopen`), which the catalog
+  engine cannot declare; without it the auto-merge variant would merge at once without the
+  pipeline check. Proving auto-merge afterwards also needs a postflight check that accepts
+  either of two observations (`docs/local-gitlab-merge.md`, *Not selected: auto-merge and
+  reopen*).
+
+- Running a Jira transition (`doTransition`) is not selected. Jira answers it `204` with no body,
+  and the catalog guard's postflight checks only the write's own response body, so it cannot
+  prove the issue reached the target status; its single preflight read cannot check both the
+  issue's current status and the transition's availability. Both are guard capabilities the
+  engine lacks (`docs/catalog-jira.md`, *Running a transition: not selected*).
+
 ## 0.40.0 — 2026-10-09
 
 ### Added

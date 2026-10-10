@@ -123,7 +123,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "Projects, issues, files, branches, tags, releases, commits, compares, deployments, pipelines, jobs, traces and merge requests as reads; issue and merge-request writes under approval.",
+      "detail": "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and merge-request discussions as reads; issue, merge-request, note and discussion writes under approval.",
       "href": "/docs/reference/adapters/gitlab",
       "label": "GitLab",
       "status": "shipped"
@@ -137,7 +137,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "Issue search by JQL, one issue by key, comments, changelogs, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
+      "detail": "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
       "href": "/docs/reference/adapters/catalog",
       "label": "Jira Cloud",
       "status": "shipped"

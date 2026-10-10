@@ -162,6 +162,41 @@ pub struct Selection {
     /// Omitted when empty, which leaves the body an open object.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_keys: Vec<String>,
+    /// The JSON type of closed body keys, keyed by a name `body_keys` admits:
+    /// `string`, `integer` or `boolean`, as the provider's request body schema
+    /// types it, which the bundle does not record. A typed key present in a
+    /// body must be a JSON value of exactly that type (no string spelling of
+    /// a boolean or an integer, and no `null`), or the write is refused before
+    /// any request; the declaration types it the same, except that an
+    /// `integer` key admits only an integer literal in the i64 or u64 range,
+    /// where JSON Schema also counts `3.0` or `1e2`. Omitted when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub body_types: BTreeMap<String, ValueType>,
+    /// Closed body keys the provider's request body schema requires, each
+    /// admitted by `body_keys`: a body without one is refused before any
+    /// request, and the declaration requires it. Keys a guard reads are
+    /// required already. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub body_required: Vec<String>,
+}
+
+/// The declared schema of a body key typed by `body_types`: exactly that JSON
+/// type, since the body is sent as given.
+fn body_type_schema(value_type: ValueType) -> Value {
+    match value_type {
+        ValueType::String => json!({"type": "string"}),
+        ValueType::Integer => json!({"type": "integer"}),
+        ValueType::Boolean => json!({"type": "boolean"}),
+    }
+}
+
+/// Whether a body value is a JSON value of exactly the declared type.
+fn fits_body_type(value_type: ValueType, value: &Value) -> bool {
+    match value_type {
+        ValueType::String => value.is_string(),
+        ValueType::Integer => value.is_i64() || value.is_u64(),
+        ValueType::Boolean => value.is_boolean(),
+    }
 }
 
 /// The body paths a guard reads, each the part after `body.` of a reference.
@@ -605,6 +640,40 @@ impl Engine {
                     )));
                 }
             }
+            // Types and requirements name keys of a closed body: a key the
+            // set does not admit could never be sent, and a requirement named
+            // twice is a mistake in the selection.
+            let admitted = |key: &String| selection.body_keys.contains(key);
+            let mut required = std::collections::BTreeSet::new();
+            if !selection.body_types.keys().all(admitted) {
+                return Err(refuse(format!(
+                    "selection `{}` declares body_types for a key its body_keys do not admit",
+                    selection.id
+                )));
+            }
+            if !selection
+                .body_required
+                .iter()
+                .all(|key| admitted(key) && required.insert(key))
+            {
+                return Err(refuse(format!(
+                    "selection `{}` declares body_required that do not name distinct keys its body_keys admit",
+                    selection.id
+                )));
+            }
+            // A guard path nested under a key typed as a scalar could never
+            // resolve: refused here, not at every write.
+            if let Some(path) = selection.guard.as_ref().and_then(|guard| {
+                guarded_body_paths(guard).find(|rest| {
+                    rest.split_once('.')
+                        .is_some_and(|(key, _)| selection.body_types.contains_key(key))
+                })
+            }) {
+                return Err(refuse(format!(
+                    "guard of `{}` reads `body.{path}` under a key its body_types type as a scalar",
+                    selection.id
+                )));
+            }
             if selection.response == Some(ResponseKind::Text) && selection.effect != Effect::Read {
                 return Err(refuse(format!(
                     "selection `{}` declares a text response for a write",
@@ -812,6 +881,30 @@ impl Engine {
                 .is_some_and(|body| body.keys().all(|key| body_keys.contains(key)))
         {
             return Err(refuse("body carries a key its selection does not admit"));
+        }
+        // So are the closed body's requirements and types.
+        if let Some(body) = input.get("body").and_then(Value::as_object) {
+            if let Some(key) = exposed
+                .selection
+                .body_required
+                .iter()
+                .find(|key| !body.contains_key(key.as_str()))
+            {
+                return Err(refuse(format!("body lacks the required key `{key}`")));
+            }
+            if let Some((key, _)) = exposed
+                .selection
+                .body_types
+                .iter()
+                .find(|(key, value_type)| {
+                    body.get(key.as_str())
+                        .is_some_and(|value| !fits_body_type(**value_type, value))
+                })
+            {
+                return Err(refuse(format!(
+                    "body key `{key}` is not of its declared type"
+                )));
+            }
         }
         // The credential is never sent from caller input, so a body naming
         // it under any ASCII case is refused here as well as in the
@@ -1274,9 +1367,11 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
             }
             body
         } else {
-            // A closed body: exactly these keys. A key a guard reads directly
-            // is declared as the scalar the guard compares; any other key takes
-            // any JSON value. Every key a guard reads is required.
+            // A closed body: exactly these keys. A key `body_types` types is
+            // declared as exactly that JSON type; otherwise a key a guard reads
+            // directly is declared as the scalar the guard compares, and any
+            // other key takes any JSON value. Every key a guard reads, and
+            // every key `body_required` names, is required.
             let scalars = selection
                 .guard
                 .as_ref()
@@ -1286,7 +1381,9 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
                 .body_keys
                 .iter()
                 .map(|key| {
-                    let schema = if scalars.contains(key.as_str()) {
+                    let schema = if let Some(value_type) = selection.body_types.get(key) {
+                        body_type_schema(*value_type)
+                    } else if scalars.contains(key.as_str()) {
                         declared_type(None)
                     } else {
                         json!({})
@@ -1299,13 +1396,14 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
                 "properties": keys,
                 "additionalProperties": false,
             });
-            let guarded: Vec<&str> = selection
+            let mut required: std::collections::BTreeSet<&str> = selection
                 .guard
                 .as_ref()
-                .map(|guard| guarded_body_keys(guard).into_iter().collect())
+                .map(guarded_body_keys)
                 .unwrap_or_default();
-            if !guarded.is_empty() {
-                body["required"] = json!(guarded);
+            required.extend(selection.body_required.iter().map(String::as_str));
+            if !required.is_empty() {
+                body["required"] = json!(required);
             }
             body
         };

@@ -57,8 +57,9 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Slack guide](catalog-slack.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
-serves the provider from the pinned source alone, plus seven repository reads
-and one unguarded write, `issue.create`:
+serves the provider from the pinned source alone, plus eleven repository reads
+and one unguarded write, `issue.create`, and the merge-request note and discussion
+operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)):
 
 | id | source operation | effect |
 |---|---|---|
@@ -70,6 +71,9 @@ and one unguarded write, `issue.create`:
 | `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
+| `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | read |
+| `merge_request.note.create`, `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes`, `…DiscussionsDiscussionIdNotes`, unguarded | write |
+| `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`, guarded | write |
 
 The GitLab set also declares the merge request feed, a `datasource.feed/v1alpha1`
 binding under profile `gitlab-merge-requests/1`: `feed.containers` lists the
@@ -83,18 +87,18 @@ merge requests are not observed; the profile statement is
 to an adapter's permitted operations to read the feed;
 `operations list --family datasource.feed/v1alpha1` then names them.
 
-The repository reads other than `repository.compare` list one page per call. Each takes `page` and `per_page`;
+The repository reads other than `repository.compare` and `commit.get` list one page per call. Each takes `page` and `per_page`;
 a caller has walked the list when a page comes back shorter than `per_page`.
 GitLab serves at most 100 items per page, so with a larger value every page
 would be short and the walk would stop after page one. The pinned source
 declares no range, so the shipped selection bounds `per_page` to 1 through 100
 on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
-`pipeline.jobs` and these six): a value of zero or below never ends a walk on a
+`pipeline.jobs` and these nine): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares,
-except those a selection withholds (`commits.list` withholds `pagination` and
-`page_token`), is accepted by name, with the type the pinned source gives it: an integer as a
+except those a selection withholds (`commits.list` and `repository.tree` withhold
+`pagination` and `page_token`, `branches.list` withholds `page_token`), is accepted by name, with the type the pinned source gives it: an integer as a
 JSON integer or its decimal string (`100` or `"100"`), a boolean as `true` or
 `false` (or those two strings), a string as any string or a JSON integer (sent as
 its decimal text); any other value, such as `per_page=true` or `page=2.0`, is
@@ -110,9 +114,22 @@ refused as `invalid_input` before any request.
 | `repository.compare` | `getApiV4ProjectsIdRepositoryCompare` | `GET /projects/{id}/repository/compare` with `from` and `to` (both required) and `straight`; not paged; `read_api` scope. The body is GitLab's own: an empty compare answers `200` with `"commits": []` and `"compare_timeout": false`, a compare GitLab cut short also answers `200`, possibly with `"commits": []`, but with `"compare_timeout": true`; so read `body.compare_timeout`, not the length of `commits`, to tell them apart. GitLab always includes `diffs`, and a body over the provider's 4 MiB response limit answers `capacity` with no body at all; to place commits between two tags, walk `commits.list` instead, which carries no diffs | none | read |
 | `deployments.list` | `getApiV4ProjectsIdDeployments` | `GET /projects/{id}/deployments`, e.g. `environment`, `status`, `order_by`, `sort`; the body is GitLab's own, so each deployment carries `environment.name` and `deployable`, the job that ran it (`deployable.id`); a project the token cannot read answers GitLab's `403` or `404` with the refusal the other list reads answer; `read_api` scope | `updated_after`, `updated_before`, `finished_after`, `finished_before`: strings that GitLab reads as ISO 8601 date-times | read |
 
+| `repository.tree` | `getApiV4ProjectsIdRepositoryTree` | `GET /projects/{id}/repository/tree`, e.g. `ref`, `path`, `recursive=true`; each entry carries `id`, `name`, `type` (`tree` or `blob`), `path` and `mode`; offset paging only: the selection withholds `pagination` and `page_token`, so `pagination=keyset` is refused as `invalid_input` before any request, as on `commits.list`. Example: `{"id": "org/project", "ref": "main", "path": "src", "recursive": true, "per_page": 100, "page": 1}` sends `GET /projects/org%2Fproject/repository/tree?ref=main&path=src&recursive=true&page=1&per_page=100` | none | read |
+| `commit.get` | `getApiV4ProjectsIdRepositoryCommitsSha` | `GET /projects/{id}/repository/commits/{sha}`, `sha` a commit id, branch or tag name, sent as one path segment (`release/v0.3` is encoded, never a second segment); `stats=true` adds line counts; not paged. A sha GitLab does not find answers its `404`, refused as `not_found` | none | read |
+| `commit.diff` | `getApiV4ProjectsIdRepositoryCommitsShaDiff` | `GET /projects/{id}/repository/commits/{sha}/diff`, `unidiff`; each entry is GitLab's diff with `new_path`, `old_path`, `diff` and the `new_file`, `renamed_file`, `deleted_file` flags and GitLab's `collapsed` and `too_large` flags, unchanged. A sha GitLab does not find is refused as `not_found` | none | read |
+| `branches.list` | `getApiV4ProjectsIdRepositoryBranches` | `GET /projects/{id}/repository/branches`, e.g. `search`, `regex`, `sort` (`name_asc`, `updated_asc`, `updated_desc`); each branch carries its head `commit`, `default`, `protected` and `merged`; offset paging only: the selection withholds `page_token`, so an input carrying it is refused as `invalid_input` before any request | none | read |
+
 `projects.list` returns each project unchanged, including `archived`,
-`created_at`, `last_activity_at` and `path_with_namespace`. All seven need only
+`created_at`, `last_activity_at` and `path_with_namespace`. All eleven need only
 the `read_api` token scope.
+
+Code search within a project (`getApiV4ProjectsIdDashSearch`, scope `blobs`) is
+not selected. The pinned source declares its path as
+`/api/v4/projects/{id}/(-/)search`, GitLab's notation for an optional `-/`
+segment; the engine reads the template literally and would send
+`/projects/{id}/(-/)search`, and a `connectors-source-amendments/1` file can add
+an optional query parameter but cannot correct a path. A selection bound is an
+integer range, so it also cannot hold the required `scope` to `blobs`.
 
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
 and pins the complete list of shipped ids, so a renamed, dropped or added id
@@ -368,6 +385,24 @@ The complete configuration used against the sandbox is
   a `body.<key>` the set does not admit is refused when the selection loads.
   The bundle records no body schema, so the names are not checked against the
   provider's.
+- `body_types` is optional, beside `body_keys`: `{"<key>": "string" | "integer"
+  | "boolean"}` gives a closed body key the JSON type the provider's request
+  body schema gives it. A typed key present in a body must be a JSON value of
+  exactly that type, with no string spelling of a boolean or an integer and no
+  `null`, or the write is refused as `invalid_input` before any request; the
+  declared input schema types it the same, also where a guard reads it. One
+  difference: an `integer` key admits only an integer literal in the 64-bit
+  range, while JSON Schema's `integer` also admits `3.0` or `1e2`, so such a
+  value passes the declaration and is still refused.
+  `body_required` is optional too: `["<key>", …]` names the closed body keys
+  that schema requires, and a body without one is refused as `invalid_input`
+  before any request and declared required (keys a guard reads are required
+  already). GitLab's note and reply type `body` as a string and require it; its
+  discussion resolve types `resolved` as a boolean. A key either names that
+  `body_keys` does not admit (so either one without `body_keys`), a key
+  `body_required` repeats, or a guard reading a path nested under a typed key
+  is refused when the selection loads. Like `body_keys`, they are declared by
+  the selection from the pinned document and not checked against it.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON

@@ -86,15 +86,20 @@ impl Shape {
 }
 
 /// Process selectors, separate from every callable payload.
+///
+/// `ess-cli-plan/1` carries all three. `ess-cli-plan/2` omits an undeclared `config` or `output`
+/// key and never writes `null` for one, so an `ess-cli-plan/1` plan keeps its bytes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Globals {
-    /// Configuration file selector.
-    pub config: String,
+    /// Configuration file selector; absent, the CLI has no configuration flag.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config: Option<String>,
     /// State-directory selector.
     pub state: String,
-    /// Human/JSON output selector.
-    pub output: String,
+    /// Human/JSON output selector; absent, the CLI writes JSON only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
 }
 
 /// Owner-qualified callable dispatch.
