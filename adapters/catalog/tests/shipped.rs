@@ -29,7 +29,9 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
     // The complete shipped list: every operation the retired native GitLab
     // adapter declared, except its composite `merge_request.validate`, which
     // is two of these reads and a comparison the merge guard now makes itself;
-    // then the repository reads and the unguarded issue create. A renamed,
+    // then the repository reads, the unguarded issue create, and the merge-request
+    // note, discussion read, reply and guarded resolve, and the repository
+    // tree, single commit, commit diff and branch list reads. A renamed,
     // dropped or added id fails here.
     let mut expected = vec![
         "project.get",
@@ -54,10 +56,18 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         "repository.compare",
         "deployments.list",
         "issue.create",
+        "merge_request.note.create",
+        "merge_request.discussion.get",
+        "merge_request.discussion.reply",
+        "merge_request.discussion.resolve",
+        "repository.tree",
+        "commit.get",
+        "commit.diff",
+        "branches.list",
     ];
     expected.sort();
     assert_eq!(declared, expected);
-    assert_eq!(declared.len(), 22);
+    assert_eq!(declared.len(), 30);
     assert_eq!(engine.effect("merge_request.merge"), Some(Effect::Write));
     assert_eq!(engine.effect("job.trace"), Some(Effect::Read));
     assert_eq!(engine.effect("issue.create"), Some(Effect::Write));
@@ -72,6 +82,10 @@ fn shipped_gitlab_selections_resolve_and_cover_the_former_native_surface() {
         ("commits.list", "getApiV4ProjectsIdRepositoryCommits"),
         ("repository.compare", "getApiV4ProjectsIdRepositoryCompare"),
         ("deployments.list", "getApiV4ProjectsIdDeployments"),
+        ("repository.tree", "getApiV4ProjectsIdRepositoryTree"),
+        ("commit.get", "getApiV4ProjectsIdRepositoryCommitsSha"),
+        ("commit.diff", "getApiV4ProjectsIdRepositoryCommitsShaDiff"),
+        ("branches.list", "getApiV4ProjectsIdRepositoryBranches"),
     ] {
         let selection = selections
             .iter()
@@ -120,6 +134,8 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
     assert_eq!(
         paged,
         [
+            "branches.list",
+            "commit.diff",
             "commits.list",
             "deployments.list",
             "issues.list",
@@ -129,6 +145,7 @@ fn every_shipped_gitlab_read_that_pages_bounds_per_page_at_the_provider_cap() {
             "project.events",
             "projects.list",
             "releases.list",
+            "repository.tree",
             "tags.list",
         ]
     );

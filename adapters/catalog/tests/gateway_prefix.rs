@@ -125,22 +125,26 @@ fn refusal(config: &Value) -> String {
 /// `repository.compare`, again when it gained `deployments.list`, again
 /// when `commits.list` withheld `pagination` and `page_token`, again when it
 /// gained `issue.create`, and again when it declared the merge request feed
-/// (`feed.containers`, `feed.items`), which the configuration revision carries.
+/// (`feed.containers`, `feed.items`), which the configuration revision carries,
+/// again when it gained the merge-request note, discussion read, reply and
+/// resolve, and again when those writes typed and required their body keys
+/// and the resolve guard compared the discussion id, and again when it gained
+/// `repository.tree`, `commit.get`, `commit.diff` and `branches.list`.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
-/// `users.search`.
+/// `users.search`, and again when it gained `issue.transitions`.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "c830b6fb3706d151510478af36ef1101e91b221d1abdbe53c2d2256cdfaec7d5",
-        "eea3e4459297e6bc0809dab22e57ccef356048987fc5f5756bb449baaeff1fb5",
+        "76b335f641b5595e516031259b2d9048f70805ed0a3962a5934d8bd5b594838f",
+        "f031cac0faf72916cda75f1308ac74e7853ecf4d6b676db9640b2adb1a48a7dc",
     ),
     (
         "catalog-jira.md",
         "jira",
-        "629e9f44b62b10aa30387df0301a7eed68cee22a9957ec5935716cd7e24bfc2a",
-        "81ba9d0d549266dd9ec07e310f90a30a3ff78cbacb5c79d0813d392980f80ac7",
+        "0f714ef84b4bb5a56dd4a85d61006f84664e48fc033e5d585f7bac97a361b300",
+        "27fbc9e9690b7e46189d8ea1d1bc0f4acca778a8629bef260f306a65eadb64c4",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision.

@@ -2,29 +2,19 @@
 format: aep.planning-md/3
 id: story:parity-gitlab-mr-writes
 kind: story
-status: draft
+status: active
 title: GitLab merge-request notes, discussions, auto-merge and reopen
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-09T22:50:37Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-09T22:50:37Z", actor: "human:timo", revision: 3}
 ---
-## Outcome
 
-GitLab merge-request notes, discussions, auto-merge and reopen — parity unit U09 of `docs/fluxplane-plugin-parity.md`.
+## Wave 20261010a (2026-10-10)
 
-## Operations
-
-`gitlab.mr.merge`, `gitlab.mr.update`, `gitlab.mr.note.create`, `gitlab.mr.discussion.reply`, `gitlab.mr.discussion.resolve`
-
-159 calls since 2026-09-09 (declared and mapped undeclared names), provider `gitlab`, planned wave W2.
-
-## Surface
-
-catalog `operations.json` selection: notes, discussion reply and resolve, guarded merge-when-pipeline-succeeds and reopen.
-
-## Acceptance
-
-- Spec first: what the unit adds is modelled in the ESS specification it belongs to (adapter model, or pinned OpenAPI source and selection) and validated with the newest `ess` before implementation.
-- Each operation above answers through `connectors operations invoke` on a saved connection, against a recorded provider fixture, with the same capability the fluxplane operation gives (the parity page names the gap per operation).
-- The parity page row of each operation moves to covered, with the Connectors operation named.
+- Delivered: `merge_request.note.create`, `merge_request.discussion.reply`, `merge_request.discussion.get` and the guarded `merge_request.discussion.resolve`; note, reply and resolve covered. Two adversary passes (`tests/adversary_gitlab_mr_writes.rs`, `tests/adversary_catalog_body_types.rs`); their fixes added `body_types` and `body_required` to the selection format.
+- Not delivered: merge when the pipeline succeeds and reopen need a body member fixed to one value. Waits for `story:catalog-selection-fixed-body-value`; `gitlab.mr.merge` and `gitlab.mr.update` stay partial.
+- The story stays active until both are selected.

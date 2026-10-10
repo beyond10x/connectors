@@ -208,7 +208,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "GitLab",
-        "Projects, issues, files, branches, tags, releases, commits, compares, deployments, pipelines, jobs, traces and merge requests as reads; issue and merge-request writes under approval.",
+        "Projects, issues, files, the repository tree, branches, tags, releases, commits, commit diffs, compares, deployments, pipelines, jobs, traces, merge requests and merge-request discussions as reads; issue, merge-request, note and discussion writes under approval.",
         "adapters/catalog/tests/shipped.rs::shipped_gitlab_selections_resolve_and_cover_the_former_native_surface",
         "/docs/reference/adapters/gitlab",
     ),
@@ -222,8 +222,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Jira Cloud",
-        "Issue search by JQL, one issue by key, comments, changelogs, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
-        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_exactly_the_six_reads",
+        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types and user search over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
+        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_exactly_the_seven_reads",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
