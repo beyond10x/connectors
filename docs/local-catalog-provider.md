@@ -59,9 +59,10 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 every operation the retired native GitLab adapter exposed, so one configuration
 serves the provider from the pinned source alone, plus eleven repository reads
 and one unguarded write, `issue.create`, the merge-request note and discussion
-operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)), and the
+operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)), the
 auto-merge and reopen variants of merge and update
-([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)):
+([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)), and two
+merge-request list reads, its diffs and its discussions:
 
 | id | source operation | effect |
 |---|---|---|
@@ -75,6 +76,7 @@ auto-merge and reopen variants of merge and update
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
 | `merge_request.auto_merge`, `merge_request.reopen` | `…MergeRequestIidMerge` and `…MergeRequestIid`, guarded, each with one fixed body value ([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)) | write |
 | `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | read |
+| `merge_request.diffs`, `merge_request.discussions` | `getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs`, `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions`, each one page per call ([below](#merge-request-diffs-and-discussions)) | read |
 | `merge_request.note.create`, `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes`, `…DiscussionsDiscussionIdNotes`, unguarded | write |
 | `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`, guarded | write |
 
@@ -96,7 +98,7 @@ GitLab serves at most 100 items per page, so with a larger value every page
 would be short and the walk would stop after page one. The pinned source
 declares no range, so the shipped selection bounds `per_page` to 1 through 100
 on every list read (`issues.list`, `merge_requests.list`, `pipelines.list`,
-`pipeline.jobs` and these nine): a value of zero or below never ends a walk on a
+`pipeline.jobs`, `merge_request.diffs`, `merge_request.discussions` and these nine): a value of zero or below never ends a walk on a
 short page. A value outside that range, or one that is not an integer, is
 refused as `invalid_input` before any request. The provider returns `status`, `body` and `provenance`, not GitLab's
 `X-Next-Page` header. Every other query parameter the pinned source declares,
@@ -133,6 +135,22 @@ segment; the engine reads the template literally and would send
 `/projects/{id}/(-/)search`, and a `connectors-source-amendments/1` file can add
 an optional query parameter but cannot correct a path. A selection bound is an
 integer range, so it also cannot hold the required `scope` to `blobs`.
+
+### Merge-request diffs and discussions
+
+Two reads list what a merge request holds, both by the merge request's
+project-local IID, one page per call, with `page` and `per_page` (1 through
+100) as on the list reads above, and only the `read_api` token scope:
+
+| id | source operation | request | effect |
+|---|---|---|---|
+| `merge_request.diffs` | `getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs` | `GET /projects/{id}/merge_requests/{merge_request_iid}/diffs`, `unidiff=true` for the unified diff format; each entry is GitLab's file diff, unchanged: `old_path`, `new_path`, `diff`, the `new_file`, `renamed_file` and `deleted_file` flags, and GitLab's `collapsed` and `too_large` flags. Example: `{"id": "org/project", "merge_request_iid": 7, "unidiff": true, "per_page": 100, "page": 1}` sends `GET /projects/org%2Fproject/merge_requests/7/diffs?page=1&per_page=100&unidiff=true` | read |
+| `merge_request.discussions` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions` | `GET /projects/{id}/merge_requests/{noteable_id}/discussions`, `noteable_id` the IID, as on the discussion routes of [the guarded merge guide](local-gitlab-merge.md#notes-and-discussions); each discussion carries its `id`, `individual_note`, `resolvable`, `resolved` and its `notes`, unchanged, system notes included. Its `id` is the `discussion_id` that `merge_request.discussion.get`, `.reply` and `.resolve` take | read |
+
+A merge request GitLab does not find answers its `404`, refused as
+`not_found`; one the token may not read answers `403`, refused as `forbidden`.
+The flat note list (`getApiV4ProjectsIdMergeRequestsNoteableIdNotes`) is not
+selected: every note is in the discussion list, inside its discussion.
 
 `adapters/catalog/tests/shipped.rs` loads this file against the committed bundle
 and pins the complete list of shipped ids, so a renamed, dropped or added id
