@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use connectors_core::{Error, ErrorCode, Result};
 use connectors_sdk::{
     AuthProbe, AuthenticatedHttp, AuthenticatedWrite, Credential, HttpResponse, HttpResponsePrefix,
-    WriteMethod,
+    MessageStream, UpgradeBounds, Upgraded, WriteMethod,
 };
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
@@ -181,7 +181,24 @@ impl ScopedHttp {
     /// }
     /// ```
     pub fn into_write(self) -> Box<dyn AuthenticatedWrite> {
-        Box::new(ScopedWrite(self))
+        Box::new(ScopedWrite {
+            http: self,
+            upgrades: None,
+        })
+    }
+
+    /// Trusted composition only, inside the preparation of a write the host
+    /// admitted: the single consuming write capability of [`Self::into_write`]
+    /// that may also open one upgraded stream under `bounds`. The upgrade goes
+    /// to the captured target under the captured TLS configuration and
+    /// credential, like every request of this port; the host enforces the
+    /// bounds. A capability built with `into_write` refuses an upgrade with no
+    /// I/O, and a read port has no upgrade at all.
+    pub fn into_upgrade_write(self, bounds: UpgradeBounds) -> Box<dyn AuthenticatedWrite> {
+        Box::new(ScopedWrite {
+            http: self,
+            upgrades: Some(bounds),
+        })
     }
 
     /// Trusted composition fixes the probe's path here, once. The returned port
@@ -361,7 +378,12 @@ impl ScopedHttp {
 // Deliberately private, non-Clone, and separate from the GET capability. Native
 // effect interpretation remains with the adapter: even a successful HTTP status
 // is only a response, and every transport failure can follow a committed write.
-struct ScopedWrite(ScopedHttp);
+struct ScopedWrite {
+    http: ScopedHttp,
+    /// Present only when trusted composition built the capability for one
+    /// upgraded stream (`ScopedHttp::into_upgrade_write`).
+    upgrades: Option<UpgradeBounds>,
+}
 #[async_trait]
 impl AuthenticatedWrite for ScopedWrite {
     async fn send_json(
@@ -377,7 +399,7 @@ impl AuthenticatedWrite for ScopedWrite {
             WriteMethod::Patch => reqwest::Method::PATCH,
             WriteMethod::Delete => reqwest::Method::DELETE,
         };
-        let request = self.0.request(method, segments, query).await?;
+        let request = self.http.request(method, segments, query).await?;
         // A null body sends no document at all, which is what a bodiless DELETE
         // declares; any other value is sent as one JSON document.
         let request = if body.is_null() {
@@ -411,6 +433,227 @@ impl AuthenticatedWrite for ScopedWrite {
             headers,
             body,
         })
+    }
+
+    /// `connectors.transport.UpgradeOutcome` (`ess/domains/transport.yaml`).
+    /// Only the WebSocket framing is new: the request is built by the same
+    /// `request` as every other one, so the captured target, TLS roots,
+    /// credential header, no-proxy and no-redirect policy all apply.
+    async fn upgrade(
+        self: Box<Self>,
+        segments: &[&str],
+        query: &[(&str, String)],
+        protocols: &[&str],
+    ) -> Upgraded {
+        let Some(bounds) = self.upgrades else {
+            return Upgraded::NotSent(Error::new(
+                ErrorCode::Unsupported,
+                "this write capability carries no upgraded stream",
+            ));
+        };
+        if protocols.is_empty() || protocols.len() > 8 || !protocols.iter().all(|p| token(p)) {
+            return Upgraded::NotSent(Error::invalid(
+                "upgrade subprotocols must be one to eight HTTP tokens",
+            ));
+        }
+        let until = tokio::time::Instant::now() + bounds.timeout();
+        let request = match self
+            .http
+            .request(reqwest::Method::GET, segments, query)
+            .await
+        {
+            Ok(request) => request,
+            Err(error) => return Upgraded::NotSent(error),
+        };
+        let key = tokio_tungstenite::tungstenite::handshake::client::generate_key();
+        let request = request
+            .version(reqwest::Version::HTTP_11)
+            .timeout(bounds.timeout())
+            .header(reqwest::header::CONNECTION, "Upgrade")
+            .header(reqwest::header::UPGRADE, "websocket")
+            .header(reqwest::header::SEC_WEBSOCKET_VERSION, "13")
+            .header(reqwest::header::SEC_WEBSOCKET_KEY, key.as_str())
+            .header(
+                reqwest::header::SEC_WEBSOCKET_PROTOCOL,
+                protocols.join(", "),
+            );
+        let response = match tokio::time::timeout_at(until, request.send()).await {
+            Err(_) => {
+                return Upgraded::Lost(Error::new(
+                    ErrorCode::Timeout,
+                    "upgrade request passed its deadline",
+                ));
+            }
+            // A connection that never opened carried no request.
+            Ok(Err(error)) if error.is_connect() => {
+                return Upgraded::NotSent(provider_error(error));
+            }
+            Ok(Err(error)) => return Upgraded::Lost(provider_error(error)),
+            Ok(Ok(response)) => response,
+        };
+        let status = response.status().as_u16();
+        if status != 101 {
+            // A redirect is an answer like any other; it is never followed.
+            return Upgraded::Answered(status);
+        }
+        // The server switched protocols, so the effect may have started: a
+        // handshake that does not verify is a lost stream, not a refusal.
+        let headers = response.headers();
+        let header = |name: reqwest::header::HeaderName| {
+            headers.get(name).and_then(|value| value.to_str().ok())
+        };
+        let selected = header(reqwest::header::SEC_WEBSOCKET_PROTOCOL)
+            .filter(|selected| protocols.contains(selected))
+            .map(str::to_owned);
+        let accept = tokio_tungstenite::tungstenite::handshake::derive_accept_key(key.as_bytes());
+        let verified = header(reqwest::header::UPGRADE)
+            .is_some_and(|value| value.eq_ignore_ascii_case("websocket"))
+            && header(reqwest::header::CONNECTION).is_some_and(|value| {
+                value
+                    .split(',')
+                    .any(|token| token.trim().eq_ignore_ascii_case("upgrade"))
+            })
+            && header(reqwest::header::SEC_WEBSOCKET_ACCEPT) == Some(accept.as_str());
+        let (Some(selected), true) = (selected, verified) else {
+            return Upgraded::Lost(Error::new(
+                ErrorCode::UpstreamProtocol,
+                "upgrade switched protocols without a handshake this binding offered",
+            ));
+        };
+        let io = match tokio::time::timeout_at(until, response.upgrade()).await {
+            Ok(Ok(io)) => io,
+            Ok(Err(_)) => return Upgraded::Lost(Error::unavailable()),
+            Err(_) => {
+                return Upgraded::Lost(Error::new(
+                    ErrorCode::Timeout,
+                    "upgrade request passed its deadline",
+                ));
+            }
+        };
+        let config = tokio_tungstenite::tungstenite::protocol::WebSocketConfig::default()
+            .max_message_size(Some(bounds.max_message_bytes()))
+            .max_frame_size(Some(bounds.max_message_bytes()));
+        let socket = tokio_tungstenite::WebSocketStream::from_raw_socket(
+            io,
+            tokio_tungstenite::tungstenite::protocol::Role::Client,
+            Some(config),
+        )
+        .await;
+        Upgraded::Accepted(Box::new(ScopedStream {
+            socket: Some(socket),
+            protocol: selected,
+            max_total_bytes: bounds.max_total_bytes(),
+            until,
+            consumed: 0,
+            ended: None,
+        }))
+    }
+}
+
+/// An RFC 9110 token, as a WebSocket subprotocol name must be.
+fn token(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+}
+
+/// The client half of one accepted upgraded stream
+/// (`connectors.transport.UpgradedStreamEnd`). Ping is answered and fragments
+/// are reassembled by the framing library below; the host counts every
+/// message against the total bound and holds the deadline, so an adapter
+/// reading slowly or never cannot extend either.
+struct ScopedStream {
+    socket: Option<tokio_tungstenite::WebSocketStream<reqwest::Upgraded>>,
+    protocol: String,
+    max_total_bytes: usize,
+    until: tokio::time::Instant,
+    consumed: usize,
+    /// How the stream ended, repeated to every later call.
+    ended: Option<Option<Error>>,
+}
+impl ScopedStream {
+    /// Close the stream, waiting at most a second and never past the deadline
+    /// for the close handshake, then drop the connection.
+    async fn end(&mut self, error: Option<Error>) -> Result<Option<Vec<u8>>> {
+        if let Some(mut socket) = self.socket.take() {
+            let grace = (tokio::time::Instant::now() + Duration::from_secs(1)).min(self.until);
+            let _ = tokio::time::timeout_at(grace, socket.close(None)).await;
+        }
+        self.ended = Some(error.clone());
+        match error {
+            Some(error) => Err(error),
+            None => Ok(None),
+        }
+    }
+}
+fn truncated() -> Error {
+    Error::new(
+        ErrorCode::Capacity,
+        "upgraded stream reached its byte bound and was closed; its output is truncated",
+    )
+}
+#[async_trait]
+impl MessageStream for ScopedStream {
+    fn protocol(&self) -> &str {
+        &self.protocol
+    }
+    async fn next_message(&mut self) -> Result<Option<Vec<u8>>> {
+        use futures_util::StreamExt as _;
+        use tokio_tungstenite::tungstenite::{Error as Ws, Message};
+        if let Some(ended) = &self.ended {
+            return match ended {
+                Some(error) => Err(error.clone()),
+                None => Ok(None),
+            };
+        }
+        loop {
+            let Some(socket) = self.socket.as_mut() else {
+                return self.end(None).await;
+            };
+            let next = match tokio::time::timeout_at(self.until, socket.next()).await {
+                Ok(next) => next,
+                Err(_) => {
+                    return self
+                        .end(Some(Error::new(
+                            ErrorCode::Timeout,
+                            "upgraded stream passed its deadline",
+                        )))
+                        .await;
+                }
+            };
+            let message = match next {
+                None => return self.end(None).await,
+                Some(Ok(message)) => message,
+                Some(Err(Ws::Capacity(_))) => return self.end(Some(truncated())).await,
+                Some(Err(_)) => {
+                    return self
+                        .end(Some(Error::new(
+                            ErrorCode::Unavailable,
+                            "upgraded stream was lost",
+                        )))
+                        .await;
+                }
+            };
+            self.consumed = self.consumed.saturating_add(message.len());
+            if self.consumed > self.max_total_bytes {
+                return self.end(Some(truncated())).await;
+            }
+            match message {
+                Message::Binary(bytes) => return Ok(Some(bytes.to_vec())),
+                Message::Ping(_) | Message::Pong(_) | Message::Frame(_) => continue,
+                Message::Close(_) => return self.end(None).await,
+                Message::Text(_) => {
+                    return self
+                        .end(Some(Error::new(
+                            ErrorCode::UpstreamProtocol,
+                            "upgraded stream sent a text message",
+                        )))
+                        .await;
+                }
+            }
+        }
     }
 }
 

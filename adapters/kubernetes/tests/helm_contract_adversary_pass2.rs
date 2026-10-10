@@ -65,6 +65,9 @@ fn adapter(served: Value) -> Kubernetes {
         resource_kinds: vec!["pods".into()],
         discover_hosts: false,
         helm_release_reads: HelmReleaseReads::RedactedContent,
+        pod_logs: false,
+        pod_exec: false,
+        kubeconfig_contexts: false,
     };
     let effective = json!({"service":{"instance":"adversary2","listen":"127.0.0.1:0",
         "service_credential":{"kind":"environment","name":"UNUSED"}},

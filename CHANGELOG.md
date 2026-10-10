@@ -1,5 +1,74 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Binary responses in the catalog provider (`docs/local-catalog-provider.md`, *Configure the
+  provider*). A selection with `"response": "binary"` and `"binary": {"max_bytes", "hosts"}`
+  reads the answer as bytes; the result stays JSON, with `body` holding `media_type`, `length`,
+  `sha256` and `content_base64`. `max_bytes` is at most 2 MiB, and a longer body is refused as
+  `capacity`, never truncated. A redirect is followed at most three times, only to an origin the
+  selection's `binary.hosts` names and the connection admits; any other target is refused as
+  `forbidden` with nothing sent there. A `download` selection (`{"path_prefix"}`) reads a URL the
+  provider handed out, given as the input `url`.
+- Slack files (`docs/catalog-slack.md`, *Files*): `files.list` (paged by `page` and `count`),
+  `files.info`, and `file.download`, which reads a file's `url_private` on
+  `https://files.slack.com` under `/files-pri/` with the bot token. The file record gains
+  `name`, `filetype`, `mimetype` and `size`.
+- Jira attachment content (`docs/catalog-jira.md`, *Attachment content*): `attachment.content`
+  selects `getAttachmentContent`. With `redirect=false` Jira answers the content itself;
+  otherwise its `303` is followed to `https://api.media.atlassian.com` without the credential,
+  when the connection admits that host.
+- Kubernetes pod logs (`docs/local-kubernetes-cli.md`, *Read pod logs*): `pods.logs` reads a
+  bounded tail of one container's log in a configured namespace (`tail_lines` up to 1,000,
+  `since_seconds` up to 86,400, `max_bytes` up to 128 KiB), timestamped, in the cluster's order;
+  a cut never splits a UTF-8 character.
+- Kubernetes kubeconfig contexts (*List kubeconfig contexts*): `contexts.list` lists the
+  contexts of the kubeconfig the local configuration names (name, cluster, namespace, current
+  flag), never its credentials, servers or certificates, and makes no cluster request.
+- Kubernetes pod exec (*Run a command in a pod*): `pods.exec` runs one command, an argument
+  vector with no shell, in a named container. It is a write on the `connectors-private/2`
+  exchange through the local CLI only: the approval is spent and the attempt recorded as for
+  every write, then one WebSocket upgrade goes through the host's admitted request path. It
+  returns the exit status and stdout and stderr, each bounded by `max_output_bytes` (at most
+  1 MiB), within `timeout_seconds` (at most 60). A non-zero exit is an applied attempt; a lost
+  stream is `unknown` and never resent. The SDK gains `AuthenticatedWrite::upgrade`, and a read
+  capability cannot open an upgrade.
+
+### Configuration
+
+- Catalog: a connection may admit up to eight more origins in `hosts`,
+  `[{"origin", "credential"}]`; `credential: true` sends the connection's credential there.
+  A Slack connection that downloads files needs
+  `{"origin": "https://files.slack.com", "credential": true}`; a Jira connection that follows
+  attachment redirects needs `{"origin": "https://api.media.atlassian.com"}`, and without it
+  callers pass `redirect=false`. Each admitted origin must be reached by some selected binary
+  read, or the configuration is refused. Without `hosts` the configuration revision is
+  unchanged.
+- Kubernetes: `pod_logs: true` advertises `pods.logs`; `kubeconfig`, an absolute path to an
+  owner-only kubeconfig, advertises `contexts.list`; `pod_exec: true` advertises `pods.exec` on
+  the write exchange, and needs `private_protocol = "connectors-private/2"`, the operation in the
+  adapter's permissions and an approval policy. Each is off when absent and then leaves the
+  configuration revision unchanged. The service configuration can enable `pod_logs` only.
+
+### Compatibility
+
+- The Slack and Jira selection sets grow (Slack bot set from 7 to 10, Jira from 8 to 9
+  operations), so their descriptors and configuration revisions change; copy the revision from
+  `--print-local-bootstrap` again and add the new operations to the adapter's `operations` to use
+  them. GitLab and Confluence revisions are unchanged.
+- JSON and text selections read as before. A `connectors-catalog-operations/1` selection may now
+  carry `response: binary`, `binary` and `download`.
+
+### Limitations
+
+- Fixtures only: no live Slack workspace, Jira site or cluster was called. Jira's redirect
+  target `https://api.media.atlassian.com` is inferred, not verified against a live site.
+- Not included: Slack file upload and delete, Jira attachment upload and delete (a binary
+  request body is not sent), Kubernetes port-forward, log following, and exec with stdin or a
+  terminal. The per-read Kubernetes permission pre-check is still not performed.
+
 ## 0.44.0 — 2026-10-10
 
 ### Added

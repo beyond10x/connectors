@@ -175,6 +175,12 @@ struct Configuration {
     #[serde(default)]
     request_prefix: Option<String>,
     ca_file: Option<PathBuf>,
+    /// The origins this connection admits besides `api_base`
+    /// (`connectors_catalog.binary.Hosts`), which only a binary read reaches,
+    /// and only those its selection names. Omitted when empty, so a
+    /// configuration without it keeps its revision.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    hosts: Vec<AdmittedHost>,
     auth: AuthConfig,
     /// Selections written into this file.
     #[serde(default)]
@@ -184,6 +190,20 @@ struct Configuration {
     #[serde(default)]
     operations_file: Option<PathBuf>,
 }
+
+/// One origin a connection admits besides its API base
+/// (`connectors_catalog.binary.AdmittedHost`). With `credential` the
+/// connection's credential header travels to it, as Slack's file host
+/// requires; otherwise requests to it carry none.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AdmittedHost {
+    origin: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    credential: bool,
+}
+/// The most origins a connection admits besides its API base.
+const ADMITTED_HOSTS: usize = 8;
 
 /// The document `operations_file` names.
 #[derive(Deserialize)]
@@ -620,6 +640,9 @@ pub struct Local {
     bootstrap: Bootstrap,
     bootstrap_v2: Bootstrap,
     http: Arc<ScopedHttp>,
+    /// Each admitted origin's port, without a credential, and whether the
+    /// connection's credential travels to it.
+    hosts: BTreeMap<String, (Arc<ScopedHttp>, bool)>,
     engine: Engine,
     instance: String,
     auth: AuthConfig,
@@ -851,6 +874,24 @@ impl Local {
         };
         let engine = Engine::with_feed(&bundle, &document_base, &operations, feed.as_ref())
             .map_err(Failure::from_service)?;
+        // Every admitted host is a distinct canonical https origin that some
+        // selected binary read reaches: the selection names what it may need,
+        // the connection decides what it allows. A reached host the connection
+        // does not admit is not a load failure, so a connection written before
+        // a selection reached it keeps loading; the read that needs it is
+        // refused as `forbidden` before anything is sent there.
+        let reached = engine.reached_hosts();
+        let mut admitted = BTreeSet::new();
+        if config.hosts.len() > ADMITTED_HOSTS
+            || config.hosts.iter().any(|host| {
+                connectors_catalog_provider::origin(&host.origin).as_deref()
+                    != Some(host.origin.as_str())
+                    || !admitted.insert(host.origin.as_str())
+                    || !reached.contains(host.origin.as_str())
+            })
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
         // Trust roots enter the revision by their bytes only, as `ca_file` does, so
         // the same roots at another path keep it.
         let mut auth = serde_json::to_value(&config.auth).map_err(|_| Failure::Protocol)?;
@@ -883,6 +924,11 @@ impl Local {
         if let Some(prefix) = &config.request_prefix {
             effective["request_prefix"] = json!(prefix);
         }
+        // Present only when declared, so a configuration without hosts keeps its revision.
+        if !config.hosts.is_empty() {
+            effective["hosts"] =
+                serde_json::to_value(&config.hosts).map_err(|_| Failure::Protocol)?;
+        }
         let configuration_revision = connectors_core::digest(&effective);
         let http = Arc::new(
             ScopedHttp::new_with_ca_bytes(
@@ -899,6 +945,26 @@ impl Local {
             )
             .map_err(Failure::from_service)?,
         );
+        // Each admitted origin gets its own port under the same trust roots and
+        // credential placement as the API base; the credential is attached per
+        // request, and only where the connection says it travels.
+        let mut hosts = BTreeMap::new();
+        for host in &config.hosts {
+            let port = ScopedHttp::new_with_ca_bytes(
+                &HttpConfig {
+                    base_url: format!("{}/", host.origin),
+                    credential: None,
+                    credential_header: config.auth.header.clone(),
+                    bearer: config.auth.bearer,
+                    allow_plaintext: false,
+                    ca_file: None,
+                },
+                None,
+                ca.as_deref(),
+            )
+            .map_err(Failure::from_service)?;
+            hosts.insert(host.origin.clone(), (Arc::new(port), host.credential));
+        }
         let field = |name: &str, label: &str, max_bytes: u32| EntryField {
             name: name.into(),
             label: label.into(),
@@ -996,6 +1062,7 @@ impl Local {
             bootstrap,
             bootstrap_v2,
             http,
+            hosts,
             engine,
             instance: config.instance,
             auth: config.auth,
@@ -1008,6 +1075,24 @@ impl Local {
     /// The API port carrying `credential` as this profile's header.
     fn with(&self, credential: Secret) -> ScopedHttp {
         self.http.with_credential(Arc::new(Fixed(credential)))
+    }
+    /// The ports of the admitted origins for one request: carrying
+    /// `credential` where the connection sends it, and nothing elsewhere.
+    fn host_ports(
+        &self,
+        credential: &Arc<dyn Credential>,
+    ) -> BTreeMap<String, Arc<dyn connectors_sdk::AuthenticatedHttp>> {
+        self.hosts
+            .iter()
+            .map(|(origin, (port, carries))| {
+                let port: Arc<dyn connectors_sdk::AuthenticatedHttp> = if *carries {
+                    Arc::new(port.with_credential(credential.clone()))
+                } else {
+                    port.clone()
+                };
+                (origin.clone(), port)
+            })
+            .collect()
     }
     /// The bounded protected document, taken out of the caller's buffer.
     fn document(mut document: Secret) -> Result<Zeroizing<Vec<u8>>> {
@@ -1379,11 +1464,13 @@ impl runtime::Adapter for Local {
         // child holds what it derived from it (the basic header value, an
         // OAuth access token), so it withholds a reason holding any of that.
         let derived = Zeroizing::new(credential.0.clone());
-        let http = self.with(credential);
+        let credential: Arc<dyn Credential> = Arc::new(Fixed(credential));
+        let http = self.http.with_credential(credential.clone());
+        let hosts = self.host_ports(&credential);
         let started = Instant::now();
         let mut result = self
             .engine
-            .read(&http, &self.instance, operation, input.clone())
+            .read_reaching(&http, &hosts, &self.instance, operation, input.clone())
             .await;
         // A read is sent once more, and only once, after the delay the
         // provider named on its own `429`, when that wait still leaves the
@@ -1396,7 +1483,9 @@ impl runtime::Adapter for Local {
             && let Some(bound) = deadline.checked_sub(RETRY_MARGIN)
         {
             tokio::time::sleep(wait).await;
-            let second = self.engine.read(&http, &self.instance, operation, input);
+            let second = self
+                .engine
+                .read_reaching(&http, &hosts, &self.instance, operation, input);
             if let Ok(second) =
                 tokio::time::timeout_at(tokio::time::Instant::from_std(bound), second).await
             {

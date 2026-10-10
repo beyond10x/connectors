@@ -457,6 +457,23 @@ The complete configuration used against the sandbox is
   `..` (so no query, fragment or percent-encoding); it must be the leading part
   of the `api_base` path, or the configuration is refused. Without it the
   configuration revision is what it was before the field existed.
+- `hosts` is optional: up to eight origins the connection admits besides
+  `api_base`, each `{"origin": "https://<host>", "credential": true}`.
+  Only a binary read reaches them, and only those its selection's
+  `binary.hosts` names. With `credential` true the connection's credential
+  header is sent there too, as Slack's file host requires; absent or false,
+  requests there carry no credential, as for a redirect to a URL that carries
+  its own grant. Each origin must be canonical (as for `binary.hosts`), named
+  once and reached by some selected binary read, or the configuration is
+  refused. A host a selection reaches but the connection does not admit is not
+  a configuration error: the read that needs it is refused as `forbidden` with
+  nothing sent there. Without `hosts` the configuration revision is what it was
+  before the field existed; adding it changes the revision. Modelled as
+  `connectors_catalog.binary.Hosts`.
+
+  ```json
+  "hosts": [{"origin": "https://files.slack.com", "credential": true}]
+  ```
 - `operations_file` names a shipped selection set; its `provider` must match. An
   inline `operations` list is accepted as well and comes first. The selection
   ids, in either place, are what the host permits and the approval policy names.
@@ -470,10 +487,43 @@ The complete configuration used against the sandbox is
   `effect` is declared, not inferred from the method: `read` is allowed only for
   GET, `write` only for POST, PUT, PATCH and DELETE, and a write is a
   required-approval mutation under private protocol two like any other.
-- `response` is a reviewed exception for a read whose source declares JSON where
-  the provider answers plain text, as GitLab does for a job trace. Without it the
-  bundle decides: a 2xx declared only as `text/…` is read as text, anything else
-  as JSON. A write never carries it.
+- `response` is a reviewed exception for a read whose answer is not what the
+  bundle's media types say. Without it the bundle decides: a 2xx declared only as
+  `text/…` is read as text, anything else as JSON. `text` is for a source that
+  declares JSON where the provider answers plain text, as GitLab does for a job
+  trace. `binary` reads the body as bytes, whatever media type it carries, and
+  needs `binary` beside it. A write never carries either.
+- `binary` is required with `"response": "binary"` and refused without it:
+  `{"max_bytes": <n>, "hosts": ["https://<host>", …]}`.
+  - `max_bytes` (1 to 2,097,152) bounds the body. A longer body is refused as
+    `capacity`, never truncated. 2 MiB keeps the base64 body and its envelope
+    under the provider's result limit.
+  - `hosts` is optional: one to four origins, `https://<host>` or
+    `https://<host>:<port>` in lower case, with no path, query, fragment or user
+    information, that this read may reach besides `api_base`. A redirect (301,
+    302, 303, 307 or 308 with a `Location`) is followed at most three times, and
+    only to an origin in `hosts` that the connection also admits (`hosts` in the
+    configuration, below); a redirect anywhere else is refused as `forbidden`
+    by name, with nothing sent there. Without `hosts` no redirect is followed and
+    a 3xx is a refusal.
+
+  The result of a binary read is `{status, body, provenance}` as for any read,
+  with `body` `{media_type, length, sha256, content_base64}`: the answer's
+  `Content-Type` without parameters in lower case (`application/octet-stream`
+  when it names none), the length in bytes, the lower-case hex SHA-256 of the
+  bytes and the bytes in standard base64 with padding. `status` is that of the
+  answer that carried the body, after any redirect. The body is never written to
+  a file. A non-2xx answer after a redirect is classified as for any read.
+- `download` is optional, only with `"response": "binary"`, `binary.hosts` and no
+  `operation_id`: `{"path_prefix": "/<segment>/"}`. It makes the selection a read
+  of a URL the provider itself handed out, such as Slack's `url_private`: the
+  only input is `url`, an `https` URL on an origin in `binary.hosts` whose path
+  starts with `path_prefix`, sent as one GET to that origin. A URL elsewhere is
+  refused before any request. A `download` selection names no bundle operation;
+  `path_prefix` must start and end with `/`.
+
+  `response`, `binary` and `download` are modelled as
+  `connectors_catalog.binary.BinarySelection` in `adapters/catalog/spec/ess`.
 - `bounds` is optional and narrows query parameters the source declares, each
   by exactly one of two forms:
   - a range, `{"<parameter>": {"minimum": <n>, "maximum": <n>}}`, such as a
@@ -769,9 +819,10 @@ approval policy naming them; see [the guarded merge guide](local-gitlab-merge.md
 
 Input is one property per declared path or query parameter, named as the source
 names it, a `body` object where the operation takes one, and any extra value a
-guard reads. Output is the provider's status, its body unchanged (JSON, or a
-string for a text read), and provenance whose `source_revision` is the pinned
-source's SHA-256.
+guard reads. Output is the provider's status, its body unchanged (JSON, a
+string for a text read, or `{media_type, length, sha256, content_base64}` for a
+binary read), and provenance whose `source_revision` is the pinned source's
+SHA-256.
 
 ```sh
 connectors operations invoke --adapter forge --connection "$connection" \
@@ -815,6 +866,10 @@ appeared, which opened merge request 11 at the moved head and was classified
   supplies it and validated only by the provider.
 - Header and cookie parameters are not carried; a selection whose operation
   requires one is refused at load.
+- A binary answer is read whole into the result, at most 2 MiB; there is no
+  streaming and no binary or multipart request body, so
+  uploads are not served. Binary reads are verified against local fixtures
+  only (`adapters/catalog/tests/binary_responses.rs`).
 - One authentication profile per configuration: a token in one header, a
   basic profile (`"scheme": "basic"`) sending an account and API token as HTTP
   basic, an OAuth refresh profile (`"scheme": "oauth2_refresh"`), or an OAuth

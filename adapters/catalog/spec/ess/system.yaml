@@ -3,6 +3,7 @@ system: connectors_catalog
 version: v1
 domains:
   - connectors_catalog.amendment
+  - connectors_catalog.binary
   - connectors_catalog.feed
   - connectors_catalog.guard
   - connectors_catalog.identity

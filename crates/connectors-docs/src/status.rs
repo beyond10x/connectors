@@ -18,7 +18,7 @@ pub const DATA: &str = "website/data/status.json";
 pub const PAGE: &str = "website/docs/status.md";
 
 /// The date the list below was last checked against the repository.
-const AS_OF: &str = "2026-10-09";
+const AS_OF: &str = "2026-10-10";
 
 /// One capability on the status page.
 pub struct Capability {
@@ -229,8 +229,22 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Jira Cloud",
-        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
-        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_seven_reads_and_the_transition_run",
+        "Issue search by JQL, one issue by key, comments, changelogs, an issue's available transitions, a project's creatable issue types, user search, an attachment's content, and running one transition by id under a guard that reads the issue before and after it, over HTTP basic authentication (one issue, issue types and user search since 0.39.0).",
+        "adapters/catalog/tests/jira.rs::shipped_jira_selections_are_the_eight_reads_and_the_transition_run",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "Binary responses",
+        "A selection can read an answer as bytes: media type, length, SHA-256 and the bytes in base64, at most 2 MiB and refused as capacity above it, with at most three redirects, each only to an origin the selection names and the connection admits in its hosts; verified against fixtures only.",
+        "adapters/catalog/tests/binary_responses.rs::a_binary_selection_answers_media_type_length_digest_and_the_bytes",
+        "/docs/concepts/catalog-provider",
+    ),
+    shipped(
+        "Catalog provider",
+        "Jira attachment content",
+        "attachment.content reads one attachment as a binary body, directly with redirect=false or through Jira's 303 to an admitted media host; that host, api.media.atlassian.com, is inferred and not verified against a live site.",
+        "adapters/catalog/tests/jira_attachment.rs::the_303_is_followed_to_the_admitted_media_host_only",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -278,8 +292,15 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Slack conversations",
-        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0); verified against a local fixture only.",
+        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_the_user_search",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "Slack files",
+        "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::the_download_reads_url_private_with_the_token_on_an_admitted_host",
         "/docs/reference/adapters/catalog",
     ),
     decided(
@@ -300,6 +321,27 @@ pub const CAPABILITIES: &[Capability] = &[
         "Kubernetes single objects, namespaces and rollout history",
         "resources.get reads one object by name, namespaces.list the configured namespaces the cluster has, deployments.history the ReplicaSets a Deployment controls; replicasets and events are configurable kinds; verified against API-shaped fixtures.",
         "adapters/kubernetes/tests/parity_reads.rs::the_new_kinds_are_configurable_and_the_new_reads_are_advertised",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
+        "Kubernetes pod logs",
+        "pods.logs reads a bounded tail of one container's log in a configured namespace, at most 1,000 lines and 128 KiB, when pod_logs is configured; verified against API-shaped fixtures.",
+        "adapters/kubernetes/tests/pod_logs.rs::pod_logs_are_bounded_and_container_selected",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
+        "Kubernetes kubeconfig contexts",
+        "contexts.list lists the contexts of the one kubeconfig a local configuration names, never its credentials or servers, with no cluster request.",
+        "adapters/kubernetes/tests/kubeconfig_contexts.rs::contexts_are_listed_without_credentials",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
+        "Kubernetes pod exec",
+        "pods.exec runs one command as an argument vector in a named container, through the local CLI under approval, when pod_exec is configured; exit status and bounded output come back, and a lost stream is unknown and never resent; verified against recorded streams, not a live cluster.",
+        "adapters/kubernetes/tests/local_exec.rs::local_pod_exec_runs_through_the_approved_write_exchange",
         "/docs/reference/adapters/kubernetes",
     ),
     shipped(

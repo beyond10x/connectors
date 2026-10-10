@@ -3,19 +3,19 @@
 title: "Kubernetes logs"
 sidebar_label: "Kubernetes logs"
 sidebar_position: 34
-description: "Specified; runtime pending. Contract owner: kubernetes."
+description: "Implemented as pods.logs; permission pre-check open. Contract owner: kubernetes."
 custom_edit_url: null
 ---
 
 # Kubernetes pod logs/v1alpha1
 
-:::info[Specified; runtime pending]
+:::info[Implemented as pods.logs; permission pre-check open]
 
 Rendered from [`adapters/kubernetes/contracts/logs/v1alpha1/semantics.md`](https://github.com/beyond10x/connectors/blob/main/adapters/kubernetes/contracts/logs/v1alpha1/semantics.md) by `connectors-docs`; the source owns every rule on this page.
 
 :::
 
-**Status:** proposed native binding, not implemented. Implements the shared
+**Status:** implemented as `pods.logs` (2026-10-10; see [Implementation](#implementation-2026-10-10)). Implements the shared
 [datasource.logs/v1alpha1](../../../contracts/data/logs.md)
 obligations as profile `kubernetes-pod-logs`.
 
@@ -104,6 +104,43 @@ Required fixtures: out-of-allowlist namespace makes zero requests; exact pods/lo
 permission precedes GET; timestamped and untimestamped lines preserve order;
 empty lines, unterminated EOF, split UTF-8, tail/byte caps, timeout and current
 revocation remain distinct. These are specification scenarios, not test results.
-Native selectors, decoding and containment remain unimplemented binding obligations.
+Native selectors, decoding and containment are implemented; see [Implementation](#implementation-2026-10-10).
 The scenario record records the corresponding
 manual observations without claiming executed provider conformance.
+
+## Implementation (2026-10-10)
+
+The operation is `pods.logs`, named in the adapter's collection style
+(`resources.list`, `deployments.history`); the design's `pod.logs` is the same
+operation. Its typed selection, lines and truncation are the
+`connectors_kubernetes.logs` ESS domain.
+It is advertised only when the configuration sets `pod_logs: true`: log text
+routinely carries values a pod object does not, so reading it is admitted
+separately from `resource_kinds`, as Helm content reads are.
+
+The binding above is implemented as written, with these resolutions where the
+implemented adapter and this proposed text disagreed:
+
+- **Permission pre-check.** No read of this adapter performs the exact-target
+  permission query yet (design §5: "the implemented
+  bearer adapter has not gained this runtime behavior yet"). `pods.logs` is
+  admitted the way every implemented read is: the configured namespace is checked
+  before any request, and the provider's RBAC answer to the one log GET is the
+  authority (403 is `forbidden`, never empty logs). The pre-check stays an open
+  obligation shared with the other reads, not a property of this one.
+- **Bounds.** `max_bytes` is enforced by the read port while consuming (a
+  bounded prefix of the one response); provider `limitBytes` is never sent. A
+  body that reaches `max_bytes` is the deliberate receiver cutoff whether or not
+  the port saw the end. The 15 s / 20 s deadlines are the host invocation
+  deadline; response headers are bounded by the shared HTTP port (32 KiB), not
+  the 16 KiB stated above. Neither is a second, adapter-local budget.
+- **Malformed text.** Invalid UTF-8 anywhere except an incomplete trailing scalar
+  at the cutoff refuses as `unavailable`.
+
+Recorded-fixture tests (`tests/pod_logs.rs`) now execute K01 (namespace outside
+the allowlist, zero requests), K03 (request terms), K04 (timestamped, untimestamped
+and empty lines in provider order), K05 (unterminated remainder, 8 KiB clip with
+`complete: true`) and K07 (split scalar withheld at the cutoff; malformed text
+refuses). K02's permission request is not implemented (above); K06 and K08 are
+covered in part (tail and byte caps separately; provider refusal). The
+scenario record stays the 2026-09-09 manual audit.

@@ -1,0 +1,46 @@
+domain: connectors_kubernetes.contexts
+summary: Kubernetes-owned projection of the contexts of the kubeconfig a local connection was configured with.
+
+# Normative owner: adapters/kubernetes/contracts/reads/v1alpha1/semantics.md,
+# "Kubeconfig contexts". A kubeconfig is an operator-owned file this adapter only
+# reads; a context is a named triple in it, not a provider object and not an entity
+# this system owns or moves.
+types:
+  - name: connectors_kubernetes.contexts.KubeconfigContext
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: cluster, type: String}
+      - {name: namespace, type: "Optional<String>"}
+      - {name: current, type: Boolean}
+    invariants:
+      - name.count: {gte: 1, lte: 256}
+      - cluster.count: {gte: 1, lte: 256}
+      - any:
+          - missing(namespace)
+          - namespace.count: {gte: 1, lte: 63}
+    # One entry of the file's contexts list, in file order: its name, the name of the
+    # cluster entry it selects and its default namespace (absent when the context
+    # sets none). current is true for the one context the file's current-context
+    # names, and false for every context when current-context is absent or names no
+    # listed context. The user a context selects, every users entry, every cluster
+    # server, certificate authority, client certificate, key, token, exec plugin and
+    # auth-provider setting are never read into this projection: it carries names and
+    # the namespace only.
+  - name: connectors_kubernetes.contexts.KubeconfigSource
+    kind: struct
+    fields:
+      - {name: path_digest, type: String}
+    invariants:
+      - path_digest.count: {gte: 64, lte: 64}
+    # The configured file, as the effective local configuration records it: a digest
+    # of the absolute path the native configuration names. It is part of the
+    # configuration revision the host admitted, so a connection lists the contexts of
+    # the file it was configured with and of no other; contexts.list takes no path or
+    # any other input naming a file. The file is read when the operation is invoked,
+    # so a context added later or a changed current-context shows on the next read.
+
+# ESS-LIMIT: the file read itself, owner-only file admission, the YAML grammar, the
+# 256-context bound on the file and the rule that duplicate context names refuse are
+# effects and predicates over bytes ESS does not express. The composition enforces
+# each before it returns a page.

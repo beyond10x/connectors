@@ -1,7 +1,8 @@
 # Kubernetes through the local CLI
 
 The current local binding reads the configured namespaces and resource kinds, and
-optionally discovers hosts, using a saved Kubernetes bearer token. It requires
+optionally discovers hosts, reads pod logs, lists the contexts of one kubeconfig
+and runs a command in a pod under approval, using a saved Kubernetes bearer token. It requires
 Linux x86_64 and the [qualified Secret Service binding](local-secret-service.md).
 The separately installed older CLI is not upgraded by building this checkout.
 
@@ -60,6 +61,38 @@ and no setting adds a general Secret read.
 Adding or changing this field changes the effective document, so the
 `configuration_revision` changes with it and must be copied from
 `--print-local-bootstrap` again.
+
+Three more fields are optional and each enables one operation. Absent, each is
+off and leaves the effective document, and so the `configuration_revision`, as it
+was before the field existed; set, it changes the revision.
+
+| Field | Enables | Value |
+|---|---|---|
+| `pod_logs` | `pods.logs` ([Read pod logs](#read-pod-logs)) | `true`; absent means false |
+| `kubeconfig` | `contexts.list` ([List kubeconfig contexts](#list-kubeconfig-contexts)) | the absolute path of an owner-only kubeconfig file |
+| `pod_exec` | `pods.exec`, a write ([Run a command in a pod](#run-a-command-in-a-pod)) | `true`; absent means false |
+
+```json
+{
+  "format": "connectors-kubernetes-local/1",
+  "instance": "kubernetes-local",
+  "api_base": "https://cluster.example:6443/",
+  "namespaces": ["default"],
+  "resource_kinds": ["pods", "services", "deployments", "endpointslices"],
+  "discover_hosts": false,
+  "helm_release_reads": "off",
+  "pod_logs": true,
+  "kubeconfig": "/absolute/private/kubeconfig",
+  "pod_exec": true
+}
+```
+
+Pod logs are admitted apart from `resource_kinds`, because log text routinely
+carries values a pod object does not. The kubeconfig is read and parsed once when
+the configuration loads, and a path that is not an owner-only, readable kubeconfig
+refuses the configuration; the revision records a digest of the path, not of the
+file. The federated service configuration can enable `pod_logs`, but not
+`kubeconfig` or `pod_exec`.
 
 The block above is the file format. The adapter's published
 `configuration_schema` has two branches, and the local one describes the
@@ -201,9 +234,13 @@ revision, then invoke with the saved connection as above. The request shapes are
 | `helm_releases.status` | `{"namespace":"default","release":"api","limit":50}` |
 | `helm_releases.values` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
 | `helm_releases.manifest` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
+| `pods.logs` | `{"namespace":"default","pod":"api-0","container":"api","tail_lines":200}` |
+| `contexts.list` | `{"limit":50}` |
+| `pods.exec` | `{"namespace":"default","pod":"api-0","container":"api","command":["cat","/etc/hostname"]}` |
 
-For every operation above except `resources.get`, which takes no `limit`, and
-the two release projections, `limit` is between 1 and 100. For `helm_releases.values` and
+For every operation above except `resources.get`, which takes no `limit`, the two
+release projections, `pods.logs` and `pods.exec`, which take none, and
+`contexts.list`, whose `limit` is between 1 and 256, `limit` is between 1 and 100. For `helm_releases.values` and
 `helm_releases.manifest` it is between 1 and 500, because those two page over
 one stored object rather than over a provider collection. List results contain
 `items`, `next_cursor` and `complete`. Pass a returned cursor alongside unchanged selectors, limit and
@@ -268,6 +305,79 @@ namespace `default` granting `get` on `namespaces` is enough to read the
 `default` namespace. No ClusterRole is needed, and the binding never asks for
 `list` on namespaces.
 
+## Read pod logs
+
+`pods.logs` reads a bounded tail of one pod's log in a configured namespace, as
+the [logs contract](../adapters/kubernetes/contracts/logs/v1alpha1/semantics.md)
+states. It is advertised only while `pod_logs` is true. The input is closed:
+`namespace` and `pod` are required; `container` is optional, and without it the
+cluster chooses the pod's default container, so name it for a pod with several.
+`since_seconds` (1–86,400, default 86,400), `tail_lines` (1–1,000, default 200)
+and `max_bytes` (1–131,072, default 131,072) bound the read. There is no cursor,
+no follow and no previous container.
+
+The adapter makes one log GET with timestamps and returns the lines in the order
+the cluster sent them, each with `timestamp_unix_ns` (null when a line carries no
+timestamp), its `stream` (namespace, pod, container), the line text and
+`line_truncated`. A line is clipped at 8 KiB. `complete` is true only when the
+read ended below both the line and byte bounds; reaching either is reported in
+`truncation.causes`. A cut never splits a UTF-8 character; other invalid UTF-8
+refuses the read as `unavailable`. A namespace outside the configuration is
+refused with no request; the cluster's 403 is `forbidden` and its 404
+`not_found`, never empty logs. The credential needs `get` on `pods/log` in the
+namespace. The per-read permission pre-check the contract describes is not
+performed, as for every read of this binding.
+
+## List kubeconfig contexts
+
+`contexts.list` lists the contexts of the kubeconfig named by the configuration's
+`kubeconfig`, and is advertised only when it names one. Its only input is `limit`
+(1–256); no input can name a file, so a connection reads the file it was
+configured with and no other. The file is read again at each call, so a context
+added later or a changed `current-context` shows on the next read; no cluster
+request is made and the credential is not used.
+
+Each item is `name`, `cluster` (the cluster entry's name), `namespace` (null when
+the context sets none) and `current` (true for the context `current-context`
+names). Users, servers, certificate authorities, client certificates and keys,
+tokens, exec plugins and auth providers are never read into the result. A file
+over 1 MiB or with more than 256 contexts, a repeated context name, a name over
+256 bytes or a namespace over 63 refuses the whole file. A smaller `limit` returns
+the first contexts with `complete: false` and no cursor. A file missing, or no
+longer owner-only, at the call is `unavailable`. The list does not create a
+connection from a context: each connection is still configured and connected as
+above.
+
+## Run a command in a pod
+
+`pods.exec` runs one command in one named container of a pod in a configured
+namespace, as the [mutation contract, §4.2](../adapters/kubernetes/contracts/mutations/v1alpha1/semantics.md#42-pod-exec-podsexec)
+states. It is a write: it is advertised only while `pod_exec` is true, only on the
+`connectors-private/2` write exchange, and the read exchange and the federated
+service never list it. The adapter entry needs `private_protocol =
+"connectors-private/2"` and `pods.exec` in its `operations`, and the operation
+needs an approval policy and an issued approval like every write
+([local approvals](local-approvals.md)). The host spends the approval and records
+the attempt before the adapter opens the stream.
+
+The input is closed: `namespace`, `pod`, `container` (required, no default
+container) and `command`, an argument vector of 1–64 elements, each 1–4,096
+bytes and at most 16,384 in all, whose first element is the executable; no shell
+is added. `timeout_seconds` (1–60, default 30) bounds the run and
+`max_output_bytes` (1–1,048,576, default 65,536) bounds stdout and stderr each.
+There is no stdin and no terminal.
+
+The adapter sends one GET to the pod's `exec` subresource, upgraded to a WebSocket
+through the host's admitted connection to the configured API server (no redirect
+followed), and reads the cluster's status message. The result is `namespace`,
+`pod`, `container`, `exit_code`, `stdout`, `stderr`, `stdout_truncated` and
+`stderr_truncated`. A non-zero exit is an applied attempt with that `exit_code`,
+not a refusal. An upgrade the cluster refuses with 400, 401, 403, 404 or 422 is a
+refusal and no process ran. A lost stream, an answer without a status, a 5xx or
+the deadline is `unknown`: the command may have run, and it is never sent again;
+running it again takes a new approval. The credential needs the cluster's
+permission on the `pods/exec` subresource in the namespace.
+
 ## Read Helm releases
 
 The four `helm_releases.*` operations read the Secrets a Helm release is stored
@@ -330,11 +440,14 @@ page.
 
 ## Limitations
 
-This binding advertises up to ten read operations. Events are read as a list of
-core/v1 Event objects in one namespace; there is no watch, and no read filters
-events by the object they involve. Conditions, pod logs, exec, copy, port
-forwarding and every mutation are not implemented. `deployments.history` reports
-the stored ReplicaSets; it does not diff revisions or roll one back.
+This binding advertises up to twelve read operations and one write, `pods.exec`.
+Events are read as a list of core/v1 Event objects in one namespace; there is no
+watch, and no read filters events by the object they involve. Conditions, log
+following, interactive exec (stdin or a terminal), copy, port forwarding and
+every other mutation are not implemented. `deployments.history` reports the
+stored ReplicaSets; it does not diff revisions or roll one back. `pods.logs`,
+`contexts.list` and `pods.exec` are verified against recorded API answers and
+streams, not a live cluster.
 
 Of the Helm surface, only release-state reads exist. Installing, upgrading,
 uninstalling and rolling back a release are not implemented; neither are chart

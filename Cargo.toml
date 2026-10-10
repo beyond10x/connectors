@@ -35,6 +35,9 @@ base64 = "0.23"
 clap = { version = "4.6", features = ["derive"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 futures-util = "0.3"
+# WebSocket framing only, over a connection the host already opened and admitted
+# (`connectors_host::http`): no TLS and no connect feature, so it never dials.
+tokio-tungstenite = { version = "0.29.0", default-features = false, features = ["handshake"] }
 hex = "0.4"
 hmac = "0.13"
 jsonschema = { version = "0.58", default-features = false }
