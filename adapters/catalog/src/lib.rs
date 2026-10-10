@@ -131,13 +131,37 @@ const BINARY_HOSTS: usize = 4;
 /// `hosts` are the origins, besides the API base, that the read may reach: a
 /// `download` URL's origin and a redirect's target. A redirect is followed only
 /// to one of them that the connection also admits ([`Hosts`]); with none, a
-/// redirect is refused. Omitted when empty, as the model omits it.
+/// redirect is refused. Omitted when empty, as the model omits it; given as an
+/// explicit empty list, it is refused when the selection loads, as the model
+/// requires at least one host whenever `hosts` is defined.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(from = "BinaryMembers")]
 pub struct Binary {
     pub max_bytes: u64,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hosts: Vec<String>,
+    /// `hosts` was given, and empty: never serialised, refused at load.
+    #[serde(skip)]
+    empty_hosts: bool,
+}
+
+/// The members of [`Binary`] as written, `hosts` absent kept apart from empty.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BinaryMembers {
+    max_bytes: u64,
+    #[serde(default, deserialize_with = "present_hosts")]
+    hosts: Option<Vec<String>>,
+}
+
+impl From<BinaryMembers> for Binary {
+    fn from(members: BinaryMembers) -> Self {
+        Self {
+            max_bytes: members.max_bytes,
+            empty_hosts: members.hosts.as_ref().is_some_and(Vec::is_empty),
+            hosts: members.hosts.unwrap_or_default(),
+        }
+    }
 }
 
 /// A read of a URL the provider handed out, such as Slack's `url_private`
@@ -173,9 +197,9 @@ impl Hosts for BTreeMap<String, std::sync::Arc<dyn AuthenticatedHttp>> {
 
 /// The canonical origin of an `https` origin or URL: `https://<host>` or
 /// `https://<host>:<port>`, the host in lower case, the default port dropped.
-/// `None` for anything else: another scheme, user information, an empty or
-/// bracketed host, a host with characters outside letters, digits, `-` and
-/// `.`, or a port that is not a decimal number in range.
+/// `None` for anything else: another scheme, user information, a bracketed
+/// host, a host that is not a hostname ([`hostname`]), or a port that is not
+/// a decimal number in range.
 pub fn origin(text: &str) -> Option<String> {
     if !text.get(..8)?.eq_ignore_ascii_case("https://") {
         return None;
@@ -187,11 +211,7 @@ pub fn origin(text: &str) -> Option<String> {
         Some((host, port)) => (host, Some(port)),
         None => (authority, None),
     };
-    if host.is_empty()
-        || !host
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'.')
-    {
+    if !hostname(host) {
         return None;
     }
     let host = host.to_ascii_lowercase();
@@ -208,6 +228,22 @@ pub fn origin(text: &str) -> Option<String> {
             }
         }
     }
+}
+
+/// Whether a host is a hostname (`connectors_catalog.binary.Origin`):
+/// dot-separated labels, each one to 63 letters, digits and hyphens, none
+/// starting or ending with a hyphen, at most 253 bytes in all. A dotted IPv4
+/// literal is one; an empty label (`..`, `a..b`, `.`, a trailing dot) is not.
+fn hostname(host: &str) -> bool {
+    host.len() <= 253
+        && host.split('.').all(|label| {
+            (1..=63).contains(&label.len())
+                && label
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+        })
 }
 
 /// The declarative head guard: a preflight read that refuses before any write
@@ -489,6 +525,13 @@ where
     D: serde::Deserializer<'de>,
 {
     Read::deserialize(deserializer).map(Some)
+}
+
+fn present_hosts<'de, D>(deserializer: D) -> std::result::Result<Option<Vec<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Vec::<String>::deserialize(deserializer).map(Some)
 }
 
 fn present_flag<'de, D>(deserializer: D) -> std::result::Result<Option<bool>, D::Error>
@@ -1315,6 +1358,15 @@ impl Engine {
             .get("url")
             .and_then(Value::as_str)
             .ok_or_else(|| refuse("`url` is not a string"))?;
+        // A segment decoding to a separator is one segment here, but lands
+        // outside `path_prefix` on a server that decodes it. A dot segment is
+        // refused below, as a URL this engine does not send.
+        if origin(url).is_some() && Target::escapes(&url["https://".len()..]) {
+            return Err(Error::new(
+                ErrorCode::Forbidden,
+                "`url` has a path segment that decodes to `/` or `\\`",
+            ));
+        }
         let target = Target::absolute(url)
             .ok_or_else(|| refuse("`url` is not an https URL this engine can send"))?;
         if !binary.hosts.contains(&target.origin) {
@@ -2215,7 +2267,8 @@ fn declare_download(selection: &Selection, download: &Download) -> connectors_co
 
 /// What a selection's binary members must be, whatever it reads: `binary`
 /// exactly when `response` is `binary`, on a read, with `max_bytes` from one
-/// to [`BINARY_LIMIT`] and at most four distinct canonical `https` origins.
+/// to [`BINARY_LIMIT`] and, when `hosts` is given, one to four distinct
+/// canonical `https` origins.
 fn check_binary(selection: &Selection) -> Result<()> {
     let declared = selection.response == Some(ResponseKind::Binary);
     let Some(binary) = &selection.binary else {
@@ -2234,6 +2287,8 @@ fn check_binary(selection: &Selection) -> Result<()> {
         Some("for a write")
     } else if binary.max_bytes == 0 || binary.max_bytes > BINARY_LIMIT {
         Some("with max_bytes outside 1 to 2097152")
+    } else if binary.empty_hosts {
+        Some("with an empty hosts list, which must name at least one host or be omitted")
     } else if binary.hosts.len() > BINARY_HOSTS {
         Some("reaching more than four hosts")
     } else if binary
@@ -2324,8 +2379,23 @@ impl Target {
         Self::absolute(location)
     }
 
+    /// Whether the path of an authority-and-reference (an absolute URL after
+    /// `https://`) has a segment that, percent-decoded, holds `/` or `\`: one
+    /// segment to this engine, re-encoded by the port, but another path on a
+    /// server that decodes it.
+    fn escapes(rest: &str) -> bool {
+        let rest = rest.split(['?', '#']).next().unwrap_or_default();
+        let Some(start) = rest.find('/') else {
+            return false;
+        };
+        rest[start + 1..]
+            .split('/')
+            .any(|segment| percent_decode(segment, false).is_some_and(|s| s.contains(['/', '\\'])))
+    }
+
     /// The path and query after an origin, the fragment dropped. The path is
-    /// at least one segment, none empty, `.` or `..` once decoded.
+    /// at least one segment, none empty, `.` or `..` once decoded, and none
+    /// holding `/` or `\` once decoded.
     fn reference(origin: String, reference: &str) -> Option<Self> {
         let reference = reference.split('#').next().unwrap_or_default();
         let (raw_path, raw_query) = reference.split_once('?').unwrap_or((reference, ""));
@@ -2336,7 +2406,7 @@ impl Target {
             .collect::<Option<Vec<String>>>()?;
         if segments
             .iter()
-            .any(|s| s.is_empty() || s == "." || s == "..")
+            .any(|s| s.is_empty() || s == "." || s == ".." || s.contains(['/', '\\']))
         {
             return None;
         }
@@ -2483,18 +2553,59 @@ async fn read_binary(
             ),
         ));
     }
-    Ok((response.status, binary_body(&response)))
+    Ok((response.status, binary_body(&response)?))
 }
 
-/// A binary body: its media type, length, SHA-256 and standard base64.
-fn binary_body(response: &HttpResponse) -> Value {
-    use base64::{Engine as _, engine::general_purpose::STANDARD};
-    use sha2::{Digest as _, Sha256};
-    let media_type = response
+/// One response field's value, by name in any ASCII case.
+fn header<'a>(response: &'a HttpResponse, name: &str) -> Option<&'a str> {
+    response
         .headers
         .iter()
-        .find(|(name, _)| name.eq_ignore_ascii_case("content-type"))
-        .and_then(|(_, value)| value.split(';').next())
+        .find(|(key, _)| key.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
+}
+
+/// Whether a field value holds a `,` outside a quoted string: the transport
+/// joins repeated field lines with `, `, so a `Content-Type` holding one names
+/// more than one media type.
+fn listed(value: &str) -> bool {
+    let mut quoted = false;
+    let mut escaped = false;
+    for c in value.chars() {
+        match c {
+            _ if escaped => escaped = false,
+            '\\' if quoted => escaped = true,
+            '"' => quoted = !quoted,
+            ',' if !quoted => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
+/// A binary body: its media type, length, SHA-256 and standard base64. The
+/// media type is `application/octet-stream` when the answer names none or
+/// carries a content coding other than `identity`, which this engine neither
+/// requests nor decodes; an answer naming more than one media type is refused.
+fn binary_body(response: &HttpResponse) -> Result<Value> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use sha2::{Digest as _, Sha256};
+    let declared = header(response, "content-type");
+    if declared.is_some_and(listed) {
+        return Err(Error::new(
+            ErrorCode::UpstreamProtocol,
+            "provider answered with more than one Content-Type",
+        ));
+    }
+    let coded = header(response, "content-encoding").is_some_and(|value| {
+        value
+            .split(',')
+            .map(str::trim)
+            .any(|coding| !coding.is_empty() && !coding.eq_ignore_ascii_case("identity"))
+    });
+    let media_type = declared
+        .filter(|_| !coded)
+        .and_then(|value| value.split(';').next())
         .map(|value| value.trim().to_ascii_lowercase())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "application/octet-stream".to_owned());
@@ -2502,10 +2613,10 @@ fn binary_body(response: &HttpResponse) -> Value {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect();
-    json!({
+    Ok(json!({
         "media_type": media_type,
         "length": response.body.len(),
         "sha256": sha256,
         "content_base64": STANDARD.encode(&response.body),
-    })
+    }))
 }
