@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.41.0 — 2026-10-10
 
 ### Added
 
@@ -71,7 +71,19 @@
   new `identical_answer` field unset. The shared and adapter models, the authored scenarios and
   the generated documentation pages pass under 0.57.0's new validation rules unchanged.
 
+### Compatibility
+
+- The Jira and GitLab catalog selections grow, so their descriptors and the configuration
+  revisions of their guides change. An existing local adapter entry keeps working with the
+  operations it names; add the new ones to its `operations` permission to use them.
+- `body_types` and `body_required` are optional selection fields; a selection without them
+  declares and prepares exactly as before.
+
 ### Limits
+
+- `connectors-build metadata-conformance emit` writes an `ess-mutation-manifest/2` manifest that
+  the pinned ESS refuses for the `emit-swap` mutant class, which only `/4` holds. The repository
+  gate runs the baseline metadata suite, which passes; `emit` is not on its path.
 
 - GitLab code search within a project (`getApiV4ProjectsIdDashSearch`, scope `blobs`) is not
   selected. The pinned document declares its path as `/api/v4/projects/{id}/(-/)search`, GitLab's
