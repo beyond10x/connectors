@@ -58,8 +58,10 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
 serves the provider from the pinned source alone, plus eleven repository reads
-and one unguarded write, `issue.create`, and the merge-request note and discussion
-operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)):
+and one unguarded write, `issue.create`, the merge-request note and discussion
+operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussions)), and the
+auto-merge and reopen variants of merge and update
+([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)):
 
 | id | source operation | effect |
 |---|---|---|
@@ -71,6 +73,7 @@ operations ([the guarded merge guide](local-gitlab-merge.md#notes-and-discussion
 | `merge_request.create` | `postApiV4ProjectsIdMergeRequests`, guarded | write |
 | `merge_request.update` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid`, guarded | write |
 | `merge_request.merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`, guarded | write |
+| `merge_request.auto_merge`, `merge_request.reopen` | `…MergeRequestIidMerge` and `…MergeRequestIid`, guarded, each with one fixed body value ([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)) | write |
 | `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | read |
 | `merge_request.note.create`, `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes`, `…DiscussionsDiscussionIdNotes`, unguarded | write |
 | `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId`, guarded | write |
@@ -403,6 +406,23 @@ The complete configuration used against the sandbox is
   `body_required` repeats, or a guard reading a path nested under a typed key
   is refused when the selection loads. Like `body_keys`, they are declared by
   the selection from the pinned document and not checked against it.
+- `body_fixed` is optional, beside `body_keys`: `{"<key>": <value>}` fixes a
+  closed body key to one JSON string, integer or boolean. The provider sends
+  exactly that value under that key on every write, and a body naming the key
+  at all, with that value or any other, is refused as `invalid_input` before
+  any request. The key is left out of the declared input schema; when every key
+  `body_keys` admits is fixed, `body` is not required and may be omitted. It is
+  for a guarded variant of an existing write whose meaning rests on one body
+  value, such as GitLab's merge with `auto_merge: true` or its update with
+  `state_event: reopen` ([Auto-merge and reopen](local-gitlab-merge.md#auto-merge-and-reopen)).
+  A fixed key `body_keys` does not admit (so any without `body_keys`), a value
+  that is not a string, an integer or a boolean or not of the key's
+  `body_types` type, a key `body_required` names and a key a guard reads are
+  refused when the selection loads: a guard compares a fixed value as a
+  `literal`. `body_keys`, `body_types`, `body_required` and `body_fixed` are
+  modelled as `connectors_catalog.selection.ClosedBody` in
+  `adapters/catalog/spec/ess`, and every shipped selection is checked against
+  it.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
@@ -425,14 +445,22 @@ The complete configuration used against the sandbox is
     `doTransition` (`204`). A read that fails, or answers without the pinned
     value, leaves the outcome uncertain as a differing value does. The write's
     own status and body are still what the operation returns.
+  - `postflight.any_of` is optional: two or more checks of which at least one
+    must hold, beside every check in `postflight.checks`, against the same
+    answer. It is one check that accepts one of several observations, for a
+    write whose success has more than one shape: GitLab's merge with
+    `auto_merge: true` answers either with `merge_when_pipeline_succeeds`
+    `true` or, when the pipeline had already succeeded, with `state` `merged`.
+    An answer with none of them leaves the outcome uncertain. Its checks count
+    toward the sixteen.
   - Every read binds every value, and every check resolves its input, before
     the first request; a missing one is refused as `invalid_input` with nothing
     sent. A read that is not a GET under the base path, more than sixteen checks
-    in all, a further preflight without checks, more than three of them, and a
-    postflight read without checks are refused when the selection loads, as is
-    a credential parameter bound by any read's `values`. The format is modelled
-    as `connectors_catalog.guard.Guard` in `adapters/catalog/spec/ess`, and
-    every shipped guard is checked against it.
+    in all, a further preflight without checks, more than three of them, a
+    postflight read without checks and an `any_of` of one check are refused
+    when the selection loads, as is a credential parameter bound by any read's
+    `values`. The format is modelled as `connectors_catalog.guard.Guard` in
+    `adapters/catalog/spec/ess`, and every shipped guard is checked against it.
 
 The merge guard in the shipped set reads the merge request and requires, before
 the one PUT: `/sha` equal to the pinned `body.sha`, `/state` literally `opened`,

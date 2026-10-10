@@ -125,6 +125,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         body_keys: Vec::new(),
         body_types: BTreeMap::new(),
         body_required: Vec::new(),
+        body_fixed: BTreeMap::new(),
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {
@@ -141,6 +142,7 @@ fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Chec
         postflight: Postflight {
             checks: postflight,
             read: None,
+            any_of: vec![],
         },
     }
 }
@@ -163,6 +165,7 @@ fn selections() -> Vec<Selection> {
                 postflight: Postflight {
                     checks: vec![input_check("/sha", "sha")],
                     read: None,
+                    any_of: vec![],
                 },
             }),
             ..select("merge_request.create", "createMergeRequest", Effect::Write)

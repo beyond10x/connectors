@@ -62,13 +62,23 @@ types:
   # `doTransition` (204). A read that fails, or answers without the checked value, leaves the
   # effect possible, as a differing value does. The write's own answer is not read for checks
   # then, and a body it carries is still returned.
+  #
+  # `any_of` is one check that accepts one of several observations: it holds when at least one
+  # of its comparisons holds, beside every check in `checks`. It is for a write whose success
+  # has more than one shape, such as GitLab's merge with `auto_merge` fixed to `true`, which
+  # answers either with auto-merge set (`/merge_when_pipeline_succeeds` `true`) or, when the
+  # pipeline had already succeeded, merged at once (`/state` `merged`). At least two
+  # comparisons, since one is an ordinary check; absent when unused, so a postflight without it
+  # keeps its serialised form. Its comparisons count toward the sixteen checks.
   - name: connectors_catalog.guard.Postflight
     kind: struct
     fields:
       - {name: checks, type: "List<connectors_catalog.guard.Check>"}
       - {name: read, type: "Optional<connectors_catalog.guard.Read>"}
+      - {name: any_of, type: "Optional<List<connectors_catalog.guard.Check>>"}
     invariants:
       - any: [{not: defined(read)}, {checks.count: {gte: 1}}]
+      - any: [{not: defined(any_of)}, {any_of.count: {gte: 2}}]
 
   # `preflight` is the first read; `further_preflights` are read after it, in order, each with its
   # own checks, and the first that refuses stops the guard with the write unsent: for a write

@@ -25,12 +25,45 @@
   `target_status`, or the outcome is `unknown`. Verified against a local fixture written in the
   pinned document's shapes, not a live site. The Jira guide's example configuration therefore
   has a new configuration revision.
+- A catalog selection can fix a body member to one value, and a postflight can accept one of
+  several observations (`docs/local-catalog-provider.md`, `body_fixed` and `guard`):
+  - `body_fixed` maps closed body keys to a JSON string, integer or boolean each. The provider
+    sends exactly that value on every write; a caller's body naming the key at all is refused as
+    `invalid_input` before any request, and the key is left out of the declared input schema.
+    When every admitted key is fixed, `body` may be omitted. A fixed key `body_keys` does not
+    admit, a value of another type, and a key a guard reads or `body_required` names are refused
+    when the selection loads.
+  - `postflight.any_of` lists two or more checks of which at least one must hold, beside every
+    check in `postflight.checks`; an answer with none of them leaves the outcome `unknown`.
+  - Both are modelled first in `adapters/catalog/spec/ess` (the new
+    `connectors_catalog.selection.ClosedBody`, beside `body_keys`, `body_types` and
+    `body_required`, and `connectors_catalog.guard.Postflight`), and every shipped selection is
+    checked against the model. Both are omitted when empty, so every existing selection keeps
+    its bytes and its configuration revision.
+- GitLab through the catalog provider sets a merge request to merge when its pipeline succeeds,
+  and reopens a closed one, each a required-approval write (`docs/local-gitlab-merge.md`,
+  *Auto-merge and reopen*):
+  - `merge_request.auto_merge` selects `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`
+    with `auto_merge` fixed to `true` and the body closed to `sha` and `auto_merge`. The guard
+    pins the head and the open state, deliberately not a succeeded pipeline; GitLab's answer
+    must keep the head and show either auto-merge set or the merge request merged.
+  - `merge_request.reopen` selects `putApiV4ProjectsIdMergeRequestsMergeRequestIid` with exactly
+    `state_event: reopen`. The guard requires state `closed` at the pinned `sha` before, and
+    `opened` in GitLab's answer.
+  - `merge_request.merge` and `merge_request.update` keep their guards. Verified against a local
+    fixture written in the pinned document's shapes, not a live GitLab. The GitLab example
+    configuration in `docs/local-catalog-provider.md` therefore has a new configuration
+    revision.
 
 ### Limits
 
 - A transition that is not open on the issue is refused before the `POST` as `protocol`, not
   `forbidden`: Jira's narrowed answer has no transition, and a preflight answer without the
   checked value is read as a protocol failure for every guard.
+- `merge_request.auto_merge` admits only `sha` beside the fixed `auto_merge`: an auto-merge with
+  `squash` or `should_remove_source_branch` is refused before any request. The pinned document
+  declares `merge_when_pipeline_succeeds` on GitLab's answer; that GitLab sets it `true` on an
+  accepted auto-merge has not been observed against a running GitLab.
 
 ## 0.41.0 — 2026-10-10
 

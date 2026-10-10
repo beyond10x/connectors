@@ -5,3 +5,4 @@ domains:
   - connectors_catalog.feed
   - connectors_catalog.guard
   - connectors_catalog.identity
+  - connectors_catalog.selection
