@@ -36,3 +36,71 @@ types:
     # ESS 0.36 has no evidence-provenance, trusted-time, byte-fixity or cross-record
     # construct.
     # No provider-resource entity, lifecycle or persistent ownership is introduced.
+
+  # Normative owner: adapters/kubernetes/contracts/mutations/v1alpha1/semantics.md, pods.exec.
+  - name: connectors_kubernetes.mutations.PodExecRequest
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: pod, type: String}
+      - {name: container, type: String}
+      - {name: command, type: "List<String>"}
+      - {name: timeout_seconds, type: Integer}
+      - {name: max_output_bytes, type: Integer}
+    invariants:
+      - namespace.count: {gte: 1, lte: 63}
+      - pod.count: {gte: 1, lte: 253}
+      - container.count: {gte: 1, lte: 63}
+      - command.count: {gte: 1, lte: 64}
+      - timeout_seconds: {gte: 1, lte: 60}
+      - max_output_bytes: {gte: 1, lte: 1048576}
+    # The closed input of pods.exec after defaults (timeout_seconds 30,
+    # max_output_bytes 65536). command is the argument vector exactly as the process
+    # receives it: its first element is the executable and no shell is added, so a
+    # caller who wants a shell names one. Each element is 1..4096 bytes and the vector
+    # at most 16384 bytes in all. container is required: exec never falls back to a
+    # default container. namespace must be configured, checked before any I/O.
+    # max_output_bytes bounds stdout and stderr each; timeout_seconds bounds the whole
+    # attempt from the upgrade request to the status.
+  - name: connectors_kubernetes.mutations.ExecChannel
+    kind: enum
+    variants: [stdout, stderr, status]
+    # The server-to-client channels of the exec subresource's v5.channel.k8s.io and
+    # v4.channel.k8s.io subprotocols: the first byte of every binary message, 1, 2
+    # and 3. stdin (0) and resize (4) are never opened (stdin=false, tty=false), so a
+    # message on them, or on any other channel, is outside the binding.
+  - name: connectors_kubernetes.mutations.PodExecResult
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: pod, type: String}
+      - {name: container, type: String}
+      - {name: exit_code, type: Integer}
+      - {name: stdout, type: String}
+      - {name: stderr, type: String}
+      - {name: stdout_truncated, type: Boolean}
+      - {name: stderr_truncated, type: Boolean}
+    invariants:
+      - exit_code: {gte: 0, lte: 255}
+    # A completed attempt: the provider's status message on channel 3 was received.
+    # exit_code 0 is status Success; a non-zero code is status Failure with reason
+    # NonZeroExitCode and an ExitCode cause, and is a completed attempt, not a refusal.
+    # stdout and stderr keep the first max_output_bytes bytes of each channel; the
+    # rest is read and discarded so the status is still observed, and the matching
+    # flag is set. A cut never splits a UTF-8 scalar; invalid bytes are replaced.
+  - name: connectors_kubernetes.mutations.PodExecOutcome
+    kind: enum
+    variants: [completed, refused, unknown]
+    # completed: a status message settled the exit code (applied). refused: nothing
+    # was sent, or the API server answered the upgrade request with a 4xx and no
+    # stream, so the command did not start. unknown: anything after the upgrade
+    # request was sent that is not a settled status - a lost or closed stream, an
+    # unoffered subprotocol, a deadline, a 5xx, a failure status that is not an exit
+    # code, output beyond the consumable bound. Unknown is reported as unknown and is
+    # never retried or settled later by this binding.
+
+# ESS-LIMIT (pods.exec): the per-element and total byte bounds of command, the
+# DNS-1123 predicates, the channel framing, status parsing and UTF-8 boundary cut are
+# predicates over bytes; approval, the attempt record and the dispatch fence are the
+# host's shared mutation lifecycle (ess/domains/mutations.yaml), which this adapter
+# model references and does not restate.

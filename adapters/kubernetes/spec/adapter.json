@@ -11,7 +11,10 @@
     "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/namespace-v1/",
     "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/replica-set-v1/",
     "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/",
-    "https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/"
+    "https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/",
+    "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#get-read-log-of-the-specified-pod",
+    "https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/",
+    "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#get-connect-get-requests-to-exec-of-pod"
   ],
   "configuration_schema": {
     "oneOf": [
@@ -79,6 +82,19 @@
               "metadata",
               "redacted_content"
             ]
+          },
+          "pod_logs": {
+            "description": "Advertises pods.logs. Absent means false: the effective document carries it only when true, so a configuration that does not enable it keeps its revision.",
+            "const": true
+          },
+          "pod_exec": {
+            "description": "Advertises pods.exec, a mutation, over the connectors-private/2 write exchange only; the read exchange never lists it. Absent means false: the effective document carries it only when true, so a configuration that does not enable it keeps its revision.",
+            "const": true
+          },
+          "kubeconfig_path_digest": {
+            "description": "Digest of the absolute kubeconfig path the native configuration names; present only when it names one, and then contexts.list is advertised and reads that file alone.",
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         },
         "required": [
@@ -141,6 +157,14 @@
                   "metadata",
                   "redacted_content"
                 ]
+              },
+              "pod_logs": {
+                "description": "Advertises pods.logs when true.",
+                "type": "boolean"
+              },
+              "pod_exec": {
+                "description": "Advertises pods.exec when true; the federated service has no write exchange, so it is refused there.",
+                "const": false
               }
             },
             "required": [
@@ -1487,6 +1511,461 @@
           "items",
           "next_cursor",
           "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "pods.logs",
+      "description": "Read a bounded tail of one pod container's log in a configured namespace, as timestamped lines; advertised only when pod_logs is configured.",
+      "contract": "datasource.logs/v1alpha1",
+      "profile": "kubernetes-pod-logs",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "pod": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "container": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "since_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400
+          },
+          "tail_lines": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "max_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 131072
+          }
+        },
+        "required": [
+          "namespace",
+          "pod"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp_unix_ns": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "pattern": "^-?[0-9]{1,30}$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "stream": {
+                  "type": "object",
+                  "properties": {
+                    "namespace": {
+                      "type": "string"
+                    },
+                    "pod": {
+                      "type": "string"
+                    },
+                    "container": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "namespace",
+                    "pod",
+                    "container"
+                  ],
+                  "additionalProperties": false
+                },
+                "line": {
+                  "type": "string"
+                },
+                "line_truncated": {
+                  "type": "boolean"
+                },
+                "redacted": {
+                  "const": false
+                },
+                "source": {
+                  "type": "null"
+                }
+              },
+              "required": [
+                "timestamp_unix_ns",
+                "stream",
+                "line",
+                "line_truncated",
+                "redacted",
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "selection": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "kubernetes-relative-tail"
+              },
+              "since_seconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 86400
+              },
+              "tail_lines": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            },
+            "required": [
+              "kind",
+              "since_seconds",
+              "tail_lines"
+            ],
+            "additionalProperties": false
+          },
+          "order": {
+            "const": "provider"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "object",
+            "properties": {
+              "causes": {
+                "type": "array",
+                "maxItems": 3,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "provider_limit",
+                    "source_bytes",
+                    "line_bytes"
+                  ]
+                }
+              },
+              "occurrences_dropped": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "stream_groups_dropped": {
+                "const": 0
+              }
+            },
+            "required": [
+              "causes",
+              "occurrences_dropped",
+              "stream_groups_dropped"
+            ],
+            "additionalProperties": false
+          },
+          "next_cursor": {
+            "type": "null"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "lines",
+          "selection",
+          "order",
+          "complete",
+          "truncation",
+          "next_cursor",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "contexts.list",
+      "description": "List the contexts of the kubeconfig this local connection was configured with: name, cluster, namespace and the current flag, never a credential or server detail; advertised only when the local configuration names a kubeconfig.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-kubeconfig-contexts",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 256
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "cluster": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "namespace": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 63
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "current": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "cluster",
+                "namespace",
+                "current"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "type": "null"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "const": "kubeconfig/contexts"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "pods.exec",
+      "description": "Run one command, given as an argument vector with no shell added, in a named container of a pod in a configured namespace, bounded in time and output; a mutation that needs an approval and is advertised only when pod_exec is configured.",
+      "contract": "operations/v1alpha1",
+      "profile": "mutation",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "pod": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "container": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "command": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            }
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "max_output_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          }
+        },
+        "required": [
+          "namespace",
+          "pod",
+          "container",
+          "command"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string"
+          },
+          "pod": {
+            "type": "string"
+          },
+          "container": {
+            "type": "string"
+          },
+          "exit_code": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "stdout": {
+            "type": "string"
+          },
+          "stderr": {
+            "type": "string"
+          },
+          "stdout_truncated": {
+            "type": "boolean"
+          },
+          "stderr_truncated": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "namespace",
+          "pod",
+          "container",
+          "exit_code",
+          "stdout",
+          "stderr",
+          "stdout_truncated",
+          "stderr_truncated",
           "provenance"
         ],
         "additionalProperties": false

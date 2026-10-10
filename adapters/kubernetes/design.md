@@ -12,7 +12,7 @@ Shared ESS retains only generic facts and references; this model does not implem
 
 Implemented today (`adapters/kubernetes/spec/adapter.json`): `resources.list` (`datasource.records/v1alpha1`, profile `kubernetes-list`), `endpoints.discover` (`endpoint_discovery/v1alpha1`), `hosts.discover` (`host_discovery/v1alpha1`); `resources.get`, `namespaces.list` and `deployments.history` (`datasource.records/v1alpha1`, [reads binding](contracts/reads/v1alpha1/semantics.md)); configuration `namespaces`, `resource_kinds` (pods, services, deployments, endpointslices, replicasets, events), `discover_hosts`; bearer token via `urn:connectors:config:v1:http` credential. Placement: in-cluster or wherever the API server is reachable (`contracts/service/v1alpha1/semantics.md`, Kubernetes paragraph).
 
-Rebuild adds what the old integration had and the first slice did not: pod logs, deployment status and rollout restart, Service target recognition, the API-server service proxy route, exec-plugin and client-certificate authentication, and per-verb permission evidence. Kubeconfig context candidates (old design 10 §1-2) become host/CLI configuration tooling, not an adapter contract.
+Rebuild adds what the old integration had and the first slice did not: pod logs, deployment status and rollout restart, Service target recognition, the API-server service proxy route, exec-plugin and client-certificate authentication, and per-verb permission evidence. Kubeconfig context candidates (old design 10 §1-2) become host/CLI configuration tooling, not an adapter contract; listing the contexts of the one kubeconfig a local configuration names is the `contexts.list` read (2026-10-10).
 
 ## 2. Old surface and disposition
 
@@ -23,13 +23,13 @@ Rebuild adds what the old integration had and the first slice did not: pod logs,
 | `kubernetes.pod.logs`: `namespace`, `pod`, `container`, `tail_lines` 1–1000 (200), `since_seconds` ≤ 86400, 128 KiB, namespace grant as containment | `workloads.rs:50,1120-1145` | preserve → `datasource.logs` profile `kubernetes-pod-logs` |
 | `kubernetes.workloads` datasource (value-projected, excludes Secrets, env, labels, annotations, raw objects, event messages) | `workloads.rs:51`; `contracts/connector-datasource/v0alpha1/README.md:13-15` | change: `resources.list` returns provider-native objects with a declared projection; the exclusion list becomes a configured projection, not a contract |
 | `kubernetes.databases` datasource | `databases.rs:46` | preserve → `endpoints.discover` classification candidates (implemented) |
-| Kubeconfig context candidates, passive read, `allow_exec_auth = false` | `docs/design/10-…:18-72`; `local.rs:311-315` | move to host/CLI tooling; exec plugin becomes `auth.capability` `exec-credential-plugin` gated by configuration |
+| Kubeconfig context candidates, passive read, `allow_exec_auth = false` | `docs/design/10-…:18-72`; `local.rs:311-315` | context listing → `contexts.list`, a read of the one kubeconfig the local configuration names ([reads binding](contracts/reads/v1alpha1/semantics.md#kubeconfig-contexts), 2026-10-10); building a connection from a context stays host/CLI tooling; exec plugin becomes `auth.capability` `exec-credential-plugin` gated by configuration |
 | Core/v1 Service recognizer (grafana, prometheus, loki, alertmanager), SSAR per namespace, `resource_limit`, no Secrets/ConfigMaps/env/EndpointSlice addresses | `docs/design/10-…:73-100` | preserve → `resource_discovery` profile `kubernetes-service-targets` |
 | `kubernetes_service_proxy_v1`: fixed Service and port, `get` on `services/proxy` per invocation, target-relative GET via API server, no fallback | `docs/design/10-…:102-116` | preserve → `route.mediated_http` profile `kubernetes-service-proxy` |
 | Argo CD recognized, observation only | `docs/design/10-…:173` | preserve as recognizer marker with no route |
 | Token, token file, client certificate auth | `local.rs:1076-1079` | preserve → `http-bearer`, `mtls-client-identity` |
 | Watches | `docs/design.md:939` | deferred (`events`) |
-| Process execution into a pod | none in old repo (`rg exec` finds only exec-auth) | deferred (`execution`, `docs/design.md:464`) |
+| Process execution into a pod | none in old repo (`rg exec` finds only exec-auth) | `pods.exec` mutation ([mutation binding §4.2](contracts/mutations/v1alpha1/semantics.md#42-pod-exec-podsexec), 2026-10-10); its stream transport is open |
 
 ## 3. Contracts needed and why
 
@@ -59,7 +59,9 @@ Rebuild adds what the old integration had and the first slice did not: pod logs,
 | `deployments.history` | records `kubernetes-rollout-history` | read | `kubernetes.deployment.history` |
 | `endpoints.discover` (exists) | endpoint_discovery | none | `kubernetes.databases` |
 | `hosts.discover` (exists) | host_discovery | none | — |
-| `pod.logs` | logs `kubernetes-pod-logs` | read | `kubernetes.pod.logs` |
+| `pods.logs` (implemented 2026-10-10, `pod_logs` enables it) | logs `kubernetes-pod-logs` | read | `kubernetes.pod.logs` |
+| `contexts.list` (implemented 2026-10-10, local `kubeconfig` enables it) | records `kubernetes-kubeconfig-contexts` | read of the configured kubeconfig, no provider request | `kubernetes.cluster.list` |
+| `pods.exec` (specified 2026-10-10; transport open) | mutation, `idempotency: none`, `approval: required` | external_write, network, process | `kubernetes.pod.exec` |
 | `deployment.rollout_restart` | mutation, `idempotency: keyed` (receiver F02), `approval: required` | external_write, network | `kubernetes.deployment.rollout-restart` |
 | `services.observe` | resource_discovery `kubernetes-service-targets` | none | Service recognizer |
 | (capability) `route.mediated_http` `kubernetes-service-proxy` | provided to the host | forwards GET | `kubernetes_service_proxy_v1` |
@@ -118,7 +120,7 @@ Illustrative outline of proposed extensions to the implemented schema; this is n
 
 ## 9. Deferred
 
-`events` (watch, resourceVersion gaps), `execution` (pod exec with admitted workload/container, `docs/design.md:464`), tunnels beyond the API-server proxy.
+`events` (watch, resourceVersion gaps), tunnels beyond the API-server proxy. Pod exec left this list on 2026-10-10 (`pods.exec`, §4); its stream transport is the open part.
 
 ## 10. Evidence required
 

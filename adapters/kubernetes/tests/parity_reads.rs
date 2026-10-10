@@ -70,6 +70,9 @@ fn recorded_adapter(
         resource_kinds: kinds.iter().map(|k| (*k).to_owned()).collect(),
         discover_hosts: false,
         helm_release_reads: HelmReleaseReads::Off,
+        pod_logs: false,
+        pod_exec: false,
+        kubeconfig_contexts: false,
     };
     let effective = json!({"service":{"instance":"recorded","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED"}},"http":{"base_url":"https://fixture.invalid/"},"adapter":config});
     let adapter = Kubernetes::new("recorded", config, effective, recorded.clone()).unwrap();
@@ -573,6 +576,9 @@ async fn the_new_kinds_are_configurable_and_the_new_reads_are_advertised() {
         resource_kinds: vec!["namespaces".into()],
         discover_hosts: false,
         helm_release_reads: HelmReleaseReads::Off,
+        pod_logs: false,
+        pod_exec: false,
+        kubeconfig_contexts: false,
     };
     let effective = json!({"adapter":config});
     assert!(

@@ -11,3 +11,44 @@ types:
     # Bytes are 0..255. Retain at most the admitted 1..1048576-byte ceiling;
     # complete means EOF was actually observed, not that Content-Length matched.
     # No range/resume identity, retry, freshness or business permission is implied.
+
+  # The upgraded stream of one admitted write (connectors_sdk::AuthenticatedWrite::upgrade,
+  # served by crates/connectors-host/src/http.rs). It is reachable only from the consuming
+  # write capability trusted composition hands a prepared write, so it is opened only after
+  # the host spent the approval and recorded the attempt; a read port has no upgrade.
+  - name: connectors.transport.UpgradeBounds
+    kind: struct
+    fields:
+      - {name: max_message_bytes, type: Integer}
+      - {name: max_total_bytes, type: Integer}
+      - {name: timeout_ms, type: Integer}
+    invariants:
+      - max_message_bytes: {gte: 1, lte: 16777216}
+      - max_total_bytes: {gte: 1, lte: 67108864}
+      - timeout_ms: {gte: 1, lte: 120000}
+    # Fixed by trusted composition when it builds the write capability, never by the
+    # business adapter. The host enforces all three: one message larger than
+    # max_message_bytes, or more than max_total_bytes of messages in all, closes the
+    # stream and ends it truncated; timeout_ms bounds the whole exchange from the
+    # upgrade request to the last message and ends it at the deadline. max_message_bytes
+    # never exceeds max_total_bytes.
+  - name: connectors.transport.UpgradeOutcome
+    kind: enum
+    variants: [not_sent, answered, lost, accepted]
+    # not_sent: refused before any byte left the host (no upgrade bounds composed, a path
+    # segment the binding refuses, a credential that cannot be carried). answered: the
+    # configured host answered the upgrade request with a status other than 101 and no
+    # stream; a redirect is answered, never followed, so no other host is reached.
+    # lost: the request was sent and nothing more is known, including a 101 whose
+    # handshake (accept key, subprotocol) does not verify. accepted: the server switched
+    # protocols to one of the offered subprotocols. Only not_sent and answered prove the
+    # effect did not start; the request is never resent.
+  - name: connectors.transport.UpgradedStreamEnd
+    kind: enum
+    variants: [closed, lost, truncated, deadline]
+    # How an accepted stream ended, as the port reports it: closed is a clean close
+    # (Ok(None)); lost is a transport failure or a text or protocol-invalid message
+    # (UpstreamProtocol or Unavailable); truncated is a byte bound reached (Capacity),
+    # after which the host has closed the stream and delivers nothing more; deadline is
+    # timeout_ms passed (Timeout). Ping and pong are answered below the port and
+    # fragments are reassembled there; only whole binary messages reach the adapter.

@@ -70,3 +70,34 @@ With a current descriptor revision, shared public lookup returns not_found befor
 the separate adapter-internal forbidden guard. An old revision fails stale_description
 first. This is a native implementation fact, not a universal shared disabled-operation
 policy.
+
+## Kubeconfig contexts
+
+`contexts.list` (`kubernetes-kubeconfig-contexts`) lists the contexts of the
+kubeconfig a local connection was configured with. Its typed projection is the
+[`contexts` ESS domain](../../../spec/ess/domains/contexts.yaml).
+
+- **Which file.** The local native configuration names it as `kubeconfig`, an
+  absolute path to an owner-only file. The composition reads and parses it once at
+  load (a file that is not a readable kubeconfig refuses the configuration) and
+  records the path's digest in the effective configuration, so the path is part
+  of the configuration revision the host admitted. The operation's only input is
+  `limit` (1–256): no input can name a file, and a connection reads the file it
+  was configured with and no other. The service configuration cannot enable it.
+- **Why an adapter read and not a setup listing.** Both would read the same file;
+  only this one is invocable on a saved connection, and fixing the path in the
+  admitted configuration is what keeps an operation from reaching any other
+  kubeconfig. The composition, not the business library, reads the file, so the
+  business adapter still holds no file authority.
+- **When.** The file is read at each invocation, so a context added later or a
+  changed `current-context` shows on the next read; there is no provider request.
+- **What.** Each context in file order: `name`, `cluster` (the cluster entry's
+  name), `namespace` (null when the context sets none) and `current` (true for the
+  context `current-context` names; all false when it names none). Users, cluster
+  servers, certificate authorities, client certificates and keys, tokens, exec
+  plugins and auth providers are never read into the result.
+- **Bounds and refusals.** At most 1 MiB and 256 contexts; a repeated context
+  name, a name over 256 bytes or a namespace over 63 refuses the whole file
+  rather than listing part of it. A smaller `limit` returns the first contexts
+  with `complete: false`; there is no cursor. A file missing or no longer
+  owner-only at invocation is `unavailable`.

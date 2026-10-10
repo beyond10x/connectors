@@ -84,6 +84,9 @@ async fn discovery_is_attributed_paged_and_does_not_activate_observed_endpoints(
         resource_kinds: vec!["services".into()],
         discover_hosts: true,
         helm_release_reads: HelmReleaseReads::Off,
+        pod_logs: false,
+        pod_exec: false,
+        kubeconfig_contexts: false,
     };
     let effective = json!({"service":{"instance":"cluster-test","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED_FIXTURE_BINDING"}},"http":http,"adapter":config});
     let adapter = Kubernetes::new(
@@ -202,6 +205,9 @@ fn expansion_adapter(addresses: usize) -> (Kubernetes, Arc<AtomicUsize>) {
         resource_kinds: vec!["services".into()],
         discover_hosts: false,
         helm_release_reads: HelmReleaseReads::Off,
+        pod_logs: false,
+        pod_exec: false,
+        kubeconfig_contexts: false,
     };
     let effective = json!({"service":{"instance":"bounded","listen":"127.0.0.1:0","service_credential":{"kind":"environment","name":"UNUSED"}},"http":{"base_url":"https://fixture.invalid/"},"adapter":config});
     let adapter = Kubernetes::new(
