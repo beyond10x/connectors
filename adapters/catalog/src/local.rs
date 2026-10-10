@@ -1287,16 +1287,25 @@ impl runtime::Adapter for Local {
         document: Secret,
         input: Value,
     ) -> Result<Box<dyn runtime::PreparedWrite>> {
-        let (http, key) = self.authenticated(document).await?;
+        let (credential, key) = self.credential(document).await?;
+        let credential: Arc<dyn Credential> = Arc::new(Fixed(credential));
+        let http = self.http.with_credential(credential.clone());
         let prepared = self
             .engine
             .prepare(&http, &self.instance, operation, input)
             .await
             .map_err(Failure::from_provider);
         self.evict_refused(key, &prepared);
+        let prepared = prepared?;
+        // A guard that reads after the write reads with the same credential,
+        // through a port that can only read.
+        let reader = prepared
+            .reads_after()
+            .then(|| self.http.with_credential(credential));
         Ok(Box::new(Write {
-            prepared: prepared?,
+            prepared,
             http: http.into_write(),
+            reader,
             token: key.and_then(|key| Some((self.oauth.clone()?, key))),
         }))
     }
@@ -1414,6 +1423,8 @@ impl runtime::Adapter for Local {
 struct Write {
     prepared: connectors_catalog_provider::Prepared,
     http: Box<dyn connectors_sdk::AuthenticatedWrite>,
+    /// The read port of a guard that reads after the write; `None` otherwise.
+    reader: Option<ScopedHttp>,
     /// The cache and key of the OAuth access token the write carries.
     token: Option<(Arc<OAuth>, [u8; 32])>,
 }
@@ -1423,9 +1434,17 @@ impl runtime::PreparedWrite for Write {
         let Write {
             prepared,
             http,
+            reader,
             token,
         } = *self;
-        let outcome = prepared.execute(http).await;
+        let outcome = prepared
+            .execute_reading(
+                http,
+                reader
+                    .as_ref()
+                    .map(|reader| reader as &dyn connectors_sdk::AuthenticatedHttp),
+            )
+            .await;
         // A write the provider refused as unauthorized refused the token too.
         if let (Some((oauth, key)), connectors_sdk::WriteOutcome::Refused(error)) =
             (&token, &outcome)

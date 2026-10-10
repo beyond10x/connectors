@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0410-parity-gitlab-jira
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.41.0: Jira transitions, GitLab merge-request writes and repository reads, ESS 0.57.0'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261010a-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-10T01:06:01Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-10T02:26:11Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 

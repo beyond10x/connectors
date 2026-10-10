@@ -110,7 +110,7 @@ unchanged. They have not been re-run with the catalog provider as the child;
 
 ## Notes and discussions
 
-Three more merge-request writes and one read run the same way, from the same pinned source and
+Three more merge-request writes and two reads run the same way, from the same pinned source and
 selection set. Each write is a required-approval mutation: name it in the approval policy, prepare
 and issue an approval for the exact input, then invoke it with `--approval-file`, as above.
 
@@ -120,12 +120,16 @@ and issue an approval for the exact input, then invoke it with `--approval-file`
 
 In every input, `id` is the project path or numeric id and `noteable_id` is the merge request's
 project-local IID (GitLab's name for it on these routes). A discussion id is the string GitLab
-gives each discussion; `merge_request.discussion.get` reads one by that id.
+gives each discussion; `merge_request.discussions` lists every discussion of a merge request with
+its id, one page per call
+([Merge-request diffs and discussions](local-catalog-provider.md#merge-request-diffs-and-discussions)),
+and `merge_request.discussion.get` reads one by that id.
 
 | id | GitLab operation | request | guard |
 |---|---|---|---|
 | `merge_request.note.create` | `postApiV4ProjectsIdMergeRequestsNoteableIdNotes` | `POST /projects/{id}/merge_requests/{noteable_id}/notes`, body `body` (a string, required) and optionally `internal` (a boolean) | none |
 | `merge_request.discussion.reply` | `postApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionIdNotes` | `POST …/discussions/{discussion_id}/notes`, body `body` (a string, required) | none |
+| `merge_request.discussions` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions` | `GET …/discussions`, `page` and `per_page` (1 through 100) (a read) | — |
 | `merge_request.discussion.get` | `getApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | `GET …/discussions/{discussion_id}` (a read) | — |
 | `merge_request.discussion.resolve` | `putApiV4ProjectsIdMergeRequestsNoteableIdDiscussionsDiscussionId` | `PUT …/discussions/{discussion_id}`, body exactly `resolved`, a JSON boolean | preflight `id` equals `discussion_id` and `resolvable` is `true`; postflight `id` equals `discussion_id` and `resolved` equals `body.resolved` |
 
@@ -174,27 +178,57 @@ the provider's forbidden, `404` its not-found, `409` invalid input. These operat
 against a fixture in the pinned document's shapes
 (`adapters/catalog/tests/gitlab_mr_writes.rs`), not against a running GitLab.
 
-## Not selected: auto-merge and reopen
+## Auto-merge and reopen
 
-Two guarded variants were considered on 2026-10-10 and are not selected, because the catalog
-engine cannot express them. `merge_request.merge` and `merge_request.update` keep their guards
-unchanged.
+Two guarded variants of the writes above run the same way, from the same pinned source and
+selection set, since 2026-10-10. Each selection fixes one body member to one value
+(`body_fixed`, [selection format](local-catalog-provider.md#configure-the-provider)): the
+provider sends exactly that value on every write, and a caller's body naming the member at all,
+with that value or any other, is refused as `invalid_input` before any request. Name them in
+the approval policy as above:
 
-- **Merge when the pipeline succeeds.** A variant of `merge_request.merge` would pin the head and
-  the open state, but not a succeeded pipeline. GitLab only waits for the pipeline when the body
-  carries `auto_merge: true` (`merge_when_pipeline_succeeds` in the pinned document is deprecated
-  in its favour); with `false` or without it, the same request merges at once. A selection can
-  close a body to a set of keys, and a guard can compare GitLab's answers with the input, but
-  nothing can require an input value to be a fixed literal. Without that, the variant would be a
-  merge that skips the pipeline check. Proving the outcome afterwards would also need one check
-  that accepts either of two observations: auto-merge set (`merge_when_pipeline_succeeds` true),
-  or `state` `merged` when the pipeline had already succeeded. Today `merge_request.merge` takes
-  `auto_merge` in its body under the full five-check guard, so auto-merge is reachable only once
-  the pinned pipeline has succeeded.
-- **Reopen.** A variant of `merge_request.update` would require state `closed` and the pinned head,
-  and send only `state_event: reopen`, with `state` `opened` afterwards. The guard is expressible;
-  fixing the one body member to `reopen` is not.
+```json
+{"operations":["merge_request.auto_merge","merge_request.reopen"]}
+```
 
-Both need the same engine capability: a selection that fixes a body member to a literal value,
-refused before any request when the input differs. The merge variant also needs a postflight
-check that accepts one of several observations.
+| id | GitLab operation | request | guard |
+|---|---|---|---|
+| `merge_request.auto_merge` | `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge` | `PUT /projects/{id}/merge_requests/{merge_request_iid}/merge`, body exactly the caller's `sha` and the fixed `auto_merge: true` | preflight `sha` equals `body.sha` and `state` is `opened`; postflight `sha` equals `body.sha`, and either `merge_when_pipeline_succeeds` is `true` or `state` is `merged` |
+| `merge_request.reopen` | `putApiV4ProjectsIdMergeRequestsMergeRequestIid` | `PUT /projects/{id}/merge_requests/{merge_request_iid}`, body exactly the fixed `state_event: reopen` | preflight `sha` equals the input `sha` and `state` is `closed`; postflight `sha` still equals the input `sha` and `state` is `opened` |
+
+**Merge when the pipeline succeeds.** GitLab waits for the pipeline only when the body carries
+`auto_merge: true` (`merge_when_pipeline_succeeds` in the pinned document is deprecated in its
+favour); with `false` or without it, the same request merges at once. The selection fixes it,
+and closes the body to `sha` and `auto_merge`, so the caller sends only the pinned head:
+
+```json
+{"id":"group/project","merge_request_iid":17,"body":{"sha":"0123456789abcdef0123456789abcdef01234567"}}
+```
+
+The guard pins the head and the open state, and deliberately not a mergeable status or a
+succeeded pipeline: waiting for the pipeline is what this variant is for. GitLab still checks
+`sha` atomically on the PUT. Its answer has one of two shapes, and the postflight accepts either
+(`any_of`): auto-merge set (`merge_when_pipeline_succeeds` `true`, still `opened`), or `merged`
+when the pipeline had already succeeded. An answer with neither, or another head, is `unknown`,
+never refused. The deprecated `merge_when_pipeline_succeeds`, `should_remove_source_branch`,
+`squash` and every other body key are refused before any request; use `merge_request.merge`
+for a merge with those options. `merge_request.merge` keeps its five-check guard.
+
+**Reopen.** The selection fixes `state_event` to `reopen` and admits no other body key, so the
+caller's `body` may be omitted (or sent as `{}`); `sha` is the pinned head, as for
+`merge_request.update`:
+
+```json
+{"id":"group/project","merge_request_iid":17,"sha":"0123456789abcdef0123456789abcdef01234567"}
+```
+
+Before the one `PUT` the provider reads the merge request and refuses, with nothing written,
+unless it is `closed` at the pinned head; an open or merged one is refused the same way. GitLab's
+answer must report it `opened`; otherwise the outcome is `unknown`. Like the update guard, this
+one is not atomic: GitLab offers no precondition on the `PUT`. `merge_request.update` keeps its
+guard, so it still refuses a closed merge request.
+
+Both variants are checked against a fixture in the pinned document's shapes
+(`adapters/catalog/tests/gitlab_mr_variants.rs`), not against a running GitLab. The pinned
+document declares `merge_when_pipeline_succeeds` on the merge request GitLab answers; that GitLab
+answers an accepted auto-merge with it `true` has not been observed against a running GitLab.

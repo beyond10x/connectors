@@ -1,0 +1,97 @@
+domain: connectors_catalog.guard
+summary: The declarative guard of a selected write, the optional `guard` of an operation in a `connectors-catalog-operations/1` selection file, which the engine reads before and after it sends the write.
+
+# Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`guard`). The engine
+# reads this document as `guard` on a write's selection.
+#
+# Every read a guard names is a GET of the provider's pinned bundle under the configuration's base
+# path, its parameters bound from the write's input. A difference before the write is a refusal
+# with the write unsent; a difference after it leaves the effect possible, never refused, and no
+# corrective request is issued.
+
+types:
+  # An input reference: a top-level input key, or `body.<key>` (a path through the body, dotted).
+  - name: connectors_catalog.guard.Reference
+    kind: newtype
+    of: String
+
+  # What an observed scalar is compared with: the input value a reference names, or a literal
+  # written in the selection. Exactly one of the two (Expectation's invariants); serialised as
+  # `{"input": "<reference>"}` or `{"literal": "<value>"}`.
+  - name: connectors_catalog.guard.Expectation
+    kind: struct
+    fields:
+      - {name: input, type: "Optional<connectors_catalog.guard.Reference>"}
+      - {name: literal, type: "Optional<String>"}
+    invariants:
+      - any: [defined(input), defined(literal)]
+      - any: [{not: defined(input)}, {not: defined(literal)}]
+
+  # The scalar at the RFC 6901 `pointer` in an observed answer must equal what `expect` resolves
+  # to, both compared as text.
+  - name: connectors_catalog.guard.Check
+    kind: struct
+    fields:
+      - {name: pointer, type: String}
+      - {name: expect, type: connectors_catalog.guard.Expectation}
+    invariants:
+      - pointer.count >= 1
+
+  # One read a guard issues: the bundle operation, and its parameters (by name) bound from the
+  # write's input references.
+  - name: connectors_catalog.guard.Read
+    kind: struct
+    fields:
+      - {name: operation_id, type: String}
+      - {name: values, type: "Map<String, connectors_catalog.guard.Reference>"}
+
+  # A read before the write, whose answer must satisfy every check. A read that answers 404 is a
+  # refusal before dispatch.
+  - name: connectors_catalog.guard.Preflight
+    kind: struct
+    fields:
+      - {name: operation_id, type: String}
+      - {name: values, type: "Map<String, connectors_catalog.guard.Reference>"}
+      - {name: checks, type: "List<connectors_catalog.guard.Check>"}
+    invariants:
+      - checks.count >= 1
+
+  # The checks after the write. Without `read` they apply to the write's own answer. With it, the
+  # engine issues that read once, after the write was answered with a 2xx, and the checks apply to
+  # the read's answer instead: for a write that answers without a body, such as Jira's
+  # `doTransition` (204). A read that fails, or answers without the checked value, leaves the
+  # effect possible, as a differing value does. The write's own answer is not read for checks
+  # then, and a body it carries is still returned.
+  #
+  # `any_of` is one check that accepts one of several observations: it holds when at least one
+  # of its comparisons holds, beside every check in `checks`. It is for a write whose success
+  # has more than one shape, such as GitLab's merge with `auto_merge` fixed to `true`, which
+  # answers either with auto-merge set (`/merge_when_pipeline_succeeds` `true`) or, when the
+  # pipeline had already succeeded, merged at once (`/state` `merged`). At least two
+  # comparisons, since one is an ordinary check; absent when unused, so a postflight without it
+  # keeps its serialised form. An empty list is the same as an absent one and is not written
+  # back. Its comparisons count toward the sixteen checks.
+  - name: connectors_catalog.guard.Postflight
+    kind: struct
+    fields:
+      - {name: checks, type: "List<connectors_catalog.guard.Check>"}
+      - {name: read, type: "Optional<connectors_catalog.guard.Read>"}
+      - {name: any_of, type: "Optional<List<connectors_catalog.guard.Check>>"}
+    invariants:
+      - any: [{not: defined(read)}, {checks.count: {gte: 1}}]
+      - any: [{not: defined(any_of)}, {any_of.count: {lte: 0}}, {any_of.count: {gte: 2}}]
+
+  # `preflight` is the first read; `further_preflights` are read after it, in order, each with its
+  # own checks, and the first that refuses stops the guard with the write unsent: for a write
+  # whose preconditions live in two answers, such as Jira's current status (`getIssue`) and the
+  # transition's availability (`getTransitions` narrowed by `transitionId`). Absent and empty are
+  # the same, so a guard without further reads keeps its serialised form. At most sixteen checks
+  # in all.
+  - name: connectors_catalog.guard.Guard
+    kind: struct
+    fields:
+      - {name: preflight, type: connectors_catalog.guard.Preflight}
+      - {name: further_preflights, type: "Optional<List<connectors_catalog.guard.Preflight>>"}
+      - {name: postflight, type: connectors_catalog.guard.Postflight}
+    invariants:
+      - any: [{not: defined(further_preflights)}, {further_preflights.count: {lte: 3}}]

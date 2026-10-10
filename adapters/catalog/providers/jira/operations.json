@@ -15,6 +15,20 @@
     {"id": "issue.create_meta", "operation_id": "getCreateIssueMetaIssueTypes", "effect": "read",
      "description": "List the issue types the account can create in one project, by id or key, one page per call; the walk ends when startAt plus the page's issueTypes reaches total"},
     {"id": "users.search", "operation_id": "findUsers", "effect": "read",
-     "description": "Find active users whose display name or email address starts with query, or by exact accountId, one page per call of the first 1,000 matches; the walk ends on an empty page"}
+     "description": "Find active users whose display name or email address starts with query, or by exact accountId, one page per call of the first 1,000 matches; the walk ends on an empty page"},
+    {"id": "issue.transition.run", "operation_id": "doTransition", "effect": "write",
+     "description": "Run one transition on one issue by id or key: body.transition.id names it, and fields and update set the transition screen's fields. Refused before the write unless the issue's status id is current_status and the transition is open on it with target status id target_status; Jira answers 204, and the issue read again after the write must be in target_status",
+     "body_keys": ["transition", "fields", "update"],
+     "guard": {
+       "preflight": {"operation_id": "getIssue", "values": {"issueIdOrKey": "issueIdOrKey"},
+                     "checks": [{"pointer": "/fields/status/id", "expect": {"input": "current_status"}}]},
+       "further_preflights": [
+         {"operation_id": "getTransitions",
+          "values": {"issueIdOrKey": "issueIdOrKey", "transitionId": "body.transition.id"},
+          "checks": [{"pointer": "/transitions/0/id", "expect": {"input": "body.transition.id"}},
+                     {"pointer": "/transitions/0/isAvailable", "expect": {"literal": "true"}},
+                     {"pointer": "/transitions/0/to/id", "expect": {"input": "target_status"}}]}],
+       "postflight": {"read": {"operation_id": "getIssue", "values": {"issueIdOrKey": "issueIdOrKey"}},
+                      "checks": [{"pointer": "/fields/status/id", "expect": {"input": "target_status"}}]}}}
   ]
 }

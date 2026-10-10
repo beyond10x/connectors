@@ -193,7 +193,12 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
                     expect: Expectation::Input("version".into()),
                 }],
             },
-            postflight: Postflight { checks: vec![] },
+            further_preflights: vec![],
+            postflight: Postflight {
+                checks: vec![],
+                read: None,
+                any_of: vec![],
+            },
         })
     );
     // The declared inputs: every write takes a `body`; the update also takes

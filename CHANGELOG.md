@@ -1,5 +1,91 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A catalog guard can read after the write and read more than once before it, so a write whose
+  answer carries no body can be proved (`docs/local-catalog-provider.md`, `guard`):
+  - `postflight.read` names a GET of the bundle, bound from the write's input like a preflight.
+    The engine issues it once after a `2xx`, and the postflight's checks apply to its answer
+    instead of the write's. A read that fails, or answers with another value, leaves the outcome
+    `unknown`. The write's own status and body are still what the operation returns.
+  - `further_preflights` adds up to three reads before the write, each with its own checks, read
+    in order after `preflight`; the first that refuses stops the write unsent.
+  - The guard format is modelled as `connectors_catalog.guard` in `adapters/catalog/spec/ess`,
+    and every shipped guard is checked against it. A guard without either member serialises as
+    before, so every existing selection keeps its bytes and its configuration revision.
+- Jira Cloud through the catalog provider runs a transition: `issue.transition.run` selects
+  `doTransition` (`POST /rest/api/3/issue/{issueIdOrKey}/transitions`), a required-approval
+  write by transition id (`docs/catalog-jira.md`, *Running a transition*). Its input names the
+  issue's current status id and the transition's target status id; its body is closed to
+  `transition`, `fields` and `update`. Before the `POST` the guard reads the issue (its status
+  must be `current_status`) and the transition narrowed by `transitionId` (it must be open, with
+  target `target_status`); after Jira's `204` it reads the issue again, whose status must be
+  `target_status`, or the outcome is `unknown`. Verified against a local fixture written in the
+  pinned document's shapes, not a live site. The Jira guide's example configuration therefore
+  has a new configuration revision.
+- A catalog selection can fix a body member to one value, and a postflight can accept one of
+  several observations (`docs/local-catalog-provider.md`, `body_fixed` and `guard`):
+  - `body_fixed` maps closed body keys to a JSON string, integer or boolean each. The provider
+    sends exactly that value on every write; a caller's body naming the key at all is refused as
+    `invalid_input` before any request, and the key is left out of the declared input schema.
+    When every admitted key is fixed, `body` may be omitted. A fixed key `body_keys` does not
+    admit, a value of another type, and a key a guard reads or `body_required` names are refused
+    when the selection loads.
+  - `postflight.any_of` lists two or more checks of which at least one must hold, beside every
+    check in `postflight.checks`; an answer with none of them leaves the outcome `unknown`.
+  - Both are modelled first in `adapters/catalog/spec/ess` (the new
+    `connectors_catalog.selection.ClosedBody`, beside `body_keys`, `body_types` and
+    `body_required`, and `connectors_catalog.guard.Postflight`), and every shipped selection is
+    checked against the model. Both are omitted when empty, so every existing selection keeps
+    its bytes and its configuration revision.
+- GitLab through the catalog provider sets a merge request to merge when its pipeline succeeds,
+  and reopens a closed one, each a required-approval write (`docs/local-gitlab-merge.md`,
+  *Auto-merge and reopen*):
+  - `merge_request.auto_merge` selects `putApiV4ProjectsIdMergeRequestsMergeRequestIidMerge`
+    with `auto_merge` fixed to `true` and the body closed to `sha` and `auto_merge`. The guard
+    pins the head and the open state, deliberately not a succeeded pipeline; GitLab's answer
+    must keep the head and show either auto-merge set or the merge request merged.
+  - `merge_request.reopen` selects `putApiV4ProjectsIdMergeRequestsMergeRequestIid` with exactly
+    `state_event: reopen`. The guard requires state `closed` at the pinned `sha` before, and
+    `opened` at that same `sha` in GitLab's answer: a branch pushed while the request was closed
+    reopens it at a new head, which is reported as an unknown effect, not applied.
+  - `merge_request.merge` and `merge_request.update` keep their guards. Verified against a local
+    fixture written in the pinned document's shapes, not a live GitLab. The GitLab example
+    configuration in `docs/local-catalog-provider.md` therefore has a new configuration
+    revision.
+- GitLab through the catalog provider lists a merge request's diffs and its discussions, two
+  reads from the pinned OpenAPI document as it stands (`docs/local-catalog-provider.md`,
+  *Merge-request diffs and discussions*):
+  - `merge_request.diffs` (`getApiV4ProjectsIdMergeRequestsMergeRequestIidDiffs`,
+    `GET /projects/{id}/merge_requests/{merge_request_iid}/diffs`) lists its file diffs, with
+    `unidiff`.
+  - `merge_request.discussions` (`getApiV4ProjectsIdMergeRequestsNoteableIdDiscussions`,
+    `GET /projects/{id}/merge_requests/{noteable_id}/discussions`) lists its discussions, each
+    with its notes and the id `merge_request.discussion.get`, `.reply` and `.resolve` take.
+  Both are paged one page per call and bound `per_page` to 1 through 100, as every GitLab list
+  read does. A merge request GitLab does not find is refused as `not_found`, one the token may
+  not read as `forbidden`. Verified against local fixtures written in the pinned document's
+  shapes, through the engine and through the owned provider process, not a live GitLab. The
+  GitLab example configuration in `docs/local-catalog-provider.md` therefore has a new
+  configuration revision.
+
+### Limits
+
+- A transition that is not open on the issue is refused before the `POST` as `protocol`, not
+  `forbidden`: Jira's narrowed answer has no transition, and a preflight answer without the
+  checked value is read as a protocol failure for every guard.
+- `merge_request.auto_merge` admits only `sha` beside the fixed `auto_merge`: an auto-merge with
+  `squash` or `should_remove_source_branch` is refused before any request. The pinned document
+  declares `merge_when_pipeline_succeeds` on GitLab's answer; that GitLab sets it `true` on an
+  accepted auto-merge has not been observed against a running GitLab.
+- `merge_request.discussions` returns GitLab's discussions unfiltered, system notes included.
+  The flat merge-request note list (`getApiV4ProjectsIdMergeRequestsNoteableIdNotes`) is not
+  selected; every note is in the discussion list, inside its discussion. The
+  single-response `…/merge_requests/{merge_request_iid}/changes` is not selected; its unpaged
+  body carries every diff at once.
+
 ## 0.41.0 — 2026-10-10
 
 ### Added

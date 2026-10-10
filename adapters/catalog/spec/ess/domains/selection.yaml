@@ -1,0 +1,43 @@
+domain: connectors_catalog.selection
+summary: The members of a selected write in a `connectors-catalog-operations/1` selection file that close, type, require and fix its JSON body, which the engine holds before it sends the write.
+
+# Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`body_keys`,
+# `body_types`, `body_required`, `body_fixed`). The engine reads these as members of a
+# selection; each is omitted when empty, so a selection without it keeps its serialised form.
+#
+# The bundle records no request body schema, so every name here is declared by the selection
+# from the pinned document and not checked against it. What the engine refuses when a selection
+# loads beyond these invariants (an empty, dotted or repeated key, a key the other members name
+# that `body_keys` does not admit, a fixed key a guard reads or `body_required` names, a fixed
+# value that is not a string, an integer or a boolean, or not of the key's `body_types` type) is
+# stated in the owner and pinned by the engine's tests; ESS 0.57 has no set-membership
+# constraint between two members, and no untagged scalar to type a fixed value by.
+
+types:
+  # The JSON type a closed body key takes, as the provider's request body schema types it.
+  - name: connectors_catalog.selection.BodyType
+    kind: enum
+    variants: [string, integer, boolean]
+
+  # `body_keys` closes the body to exactly those top-level keys. `body_types` types some of them
+  # and `body_required` requires some of them, of the caller's body.
+  #
+  # `body_fixed` fixes a key to one value: the engine sends exactly that value under that key on
+  # every write, whatever the caller gives, and a caller's body carrying the key at all is
+  # refused before any request. The key is not declared in the caller's input schema. It is for
+  # a guarded variant of an existing write whose meaning rests on one body value, such as GitLab's
+  # merge with `auto_merge: true` (wait for the pipeline) or its update with
+  # `state_event: reopen`. A fixed key must be admitted by `body_keys`, so a fixed write's body
+  # is always closed: the caller cannot add a key beside it that would change what it does. When
+  # every admitted key is fixed, the caller's `body` may be omitted.
+  - name: connectors_catalog.selection.ClosedBody
+    kind: struct
+    fields:
+      - {name: body_keys, type: "Optional<List<String>>"}
+      - {name: body_types, type: "Optional<Map<String, connectors_catalog.selection.BodyType>>"}
+      - {name: body_required, type: "Optional<List<String>>"}
+      - {name: body_fixed, type: "Optional<Map<String, Json>>"}
+    invariants:
+      - any: [{not: defined(body_types)}, defined(body_keys)]
+      - any: [{not: defined(body_required)}, defined(body_keys)]
+      - any: [{not: defined(body_fixed)}, defined(body_keys)]

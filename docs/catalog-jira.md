@@ -2,10 +2,10 @@
 
 The catalog provider reads Jira Cloud issues by JQL or one by key, their comments
 and their changelog, the transitions open on an issue, the issue types a project
-can create, and users, from the
+can create, and users, and runs one transition on an issue, from the
 pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
 Jira-specific code: the pinned document is compiled into a bundle, a reviewed
-selection set exposes seven reads, and the engine described in
+selection set exposes seven reads and one guarded write, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work exactly as described
 there; this page covers what differs for Jira.
@@ -34,8 +34,8 @@ fresh run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/jira/operations.json`](../adapters/catalog/providers/jira/operations.json)
-exposes seven reads and nothing else. Each is `effect: read`; there are no
-writes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
+exposes seven reads and one write, `issue.transition.run`, guarded as
+[Running a transition](#running-a-transition) describes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
 `operationId` and path in the pinned document, so a renamed or dropped id, or a
 source operation that moved, fails the gate. The bundle refuses at load any
 `operation_id` the pinned document lacks.
@@ -143,30 +143,67 @@ Jira's behaviour and has not been checked against a live site here.
 Every other query parameter the pinned document declares for an operation is
 accepted by name; one it does not declare is refused before any request.
 
-## Running a transition: not selected
+## Running a transition
 
-`doTransition` (`POST /rest/api/3/issue/{issueIdOrKey}/transitions`) is in the
-bundle but not in the selection set, because the catalog guard cannot yet
-guard it the way every selected write is guarded (as `merge_request.merge` is in
-[the guarded merge guide](local-gitlab-merge.md)):
+`issue.transition.run` selects `doTransition`
+(`POST /rest/api/3/issue/{issueIdOrKey}/transitions`), a write that needs an
+approval like every catalog write
+([the catalog provider guide](local-catalog-provider.md#invoke)). It runs
+one transition by its id; running one by name, or walking several transitions to
+reach a status, is composition over `issue.transitions` and this write, and stays
+outside the catalog.
 
-- **No postflight re-read.** A guard's postflight compares values in the write's
-  own response body. Jira answers a transition with `204` and no body, so a
-  check that the issue reached the transition's target status always leaves the
-  outcome uncertain, and a guard without that check proves nothing after the
-  write. The guard would need a postflight that reads the issue again
-  (`getIssue`) and checks `/fields/status/id`.
-- **One preflight read.** A guard reads once before the write. Refusing unless
-  the issue is in the status the caller names needs `getIssue`
-  (`/fields/status/id`); refusing unless the transition is open needs
-  `getTransitions` with `transitionId` (`/transitions/0/id`). The guard cannot do
-  both, and a check cannot pick an array element by its `id` without that
-  filter.
+Its input is `issueIdOrKey`, two status ids the caller reads first, and the body
+Jira takes:
 
-Until the guard can, read `issue.transitions` for the transition's `id` and its
-target status, and run the transition outside Connectors. Running a transition
-by name, or walking several transitions to reach a status, is composition over
-these operations and stays outside the catalog in any case.
+- `current_status`: the id of the status the issue must be in now, the
+  `fields.status.id` of `issue.get`.
+- `target_status`: the id of the status the transition leads to, the `to.id` of
+  the transition in `issue.transitions`.
+- `body`: closed to `transition`, `fields` and `update`. `transition.id` names
+  the transition and is required; `fields` and `update` set the fields of the
+  transition's screen, such as a resolution, as Jira's `IssueUpdateDetails`
+  defines them (`expand=transitions.fields` on `issue.transitions` lists them).
+  `historyMetadata` and `properties`, and any other key, are refused as
+  `invalid_input` before any request.
+
+The guard reads twice before the write and once after it:
+
+1. `getIssue` on the issue: `/fields/status/id` must be `current_status`.
+2. `getTransitions` on the issue with `transitionId` set to `transition.id`.
+   Jira answers it with that one transition while it is open on the issue, and
+   with an empty list otherwise. `/transitions/0/id` must be `transition.id`,
+   `/transitions/0/isAvailable` `true` and `/transitions/0/to/id`
+   `target_status`.
+3. After Jira answers the `POST` with a `2xx` (`204`, with no body), `getIssue`
+   on the issue again: `/fields/status/id` must be `target_status`.
+
+An issue in another status, an issue Jira does not find, and a transition whose
+target is another status are refused as `forbidden` with the `POST` unsent, the
+outcome `not_attempted`. A transition that is not open on the issue is refused
+as well, with the `POST` unsent, as `protocol`: Jira's narrowed answer has no
+transition at `/transitions/0`. When the read after the write finds another
+status, or fails, the outcome is `unknown`: Jira may have run the transition, and
+a post function or another user may have moved the issue since. Nothing is sent
+again. Jira's definite refusals of the `POST` itself are `refused`: the pinned
+document gives `400` for a request it finds invalid, such as a field the
+transition's screen does not include, and `401`, `404`, `409` and `422`. Its
+`413` is not among the statuses the engine reads as definite, so it leaves the
+outcome `unknown`.
+
+```json
+{"issueIdOrKey":"FIX-1","current_status":"3","target_status":"10002",
+ "body":{"transition":{"id":"31"}}}
+```
+
+Prepare, issue and invoke the write with that input as
+[the guarded merge guide](local-gitlab-merge.md) describes for a merge. Approved,
+it sends `GET /rest/api/3/issue/FIX-1`,
+`GET /rest/api/3/issue/FIX-1/transitions?transitionId=31`,
+`POST /rest/api/3/issue/FIX-1/transitions` with the body as given, and
+`GET /rest/api/3/issue/FIX-1`, and answers with Jira's `204` and a `null` body.
+Verified against the local fixture `adapters/catalog/tests/jira_transition_run.rs`
+in the pinned document's shapes, not against a live site.
 
 ## Authentication
 
@@ -271,7 +308,8 @@ An OAuth 2.0 (3LO) access token is sent as a bearer token. **Not verified live.*
 The credential document is `{"token": "<access token>"}`, sent as
 `Authorization: Bearer <access token>`. The provider does not refresh an OAuth
 token; connect again when it expires. The token must carry the read scopes the
-seven reads and `myself` need; Atlassian names them per operation.
+seven reads and `myself` need, and the write scope a transition needs; Atlassian names them per
+operation.
 
 ## Limits
 
