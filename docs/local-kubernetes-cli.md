@@ -39,7 +39,8 @@ Replace the example target and scope with your cluster coordinates:
 `resource_kinds` are the complete configured scope: a request outside either is
 refused before any provider work, and no wildcard or all-namespaces mode is
 available in this profile. `resource_kinds` accepts only `pods`, `services`,
-`deployments` and `endpointslices`. The optional `ca_file` names an owner-only PEM
+`deployments`, `endpointslices`, `replicasets` and `events` (the core/v1 Event
+collection that `kubectl get events` reads). The optional `ca_file` names an owner-only PEM
 certificate file; supply the cluster CA there when it is not in the system store.
 
 `discover_hosts` is optional and defaults to false. While it is false the adapter
@@ -54,8 +55,8 @@ a Helm release this binding may read:
 | `"metadata"` | `helm_releases.history`, `helm_releases.status` |
 | `"redacted_content"` | those two plus `helm_releases.values`, `helm_releases.manifest` |
 
-Release reads do not touch `resource_kinds`: that enum stays `pods`, `services`,
-`deployments` and `endpointslices`, and no setting adds a general Secret read.
+Release reads do not touch `resource_kinds`: that enum stays the six kinds above,
+and no setting adds a general Secret read.
 Adding or changing this field changes the effective document, so the
 `configuration_revision` changes with it and must be copied from
 `--print-local-bootstrap` again.
@@ -191,6 +192,9 @@ revision, then invoke with the saved connection as above. The request shapes are
 | Operation | Example input |
 |---|---|
 | `resources.list` | `{"namespace":"default","kind":"pods","limit":50}` |
+| `resources.get` | `{"namespace":"default","kind":"deployments","name":"api"}` |
+| `namespaces.list` | `{"limit":50}` |
+| `deployments.history` | `{"namespace":"default","name":"api","limit":50}` |
 | `endpoints.discover` | `{"namespace":"default","limit":50}` |
 | `hosts.discover` | `{"limit":50}` |
 | `helm_releases.history` | `{"namespace":"default","release":"api","limit":50}` |
@@ -198,8 +202,8 @@ revision, then invoke with the saved connection as above. The request shapes are
 | `helm_releases.values` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
 | `helm_releases.manifest` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
 
-For every operation above except the two release projections,
-`limit` is between 1 and 100. For `helm_releases.values` and
+For every operation above except `resources.get`, which takes no `limit`, and
+the two release projections, `limit` is between 1 and 100. For `helm_releases.values` and
 `helm_releases.manifest` it is between 1 and 500, because those two page over
 one stored object rather than over a provider collection. List results contain
 `items`, `next_cursor` and `complete`. Pass a returned cursor alongside unchanged selectors, limit and
@@ -213,6 +217,56 @@ expansion over 4096 observations is refused rather than truncated; request fewer
 slices per page.
 
 `hosts.discover` reads nodes and is available only while `discover_hosts` is true.
+
+## Read single objects, namespaces and rollout history
+
+The [reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md)
+states the behaviour of these three reads. Each one is bounded by the configured
+`namespaces` and `resource_kinds`. A namespace or kind outside that scope is
+refused as `forbidden` before any request.
+
+`resources.get` reads one object of an admitted kind by name and returns a page of
+exactly that object, `complete: true` and no cursor. The name must be a DNS-1123
+subdomain. An absent object is a `service_failure` refusal with `service_code:
+not_found`, not an empty page; use `resources.list` to ask what exists.
+
+`namespaces.list` reads each configured namespace by its exact name, in
+configuration order, and returns the ones the cluster has. A configured namespace
+the cluster does not have is omitted. Any other refusal, such as a 403, refuses the
+whole page, because a denied namespace is not evidence that it is absent. The
+cluster's namespace collection is never listed, so this read cannot reveal a
+namespace outside the configured set. `limit` bounds how many configured names one
+page reads, and the cursor is a position in the configured list.
+
+`deployments.history` needs both `deployments` and `replicasets` in
+`resource_kinds`. It reads the Deployment, which answers `not_found` when absent.
+It then lists ReplicaSets matching the Deployment's own selector and keeps only
+those whose controlling owner is that Deployment by uid; a label match alone is
+not ownership. Each item is the full ReplicaSet, and its revision is the
+`deployment.kubernetes.io/revision` annotation. A selector this binding cannot
+carry exactly is refused before the list. The controller prunes ReplicaSets beyond
+`spec.revisionHistoryLimit`, so a missing revision may be pruned or may never have
+existed, and the page cannot say which.
+
+Events are read with `resources.list` and `"kind":"events"`, and ReplicaSets with
+`"kind":"replicasets"`, once those kinds are configured.
+
+Add each operation you use to `operations` in the adapter's permissions, as in the
+configuration above. The credential needs this RBAC in every configured namespace
+it reads:
+
+| Operation | RBAC rule (namespaced Role) |
+|---|---|
+| `resources.get` | `get` on the requested kind (`pods`, `services`, `events`, `endpointslices` in `discovery.k8s.io`, or `deployments`, `replicasets` in `apps`) |
+| `namespaces.list` | `get` on `namespaces` in each configured namespace |
+| `deployments.history` | `get` on `deployments` and `list` on `replicasets`, both in `apps` |
+| `resources.list` of `events` | `list` on `events` (core group) |
+| `resources.list` of `replicasets` | `list` on `replicasets` in `apps` |
+
+The authorization namespace of a namespace object is its own name, so a Role in
+namespace `default` granting `get` on `namespaces` is enough to read the
+`default` namespace. No ClusterRole is needed, and the binding never asks for
+`list` on namespaces.
 
 ## Read Helm releases
 
@@ -276,9 +330,11 @@ page.
 
 ## Limitations
 
-This binding advertises up to seven read operations. Kubernetes events,
-conditions, pod logs, exec, copy, port forwarding and every mutation are not
-implemented.
+This binding advertises up to ten read operations. Events are read as a list of
+core/v1 Event objects in one namespace; there is no watch, and no read filters
+events by the object they involve. Conditions, pod logs, exec, copy, port
+forwarding and every mutation are not implemented. `deployments.history` reports
+the stored ReplicaSets; it does not diff revisions or roll one back.
 
 Of the Helm surface, only release-state reads exist. Installing, upgrading,
 uninstalling and rolling back a release are not implemented; neither are chart

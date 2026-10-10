@@ -1,0 +1,95 @@
+domain: connectors_kubernetes.reads
+summary: Kubernetes-owned read selections - resource kinds, single-object coordinates, configured namespace observations and Deployment rollout history.
+
+# Normative owner: adapters/kubernetes/contracts/reads/v1alpha1/semantics.md.
+# Every value below selects or describes a provider-owned object this adapter only
+# reads. Nothing here is declared as an entity with a lifecycle: the adapter creates,
+# owns and moves none of these objects, and an observation has no state this system
+# advances. Items are returned as the full provider objects, never as a projection.
+types:
+  - name: connectors_kubernetes.reads.ResourceKind
+    kind: enum
+    variants: [pods, services, deployments, endpointslices, replicasets, events]
+    # The closed set a configuration may admit in resource_kinds and a caller may
+    # name in a read. Each variant binds exactly one collection path:
+    # pods, services, events -> /api/v1/namespaces/<ns>/<kind>;
+    # deployments, replicasets -> /apis/apps/v1/namespaces/<ns>/<kind>;
+    # endpointslices -> /apis/discovery.k8s.io/v1/namespaces/<ns>/endpointslices.
+    # events is core/v1 Event (the collection kubectl get events reads), not
+    # events.k8s.io/v1. Watches stay deferred: an events read is one bounded list.
+    # Namespaces are deliberately not a variant: they are cluster-scoped, so a kind
+    # would need a cluster-wide list and would disclose names outside the
+    # configured scope. NamespaceObservation covers them instead.
+  - name: connectors_kubernetes.reads.ObjectCoordinates
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: kind, type: connectors_kubernetes.reads.ResourceKind}
+      - {name: name, type: String}
+    invariants:
+      - namespace.count: {gte: 1, lte: 63}
+      - name.count: {gte: 1, lte: 253}
+    # The selection of resources.get. namespace must be one of the configured
+    # namespaces and kind one of the configured resource_kinds; both are checked
+    # before any provider request, and a refusal there is forbidden, not not_found.
+    # name must be a DNS-1123 subdomain (lowercase alphanumerics, '-' and '.',
+    # alphanumeric at both ends), which String does not enforce; the binding does,
+    # before dispatch, so a name can never add a path segment. The length half of
+    # that rule is declared above. An absent object answers not_found, distinct from
+    # an empty list page. The returned object must report the requested name and
+    # namespace; an object reporting another identity is a protocol violation.
+  - name: connectors_kubernetes.reads.NamespacePresence
+    kind: enum
+    variants: [present, absent]
+    # The outcome of reading one configured namespace by name. present is a 2xx
+    # Namespace object; absent is the provider's 404. Any other answer (403, 401,
+    # 5xx) is neither and refuses the read rather than being reported as absent:
+    # a denied namespace is not evidence that the namespace does not exist.
+  - name: connectors_kubernetes.reads.NamespaceObservation
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: presence, type: connectors_kubernetes.reads.NamespacePresence}
+    invariants:
+      - namespace.count: {gte: 1, lte: 63}
+    # namespaces.list reads each configured namespace by exact name
+    # (GET /api/v1/namespaces/<name>) in configuration order and lists the present
+    # ones as full Namespace objects; absent ones are omitted. It never lists the
+    # cluster-scoped namespaces collection, so no name outside the configured set can
+    # be observed and namespace authority is exactly the configured set it was before.
+    # The page is bounded by limit configured names, and its continuation is an
+    # adapter-issued position within the configured list, not a provider token. A
+    # page has no collection revision: each Namespace carries its own resourceVersion.
+  - name: connectors_kubernetes.reads.RolloutHistorySelection
+    kind: struct
+    fields:
+      - {name: namespace, type: String}
+      - {name: deployment, type: String}
+      - {name: deployment_uid, type: String}
+    invariants:
+      - namespace.count: {gte: 1, lte: 63}
+      - deployment.count: {gte: 1, lte: 253}
+    # The selection of deployments.history. namespace and deployment are caller
+    # input; deployment_uid is read from the Deployment object itself, never supplied,
+    # and binds the continuation so a recreated Deployment of the same name cannot
+    # resume a page of its predecessor. The ReplicaSets are listed with the
+    # Deployment's own spec.selector translated to a label selector, and a listed
+    # ReplicaSet belongs to the history only when one of its ownerReferences has
+    # controller true and uid equal to deployment_uid: a label match alone is not
+    # ownership. Each ReplicaSet's rollout revision is its
+    # metadata.annotations["deployment.kubernetes.io/revision"], carried in the
+    # full object and not projected.
+    # DECIDED 2026-10-10: items keep provider list order (by name); a page is not
+    # sorted by revision, because ordering across pages would need the whole
+    # collection. A caller orders by the annotation.
+    # DECIDED 2026-10-10: the history is never claimed complete beyond the provider's
+    # own collection: the controller prunes ReplicaSets beyond
+    # spec.revisionHistoryLimit, so absent revisions are pruned or never existed and
+    # this read cannot tell which.
+
+# ESS-LIMIT: the DNS-1123 predicate on name and deployment, the owner predicate
+# (an ownerReferences entry with controller true and the read uid), the selector
+# translation and the identity check of a returned object. The character-class half
+# is left undeclared for the same reason as the digits-only rule in mutations.yaml
+# (synthesis refuses a type invariant no view holds); the rest needs a cross-record
+# read ESS does not have. The binding enforces each around its provider calls.

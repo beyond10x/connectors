@@ -159,6 +159,9 @@ impl Local {
                     scopes: BTreeSet::new(),
                     effect: match o.id.as_str() {
                         "resources.list"
+                        | "resources.get"
+                        | "namespaces.list"
+                        | "deployments.history"
                         | "endpoints.discover"
                         | "hosts.discover"
                         | "helm_releases.history"
