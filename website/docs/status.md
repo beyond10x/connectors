@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-09: 33 capabilities are shipped, 3 are decided and 4 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-09: 34 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -65,9 +65,11 @@ As of 2026-10-09: 33 capabilities are shipped, 3 are decided and 4 are planned. 
 | [Tavily web search](./reference/adapters/tavily/index.md) | ● shipped | websearch.search, websearch.fetch and websearch.crawl through the shared websearch family; the key is checked without spending a search. |
 | [Loki LogQL reads](./reference/adapters/loki/index.md) | ● shipped | logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0). |
 | [Grafana data sources](./reference/adapters/grafana/index.md) | ● shipped | datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (since 0.39.0). |
+| [Prometheus PromQL reads](./reference/adapters/prometheus/index.md) | ● shipped | series.query, series.query_range and rules.list through a saved bearer connection, directly or through Grafana's data-source proxy. |
 | [Kubernetes permission checks](./reference/adapters/kubernetes/index.md) | ○ planned | Per-operation SelfSubjectAccessReview checks and the remaining Kubernetes and Helm workflows. |
 | [Loki tenants and other authentication](./reference/adapters/loki/index.md) | ○ planned | An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected. |
-| [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Atlassian native documents, Docker, Prometheus, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built. |
+| [Prometheus tenants, timeouts and other authentication](./reference/adapters/prometheus/index.md) | ○ planned | An X-Scope-OrgID tenant header, an adapter-set query timeout, a Capacity error for too many samples apart from other execution errors, and profiles other than a bearer token. |
+| [Specification-only adapters](./reference/adapters/index.md) | ◐ decided | Atlassian native documents, Docker, Alertmanager, SIP and RTVBP have designs or typed models and no runtime; Grafana dashboards, datasource discovery and the mediated route are specified and not built. |
 | [MCP](./reference/adapters/index.md) | ○ planned | MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime. |
 
 ## Distribution

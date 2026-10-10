@@ -1,13 +1,13 @@
 ---
 title: Grafana
 sidebar_position: 9
-description: Data-source records through a saved service-account connection, and Loki reads through Grafana's proxy.
+description: Data-source records through a saved service-account connection, and Loki and Prometheus reads through Grafana's proxy.
 ---
 
 # Grafana
 
-List the data sources a Grafana service account can read, and reach a Loki data source through
-Grafana.
+List the data sources a Grafana service account can read, and reach a Loki or Prometheus data
+source through Grafana.
 
 ## Current capabilities
 
@@ -33,6 +33,13 @@ A Loki data source is read through Grafana as a [Loki](../loki/index.md) connect
 `base_url` is `https://<grafana>/api/datasources/proxy/uid/<uid>/`, with the Grafana token as
 its bearer token. `logs.query_range`, `logs.query_metric` and `logs.labels` then answer through
 Grafana's data-source proxy.
+
+## Prometheus through Grafana
+
+A Prometheus data source is read the same way, as a [Prometheus](../prometheus/index.md)
+connection whose `base_url` is the data source's proxy path, with the Grafana token as its
+bearer token. `series.query`, `series.query_range` and `rules.list` then answer through Grafana's
+data-source proxy.
 
 ## Limits
 

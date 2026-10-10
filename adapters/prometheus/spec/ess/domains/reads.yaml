@@ -1,0 +1,63 @@
+domain: connectors_prometheus.reads
+summary: Prometheus-owned PromQL instant and range selections, their result kinds and series bounds.
+
+# Normative owner: adapters/prometheus/contracts/series/v1alpha1/semantics.md §§3–5 (promql-range)
+# and §11 (promql-instant and the implemented binding). Declared in spec/adapter.json as
+# `series.query` and `series.query_range`.
+types:
+  # `data.resultType` of a Prometheus query answer. A range query answers `matrix` only;
+  # an instant query answers any of the four (a range-vector selector such as `up[5m]`
+  # answers `matrix` at one instant).
+  - name: connectors_prometheus.reads.ResultType
+    kind: enum
+    variants: [vector, matrix, scalar, string]
+
+  # §11.1: one PromQL expression evaluated at one instant. Omitted `time_unix_s` is the
+  # receiver clock, whole seconds.
+  - name: connectors_prometheus.reads.InstantSelection
+    kind: struct
+    fields:
+      - {name: query, type: String}
+      - {name: time_unix_s, type: "Optional<Integer>"}
+      - {name: max_series, type: "Optional<Integer>"}
+      - {name: max_samples_per_series, type: "Optional<Integer>"}
+    invariants:
+      - query.count: {gte: 1, lte: 16384}
+      - time_unix_s: {gte: 0, lte: 9999999999}
+      - max_series: {gte: 1, lte: 500}
+      - max_samples_per_series: {gte: 1, lte: 2000}
+
+  # §3–4: one PromQL expression over [start, end] at an explicit step. The window is at
+  # most seven days; the step is at least one second.
+  - name: connectors_prometheus.reads.RangeSelection
+    kind: struct
+    fields:
+      - {name: query, type: String}
+      - {name: start_unix_s, type: Integer}
+      - {name: end_unix_s, type: Integer}
+      - {name: step_s, type: Integer}
+      - {name: max_series, type: "Optional<Integer>"}
+      - {name: max_samples_per_series, type: "Optional<Integer>"}
+    invariants:
+      - query.count: {gte: 1, lte: 16384}
+      - start_unix_s: {gte: 0, lte: 9999999999}
+      - end_unix_s: {gte: 0, lte: 9999999999}
+      - step_s: {gte: 1, lte: 604800}
+      - max_series: {gte: 1, lte: 500}
+      - max_samples_per_series: {gte: 1, lte: 2000}
+
+  # The effective window a range result echoes after normalization (§3 `window`).
+  - name: connectors_prometheus.reads.Window
+    kind: struct
+    fields:
+      - {name: start_unix_s, type: Integer}
+      - {name: end_unix_s, type: Integer}
+      - {name: step_s, type: Integer}
+
+# ESS-LIMIT: start < end, end − start ≤ 604,800 s and (end − start) div step + 1 ≤
+# max_samples_per_series compare sibling fields, which ESS invariants cannot; the adapter
+# refuses each as InvalidInput before dispatch (contract §4, §11.3) and tests/protocol.rs
+# asserts it. A sample is `[timestamp, value]` with a JSON-number timestamp that may be
+# fractional and a string value kept verbatim (`NaN`, `+Inf`); ESS has no heterogeneous
+# tuple, so the sample shape is owned by spec/adapter.json's output schemas. PromQL itself
+# is not parsed: the query is forwarded unchanged.

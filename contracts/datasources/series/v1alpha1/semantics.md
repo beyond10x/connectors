@@ -17,9 +17,9 @@ profile catalog. Each advertised schema is closed; profile-specific structures
 remain typed in the owning adapter rather than becoming an arbitrary payload bag.
 
 The [Prometheus series binding](../../../../adapters/prometheus/contracts/series/v1alpha1/semantics.md)
-owns the currently proposed range-query profile and all native projection rules.
-Its instant and label names are reserved/refused in that adapter and are not shared
-profile vocabulary or advertised support. This index link does not require that
+owns its range and instant query profiles and all native projection rules. Its
+label name is reserved/refused in that adapter; none of its profile names is shared
+profile vocabulary. This index link does not require that
 adapter to exist for another implementation to conform to the shared contract.
 
 ## Admission, completeness and limits

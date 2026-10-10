@@ -1,0 +1,1 @@
+{"status":"success","data":{"resultType":"matrix","result":[{"metric":{"status":"200"},"values":[[1788822000,"12.5"],[1788822060,"13"],[1788822120,"+Inf"]]},{"metric":{"status":"500"},"values":[[1788822000,"0.25"],[1788822060,"0"],[1788822120,"NaN"]]}]}}

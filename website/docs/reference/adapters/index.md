@@ -20,6 +20,7 @@ an installed capability: the runtime column says what runs.
 | [SQL (PostgreSQL and MySQL)](./sql/index.md) | `connectors-sql` | `query.read`, `schema.list`, `database.list`, `table.list`, `table.describe`, `index.list` |
 | [Tavily](./tavily/index.md) | `connectors-tavily` | `websearch.search`, `websearch.fetch`, `websearch.crawl` |
 | [Loki](./loki/index.md) | `connectors-loki` | `logs.query_range`, `logs.query_metric`, `logs.labels`, directly or through Grafana's data-source proxy |
+| [Prometheus](./prometheus/index.md) | `connectors-prometheus` | `series.query`, `series.query_range`, `rules.list`, directly or through Grafana's data-source proxy |
 | [Grafana](./grafana/index.md) | `connectors-grafana` | `datasources.list`; discovery and the mediated route are specified only |
 
 ## Specification or design only
@@ -28,7 +29,6 @@ an installed capability: the runtime column says what runs.
 |---|---|
 | [Atlassian](./atlassian/index.md) | native document contracts and an ESS model for Jira and Confluence; Jira and Confluence reads run through the catalog provider instead |
 | [Docker](./docker/index.md) | native log and mutation contracts and an ESS model |
-| [Prometheus](./prometheus/index.md) | a native PromQL series contract |
 | [Alertmanager](./alertmanager/index.md) | a design |
 | [SIP](./sip/index.md) | a native dial contract |
 | [RTVBP](./rtvbp/index.md) | a native session contract |

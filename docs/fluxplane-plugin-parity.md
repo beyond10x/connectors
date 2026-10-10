@@ -158,6 +158,16 @@ Sources:
   `adapters/catalog/providers/gitlab/operations.json`, so no earlier citation in the
   [gitlab](#gitlab) section moved. The [Gap units](#gap-units) table still shows the 2026-10-07
   baseline.
+- **Prometheus, 2026-10-10 (unreleased).** `prometheus.query`, `prometheus.query_range`,
+  `prometheus.rules` and `prometheus.test` moved from missing to covered, and so did
+  `grafana.prometheus.query`, `grafana.prometheus.range` and `grafana.prometheus.rules`, when the
+  native Prometheus adapter shipped `series.query`, `series.query_range` and `rules.list`, direct
+  and through the Grafana data-source proxy. The `prometheus` row of the per-plugin table now
+  reads 4 / 2 covered and 4 / 0 missing, the `grafana` row 8 / 425 covered and 12 / 0 missing,
+  and the summary and total rows move by the same 7 operations and 69 calls; the plugin verdict
+  of `prometheus` moves to covered, and [Not planned until used](#not-planned-until-used) loses
+  `query_range` and `rules`. The [Gap units](#gap-units) table still shows the 2026-10-07
+  baseline.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -176,7 +186,7 @@ Sources:
   | homer | 33 | missing |
   | confluence | 13 | covered |
   | alertmanager | 2 | missing |
-  | prometheus | 2 | missing |
+  | prometheus | 2 | covered |
   | the other 11 missing plugins | 0 | missing |
   | **total** | **6,191** (148 operation names) | |
 
@@ -184,9 +194,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 66 | 5,542 | 55 | 5,542 |
+| covered | 73 | 5,611 | 60 | 5,611 |
 | partial | 14 | 26 | 7 | 26 |
-| missing | 221 | 788 | 47 | 788 |
+| missing | 214 | 719 | 42 | 719 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -203,12 +213,12 @@ Per plugin (operations / calls):
 | jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
 | slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
-| grafana | 20 | 7 | 425 | 5 / 358 | 0 / 0 | 15 / 67 |
+| grafana | 20 | 7 | 425 | 8 / 425 | 0 / 0 | 12 / 0 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
 | kubernetes | 24 | 14 | 72 | 6 / 31 | 6 / 10 | 12 / 31 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
 | confluence | 15 | 3 | 13 | 4 / 5 | 0 / 0 | 11 / 8 |
-| prometheus | 8 | 2 | 2 | 0 / 0 | 0 / 0 | 8 / 2 |
+| prometheus | 8 | 2 | 2 | 4 / 2 | 0 / 0 | 4 / 0 |
 | alertmanager | 5 | 1 | 1 | 0 / 0 | 0 / 0 | 5 / 1 |
 | asterisk | 8 | 0 | 0 | 0 / 0 | 0 / 0 | 8 / 0 |
 | aws | 11 | 0 | 0 | 0 / 0 | 0 / 0 | 11 / 0 |
@@ -224,16 +234,16 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **66 / 5,542** | **14 / 26** | **221 / 788** |
+| **total** | **301** | **109** | **6,356** | **73 / 5,611** | **14 / 26** | **214 / 719** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
 
 | verdict | plugins | count |
 |---|---|---:|
-| covered | gitlab, jira, confluence, grafana, kubernetes, loki, slack, sql, tavily | 9 |
+| covered | gitlab, jira, confluence, grafana, kubernetes, loki, prometheus, slack, sql, tavily | 10 |
 | partial only | websearch | 1 |
-| missing | homer, prometheus, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 14 |
+| missing | homer, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 13 |
 | no operations declared | clock | 1 |
 
 ## Verdict rules
@@ -464,18 +474,19 @@ token as its `loki.bearer` token, sends its probe and every read below that pref
 `a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix`). The uid
 comes from `datasources.list`. The mediated route of the design, `grafana-datasource-proxy`
 (`adapters/grafana/design.md:19`), which would seal the uid and allowlist targets, is not
-built; Prometheus and Alertmanager through Grafana still need their own adapters. Each read is
+built. Prometheus, like Loki, runs on a connection whose base URL is the proxy path
+([prometheus](#prometheus)); Alertmanager through Grafana still needs its own adapter. Each read is
 tested against fixture answers in Grafana and Loki API shapes, not a live Grafana.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
 | `grafana.loki.query` | 320 | 12 | 2026-09-28 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) on a Loki connection through the Grafana proxy | covered | Unpaged: at most 1,000 lines per call over at most 24 hours. A metric expression is `logs.query_metric` (`adapters/loki/spec/adapter.json:259`). The connection names the data source uid in its `base_url`. |
-| `grafana.prometheus.query` | 49 | 7 | 2026-10-06 | — | missing | An instant PromQL query through the proxy. Needs the Grafana route and a Prometheus adapter. |
+| `grafana.prometheus.query` | 49 | 7 | 2026-10-06 | `series.query` (`adapters/prometheus/spec/adapter.json:60`) on a Prometheus connection through the Grafana proxy | covered | No tenant header and no `timeout` parameter; "too many samples" is reported as an execution error, not a capacity error. |
 | `grafana.datasource.list` | 31 | 12 | 2026-10-06 | `datasources.list` (`adapters/grafana/spec/adapter.json:45`) | covered | uid, name, type, access mode and default flag only; backend URLs and settings are withheld. Unpaged, at most 1,000 records. |
-| `grafana.prometheus.range` | 17 | 3 | 2026-10-06 | — | missing | A range PromQL query through the proxy. |
+| `grafana.prometheus.range` | 17 | 3 | 2026-10-06 | `series.query_range` (`adapters/prometheus/spec/adapter.json:222`) on a Prometheus connection through the Grafana proxy | covered | As `grafana.prometheus.query`. |
 | `grafana.loki.labels` | 6 | 4 | 2026-09-22 | `logs.labels` (`adapters/loki/spec/adapter.json:429`) on a Loki connection through the Grafana proxy | covered | Label names, or one label's values. |
 | `grafana.loki.recent_logs` | 1 | 1 | 2026-09-15 | `logs.query_range` (`adapters/loki/spec/adapter.json:60`) with a start and no end, on a Loki connection through the Grafana proxy | covered | The caller computes the start (now minus N minutes); an omitted `end_unix_ns` is the receiver clock (`adapters/loki/tests/protocol.rs`, `recent_logs_through_the_grafana_proxy_end_at_the_receiver_clock_below_the_prefix`). |
-| `grafana.prometheus.rules` | 1 | 1 | 2026-09-23 | — | missing | Prometheus rules through the proxy. |
+| `grafana.prometheus.rules` | 1 | 1 | 2026-09-23 | `rules.list` (`adapters/prometheus/spec/adapter.json:407`) on a Prometheus connection through the Grafana proxy | covered | Each alerting rule carries its count of active alerts, not the alerts. |
 | `grafana.alerts.active` | 0 | 0 | - | — | missing | Alertmanager through the proxy. |
 | `grafana.alerts.silences.create` | 0 | 0 | - | — | missing | An Alertmanager write through the proxy. |
 | `grafana.alerts.silences.delete` | 0 | 0 | - | — | missing | An Alertmanager write through the proxy. |
@@ -600,20 +611,24 @@ v2 has no CQL search and no user search.
 
 Source: fluxplane inventory §2 prometheus.
 
-Connectors has no Prometheus runtime. `adapters/prometheus` holds `design.md` and the
-`promql-range` contract. The baseline notes that instant queries are not specified
-(`docs/recent-adapter-usage-20260909.md`, U08).
+Connectors serves Prometheus through the native adapter `adapters/prometheus` (line numbers
+below are `adapters/prometheus/spec/adapter.json`): instant and range PromQL queries and the rule
+list, on a bearer-token connection whose probe is `GET /api/v1/status/buildinfo`. Through Grafana
+the same adapter runs on a connection whose base URL is Grafana's data-source proxy path, as Loki
+does. Each read is tested against recorded answers in Prometheus API shapes, through the private
+runtime and the CLI, not a live Prometheus. Limits: no tenant header, no `timeout` parameter, a
+"too many samples" answer is reported as an execution error, and only the bearer profile is built.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `prometheus.query` | 1 | 1 | 2026-09-16 | — | missing | No runtime. Instant queries are not specified. |
-| `prometheus.test` | 1 | 1 | 2026-09-24 | — | missing | No Prometheus connection. |
-| `prometheus.alerts` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.labels` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.query_range` | 0 | 0 | - | — | missing | No runtime. A range query is specified but not implemented. |
-| `prometheus.rules` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.series` | 0 | 0 | - | — | missing | No runtime. |
-| `prometheus.targets` | 0 | 0 | - | — | missing | No runtime. |
+| `prometheus.query` | 1 | 1 | 2026-09-16 | `series.query` (`adapters/prometheus/spec/adapter.json:60`) | covered | No tenant header and no `timeout` parameter. |
+| `prometheus.test` | 1 | 1 | 2026-09-24 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/v1/status/buildinfo` probe with the saved token. |
+| `prometheus.alerts` | 0 | 0 | - | — | missing | Not selected. |
+| `prometheus.labels` | 0 | 0 | - | — | missing | Not selected. |
+| `prometheus.query_range` | 0 | 0 | - | `series.query_range` (`adapters/prometheus/spec/adapter.json:222`) | covered | — |
+| `prometheus.rules` | 0 | 0 | - | `rules.list` (`adapters/prometheus/spec/adapter.json:407`) | covered | Each alerting rule carries its count of active alerts, not the alerts. |
+| `prometheus.series` | 0 | 0 | - | — | missing | Not selected. |
+| `prometheus.targets` | 0 | 0 | - | — | missing | Not selected. |
 
 ## alertmanager
 
@@ -1022,8 +1037,8 @@ waits for any unit it depends on: U05 after U04, U12 after U05, U08 and U13 afte
 
 ## Not planned until used
 
-182 operations with 0 calls are partial or missing: 175 missing and 7 partial. They belong to
-no unit until a session uses them. The other 10 operations with 0 calls are already covered.
+180 operations with 0 calls are partial or missing: 173 missing and 7 partial. They belong to
+no unit until a session uses them. The other 12 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
@@ -1035,7 +1050,7 @@ no unit until a session uses them. The other 10 operations with 0 calls are alre
 | kubernetes | 7 | `container.show` (partial), `deployment.restart`, `deployment.scale`, `ingress.list`, `node.list` (partial), `portforward.list`, `service.show` (partial) |
 | homer | 3 | `alias.list`, `call.analyze`, `pcap.export` |
 | confluence | 10 | `attachment.delete`, `attachment.get`, `index.build`, `page.attachment.add`, `page.attachment.list`, `page.comment.add`, `page.create`, `page.delete`, `page.update`, `user.search` |
-| prometheus | 6 | `alerts`, `labels`, `query_range`, `rules`, `series`, `targets` |
+| prometheus | 4 | `alerts`, `labels`, `series`, `targets` |
 | alertmanager | 4 | `silence.create`, `silence.delete`, `silence.list`, `test` |
 | asterisk | 8 | all |
 | aws | 11 | all |

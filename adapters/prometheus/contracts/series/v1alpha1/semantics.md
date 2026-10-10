@@ -1,16 +1,16 @@
 # Prometheus promql-range profile/v1alpha1
 
-- **Status:** proposed, not implemented.
+- **Status:** proposed; implemented in part by the `connectors-prometheus` executable since 2026-10-10 (§11).
 - **Shared dependency:** this adapter binding specializes the shared datasource contract of the same family and version. Native rules and future conformance fixtures are owned here.
 - **Family:** datasources. Siblings: [records](../../../../../contracts/datasources/records/v1alpha1/semantics.md), [logs](../../../../../contracts/datasources/logs/v1alpha1/semantics.md), relational (in [service v1alpha1](../../../../../contracts/service/v1alpha1/semantics.md)).
-- **Recorded:** 2026-09-08.
+- **Recorded:** 2026-09-08; §11 added 2026-10-10.
 
 ## 1. Identity
 
 | Field | Value |
 |---|---|
 | Contract | `datasource.series/v1alpha1` |
-| Profiles | selected: `promql-range`; reserved/refused: `promql-instant`, `promql-labels` |
+| Profiles | selected: `promql-range`, `promql-instant` (since 2026-10-10, §11.1); reserved/refused: `promql-labels` |
 | Shared with records | provenance and completeness semantics; not the page shape |
 
 A series read returns labeled time series of numeric samples for a native query over a time range with a step. The design requires instant/range semantics, timestamps, step/resolution, label sets, the native query, and partial/error behavior to be preserved, and states that a series is not a log record (`docs/design.md:455`).
@@ -21,6 +21,11 @@ optional instant value does not define a separately admitted request/result
 contract. `promql-labels` is reserved/refused because no selected source operation,
 schema, completeness rule or conformance input defines it. Neither reserved name
 may appear in an advertised profile list or be accepted as an invocation profile.
+
+Since 2026-10-10 `promql-instant` is selected: §11.1 gives it its own request, result,
+limits and conformance scenarios, which is what the paragraph above required. The
+rule list `prometheus-rules` (§11.2) is a profile of `datasource.records/v1alpha1`, not
+of this contract: rules are not series. `promql-labels` stays reserved/refused.
 
 ## 2. Old evidence and disposition
 
@@ -123,3 +128,158 @@ Errors: base codes; provider 400 (bad PromQL) → `InvalidInput` with a safe cla
 | Sample values as strings versus numbers | strings (lossless) |
 | Window maximum | 7 d |
 | Instant and label profiles | reserved/refused and unadvertised until a separately reviewed source operation, schema and conformance set selects each one |
+| Instant profile (2026-10-10) | selected by §11.1; the label profile stays reserved/refused |
+
+## 11. Instant queries, rules and the bearer connection
+
+**Recorded:** 2026-10-10, for parity unit U12 (`story:parity-prometheus-query`). Typed in the
+[Prometheus-owned model](../../../spec/ess/system.yaml) (`reads`, `rules` and `connection`
+domains) and declared in [the adapter specification](../../../spec/adapter.json).
+
+| Operation | Contract | Profile | Native request |
+|---|---|---|---|
+| `series.query` | `datasource.series/v1alpha1` | `promql-instant` | `GET api/v1/query` |
+| `series.query_range` | `datasource.series/v1alpha1` | `promql-range` | `GET api/v1/query_range` |
+| `rules.list` | `datasource.records/v1alpha1` | `prometheus-rules` | `GET api/v1/rules` |
+
+Paths are relative to the configured base URL. Every operation is one GET with no retry,
+under the host's provider body bound and transport deadline. A transport failure, an
+oversized body or a malformed answer is Unavailable; a deadline is Timeout.
+
+**Provider status.** 400 is InvalidInput, 401 Unauthorized, 403 Forbidden, 422 (the
+expression could not be executed) UpstreamProtocol, 429 RateLimited; 503 and every other
+non-200 status are Unavailable. No provider text, query text, origin or credential enters
+an error. Too many samples is answered by Prometheus as a 422 execution error and so
+reaches the caller as UpstreamProtocol; §3's Capacity mapping would need the provider's
+message text, which this binding does not read.
+
+**Success envelope.** Exactly `status: "success"` and `data`, with optional `warnings` and
+`infos`, each an array of strings; any other top-level member, or a `status` other than
+`success`, is Unavailable. Each note is clipped to 256 bytes on a character boundary and at
+most 32 of each kind are returned. `complete` is false when any warning is present, when a
+note was omitted past 32, or when any truncation applied. Infos alone do not make a result
+partial.
+
+**Series.** A series' `labels` are the provider's `metric` object verbatim (at most 128
+entries, names of at most 128 bytes, values of at most 4 KiB, 32 KiB in all; a violation is
+Unavailable). A sample is `[timestamp, value]`: the timestamp is the provider's JSON number
+(seconds, fractional as given, never negative) and the value the provider's string,
+verbatim (`NaN`, `+Inf`). Series keep provider order. Samples of one series must be strictly
+ascending by timestamp; otherwise the answer is Unavailable. `max_series` (1–500, default
+500) and `max_samples_per_series` (1–2,000, default 2,000) bound what is returned: series past
+the first are dropped with `series_truncated: true`, samples past the first of a series with
+that series' `samples_truncated: true`.
+
+### 11.1 `promql-instant`
+
+Input `{query, time_unix_s?, max_series?, max_samples_per_series?}`. `query` is 1–16,384
+bytes, forwarded unchanged. `time_unix_s` is whole seconds, 0–9,999,999,999; omitted, it is
+the receiver clock in whole seconds. The request sends `query` and `time` exactly.
+
+`data.resultType` is `vector`, `matrix` (a range-vector selector such as `up[5m]`
+evaluated at one instant), `scalar` or `string`. A vector element is `{metric, value}`; a
+matrix element `{metric, values}`; a scalar or string result is one `[timestamp, value]`
+pair, returned as one series with empty labels. Any other shape is Unavailable. Result:
+
+```json
+{ "result_type": "vector", "series": [ { "labels": { "job": "api" }, "samples": [ [1788825600.25, "1"] ], "samples_truncated": false } ], "series_truncated": false, "complete": true, "warnings": [], "infos": [], "time_unix_s": 1788825600, "provenance": { "instance": "…", "resource": "prometheus:query", "observed_at_unix_ms": 0, "source_revision": null } }
+```
+
+`time_unix_s` echoes the evaluation time sent. An instant read is not cached.
+
+### 11.2 `prometheus-rules` (`datasource.records/v1alpha1`)
+
+Input `{kind?}`, `alerting` or `recording`; given, the request sends `type=alert` or
+`type=record` and the binding also keeps only rules of that kind, so a provider that ignores
+the filter cannot widen the result. Absent, both kinds are listed.
+
+`data` must hold `groups`, an array; each group a `name` string, an optional `interval`
+number of seconds and a `rules` array. Each rule needs `name`, `query`, `health` (`ok`,
+`err` or `unknown`) and `type` (`alerting` or `recording`); an alerting rule needs `state`
+(`inactive`, `pending` or `firing`) and `alerts`, an array. `labels` and `annotations`,
+absent or null, are empty. Members this section does not name (`file`, `evaluationTime`,
+`lastEvaluation`, `keepFiringFor`, a group's `limit` and later additions) are not read, and
+the rule file path is never returned. Any violation of the named members is Unavailable.
+
+Each rule becomes one record, in group order and then rule order:
+`{group, group_interval_ms?, name, kind, query, labels, annotations, health, last_error?,
+state?, duration_ms?, active_alerts?}`. Durations are the provider's decimal seconds as
+exact whole milliseconds. `last_error` is present only for a nonempty provider error,
+clipped to 256 bytes. `active_alerts` counts the rule's `alerts`; the alerts themselves
+are not returned. At most 2,000 rules are returned; past that, cause `rule_limit` and
+`complete: false`. `next_cursor` is always null.
+
+### 11.3 The implemented `promql-range` binding
+
+The library binding in `adapters/prometheus/src` implements §§3–5 with this selection:
+
+- **Whole seconds.** `start_unix_s`, `end_unix_s` and `step_s` are integers; the request
+  sends them as decimal integers (`step` as plain seconds).
+- **Points, not quotient.** §4's `(end − start) / step ≤ max_samples_per_series` is
+  applied as `(end − start) div step + 1 ≤ max_samples_per_series`, the number of points
+  Prometheus evaluates, so an admitted request is never truncated by a conforming
+  provider. start < end and end − start ≤ 604,800 s. A violation is InvalidInput before
+  dispatch.
+- **Result type.** A range answer whose `resultType` is not `matrix`, or a sample outside
+  `[start, end]`, is Unavailable.
+- **No `timeout` parameter.** §2's adapter-set `timeout` is not sent; the host transport
+  deadline bounds the call.
+- **Scope.** Configuration requires `query_scope.allowed_matchers` and admits only the
+  explicit empty array (the entire deployment). No reviewed PromQL parser exists, so the
+  scoped form of §4 is not advertised and a nonempty array is an invalid configuration.
+- **Tenant header.** `X-Scope-OrgID` needs the shared HTTP header extension the host HTTP
+  port does not carry; no tenant header is sent and §6's tenant scenario is not met.
+- **No cache.** Nothing is retained between calls.
+
+### 11.4 The bearer connection
+
+The executable `connectors-prometheus` (`adapters/prometheus/src/local.rs`) advertises one
+profile, `prometheus.bearer`, and serves the three operations through the local host. Its
+configuration, profile, entry and identity probe are modelled in
+`spec/ess/domains/connection.yaml`; `tests/ess_model.rs` checks the executable against the
+schemas and invariants that model generates.
+
+- **Profile.** Scheme `http_bearer`, capability `http-bearer`, purpose `service_account`,
+  subject `app`. The protected entry is `{"token": "..."}` (1–8,192 visible ASCII bytes),
+  sent as `Authorization: Bearer <token>`. Prometheus grants no scopes; every operation is a
+  read. The design's anonymous, basic and parent-mediated profiles are not advertised: the
+  local host admits no profile without a credential.
+- **Identity probe.** Connect, repair and revalidate send `GET api/v1/status/buildinfo` with
+  the token: a bounded status read that runs no query. `200` admits the token; `401` and
+  `403` refuse it as an invalid credential; `429` and `5xx` are unavailable; any other status
+  is a protocol failure. The body is not read. Validation evidence lasts 60 seconds.
+- **Identity.** Prometheus has no user or account read, so the identity is the configured
+  connection (source `configuration`): kind `prometheus.connection`, subject the
+  configuration's `instance`. Any accepted token is the same identity. Use one `instance`
+  per deployment, tenant and, through Grafana, data source.
+- **Configuration.** The owner-only file `connectors-prometheus-local/1` names `instance`
+  (1–128 characters of `A–Z a–z 0–9 _ . -`), an HTTPS `base_url` of at most 512 characters
+  in its canonical form (lowercase `https://` and host, a path ending in `/`, no
+  credentials, query or fragment), an optional owner-only PEM `ca_file` at an absolute
+  path that replaces the system roots, and `query_scope: {"allowed_matchers": []}`.
+
+### 11.5 Through Grafana
+
+Grafana's data-source proxy serves a Prometheus data source's HTTP API below
+`/api/datasources/proxy/uid/<uid>/` and authenticates its own service-account token. A
+`prometheus.bearer` connection whose `base_url` is that proxy path and whose token is the
+Grafana token sends its probe and every read below the prefix; the uid comes from Grafana's
+`datasources.list`. This is the placement the fluxplane operations `grafana.prometheus.query`,
+`grafana.prometheus.range` and `grafana.prometheus.rules` used. §6's route-transparency
+scenario holds: the same fixture answers give the same result below the prefix as direct.
+The design's sealed mediated route (`prometheus.via_parent`) is not built; the proxy path is
+an ordinary base URL, so the connection, not a parent route, names the data source.
+
+### 11.6 Conformance
+
+| Scenario | Test (`adapters/prometheus/tests/`) |
+|---|---|
+| §6 600 series → 500, `series_truncated`, partial | `protocol.rs` `series_past_the_bound_are_dropped_and_flagged` |
+| §6 warnings → partial, each clipped to 256 bytes | `protocol.rs` `provider_warnings_make_the_result_partial_and_are_clipped` |
+| §6 point bound exceeded → InvalidInput, zero requests | `protocol.rs` `a_range_input_outside_the_profile_is_refused_before_any_request` |
+| §6 `NaN` and a fractional timestamp kept | `protocol.rs` `an_instant_query_sends_the_time_and_keeps_values_and_fractional_timestamps` |
+| §6 400 → InvalidInput without provider text | `protocol.rs` `provider_refusals_map_to_family_errors_without_provider_text` |
+| §6 tenant header | not met (§11.3) |
+| §6 Grafana proxy route transparency | `protocol.rs` `the_grafana_datasource_proxy_route_answers_as_direct`; `local_runtime.rs` `a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefix` |
+| §11.2 rules, kind filter, rule bound | `protocol.rs` `rules_are_listed_one_record_per_rule_with_group_and_alert_state`, `a_rule_kind_filter_is_sent_and_held`, `rules_past_two_thousand_are_dropped_and_flagged` |
+| §11.4 connection and probe | `local_runtime.rs`, `ess_model.rs`, `local_runtime/cli_journey.rs` |
