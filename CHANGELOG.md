@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.44.0 — 2026-10-10
 
 ### Added
 
@@ -24,6 +24,23 @@
   name, never the cluster's list; `deployments.history` returns the ReplicaSets a Deployment
   controls, with their revisions; `resource_kinds` admits `replicasets` and `events`. Every read
   stays inside the configured namespaces and kinds.
+
+### Compatibility
+
+- The GitLab selection set grows from 42 to 51 operations, so the GitLab descriptor and the
+  configuration revision of its guide change. An existing local adapter entry keeps working with
+  the operations it names; add the new ones to its `operations` permission to use them.
+- The Kubernetes descriptor gains `resources.get`, `namespaces.list` and `deployments.history`;
+  existing configurations keep working, and `replicasets` and `events` are read only when listed
+  in `resource_kinds`.
+- A `connectors-source-amendments/1` entry may now hold `correct_media_type`; files with
+  `add_parameter` or `correct_path` entries read as before.
+
+### Limitations
+
+- Fixtures only: no live GitLab or Kubernetes call. The namespace `get` RBAC a namespaced Role
+  grants is stated from the API's documented behaviour, not checked against a cluster.
+- Confluence CQL search is not in this release.
 
 ## 0.43.0 — 2026-10-10
 

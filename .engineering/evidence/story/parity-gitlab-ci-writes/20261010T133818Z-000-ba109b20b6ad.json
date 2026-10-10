@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-10T13:38:18Z",
+  "actor": "human:timo",
+  "artifact": "story:parity-gitlab-ci-writes",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/153 repository gate pass; package gates on 69dbc5fb8: 1082 passed 0 failed; adapters/catalog/tests/gitlab_ci_project_writes.rs, adapters/catalog/tests/gitlab_ci_project_writes_adversary.rs",
+    "reference": "69dbc5fb8"
+  }
+}
