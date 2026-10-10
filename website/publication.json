@@ -215,7 +215,7 @@
       "title": "Kubernetes reads",
       "source": "adapters/kubernetes/contracts/reads/v1alpha1/semantics.md",
       "owner": "kubernetes",
-      "status": "First-slice reads implemented; extensions specified"
+      "status": "Reads and kubeconfig contexts implemented; extensions specified"
     },
     {
       "route": "/adapters/kubernetes/contracts/auth",
@@ -236,7 +236,7 @@
       "title": "Kubernetes logs",
       "source": "adapters/kubernetes/contracts/logs/v1alpha1/semantics.md",
       "owner": "kubernetes",
-      "status": "Specified; runtime pending"
+      "status": "Implemented as pods.logs; permission pre-check open"
     },
     {
       "route": "/adapters/kubernetes/contracts/helm",
@@ -250,7 +250,7 @@
       "title": "Kubernetes mutations",
       "source": "adapters/kubernetes/contracts/mutations/v1alpha1/semantics.md",
       "owner": "kubernetes",
-      "status": "Specified; runtime pending"
+      "status": "Pod exec implemented, local CLI only; rollout restart specified"
     },
     {
       "route": "/adapters/kubernetes/contracts/routes",

@@ -215,6 +215,32 @@ Sources:
   0.40.0), and [Gap units](#gap-units) and [Waves](#waves) gain an open column (619 calls open,
   U15, U16 and U18 among the covered units) beside their 2026-10-07 baseline. The Confluence
   CQL search (U20) is not in this change and stays missing.
+- **Binary reads and Kubernetes logs, contexts and exec, 2026-10-10 (unreleased).** The catalog
+  engine gained a binary response kind: the result is JSON with the body's media type, length,
+  SHA-256 and the bytes in base64, at most 2 MiB, and a redirect is followed only to an origin the
+  selection names and the connection admits in its new `hosts` configuration
+  ([Configure the provider](local-catalog-provider.md#configure-the-provider)). With it
+  `slack.file.list`, `slack.file.info` and `slack.file.download` moved from missing to covered
+  (`files.list`, `files.info`, `file.download`), and so did `slack.download` (0 calls), the same
+  fetch of `url_private`; `jira.issue.attachment.get` moved from missing to covered
+  (`attachment.content`, `getAttachmentContent`). The native Kubernetes adapter shipped
+  `pods.logs`, `contexts.list` and the mutation `pods.exec`
+  ([Kubernetes CLI guide](local-kubernetes-cli.md#read-pod-logs)): `kubernetes.pod.logs` and
+  `kubernetes.pod.exec` moved from missing to covered, and `kubernetes.cluster.list` from partial
+  to covered. Everything is verified against fixtures, not a live Slack, Jira or cluster; Jira's
+  redirect target `https://api.media.atlassian.com` is inferred from Atlassian's documentation,
+  not observed. `slack.file.upload`, `slack.file.delete` and the three port-forward operations
+  stay missing. The `slack` row now reads 12 / 511 covered and 18 / 193 missing, the `jira` row
+  9 / 1,034 covered and 11 / 325 missing, the `kubernetes` row 15 / 67 covered, 2 / 0 partial and
+  7 / 5 missing; the summary and total rows move by 8 operations and 42 calls (5 from partial,
+  37 from missing), [Not planned until used](#not-planned-until-used) loses `slack.download`,
+  and the open column of [Gap units](#gap-units) and [Waves](#waves) falls from 619 to 577
+  (U21, U22 and U23 covered; U13 keeps its upload and delete open, U19 its port-forward). No
+  mapped call of [Used but not declared](#used-but-not-declared) lands on these operations. The
+  Slack and Jira selections were appended to their `operations.json`, which moved
+  `issue.transition.run` to line 23; the Kubernetes configuration schema grew above the
+  operations, so every `adapters/kubernetes/spec/adapter.json` and `adapters/kubernetes/src/lib.rs`
+  citation in the [kubernetes](#kubernetes) section was re-read.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -241,9 +267,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 95 | 5,745 | 81 | 5,745 |
-| partial | 8 | 10 | 2 | 10 |
-| missing | 198 | 601 | 26 | 601 |
+| covered | 103 | 5,787 | 88 | 5,787 |
+| partial | 7 | 5 | 1 | 5 |
+| missing | 191 | 564 | 20 | 564 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -258,12 +284,12 @@ Per plugin (operations / calls):
 | plugin | declared | used | calls | covered | partial | missing |
 |---|---:|---:|---:|---|---|---|
 | gitlab | 64 | 38 | 2,670 | 40 / 2,670 | 2 / 0 | 22 / 0 |
-| jira | 21 | 13 | 1,364 | 8 / 1,032 | 1 / 5 | 12 / 327 |
-| slack | 30 | 16 | 704 | 8 / 490 | 0 / 0 | 22 / 214 |
+| jira | 21 | 13 | 1,364 | 9 / 1,034 | 1 / 5 | 11 / 325 |
+| slack | 30 | 16 | 704 | 12 / 511 | 0 / 0 | 18 / 193 |
 | sql | 6 | 6 | 703 | 6 / 703 | 0 / 0 | 0 / 0 |
 | grafana | 20 | 7 | 425 | 8 / 425 | 0 / 0 | 12 / 0 |
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
-| kubernetes | 24 | 14 | 72 | 12 / 48 | 3 / 5 | 9 / 19 |
+| kubernetes | 24 | 14 | 72 | 15 / 67 | 2 / 0 | 7 / 5 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
 | confluence | 15 | 3 | 13 | 4 / 5 | 0 / 0 | 11 / 8 |
 | prometheus | 8 | 2 | 2 | 4 / 2 | 0 / 0 | 4 / 0 |
@@ -282,7 +308,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **95 / 5,745** | **8 / 10** | **198 / 601** |
+| **total** | **301** | **109** | **6,356** | **103 / 5,787** | **7 / 5** | **191 / 564** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -374,7 +400,7 @@ Connectors serves GitLab through the catalog provider, `adapters/catalog/provide
 | `gitlab.release.link.create` | 0 | 0 | - | — | missing | Release-link writes are not selected. |
 | `gitlab.release.link.delete` | 0 | 0 | - | — | missing | Release-link writes are not selected. |
 | `gitlab.release.link.update` | 0 | 0 | - | — | missing | Release-link writes are not selected. |
-| `gitlab.repository.archive` | 0 | 0 | - | — | missing | A binary archive. The catalog reads only JSON or text responses (`adapters/catalog/src/lib.rs:77`). |
+| `gitlab.repository.archive` | 0 | 0 | - | — | missing | A binary archive, not selected. Since 2026-10-10 the catalog reads binary answers, bounded at 2 MiB, which a repository archive can exceed. |
 | `gitlab.repository.changelog.add` | 0 | 0 | - | — | missing | The changelog API is not selected. |
 | `gitlab.repository.changelog.generate` | 0 | 0 | - | — | missing | The changelog API is not selected. |
 | `gitlab.repository.file.create` | 0 | 0 | - | — | missing | The file write is not selected. |
@@ -403,8 +429,9 @@ Connectors catalog provider: `adapters/catalog/providers/jira/operations.json`. 
 `getCreateIssueMetaIssueTypes` and `findUsers` are selected, as `issue.get`,
 `issue.create_meta` and `users.search` (`docs/catalog-jira.md`). Since 2026-10-10
 `getTransitions` is selected as `issue.transitions`, and `doTransition` as the guarded write
-`issue.transition.run` ([Running a transition](catalog-jira.md#running-a-transition)). None of
-the others is.
+`issue.transition.run` ([Running a transition](catalog-jira.md#running-a-transition)), and
+`getAttachmentContent` as the binary read `attachment.content`
+([Attachment content](catalog-jira.md#attachment-content)). None of the others is.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
@@ -414,12 +441,12 @@ the others is.
 | `jira.issue.comment.list` | 130 | 20 | 2026-10-05 | `issue.comments` (:7) | covered | Bodies come back as ADF, not Markdown. |
 | `jira.issue.transition.list` | 127 | 20 | 2026-10-01 | `issue.transitions` (:13) | covered | The transitions open on one issue, each with its target status in `to`. Every declared filter is kept: `transitionId`, `expand=transitions.fields`, `includeUnavailableTransitions` and the ordering and remote-condition flags (2026-10-10). |
 | `jira.issue.create` | 115 | 24 | 2026-10-06 | — | missing | `createIssue` is not selected. There is no read-back check for fields Jira dropped. |
-| `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | `issue.transition.run` (:19) | covered | By transition id, with the issue's current and the transition's target status ids, and an approval. Guarded: refused before the `POST` unless the issue is in the current status and the transition is open with that target; Jira's `204` is proved by reading the issue again, whose status must be the target, or the outcome is unknown. A by-name run or a walk to a target status is composition outside the catalog ([Running a transition](catalog-jira.md#running-a-transition)) (2026-10-10). |
+| `jira.issue.transition.run` | 109 | 18 | 2026-10-01 | `issue.transition.run` (:23) | covered | By transition id, with the issue's current and the transition's target status ids, and an approval. Guarded: refused before the `POST` unless the issue is in the current status and the transition is open with that target; Jira's `204` is proved by reading the issue again, whose status must be the target, or the outcome is unknown. A by-name run or a walk to a target status is composition outside the catalog ([Running a transition](catalog-jira.md#running-a-transition)) (2026-10-10). |
 | `jira.issue.link.add` | 40 | 11 | 2026-09-28 | — | missing | `linkIssues` is not selected. |
 | `jira.issue.edit` | 26 | 10 | 2026-09-24 | — | missing | `editIssue` is not selected. |
 | `jira.issue.create_meta` | 5 | 5 | 2026-10-06 | `issue.create_meta` (:15) | partial | The issue types a project can create, by project id or key. fluxplane takes an `issue_type` filter (`fluxplane-plugin operation describe jira jira.issue.create_meta`, 2026-10-09) for that type's create fields; the fields of one issue type (`getCreateIssueMetaIssueTypeId`) are not selected. |
 | `jira.issue.delete` | 3 | 1 | 2026-09-16 | — | missing | `deleteIssue` is not selected. |
-| `jira.issue.attachment.get` | 2 | 1 | 2026-09-17 | — | missing | A binary download (`getAttachmentContent`). The catalog reads only JSON or text responses. |
+| `jira.issue.attachment.get` | 2 | 1 | 2026-09-17 | `attachment.content` (:19) | covered | `getAttachmentContent` as a binary read: the bytes in base64 with their media type, length and SHA-256, refused above 2 MiB. Jira answers `303` to a download URL unless `redirect` is `false`; the redirect is followed only to `https://api.media.atlassian.com` without the credential, and only when the connection admits that host in `hosts`, so a connection without it passes `redirect=false`. That target is inferred from Atlassian's documentation, not observed on a live site (2026-10-10). |
 | `jira.user.search` | 2 | 2 | 2026-09-28 | `users.search` (:17) | covered | By `query` or exact `accountId`, over the first 1,000 matches; privacy controls may withhold email addresses. |
 | `jira.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
 | `jira.issue.attachment.add` | 0 | 0 | - | — | missing | A multipart upload (`addAttachment`). It is not established whether the catalog can send a non-JSON request body. |
@@ -438,7 +465,8 @@ Connectors serves Slack through the catalog provider since 2026-10-08,
 `adapters/catalog/providers/slack/operations.json` (line numbers below), from the pinned Slack
 Web API document (`docs/catalog-slack.md`). A saved connection uses the profile `slack.bot`: a
 bot token as `Authorization: Bearer`, proved by `GET /api/auth.test`. The three conversation
-reads, `users.list`, `team.info`, `emoji.list` and `auth.test` are selected there; search is a
+reads, `users.list`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `files.info` and the
+binary download `file.download` are selected there; search is a
 second connection under the user-token profile `slack.user`, whose selection set
 `adapters/catalog/providers/slack/user-operations.json` selects `search.messages` alone. Every
 other row is still missing. The 2026-09-09 baseline listed Slack as
@@ -453,14 +481,14 @@ the Slack Web API method that would back it.
 | `slack.search` | 73 | 19 | 2026-10-05 | `search.messages` (`adapters/catalog/providers/slack/user-operations.json:5`) | covered | On a second connection with a user token (`slack.user`, scope `search:read`); a bot token cannot search. Pages by `page` and `count` (1–100), not by cursor. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5) | covered | One page of at most 1,000 per call; no lookup by channel name. |
-| `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | No provider. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload. |
+| `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload, which the catalog cannot send (it reads binary answers only). |
 | `slack.message.edit` | 20 | 8 | 2026-10-03 | — | missing | No provider. Would be backed by `chat.update`. |
 | `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:20) and `auth.test` (:26) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
-| `slack.file.download` | 11 | 8 | 2026-09-29 | — | missing | No provider. A binary fetch of `url_private`. |
+| `slack.file.download` | 11 | 8 | 2026-09-29 | `file.download` (:36) | covered | A binary read of a file's `url_private` or `url_private_download`: an `https` URL on `files.slack.com` under `/files-pri/`, sent with the bot token, answered as base64 with media type, length and SHA-256, refused above 2 MiB. The connection must admit `https://files.slack.com` with `"credential": true` in `hosts`; without it the download is refused as `forbidden` with nothing sent (2026-10-10). |
 | `slack.message.delete` | 10 | 6 | 2026-09-29 | — | missing | No provider. Would be backed by `chat.delete`. |
-| `slack.file.delete` | 7 | 4 | 2026-09-29 | — | missing | No provider. Would be backed by `files.delete`. |
-| `slack.file.info` | 7 | 2 | 2026-09-29 | — | missing | No provider. Would be backed by `files.info`. |
-| `slack.file.list` | 3 | 1 | 2026-09-29 | — | missing | No provider. Would be backed by `files.list`. |
+| `slack.file.delete` | 7 | 4 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.delete`. |
+| `slack.file.info` | 7 | 2 | 2026-09-29 | `files.info` (:32) | covered | One file by id, with `name`, `filetype`, `mimetype`, `size` and `url_private`; scope `files:read`. A Slack error is a `200` answer with `"ok": false` (2026-10-10). |
+| `slack.file.list` | 3 | 1 | 2026-09-29 | `files.list` (:29) | covered | Pages by `page` and `count`, not by cursor; narrowed by `channel`, `user`, `types`, `ts_from` and `ts_to`; scope `files:read` (2026-10-10). |
 | `slack.test` | 3 | 3 | 2026-09-26 | `connections revalidate` (`apps/connectors/spec/cli.yaml:387`) | covered | Repeats the `GET /api/auth.test` probe with the saved bot token. |
 | `slack.emoji.list` | 1 | 1 | 2026-09-28 | `emoji.list` (:23) | covered | The workspace's custom emoji, in one call; the pinned document states no member of the answer, which is returned as Slack sent it. |
 | `slack.bookmark.add` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.add`. |
@@ -469,7 +497,7 @@ the Slack Web API method that would back it.
 | `slack.bookmark.list` | 0 | 0 | - | — | missing | No provider. Would be backed by `bookmarks.list`. |
 | `slack.channel.join` | 0 | 0 | - | — | missing | No provider. Would be backed by `conversations.join`. |
 | `slack.channel.mark-read` | 0 | 0 | - | — | missing | No provider. Would be backed by `conversations.mark`. |
-| `slack.download` | 0 | 0 | - | — | missing | No provider. A binary fetch of `url_private`. |
+| `slack.download` | 0 | 0 | - | `file.download` (:36) | covered | The same fetch of `url_private` as `slack.file.download`, under the same `hosts` admission (2026-10-10). |
 | `slack.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
 | `slack.mentions` | 0 | 0 | - | — | missing | Not selected as its own operation. `search.messages` on the user-token connection is selected; the mention classification is done on the fluxplane side. |
 | `slack.presence.get` | 0 | 0 | - | — | missing | No provider. Would be backed by `users.getPresence`. |
@@ -577,43 +605,47 @@ Source: fluxplane inventory §2 kubernetes.
 
 Connectors native adapter: `adapters/kubernetes/spec/adapter.json`.
 
-- `resources.list` (:164) returns full provider objects. It covers six kinds: pods, services,
-  deployments, endpointslices, replicasets and events (`adapters/kubernetes/src/lib.rs:564-578`).
-  Its input is `namespace`, `kind`, `limit` and `cursor`, with no name filter (:168-209).
-- `resources.get` (:278) reads one object of a configured kind by name, and answers `not_found`
+- `resources.list` (:188) returns full provider objects. It covers six kinds: pods, services,
+  deployments, endpointslices, replicasets and events (`adapters/kubernetes/src/lib.rs:722-736`).
+  Its input is `namespace`, `kind`, `limit` and `cursor`, with no name filter (:192-233).
+- `resources.get` (:302) reads one object of a configured kind by name, and answers `not_found`
   when it is absent (2026-10-10).
-- Each instance configures the namespaces it may read (`adapters/kubernetes/src/lib.rs:55-69`).
-  `namespaces.list` (:376) reads each configured namespace by name and omits the ones the
+- Each instance configures the namespaces it may read (`adapters/kubernetes/src/lib.rs:75-89`).
+  `namespaces.list` (:400) reads each configured namespace by name and omits the ones the
   cluster does not have; it never lists the cluster's namespaces (2026-10-10).
-- `deployments.history` (:473) returns the ReplicaSets one Deployment controls by owner uid, with
+- `deployments.history` (:497) returns the ReplicaSets one Deployment controls by owner uid, with
   their rollout revisions (2026-10-10).
-- It advertises no writes and no process execution (README.md:126-129).
+- `pods.logs` (:1520) reads a bounded tail of one container's log, behind the `pod_logs` flag;
+  `contexts.list` (:1746) lists the contexts of the kubeconfig the local configuration names (its
+  `kubeconfig` path); `pods.exec` (:1852) is the one write, a command run under approval on the
+  local `connectors-private/2` write exchange only, behind the `pod_exec` flag. The federated
+  service advertises no write (2026-10-10).
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `kubernetes.pod.list` | 17 | 7 | 2026-09-22 | `resources.list` kind `pods` (:164) | covered | Configured namespaces only. |
-| `kubernetes.container.list` | 10 | 2 | 2026-09-20 | `resources.list` kind `pods` (:164) | covered | Containers are read from the full pod objects; there is no derived container list. |
-| `kubernetes.namespace.list` | 10 | 4 | 2026-09-22 | `namespaces.list` (:376) | covered | The configured namespaces the cluster has, each read by name; the cluster's namespace list is never read, so a namespace outside the configuration is not shown. |
-| `kubernetes.pod.exec` | 9 | 2 | 2026-09-15 | — | missing | Process execution is not advertised. |
-| `kubernetes.cluster.list` | 5 | 5 | 2026-09-18 | `connections list` (`apps/connectors/spec/cli.yaml:320`) | partial | Lists saved Kubernetes connections, not kubeconfig contexts. |
-| `kubernetes.pod.logs` | 5 | 1 | 2026-09-15 | — | missing | Specified in `adapters/kubernetes/contracts/logs` but not implemented. |
-| `kubernetes.service.list` | 4 | 1 | 2026-09-19 | `resources.list` kind `services` (:164) | covered | Configured namespaces only. |
-| `kubernetes.pod.show` | 3 | 2 | 2026-09-15 | `resources.get` kind `pods` (:278) | covered | Configured namespaces only; an absent pod answers `not_found`. |
-| `kubernetes.deployment.show` | 2 | 2 | 2026-09-19 | `resources.get` kind `deployments` (:278) | covered | Configured namespaces only. |
+| `kubernetes.pod.list` | 17 | 7 | 2026-09-22 | `resources.list` kind `pods` (:188) | covered | Configured namespaces only. |
+| `kubernetes.container.list` | 10 | 2 | 2026-09-20 | `resources.list` kind `pods` (:188) | covered | Containers are read from the full pod objects; there is no derived container list. |
+| `kubernetes.namespace.list` | 10 | 4 | 2026-09-22 | `namespaces.list` (:400) | covered | The configured namespaces the cluster has, each read by name; the cluster's namespace list is never read, so a namespace outside the configuration is not shown. |
+| `kubernetes.pod.exec` | 9 | 2 | 2026-09-15 | `pods.exec` (:1852) | covered | One command as an argument vector with no shell, in a named container; needs `pod_exec: true`, the local write exchange and an approval, and is recorded as an attempt like every write. Exit status and stdout and stderr up to `max_output_bytes` each (at most 1 MiB) come back; at most 60 s. No stdin and no TTY, so no interactive session. A lost stream is `unknown` and never resent. Verified against recorded streams, not a live cluster (2026-10-10). |
+| `kubernetes.cluster.list` | 5 | 5 | 2026-09-18 | `contexts.list` (:1746) | covered | The contexts of the one kubeconfig the local configuration names in `kubeconfig` (absolute, owner-only): name, cluster, namespace and the current flag, never credentials or servers. It reads no other kubeconfig and does not build a connection from a context; `connections list` (`apps/connectors/spec/cli.yaml:320`) lists the saved connections (2026-10-10). |
+| `kubernetes.pod.logs` | 5 | 1 | 2026-09-15 | `pods.logs` (:1520) | covered | One container's log in a configured namespace, needs `pod_logs: true`; `tail_lines` up to 1,000, `since_seconds` up to a day, `max_bytes` up to 128 KiB, timestamped lines. No follow. The per-read permission pre-check the contract names is not performed; the cluster's RBAC answer decides (2026-10-10). |
+| `kubernetes.service.list` | 4 | 1 | 2026-09-19 | `resources.list` kind `services` (:188) | covered | Configured namespaces only. |
+| `kubernetes.pod.show` | 3 | 2 | 2026-09-15 | `resources.get` kind `pods` (:302) | covered | Configured namespaces only; an absent pod answers `not_found`. |
+| `kubernetes.deployment.show` | 2 | 2 | 2026-09-19 | `resources.get` kind `deployments` (:302) | covered | Configured namespaces only. |
 | `kubernetes.portforward.start` | 2 | 1 | 2026-09-21 | — | missing | No port-forward. |
 | `kubernetes.portforward.stop` | 2 | 1 | 2026-09-21 | — | missing | No port-forward. |
-| `kubernetes.deployment.history` | 1 | 1 | 2026-09-11 | `deployments.history` (:473) | covered | The ReplicaSets the Deployment controls, each with its revision annotation; needs `deployments` and `replicasets` configured. ReplicaSets pruned beyond `revisionHistoryLimit` are gone. |
-| `kubernetes.event.list` | 1 | 1 | 2026-09-11 | `resources.list` kind `events` (:164) | covered | Configured namespaces only, once `events` is a configured kind. |
+| `kubernetes.deployment.history` | 1 | 1 | 2026-09-11 | `deployments.history` (:497) | covered | The ReplicaSets the Deployment controls, each with its revision annotation; needs `deployments` and `replicasets` configured. ReplicaSets pruned beyond `revisionHistoryLimit` are gone. |
+| `kubernetes.event.list` | 1 | 1 | 2026-09-11 | `resources.list` kind `events` (:188) | covered | Configured namespaces only, once `events` is a configured kind. |
 | `kubernetes.secret.read` | 1 | 1 | 2026-09-11 | — | missing | No Secret read. The Helm reads disclose redacted projections only. |
-| `kubernetes.container.show` | 0 | 0 | - | `resources.get` kind `pods` (:278) | partial | No container read: the container is read from the pod object. |
-| `kubernetes.deployment.list` | 0 | 0 | - | `resources.list` kind `deployments` (:164) | covered | Configured namespaces only. |
-| `kubernetes.deployment.restart` | 0 | 0 | - | — | missing | Restart is specified in `adapters/kubernetes/contracts/mutations`; no write is implemented. |
+| `kubernetes.container.show` | 0 | 0 | - | `resources.get` kind `pods` (:302) | partial | No container read: the container is read from the pod object. |
+| `kubernetes.deployment.list` | 0 | 0 | - | `resources.list` kind `deployments` (:188) | covered | Configured namespaces only. |
+| `kubernetes.deployment.restart` | 0 | 0 | - | — | missing | Restart is specified in `adapters/kubernetes/contracts/mutations`; the only implemented write is `pods.exec`. |
 | `kubernetes.deployment.scale` | 0 | 0 | - | — | missing | No write. |
-| `kubernetes.endpoint.discover` | 0 | 0 | - | `endpoints.discover` (:583) | covered | — |
+| `kubernetes.endpoint.discover` | 0 | 0 | - | `endpoints.discover` (:607) | covered | — |
 | `kubernetes.ingress.list` | 0 | 0 | - | — | missing | Ingresses are not a kind. |
-| `kubernetes.node.list` | 0 | 0 | - | `hosts.discover` (:768) | partial | Opt-in. Returns name, addresses and conditions (`adapters/kubernetes/src/lib.rs:966`); no roles, kubelet version or capacity. |
+| `kubernetes.node.list` | 0 | 0 | - | `hosts.discover` (:792) | partial | Opt-in. Returns name, addresses and conditions (`adapters/kubernetes/src/lib.rs:1124`); no roles, kubelet version or capacity. |
 | `kubernetes.portforward.list` | 0 | 0 | - | — | missing | No port-forward. |
-| `kubernetes.service.show` | 0 | 0 | - | `resources.get` kind `services` (:278) | covered | Configured namespaces only. |
+| `kubernetes.service.show` | 0 | 0 | - | `resources.get` kind `services` (:302) | covered | Configured namespaces only. |
 | `kubernetes.test` | 0 | 0 | - | `connections revalidate` (SelfSubjectReview probe, `adapters/kubernetes/src/auth.rs:16`) | covered | — |
 
 ## homer
@@ -648,7 +680,7 @@ v2 has no CQL search and no user search.
 | `confluence.page.show` | 4 | 3 | 2026-09-24 | `page.get` (:11) | covered | The body comes in storage format, not Markdown. |
 | `confluence.test` | 1 | 1 | 2026-09-21 | `connections revalidate` (identity probe, `docs/catalog-confluence.md:111`) | covered | — |
 | `confluence.attachment.delete` | 0 | 0 | - | — | missing | `deleteAttachment` (v2) is not selected. |
-| `confluence.attachment.get` | 0 | 0 | - | — | missing | A binary download. The catalog reads only JSON or text responses. |
+| `confluence.attachment.get` | 0 | 0 | - | — | missing | A binary download, not selected. Since 2026-10-10 the catalog reads binary answers (at most 2 MiB). |
 | `confluence.index.build` | 0 | 0 | - | — | missing | A fluxplane-local index. |
 | `confluence.page.attachment.add` | 0 | 0 | - | — | missing | Upload is a v1 multipart call and is not in the pinned v2 source. |
 | `confluence.page.attachment.list` | 0 | 0 | - | — | missing | `getPageAttachments` (v2) is not selected. |
@@ -1048,20 +1080,20 @@ The "provider in Connectors" column uses three values:
 | U10 | GitLab repository reads | gitlab | catalog | Catalog `operations.json` selection only: code search, tree, single commit, commit diff, branch list. | `gitlab.search.blobs`, `gitlab.repository.tree` | 110 | 15 | 125 | 0 |
 | U11 | GitLab merge-request reads | gitlab | catalog | Catalog `operations.json` selection only: merge-request diffs, discussions, notes. | `gitlab.mr.changes`, `gitlab.mr.discussion.list` | 101 | 5 | 106 | 0 |
 | U12 | Prometheus PromQL, direct and through Grafana | prometheus | new (`adapters/prometheus`: design and `promql-range` contract) | A new native adapter. Instant queries and rules need contract additions. The mediated placement depends on U05. | `grafana.prometheus.query`, `grafana.prometheus.range`, `grafana.prometheus.rules`, `prometheus.query`, `prometheus.test` | 69 | 0 | 69 | 0 |
-| U13 | Slack files | slack | new (after U02) | A catalog engine change: binary download and a multi-step external upload. | `slack.file.upload`, `slack.file.download`, `slack.file.delete`, `slack.file.info`, `slack.file.list` | 52 | 0 | 52 | 52 |
+| U13 | Slack files | slack | new (after U02) | A catalog engine change: binary download and a multi-step external upload. | `slack.file.upload`, `slack.file.download`, `slack.file.delete`, `slack.file.info`, `slack.file.list` | 52 | 0 | 52 | 31 |
 | U14 | GitLab tags and releases | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.release.create`, `gitlab.repository.tag.create`, `gitlab.repository.tag.show`, `gitlab.release.show`, `gitlab.release.link.list`, `gitlab.release.update`, `gitlab.repository.tag.delete` | 45 | 0 | 45 | 0 |
 | U15 | GitLab CI/CD writes and environments | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.pipeline.retry`, `gitlab.pipeline.cancel`, `gitlab.pipeline.create`, `gitlab.environment.list` | 36 | 0 | 36 | 0 |
 | U16 | GitLab project and repository writes | gitlab | catalog | Catalog `operations.json` selection only. | `gitlab.repository.commit.create`, `gitlab.project.create`, `gitlab.repository.file.update`, `gitlab.branch.create`, `gitlab.branch.delete` | 36 | 0 | 36 | 0 |
 | U17 | Homer SIP capture reads | homer | new | A new catalog provider, if the Homer API's Swagger document can be pinned (not checked). Otherwise a new native adapter. | `homer.call.list`, `homer.call.show`, `homer.test`, `homer.call.qos`, `homer.search` | 32 | 1 | 33 | 33 |
 | U18 | Kubernetes reads: namespaces, single objects, events, rollout history | kubernetes | native | Change the native adapter: new kinds (namespaces, events, ReplicaSets) and a single-object read. | `kubernetes.namespace.list`, `kubernetes.pod.show`, `kubernetes.deployment.show`, `kubernetes.deployment.history`, `kubernetes.event.list` | 17 | 0 | 17 | 0 |
-| U19 | Kubernetes exec and port-forward | kubernetes | native | Change the native adapter: the streaming subresources. The execution profile is deferred (README.md:115-116). | `kubernetes.pod.exec`, `kubernetes.portforward.start`, `kubernetes.portforward.stop` | 13 | 0 | 13 | 13 |
+| U19 | Kubernetes exec and port-forward | kubernetes | native | Change the native adapter: the streaming subresources. The execution profile is deferred (README.md:115-116). | `kubernetes.pod.exec`, `kubernetes.portforward.start`, `kubernetes.portforward.stop` | 13 | 0 | 13 | 4 |
 | U20 | Confluence CQL search | confluence | catalog | A new pinned OpenAPI source (Confluence REST v1) for the existing catalog provider. | `confluence.page.search` | 8 | 0 | 8 | 8 |
-| U21 | Kubernetes contexts | kubernetes | native | Change the native adapter and the CLI connection setup: discover kubeconfig contexts. | `kubernetes.cluster.list` | 5 | 0 | 5 | 5 |
-| U22 | Kubernetes pod logs | kubernetes | native | Change the native adapter: implement the specified `adapters/kubernetes/contracts/logs`. | `kubernetes.pod.logs` | 5 | 0 | 5 | 5 |
-| U23 | Jira attachment download | jira | catalog | A catalog engine change: binary responses. | `jira.issue.attachment.get` | 2 | 0 | 2 | 2 |
+| U21 | Kubernetes contexts | kubernetes | native | Change the native adapter and the CLI connection setup: discover kubeconfig contexts. | `kubernetes.cluster.list` | 5 | 0 | 5 | 0 |
+| U22 | Kubernetes pod logs | kubernetes | native | Change the native adapter: implement the specified `adapters/kubernetes/contracts/logs`. | `kubernetes.pod.logs` | 5 | 0 | 5 | 0 |
+| U23 | Jira attachment download | jira | catalog | A catalog engine change: binary responses. | `jira.issue.attachment.get` | 2 | 0 | 2 | 0 |
 | U24 | Alertmanager alerts | alertmanager | new (`adapters/alertmanager`: design only) | A new native adapter. The alert record schema is still unauthored. | `alertmanager.alerts` | 1 | 1 | 2 | 2 |
 | U25 | Kubernetes Secret read | kubernetes | native | Change the native adapter. It needs a disclosure decision first. | `kubernetes.secret.read` | 1 | 0 | 1 | 1 |
-| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** | **619** |
+| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** | **577** |
 
 The operation, declared, undeclared and total columns are the 2026-10-07 baseline: the units
 covered exactly the 89 declared operations that then had calls and were partial (16) or missing
@@ -1070,12 +1102,13 @@ that baseline.
 
 The open column is recounted from the rows above: a unit's declared calls whose operation is
 still partial or missing, plus its mapped calls in [Used but not declared](#used-but-not-declared)
-that do not land on covered. A unit with 0 open is covered. The 28 operations still open are
-exactly the operations with calls that are partial (2) or missing (26) in the
-[Summary](#summary), and their 611 declared calls equal its partial (10) and missing (601)
+that do not land on covered. A unit with 0 open is covered. The 21 operations still open are
+exactly the operations with calls that are partial (1) or missing (20) in the
+[Summary](#summary), and their 569 declared calls equal its partial (5) and missing (564)
 totals; the other 8 open calls are the mapped calls added to the gap units. On 2026-10-10,
-U01, U04, U05, U07, U09–U12, U14–U16 and U18 are covered. U02 keeps only its 5 mapped
-single-user reads open, and U03 only `jira.issue.create_meta` (partial).
+U01, U04, U05, U07, U09–U12, U14–U16, U18 and U21–U23 are covered. U02 keeps only its 5 mapped
+single-user reads open, U03 only `jira.issue.create_meta` (partial), U13 only its upload and
+delete (31 calls) and U19 only its port-forward (4 calls).
 
 ## Waves
 
@@ -1095,22 +1128,22 @@ the sum of its units' open calls in [Gap units](#gap-units); a wave with 0 open 
 | W1 | U01 MySQL query and schema reads · U02 Slack provider and conversation reads · U03 Jira issue reads · U04 Loki LogQL | sql, slack, jira, loki | 1,985 | 10 |
 | W2 | U05 Grafana datasources and Loki through Grafana · U06 Jira issue writes · U08 Slack message writes · U09 GitLab merge-request writes | grafana, jira, slack, gitlab | 1,006 | 488 |
 | W3 | U07 Jira transitions · U10 GitLab repository reads · U12 Prometheus PromQL · U18 Kubernetes reads | jira, gitlab, prometheus, kubernetes | 453 | 0 |
-| W4 | U11 GitLab merge-request reads · U13 Slack files · U17 Homer SIP capture reads · U19 Kubernetes exec and port-forward | gitlab, slack, homer, kubernetes | 204 | 98 |
-| W5 | U14 GitLab tags and releases · U20 Confluence CQL search · U21 Kubernetes contexts · U23 Jira attachment download | gitlab, confluence, kubernetes, jira | 60 | 15 |
-| W6 | U15 GitLab CI/CD writes and environments · U22 Kubernetes pod logs · U24 Alertmanager alerts | gitlab, kubernetes, alertmanager | 43 | 7 |
+| W4 | U11 GitLab merge-request reads · U13 Slack files · U17 Homer SIP capture reads · U19 Kubernetes exec and port-forward | gitlab, slack, homer, kubernetes | 204 | 68 |
+| W5 | U14 GitLab tags and releases · U20 Confluence CQL search · U21 Kubernetes contexts · U23 Jira attachment download | gitlab, confluence, kubernetes, jira | 60 | 8 |
+| W6 | U15 GitLab CI/CD writes and environments · U22 Kubernetes pod logs · U24 Alertmanager alerts | gitlab, kubernetes, alertmanager | 43 | 2 |
 | W7 | U16 GitLab project and repository writes · U25 Kubernetes Secret read | gitlab, kubernetes | 37 | 1 |
-| | **total** | | **3,788** | **619** |
+| | **total** | | **3,788** | **577** |
 
 ## Not planned until used
 
-178 operations with 0 calls are partial or missing: 172 missing and 6 partial. They belong to
-no unit until a session uses them. The other 14 operations with 0 calls are already covered.
+177 operations with 0 calls are partial or missing: 171 missing and 6 partial. They belong to
+no unit until a session uses them. The other 15 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
 | gitlab | 24 | `branch.delete_merged`, `ci.variable.create`, `ci.variable.delete`, `ci.variable.update`, `index.build`, `issue.list` (partial), `issue.note.create`, `issue.note.list`, `issue.show` (partial), `issue.update`, `mr.approve`, `mr.diff.lines`, `mr.discussion.create`, `release.delete`, `release.link.create`, `release.link.delete`, `release.link.update`, `repository.archive`, `repository.changelog.add`, `repository.changelog.generate`, `repository.file.create`, `repository.file.delete`, `snippet.create`, `snippet.delete` |
 | jira | 6 | `index.build`, `issue.attachment.add`, `issue.attachment.delete`, `issue.comment.delete`, `issue.comment.edit`, `issue.edit_meta` |
-| slack | 14 | `bookmark.add`, `bookmark.delete`, `bookmark.edit`, `bookmark.list`, `channel.join`, `channel.mark-read`, `download`, `index.build`, `mentions`, `presence.get`, `presence.set`, `reaction.add`, `reaction.remove`, `unreads` |
+| slack | 13 | `bookmark.add`, `bookmark.delete`, `bookmark.edit`, `bookmark.list`, `channel.join`, `channel.mark-read`, `index.build`, `mentions`, `presence.get`, `presence.set`, `reaction.add`, `reaction.remove`, `unreads` |
 | grafana | 12 | `alerts.active`, `alerts.silences.create`, `alerts.silences.delete`, `alerts.silences.list`, `annotation.add`, `annotation.list`, `dashboard.get`, `dashboard.list`, `datasource.health`, `folder.list`, `tempo.search`, `tempo.trace.get` |
 | loki | 1 | `recent_logs` |
 | kubernetes | 6 | `container.show` (partial), `deployment.restart`, `deployment.scale`, `ingress.list`, `node.list` (partial), `portforward.list` |

@@ -2,10 +2,10 @@
 
 The catalog provider reads Jira Cloud issues by JQL or one by key, their comments
 and their changelog, the transitions open on an issue, the issue types a project
-can create, and users, and runs one transition on an issue, from the
-pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
+can create, users and an attachment's content, and runs one transition on an
+issue, from the pinned Jira Cloud platform REST v3 OpenAPI document. Nothing here is
 Jira-specific code: the pinned document is compiled into a bundle, a reviewed
-selection set exposes seven reads and one guarded write, and the engine described in
+selection set exposes eight reads and one guarded write, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work exactly as described
 there; this page covers what differs for Jira.
@@ -34,7 +34,7 @@ fresh run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/jira/operations.json`](../adapters/catalog/providers/jira/operations.json)
-exposes seven reads and one write, `issue.transition.run`, guarded as
+exposes eight reads and one write, `issue.transition.run`, guarded as
 [Running a transition](#running-a-transition) describes. `adapters/catalog/tests/jira.rs` pins this exact id list and each id's
 `operationId` and path in the pinned document, so a renamed or dropped id, or a
 source operation that moved, fails the gate. The bundle refuses at load any
@@ -53,6 +53,7 @@ the end of a walk are in it.
 | `issue.transitions` | `getTransitions` | `GET /rest/api/3/issue/{issueIdOrKey}/transitions` | none | one issue per call | none |
 | `issue.create_meta` | `getCreateIssueMetaIssueTypes` | `GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes` | `startAt`, `maxResults` | `startAt + len(issueTypes) >= total` | none |
 | `users.search` | `findUsers` | `GET /rest/api/3/user/search` | `startAt`, `maxResults` | an empty page | none |
+| `attachment.content` | `getAttachmentContent` | `GET /rest/api/3/attachment/content/{id}` | none | one attachment per call | none; see [Attachment content](#attachment-content) |
 
 - **`issues.search`** replaces the deprecated `GET /rest/api/3/search`. Send the
   first page without `nextPageToken`; for each following page, send the
@@ -76,8 +77,8 @@ the end of a walk are in it.
 - **`issue.get`** takes `issueIdOrKey`, such as `FIX-1`, and returns the one
   issue. Without `fields` Jira returns all fields; `fields` takes a JSON array or
   one comma-separated string, as on `issues.search`, and the field `attachment`
-  carries the issue's attachment metadata (the content itself is a binary read
-  this provider does not serve). `expand` is one comma-separated string, such as
+  carries the issue's attachment metadata, each attachment's `id` among it, which
+  `attachment.content` reads. `expand` is one comma-separated string, such as
   `renderedFields,names`: `renderedFields` adds the HTML rendering of rich-text
   fields beside their Atlassian Document Format value, and `names` the display
   name of each field. An issue Jira does not find, or that the account may not
@@ -142,6 +143,35 @@ returned issue. Whether a given kind of change moves an issue's `updated` is
 Jira's behaviour and has not been checked against a live site here.
 Every other query parameter the pinned document declares for an operation is
 accepted by name; one it does not declare is refused before any request.
+
+## Attachment content
+
+`attachment.content` selects `getAttachmentContent` as a binary read
+([binary reads](local-catalog-provider.md#configure-the-provider)). It takes the
+attachment's `id`, as `issue.get` lists it under `fields.attachment`, and answers
+`{media_type, length, sha256, content_base64}`: the bytes in base64 with their
+media type, length and SHA-256. An attachment over 2 MiB is refused as
+`capacity`, never truncated.
+
+The pinned document gives two answers. With `redirect` set to `false`, Jira
+answers `200` with the content itself. Otherwise, the default, Jira answers `303`
+with a `Location` to a download URL. The selection follows that redirect only to
+`https://api.media.atlassian.com`, without the connection's credential, and only
+when the connection admits that host:
+
+```json
+"hosts": [{"origin": "https://api.media.atlassian.com"}]
+```
+
+Without that entry the configuration still loads, and a call without
+`"redirect": false` is refused as `forbidden` when Jira redirects, with nothing
+sent to the media host; send `"redirect": false` instead. A redirect to any other
+host is refused the same way. Adding `hosts` changes the configuration revision.
+
+**The media host is inferred, not verified live.** The pinned document names no
+redirect host; `https://api.media.atlassian.com`, Atlassian's media download
+host, is an inference, and no live site has been asked. If a site redirects
+elsewhere, the read is refused by name and `redirect: false` still works.
 
 ## Running a transition
 
@@ -308,11 +338,17 @@ An OAuth 2.0 (3LO) access token is sent as a bearer token. **Not verified live.*
 The credential document is `{"token": "<access token>"}`, sent as
 `Authorization: Bearer <access token>`. The provider does not refresh an OAuth
 token; connect again when it expires. The token must carry the read scopes the
-seven reads and `myself` need, and the write scope a transition needs; Atlassian names them per
+eight reads and `myself` need, and the write scope a transition needs; Atlassian names them per
 operation.
 
 ## Limits
 
+- `attachment.content` is verified through the engine against synthetic answers
+  (`adapters/catalog/tests/jira_attachment.rs`): the direct `200` with
+  `redirect=false`, the `303` followed to the admitted media host with no
+  credential, refusals for an unadmitted or other host, and an attachment over
+  2 MiB refused as `capacity`. The media host is inferred
+  ([Attachment content](#attachment-content)).
 - Verified against a local HTTPS fixture (`adapters/catalog/tests/jira.rs`):
   the exact request of each read, including the JQL time filter and the basic
   header, the returned body as JSON, and a walk of each list to the end
