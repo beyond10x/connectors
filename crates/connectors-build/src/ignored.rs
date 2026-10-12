@@ -168,6 +168,14 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             }
             _ => None,
         },
+        // The contract suite against the real Secret Service, in its private
+        // fixture. The macOS and Windows real-store cases compile on their own
+        // platform only and run in CI (`custody-platforms.yml`), not here.
+        (
+            "connectors-custody",
+            "connectors_custody",
+            "tests::secret_service_answers_the_custody_contract",
+        ) => Some((Disposable, vec![CUSTODY])),
         (
             "connectors-catalog-provider",
             "local_runtime",

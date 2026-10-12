@@ -17,7 +17,11 @@ use std::{fmt, time::Instant};
 use uuid::Uuid;
 use zeroize::Zeroizing;
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod contract;
 pub mod memory;
+#[cfg(test)]
+mod tests;
 
 #[cfg(target_os = "windows")]
 pub mod credential_manager;
