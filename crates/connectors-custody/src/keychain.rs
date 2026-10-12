@@ -172,6 +172,36 @@ impl Keychain {
             Err(_) => Err(Failure::Unavailable),
         }
     }
+
+    /// One read of `version` answered as [`Backend::read`] answers it, with
+    /// the keychain's status code when the item lookup failed. It observes the
+    /// keychain's access decision for this executable and changes nothing.
+    pub fn read_observed(&self, version: Version) -> (Result<Material>, Option<OSStatus>) {
+        let _quiet = match NoInteraction::enter() {
+            Ok(quiet) => quiet,
+            Err(failure) => return (Err(failure), None),
+        };
+        if let Err(failure) = self.admit(version) {
+            return (Err(failure), None);
+        }
+        match self
+            .keychain
+            .find_generic_password(SERVICE, &version.item_name())
+        {
+            Ok((password, _item)) => {
+                let material = Material::from_slice(&password);
+                drop(password);
+                if material.is_empty() || material.len() > MAX_BYTES {
+                    return (Err(Failure::Unavailable), None);
+                }
+                (Ok(material), None)
+            }
+            Err(error) if error.code() == errSecItemNotFound => {
+                (Err(Failure::Missing), Some(error.code()))
+            }
+            Err(error) => (Err(Failure::Unavailable), Some(error.code())),
+        }
+    }
 }
 
 fn status(keychain: &SecKeychain) -> State {

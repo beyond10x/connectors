@@ -37,3 +37,22 @@ jobs:
       - name: Test the custody crate against the platform store
         shell: bash
         run: cargo test --locked -p connectors-custody -- --include-ignored
+      # An observation, not a check: a second executable reads a login keychain
+      # item the first created, with today's item access. The reader exits 0
+      # on every outcome, `Unavailable` included; a crash fails the step.
+      - name: Observe a second binary reading a keychain item
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        shell: bash
+        run: |
+          cargo build --locked -p connectors-custody --example keychain_probe_writer --example keychain_probe_reader
+          ids=$(target/debug/examples/keychain_probe_writer write)
+          observed=$(target/debug/examples/keychain_probe_reader $ids)
+          echo "$observed"
+          target/debug/examples/keychain_probe_writer delete $ids
+          {
+            echo "### Keychain item read by a second binary"
+            echo
+            echo '```'
+            echo "$observed"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
