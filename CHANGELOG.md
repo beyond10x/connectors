@@ -11,9 +11,11 @@
   Linux keeps the qualified Secret Service binding, moved unchanged behind the trait. macOS stores
   generic password items in the login keychain with user interaction disallowed, so a locked
   keychain is `Unavailable` and never prompts. Windows stores generic credentials in the
-  Credential Manager with local-machine persistence; a value over 2,560 bytes is
-  `InvalidMaterial` and nothing is written. No binding falls back to another, to a file or to an
-  environment variable.
+  Credential Manager with local-machine persistence; since one credential holds at most
+  2,560 bytes, every value is written as numbered part entries, then a header entry naming the
+  part count and the value's SHA-256, written last, and a read checks every part and the digest.
+  Every binding holds values up to 64 KiB, which covers the largest material of every shipped
+  auth profile. No binding falls back to another, to a file or to an environment variable.
 - `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
   `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
   target.
@@ -34,11 +36,9 @@
   launch, filesystem admission and terminal entry are Linux-only, so the `connectors` binary
   does not build there. Only `connectors-custody` builds and is tested on those platforms, in the
   `Custody platforms` workflow.
-- Every shipped auth profile whose entry field is bounded at 8,192 bytes can produce material
-  larger than the Windows bound of 2,560 bytes (from 8,204 bytes for one token field to
-  24,630 bytes for the catalog `oauth2_refresh` triple); on Windows such a credential would be
-  refused as `InvalidMaterial`. The custody test that measures this fails until the entry bounds
-  or the Windows binding change.
+- Whether a second, upgraded `connectors` binary on macOS can read login keychain items the
+  previous one created is not decided: items keep the keychain's default per-application access,
+  and the `Custody platforms` workflow records what a second executable observes.
 
 ## 0.45.0 — 2026-10-10
 
