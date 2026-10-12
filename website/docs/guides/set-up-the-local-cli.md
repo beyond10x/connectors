@@ -64,13 +64,14 @@ the whole store, so an edit that bypasses SQLite is refused by the next command.
 ```sh
 ../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
   --output json setup check \
-  | jq '{ok, keyring: .result.keyring, prerequisites: [.result.prerequisites[] | "\(.name): \(.state)"]}'
+  | jq '{ok, keyring: .result.keyring, custody_backend: .result.custody_backend, prerequisites: [.result.prerequisites[] | "\(.name): \(.state)"]}'
 ```
 
 ```json
 {
   "ok": true,
   "keyring": "available",
+  "custody_backend": "secret_service",
   "prerequisites": [
     "configuration: ready",
     "metadata: ready",
@@ -82,7 +83,9 @@ the whole store, so an edit that bypasses SQLite is refused by the next command.
 
 `setup check` authenticates nowhere. `keyring` is the Linux Secret Service that will hold saved
 credentials; a machine without one cannot save a connection, and the check says so before any
-connect asks for a credential.
+connect asks for a credential. `custody_backend` names the store custody uses, fixed when the
+binary is built: `secret_service` on Linux. The `macos_keychain` and `windows_credential_manager`
+bindings exist, but the CLI does not yet run on macOS or Windows.
 
 ## Nothing is configured yet
 

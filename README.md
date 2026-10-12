@@ -39,7 +39,13 @@ The local CLI implements setup, configured adapter management, protected
 connect/repair, saved-credential revalidation, connection inspection/revoke, cached operation discovery and
 supervised GitLab and Kubernetes reads. A local owner manages exact
 child processes; SQLite records metadata and a qualified Secret Service keyring
-stores credentials. See the [catalog provider guide](docs/local-catalog-provider.md),
+stores credentials. Credential custody has one binding per platform, fixed when the binary is
+built and reported by `setup check` as `custody_backend`: the Secret Service on Linux, the
+login keychain on macOS and the Credential Manager on Windows
+([custody semantics §5.1](contracts/auth/custody/v1alpha1/semantics.md#51-platform-bindings-of-the-local-host)).
+The macOS and Windows bindings have a CI job that runs the custody contract suite against their
+real stores, but the CLI and its local host do not yet run on macOS or Windows; every release is
+still a Linux x86_64 build. See the [catalog provider guide](docs/local-catalog-provider.md),
 the [Kubernetes CLI guide](docs/local-kubernetes-cli.md) and the
 [runtime binding](docs/local-runtime-foundation.md).
 
