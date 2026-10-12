@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- ESS 0.59.0 (from 0.57.0): the seven ESS crates and the pinned toolchain; Entity Runtime Core
+  stays 0.28.0 through `ess-entity-runtime`, and Entity Runtime stays 0.30.3. Install ESS 0.59.0
+  (`b10x upgrade`) or select it with `--ess`/`CONNECTORS_ESS`. The generated CLI contract runtime
+  is unchanged. Its binding, the local metadata Entity Runtime definitions and the generated
+  documentation pages are regenerated and carry the committed model change:
+  `connectors.cli.OperatingSystem` gains `macos` and `windows`, and
+  `connectors.cli.SetupCheckResult` gains `custody_backend`.
+
 ## 0.45.0 — 2026-10-10
 
 ### Added
