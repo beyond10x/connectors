@@ -1,7 +1,7 @@
 //! Qualification for one audited Linux GNOME Keyring binary and encrypted login
 //! collection. Refuse unsupported implementations instead of guessing durability.
-use super::{Failure, Result};
-use crate::local::{filesystem as fs, keyring::Service};
+use super::{Service, fs};
+use crate::{Failure, Result};
 use sha2::{Digest, Sha256};
 use std::{
     ffi::{CString, OsStr},
@@ -17,8 +17,7 @@ use zeroize::Zeroizing;
 
 // Arch Linux gnome-keyring 1:50.0-1; source and installed artifact receipts are
 // recorded in docs/local-secret-service.md. This pin is intentionally narrow.
-pub(super) const DAEMON_SHA256: &str =
-    "b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02f5f2ca53958b";
+const DAEMON_SHA256: &str = "b9a71f6b4c4bfaf1759a99036b7b3ab6cf98b2b479c0c2a24f02f5f2ca53958b";
 const COLLECTION: &str = "/org/freedesktop/secrets/collection/login";
 const FILE: &str = "login.keyring";
 const HEADER: &[u8; 20] = b"GnomeKeyring\n\r\0\n\0\0\0\0";
@@ -28,7 +27,7 @@ pub(super) struct Persistence {
     pub(super) directory: File,
     path: PathBuf,
     ancestors: Vec<File>,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub(super) fail_sync: std::sync::atomic::AtomicBool,
 }
 
@@ -107,7 +106,7 @@ impl Persistence {
         }
         let directory = store_directory(&environment)?;
         drop(environment);
-        let directory_file = fs::directory(&directory, false, true).map_err(unavailable)?;
+        let directory_file = fs::directory(&directory, true).map_err(unavailable)?;
         // A successful fsync on a RAM filesystem is not persistent custody.
         // This initial receipt qualifies the local ext filesystem family only.
         let mut kind = std::mem::MaybeUninit::<libc::statfs>::uninit();
@@ -121,14 +120,14 @@ impl Persistence {
         }
         let mut ancestors = Vec::new();
         for ancestor in directory.ancestors().skip(1) {
-            ancestors.push(fs::directory(ancestor, false, false).map_err(unavailable)?);
+            ancestors.push(fs::directory(ancestor, false).map_err(unavailable)?);
         }
         let result = Self {
             process,
             directory: directory_file,
             path: directory,
             ancestors,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "test-support"))]
             fail_sync: std::sync::atomic::AtomicBool::new(false),
         };
         result.check_process()?;
@@ -153,7 +152,7 @@ impl Persistence {
     }
 
     fn encrypted_file(&self) -> Result<File> {
-        let current = fs::directory(&self.path, false, true).map_err(unavailable)?;
+        let current = fs::directory(&self.path, true).map_err(unavailable)?;
         let current = current.metadata().map_err(unavailable)?;
         let held = self.directory.metadata().map_err(unavailable)?;
         if (current.dev(), current.ino()) != (held.dev(), held.ino()) {
@@ -175,7 +174,7 @@ impl Persistence {
 
     pub(super) fn synchronize(&self) -> Result<()> {
         self.check_process()?;
-        #[cfg(test)]
+        #[cfg(any(test, feature = "test-support"))]
         if self.fail_sync.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(Failure::Unavailable);
         }

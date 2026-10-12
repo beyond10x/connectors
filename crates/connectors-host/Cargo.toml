@@ -11,6 +11,7 @@ license.workspace = true
 schema = []
 
 [dependencies]
+connectors-custody.workspace = true
 schemars = "1.2"
 connectors-core.workspace = true
 connectors-sdk.workspace = true
@@ -42,11 +43,12 @@ toml = "1.1"
 uuid.workspace = true
 sha2.workspace = true
 hex.workspace = true
-zbus = "=5.19.0"
 zeroize.workspace = true
 time.workspace = true
 
 [dev-dependencies]
+connectors-custody = { workspace = true, features = ["test-support"] }
+zbus = "=5.19.0"
 rcgen = "0.14"
 tempfile.workspace = true
 tokio-rustls = { version="0.26", default-features=false, features=["ring", "tls12"] }
