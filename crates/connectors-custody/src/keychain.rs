@@ -2,8 +2,10 @@
 //! service `connectors`, account the purpose, scope and version ids
 //! ([`Version::item_name`]). User interaction is disallowed for every call, so
 //! a locked keychain answers `Unavailable` and never shows an unlock prompt.
-//! The data-protection keychain needs a signed binary with entitlements and is
-//! not used.
+//! Every item is created with an access whose decrypt ACLs admit any
+//! application of the user, so an upgraded or rebuilt binary reads the items
+//! an earlier one wrote without a prompt (contract §5.1). The data-protection
+//! keychain needs a signed binary with entitlements and is not used.
 //!
 //! The keychain is injectable ([`Keychain::with_keychain`]) so a test can
 //! create, lock and delete its own temporary keychain.
@@ -11,12 +13,22 @@ use crate::{
     Backend, CustodyBackend, Failure, MAX_BYTES, Material, Result, Scope, State, Version,
     admit_material,
 };
-use core_foundation::base::TCFType;
-use security_framework::os::macos::keychain::SecKeychain;
+use core_foundation::{
+    array::{CFArray, CFArrayRef},
+    base::{CFType, CFTypeRef, TCFType, ToVoid},
+    data::CFData,
+    dictionary::CFMutableDictionary,
+    string::{CFString, CFStringRef},
+};
+use security_framework::os::macos::{access::SecAccess, keychain::SecKeychain};
 use security_framework_sys::{
-    base::{OSStatus, SecKeychainRef, errSecDuplicateItem, errSecItemNotFound},
+    base::{OSStatus, SecAccessRef, SecKeychainRef, errSecDuplicateItem, errSecItemNotFound},
+    item::{
+        kSecAttrAccount, kSecAttrService, kSecClass, kSecClassGenericPassword, kSecUseKeychain,
+        kSecValueData,
+    },
     keychain::{SecKeychainGetUserInteractionAllowed, SecKeychainSetUserInteractionAllowed},
-    keychain_item::SecKeychainItemDelete,
+    keychain_item::{SecItemAdd, SecKeychainItemDelete},
 };
 use std::{
     ffi::CStr,
@@ -36,11 +48,110 @@ type Found = (
     security_framework::os::macos::keychain_item::SecKeychainItem,
 );
 
+/// `SecACLRef`, an element of the array `SecAccessCopyMatchingACLList` returns.
+type SecAclRef = CFTypeRef;
+/// `SecKeychainPromptSelector`, a `uint16` in `SecBase.h`.
+type PromptSelector = u16;
+
+// SAFETY: declarations of Security framework symbols that
+// security-framework-sys 2.17.0 does not bind, with the C signatures of
+// `SecKeychain.h`, `SecAccess.h`, `SecACL.h` and `SecItem.h`.
 #[link(name = "Security", kind = "framework")]
 unsafe extern "C" {
     fn SecKeychainGetStatus(keychain: SecKeychainRef, status: *mut u32) -> OSStatus;
     fn SecKeychainLock(keychain: SecKeychainRef) -> OSStatus;
     fn SecKeychainDelete(keychain: SecKeychainRef) -> OSStatus;
+    static kSecAttrAccess: CFStringRef;
+    static kSecACLAuthorizationDecrypt: CFStringRef;
+    fn SecAccessCreate(
+        descriptor: CFStringRef,
+        trusted_list: CFArrayRef,
+        access: *mut SecAccessRef,
+    ) -> OSStatus;
+    fn SecAccessCopyMatchingACLList(access: SecAccessRef, authorization: CFTypeRef) -> CFArrayRef;
+    fn SecACLCopyContents(
+        acl: SecAclRef,
+        application_list: *mut CFArrayRef,
+        description: *mut CFStringRef,
+        prompt_selector: *mut PromptSelector,
+    ) -> OSStatus;
+    fn SecACLSetContents(
+        acl: SecAclRef,
+        application_list: CFArrayRef,
+        description: CFStringRef,
+        prompt_selector: PromptSelector,
+    ) -> OSStatus;
+}
+
+/// An item access whose decrypt ACLs admit any application: each ACL that
+/// authorizes decrypt gets a NULL application list, which means any
+/// application. An empty list would mean none. The other ACLs, the owner's
+/// change-ACL authorization among them, keep what `SecAccessCreate` gave them.
+fn any_application_access() -> Result<SecAccess> {
+    let descriptor = CFString::new(SERVICE);
+    let mut access: SecAccessRef = std::ptr::null_mut();
+    // SAFETY: descriptor is live for the call, a NULL trusted list is
+    // documented (the calling application), and access is a valid output.
+    let status = unsafe {
+        SecAccessCreate(
+            descriptor.as_concrete_TypeRef(),
+            std::ptr::null(),
+            &mut access,
+        )
+    };
+    if status != 0 || access.is_null() {
+        return Err(Failure::Unavailable);
+    }
+    // SAFETY: SecAccessCreate returned the access retained (create rule).
+    let access = unsafe { SecAccess::wrap_under_create_rule(access) };
+    // SAFETY: the access is live and the tag is a Security framework constant.
+    let acls = unsafe {
+        SecAccessCopyMatchingACLList(
+            access.as_concrete_TypeRef(),
+            kSecACLAuthorizationDecrypt.cast(),
+        )
+    };
+    if acls.is_null() {
+        return Err(Failure::Unavailable);
+    }
+    // SAFETY: the copy function returned the array retained (create rule).
+    let acls = unsafe { CFArray::<CFType>::wrap_under_create_rule(acls) };
+    if acls.is_empty() {
+        return Err(Failure::Unavailable);
+    }
+    for acl in acls.iter() {
+        let acl = acl.as_CFTypeRef();
+        let mut applications: CFArrayRef = std::ptr::null();
+        let mut description: CFStringRef = std::ptr::null();
+        let mut prompt: PromptSelector = 0;
+        // SAFETY: acl is an element of the live array; the outputs are valid.
+        let status =
+            unsafe { SecACLCopyContents(acl, &mut applications, &mut description, &mut prompt) };
+        // SAFETY: both outputs are returned retained (copy rule) or NULL.
+        let _applications = (!applications.is_null())
+            .then(|| unsafe { CFArray::<CFType>::wrap_under_create_rule(applications) });
+        // SAFETY: as above.
+        let description = (!description.is_null())
+            .then(|| unsafe { CFString::wrap_under_create_rule(description) });
+        if status != 0 {
+            return Err(Failure::Unavailable);
+        }
+        let description = description.unwrap_or_else(|| descriptor.clone());
+        // SAFETY: acl and description are live; a NULL application list
+        // means any application.
+        let status = unsafe {
+            SecACLSetContents(
+                acl,
+                std::ptr::null(),
+                description.as_concrete_TypeRef(),
+                prompt,
+            )
+        };
+        if status != 0 {
+            return Err(Failure::Unavailable);
+        }
+    }
+    Ok(access)
 }
 
 /// The writes and deletions of this process, one at a time. A second write of
@@ -162,6 +273,29 @@ impl Keychain {
             .unwrap_or(State::Unavailable)
     }
 
+    /// Adds the generic password item of `version` to this keychain with
+    /// [`any_application_access`], answering the keychain's status code.
+    fn add(&self, version: Version, material: &Material) -> Result<OSStatus> {
+        let access = any_application_access()?;
+        let service = CFString::new(SERVICE);
+        let account = CFString::new(&version.item_name());
+        let data = CFData::from_buffer(material.as_bytes());
+        let mut attributes = CFMutableDictionary::from_CFType_pairs(&[]);
+        // SAFETY: the keys are Security framework constants; every value is
+        // live until the dictionary is released after the call.
+        unsafe {
+            attributes.add(&kSecClass.to_void(), &kSecClassGenericPassword.to_void());
+            attributes.add(&kSecAttrService.to_void(), &service.to_void());
+            attributes.add(&kSecAttrAccount.to_void(), &account.to_void());
+            attributes.add(&kSecValueData.to_void(), &data.to_void());
+            attributes.add(&kSecUseKeychain.to_void(), &self.keychain.to_void());
+            attributes.add(&kSecAttrAccess.to_void(), &access.to_void());
+        }
+        let attributes = attributes.to_immutable();
+        // SAFETY: the dictionary is live for the call; no result is requested.
+        Ok(unsafe { SecItemAdd(attributes.as_concrete_TypeRef(), std::ptr::null_mut()) })
+    }
+
     fn find(&self, version: Version) -> Result<Option<Found>> {
         match self
             .keychain
@@ -258,16 +392,11 @@ impl Backend for Keychain {
         if self.find(version)?.is_some() {
             return Err(Failure::Conflict);
         }
-        match self
-            .keychain
-            .add_generic_password(SERVICE, &version.item_name(), material.as_bytes())
-        {
-            Ok(()) => {}
-            Err(error) if error.code() == errSecDuplicateItem => return Err(Failure::Conflict),
-            Err(error) if error.code() == ERR_SEC_INTERACTION_NOT_ALLOWED => {
-                return Err(Failure::Unavailable);
-            }
-            Err(_) => return Err(Failure::OutcomeUnknown),
+        match self.add(version, material)? {
+            0 => {}
+            errSecDuplicateItem => return Err(Failure::Conflict),
+            ERR_SEC_INTERACTION_NOT_ALLOWED => return Err(Failure::Unavailable),
+            _ => return Err(Failure::OutcomeUnknown),
         }
         let retained = self.read(version).map_err(|_| Failure::OutcomeUnknown)?;
         if !retained.ct_eq(material.as_bytes()) {

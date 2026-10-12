@@ -1,7 +1,6 @@
-//! The first of two executables that observe how the macOS login keychain
-//! treats an item one binary created when another binary reads it, with the
-//! access the custody binding creates items with today. It observes; it does
-//! not change that access.
+//! The first of two executables that check that the macOS login keychain lets
+//! another binary read an item this one created, with the access the custody
+//! binding creates items with.
 //!
 //! `keychain_probe_writer write` stores a fixed test value under a fresh
 //! random scope and prints `<authority> <allocation> <version>`;
