@@ -22,7 +22,7 @@ use core_foundation::{
 };
 use security_framework::os::macos::{access::SecAccess, keychain::SecKeychain};
 use security_framework_sys::{
-    base::{OSStatus, SecAccessRef, SecKeychainRef, errSecDuplicateItem, errSecItemNotFound},
+    base::{SecAccessRef, SecKeychainRef, errSecDuplicateItem, errSecItemNotFound},
     item::{
         kSecAttrAccount, kSecAttrService, kSecClass, kSecClassGenericPassword, kSecUseKeychain,
         kSecValueData,
@@ -40,6 +40,9 @@ use std::{
 
 /// The service every custody item carries.
 pub const SERVICE: &str = "connectors";
+// `security_framework_sys::base` imports `OSStatus` privately; it is `i32` in
+// core-foundation-sys, as in the Security framework headers.
+type OSStatus = i32;
 const ERR_SEC_INTERACTION_NOT_ALLOWED: OSStatus = -25308;
 const UNLOCKED: u32 = 1; // kSecUnlockStateStatus
 
