@@ -679,7 +679,9 @@ fn largest_materials() -> Vec<(&'static str, usize)> {
     for profile in PROFILES {
         for (source, declaration) in profile.declares {
             assert!(
-                source.contains(declaration),
+                // A Windows checkout has CRLF line endings; declarations are matched
+                // as LF text.
+                source.replace("\r\n", "\n").contains(declaration),
                 "{}: the source no longer declares {declaration:?}; update this record",
                 profile.name
             );
