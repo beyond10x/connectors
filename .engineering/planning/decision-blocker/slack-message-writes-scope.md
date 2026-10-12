@@ -2,13 +2,15 @@
 format: aep.planning-md/3
 id: decision-blocker:slack-message-writes-scope
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided whether Slack message sends may reach direct messages
 relations:
 - blocks: story:slack-message-send
 - blocks: story:parity-slack-message-writes
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-12T23:09:30Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -32,3 +34,7 @@ Recommended: A. It gives posting to the users who need it with the narrower reac
 can follow as their own story when asked.
 
 Default on silence: C (nothing is built).
+
+## Decided
+
+Option A, 2026-10-13: `slack.message.send` posts to channels only. `chat.postMessage` is selected for a conversation the bot is a member of; `conversations.open` is not selected and no `im:*` or `mpim:*` scope is declared, as the 0.5.9 removal left them. Direct messages are not planned. story:slack-message-send proceeds on this after the custody wave.

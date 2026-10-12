@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:platform-custody-limits
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided how Windows stores values over 2,560 bytes or how macOS items survive an upgrade
 relations:
 - blocks: story:platform-credential-custody
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 4
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-12T23:09:29Z", actor: "human:timo", revision: 4}
 ---
 ## Question
 
@@ -50,4 +52,4 @@ Default on silence: 1A and 2A.
 
 Part 1, option A, 2026-10-12: a Windows value over 2,560 bytes is split over numbered Credential Manager entries of its version, written first, then one header entry naming their count and digest, written last. A read needs the header and every part; a delete removes the header first. The 64 KiB bound holds on every platform. Crash tests cover parts without a header, which are orphans reclaimed like any unacknowledged version.
 
-Part 2 is open with the owner. Meanwhile a macOS runner test records what a second binary observes when it reads an item the first created, under today's per-application access.
+Part 2, option A, 2026-10-13: macOS keychain items are created with an access that admits any application of the user, the same exposure as the Secret Service on Linux; a locked keychain is still refused without a prompt. The CI runner test in which a second binary reads an item the first created stays, and fails when the reader is refused.
