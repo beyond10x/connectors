@@ -16,6 +16,7 @@
   part count and the value's SHA-256, written last, and a read checks every part and the digest.
   Every binding holds values up to 64 KiB, which covers the largest material of every shipped
   auth profile. No binding falls back to another, to a file or to an environment variable.
+- macOS keychain items admit any application of the user, so an upgraded binary keeps reading them.
 - `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
   `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
   target.
@@ -36,9 +37,6 @@
   launch, filesystem admission and terminal entry are Linux-only, so the `connectors` binary
   does not build there. Only `connectors-custody` builds and is tested on those platforms, in the
   `Custody platforms` workflow.
-- Whether a second, upgraded `connectors` binary on macOS can read login keychain items the
-  previous one created is not decided: items keep the keychain's default per-application access,
-  and the `Custody platforms` workflow records what a second executable observes.
 
 ## 0.45.0 — 2026-10-10
 

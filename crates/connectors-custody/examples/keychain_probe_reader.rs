@@ -1,12 +1,12 @@
-//! The second of two executables that observe how the macOS login keychain
-//! treats an item `keychain_probe_writer` created when this other binary
-//! reads it, with the access the custody binding creates items with today.
+//! The second of two executables that check that the macOS login keychain
+//! lets this other binary read an item `keychain_probe_writer` created, with
+//! the access the custody binding creates items with.
 //!
 //! `keychain_probe_reader <authority> <allocation> <version>` reads that
 //! version with user interaction disallowed and prints `read: ok`, or the
 //! `Failure` variant and the keychain's status code; then it deletes the item
-//! if it can and prints that outcome. Every observation exits 0: the outcome
-//! is the result. A crash exits otherwise.
+//! if it can and prints that outcome. It exits 0 only when it read back the
+//! exact value the writer stored, and 1 on every other outcome.
 
 #[cfg(target_os = "macos")]
 fn main() -> std::process::ExitCode {
@@ -57,20 +57,36 @@ mod probe {
             Ok(keychain) => keychain,
             Err(failure) => {
                 println!("read: {failure:?} (the login keychain did not open)");
-                return ExitCode::SUCCESS;
+                return ExitCode::FAILURE;
             }
         };
-        match keychain.read_observed(version) {
-            (Ok(material), _) if material.ct_eq(VALUE) => println!("read: ok"),
-            (Ok(_), _) => println!("read: ok, but not the value the writer stored"),
-            (Err(failure), Some(status)) => println!("read: {failure:?}, status {status}"),
-            (Err(failure), None) => println!("read: {failure:?}, no keychain status"),
-        }
+        let read = match keychain.read_observed(version) {
+            (Ok(material), _) if material.ct_eq(VALUE) => {
+                println!("read: ok");
+                true
+            }
+            (Ok(_), _) => {
+                println!("read: ok, but not the value the writer stored");
+                false
+            }
+            (Err(failure), Some(status)) => {
+                println!("read: {failure:?}, status {status}");
+                false
+            }
+            (Err(failure), None) => {
+                println!("read: {failure:?}, no keychain status");
+                false
+            }
+        };
         let until = Instant::now() + Duration::from_secs(10);
         match keychain.delete(version, until, || Ok(())) {
             Ok(()) => println!("reader delete: ok"),
             Err(failure) => println!("reader delete: {failure:?}"),
         }
-        ExitCode::SUCCESS
+        if read {
+            ExitCode::SUCCESS
+        } else {
+            ExitCode::FAILURE
+        }
     }
 }
