@@ -127,6 +127,25 @@ version afterwards does not reach the consumer's copy.
 | Read latency budget | part of the provider deadline; a read exceeding it is `Unavailable` |
 | Retry | reads may be retried by the caller; writes are not retried after an unknown outcome without a new version id |
 
+### 5.1 Platform bindings of the local host
+
+The local host's `versioned` custody has one binding per platform, fixed when the binary is built
+and reported by `setup check` as `custody_backend` (`connectors.cli.CustodyBackend`). No binding
+falls back to another, to a file or to an environment variable; without a usable binding, custody
+answers `Unavailable` and the CLI refuses with `custody_unavailable`. None activates, unlocks or
+prompts.
+
+| Platform | Binding | Store | Value bound | Locked or absent store |
+|---|---|---|---|---|
+| Linux | `secret_service` | the qualified Secret Service `login` collection ([local Secret Service](../../../../docs/local-secret-service.md)) | 64 KiB | `Unavailable` |
+| macOS | `macos_keychain` | generic password items in the user's login keychain, user interaction disallowed; the data-protection keychain needs entitlements and is not used | 64 KiB | `Unavailable`, never an unlock prompt |
+| Windows | `windows_credential_manager` | generic credentials with local-machine persistence, never roaming | 2,560 bytes (`CRED_MAX_CREDENTIAL_BLOB_SIZE`); a larger value is `InvalidMaterial` and nothing is written | `Unavailable` |
+
+Every binding keys an item by the scope and version ids alone, so the immutable-version, scoped
+read and `Conflict` rules of §4.1 hold unchanged. One conformance suite, generic over the binding,
+runs against an in-memory reference on every platform and against each real binding on its own
+platform.
+
 ## 6. Conformance scenarios (`docs/design.md:986`)
 
 - Write, publish, read: read returns the bytes; a second write creates a new version; the old version stays readable until deleted.
