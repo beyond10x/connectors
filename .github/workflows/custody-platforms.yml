@@ -1,0 +1,39 @@
+name: Custody platforms
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: custody-platforms-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  custody:
+    name: custody on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component clippy
+          rustup default 1.98.1
+          rustc --version
+      - name: Lint the custody crate
+        shell: bash
+        run: cargo clippy --locked -p connectors-custody --all-targets -- -D warnings
+      - name: Test the custody crate against the platform store
+        shell: bash
+        run: cargo test --locked -p connectors-custody -- --include-ignored
