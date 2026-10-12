@@ -334,7 +334,7 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     if call.callable == "setup-init" {
         let initialized = Config::initialize(&paths).map_err(host_failure)?;
         return Ok(
-            json!({"disposition":initialized.disposition(), "config_path":paths.config, "state_path":paths.state, "os":"linux"}),
+            json!({"disposition":initialized.disposition(), "config_path":paths.config, "state_path":paths.state, "os":std::env::consts::OS}),
         );
     }
     let config = Config::read(&paths.config).map_err(configuration_refusal)?;
@@ -355,8 +355,10 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         let qualified = state == keyring::State::Available
             && keyring::custody::available_at(config.secret_service_socket.as_deref());
         checks.push(json!({"name":"persistent_custody_qualification", "state":if qualified {"ready"} else {"failed"}, "next_action":"none"}));
+        // `os` is the build target's (`linux`, `macos`, `windows`, the model's
+        // variants), and `custody_backend` the binding fixed with it.
         return Ok(
-            json!({"config_path":paths.config,"state_path":paths.state,"os":"linux", "keyring":match state {keyring::State::Available => "available",keyring::State::Locked => "locked",keyring::State::Unavailable => "unavailable"},"prerequisites":checks}),
+            json!({"config_path":paths.config,"state_path":paths.state,"os":std::env::consts::OS, "keyring":match state {keyring::State::Available => "available",keyring::State::Locked => "locked",keyring::State::Unavailable => "unavailable"},"custody_backend":keyring::PLATFORM.map(keyring::CustodyBackend::as_str),"prerequisites":checks}),
         );
     }
     if call.callable == "adapters-list" {
