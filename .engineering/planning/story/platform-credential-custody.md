@@ -2,12 +2,16 @@
 format: aep.planning-md/3
 id: story:platform-credential-custody
 kind: story
-status: draft
+status: active
 title: macOS Keychain and Windows Credential Manager custody beside the Secret Service
 relations:
 - decomposes: epic:local-cli-on-macos-and-windows
 - serves: vision:independent-contract-adapters
-revision: 2
+- informed_by: decision-blocker:wave-20261012a-scope
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-12T20:39:18Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-12T20:39:19Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 

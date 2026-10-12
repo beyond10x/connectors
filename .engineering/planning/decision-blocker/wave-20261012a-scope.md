@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:wave-20261012a-scope
 kind: decision-blocker
-status: open
+status: cleared
 title: Which parts of the macOS and Windows epic wave 20261012a delivers
 relations:
 - blocks: story:platform-credential-custody
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-12T20:39:10Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -30,3 +32,7 @@ choices (process supervision, executable capture, owner transport) that are bett
 own specification step.
 
 Default on silence: A.
+
+## Decided
+
+Option A, 2026-10-12: wave 20261012a delivers story:platform-credential-custody only: the connectors-custody crate with the backend trait, the Secret Service backend moved behind it unchanged, the macOS Keychain backend through security-framework 3.7.0 and the Windows Credential Manager backend through windows-sys 0.61.2, with CI jobs on macos-latest and windows-latest for that crate. One pull request, released as 0.46.0. story:host-runs-on-macos is the next wave, then story:host-runs-on-windows, each proposed on its own. The build is held to 8G of target on disk.
