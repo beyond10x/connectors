@@ -15,7 +15,7 @@ The grouped `connectors` commands (`setup`, `adapters`, `connections`, `operatio
 |---|---|---|
 | Configuration | the configured adapters, each with its executable's path and SHA-256 and the configuration revision it serves; consumers; the approval clock | a private TOML file, owner-only |
 | Metadata store | connections and their identities, validation evidence, approval policy and keys, mutation attempts and execution audit | Entity Runtime records over an Eventlog SQLite database |
-| Custody | credentials | the Linux Secret Service keyring, in a qualified binding |
+| Custody | credentials | the platform's protected store, fixed when the binary is built: the Linux Secret Service keyring, in a qualified binding. macOS login keychain and Windows Credential Manager bindings exist; the CLI does not yet run on macOS or Windows |
 
 A **local owner** process starts on demand, holds the metadata store and supervises the adapter
 executables as child processes over a private protocol. It starts only the exact executable the

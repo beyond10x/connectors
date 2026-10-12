@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Added
+
+- Credential custody backends per platform, in the new crate `connectors-custody`
+  ([custody semantics §5.1](contracts/auth/custody/v1alpha1/semantics.md#51-platform-bindings-of-the-local-host)):
+  one backend trait (write a new scoped version, read an exact version, delete, inspect the
+  store), an in-memory reference, and one binding per platform, fixed when the binary is built.
+  Linux keeps the qualified Secret Service binding, moved unchanged behind the trait. macOS stores
+  generic password items in the login keychain with user interaction disallowed, so a locked
+  keychain is `Unavailable` and never prompts. Windows stores generic credentials in the
+  Credential Manager with local-machine persistence; a value over 2,560 bytes is
+  `InvalidMaterial` and nothing is written. No binding falls back to another, to a file or to an
+  environment variable.
+- `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
+  `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
+  target.
+
 ### Changed
 
 - ESS 0.59.0 (from 0.57.0): the seven ESS crates and the pinned toolchain; Entity Runtime Core
@@ -11,6 +27,18 @@
   documentation pages are regenerated and carry the committed model change:
   `connectors.cli.OperatingSystem` gains `macos` and `windows`, and
   `connectors.cli.SetupCheckResult` gains `custody_backend`.
+
+### Limitations
+
+- The CLI and its local host do not yet run on macOS or Windows: owner transport, consumer
+  launch, filesystem admission and terminal entry are Linux-only, so the `connectors` binary
+  does not build there. Only `connectors-custody` builds and is tested on those platforms, in the
+  `Custody platforms` workflow.
+- Every shipped auth profile whose entry field is bounded at 8,192 bytes can produce material
+  larger than the Windows bound of 2,560 bytes (from 8,204 bytes for one token field to
+  24,630 bytes for the catalog `oauth2_refresh` triple); on Windows such a credential would be
+  refused as `InvalidMaterial`. The custody test that measures this fails until the entry bounds
+  or the Windows binding change.
 
 ## 0.45.0 — 2026-10-10
 
