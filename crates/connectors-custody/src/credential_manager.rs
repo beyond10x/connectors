@@ -1,12 +1,17 @@
 //! The Windows binding: generic credentials in the user's Credential Manager,
-//! persisted on the local machine and never roaming. The target name is
-//! `connectors/` and the purpose, scope and version ids
-//! ([`Version::item_name`]). A credential blob holds at most 2,560 bytes
-//! (`CRED_MAX_CREDENTIAL_BLOB_SIZE`); a larger value is `InvalidMaterial`
-//! before any call, and is never split or written elsewhere.
+//! persisted on the local machine and never roaming. A credential blob holds
+//! at most 2,560 bytes (`CRED_MAX_CREDENTIAL_BLOB_SIZE`), so every version is
+//! stored in the split layout of [`crate::parts`]: numbered part entries
+//! written first, then a header entry naming the length, the part count and
+//! the SHA-256, written last. The header's target name is `connectors/` and
+//! the purpose, scope and version ids ([`Version::item_name`]); a part's
+//! appends `/part/` and its number. The bound is 64 KiB, as on every platform.
+//!
+//! This module is the entry store only; the layout, its ordering and its crash
+//! handling are platform-neutral and tested everywhere.
 use crate::{
-    Backend, CustodyBackend, Failure, Material, Result, Scope, State, Version, WINDOWS_MAX_BYTES,
-    admit_material,
+    Failure, Material, Result, Scope, State,
+    parts::{Entries, PART_BYTES, Parted},
 };
 use std::time::Instant;
 use windows_sys::Win32::{
@@ -21,12 +26,12 @@ use windows_sys::Win32::{
     System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject},
 };
 
-const _: () = assert!(CRED_MAX_CREDENTIAL_BLOB_SIZE as usize == WINDOWS_MAX_BYTES);
+pub use crate::parts::TARGET_PREFIX;
 
-/// Every target name starts with this prefix.
-pub const TARGET_PREFIX: &str = "connectors/";
+const _: () = assert!(CRED_MAX_CREDENTIAL_BLOB_SIZE as usize == PART_BYTES);
+
 /// Serializes custody writes and deletions of this user's logon session, so
-/// the check for an existing version and the write that follows are one step.
+/// the check for an existing version and the writes that follow are one step.
 const MUTEX: &str = "Local\\connectors-custody";
 const PROBE: &str = "connectors/state-probe";
 
@@ -34,13 +39,10 @@ fn wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-fn target(version: Version) -> Vec<u16> {
-    wide(&format!("{TARGET_PREFIX}{}", version.item_name()))
-}
-
 /// The session-wide custody mutex, held until dropped. An abandoned mutex (a
-/// holder that exited) is acquired: the store itself is consistent per call.
-struct SessionLock(HANDLE);
+/// holder that exited) is acquired: the store itself is consistent per call,
+/// and the layout leaves a header-less remainder for a delete to reclaim.
+pub struct SessionLock(HANDLE);
 
 impl SessionLock {
     fn acquire(until: Instant) -> Result<Self> {
@@ -76,20 +78,15 @@ impl Drop for SessionLock {
     }
 }
 
-enum Read {
-    Found(Material),
-    Missing,
-}
-
 /// Read one generic credential, copying its blob out and zeroing the buffer
 /// the API returned before it is freed.
-fn read_target(name: &[u16]) -> Result<Read> {
+fn read_target(name: &[u16]) -> Result<Option<Material>> {
     let mut credential: *mut CREDENTIALW = std::ptr::null_mut();
     // SAFETY: name is NUL-terminated; credential is a valid output location.
     if unsafe { CredReadW(name.as_ptr(), CRED_TYPE_GENERIC, 0, &mut credential) } == 0 {
         // SAFETY: no preconditions.
         return match unsafe { GetLastError() } {
-            ERROR_NOT_FOUND => Ok(Read::Missing),
+            ERROR_NOT_FOUND => Ok(None),
             _ => Err(Failure::Unavailable),
         };
     }
@@ -100,12 +97,13 @@ fn read_target(name: &[u16]) -> Result<Read> {
         let outcome =
             if record.Type != CRED_TYPE_GENERIC || record.Persist != CRED_PERSIST_LOCAL_MACHINE {
                 Err(Failure::Denied)
-            } else if record.CredentialBlob.is_null() || size == 0 || size > WINDOWS_MAX_BYTES {
+            } else if record.CredentialBlob.is_null() || size == 0 || size > PART_BYTES {
                 Err(Failure::Unavailable)
             } else {
-                Ok(Read::Found(Material::from_slice(
-                    std::slice::from_raw_parts(record.CredentialBlob, size),
-                )))
+                Ok(Some(Material::from_slice(std::slice::from_raw_parts(
+                    record.CredentialBlob,
+                    size,
+                ))))
             };
         if !record.CredentialBlob.is_null() {
             std::ptr::write_bytes(record.CredentialBlob, 0, size);
@@ -117,73 +115,40 @@ fn read_target(name: &[u16]) -> Result<Read> {
     result
 }
 
-/// The Credential Manager opened for one scope.
-#[derive(Debug)]
-pub struct CredentialManager {
-    scope: Scope,
-}
+/// The user's Credential Manager as an entry store.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CredentialEntries;
 
-impl CredentialManager {
-    /// Opening touches nothing; the store is reached per call.
-    pub fn open(scope: Scope) -> Result<Self> {
-        Ok(Self { scope })
+impl Entries for CredentialEntries {
+    type Lock<'a> = SessionLock;
+
+    fn lock(&self, until: Instant) -> Result<SessionLock> {
+        SessionLock::acquire(until)
     }
 
     /// Passive state: a read of a name custody never writes. A session with
     /// no credential store answers `Unavailable`.
-    pub fn inspect() -> State {
+    fn state(&self) -> State {
         match read_target(&wide(PROBE)) {
             Ok(_) => State::Available,
             Err(_) => State::Unavailable,
         }
     }
-}
 
-impl Backend for CredentialManager {
-    fn kind(&self) -> CustodyBackend {
-        CustodyBackend::WindowsCredentialManager
+    fn read(&self, name: &str) -> Result<Option<Material>> {
+        read_target(&wide(name))
     }
 
-    fn scope(&self) -> Scope {
-        self.scope
-    }
-
-    fn state(&self) -> State {
-        Self::inspect()
-    }
-
-    fn admit(&self, version: Version) -> Result<()> {
-        if version.scope() != self.scope {
-            return Err(Failure::Denied);
+    fn write(&self, name: &str, blob: &[u8]) -> Result<()> {
+        if blob.is_empty() || blob.len() > PART_BYTES {
+            return Err(Failure::InvalidMaterial);
         }
-        if self.state() != State::Available {
-            return Err(Failure::Unavailable);
-        }
-        Ok(())
-    }
-
-    fn write_new(
-        &self,
-        version: Version,
-        material: &Material,
-        until: Instant,
-        guard: impl FnOnce() -> Result<()>,
-    ) -> Result<()> {
-        // The bound is checked before any call: nothing is written for a
-        // larger value.
-        admit_material(self.scope, material, WINDOWS_MAX_BYTES)?;
-        let _lock = SessionLock::acquire(until)?;
-        self.admit(version)?;
-        guard()?;
-        let mut name = target(version);
-        if let Read::Found(_) = read_target(&name)? {
-            return Err(Failure::Conflict);
-        }
+        let mut name = wide(name);
         let credential = CREDENTIALW {
             Type: CRED_TYPE_GENERIC,
             TargetName: name.as_mut_ptr(),
-            CredentialBlobSize: material.len() as u32,
-            CredentialBlob: material.as_bytes().as_ptr().cast_mut(),
+            CredentialBlobSize: blob.len() as u32,
+            CredentialBlob: blob.as_ptr().cast_mut(),
             Persist: CRED_PERSIST_LOCAL_MACHINE,
             ..Default::default()
         };
@@ -196,45 +161,11 @@ impl Backend for CredentialManager {
                 _ => Failure::OutcomeUnknown,
             });
         }
-        match read_target(&name) {
-            Ok(Read::Found(retained)) if retained.ct_eq(material.as_bytes()) => Ok(()),
-            _ => Err(Failure::OutcomeUnknown),
-        }
+        Ok(())
     }
 
-    fn read(&self, version: Version) -> Result<Material> {
-        self.admit(version)?;
-        match read_target(&target(version))? {
-            Read::Found(material) => Ok(material),
-            Read::Missing => Err(Failure::Missing),
-        }
-    }
-
-    fn confirm(
-        &self,
-        version: Version,
-        until: Instant,
-        guard: impl FnOnce() -> Result<()>,
-        validate: impl FnOnce(&Material) -> Result<()>,
-    ) -> Result<()> {
-        let _lock = SessionLock::acquire(until)?;
-        self.admit(version)?;
-        guard()?;
-        let material = self.read(version)?;
-        admit_material(self.scope, &material, WINDOWS_MAX_BYTES)?;
-        validate(&material)
-    }
-
-    fn delete(
-        &self,
-        version: Version,
-        until: Instant,
-        guard: impl FnOnce() -> Result<()>,
-    ) -> Result<()> {
-        let _lock = SessionLock::acquire(until)?;
-        self.admit(version)?;
-        guard()?;
-        let name = target(version);
+    fn delete(&self, name: &str) -> Result<()> {
+        let name = wide(name);
         // SAFETY: name is NUL-terminated and outlives the call.
         if unsafe { CredDeleteW(name.as_ptr(), CRED_TYPE_GENERIC, 0) } == 0 {
             // SAFETY: no preconditions.
@@ -242,9 +173,21 @@ impl Backend for CredentialManager {
                 return Err(Failure::OutcomeUnknown);
             }
         }
-        match read_target(&name) {
-            Ok(Read::Missing) => Ok(()),
-            _ => Err(Failure::OutcomeUnknown),
-        }
+        Ok(())
+    }
+}
+
+/// The Credential Manager opened for one scope.
+pub type CredentialManager = Parted<CredentialEntries>;
+
+impl Parted<CredentialEntries> {
+    /// Opening touches nothing; the store is reached per call.
+    pub fn open(scope: Scope) -> Result<Self> {
+        Ok(Self::new(CredentialEntries, scope))
+    }
+
+    /// Passive state of the user's Credential Manager.
+    pub fn inspect() -> State {
+        CredentialEntries.state()
     }
 }

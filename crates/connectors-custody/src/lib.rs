@@ -20,6 +20,7 @@ use zeroize::Zeroizing;
 #[cfg(any(test, feature = "test-support"))]
 pub mod contract;
 pub mod memory;
+pub mod parts;
 #[cfg(test)]
 mod tests;
 
@@ -30,12 +31,10 @@ pub mod keychain;
 #[cfg(target_os = "linux")]
 pub mod secret_service;
 
-/// The largest value the custody model admits (64 KiB).
+/// The largest value the custody model admits (64 KiB), on every platform.
+/// The Windows binding splits a value over Credential Manager entries
+/// ([`parts`]) to hold it.
 pub const MAX_BYTES: usize = 64 * 1024;
-/// The largest value a Windows generic credential holds
-/// (`CRED_MAX_CREDENTIAL_BLOB_SIZE`). A larger value is `InvalidMaterial`
-/// there; it is never split or written elsewhere.
-pub const WINDOWS_MAX_BYTES: usize = 2560;
 /// The exact size of an approval signing seed.
 pub const SIGNING_SEED_BYTES: usize = 32;
 
@@ -58,11 +57,10 @@ impl CustodyBackend {
         }
     }
 
-    /// The largest value this binding stores.
+    /// The largest value this binding stores: [`MAX_BYTES`] for every one.
     pub fn max_bytes(self) -> usize {
         match self {
-            Self::SecretService | Self::MacosKeychain => MAX_BYTES,
-            Self::WindowsCredentialManager => WINDOWS_MAX_BYTES,
+            Self::SecretService | Self::MacosKeychain | Self::WindowsCredentialManager => MAX_BYTES,
         }
     }
 }
