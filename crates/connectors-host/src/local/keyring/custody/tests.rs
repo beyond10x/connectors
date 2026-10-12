@@ -1,157 +1,27 @@
 use super::*;
-use crate::local::filesystem;
+use connectors_custody::MAX_BYTES;
 use std::{
     io::Write,
-    os::unix::{fs::PermissionsExt, net::UnixStream},
-    path::PathBuf,
-    process::{Child, Command, Stdio},
-    sync::{Arc, Barrier, atomic::Ordering},
+    os::unix::fs::PermissionsExt,
+    process::Command,
+    sync::{Arc, Barrier},
     time::{Duration, Instant},
 };
+use uuid::Uuid;
 
-// These fixtures own every process and path they touch. They never connect to
-// the desktop bus, use a user's existing collection, or invoke an unlock prompt.
-struct OwnedChild(Child);
-impl Drop for OwnedChild {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
-    }
+// The private fixture lives beside the binding it qualifies, in
+// `connectors_custody::secret_service::fixture`. It owns every process and
+// path it touches. It never connects to the desktop bus, uses a user's
+// existing collection, or invokes an unlock prompt.
+pub(crate) use connectors_custody::secret_service::fixture::Fixture;
+
+/// The host's store over a fixture's bus.
+pub(crate) trait Stores {
+    fn store(&self, scope: Scope) -> Result<Store>;
 }
-
-pub(crate) struct Fixture {
-    daemon: Option<OwnedChild>,
-    _bus: OwnedChild,
-    pub(crate) root: tempfile::TempDir,
-    pub(crate) socket: PathBuf,
-    data: PathBuf,
-    incarnation: u32,
-}
-
-impl Fixture {
-    pub(crate) fn new() -> Self {
-        let temporary = std::env::var_os("TMPDIR").expect("task-owned TMPDIR required");
-        let root = tempfile::Builder::new()
-            .prefix("secret-service-")
-            .tempdir_in(temporary)
-            .unwrap();
-        // Production socket admission requires a private parent; direct custody
-        // fixtures previously bypassed that transport admission via connect().
-        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
-        let socket = root.path().join("bus");
-        let data = root.path().join("data");
-        filesystem::directory(&data.join("keyrings"), true, true).unwrap();
-        filesystem::directory(&root.path().join("home"), true, true).unwrap();
-        let bus = OwnedChild(
-            Command::new("/usr/bin/dbus-daemon")
-                .args(["--session", "--nofork", "--nopidfile"])
-                .arg(format!("--address=unix:path={}", socket.display()))
-                .env_clear()
-                .env("PATH", "/usr/bin")
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .spawn()
-                .unwrap(),
-        );
-        let until = Instant::now() + Duration::from_secs(5);
-        while UnixStream::connect(&socket).is_err() {
-            assert!(Instant::now() < until, "private fixture bus unavailable");
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        let mut fixture = Self {
-            daemon: None,
-            _bus: bus,
-            root,
-            socket,
-            data,
-            incarnation: 0,
-        };
-        fixture.start(true);
-        fixture
-    }
-
-    pub(crate) fn start(&mut self, unlock: bool) {
-        assert!(self.daemon.is_none());
-        self.incarnation += 1;
-        let runtime = self
-            .root
-            .path()
-            .join(format!("runtime-{}", self.incarnation));
-        filesystem::directory(&runtime, true, true).unwrap();
-        let mut command = Command::new("/usr/bin/gnome-keyring-daemon");
-        command
-            .args([
-                "--foreground",
-                "--components=secrets",
-                "--control-directory",
-            ])
-            .arg(&runtime)
-            .env_clear()
-            .env("PATH", "/usr/bin")
-            .env("HOME", self.root.path().join("home"))
-            .env("XDG_DATA_HOME", &self.data)
-            .env("XDG_RUNTIME_DIR", &runtime)
-            .env(
-                "DBUS_SESSION_BUS_ADDRESS",
-                format!("unix:path={}", self.socket.display()),
-            )
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        if unlock {
-            command.arg("--unlock").stdin(Stdio::piped());
-        } else {
-            command.stdin(Stdio::null());
-        }
-        let mut daemon = OwnedChild(command.spawn().unwrap());
-        if unlock {
-            // Fictional fixture password, supplied only over the owned pipe.
-            daemon
-                .0
-                .stdin
-                .take()
-                .unwrap()
-                .write_all(b"connectors-disposable-keyring-password")
-                .unwrap();
-        }
-        self.daemon = Some(daemon);
-        let expected = if unlock {
-            State::Available
-        } else {
-            State::Locked
-        };
-        let until = Instant::now() + Duration::from_secs(10);
-        loop {
-            let state = UnixStream::connect(&self.socket)
-                .ok()
-                .and_then(|s| Service::connect(s).ok())
-                .and_then(|s| s.state().ok());
-            if state == Some(expected) {
-                break;
-            }
-            assert!(
-                Instant::now() < until,
-                "private fixture collection did not become ready"
-            );
-            assert!(
-                self.daemon
-                    .as_mut()
-                    .unwrap()
-                    .0
-                    .try_wait()
-                    .unwrap()
-                    .is_none(),
-                "fixture daemon exited"
-            );
-            std::thread::sleep(Duration::from_millis(20));
-        }
-    }
-
-    pub(crate) fn stop(&mut self) {
-        drop(self.daemon.take());
-    }
+impl Stores for Fixture {
     fn store(&self, scope: Scope) -> Result<Store> {
-        Store::connect(UnixStream::connect(&self.socket).unwrap(), scope)
+        self.backend(scope).map(Store::from_backend)
     }
 }
 
@@ -209,9 +79,9 @@ fn disposable_secret_service_restart_and_failures() {
         written,
         Ok(()),
         "lookup={:?} read={:?} barrier={:?}",
-        store.find(first).map(|v| v.is_some()),
+        store.backend().contains(first),
         store.read(first).map(|_| ()),
-        store.persistence.synchronize()
+        store.backend().synchronize()
     );
     assert_eq!(store.write_new(second, &second_bytes), Ok(()));
     assert_eq!(
@@ -239,12 +109,12 @@ fn disposable_secret_service_restart_and_failures() {
     // A failed barrier after a successful CreateItem is uncertainty, never a
     // durable acknowledgement. Its exact candidate identity survives in caller
     // metadata; reusing the write path refuses instead of replacing it.
-    store.persistence.fail_sync.store(true, Ordering::SeqCst);
+    store.fail_synchronization(true);
     assert_eq!(
         store.write_new(orphan, &first_bytes),
         Err(Failure::OutcomeUnknown)
     );
-    store.persistence.fail_sync.store(false, Ordering::SeqCst);
+    store.fail_synchronization(false);
     assert_eq!(
         store.write_new(orphan, &second_bytes),
         Err(Failure::Conflict)
@@ -323,14 +193,7 @@ fn disposable_secret_service_restart_and_failures() {
     // Native metadata tampering cannot widen the scoped resolver's authority.
     let changed = version(own_scope);
     final_store.write_new(changed, &first_bytes).unwrap();
-    let item = final_store.find(changed).unwrap().unwrap();
-    let proxy = final_store
-        .service
-        .proxy(item.as_str(), ITEM_INTERFACE)
-        .unwrap();
-    let mut attrs = final_store.attributes(changed);
-    attrs.insert("unexpected.attribute", "fictional".to_owned());
-    proxy.set_property("Attributes", attrs).unwrap();
+    final_store.backend().tamper_attributes(changed).unwrap();
     assert!(matches!(final_store.read(changed), Err(Failure::Denied)));
     // This fixture covers the backend alone. Registry publication/retirement and
     // CLI status/revoke are exercised by the composition fixture below.
@@ -552,18 +415,12 @@ fn disposable_registry_publication_cli_and_retirement_restart() {
         .unwrap();
     let unknown = prepared.version();
     let unknown_store = fixture.store(unknown.scope()).unwrap();
-    unknown_store
-        .persistence
-        .fail_sync
-        .store(true, Ordering::SeqCst);
+    unknown_store.fail_synchronization(true);
     assert_eq!(
         registry.store_and_publish(prepared, &material, &unknown_store, clock),
         Err(registry::Failure::OutcomeUnknown)
     );
-    unknown_store
-        .persistence
-        .fail_sync
-        .store(false, Ordering::SeqCst);
+    unknown_store.fail_synchronization(false);
     assert_eq!(
         cli(&[
             "status",
@@ -604,12 +461,12 @@ fn disposable_registry_publication_cli_and_retirement_restart() {
     assert_eq!(retirements.len(), 3);
     let retirement = retirements.remove(0);
     let target = fixture.store(retirement.version().scope()).unwrap();
-    target.persistence.fail_sync.store(true, Ordering::SeqCst);
+    target.fail_synchronization(true);
     assert_eq!(
         registry.delete_retired(retirement, &target, || later),
         Err(registry::Failure::OutcomeUnknown)
     );
-    target.persistence.fail_sync.store(false, Ordering::SeqCst);
+    target.fail_synchronization(false);
     // The unknown delete response retains the fence and cleanup obligation.
     // Recovery repeats guarded deletion only, never a provider effect or write.
     let registry = Registry::new(&paths.state);

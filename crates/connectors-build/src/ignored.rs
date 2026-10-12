@@ -959,7 +959,7 @@ mod local {{
     #[test]
     fn ignored_inventory_accounted() {
         assert!(
-            include_str!("../../connectors-host/src/local/keyring/custody/gnome.rs")
+            include_str!("../../connectors-custody/src/secret_service/gnome.rs")
                 .contains(GNOME_SHA256),
             "custody qualification changed; review runner prerequisites"
         );

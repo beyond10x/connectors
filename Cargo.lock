@@ -723,6 +723,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "connectors-custody"
+version = "0.45.0"
+dependencies = [
+ "core-foundation",
+ "hex",
+ "libc",
+ "security-framework",
+ "security-framework-sys",
+ "sha2 0.11.0",
+ "subtle",
+ "tempfile",
+ "uuid",
+ "windows-sys 0.61.2",
+ "zbus",
+ "zeroize",
+]
+
+[[package]]
 name = "connectors-docs"
 version = "0.45.0"
 dependencies = [
@@ -768,6 +786,7 @@ dependencies = [
  "base64 0.23.1",
  "connectors-client",
  "connectors-core",
+ "connectors-custody",
  "connectors-sdk",
  "entity-core 0.30.3",
  "entity-eventlog",
