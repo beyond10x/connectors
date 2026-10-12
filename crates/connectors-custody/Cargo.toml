@@ -13,6 +13,7 @@ license.workspace = true
 test-support = ["dep:tempfile"]
 
 [dependencies]
+sha2.workspace = true
 subtle.workspace = true
 uuid.workspace = true
 zeroize.workspace = true
@@ -21,7 +22,6 @@ tempfile = { workspace = true, optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 hex.workspace = true
 libc = "0.2"
-sha2.workspace = true
 zbus = "=5.19.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
