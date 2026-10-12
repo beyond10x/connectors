@@ -156,6 +156,25 @@ fn production_parser_initializes_and_inspects_across_processes() {
     );
 }
 
+/// `setup init` and `setup check` report the operating system the binary was
+/// built for, and `setup check` the custody binding fixed with it
+/// (`connectors.cli.CustodyBackend`, custody semantics §5.1).
+#[test]
+fn setup_reports_the_build_platform_and_its_custody_backend() {
+    let (os, backend) = if cfg!(target_os = "linux") {
+        ("linux", "secret_service")
+    } else if cfg!(target_os = "macos") {
+        ("macos", "macos_keychain")
+    } else {
+        ("windows", "windows_credential_manager")
+    };
+    let root = tempfile::tempdir().unwrap();
+    assert_eq!(success(&command(&root, &["setup", "init"]))["os"], os);
+    let check = success(&command(&root, &["setup", "check"]));
+    assert_eq!(check["os"], os);
+    assert_eq!(check["custody_backend"], backend);
+}
+
 #[test]
 fn setup_init_admits_an_adapter_entry_that_selects_its_private_protocol() {
     let root = tempfile::tempdir().unwrap();
