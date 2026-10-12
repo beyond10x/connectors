@@ -7,7 +7,7 @@ title: Nobody has decided how Windows stores values over 2,560 bytes or how macO
 relations:
 - blocks: story:platform-credential-custody
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Question
 
@@ -45,3 +45,9 @@ yet observed on a runner.
 Recommended: A, with a CI test on the runner that a second binary reads an item the first created.
 
 Default on silence: 1A and 2A.
+
+## Decided
+
+Part 1, option A, 2026-10-12: a Windows value over 2,560 bytes is split over numbered Credential Manager entries of its version, written first, then one header entry naming their count and digest, written last. A read needs the header and every part; a delete removes the header first. The 64 KiB bound holds on every platform. Crash tests cover parts without a header, which are orphans reclaimed like any unacknowledged version.
+
+Part 2 is open with the owner. Meanwhile a macOS runner test records what a second binary observes when it reads an item the first created, under today's per-application access.
