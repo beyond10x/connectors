@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
 - depends_on: story:host-runs-on-macos
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-13T06:25:56Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-13T06:25:57Z", actor: "human:timo", revision: 4}
@@ -83,3 +83,42 @@ Unit C (files, clocks, console, build tooling, 04fd3153e, 426839a0a):
 - `connectors-build` on Windows ends fixtures with `taskkill /T /F`, refuses `--tmpdir` and never counts a kubeconfig as present.
 - Elevated sessions: Windows makes BUILTIN\Administrators the default owner of new files in an elevated administrator session, so SQLite's `-wal` and `-shm` files would be refused by the owner check. Taken: when the process token is elevated and holds BUILTIN\Administrators as its default owner, an owner SID of BUILTIN\Administrators is admitted as the current user's; otherwise the check is unchanged. To be implemented and tested on the `windows-latest` runner in this wave.
 - Unchecked until the runner: NTFS refusing a rename of a folder with an open file below it; `MoveFileExW` against a reader without delete sharing; `AllocConsole` in a detached child.
+
+Adversary passes on units A and B, decisions taken:
+
+1. A consumer's job permits breakaway on request (`JOB_OBJECT_LIMIT_BREAKAWAY_OK`, never
+   `SILENT_BREAKAWAY_OK`), so an owner a consumer starts leaves the job through
+   `CREATE_BREAKAWAY_FROM_JOB` as `owner.md` already says. The adapter job keeps no breakaway.
+   The `parent_death_kill` row and the consumer-launch Windows section say so.
+2. Processes a consumer starts without breakaway end when the consumer's job closes, at the
+   consumer's exit: a Windows difference from Linux, where `PR_SET_PDEATHSIG` covers the direct
+   child only. Stated in the consumer-launch Windows section and the changelog's limitations.
+3. Image copies: the guard that removes a copy exists before any fallible step, so every early
+   return removes it; at owner start, stale `connectors-image-*` directories under `%TEMP%` whose
+   copy can be deleted (no process holds it) are removed.
+4. Children start with the copy's owner-only directory as current directory, never the
+   launcher's. A Windows adapter or consumer is self-contained: DLLs beside the original
+   executable are not found. Stated in the contracts.
+5. A consumer gets `SystemRoot` as an adapter does; the contract's environment rule names it.
+6. `pass_env` prefixes match names in any letter case on Windows.
+7. Children are created in their job with `PROC_THREAD_ATTRIBUTE_JOB_LIST`, closing the window
+   in which a suspended child is outside any job.
+8. Recorded as limitations, not fixed: an inheritable handle exists for the duration of one
+   creation, so a concurrent `bInheritHandles` creation elsewhere in the process could inherit
+   it (no such creation in the host or CLI); `-wal`/`-shm` files left by a crashed elevated
+   session are refused by a later non-elevated one until removed.
+
+9. Windows scratch of the owner and the CLI (the sealed credential directory and the image
+   copies) lives in an owner-only `run` directory under the state directory, never under
+   `temp_dir()`; the owner is also started with `TMP` and `TEMP` set to that directory, so
+   SQLite's temporary files do not fall back to the Windows directory. The stale-copy sweep of
+   decision 3 runs over that directory.
+10. Peer admission compares integrity level and restriction besides the user SID, on both
+    sides: a CLI refuses an owner whose token has another integrity level or is restricted, and
+    an owner answers such a CLI with a named refusal instead of dropping the stream. The
+    contract's Windows peer section and the `peer_credential_snapshot` row say so.
+11. The owner pipe name adds a per-state random salt kept in an owner-only file under the state
+    directory, so another local user cannot predict the name and take it first.
+12. `receive` refuses a frame that names one handle value twice, and closes every handle that
+    arrived when it refuses a frame; the scratch guard is dropped after the directory handle; a
+    request thread decrements `clients` after its pipe instance is closed.
