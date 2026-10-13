@@ -2,6 +2,7 @@
 //! own ESS model (`spec/ess/domains/connection.yaml`, `spec/ess/domains/records.yaml`): the
 //! schemas the pinned `ess` generates from it, and their invariants, accept what the
 //! executable accepts, advertises and returns, and refuse what it refuses.
+#![cfg(unix)]
 use connectors_grafana::{Grafana, auth};
 use connectors_host::{
     http::{HttpConfig, ScopedHttp},

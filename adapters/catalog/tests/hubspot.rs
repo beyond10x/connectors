@@ -8,6 +8,7 @@
 //! are asserted, the list walks two pages to the end condition the guide
 //! documents, and the account-details identity read yields the portal id. No
 //! live credential and no network.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

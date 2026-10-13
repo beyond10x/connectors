@@ -3,6 +3,7 @@
 //! configurations the executable accepts and refuse what it refuses, hold for
 //! the profile each engine advertises, and fix the read binding and the MySQL
 //! cell rules the library implements.
+#![cfg(unix)]
 #[path = "mysql/fixture.rs"]
 mod fixture;
 

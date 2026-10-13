@@ -3,6 +3,7 @@
 //! load checks in orders the unit's own cases do not take, and the acceptance
 //! driven through the adapter process rather than the engine alone. No network,
 //! no credential.
+#![cfg(unix)]
 use connectors_catalog::{
     bundle::{self, Bundle},
     ingest, inventory,

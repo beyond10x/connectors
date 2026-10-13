@@ -20,6 +20,7 @@
 //! dispatch left unknown and sent once, and Slack's `200` with `ok: false`
 //! never applied. Every id, name and message is synthetic. No live credential
 //! and no network.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

@@ -3,6 +3,7 @@
 //! engine over the committed bundle with a recording transport. Each case
 //! asserts what the pinned document (`adapters/gitlab/upstream/openapi_v3.yaml`)
 //! or the story's acceptance says.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_core::{ErrorCode, Result};

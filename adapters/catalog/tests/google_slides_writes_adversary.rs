@@ -3,6 +3,7 @@
 //! deck, driven through the engine against a scripted provider and through the
 //! provider's own bootstrap and the host's connection registry. No network, no
 //! credential.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Engine, Selection};
 use connectors_core::Result;

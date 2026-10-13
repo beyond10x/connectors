@@ -5,6 +5,7 @@
 //! changed artifact, bootstrap or trust root before any provider work. The
 //! separate CLI journey exercises the same selection through the production
 //! owner and disposable Secret Service.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

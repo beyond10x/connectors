@@ -6,6 +6,7 @@
 //! `invalid_input` before any request". These cases drive that sentence, the
 //! shipped Slack selection sets and the configuration revision. Every token,
 //! id and message is synthetic. No network and no live credential.
+#![cfg(unix)]
 use connectors_catalog::{
     bundle::{self, Bundle},
     ingest, inventory,
