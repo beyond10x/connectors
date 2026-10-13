@@ -34,12 +34,23 @@ fn own_build() -> Result<&'static str> {
     static BUILD: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     BUILD
         .get_or_init(|| {
-            std::fs::read("/proc/self/exe")
+            own_image()
                 .ok()
                 .map(|image| hex::encode(Sha256::digest(image)))
         })
         .as_deref()
         .ok_or_else(|| Code::Unavailable.into())
+}
+#[cfg(target_os = "linux")]
+fn own_image() -> std::io::Result<Vec<u8>> {
+    std::fs::read("/proc/self/exe")
+}
+/// macOS has no `/proc/self/exe`: the file at the running executable's path
+/// is read (`own_image_build_measure`: `launch_path_read`), so a file replaced
+/// there is measured as a new build.
+#[cfg(target_os = "macos")]
+fn own_image() -> std::io::Result<Vec<u8>> {
+    std::fs::read(std::env::current_exe()?)
 }
 pub struct WriteClient(Client);
 const WRITE_VERSION: &str = "connectors-owner/2";
@@ -154,6 +165,8 @@ impl Client {
         let authority = Metadata::authority_at(&paths.state)?.to_string();
         let directory = fs::directory(&paths.state, false, true)?;
         let socket = socket_path(&directory);
+        #[cfg(target_os = "macos")]
+        admit_socket(&socket)?;
         loop {
             crate::local::protected::cancellation()?;
             match connect_identified(&socket) {
@@ -186,7 +199,10 @@ impl Client {
                         &socket, stream, paths, &authority, version, deadline,
                     );
                 }
-                let (stream, mut process) = spawn(paths, &lock, deadline)?;
+                // Held to the end of this block: the owner measures its build
+                // before it answers the greeting (or never will), and only
+                // then may its launch copy go.
+                let (stream, mut process, _launched) = spawn(paths, &lock, deadline)?;
                 let result = Self::greet(
                     stream,
                     paths,
@@ -689,11 +705,35 @@ impl WriteClient {
         }
     }
 }
+#[cfg(target_os = "linux")]
 fn socket_path(directory: &File) -> PathBuf {
     PathBuf::from(format!(
         "/proc/self/fd/{}/owner.sock",
         directory.as_raw_fd()
     ))
+}
+/// macOS has no `/proc/self/fd`: the socket is named by the directory's own
+/// path (`F_GETPATH`). An unreadable path is empty, which [`admit_socket`]
+/// refuses.
+#[cfg(target_os = "macos")]
+fn socket_path(directory: &File) -> PathBuf {
+    runtime::artifact::path_of(directory)
+        .map(|path| path.join("owner.sock"))
+        .unwrap_or_default()
+}
+/// A macOS socket path must fit `sun_path` (104 bytes) with its NUL; a longer
+/// one is `InvalidConfiguration`, checked before any owner starts.
+#[cfg(target_os = "macos")]
+fn admit_socket(socket: &std::path::Path) -> Result<()> {
+    // SAFETY: an all-zero sockaddr_un is valid; only its field size is read.
+    let capacity = unsafe { std::mem::zeroed::<libc::sockaddr_un>() }
+        .sun_path
+        .len();
+    match socket.as_os_str().len() {
+        0 => Err(Code::Unavailable.into()),
+        length if length >= capacity => Err(Code::InvalidConfiguration.into()),
+        _ => Ok(()),
+    }
 }
 fn connect_socket(path: &std::path::Path) -> Result<UnixStream> {
     connect_identified(path).map(|(stream, _)| stream)
@@ -751,11 +791,21 @@ fn lock(directory: &File) -> Result<File> {
         std::ffi::OsStr::new("owner.lock"),
     )?)
 }
+/// What a started owner's caller holds until the owner has answered its
+/// greeting. On macOS that is the owner's launch copy: the owner measures its
+/// build from the file at its running executable's path
+/// (`own_image_build_measure`: `launch_path_read`), which is that copy, before
+/// it answers. Removing the copy as soon as exec returned would leave the
+/// owner nothing to measure, and it would refuse to serve.
+#[cfg(target_os = "linux")]
+struct Launched;
+#[cfg(target_os = "macos")]
+type Launched = runtime::artifact::Launch;
 fn spawn(
     paths: &Paths,
     lock: &File,
     deadline: Instant,
-) -> Result<(UnixStream, std::process::Child)> {
+) -> Result<(UnixStream, std::process::Child, Launched)> {
     let binary = std::env::current_exe().map_err(|_| Code::Unavailable)?;
     let hash = hex::encode(Sha256::digest(
         std::fs::read(&binary).map_err(|_| Code::Unavailable)?,
@@ -780,7 +830,14 @@ fn spawn(
     let private = duplicate(child.as_raw_fd())?;
     let lifetime = duplicate(lock.as_raw_fd())?;
     let (private_fd, lock_fd) = (private.as_raw_fd(), lifetime.as_raw_fd());
+    #[cfg(target_os = "linux")]
     let mut command = Command::new(format!("/proc/self/fd/{}", executable.as_raw_fd()));
+    // macOS executes the owner-private copy by its path; the caller drops the
+    // launch, which removes the copy, once the owner has answered (`Launched`).
+    #[cfg(target_os = "macos")]
+    let launch = runtime::artifact::launch_path(&executable)?;
+    #[cfg(target_os = "macos")]
+    let mut command = Command::new(launch.path());
     command
         .args([
             std::ffi::OsStr::new("__connectors-owner"),
@@ -807,7 +864,9 @@ fn spawn(
         });
     }
     let process = command.spawn().map_err(|_| Code::Unavailable)?;
-    Ok((parent, process))
+    #[cfg(target_os = "linux")]
+    let launch = Launched;
+    Ok((parent, process, launch))
 }
 
 struct Owner {
@@ -869,6 +928,8 @@ pub fn serve(paths: Paths) -> Result<()> {
         return Err(Code::Unavailable.into());
     }
     let socket = socket_path(&directory);
+    #[cfg(target_os = "macos")]
+    admit_socket(&socket)?;
     if let Ok(metadata) = std::fs::symlink_metadata(&socket) {
         if !metadata.file_type().is_socket()
             || metadata.uid() != fs::uid()
@@ -1102,6 +1163,13 @@ fn inherited() -> Result<(UnixStream, File)> {
     Ok((stream, lifetime))
 }
 fn handle(owner: Arc<Owner>, mut stream: UnixStream) -> Result<()> {
+    // The listener is non-blocking, and on macOS an accepted stream inherits
+    // that (Linux's accept(2) does not): every read before the caller's bytes
+    // arrived would end at once as a timeout, and the owner would close the
+    // stream without a reply. Each exchange waits on its own deadlines.
+    stream
+        .set_nonblocking(false)
+        .map_err(|_| Code::Unavailable)?;
     channel::peer(&stream)?;
     if owner.clients.fetch_add(1, Ordering::SeqCst) >= 32 {
         owner.clients.fetch_sub(1, Ordering::SeqCst);
@@ -2058,6 +2126,149 @@ mod tests {
         drop(held);
         let host = owner.join().unwrap();
         assert_eq!(greeted, Ok(host.expect("the next owner was never greeted")));
+    }
+}
+
+/// The owner's macOS transport (contracts/cli/v1alpha1/owner.md, "macOS").
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use super::*;
+
+    /// `own_image_build_measure`: `launch_path_read`. The build is the digest
+    /// of the file at the running executable's path.
+    #[test]
+    fn the_owner_build_is_read_from_the_launch_path() {
+        let image = std::fs::read(std::env::current_exe().unwrap()).unwrap();
+        assert_eq!(own_build().unwrap(), hex::encode(Sha256::digest(image)));
+    }
+
+    /// The owner socket is named by the state directory's own path, which
+    /// must fit the 104-byte `sun_path`; a longer one is refused as
+    /// `invalid_configuration` before any owner starts: no lifetime lock is
+    /// created and nothing is spawned.
+    #[test]
+    fn a_socket_path_past_sun_path_is_refused_before_an_owner_starts() {
+        let root = tempfile::tempdir().unwrap();
+        // The socket's directory is the private state directory; tempfile
+        // creates its directory 0777 less the umask, which that admission
+        // refuses as not private.
+        std::fs::set_permissions(
+            root.path(),
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        )
+        .unwrap();
+        let fits = fs::directory(root.path(), false, true)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", root.path().display()));
+        let socket = socket_path(&fits);
+        assert_eq!(
+            socket,
+            std::fs::canonicalize(root.path())
+                .unwrap()
+                .join("owner.sock"),
+            "F_GETPATH of {}",
+            root.path().display()
+        );
+        admit_socket(&socket).unwrap_or_else(|error| panic!("{}: {error:?}", socket.display()));
+
+        let state = root.path().join("s".repeat(100)).join("state");
+        let paths =
+            Paths::resolve(Some(&root.path().join("config/config.toml")), Some(&state)).unwrap();
+        Config::initialize(&paths)
+            .unwrap_or_else(|error| panic!("initialize {}: {error:?}", state.display()));
+        let directory = fs::directory(&paths.state, false, true)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", state.display()));
+        let long = socket_path(&directory);
+        assert!(long.as_os_str().len() >= 104, "{}", long.display());
+        assert_eq!(
+            admit_socket(&long).err().map(|error| error.code),
+            Some(Code::InvalidConfiguration),
+            "{}",
+            long.display()
+        );
+        assert_eq!(
+            Client::connect(&paths, true).err().map(|error| error.code),
+            Some(Code::InvalidConfiguration)
+        );
+        assert!(!paths.state.join("owner.lock").exists());
+        assert!(!paths.state.join("owner.sock").exists());
+    }
+
+    /// Set in a run of this test binary launched as the owner is: from its
+    /// owner-private copy, by that copy's path.
+    const LAUNCHED: &str = "CONNECTORS_LAUNCHED_OWNER_PROBE";
+
+    /// In the launched run, does what `serve` does first: measure its own
+    /// build. A no-op in an ordinary run.
+    #[test]
+    fn a_launched_owner_probe_measures_its_build() {
+        if std::env::var_os(LAUNCHED).is_some() {
+            own_build().expect("the launched owner could not measure its build");
+        }
+    }
+
+    /// `own_image_build_measure`: `launch_path_read` (owner.md, "macOS").
+    /// `spawn` executes the owner from its private copy. The owner measures
+    /// its build from the file at its running executable's path, which is that
+    /// copy: it must be able to, or every macOS owner refuses to serve. So
+    /// `spawn` hands the launch to its caller ([`Launched`]), which drops it,
+    /// removing the copy, only once the owner has answered its greeting; a
+    /// launch dropped as soon as exec returned removed the copy before the
+    /// owner could read it. This mirrors that with this test binary as the
+    /// image: the launch is held until the probe has measured and exited, and
+    /// the copy is gone afterwards.
+    #[test]
+    fn an_owner_launched_from_its_private_copy_can_measure_its_build() {
+        let binary = std::env::current_exe().unwrap();
+        let selection = crate::local::config::Executable {
+            sha256: hex::encode(Sha256::digest(std::fs::read(&binary).unwrap())),
+            path: binary,
+            args: Vec::new(),
+        };
+        let executable = selection
+            .capture(Instant::now() + Duration::from_secs(30))
+            .unwrap();
+        let launch = runtime::artifact::launch_path(&executable).unwrap();
+        let probe = format!(
+            "{}::a_launched_owner_probe_measures_its_build",
+            module_path!().split_once("::").unwrap().1
+        );
+        let mut command = Command::new(launch.path());
+        command
+            .args([&probe, "--exact", "--test-threads=1"])
+            .env(LAUNCHED, "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let mut process = command.spawn().unwrap();
+        // As in `Client::connect_version`: the launch outlives the owner's
+        // build measure, which precedes its answer.
+        let measured = process.wait().unwrap().success();
+        let copy = launch.path().to_path_buf();
+        drop(launch);
+        drop(executable);
+        assert!(
+            measured,
+            "an owner launched from its private copy cannot read its own image"
+        );
+        assert!(!copy.exists(), "the launch copy outlived its launch");
+    }
+
+    /// The `sun_path` bound at its edge: a socket path of 103 bytes fits with
+    /// its NUL, one of 104 does not.
+    #[test]
+    fn a_socket_path_of_sun_path_bytes_is_refused_and_one_shorter_admitted() {
+        let path = |length: usize| {
+            let mut path = String::from("/");
+            path.push_str(&"s".repeat(length - "/".len() - "/owner.sock".len()));
+            path.push_str("/owner.sock");
+            assert_eq!(path.len(), length);
+            std::path::PathBuf::from(path)
+        };
+        admit_socket(&path(103)).unwrap();
+        assert_eq!(
+            admit_socket(&path(104)).unwrap_err().code,
+            Code::InvalidConfiguration
+        );
     }
 }
 

@@ -869,6 +869,46 @@ the store unchanged. New ESS and deterministic output
 must be revalidated using the selected exact current-source ESS toolchain. An
 older release binary is provisional authoring evidence only.
 
+### macOS platform guarantees
+
+The host builds on seven operating-system guarantees, each fixed by the platform
+the binary was built for. `connectors.cli.PlatformGuarantee` names them,
+`connectors.cli.PlatformGuaranteeStatement` states each row below as an
+invariant, and `connectors.cli.PlatformGuaranteeWeakerForm` names every weaker
+form. Linux holds all seven, by the mechanisms the rest of this binding states.
+On macOS one holds and six hold only in a named weaker form:
+
+| Guarantee | Linux | macOS | macOS mechanism |
+|---|---|---|---|
+| `sealed_executable` | holds | weaker: `owner_private_copy` | no memfd: the image is copied into a mode 0500 file in a fresh mode 0700 directory, and the digest and Mach-O header are checked on that copy before exec by its path. Other users cannot change it; a process of the same user can rewrite it between the check and exec. A copy that is refused or never launched is removed with its directory; a launched copy is removed by its launch once the exec it serves no longer needs it. |
+| `parent_death_kill` | holds | weaker: `adapter_channel_close` | no `PR_SET_PDEATHSIG`: an adapter exits when its inherited channel on descriptor 3 reaches end of file. A consumer has no channel and outlives a launcher that dies. |
+| `exact_process_signal` | holds | weaker: `child_reap_lock` | no pidfd: kqueue `EVFILT_PROC` with `NOTE_EXIT` observes exit, and `kill` signals the child's process id only while holding the lock that reaps it, so the id cannot be reused between the check and the signal. |
+| `own_image_build_measure` | holds | weaker: `launch_path_read` | no `/proc/self/exe`: the owner build digest is read from the executable's path. A file replaced there is measured as a new build and refused as `owner_build_mismatch`. |
+| `atomic_no_replace_rename` | holds | holds | `renamex_np` with `RENAME_EXCL`, on a filesystem that reports `VOL_CAP_INT_RENAME_EXCL` (APFS). A state directory on any other filesystem is refused. |
+| `atomic_close_on_exec` | holds | weaker: `set_after_receive` | no `MSG_CMSG_CLOEXEC`: `FD_CLOEXEC` is set on each received descriptor right after `recvmsg` returns. An exec by another thread of the same process in between inherits it. |
+| `peer_credential_snapshot` | holds | weaker: `separate_pid_query` | no `SO_PEERCRED`: `LOCAL_PEERCRED` gives the connect-time uid and gid, and `LOCAL_PEERPID` the pid in a separate query. The uid check is unchanged. The owner and the supervisor use the pid only for its sign; an adapter also requires it to equal its parent's process id, the owner that made the socket pair, as on Linux. A peer that has already closed has no pid to query: the owner and the supervisor admit it by its connect-time uid, as Linux does, and an adapter refuses it. |
+
+Protected stdin (§5) keeps its rule on macOS with other mechanisms, and no
+guarantee row changes. A protected regular file is checked as on Linux, its
+parent directory found through `F_GETPATH`. macOS names no `pipe:[…]`: an
+inherited anonymous pipe is a FIFO owned by the admitted UID for which
+`F_GETPATH` returns no path, and a FIFO with a path is a named FIFO and
+refuses. The producer check reads the parent's owner through `proc_pidinfo`
+in place of `/proc/<parent>`: the parent must not be pid 1, must share this
+process's session, and must be owned by the admitted UID.
+
+Exact stop (§4) requires "Linux pidfd or equivalent non-reusable kernel process
+ownership"; on macOS the equivalent is `child_reap_lock`, which covers the
+owner's own children only, and those are the only processes stop signals. The
+runtime acceptance above applies on macOS with each Linux mechanism replaced by
+its row here: stop is exercised through the reap lock, and the owner-only
+descriptor and socket-peer checks through `LOCAL_PEERCRED`.
+
+Windows has no row: `connectors.cli.OperatingSystem` names it for custody, and no
+Windows host exists. Every Linux rule above stands as written. These macOS rows
+are specified; until the host and CLI suites run on a macOS runner, none of them
+is observed.
+
 ## Operations by family
 
 `operations list --family CONTRACT` answers only the listed operations whose

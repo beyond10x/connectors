@@ -1296,9 +1296,10 @@ mod tests {
             if fd < 0 {
                 unsafe { libc::_exit(2) };
             }
+            let unlocked: libc::c_short = libc::F_UNLCK as _;
             // SQLite's bundled unix VFS locks WAL_WRITE_LOCK at -shm byte 120.
             let mut lock = libc::flock {
-                l_type: libc::F_WRLCK as i16,
+                l_type: libc::F_WRLCK as _,
                 l_whence: libc::SEEK_SET as i16,
                 l_start: 120,
                 l_len: 1,
@@ -1309,7 +1310,7 @@ mod tests {
             unsafe {
                 libc::_exit(if result < 0 {
                     2
-                } else if lock.l_type == libc::F_UNLCK as i16 {
+                } else if lock.l_type == unlocked {
                     1
                 } else {
                     0

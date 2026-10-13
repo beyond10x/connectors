@@ -8,15 +8,14 @@ use super::{
 #[cfg(test)]
 mod tests;
 use connectors_sdk::Secret;
+#[cfg(target_os = "linux")]
+use std::os::unix::ffi::OsStrExt;
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
     os::{
         fd::{AsRawFd, FromRawFd},
-        unix::{
-            ffi::OsStrExt,
-            fs::{MetadataExt, OpenOptionsExt},
-        },
+        unix::fs::{MetadataExt, OpenOptionsExt},
     },
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
@@ -163,6 +162,31 @@ pub fn file_until(path: &Path, until: std::time::Instant, limit: usize) -> Resul
 pub fn stdin(deadline: u64) -> Result<Secret> {
     let file = duplicate(0)?;
     let info = file.metadata().map_err(source_error)?;
+    #[cfg(target_os = "macos")]
+    if info.is_file() {
+        private(&file)?;
+        let target = descriptor_path(&file).ok_or(Code::InvalidInput)?;
+        fs::directory(target.parent().ok_or(Code::InvalidInput)?, false, false)
+            .map_err(source_error)?;
+    } else {
+        // macOS has no `pipe:[…]` name: an anonymous pipe is a FIFO with no
+        // path, where a named FIFO has one. The producer check reads the
+        // parent's owner through proc_pidinfo instead of /proc/<parent>.
+        if info.mode() & libc::S_IFMT as u32 != libc::S_IFIFO as u32
+            || info.uid() != fs::uid()
+            || descriptor_path(&file).is_some()
+        {
+            return Err(Code::InvalidInput.into());
+        }
+        let parent = unsafe { libc::getppid() };
+        if parent <= 1
+            || unsafe { libc::getsid(parent) } != unsafe { libc::getsid(0) }
+            || process_uid(parent) != Some(fs::uid())
+        {
+            return Err(Code::InvalidInput.into());
+        }
+    }
+    #[cfg(target_os = "linux")]
     if info.is_file() {
         private(&file)?;
         let target = std::fs::read_link("/proc/self/fd/0").map_err(source_error)?;
@@ -192,6 +216,38 @@ pub fn stdin(deadline: u64) -> Result<Secret> {
         }
     }
     read(file, 65536, deadline)
+}
+/// The path `file` was opened by, from `F_GETPATH`; `None` for a descriptor
+/// with no path, such as an anonymous pipe.
+#[cfg(target_os = "macos")]
+fn descriptor_path(file: &File) -> Option<std::path::PathBuf> {
+    use std::os::unix::ffi::OsStringExt;
+    let mut buffer = [0u8; libc::PATH_MAX as usize];
+    // SAFETY: F_GETPATH writes at most PATH_MAX bytes, NUL included, into the
+    // live buffer.
+    if unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETPATH, buffer.as_mut_ptr()) } != 0 {
+        return None;
+    }
+    let length = buffer.iter().position(|byte| *byte == 0)?;
+    (length > 0).then(|| std::ffi::OsString::from_vec(buffer[..length].to_vec()).into())
+}
+/// The effective uid of process `pid`, from `proc_pidinfo`.
+#[cfg(target_os = "macos")]
+fn process_uid(pid: libc::pid_t) -> Option<libc::uid_t> {
+    // SAFETY: zero is a valid proc_bsdinfo.
+    let mut info: libc::proc_bsdinfo = unsafe { std::mem::zeroed() };
+    let size = std::mem::size_of::<libc::proc_bsdinfo>() as libc::c_int;
+    // SAFETY: proc_pidinfo writes at most `size` bytes into the live struct.
+    let written = unsafe {
+        libc::proc_pidinfo(
+            pid,
+            libc::PROC_PIDTBSDINFO,
+            0,
+            (&mut info as *mut libc::proc_bsdinfo).cast(),
+            size,
+        )
+    };
+    (written == size && info.pbi_pid == pid as u32).then_some(info.pbi_uid)
 }
 /// Reads once `wait` reports input. A terminal `^C` can flush the queue `poll`
 /// saw before this read runs, possibly before its SIGINT is handled; the empty

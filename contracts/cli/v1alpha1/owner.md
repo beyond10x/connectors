@@ -12,6 +12,9 @@ the same lifetime lock before spawning; failure to acquire it never authorizes a
 replacement process. A startup socket carries a fresh challenge, owner incarnation
 and metadata authority before the parent releases startup ownership. The daemon
 keeps the inherited lock and owns its children after the launching CLI exits.
+An owner that refuses to start or to keep serving exits with status 1 and writes
+only its refusal code to standard error (`connectors owner: "<code>"`), which
+the launching CLI discards.
 Once it starts admitting requests, that lock is retained until kernel process
 exit even on early return or unwinding. Recovery runs between jobs on a retained
 worker, or under the supervisor's worker-creation lock with no live worker for
@@ -132,3 +135,33 @@ provider/custody failures preserve any still-valid baseline. No credential is
 written, no new acquisition is created, and business invocation never performs
 implicit revalidation. A lost publication acknowledgement is outcome_unknown;
 connection status observes the resulting baseline and no request is replayed.
+
+## macOS
+
+The rules above are the Linux transport and stand unchanged. On macOS the
+owner keeps its socket, lifetime lock, handshake and refusals; four guarantees
+hold only in the weaker form the [platform guarantee table](semantics.md#macos-platform-guarantees)
+names:
+
+- **Build** (`own_image_build_measure`: `launch_path_read`). There is no
+  `/proc/self/exe`. `build` is the SHA-256 of the file at the running
+  executable's path, read once. An owner whose file was replaced after it
+  started is therefore measured as a new build, and a caller of the replacing
+  build is refused with `owner_build_mismatch` exactly as against another build.
+  A CLI that starts an owner runs it from its private launch copy and keeps
+  that copy until the owner has answered the startup greeting, since the owner
+  measures its build there before it answers.
+- **Socket peer** (`peer_credential_snapshot`: `separate_pid_query`). The peer
+  UID comes from `LOCAL_PEERCRED` and must be the configured UID, as on Linux;
+  the pid is a separate `LOCAL_PEERPID` query used only for its sign. A peer
+  that has already closed, such as a startup channel nobody greets, has no pid
+  to query; it is admitted by its connect-time UID as on Linux, and its stream
+  reads what was sent before the close and then end of file.
+- **Children** (`parent_death_kill`: `adapter_channel_close`;
+  `exact_process_signal`: `child_reap_lock`). There is no parent-death signal,
+  so no retained worker thread is needed for it: an adapter child exits when its
+  channel closes. Exact stop signals the owned child by process id only under
+  the lock that reaps it; kqueue `EVFILT_PROC` with `NOTE_EXIT` reports its exit.
+- **Socket path.** There is no `/proc/self/fd`: the owner socket is bound and
+  reached by its full path, which must fit the 104-byte `sun_path`. A state
+  directory whose socket path is longer is refused before an owner starts.

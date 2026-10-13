@@ -369,13 +369,35 @@ fn sidecar_symlink_is_refused_without_touching_its_target() {
     let target = root.path().join("untouched");
     fs::write(&target, b"sentinel").unwrap();
     let sidecar = paths.state.join("metadata.sqlite3-wal");
-    // Entity Runtime retires its SQLite bridge after the setup handle drops.
-    // Wait for that legitimate WAL to close before installing the hostile link.
+    // The setup's verified Entity Runtime handle stays open in this process's
+    // idle pool, and with it the store's legitimate WAL. The pool keeps at most
+    // four handles per process and closes the oldest first, so initializing
+    // four more stores closes this one's, as a busy process would; otherwise
+    // the WAL stays until another test happens to push it out.
+    const IDLE_HANDLES: usize = 4;
+    let _others: Vec<_> = (0..IDLE_HANDLES)
+        .map(|_| {
+            let other = self::root();
+            Config::initialize(&self::paths(&other)).unwrap();
+            other
+        })
+        .collect();
+    // Wait for that WAL to close before installing the hostile link.
     let until = std::time::Instant::now() + Duration::from_secs(5);
     while sidecar.exists() && std::time::Instant::now() < until {
         std::thread::sleep(Duration::from_millis(10));
     }
-    assert!(!sidecar.exists());
+    assert!(
+        !sidecar.exists(),
+        "the store's WAL is still present 5 s after {IDLE_HANDLES} other stores were \
+         initialized: the process's idle-handle pool (IDLE_LIMIT in \
+         src/local/metadata/er.rs) still holds it open; state directory holds {:?}",
+        fs::read_dir(&paths.state)
+            .map(|entries| entries
+                .filter_map(|entry| entry.ok().map(|entry| entry.file_name()))
+                .collect::<Vec<_>>())
+            .ok()
+    );
     symlink(&target, &sidecar).unwrap();
     assert!(matches!(
         Metadata::inspect(&paths.state),

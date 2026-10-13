@@ -6,6 +6,8 @@
 //! 10 ms. The production idle bound is 600 s, so 120 empty sweeps fall inside
 //! it. The unit's own tests use a 1.5 s bound, which no sweep ever crosses.
 //! These cases use a bound longer than one sweep interval, as production does.
+#[path = "support/owner.rs"]
+mod owner_start;
 use serde_json::Value;
 use std::{
     fs,
@@ -74,7 +76,7 @@ fn start_owner(root: &tempfile::TempDir, idle_ms: u64) -> OwnerProcess {
         .open(state.join("owner.lock"))
         .unwrap();
     let (startup, owner_end) = UnixStream::pair().unwrap();
-    let owner = Command::new("/bin/sh")
+    let mut owner = Command::new("/bin/sh")
         .env("CONNECTORS_TEST_OWNER_IDLE_MS", idle_ms.to_string())
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
@@ -85,15 +87,11 @@ fn start_owner(root: &tempfile::TempDir, idle_ms: u64) -> OwnerProcess {
             owner_end,
         )))
         .stdout(std::process::Stdio::from(lock))
-        .stderr(std::process::Stdio::null())
+        .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
     drop(startup);
-    let until = Instant::now() + Duration::from_secs(20);
-    while !state.join("owner.sock").exists() {
-        assert!(Instant::now() < until, "owner never listened");
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    owner_start::wait_listening(&mut owner, root.path());
     OwnerProcess(owner)
 }
 
