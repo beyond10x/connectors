@@ -137,6 +137,9 @@ fn invoke_failure(error: owner::Error) -> HandlerReply {
 
 fn owner_failure(error: owner::Error) -> HandlerReply {
     use owner::Code::*;
+    if error.code == MetadataSchemaNewer {
+        return schema_newer(error.store_version);
+    }
     let provider = error.origin == owner::Origin::Provider;
     let (stage, action, usage) = match error.code {
         // A provider's refusal of a dispatched call is not a host admission refusal.
@@ -178,6 +181,7 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         StaleDescription | DescriptionUnavailable => ("observation", "refresh_description", false),
         ServiceFailure => ("dispatch", "retry_explicitly", false),
         OwnerBuildMismatch => ("readiness", "stop_owner", false),
+        MetadataSchemaNewer => ("admission", "upgrade", false),
     };
     // A refusal during a configuration upgrade, or of a changed binding: repair
     // refuses a changed binding, so only a new connection helps.
@@ -231,8 +235,21 @@ fn failure(code: &str, stage: &str, next_action: &str, usage: bool) -> HandlerRe
     }
 }
 
+/// `metadata_schema_newer` (semantics.md §3): a newer binary with another record
+/// model wrote the store; only a binary at least as new can use it. `store` is
+/// the release its writer marker names, `None` for `unrecorded`.
+pub(super) fn schema_newer(store: Option<String>) -> HandlerReply {
+    HandlerReply::Error {
+        code: "failure".into(),
+        data: json!({"kind":"operational","code":"metadata_schema_newer","stage":"admission","next_action":"upgrade",
+            "store_version":store.unwrap_or_else(|| "unrecorded".to_owned()),
+            "binary_version":connectors_host::local::Release::current().to_string()}),
+    }
+}
+
 fn host_failure(error: Failure) -> HandlerReply {
     match error {
+        Failure::MetadataSchemaNewer(store) => schema_newer(store.map(|release| release.to_string())),
         Failure::InvalidConfiguration => failure(
             "invalid_configuration",
             "configuration",
@@ -343,7 +360,11 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
         let state = keyring::inspect_at(config.secret_service_socket.as_deref());
         let mut checks =
             vec![json!({"name":"configuration", "state":"ready", "next_action":"none"})];
-        let metadata = Metadata::inspect(&paths.state).is_ok();
+        // A store a newer binary wrote is refused, not reported as a prerequisite.
+        let metadata = match Metadata::inspect(&paths.state) {
+            Err(failure @ Failure::MetadataSchemaNewer(_)) => return Err(host_failure(failure)),
+            opened => opened.is_ok(),
+        };
         checks.push(json!({"name":"metadata", "state": if metadata {"ready"} else {"failed"}, "next_action":if metadata {"none"} else {"check_configuration"}}));
         for (alias, adapter) in &config.adapters {
             let ready = adapter.executable.check().is_ok();

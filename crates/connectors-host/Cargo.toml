@@ -9,6 +9,9 @@ license.workspace = true
 [features]
 # Compatibility feature: runtime descriptors now always need config reflection.
 schema = []
+# Test-only seams: never enabled by a released binary (`apps/connectors` enables it
+# for its integration tests only).
+test-support = []
 
 [dependencies]
 connectors-custody.workspace = true
