@@ -1,3 +1,5 @@
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 use connectors_host::local::{
     Failure,
     config::{Config, Paths},

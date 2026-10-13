@@ -1,3 +1,5 @@
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 use async_trait::async_trait;
 use connectors_core::{Descriptor, ErrorCode, Invocation, Operation, Result, WIRE_VERSION};
 use connectors_host::{
