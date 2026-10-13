@@ -183,6 +183,53 @@ fn a_delete_interrupted_among_the_parts_is_reclaimed() {
     assert!(entries.names().is_empty());
 }
 
+/// Deletes that succeed but leave an entry for the next read (seen on the
+/// Windows runner) are repeated in a later round; the delete is acknowledged
+/// once a read finds nothing.
+#[test]
+fn an_entry_still_found_after_its_delete_is_deleted_again() {
+    let (entries, backend, scope) = parted();
+    let version = Version::new(scope, Uuid::new_v4()).unwrap();
+    assert_eq!(
+        backend.write_new(
+            version,
+            &Material::new(value(3 * PART_BYTES)),
+            until(),
+            || Ok(())
+        ),
+        Ok(())
+    );
+    entries.leave_after_delete(2);
+    assert_eq!(backend.delete(version, until(), || Ok(())), Ok(()));
+    assert!(entries.names().is_empty());
+    // One round deletes the header and every possible part; a second round
+    // ran for the two entries left behind.
+    assert!(entries.calls().1 > MAX_PARTS + 1);
+}
+
+/// An entry still found after every round is an unknown outcome, and stays
+/// for a later delete to reclaim.
+#[test]
+fn an_entry_found_after_every_delete_round_is_an_unknown_outcome() {
+    let (entries, backend, scope) = parted();
+    let version = Version::new(scope, Uuid::new_v4()).unwrap();
+    assert_eq!(
+        backend.write_new(version, &Material::new(value(PART_BYTES)), until(), || Ok(
+            ()
+        )),
+        Ok(())
+    );
+    entries.leave_after_delete(usize::MAX);
+    assert_eq!(
+        backend.delete(version, until(), || Ok(())),
+        Err(Failure::OutcomeUnknown)
+    );
+    assert!(!entries.names().is_empty());
+    entries.leave_after_delete(0);
+    assert_eq!(backend.delete(version, until(), || Ok(())), Ok(()));
+    assert!(entries.names().is_empty());
+}
+
 #[test]
 fn a_part_removed_under_a_header_is_invalid_material() {
     let (entries, backend, scope) = parted();
@@ -710,15 +757,19 @@ fn os_errors() -> String {
     #[cfg(target_os = "windows")]
     {
         format!(
-            "{:?}",
+            "{:?}; delete remainders: {:?}",
             crate::credential_manager::OS_ERRORS
                 .lock()
-                .map(|e| e.clone())
+                .map(|e| e.clone()),
+            crate::parts::REMAINDERS.lock().map(|r| r.clone())
         )
     }
     #[cfg(not(target_os = "windows"))]
     {
-        String::from("none recorded on this platform")
+        format!(
+            "none recorded on this platform; delete remainders: {:?}",
+            crate::parts::REMAINDERS.lock().map(|r| r.clone())
+        )
     }
 }
 
@@ -773,6 +824,7 @@ fn largest_materials_round_trip<B: Backend>(open: &dyn Fn(Scope) -> Result<B>) {
         "signing seed: delete; failing OS calls: {}",
         os_errors()
     );
+    println!("custody delete rounds: {}", os_errors());
 }
 
 /// The story's measurement, held to the 64 KiB bound of every platform: every
