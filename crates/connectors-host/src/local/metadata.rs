@@ -8,9 +8,10 @@ mod er;
 mod metamorphic_tests;
 use rusqlite::{Connection, OpenFlags, TransactionBehavior};
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use std::os::fd::AsRawFd;
 use std::{
     ffi::OsStr,
-    os::fd::AsRawFd,
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -185,11 +186,19 @@ thread_local! {
 fn inherited_lock_wait() -> Duration {
     static INHERITED: std::sync::OnceLock<Duration> = std::sync::OnceLock::new();
     *INHERITED.get_or_init(|| {
-        parse_lock_wait(
-            std::env::var(LOCK_WAIT_ENV).ok().as_deref(),
-            std::os::unix::process::parent_id(),
-        )
-        .unwrap_or(LIFECYCLE_LOCK_WAIT)
+        let value = std::env::var(LOCK_WAIT_ENV).ok();
+        #[cfg(unix)]
+        let parent = std::os::unix::process::parent_id();
+        // Windows: std has no parent process id and the enabled bindings no
+        // query for one, so a handed value binds whichever process handed it;
+        // a grandchild of a handing test inherits its wait.
+        #[cfg(windows)]
+        let parent = value
+            .as_deref()
+            .and_then(|value| value.split_once(':'))
+            .and_then(|(handed_by, _)| handed_by.parse::<u32>().ok())
+            .unwrap_or(0);
+        parse_lock_wait(value.as_deref(), parent).unwrap_or(LIFECYCLE_LOCK_WAIT)
     })
 }
 
@@ -895,7 +904,12 @@ impl Metadata {
                 .ok_or(Failure::MetadataUnavailable)?;
             // Recorded first: after a failed unlock the lock is not known held.
             self.lock_released = true;
+            #[cfg(unix)]
             if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_UN) } != 0 {
+                return Err(Failure::MetadataUnavailable);
+            }
+            #[cfg(windows)]
+            if lock.unlock().is_err() {
                 return Err(Failure::MetadataUnavailable);
             }
         }
@@ -1214,6 +1228,7 @@ fn lifecycle_lock(directory: &std::fs::File) -> Result<std::fs::File> {
 
 fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
     let deadline = Instant::now() + lifecycle_lock_wait();
+    #[cfg(unix)]
     loop {
         // SAFETY: file owns the live descriptor. Dropping it releases the lock.
         let result = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_NB | libc::LOCK_EX) };
@@ -1225,6 +1240,18 @@ fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
             return Err(Failure::MetadataUnavailable);
         }
         std::thread::sleep(Duration::from_millis(5));
+    }
+    // Windows: an exclusive `LockFileEx` on the whole lock file through its
+    // handle, released when the handle closes.
+    #[cfg(windows)]
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(()),
+            Err(std::fs::TryLockError::WouldBlock) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            Err(_) => return Err(Failure::MetadataUnavailable),
+        }
     }
 }
 
@@ -1283,6 +1310,7 @@ mod tests {
         assert_eq!(handed(None), None);
     }
 
+    #[cfg(unix)]
     fn wal_writer_lock_held(shm: &Path) -> bool {
         use std::os::unix::ffi::OsStrExt;
         let path = std::ffi::CString::new(shm.as_os_str().as_bytes()).unwrap();
@@ -1325,6 +1353,7 @@ mod tests {
         exit == 0
     }
 
+    #[cfg(unix)]
     #[test]
     fn metadata_file_verification_preserves_an_existing_sqlite_wal_lock() {
         use std::os::unix::fs::PermissionsExt;
@@ -1353,6 +1382,7 @@ mod tests {
     /// Eventlog's own SQLite handle is outside the lifecycle lock, so its last
     /// close retires sidecars while another process is admitting the file. A
     /// sidecar that is gone by the time it is checked is absent, not unsafe.
+    #[cfg(unix)]
     #[test]
     fn a_sidecar_retired_during_admission_is_absent_not_unavailable() {
         use std::os::unix::fs::{OpenOptionsExt, PermissionsExt, symlink};

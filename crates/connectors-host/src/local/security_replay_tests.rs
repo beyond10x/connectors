@@ -9,12 +9,16 @@
 use super::Failure;
 use super::metadata::{Metadata, full_replays, simulate_process};
 use rusqlite::params;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 fn store() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     super::filesystem::directory(root.path(), false, true).unwrap();
     drop(Metadata::initialize(root.path()).unwrap());
     root
@@ -155,8 +159,16 @@ fn an_owner_batch_over_a_subject_another_process_wrote_equals_a_fresh_replay() {
     // and a fresh process admits them and reads the committed batch.
     for suffix in ["-wal", "-shm"] {
         let sidecar = root.path().join(format!("metadata.sqlite3{suffix}"));
-        let mode = std::fs::metadata(&sidecar).unwrap().permissions().mode() & 0o777;
-        assert_eq!(mode, 0o600, "{suffix}");
+        #[cfg(unix)]
+        {
+            let mode = std::fs::metadata(&sidecar).unwrap().permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600, "{suffix}");
+        }
+        #[cfg(windows)]
+        crate::local::filesystem::windows::check_owner_only(
+            &std::fs::File::open(&sidecar).unwrap(),
+        )
+        .unwrap();
     }
     simulate_process(0x5ec_2003);
     let replayed = Metadata::inspect(root.path()).unwrap().recorded_rows();
