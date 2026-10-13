@@ -1,9 +1,18 @@
 //! Process observations and stop fences independent of a busy adapter channel.
 use super::*;
+#[cfg(target_os = "linux")]
 use std::{fs::File, os::fd::AsRawFd};
 
+/// The stop path's handle on an owned child: a duplicated pidfd on Linux; on
+/// macOS a share of the child's reap lock (`exact_process_signal`:
+/// `child_reap_lock`).
+#[cfg(target_os = "linux")]
+pub(super) type Handle = File;
+#[cfg(target_os = "macos")]
+pub(super) type Handle = runtime::artifact::ExactChild;
+
 pub(super) struct Owned {
-    pub handle: File,
+    pub handle: Handle,
     pub incarnation: String,
     pub revision: String,
 }
@@ -60,6 +69,21 @@ impl Control {
         Ok(json!({"observation":observation}))
     }
 }
+/// Signals the child only while its reap lock shows it unreaped; a reaped or
+/// vanished child is sent nothing, as `ESRCH` is on Linux.
+#[cfg(target_os = "macos")]
+pub(super) fn signal(handle: &Handle, signal: i32) -> Result<()> {
+    handle
+        .signal(signal)
+        .map(|_| ())
+        .map_err(|_| Code::Unavailable.into())
+}
+/// `NOTE_EXIT` from kqueue `EVFILT_PROC`, or the reap.
+#[cfg(target_os = "macos")]
+pub(super) fn exited(handle: &Handle) -> Result<bool> {
+    handle.exited().map_err(|_| Code::Unavailable.into())
+}
+#[cfg(target_os = "linux")]
 pub(super) fn signal(handle: &File, signal: i32) -> Result<()> {
     // SAFETY: a duplicated pidfd, never a caller-supplied numeric process id.
     let result = unsafe {
@@ -77,6 +101,7 @@ pub(super) fn signal(handle: &File, signal: i32) -> Result<()> {
         Err(Code::Unavailable.into())
     }
 }
+#[cfg(target_os = "linux")]
 pub(super) fn exited(handle: &File) -> Result<bool> {
     let mut poll = libc::pollfd {
         fd: handle.as_raw_fd(),
@@ -89,7 +114,7 @@ pub(super) fn exited(handle: &File) -> Result<bool> {
     }
     Ok(poll.revents & libc::POLLIN != 0)
 }
-pub(super) fn terminate(handle: &File, deadline: Instant) -> Result<()> {
+pub(super) fn terminate(handle: &Handle, deadline: Instant) -> Result<()> {
     signal(handle, libc::SIGTERM)?;
     while Instant::now() < deadline {
         if exited(handle)? {

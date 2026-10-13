@@ -34,12 +34,23 @@ fn own_build() -> Result<&'static str> {
     static BUILD: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     BUILD
         .get_or_init(|| {
-            std::fs::read("/proc/self/exe")
+            own_image()
                 .ok()
                 .map(|image| hex::encode(Sha256::digest(image)))
         })
         .as_deref()
         .ok_or_else(|| Code::Unavailable.into())
+}
+#[cfg(target_os = "linux")]
+fn own_image() -> std::io::Result<Vec<u8>> {
+    std::fs::read("/proc/self/exe")
+}
+/// macOS has no `/proc/self/exe`: the file at the running executable's path
+/// is read (`own_image_build_measure`: `launch_path_read`), so a file replaced
+/// there is measured as a new build.
+#[cfg(target_os = "macos")]
+fn own_image() -> std::io::Result<Vec<u8>> {
+    std::fs::read(std::env::current_exe()?)
 }
 pub struct WriteClient(Client);
 const WRITE_VERSION: &str = "connectors-owner/2";
@@ -154,6 +165,8 @@ impl Client {
         let authority = Metadata::authority_at(&paths.state)?.to_string();
         let directory = fs::directory(&paths.state, false, true)?;
         let socket = socket_path(&directory);
+        #[cfg(target_os = "macos")]
+        admit_socket(&socket)?;
         loop {
             crate::local::protected::cancellation()?;
             match connect_identified(&socket) {
@@ -689,11 +702,35 @@ impl WriteClient {
         }
     }
 }
+#[cfg(target_os = "linux")]
 fn socket_path(directory: &File) -> PathBuf {
     PathBuf::from(format!(
         "/proc/self/fd/{}/owner.sock",
         directory.as_raw_fd()
     ))
+}
+/// macOS has no `/proc/self/fd`: the socket is named by the directory's own
+/// path (`F_GETPATH`). An unreadable path is empty, which [`admit_socket`]
+/// refuses.
+#[cfg(target_os = "macos")]
+fn socket_path(directory: &File) -> PathBuf {
+    runtime::artifact::path_of(directory)
+        .map(|path| path.join("owner.sock"))
+        .unwrap_or_default()
+}
+/// A macOS socket path must fit `sun_path` (104 bytes) with its NUL; a longer
+/// one is `InvalidConfiguration`, checked before any owner starts.
+#[cfg(target_os = "macos")]
+fn admit_socket(socket: &std::path::Path) -> Result<()> {
+    // SAFETY: an all-zero sockaddr_un is valid; only its field size is read.
+    let capacity = unsafe { std::mem::zeroed::<libc::sockaddr_un>() }
+        .sun_path
+        .len();
+    match socket.as_os_str().len() {
+        0 => Err(Code::Unavailable.into()),
+        length if length >= capacity => Err(Code::InvalidConfiguration.into()),
+        _ => Ok(()),
+    }
 }
 fn connect_socket(path: &std::path::Path) -> Result<UnixStream> {
     connect_identified(path).map(|(stream, _)| stream)
@@ -780,7 +817,14 @@ fn spawn(
     let private = duplicate(child.as_raw_fd())?;
     let lifetime = duplicate(lock.as_raw_fd())?;
     let (private_fd, lock_fd) = (private.as_raw_fd(), lifetime.as_raw_fd());
+    #[cfg(target_os = "linux")]
     let mut command = Command::new(format!("/proc/self/fd/{}", executable.as_raw_fd()));
+    // macOS executes the owner-private copy by its path; dropped on return,
+    // after spawn has exec'd it, which removes the copy.
+    #[cfg(target_os = "macos")]
+    let launch = runtime::artifact::launch_path(&executable)?;
+    #[cfg(target_os = "macos")]
+    let mut command = Command::new(launch.path());
     command
         .args([
             std::ffi::OsStr::new("__connectors-owner"),
@@ -869,6 +913,8 @@ pub fn serve(paths: Paths) -> Result<()> {
         return Err(Code::Unavailable.into());
     }
     let socket = socket_path(&directory);
+    #[cfg(target_os = "macos")]
+    admit_socket(&socket)?;
     if let Ok(metadata) = std::fs::symlink_metadata(&socket) {
         if !metadata.file_type().is_socket()
             || metadata.uid() != fs::uid()
@@ -2058,6 +2104,55 @@ mod tests {
         drop(held);
         let host = owner.join().unwrap();
         assert_eq!(greeted, Ok(host.expect("the next owner was never greeted")));
+    }
+}
+
+/// The owner's macOS transport (contracts/cli/v1alpha1/owner.md, "macOS").
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use super::*;
+
+    /// `own_image_build_measure`: `launch_path_read`. The build is the digest
+    /// of the file at the running executable's path.
+    #[test]
+    fn the_owner_build_is_read_from_the_launch_path() {
+        let image = std::fs::read(std::env::current_exe().unwrap()).unwrap();
+        assert_eq!(own_build().unwrap(), hex::encode(Sha256::digest(image)));
+    }
+
+    /// The owner socket is named by the state directory's own path, which
+    /// must fit the 104-byte `sun_path`; a longer one is refused as
+    /// `invalid_configuration` before any owner starts: no lifetime lock is
+    /// created and nothing is spawned.
+    #[test]
+    fn a_socket_path_past_sun_path_is_refused_before_an_owner_starts() {
+        let root = tempfile::tempdir().unwrap();
+        let fits = fs::directory(root.path(), false, true).unwrap();
+        let socket = socket_path(&fits);
+        assert_eq!(
+            socket,
+            std::fs::canonicalize(root.path())
+                .unwrap()
+                .join("owner.sock")
+        );
+        admit_socket(&socket).unwrap();
+
+        let state = root.path().join("s".repeat(100)).join("state");
+        let paths =
+            Paths::resolve(Some(&root.path().join("config/config.toml")), Some(&state)).unwrap();
+        Config::initialize(&paths).unwrap();
+        let directory = fs::directory(&paths.state, false, true).unwrap();
+        assert!(socket_path(&directory).as_os_str().len() >= 104);
+        assert_eq!(
+            admit_socket(&socket_path(&directory)).unwrap_err().code,
+            Code::InvalidConfiguration
+        );
+        assert_eq!(
+            Client::connect(&paths, true).err().map(|error| error.code),
+            Some(Code::InvalidConfiguration)
+        );
+        assert!(!paths.state.join("owner.lock").exists());
+        assert!(!paths.state.join("owner.sock").exists());
     }
 }
 
