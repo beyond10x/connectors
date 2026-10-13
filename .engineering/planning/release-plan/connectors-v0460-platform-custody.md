@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0460-platform-custody
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.46.0: credential custody on macOS and Windows, ESS 0.59.0'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261012a-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-13T02:49:16Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-13T05:01:18Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
