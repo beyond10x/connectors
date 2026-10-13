@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
 - depends_on: story:host-runs-on-macos
-revision: 4
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-13T06:25:56Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-13T06:25:57Z", actor: "human:timo", revision: 4}
@@ -62,3 +62,24 @@ Local check: `cargo check --target x86_64-pc-windows-gnu` with the installed rus
 - A CI job on `windows-latest` builds the workspace and runs the host and CLI suites; a test that
   needs a Unix-only fixture is gated and named in the ignored inventory.
 - Linux and macOS behaviour and their tests are unchanged.
+
+## Wave decisions
+
+Taken inside the approved story, 2026-10-13. Each is the option the unit recommended unless noted.
+
+Unit D (specification, d5f9bd343):
+
+- `sealed_executable` is `weaker` on Windows (`deny_write_copy`): a process of the same user can open the copy for writing between the write handle's close and the deny-write open; NTFS refusal of that was not confirmed.
+- `peer_credential_snapshot` is `weaker` (`client_token_query`); `own_image_build_measure` is `weaker` (`launch_path_read`); the other four hold.
+- No separate owner-only-file guarantee row: owner-only files hold on every platform, as protected stdin does on macOS.
+- The owner-only DACL check admits the current user, LocalSystem and BUILTIN\Administrators, the counterpart of what root can read on Unix; files the host creates name the current user only.
+- Clocks are `QueryUnbiasedInterruptTimePrecise` and `QueryInterruptTimePrecise`: the plain forms advance about every 15.6 ms, under the clock binding's 1 ms resolution.
+- Protected stdin on Windows admits an owner-only file and refuses a pipe until a producer check is specified.
+- The consumer credential is one inherited read-only handle, its value in decimal in `CONNECTORS_CREDENTIAL_HANDLE` (`connectors.cli.ConsumerCredentialDelivery`).
+
+Unit C (files, clocks, console, build tooling, 04fd3153e, 426839a0a):
+
+- `owner_uid` on Windows is the last sub-authority of the user's SID, for the stored owner number; admission compares the full SID.
+- `connectors-build` on Windows ends fixtures with `taskkill /T /F`, refuses `--tmpdir` and never counts a kubeconfig as present.
+- Elevated sessions: Windows makes BUILTIN\Administrators the default owner of new files in an elevated administrator session, so SQLite's `-wal` and `-shm` files would be refused by the owner check. Taken: when the process token is elevated and holds BUILTIN\Administrators as its default owner, an owner SID of BUILTIN\Administrators is admitted as the current user's; otherwise the check is unchanged. To be implemented and tested on the `windows-latest` runner in this wave.
+- Unchecked until the runner: NTFS refusing a rename of a folder with an open file below it; `MoveFileExW` against a reader without delete sharing; `AllocConsole` in a detached child.
