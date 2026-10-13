@@ -2,12 +2,14 @@
 format: aep.planning-md/3
 id: decision-blocker:wave-20261013c-scope
 kind: decision-blocker
-status: open
+status: cleared
 title: What wave 20261013c delivers toward running the CLI on Windows
 relations:
 - blocks: story:host-runs-on-windows
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-13T06:25:48Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -25,3 +27,7 @@ Recommended: A. The units are the same in both; B only adds a release that canno
 Default on silence: A.
 
 Inside the story, the consumer contract gains a Windows delivery (an inherited handle named in an environment variable, in place of descriptor 3). That is a public contract addition, not a change to the Linux or macOS rule.
+
+## Decided
+
+Option A, 2026-10-13: wave 20261013c delivers story:host-runs-on-windows in one wave and one pull request: unit D first, then A, B and C, with A before B on `runtime/launch.rs`, an adversary pass on A and on B, and a `windows-latest` job running clippy and the tests of `connectors-host` and `connectors`. One pull request pays CI once, and the release runs on Windows.
