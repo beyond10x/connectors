@@ -19,7 +19,10 @@
 //! second owner meanwhile.
 use super::super::super::filesystem::{self as fs, windows as win};
 use super::*;
-use runtime::channel::{self, Stream};
+use runtime::{
+    artifact::quote,
+    channel::{self, Stream},
+};
 use std::{
     ffi::OsStr,
     fs::OpenOptions,
@@ -386,42 +389,6 @@ impl Process {
             _ => Err(std::io::ErrorKind::TimedOut.into()),
         }
     }
-}
-
-/// Appends `argument` to a command line as the Microsoft C runtime and Rust's
-/// standard library parse it back: quoted when empty or holding a space, tab,
-/// newline or quote, backslashes doubled before a quote.
-pub(crate) fn quote(argument: &OsStr, line: &mut Vec<u16>) {
-    let units: Vec<u16> = argument.encode_wide().collect();
-    if !line.is_empty() {
-        line.push(u16::from(b' '));
-    }
-    let plain = !units.is_empty()
-        && !units
-            .iter()
-            .any(|&unit| matches!(unit, 0x20 | 0x09 | 0x0a | 0x0b | 0x22));
-    if plain {
-        line.extend(units);
-        return;
-    }
-    line.push(u16::from(b'"'));
-    let mut backslashes = 0usize;
-    for unit in units {
-        if unit == u16::from(b'\\') {
-            backslashes += 1;
-            continue;
-        }
-        let repeat = if unit == u16::from(b'"') {
-            backslashes * 2 + 1
-        } else {
-            backslashes
-        };
-        line.extend(std::iter::repeat_n(u16::from(b'\\'), repeat));
-        line.push(unit);
-        backslashes = 0;
-    }
-    line.extend(std::iter::repeat_n(u16::from(b'\\'), backslashes * 2));
-    line.push(u16::from(b'"'));
 }
 
 /// An inheritable duplicate of `handle`, for one child's creation.
