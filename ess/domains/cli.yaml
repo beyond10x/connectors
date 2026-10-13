@@ -342,7 +342,9 @@ types:
   #   concurrent exec in the same process in between inherits the descriptor.
   # - separate_pid_query: the uid and gid are the connect-time snapshot; the pid
   #   is a separate query, used by the owner and supervisor only for its sign;
-  #   an adapter also requires it to equal its parent's process id.
+  #   an adapter also requires it to equal its parent's process id. A peer that
+  #   has already closed has no pid: the owner and supervisor admit it by its
+  #   uid, an adapter refuses it.
   - name: connectors.cli.PlatformGuaranteeWeakerForm
     kind: enum
     variants: [owner_private_copy, adapter_channel_close, child_reap_lock, launch_path_read, set_after_receive, separate_pid_query]

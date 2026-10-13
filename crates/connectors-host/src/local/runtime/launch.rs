@@ -261,8 +261,7 @@ pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Resu
     message.msg_iovlen = 1;
     message.msg_control = control.as_mut_ptr().cast();
     message.msg_controllen = space as _;
-    stream
-        .set_read_timeout(Some(remaining(until)?))
+    super::channel::set_read_timeout(stream, remaining(until)?)
         .map_err(|_| Failure::Unavailable)?;
     #[cfg(target_os = "linux")]
     let flags = libc::MSG_CMSG_CLOEXEC;

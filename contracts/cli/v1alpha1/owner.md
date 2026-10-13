@@ -12,6 +12,9 @@ the same lifetime lock before spawning; failure to acquire it never authorizes a
 replacement process. A startup socket carries a fresh challenge, owner incarnation
 and metadata authority before the parent releases startup ownership. The daemon
 keeps the inherited lock and owns its children after the launching CLI exits.
+An owner that refuses to start or to keep serving exits with status 1 and writes
+only its refusal code to standard error (`connectors owner: "<code>"`), which
+the launching CLI discards.
 Once it starts admitting requests, that lock is retained until kernel process
 exit even on early return or unwinding. Recovery runs between jobs on a retained
 worker, or under the supervisor's worker-creation lock with no live worker for
@@ -145,9 +148,15 @@ names:
   executable's path, read once. An owner whose file was replaced after it
   started is therefore measured as a new build, and a caller of the replacing
   build is refused with `owner_build_mismatch` exactly as against another build.
+  A CLI that starts an owner runs it from its private launch copy and keeps
+  that copy until the owner has answered the startup greeting, since the owner
+  measures its build there before it answers.
 - **Socket peer** (`peer_credential_snapshot`: `separate_pid_query`). The peer
   UID comes from `LOCAL_PEERCRED` and must be the configured UID, as on Linux;
-  the pid is a separate `LOCAL_PEERPID` query used only for its sign.
+  the pid is a separate `LOCAL_PEERPID` query used only for its sign. A peer
+  that has already closed, such as a startup channel nobody greets, has no pid
+  to query; it is admitted by its connect-time UID as on Linux, and its stream
+  reads what was sent before the close and then end of file.
 - **Children** (`parent_death_kill`: `adapter_channel_close`;
   `exact_process_signal`: `child_reap_lock`). There is no parent-death signal,
   so no retained worker thread is needed for it: an adapter child exits when its

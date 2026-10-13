@@ -170,8 +170,10 @@ names:
   owner as on Linux; the pid comes from a separate `LOCAL_PEERPID` query and is
   used by the supervisor only for its sign. The adapter also requires it to
   equal its parent's process id, as on Linux: the owner that made the socket
-  pair. The spawned process is still identified by the
-  supervisor's own Child handle, never by a peer pid.
+  pair. A peer that has already closed has no pid to query: the supervisor
+  admits it by its UID and reads end of file; the adapter refuses it. The
+  spawned process is still identified by the supervisor's own Child handle,
+  never by a peer pid.
 - **Parent death** (`parent_death_kill`: `adapter_channel_close`). There is no
   parent-death signal. The adapter exits when its inherited channel reaches end
   of file, which is when the owner dies; no retained spawning thread is needed.

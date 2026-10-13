@@ -5,6 +5,8 @@ use connectors_host::local::{
     config::Paths,
     owner::{Client, Code, WriteClient, mutation::Deadline},
 };
+#[path = "support/owner.rs"]
+mod owner_start;
 #[path = "support/socket.rs"]
 mod sockets;
 use serde_json::{Value, json};
@@ -75,7 +77,7 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
         .open(state.join("owner.lock"))
         .unwrap();
     let (startup, owner_end) = UnixStream::pair().unwrap();
-    let owner = Command::new("/bin/sh")
+    let mut owner = Command::new("/bin/sh")
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
         .arg(env!("CARGO_BIN_EXE_connectors"))
@@ -85,15 +87,11 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
             owner_end,
         )))
         .stdout(std::process::Stdio::from(lock))
-        .stderr(std::process::Stdio::null())
+        .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
     drop(startup);
-    let until = Instant::now() + Duration::from_secs(20);
-    while !state.join("owner.sock").exists() {
-        assert!(Instant::now() < until, "owner never listened");
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    owner_start::wait_listening(&mut owner, root.path());
     OwnerProcess(owner)
 }
 
@@ -190,12 +188,30 @@ fn an_owner_of_the_same_build_that_sheds_one_connection_is_not_reported_as_anoth
     let build = sha256_hex(&fs::read(env!("CARGO_BIN_EXE_connectors")).unwrap());
     let server = std::thread::spawn(move || {
         let mut greetings = Vec::new();
+        // The CLI below gives up within its own 10 s connect deadline. A CLI
+        // that never connects again must fail this test, not hang it.
+        let until = Instant::now() + Duration::from_secs(30);
+        listener.set_nonblocking(true).unwrap();
+        let accept = || -> Option<UnixStream> {
+            while Instant::now() < until {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        stream.set_nonblocking(false).unwrap();
+                        return Some(stream);
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(_) => return None,
+                }
+            }
+            None
+        };
         // Capacity: accepted and dropped without reading.
-        drop(listener.accept().unwrap());
+        drop(accept());
         #[allow(clippy::never_loop)]
         for _ in 0..3 {
-            listener.set_nonblocking(false).unwrap();
-            let Ok((mut stream, _)) = listener.accept() else {
+            let Some(mut stream) = accept() else {
                 break;
             };
             stream
@@ -231,6 +247,10 @@ fn an_owner_of_the_same_build_that_sheds_one_connection_is_not_reported_as_anoth
     let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
     let greetings = server.join().unwrap();
     let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !greetings.is_empty(),
+        "the CLI never greeted again after the shed connection: {stderr}"
+    );
     assert!(
         !stderr.contains("owner_build_mismatch"),
         "an owner running the CLI's own build was refused as another build \

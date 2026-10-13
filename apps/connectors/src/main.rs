@@ -23,6 +23,13 @@ fn main() {
         } else {
             Err(connectors_host::local::owner::Code::InvalidInput.into())
         };
+        // The refusal's code alone, on standard error; the CLI starts its owner
+        // with standard error discarded (contracts/cli/v1alpha1/owner.md).
+        if let Err(error) = &result
+            && let Ok(code) = serde_json::to_string(&error.code)
+        {
+            eprintln!("connectors owner: {code}");
+        }
         std::process::exit(if result.is_ok() { 0 } else { 1 });
     }
     if let Err(error) = <VersionFlag as clap::Parser>::try_parse_from(&args)
