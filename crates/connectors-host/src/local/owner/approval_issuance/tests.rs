@@ -1,3 +1,7 @@
+// The Secret Service qualification test that uses the clock server and the
+// adapter's keys runs on Linux only.
+#![cfg_attr(not(target_os = "linux"), allow(dead_code))]
+
 use super::*;
 use crate::local::clock::fixture as clock_fixture;
 use crate::local::{clock, keyring::custody, metadata::Metadata};
@@ -568,6 +572,7 @@ impl Drop for ClockServer {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 #[ignore = "requires built production CLI and qualified disposable GNOME Secret Service"]
 fn production_cli_approval_issuance_and_restart() {

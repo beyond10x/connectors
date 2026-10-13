@@ -101,6 +101,13 @@ clock's rate. Include 3 ms of additional continuation uncertainty to cover the
 accepted offset/bracketing tolerance; timer resolution above 1 ms refuses.
 The configured rate bound applies to the non-suspended monotonic elapsed time.
 
+On macOS the same rule holds with CLOCK_UPTIME_RAW in place of CLOCK_MONOTONIC
+and CLOCK_MONOTONIC_RAW in place of CLOCK_BOOTTIME: both read one unadjusted
+time base, and only the first stops while the machine sleeps, so their offset
+moves only by time asleep. Darwin's CLOCK_MONOTONIC is subject to frequency and
+time adjustments and is not used. The rate bound then covers the oscillator
+alone.
+
 Let S and R be monotonic readings before nonce creation and after receipt, N the
 current reading, p the admitted parts-per-million rate error, and q=1,000,000.
 For measured elapsed d, conservative real elapsed bounds are

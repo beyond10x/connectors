@@ -31,7 +31,107 @@ pub(crate) fn wait_readable(stream: &UnixStream) -> Result<()> {
         }
     }
 }
-pub(crate) fn peer(stream: &UnixStream) -> Result<libc::ucred> {
+/// A socket peer's credentials: the kernel's `ucred` on Linux.
+#[cfg(target_os = "linux")]
+pub(crate) type Peer = libc::ucred;
+/// A socket peer's credentials on macOS (`peer_credential_snapshot`, weaker
+/// form `separate_pid_query`): `uid` is the connect-time `LOCAL_PEERCRED`
+/// snapshot; `pid` comes from a separate `LOCAL_PEERPID` query and is held
+/// only to its sign. A peer that has already closed has no pid to query
+/// (`ENOTCONN`; the kernel keeps the snapshot, not the connection): `pid` is
+/// then `None`, the uid is still checked, and the stream reads only what the
+/// peer sent before it closed. Linux keeps the connect-time pid, so a closed
+/// peer is admitted there too.
+#[cfg(target_os = "macos")]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Peer {
+    pub pid: Option<libc::pid_t>,
+    pub uid: libc::uid_t,
+}
+/// The peer of `stream`, which must have been connected, run as the configured
+/// user and, while still connected, carry a positive pid. Anything else is
+/// `Unavailable`.
+#[cfg(target_os = "macos")]
+pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
+    use std::os::fd::AsRawFd;
+    // SAFETY: zero is a valid xucred; getsockopt writes at most `size` bytes.
+    let mut credentials: libc::xucred = unsafe { std::mem::zeroed() };
+    let mut size = std::mem::size_of::<libc::xucred>() as libc::socklen_t;
+    // SAFETY: buffers have the requested sizes and the socket is held.
+    if unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_LOCAL,
+            libc::LOCAL_PEERCRED,
+            (&mut credentials as *mut libc::xucred).cast(),
+            &mut size,
+        )
+    } != 0
+        || size as usize != std::mem::size_of::<libc::xucred>()
+        || credentials.cr_version != libc::XUCRED_VERSION
+    {
+        return Err(Failure::Unavailable);
+    }
+    let mut pid: libc::pid_t = 0;
+    let mut size = std::mem::size_of::<libc::pid_t>() as libc::socklen_t;
+    // SAFETY: buffers have the requested sizes and the socket is held.
+    let queried = unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_LOCAL,
+            libc::LOCAL_PEERPID,
+            (&mut pid as *mut libc::pid_t).cast(),
+            &mut size,
+        )
+    };
+    let pid = if queried == 0 {
+        if size as usize != std::mem::size_of::<libc::pid_t>() || pid <= 0 {
+            return Err(Failure::Unavailable);
+        }
+        Some(pid)
+    } else if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOTCONN) {
+        // `LOCAL_PEERCRED` answered, so this stream was connected: the peer
+        // has closed since.
+        None
+    } else {
+        return Err(Failure::Unavailable);
+    };
+    let peer = Peer {
+        pid,
+        uid: credentials.cr_uid,
+    };
+    if peer.uid != super::super::filesystem::uid() {
+        return Err(Failure::Unavailable);
+    }
+    Ok(peer)
+}
+/// Sets the read timeout of `stream`. macOS refuses every socket option on a
+/// stream shut in both directions, which a Unix stream is as soon as its peer
+/// has closed (`EINVAL`); Linux accepts it. What the peer sent before closing
+/// is still queued and a read of such a stream returns at once, so that
+/// refusal is passed over while the stream reports itself readable now.
+pub(crate) fn set_read_timeout(stream: &UnixStream, timeout: Duration) -> std::io::Result<()> {
+    match stream.set_read_timeout(Some(timeout)) {
+        #[cfg(target_os = "macos")]
+        Err(error) if error.raw_os_error() == Some(libc::EINVAL) && readable_now(stream) => Ok(()),
+        result => result,
+    }
+}
+/// Whether a read of `stream` returns without waiting.
+#[cfg(target_os = "macos")]
+fn readable_now(stream: &UnixStream) -> bool {
+    use std::os::fd::AsRawFd;
+    let mut descriptor = libc::pollfd {
+        fd: stream.as_raw_fd(),
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: the descriptor and initialized pollfd remain live; zero timeout.
+    let ready = unsafe { libc::poll(&mut descriptor, 1, 0) };
+    ready == 1 && descriptor.revents & (libc::POLLIN | libc::POLLHUP) != 0
+}
+#[cfg(target_os = "linux")]
+pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
     use std::os::fd::AsRawFd;
     let mut credentials = libc::ucred {
         pid: 0,
@@ -81,13 +181,15 @@ fn read_exact(
             check()?;
         }
         let remaining = remaining(until)?;
-        stream
-            .set_read_timeout(Some(if cancel.is_some() {
+        set_read_timeout(
+            stream,
+            if cancel.is_some() {
                 remaining.min(Duration::from_millis(250))
             } else {
                 remaining
-            }))
-            .map_err(io)?;
+            },
+        )
+        .map_err(io)?;
         let count = match stream.read(bytes) {
             Ok(count) => count,
             Err(error)
@@ -343,6 +445,80 @@ mod tests {
             read::<Request>(&mut reader, until, false, 0),
             Err(Failure::Timeout)
         ));
+    }
+
+    /// `peer_credential_snapshot` on macOS, weaker form `separate_pid_query`
+    /// (contracts/cli/v1alpha1/semantics.md, macOS platform guarantees): the
+    /// uid is `LOCAL_PEERCRED`'s connect-time snapshot and must be this
+    /// user's; the pid is a separate `LOCAL_PEERPID` query, held only to a
+    /// positive sign. A socket with no peer is refused.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_socket_pair_peer_is_this_user_with_a_positive_pid_and_an_unconnected_socket_is_refused() {
+        use std::os::fd::FromRawFd;
+        let (left, right) = UnixStream::pair().unwrap();
+        for end in [&left, &right] {
+            let peer = peer(end).unwrap();
+            assert_eq!(peer.uid, crate::local::filesystem::uid());
+            assert!(peer.pid.is_some_and(|pid| pid > 0), "{:?}", peer.pid);
+        }
+        // SAFETY: documented scalar arguments; the result is a new owned descriptor.
+        let raw = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0) };
+        assert!(raw >= 0);
+        // SAFETY: socket returned a new owned descriptor.
+        let unconnected = unsafe { UnixStream::from_raw_fd(raw) };
+        assert!(matches!(peer(&unconnected), Err(Failure::Unavailable)));
+    }
+
+    /// A peer that closed after connecting is still this user's (the
+    /// connect-time snapshot). Linux keeps its pid; macOS has none to query
+    /// (`separate_pid_query`), which is no refusal: the stream then reads
+    /// what the peer sent and then end of file, as on Linux.
+    #[test]
+    fn a_peer_that_has_closed_is_still_admitted_by_its_connect_time_uid() {
+        let (end, other) = UnixStream::pair().unwrap();
+        drop(other);
+        let peer = peer(&end).unwrap();
+        assert_eq!(peer.uid, crate::local::filesystem::uid());
+        #[cfg(target_os = "linux")]
+        assert!(peer.pid > 0, "{}", peer.pid);
+        #[cfg(target_os = "macos")]
+        assert_eq!(peer.pid, None);
+    }
+
+    /// A reply written just before its writer closed is read whole, with and
+    /// without cancellation. macOS refuses a read timeout on a stream whose
+    /// peer has closed (`EINVAL`); that refusal must not lose the reply.
+    #[test]
+    fn a_reply_sent_just_before_the_peer_closed_is_read_whole() {
+        let control =
+            br#"{"kind":"validate","request_id":"test","profile":"profile","deadline_ms":1}"#;
+        for cancelled in [false, true] {
+            let (mut reader, mut writer) = UnixStream::pair().unwrap();
+            let mut frame = Vec::new();
+            for size in [control.len(), 0, 0] {
+                frame.extend_from_slice(&(size as u32).to_be_bytes());
+            }
+            frame.extend_from_slice(control);
+            writer.write_all(&frame).unwrap();
+            drop(writer);
+            let cancel = || Ok(());
+            let read = read_with_cancel::<Request>(
+                &mut reader,
+                deadline(),
+                false,
+                0,
+                cancelled.then_some(&cancel as &dyn Fn() -> Result<()>),
+            );
+            assert!(read.is_ok(), "cancellable: {cancelled}");
+            // Then end of file, at once.
+            let started = Instant::now();
+            assert!(matches!(
+                read_with_cancel::<Request>(&mut reader, deadline(), false, 0, None),
+                Err(Failure::Unavailable)
+            ));
+            assert!(started.elapsed() < Duration::from_secs(1));
+        }
     }
 
     #[test]

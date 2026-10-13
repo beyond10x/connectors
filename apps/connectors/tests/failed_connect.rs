@@ -63,7 +63,12 @@ fn hex(bytes: &[u8]) -> String {
 
 /// The digest the client sends: this very test process's executable image.
 fn own_build() -> String {
+    #[cfg(target_os = "linux")]
     let image = fs::read("/proc/self/exe").unwrap();
+    // macOS has no `/proc/self/exe`: the file at this executable's path, as
+    // the owner measures its own build there (contracts/cli/v1alpha1/owner.md).
+    #[cfg(target_os = "macos")]
+    let image = fs::read(std::env::current_exe().unwrap()).unwrap();
     hex(ring::digest::digest(&ring::digest::SHA256, &image).as_ref())
 }
 

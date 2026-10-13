@@ -151,3 +151,37 @@ Linux mechanics are grounded in the upstream [Unix socket manual](https://man7.o
 and [execveat manual](https://man7.org/linux/man-pages/man2/execveat.2.html).
 Immutable executable capture uses the Linux [memfd and sealing interface](https://man7.org/linux/man-pages/man2/memfd_create.2.html).
 Process restart tests do not establish power-loss durability or provider acceptance.
+
+## macOS
+
+The rules above are the Linux binding and stand unchanged. On macOS the
+supervisor keeps every refusal and deadline above; four guarantees hold only in
+the weaker form the [platform guarantee table](semantics.md#macos-platform-guarantees)
+names:
+
+- **Admission** (`sealed_executable`: `owner_private_copy`). There is no memfd.
+  The supervisor copies the admitted bytes into a mode 0500 file in a fresh mode
+  0700 directory, verifies the configured SHA-256 and the Mach-O format against
+  that copy, and executes it by path. Path replacement and writes to the original
+  still cannot change what runs; a process of the same user can rewrite the copy
+  between the check and exec.
+- **Channel peer** (`peer_credential_snapshot`: `separate_pid_query`). The peer
+  UID comes from `LOCAL_PEERCRED`, a connect-time snapshot, and must match the
+  owner as on Linux; the pid comes from a separate `LOCAL_PEERPID` query and is
+  used by the supervisor only for its sign. The adapter also requires it to
+  equal its parent's process id, as on Linux: the owner that made the socket
+  pair. A peer that has already closed has no pid to query: the supervisor
+  admits it by its UID and reads end of file; the adapter refuses it. The
+  spawned process is still identified by the supervisor's own Child handle,
+  never by a peer pid.
+- **Parent death** (`parent_death_kill`: `adapter_channel_close`). There is no
+  parent-death signal. The adapter exits when its inherited channel reaches end
+  of file, which is when the owner dies; no retained spawning thread is needed.
+- **Stop and cleanup** (`exact_process_signal`: `child_reap_lock`). There is no
+  pidfd. Exit is observed through kqueue `EVFILT_PROC` with `NOTE_EXIT`, and the
+  owned child is signalled by its process id only under the lock that reaps it,
+  so a reaped id is never signalled. A PID recovered from metadata is still never
+  signalled.
+
+Writes on the channel use `SO_NOSIGPIPE` in place of `MSG_NOSIGNAL`, with the
+same effect.

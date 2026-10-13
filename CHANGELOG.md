@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The CLI and its local host build and run on macOS (checked on Apple silicon), with credentials
+  in the login keychain. Peer credentials come from `LOCAL_PEERCRED`, an admitted executable runs
+  from a private copy whose digest and Mach-O header are checked before exec, children are
+  watched through kqueue, the no-replace rename is `renamex_np` on APFS, and the trusted clock
+  reads `CLOCK_MONOTONIC_RAW` and `CLOCK_UPTIME_RAW` in place of the boot-time clock. The CLI semantics name seven platform guarantees
+  ([macOS platform guarantees](contracts/cli/v1alpha1/semantics.md#macos-platform-guarantees);
+  `connectors.cli.PlatformGuarantee`, `PlatformGuaranteeStatement`): Linux holds all seven, macOS
+  holds one and six in a named weaker form.
+- The `macOS host` workflow runs the lint and test suites of `connectors-host` and `connectors` on
+  `macos-latest` for every pull request and push to `main`. On a release tag it builds a release
+  binary and signs and notarizes it when the repository holds the signing secrets; without them
+  it writes a skip line to the run summary. A signed binary is a workflow artifact, not a release
+  asset.
+
+### Limitations
+
+- On macOS a consumer whose launching CLI dies first keeps running: there is no parent-death
+  signal, and only an adapter, through its descriptor-3 channel, notices.
+- On macOS a process of the same user can rewrite an executable's private copy between its
+  digest check and exec.
+- The release binary is not signed yet, so an upgraded binary on macOS still cannot read keychain
+  items an earlier build wrote (0.46.0, *Limitations*) and has to store its credentials again.
+- Tests that need the Secret Service fixture, or a socket path past the 104-byte macOS
+  `sun_path`, run on Linux only. Windows does not run the CLI yet.
+
 ## 0.47.0 — 2026-10-13
 
 ### Added

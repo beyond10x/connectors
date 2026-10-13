@@ -207,7 +207,7 @@ fn start(flow_ms: u64, token: Option<&str>) -> Flow {
 
 /// The listener's whole answer on `stream`, or what arrived within `wait`.
 fn answer(stream: &mut TcpStream, wait: Duration) -> String {
-    stream.set_read_timeout(Some(wait)).unwrap();
+    crate::local::test_streams::set_read_timeout(stream, wait);
     let mut bytes = Vec::new();
     let _ = stream.read_to_end(&mut bytes);
     String::from_utf8_lossy(&bytes).into_owned()

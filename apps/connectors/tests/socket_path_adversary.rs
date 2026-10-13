@@ -1,4 +1,9 @@
 //! Adversary probes for story:socket-path-limit-in-long-checkouts.
+//!
+//! Linux only: both probes bind past the 104-byte `sun_path` of macOS, which
+//! has no `/proc/self/fd` to shorten a path through and refuses such a path
+//! (the `sun_path` edge test in the host's owner transport).
+#![cfg(target_os = "linux")]
 #[path = "support/socket.rs"]
 mod sockets;
 

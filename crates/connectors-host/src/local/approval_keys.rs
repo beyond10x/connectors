@@ -670,5 +670,5 @@ impl Lease {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests;

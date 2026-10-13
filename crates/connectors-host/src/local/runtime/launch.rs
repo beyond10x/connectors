@@ -8,6 +8,11 @@
 //! starts the captured image with its pinned argv prefix and the caller's
 //! arguments, only the caller variables its entry passes by prefix, and the
 //! caller's stdin, stdout and stderr, then returns the consumer's exit code.
+//!
+//! macOS keeps every admission rule and changes delivery as section 7 of the
+//! contract states: the credential is an unlinked read-only file, the socket
+//! carries `SO_NOSIGPIPE`, received descriptors are marked close-on-exec right
+//! after the receive, and the image copy is executed by its path.
 use super::{Failure, Result};
 use std::{
     collections::BTreeSet,
@@ -33,6 +38,7 @@ const MARKER: u8 = 0x4c;
 /// forbid every later write, growth, shrink and seal change; the returned
 /// descriptor is a fresh read-only open file description, so its holder can
 /// neither write the bytes nor move an offset this process shares.
+#[cfg(target_os = "linux")]
 pub(crate) fn sealed(material: &[u8]) -> Result<File> {
     // SAFETY: a static NUL-terminated name and documented scalar flags.
     let raw = unsafe {
@@ -63,6 +69,92 @@ pub(crate) fn sealed(material: &[u8]) -> Result<File> {
     }
     // SAFETY: open returned a new owned descriptor.
     Ok(unsafe { File::from_raw_fd(fd) })
+}
+
+/// The macOS credential (consumer-launch.md §7): there is no memfd, so
+/// `material` is written verbatim into a mode 0400 file in a fresh mode 0700
+/// directory, a separate read-only descriptor is opened on it, and the file
+/// and its directory are removed before that descriptor is returned. Only the
+/// descriptor names the bytes: its holder reads them from the start, cannot
+/// write, shrink or grow them through it, and finds no path to reopen.
+#[cfg(target_os = "macos")]
+pub(crate) fn sealed(material: &[u8]) -> Result<File> {
+    use std::os::unix::{ffi::OsStringExt, fs::MetadataExt};
+    /// Removes the credential file, then its directory, on every exit.
+    struct Scratch(std::ffi::CString, std::ffi::CString);
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            // SAFETY: live NUL-terminated paths this function created.
+            unsafe {
+                libc::unlink(self.1.as_ptr());
+                libc::rmdir(self.0.as_ptr());
+            }
+        }
+    }
+    let mut template = std::env::temp_dir()
+        .join("connectors-credential.XXXXXX")
+        .into_os_string()
+        .into_vec();
+    template.push(0);
+    // SAFETY: a writable NUL-terminated template that mkdtemp fills in place;
+    // the directory it creates is mode 0700.
+    if unsafe { libc::mkdtemp(template.as_mut_ptr().cast()) }.is_null() {
+        return Err(Failure::Unavailable);
+    }
+    template.pop();
+    let directory = std::ffi::CString::new(template).map_err(|_| Failure::Unavailable)?;
+    let mut path = directory.as_bytes().to_vec();
+    path.extend_from_slice(b"/credential");
+    let path = std::ffi::CString::new(path).map_err(|_| Failure::Unavailable)?;
+    let scratch = Scratch(directory, path);
+    // SAFETY: a live NUL-terminated path; the result is a new owned descriptor.
+    let raw = unsafe {
+        libc::open(
+            scratch.1.as_ptr(),
+            libc::O_CREAT | libc::O_EXCL | libc::O_RDWR | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            0o400 as libc::c_uint,
+        )
+    };
+    if raw < 0 {
+        return Err(Failure::Unavailable);
+    }
+    // SAFETY: open returned a new owned descriptor.
+    let mut writable = unsafe { File::from_raw_fd(raw) };
+    writable
+        .write_all(material)
+        .map_err(|_| Failure::Unavailable)?;
+    // SAFETY: a live NUL-terminated path; the result is a new owned descriptor.
+    let fd = unsafe {
+        libc::open(
+            scratch.1.as_ptr(),
+            libc::O_RDONLY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if fd < 0 {
+        return Err(Failure::Unavailable);
+    }
+    // SAFETY: open returned a new owned descriptor.
+    let readable = unsafe { File::from_raw_fd(fd) };
+    let (written, opened) = (
+        writable.metadata().map_err(|_| Failure::Unavailable)?,
+        readable.metadata().map_err(|_| Failure::Unavailable)?,
+    );
+    if (written.dev(), written.ino()) != (opened.dev(), opened.ino())
+        || opened.len() != material.len() as u64
+    {
+        return Err(Failure::Unavailable);
+    }
+    drop(writable);
+    drop(scratch);
+    if readable
+        .metadata()
+        .map_err(|_| Failure::Unavailable)?
+        .nlink()
+        != 0
+    {
+        return Err(Failure::Unavailable);
+    }
+    Ok(readable)
 }
 
 fn remaining(until: Instant) -> Result<std::time::Duration> {
@@ -113,10 +205,35 @@ pub(crate) fn send(stream: &UnixStream, files: &[&File], until: Instant) -> Resu
     stream
         .set_write_timeout(Some(remaining(until)?))
         .map_err(|_| Failure::Unavailable)?;
+    #[cfg(target_os = "linux")]
+    let flags = libc::MSG_NOSIGNAL;
+    // macOS has no MSG_NOSIGNAL: the socket itself carries SO_NOSIGPIPE, with
+    // the same effect on this and every later write.
+    #[cfg(target_os = "macos")]
+    let flags = {
+        let enable: libc::c_int = 1;
+        // SAFETY: an initialized c_int of the stated size on a held socket.
+        if unsafe {
+            libc::setsockopt(
+                stream.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_NOSIGPIPE,
+                (&enable as *const libc::c_int).cast(),
+                std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+            )
+        } != 0
+        {
+            return Err(Failure::Unavailable);
+        }
+        0
+    };
     loop {
         // SAFETY: message and everything it points at are live for the call.
-        let sent = unsafe { libc::sendmsg(stream.as_raw_fd(), &message, libc::MSG_NOSIGNAL) };
+        let sent = unsafe { libc::sendmsg(stream.as_raw_fd(), &message, flags) };
         if sent == 1 {
+            // A captured image copy is the receiver's to launch and remove now.
+            #[cfg(target_os = "macos")]
+            super::artifact::sent(files);
             return Ok(());
         }
         let error = std::io::Error::last_os_error();
@@ -147,13 +264,18 @@ pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Resu
     message.msg_iovlen = 1;
     message.msg_control = control.as_mut_ptr().cast();
     message.msg_controllen = space as _;
-    stream
-        .set_read_timeout(Some(remaining(until)?))
+    super::channel::set_read_timeout(stream, remaining(until)?)
         .map_err(|_| Failure::Unavailable)?;
+    #[cfg(target_os = "linux")]
+    let flags = libc::MSG_CMSG_CLOEXEC;
+    // macOS has no MSG_CMSG_CLOEXEC (`atomic_close_on_exec`, weaker form
+    // `set_after_receive`): each descriptor is marked close-on-exec below, as
+    // soon as the receive returns.
+    #[cfg(target_os = "macos")]
+    let flags = 0;
     let received = loop {
         // SAFETY: message and everything it points at are live for the call.
-        let received =
-            unsafe { libc::recvmsg(stream.as_raw_fd(), &mut message, libc::MSG_CMSG_CLOEXEC) };
+        let received = unsafe { libc::recvmsg(stream.as_raw_fd(), &mut message, flags) };
         if received >= 0 {
             break received;
         }
@@ -179,7 +301,10 @@ pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Resu
                 let bytes = (*header).cmsg_len as usize - libc::CMSG_LEN(0) as usize;
                 let data = libc::CMSG_DATA(header).cast::<RawFd>();
                 for index in 0..bytes / std::mem::size_of::<RawFd>() {
-                    files.push(File::from_raw_fd(std::ptr::read_unaligned(data.add(index))));
+                    let fd = std::ptr::read_unaligned(data.add(index));
+                    #[cfg(target_os = "macos")]
+                    libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC);
+                    files.push(File::from_raw_fd(fd));
                 }
             } else {
                 foreign = true;
@@ -204,7 +329,11 @@ pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Resu
                 return Err(Failure::Unavailable);
             }
             // SAFETY: successful duplication transfers ownership to File.
-            Ok(unsafe { File::from_raw_fd(fd) })
+            let file = unsafe { File::from_raw_fd(fd) };
+            // The owner's image copy is this process's to launch and remove.
+            #[cfg(target_os = "macos")]
+            super::artifact::received(&file);
+            Ok(file)
         })
         .collect()
 }
@@ -220,14 +349,15 @@ pub struct Consumer {
 }
 
 impl Consumer {
+    /// `executable` is the captured image, as a capture or as received.
     pub(crate) fn new(
-        executable: File,
+        executable: impl Into<File>,
         credential: File,
         args: Vec<String>,
         pass_env: BTreeSet<String>,
     ) -> Self {
         Self {
-            executable,
+            executable: executable.into(),
             credential,
             args,
             pass_env,
@@ -246,7 +376,9 @@ impl Consumer {
     /// and stderr are the caller's; the credential is on descriptor 3. An
     /// `extra` argument holding NUL is `InvalidInput` and nothing starts.
     /// Returns the consumer's exit code, or 128 plus the signal number when a
-    /// signal ended it. Ends the consumer with `SIGTERM` if this thread exits first.
+    /// signal ended it. Ends the consumer with `SIGTERM` if this thread exits
+    /// first on Linux; on macOS, which has no parent-death signal, the
+    /// consumer keeps running, and the image copy is executed by its path.
     pub fn run(
         self,
         extra: &[String],
@@ -263,7 +395,16 @@ impl Consumer {
         let credential = self.credential.as_raw_fd();
         // SAFETY: getpid has no preconditions.
         let parent = unsafe { libc::getpid() };
+        #[cfg(target_os = "linux")]
         let mut command = Command::new(format!("/proc/self/fd/{}", self.executable.as_raw_fd()));
+        // macOS has no /proc/self/fd: the image copy is executed by its path,
+        // which becomes argv[0] (consumer-launch.md §7).
+        #[cfg(target_os = "macos")]
+        let launch = super::artifact::launch_path(&self.executable)?;
+        #[cfg(target_os = "macos")]
+        let mut command = Command::new(launch.path());
+        #[cfg(target_os = "macos")]
+        let end = descriptor_end()?;
         command
             .args(&self.args)
             .args(extra)
@@ -278,6 +419,7 @@ impl Consumer {
             .stderr(Stdio::inherit());
         // SAFETY: the hook calls only async-signal-safe functions on captured
         // scalars; the credential descriptor stays open until spawn returns.
+        #[cfg(target_os = "linux")]
         unsafe {
             command.pre_exec(move || {
                 if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) != 0
@@ -289,6 +431,24 @@ impl Consumer {
                     return Err(std::io::Error::last_os_error());
                 }
                 close_on_exec_above_three()
+            });
+        }
+        // macOS has no parent-death signal (`parent_death_kill`, weaker form
+        // `adapter_channel_close`, which covers adapters only): a consumer
+        // whose launcher dies first keeps running.
+        // SAFETY: the hook calls only async-signal-safe functions on captured
+        // scalars; the credential descriptor stays open until spawn returns.
+        #[cfg(target_os = "macos")]
+        unsafe {
+            command.pre_exec(move || {
+                if libc::getppid() != parent {
+                    return Err(std::io::Error::from_raw_os_error(libc::ECHILD));
+                }
+                if libc::dup2(credential, 3) < 0 || libc::fcntl(3, libc::F_SETFD, 0) < 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                close_on_exec_from_four(end);
+                Ok(())
             });
         }
         let mut child = command.spawn().map_err(|_| Failure::Unavailable)?;
@@ -311,6 +471,7 @@ impl Consumer {
 /// allocation and no `/proc` read. `close_range(CLOSE_RANGE_CLOEXEC)` needs
 /// Linux 5.11; before that (`ENOSYS`, or `EINVAL` for the flag) every number up
 /// to the `RLIMIT_NOFILE` soft limit is marked one by one.
+#[cfg(target_os = "linux")]
 fn close_on_exec_above_three() -> std::io::Result<()> {
     // SAFETY: close_range only changes descriptor flags of this process.
     if unsafe {
@@ -341,6 +502,52 @@ fn close_on_exec_above_three() -> std::io::Result<()> {
         unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
     }
     Ok(())
+}
+
+/// One past the highest descriptor number this process can hold: the
+/// `RLIMIT_NOFILE` soft limit, bounded by `kern.maxfilesperproc`. Read before
+/// the spawn, so the child marks a bounded range without a syscall it cannot
+/// make between fork and exec.
+#[cfg(target_os = "macos")]
+fn descriptor_end() -> Result<libc::c_int> {
+    let mut limit = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    // SAFETY: getrlimit writes into the live, owned struct.
+    if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &mut limit) } != 0 {
+        return Err(Failure::Unavailable);
+    }
+    let mut most: libc::c_int = 0;
+    let mut size = std::mem::size_of::<libc::c_int>();
+    // SAFETY: a static NUL-terminated name and a c_int buffer of the stated size.
+    if unsafe {
+        libc::sysctlbyname(
+            c"kern.maxfilesperproc".as_ptr(),
+            (&mut most as *mut libc::c_int).cast(),
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    } != 0
+        || size != std::mem::size_of::<libc::c_int>()
+        || most <= 0
+    {
+        return Err(Failure::Unavailable);
+    }
+    Ok(limit.rlim_cur.min(most as libc::rlim_t) as libc::c_int)
+}
+
+/// Exactly descriptors 0 to 3 reach a consumer on macOS, which has no
+/// `close_range`: every number from 4 up to `end` is marked close-on-exec one
+/// by one, including any the caller left open without it. Runs between fork
+/// and exec, so it only calls `fcntl`.
+#[cfg(target_os = "macos")]
+fn close_on_exec_from_four(end: libc::c_int) {
+    for fd in 4..end {
+        // SAFETY: F_SETFD on a number that is not open fails with EBADF, harmlessly.
+        unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
+    }
 }
 
 /// A consumer's exit code, or 128 plus the signal number that ended it.

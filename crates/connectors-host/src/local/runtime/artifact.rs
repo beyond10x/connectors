@@ -1,7 +1,15 @@
 //! Capture executable content before launch. A retained source inode alone does
 //! not prevent an in-place write between verification and exec.
+//!
+//! On Linux the capture is a sealed memfd (`sealed_executable` holds). macOS
+//! has no memfd: [`macos`] captures an owner-private copy, launches it by path
+//! and owns the launched process (contracts/cli/v1alpha1/semantics.md, "macOS
+//! platform guarantees").
+#[cfg(target_os = "linux")]
 use super::{Failure, Result};
+#[cfg(target_os = "linux")]
 use sha2::{Digest, Sha256};
+#[cfg(target_os = "linux")]
 use std::{
     fs::File,
     io::{Read, Seek, SeekFrom, Write},
@@ -12,6 +20,16 @@ use std::{
     time::Instant,
 };
 
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "macos")]
+pub(crate) use macos::{ExactChild, Image, Launch, capture, launch_path, path_of, received, sent};
+
+/// What [`capture`] returns: on Linux the sealed memfd itself.
+#[cfg(target_os = "linux")]
+pub(crate) type Image = File;
+
+#[cfg(target_os = "linux")]
 pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -> Result<File> {
     source
         .seek(SeekFrom::Start(0))
@@ -86,7 +104,8 @@ pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -
     Ok(unsafe { File::from_raw_fd(fd) })
 }
 
-#[cfg(test)]
+// ELF fixtures and memfd seals: Linux only. The macOS cases are in [`macos`].
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use std::time::Duration;

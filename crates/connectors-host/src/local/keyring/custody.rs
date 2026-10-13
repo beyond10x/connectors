@@ -79,19 +79,19 @@ impl Store {
         Ok(WrittenVersion { version })
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     fn write_new(&self, version: Version, material: &Secret) -> Result<()> {
         self.write_new_guarded(version, material, || Ok(()))
             .map(|_| ())
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn fail_synchronization(&self, fail: bool) {
         self.backend.fail_synchronization(fail);
     }
 
     /// The binding, for the qualification fixtures.
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     pub(crate) fn backend(&self) -> &Platform {
         &self.backend
     }
@@ -135,7 +135,7 @@ impl Store {
         Ok(DeletedVersion { version })
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, target_os = "linux"))]
     fn delete_for_qualification(&self, version: Version) -> Result<()> {
         self.delete_guarded(version, || Ok(())).map(|_| ())
     }
@@ -169,5 +169,5 @@ fn lock_until() -> std::time::Instant {
     std::time::Instant::now() + super::super::metadata::lifecycle_lock_wait()
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 pub(crate) mod tests;

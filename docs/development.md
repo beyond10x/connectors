@@ -36,6 +36,13 @@ host: a command-line `--config` outranks `CARGO_TARGET_<TRIPLE>_RUNNER` and
 `[target.'cfg(…)'] runner` for a target whose triple has a runner. `CARGO_TARGET_DIR` selects the build output base; the MSRV check uses
 its `msrv/` subdirectory (default `target/msrv`).
 
+On macOS the default `TMPDIR` lies under `/var`, a symbolic link to `/private/var`, and the
+host refuses a configuration or state path with a symbolic link in any component, so tests that
+run `setup` under it answer `invalid_configuration`. Run the host and CLI tests there with
+`TMPDIR` set to a directory whose path has no symbolic link, as
+[`.github/workflows/macos-host.yml`](../.github/workflows/macos-host.yml) does with the
+runner's temporary directory.
+
 [`.github/workflows/rust-gate.yml`](../.github/workflows/rust-gate.yml) runs this
 gate without `--msrv` on every pull request and every push to `main`. It installs
 Rust 1.98.1 with rustfmt and Clippy, installs the pinned ESS and AEP releases after
