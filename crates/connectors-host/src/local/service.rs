@@ -427,7 +427,8 @@ fn now_ms() -> i64 {
     i64::try_from(connectors_sdk::now_ms()).unwrap_or(i64::MAX)
 }
 
-#[cfg(test)]
+// Withdraws the store directory's permission through mode bits.
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;

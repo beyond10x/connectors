@@ -7,10 +7,11 @@
 use super::{approvals::Snapshot, filesystem as fs, metadata::Metadata};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
+#[cfg(unix)]
+use std::os::{fd::AsRawFd, unix::fs::MetadataExt};
 use std::{
     ffi::OsStr,
     fs::File,
-    os::{fd::AsRawFd, unix::fs::MetadataExt},
     path::{Path, PathBuf},
     time::{Duration, Instant},
 };
@@ -384,6 +385,7 @@ impl Lease {
         }
         let file = fs::private_file_at(&directory, OsStr::new(LOCK))?;
         let until = Instant::now() + super::metadata::lifecycle_lock_wait();
+        #[cfg(unix)]
         loop {
             // SAFETY: a live owned descriptor; flock is released at close.
             let result = unsafe {
@@ -407,13 +409,37 @@ impl Lease {
             }
             std::thread::sleep(Duration::from_millis(5));
         }
+        #[cfg(windows)]
+        loop {
+            let result = if exclusive {
+                file.try_lock()
+            } else {
+                file.try_lock_shared()
+            };
+            match result {
+                Ok(()) => break,
+                Err(std::fs::TryLockError::WouldBlock) if Instant::now() < until => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(_) => return Err(Failure::Conflict),
+            }
+        }
         let current = fs::private_file_at(&directory, OsStr::new(LOCK))?;
-        let a = file.metadata().map_err(|_| Failure::MetadataUnavailable)?;
-        let b = current
-            .metadata()
-            .map_err(|_| Failure::MetadataUnavailable)?;
-        if (a.dev(), a.ino()) != (b.dev(), b.ino()) {
+        #[cfg(windows)]
+        if fs::windows::identity(&file).map_err(|_| Failure::MetadataUnavailable)?
+            != fs::windows::identity(&current).map_err(|_| Failure::MetadataUnavailable)?
+        {
             return Err(Failure::Conflict);
+        }
+        #[cfg(unix)]
+        {
+            let a = file.metadata().map_err(|_| Failure::MetadataUnavailable)?;
+            let b = current
+                .metadata()
+                .map_err(|_| Failure::MetadataUnavailable)?;
+            if (a.dev(), a.ino()) != (b.dev(), b.ino()) {
+                return Err(Failure::Conflict);
+            }
         }
         Ok(Self {
             _file: file,

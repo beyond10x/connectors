@@ -4,8 +4,9 @@ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use connectors_sdk::Secret;
 use ring::signature::{self, KeyPair};
 use serde_json::{Value, json};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
-    os::unix::fs::PermissionsExt,
     path::Path,
     sync::{Arc, Barrier, Mutex, RwLock, RwLockReadGuard, atomic::Ordering},
 };
@@ -153,7 +154,10 @@ fn fixture() -> (
     Store<TestClock>,
 ) {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     let mut metadata = Metadata::initialize(root.path()).unwrap();
     metadata
         .connection

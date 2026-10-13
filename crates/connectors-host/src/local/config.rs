@@ -1,10 +1,11 @@
 use super::{Failure, Result, filesystem as fs};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::Read,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
 };
 
@@ -497,6 +498,35 @@ impl Executable {
 
     // Content is deliberately unverified here. Keep this private so callers
     // cannot confuse source path admission with an executable snapshot.
+    // Windows: the same admission on the opened handle, with the owner SID and
+    // the access control list in place of uid and mode bits. Windows has no
+    // execute bit to require; the PE format is checked at capture.
+    #[cfg(windows)]
+    fn source(&self) -> Result<std::fs::File> {
+        let parent = fs::directory(
+            self.path.parent().ok_or(Failure::InvalidConfiguration)?,
+            false,
+            false,
+        )?;
+        let file = fs::windows::open_child(
+            &parent,
+            self.path.file_name().ok_or(Failure::InvalidConfiguration)?,
+            windows_sys::Win32::Foundation::GENERIC_READ,
+        )
+        .map_err(|_| Failure::InvalidConfiguration)?;
+        fs::windows::check_trusted_file(&file)?;
+        if file
+            .metadata()
+            .map_err(|_| Failure::InvalidConfiguration)?
+            .len()
+            > 512 * 1024 * 1024
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        Ok(file)
+    }
+
+    #[cfg(unix)]
     fn source(&self) -> Result<std::fs::File> {
         use std::os::{
             fd::{AsRawFd, FromRawFd},
@@ -540,7 +570,8 @@ impl Executable {
     }
 }
 
-#[cfg(test)]
+// The fixtures configure Unix absolute executable paths.
+#[cfg(all(test, unix))]
 mod consumer_tests {
     //! story:launch-consumer-with-connection-credential: `connectors-local/3`
     //! adds `[consumers]`; `/1` and `/2` stay readable and refuse it.

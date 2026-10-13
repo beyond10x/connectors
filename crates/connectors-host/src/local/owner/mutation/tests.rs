@@ -151,6 +151,7 @@ mod replay {
     use super::*;
     use crate::local::{metadata::Metadata, owner::Origin, runtime};
     use connectors_core::ErrorCode;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
 
     struct Fixed;
@@ -164,7 +165,10 @@ mod replay {
     }
     fn root() -> tempfile::TempDir {
         let root = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
         std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        #[cfg(windows)]
+        crate::local::filesystem::windows::owner_only(root.path());
         drop(Metadata::initialize(root.path()).unwrap());
         let mut metadata = Metadata::update_mutations(root.path()).unwrap();
         metadata

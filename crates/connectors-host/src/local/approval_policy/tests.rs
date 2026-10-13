@@ -1,4 +1,5 @@
 use super::*;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 
@@ -14,8 +15,14 @@ fn store(path: &Path) -> Store {
     Store::new(path, "instance", "adapter").unwrap()
 }
 fn fixture() -> tempfile::TempDir {
+    #[cfg(unix)]
     let root = tempfile::tempdir_in(std::env::var_os("TMPDIR").unwrap()).unwrap();
+    #[cfg(windows)]
+    let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     fs::directory(root.path(), false, true).unwrap();
     drop(Metadata::initialize(root.path()).unwrap());
     root
@@ -450,6 +457,7 @@ fn status_and_snapshot_exclude_private_authority_and_custody_coordinates() {
     assert!(view.principal().len() <= 128);
 }
 
+#[cfg(unix)]
 #[test]
 fn inherited_policy_use_is_not_valid_in_a_forked_process() {
     let root = fixture();
