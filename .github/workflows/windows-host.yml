@@ -1,0 +1,40 @@
+name: Windows host
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-host-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  host:
+    name: host and CLI on windows-latest
+    runs-on: windows-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component clippy
+          rustup default 1.98.1
+          rustc --version
+      - name: Build the workspace
+        shell: bash
+        run: cargo build --locked --workspace --all-targets
+      - name: Lint the host and the CLI
+        shell: bash
+        run: cargo clippy --locked -p connectors-host -p connectors --all-targets -- -D warnings
+      - name: Test the host and the CLI
+        shell: bash
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: cargo test --locked --no-fail-fast -p connectors-host -p connectors
