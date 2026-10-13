@@ -1110,7 +1110,6 @@ mod suppression_tests {
 mod idle_tests {
     use super::*;
     use crate::local::config::{Executable, Startup};
-    use sha2::{Digest, Sha256};
 
     /// story:owner-idle-exit: a live adapter child with nothing in flight is
     /// not work, so an `Automatic` adapter cannot keep an owner alive; a job in
@@ -1125,8 +1124,7 @@ mod idle_tests {
         };
         Config::initialize(&paths).unwrap();
         let mut config = Config::load(&paths.config).unwrap();
-        let path = std::env::current_exe().unwrap();
-        let sha256 = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let adapter = Adapter {
             instance_id: "fixture".into(),
             adapter_id: "fixture".into(),

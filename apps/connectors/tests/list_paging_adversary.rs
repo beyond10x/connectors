@@ -294,7 +294,11 @@ fn the_encoding_admits_exactly_one_spelling_of_a_cursor() {
         ),
         ("empty", String::new()),
         ("one char", "A".to_owned()),
-        ("huge", "A".repeat(120_000)),
+        // A Windows command line holds at most 32,767 characters.
+        (
+            "huge",
+            "A".repeat(if cfg!(windows) { 30_000 } else { 120_000 }),
+        ),
     ];
     // Non-canonical trailing bits: set the lowest bit of the last symbol when
     // the length leaves unused bits.
