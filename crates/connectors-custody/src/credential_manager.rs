@@ -26,6 +26,19 @@ use windows_sys::Win32::{
     System::Threading::{CreateMutexW, ReleaseMutex, WaitForSingleObject},
 };
 
+/// Failing Credential Manager calls and their `GetLastError` codes, kept in
+/// tests only: `Failure` carries no diagnostics, and a test that sees
+/// `OutcomeUnknown` prints these to name the call that failed.
+#[cfg(test)]
+pub(crate) static OS_ERRORS: std::sync::Mutex<Vec<(&str, u32)>> = std::sync::Mutex::new(Vec::new());
+
+#[cfg(test)]
+fn record(call: &'static str, code: u32) {
+    if let Ok(mut errors) = OS_ERRORS.lock() {
+        errors.push((call, code));
+    }
+}
+
 pub use crate::parts::TARGET_PREFIX;
 
 const _: () = assert!(CRED_MAX_CREDENTIAL_BLOB_SIZE as usize == PART_BYTES);
@@ -85,7 +98,12 @@ fn read_target(name: &[u16]) -> Result<Option<Material>> {
     // SAFETY: name is NUL-terminated; credential is a valid output location.
     if unsafe { CredReadW(name.as_ptr(), CRED_TYPE_GENERIC, 0, &mut credential) } == 0 {
         // SAFETY: no preconditions.
-        return match unsafe { GetLastError() } {
+        let code = unsafe { GetLastError() };
+        #[cfg(test)]
+        if code != ERROR_NOT_FOUND {
+            record("CredReadW", code);
+        }
+        return match code {
             ERROR_NOT_FOUND => Ok(None),
             _ => Err(Failure::Unavailable),
         };
@@ -156,7 +174,10 @@ impl Entries for CredentialEntries {
         // copies the blob and does not write through it.
         if unsafe { CredWriteW(&credential, 0) } == 0 {
             // SAFETY: no preconditions.
-            return Err(match unsafe { GetLastError() } {
+            let code = unsafe { GetLastError() };
+            #[cfg(test)]
+            record("CredWriteW", code);
+            return Err(match code {
                 ERROR_NO_SUCH_LOGON_SESSION => Failure::Unavailable,
                 _ => Failure::OutcomeUnknown,
             });
@@ -169,7 +190,10 @@ impl Entries for CredentialEntries {
         // SAFETY: name is NUL-terminated and outlives the call.
         if unsafe { CredDeleteW(name.as_ptr(), CRED_TYPE_GENERIC, 0) } == 0 {
             // SAFETY: no preconditions.
-            if unsafe { GetLastError() } != ERROR_NOT_FOUND {
+            let code = unsafe { GetLastError() };
+            if code != ERROR_NOT_FOUND {
+                #[cfg(test)]
+                record("CredDeleteW", code);
                 return Err(Failure::OutcomeUnknown);
             }
         }

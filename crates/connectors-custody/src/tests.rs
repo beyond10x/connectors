@@ -704,6 +704,24 @@ fn largest_materials() -> Vec<(&'static str, usize)> {
 /// Every profile's largest material is within the 64 KiB bound and is
 /// written, read back exactly and deleted through `open`; so is the signing
 /// key.
+/// The Credential Manager calls that failed in this test binary, for an
+/// `OutcomeUnknown` that the closed `Failure` cannot explain.
+fn os_errors() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        format!(
+            "{:?}",
+            crate::credential_manager::OS_ERRORS
+                .lock()
+                .map(|e| e.clone())
+        )
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        String::from("none recorded on this platform")
+    }
+}
+
 fn largest_materials_round_trip<B: Backend>(open: &dyn Fn(Scope) -> Result<B>) {
     let (authority, allocation) = (Uuid::new_v4(), Uuid::new_v4());
     for (name, len) in largest_materials() {
@@ -723,7 +741,8 @@ fn largest_materials_round_trip<B: Backend>(open: &dyn Fn(Scope) -> Result<B>) {
                 || Ok(())
             ),
             Ok(()),
-            "{name}: {len} bytes"
+            "{name}: {len} bytes; failing OS calls: {}",
+            os_errors()
         );
         assert!(backend.read(version).unwrap().ct_eq(&material), "{name}");
         assert_eq!(backend.delete(version, until(), || Ok(())), Ok(()));
