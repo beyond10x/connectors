@@ -13,11 +13,12 @@ use connectors_host::local::{
     registry, runtime,
 };
 use serde_json::{Value, json};
+#[cfg(unix)]
+use std::time::{Duration, Instant};
 use std::{
     collections::BTreeSet,
     fs,
     process::{Command, Output},
-    time::{Duration, Instant},
 };
 
 const READ: &str = "item.read";
@@ -34,6 +35,7 @@ fn command(root: &tempfile::TempDir, args: &[&str]) -> Output {
 }
 
 /// Exit status, stdout and stderr as JSON, for comparing two runs.
+#[cfg(unix)]
 fn answer(output: &Output) -> (Option<i32>, Value, Value) {
     let parse = |bytes: &[u8]| {
         if bytes.is_empty() {
@@ -126,7 +128,9 @@ fn configured() -> tempfile::TempDir {
 }
 
 /// The test's own owner child; a failing assertion must not leave it serving.
+#[cfg(unix)]
 struct OwnerProcess(std::process::Child);
+#[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
         if self.0.try_wait().ok().flatten().is_none() {
@@ -138,6 +142,7 @@ impl Drop for OwnerProcess {
 
 /// Starts `__connectors-owner` of this build the way the CLI does (startup
 /// channel on fd 3, lifetime lock on fd 4), as owner_idle_exit_adversary.rs.
+#[cfg(unix)]
 fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
     use std::os::unix::{fs::OpenOptionsExt, net::UnixStream};
     let state = root.path().join("state");
@@ -175,6 +180,7 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
 
 /// Each read answers the same with an owner of this build running as with
 /// none: the routed read keeps the direct read's answer and refusal codes.
+#[cfg(unix)]
 #[test]
 fn routed_metadata_reads_answer_as_the_direct_read_does() {
     let root = configured();
@@ -220,6 +226,7 @@ fn routed_metadata_reads_answer_as_the_direct_read_does() {
 
 /// A real running owner, not a test-held flock, makes the enable answer
 /// `lifecycle_conflict` and changes nothing.
+#[cfg(unix)]
 #[test]
 fn a_real_running_owner_refuses_the_enable() {
     let root = configured();

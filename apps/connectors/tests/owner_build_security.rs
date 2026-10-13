@@ -1,6 +1,10 @@
 //! Integrity conformance checks for the owner build handshake
 //! (`contracts/cli/v1alpha1/owner.md`): no work request reaches an owner of
 //! another build, and an owner of the same build is never refused as another.
+//!
+//! Unix only: each case starts the owner with descriptors 3 and 4 or stands in
+//! for it on a Unix socket.
+#![cfg(unix)]
 use connectors_host::local::{
     config::Paths,
     owner::{Client, Code, WriteClient, mutation::Deadline},

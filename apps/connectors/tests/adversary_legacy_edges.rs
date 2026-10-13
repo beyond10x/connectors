@@ -1,6 +1,7 @@
 //! Adversarial edge cases for the explicit service commands' parse routing.
 
 use std::ffi::OsString;
+#[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
 use std::process::{Command, Output};
 
@@ -65,6 +66,9 @@ fn output_after_the_separator_does_not_select_json() {
     }
 }
 
+// Unix only: the argument is a non-UTF-8 byte string, and a 100,000-byte
+// argument exceeds the 32,767-character Windows command line.
+#[cfg(unix)]
 #[test]
 fn non_utf8_and_long_argv_are_the_fixed_envelope() {
     let mut bad = SENTINEL.as_bytes().to_vec();

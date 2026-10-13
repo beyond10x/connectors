@@ -139,6 +139,7 @@ fn state_directory_without_a_metadata_store_is_initialised() {
     let (root, before) = configured();
     fs::remove_dir_all(state_path(&root)).unwrap();
     fs::create_dir(state_path(&root)).unwrap();
+    #[cfg(unix)]
     fs::set_permissions(
         state_path(&root),
         std::os::unix::fs::PermissionsExt::from_mode(0o700),

@@ -4,6 +4,9 @@
 //! still receive `outcome_unknown` (semantics: the publication acknowledgement
 //! itself is uncertain). Each case drives the production owner client against
 //! a stand-in owner socket.
+//!
+//! Unix only: the stand-in owner listens on a Unix socket.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Config, Paths},
     owner::{Client, Code},

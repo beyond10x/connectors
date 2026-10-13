@@ -3,7 +3,9 @@
 // `invalid_configuration` must name the format and the entry, whichever load
 // site inside the CLI process reached the configuration first.
 use serde_json::Value;
-use std::{fs, os::unix::fs::PermissionsExt, process::Command};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::{fs, process::Command};
 
 fn command(root: &tempfile::TempDir, args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_connectors"))
@@ -36,6 +38,7 @@ fn every_cli_command_refusing_a_mismatched_entry_names_format_and_entry() {
     mismatched_v1(&root);
     let credential = root.path().join("credential.json");
     fs::write(&credential, "{}").unwrap();
+    #[cfg(unix)]
     fs::set_permissions(&credential, fs::Permissions::from_mode(0o600)).unwrap();
     let credential = credential.to_str().unwrap().to_owned();
     let invoke_tail = [

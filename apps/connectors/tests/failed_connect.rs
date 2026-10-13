@@ -16,6 +16,10 @@
 //! ignored CLI cases: the production owner launches this test binary as the
 //! adapter child, whose validation answers the adapter's own
 //! `identity_mismatch`, during an upgrading revalidation and outside one.
+//!
+//! Unix only: the stand-in owner listens on a Unix socket, the adapter fixture
+//! serves its channel on descriptor 3, and the CLI cases need a Secret Service.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Config, Paths},
     owner::{self, Client, Code},
