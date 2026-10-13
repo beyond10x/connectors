@@ -165,6 +165,32 @@ fn attrs(file: &File) -> libc::termios {
     assert_eq!(unsafe { libc::tcgetattr(file.as_raw_fd(), &mut mode) }, 0);
     mode
 }
+/// Local-mode bits the line discipline sets itself rather than a program:
+/// macOS sets `PENDIN` when canonical mode returns with input pending (the
+/// interrupted line) and `FLUSHO` on `^O`. Restoring the settings
+/// (contracts/cli/v1alpha1/semantics.md:484) is about the program's bits;
+/// Linux sets neither, so there every bit is compared.
+#[cfg(target_os = "macos")]
+const KERNEL_STATE: libc::tcflag_t = libc::PENDIN | libc::FLUSHO;
+#[cfg(not(target_os = "macos"))]
+const KERNEL_STATE: libc::tcflag_t = 0;
+/// Asserts `restored` carries `original`'s local modes, the echo and
+/// canonical bits `terminal` clears among them, and its control characters.
+fn assert_restored(restored: &libc::termios, original: &libc::termios, when: &str) {
+    assert_eq!(
+        restored.c_lflag & (libc::ECHO | libc::ECHONL | libc::ICANON),
+        original.c_lflag & (libc::ECHO | libc::ECHONL | libc::ICANON),
+        "echo and canonical bits {when}"
+    );
+    assert_eq!(
+        restored.c_lflag & !KERNEL_STATE,
+        original.c_lflag & !KERNEL_STATE,
+        "local modes {when}: restored {:#x}, original {:#x}",
+        restored.c_lflag,
+        original.c_lflag
+    );
+    assert_eq!(restored.c_cc, original.c_cc, "control characters {when}");
+}
 /// Neither terminal mode consults its deadline except as a hang guard, so the
 /// bound this test hands the child, and waits on itself, is one only a hang
 /// reaches.
@@ -299,16 +325,14 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
             )
         });
         assert_ran_one(report, "terminal_fixture");
-        assert_eq!(restored.c_lflag, original.c_lflag);
-        assert_eq!(restored.c_cc, original.c_cc);
+        assert_restored(&restored, &original, &format!("on return ({mode})"));
         // Linux keeps the terminal of an exited session leader: the settings
         // stay restored after the fixture's exit too. macOS revokes it, so
         // there is nothing left to read on this descriptor.
         #[cfg(target_os = "linux")]
         {
             let after = attrs(&slave);
-            assert_eq!(after.c_lflag, original.c_lflag);
-            assert_eq!(after.c_cc, original.c_cc);
+            assert_restored(&after, &original, &format!("after exit ({mode})"));
         }
         drain(&mut master, &mut observed);
         assert!(
