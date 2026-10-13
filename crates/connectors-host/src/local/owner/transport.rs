@@ -2154,6 +2154,76 @@ mod macos_tests {
         assert!(!paths.state.join("owner.lock").exists());
         assert!(!paths.state.join("owner.sock").exists());
     }
+
+    /// Set in a run of this test binary launched as the owner is: from its
+    /// owner-private copy, by that copy's path.
+    const LAUNCHED: &str = "CONNECTORS_LAUNCHED_OWNER_PROBE";
+
+    /// In the launched run, does what `serve` does first: measure its own
+    /// build. A no-op in an ordinary run.
+    #[test]
+    fn a_launched_owner_probe_measures_its_build() {
+        if std::env::var_os(LAUNCHED).is_some() {
+            own_build().expect("the launched owner could not measure its build");
+        }
+    }
+
+    /// `own_image_build_measure`: `launch_path_read` (owner.md, "macOS").
+    /// `spawn` executes the owner from its private copy and drops the launch,
+    /// removing the copy, as soon as `spawn` returns. The owner then measures
+    /// its build from the file at its running executable's path, which is that
+    /// copy: it must still be able to, or every macOS owner refuses to serve.
+    /// This mirrors `spawn` with this test binary as the image.
+    #[test]
+    fn an_owner_launched_from_its_private_copy_can_measure_its_build() {
+        let binary = std::env::current_exe().unwrap();
+        let selection = crate::local::config::Executable {
+            sha256: hex::encode(Sha256::digest(std::fs::read(&binary).unwrap())),
+            path: binary,
+            args: Vec::new(),
+        };
+        let executable = selection
+            .capture(Instant::now() + Duration::from_secs(30))
+            .unwrap();
+        let launch = runtime::artifact::launch_path(&executable).unwrap();
+        let probe = format!(
+            "{}::a_launched_owner_probe_measures_its_build",
+            module_path!().split_once("::").unwrap().1
+        );
+        let mut command = Command::new(launch.path());
+        command
+            .args([&probe, "--exact", "--test-threads=1"])
+            .env(LAUNCHED, "1")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        let mut process = command.spawn().unwrap();
+        // As in `spawn`: the launch is dropped when `spawn` returns.
+        drop(launch);
+        drop(executable);
+        assert!(
+            process.wait().unwrap().success(),
+            "an owner launched from its private copy cannot read its own image"
+        );
+    }
+
+    /// The `sun_path` bound at its edge: a socket path of 103 bytes fits with
+    /// its NUL, one of 104 does not.
+    #[test]
+    fn a_socket_path_of_sun_path_bytes_is_refused_and_one_shorter_admitted() {
+        let path = |length: usize| {
+            let mut path = String::from("/");
+            path.push_str(&"s".repeat(length - "/owner.sock".len()));
+            path.push_str("/owner.sock");
+            assert_eq!(path.len(), length);
+            std::path::PathBuf::from(path)
+        };
+        admit_socket(&path(103)).unwrap();
+        assert_eq!(
+            admit_socket(&path(104)).unwrap_err().code,
+            Code::InvalidConfiguration
+        );
+    }
 }
 
 /// story:owner-idle-exit with the real accept loop, recovery thread and pool,
