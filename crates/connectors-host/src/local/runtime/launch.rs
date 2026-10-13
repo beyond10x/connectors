@@ -393,9 +393,9 @@ impl Consumer {
         // macOS has no /proc/self/fd: the image copy is executed by its path,
         // which becomes argv[0] (consumer-launch.md §7).
         #[cfg(target_os = "macos")]
-        let launch = launch_path(&self.executable)?;
+        let launch = super::artifact::launch_path(&self.executable)?;
         #[cfg(target_os = "macos")]
-        let mut command = Command::new(&launch);
+        let mut command = Command::new(launch.path());
         #[cfg(target_os = "macos")]
         let end = descriptor_end()?;
         command
@@ -495,15 +495,6 @@ fn close_on_exec_above_three() -> std::io::Result<()> {
         unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
     }
     Ok(())
-}
-
-/// The path to execute the image copy `executable` refers to. The capture
-/// owns that copy, so this is a refusing stand-in until the capture's own
-/// macOS path is wired in here; the value it returns must stay alive until
-/// `spawn` returns.
-#[cfg(target_os = "macos")]
-fn launch_path(_executable: &File) -> Result<std::path::PathBuf> {
-    Err(Failure::Unsupported)
 }
 
 /// One past the highest descriptor number this process can hold: the
