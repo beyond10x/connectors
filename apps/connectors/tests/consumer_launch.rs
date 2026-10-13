@@ -38,6 +38,7 @@ fn sha256(path: &Path) -> String {
         .collect()
 }
 
+#[cfg(target_os = "linux")]
 fn uid() -> String {
     let status = fs::read_to_string("/proc/self/status").unwrap();
     status
@@ -46,6 +47,13 @@ fn uid() -> String {
         .and_then(|ids| ids.split_whitespace().next())
         .unwrap()
         .to_owned()
+}
+
+/// macOS has no `/proc/self/status`; the real uid it would report.
+#[cfg(target_os = "macos")]
+fn uid() -> String {
+    // SAFETY: getuid takes no argument and cannot fail.
+    unsafe { libc::getuid() }.to_string()
 }
 
 /// A `connectors-local/3` configuration with consumers `probe` (listing
