@@ -8,7 +8,8 @@ relations:
 - decomposes: epic:local-cli-on-macos-and-windows
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
-revision: 1
+- informed_by: decision-blocker:macos-keychain-partition
+revision: 2
 ---
 ## Outcome
 
@@ -39,3 +40,13 @@ process, with custody in the macOS Keychain (`story:platform-credential-custody`
 - A CI job on `macos-latest` builds the workspace and runs the host and CLI suites; a test that
   needs a Linux-only fixture is gated and named in the ignored inventory.
 - Linux behaviour and its tests are unchanged.
+
+## Upgrade access
+
+Verified: on the `macos-latest` runner (https://github.com/beyond10x/connectors/pull/159, run 38322932181) a second binary reading a login keychain item that an earlier binary created, with a decrypt ACL that admits any application, gets `Unavailable`, OS status -25293 (`errSecAuthFailed`). The custody step records this without failing.
+
+Inferred, not observed: the cause is the item's partition list, checked beside the ACL since macOS 10.12. It names the creating binary, and changing it needs the keychain password. An upgraded `connectors` would therefore not read credentials an earlier build stored.
+
+This story makes an upgraded binary read what an earlier one wrote, and the second-binary step becomes a failing check again.
+
+Open item: signing the release binary, so that the item's partition is the team id and survives upgrades, needs an Apple developer account. That is decided when this story starts.
