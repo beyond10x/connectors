@@ -132,3 +132,27 @@ provider/custody failures preserve any still-valid baseline. No credential is
 written, no new acquisition is created, and business invocation never performs
 implicit revalidation. A lost publication acknowledgement is outcome_unknown;
 connection status observes the resulting baseline and no request is replayed.
+
+## macOS
+
+The rules above are the Linux transport and stand unchanged. On macOS the
+owner keeps its socket, lifetime lock, handshake and refusals; four guarantees
+hold only in the weaker form the [platform guarantee table](semantics.md#macos-platform-guarantees)
+names:
+
+- **Build** (`own_image_build_measure`: `launch_path_read`). There is no
+  `/proc/self/exe`. `build` is the SHA-256 of the file at the running
+  executable's path, read once. An owner whose file was replaced after it
+  started is therefore measured as a new build, and a caller of the replacing
+  build is refused with `owner_build_mismatch` exactly as against another build.
+- **Socket peer** (`peer_credential_snapshot`: `separate_pid_query`). The peer
+  UID comes from `LOCAL_PEERCRED` and must be the configured UID, as on Linux;
+  the pid is a separate `LOCAL_PEERPID` query used only for its sign.
+- **Children** (`parent_death_kill`: `adapter_channel_close`;
+  `exact_process_signal`: `child_reap_lock`). There is no parent-death signal,
+  so no retained worker thread is needed for it: an adapter child exits when its
+  channel closes. Exact stop signals the owned child by process id only under
+  the lock that reaps it; kqueue `EVFILT_PROC` with `NOTE_EXIT` reports its exit.
+- **Socket path.** There is no `/proc/self/fd`: the owner socket is bound and
+  reached by its full path, which must fit the 104-byte `sun_path`. A state
+  directory whose socket path is longer is refused before an owner starts.

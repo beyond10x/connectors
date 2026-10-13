@@ -155,3 +155,30 @@ caller-chosen arguments or variables must refuse them itself.
   `disposable`).
 - `apps/connectors/tests/consumer_launch.rs`: configuration and `--args` refusals
   through the production CLI, before any owner starts.
+
+## 7. macOS
+
+Sections 1–5 are the Linux binding and stand unchanged. On macOS every
+configuration rule, admission refusal and boundary above holds; delivery and
+process rules change as the [platform guarantee table](semantics.md#macos-platform-guarantees)
+states:
+
+- **Image** (`sealed_executable`: `owner_private_copy`). There is no memfd. The
+  owner copies the consumer image into a mode 0500 file in a fresh mode 0700
+  directory and verifies its digest on that copy before reading the credential;
+  a wrong digest is still refused before exec. A process of the same user can
+  rewrite the copy between the check and exec.
+- **Credential.** The owner writes the material verbatim into a file in a mode
+  0700 directory, unlinks it and keeps only a read-only descriptor, which it
+  sends in place of the sealed memfd. The consumer reads descriptor 3 (also
+  `/dev/fd/3`) as on Linux.
+- **Received descriptors** (`atomic_close_on_exec`: `set_after_receive`). There is
+  no `MSG_CMSG_CLOEXEC`; the CLI sets close-on-exec on the image and credential
+  right after the receive returns.
+- **Execution.** The CLI executes the image copy by path, not through
+  `/proc/self/fd/N`; argv\[0\] is that path. It spawns with `posix_spawn` and
+  `POSIX_SPAWN_CLOEXEC_DEFAULT`, so the consumer still starts with exactly
+  descriptors 0–3.
+- **Launcher death** (`parent_death_kill`: `adapter_channel_close`). The weaker
+  form covers adapters only: a consumer has no channel, so **if the CLI dies
+  first, the consumer keeps running** and receives no `SIGTERM`.
