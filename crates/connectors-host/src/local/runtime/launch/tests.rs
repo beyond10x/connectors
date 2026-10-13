@@ -33,9 +33,30 @@ fn digest(bytes: &[u8]) -> String {
 fn pinned(path: &Path, args: &[&str]) -> Executable {
     Executable {
         path: path.into(),
-        sha256: digest(&std::fs::read(path).unwrap()),
+        sha256: digest(
+            &std::fs::read(path).unwrap_or_else(|error| panic!("{}: {error}", path.display())),
+        ),
         args: args.iter().map(|arg| arg.to_string()).collect(),
     }
+}
+
+/// An image every host of the platform carries, for cases that pin one and
+/// never run it. macOS has `test` in `/bin` only.
+#[cfg(target_os = "linux")]
+const TEST_IMAGE: &str = "/usr/bin/test";
+#[cfg(target_os = "macos")]
+const TEST_IMAGE: &str = "/bin/test";
+
+/// The environment a consumer fixture was started with. On macOS,
+/// CoreFoundation, which this test binary links through the keychain custody,
+/// sets `__CF_USER_TEXT_ENCODING` in its own process when it loads, before
+/// `main`: that variable is the consumer's own and was never passed, so it is
+/// left out. Every other variable is reported.
+fn consumer_environment() -> Vec<String> {
+    std::env::vars_os()
+        .filter(|(name, _)| !(cfg!(target_os = "macos") && name == "__CF_USER_TEXT_ENCODING"))
+        .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
+        .collect()
 }
 
 /// A fictional protected document, assembled at run time.
@@ -126,17 +147,15 @@ fn an_unlinked_credential_is_read_only_at_its_start_and_has_no_name() {
 /// `SO_NOSIGPIPE` instead (private-adapter.md, macOS), with the same effect:
 /// a send to a closed peer is refused, and the process is not killed by
 /// `SIGPIPE`. The Rust runtime already ignores `SIGPIPE` in this test process,
-/// so the option on the socket is what this case observes.
+/// so the option on the socket is what this case observes. It is read after a
+/// send that reached a live peer: macOS refuses every socket option, reads
+/// included, on a stream whose peer has closed (`EINVAL`).
 #[cfg(target_os = "macos")]
 #[test]
 fn a_send_to_a_closed_peer_is_refused_without_sigpipe() {
     let (left, right) = UnixStream::pair().unwrap();
-    drop(right);
     let credential = sealed(b"fictional").unwrap();
-    assert!(matches!(
-        send(&left, &[&credential], until()),
-        Err(Failure::Unavailable)
-    ));
+    send(&left, &[&credential], until()).unwrap();
     let mut value: libc::c_int = 0;
     let mut size = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
     // SAFETY: an initialized c_int buffer of the stated size on a live socket.
@@ -149,8 +168,11 @@ fn a_send_to_a_closed_peer_is_refused_without_sigpipe() {
             &mut size,
         )
     };
-    assert_eq!(result, 0);
+    assert_eq!(result, 0, "{}", std::io::Error::last_os_error());
     assert_ne!(value, 0);
+    drop(right);
+    let refused = send(&left, &[&credential], until());
+    assert!(matches!(refused, Err(Failure::Unavailable)), "{refused:?}");
 }
 
 #[test]
@@ -312,7 +334,7 @@ fn launch_admission_names_the_consumer_then_the_pair_then_the_image_before_any_c
     let paths = initialized(
         root.path(),
         None,
-        &pinned(Path::new("/usr/bin/test"), &["-n", "x"]),
+        &pinned(Path::new(TEST_IMAGE), &["-n", "x"]),
     );
     let code = |alias: &str, connection: &str, consumer: &str| {
         owner::admit_launch(&paths, alias, connection, consumer)
@@ -362,9 +384,7 @@ fn consumer_fixture() {
     let report = json!({
         "sha256": digest(&bytes),
         "argv": std::env::args().collect::<Vec<_>>(),
-        "env": std::env::vars_os()
-            .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
-            .collect::<Vec<_>>(),
+        "env": consumer_environment(),
     });
     let mut stdout = std::io::stdout().lock();
     writeln!(stdout, "CONSUMER {report}").unwrap();
@@ -453,7 +473,7 @@ fn a_consumer_gets_its_pinned_argv_then_the_callers_args_and_only_passed_variabl
 
 #[test]
 fn a_caller_argument_holding_nul_is_refused_before_anything_runs() {
-    let selected = pinned(Path::new("/usr/bin/test"), &["-n"]);
+    let selected = pinned(Path::new(TEST_IMAGE), &["-n"]);
     let launched = Consumer::new(
         selected.capture(until()).unwrap(),
         sealed(b"fictional").unwrap(),
@@ -642,7 +662,7 @@ fn disposable_consumer_launch_delivers_fd3_and_refuses_by_code() {
 /// open, descriptors received over `SCM_RIGHTS`); `reviewing_consumer_fixture`
 /// is the pinned consumer and reports what it received.
 mod review_conformance {
-    use super::{digest, pinned, until};
+    use super::{consumer_environment, digest, pinned, until};
     use crate::local::runtime::launch::{Consumer, DESCRIPTORS, Failure, receive, sealed, send};
     use serde_json::{Value, json};
     use std::{
@@ -741,9 +761,7 @@ mod review_conformance {
             json!({
                 "sha256": digest(&bytes),
                 "descriptors": descriptors,
-                "env": std::env::vars_os()
-                    .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
-                    .collect::<Vec<_>>(),
+                "env": consumer_environment(),
                 "seals": libc::fcntl(3, libc::F_GET_SEALS),
                 "write_fd3": write_fd3,
                 "reopen_rdwr": reopen,
@@ -819,9 +837,7 @@ mod review_conformance {
             json!({
                 "sha256": digest(&bytes),
                 "descriptors": descriptors.iter().map(|fd| (fd, "")).collect::<Vec<_>>(),
-                "env": std::env::vars_os()
-                    .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
-                    .collect::<Vec<_>>(),
+                "env": consumer_environment(),
                 "nlink": metadata.nlink(),
                 "read_only": access == libc::O_RDONLY,
                 "write_fd3": write_fd3,

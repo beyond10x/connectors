@@ -10,6 +10,8 @@
 //! Unix only: the owner is started as the CLI starts it on Unix, with its
 //! startup channel on descriptor 3 and its lifetime lock on descriptor 4.
 #![cfg(unix)]
+#[path = "support/owner.rs"]
+mod owner_start;
 use serde_json::Value;
 use std::{
     fs,
@@ -78,7 +80,7 @@ fn start_owner(root: &tempfile::TempDir, idle_ms: u64) -> OwnerProcess {
         .open(state.join("owner.lock"))
         .unwrap();
     let (startup, owner_end) = UnixStream::pair().unwrap();
-    let owner = Command::new("/bin/sh")
+    let mut owner = Command::new("/bin/sh")
         .env("CONNECTORS_TEST_OWNER_IDLE_MS", idle_ms.to_string())
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
@@ -89,15 +91,11 @@ fn start_owner(root: &tempfile::TempDir, idle_ms: u64) -> OwnerProcess {
             owner_end,
         )))
         .stdout(std::process::Stdio::from(lock))
-        .stderr(std::process::Stdio::null())
+        .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
     drop(startup);
-    let until = Instant::now() + Duration::from_secs(20);
-    while !state.join("owner.sock").exists() {
-        assert!(Instant::now() < until, "owner never listened");
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    owner_start::wait_listening(&mut owner, root.path());
     OwnerProcess(owner)
 }
 

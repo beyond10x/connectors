@@ -67,8 +67,13 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
     // SAFETY: the descriptor will be checked as a connected Unix socket before use.
     let mut channel = unsafe { UnixStream::from_raw_fd(raw) };
     let peer = channel::peer(&channel)?;
+    #[cfg(target_os = "linux")]
+    let pid = Some(peer.pid);
+    // A peer that has closed has no pid on macOS, and is refused here.
+    #[cfg(target_os = "macos")]
+    let pid = peer.pid;
     // SAFETY: getppid has no preconditions. Socketpair creator must be this parent.
-    if peer.pid != unsafe { libc::getppid() } {
+    if pid != Some(unsafe { libc::getppid() }) {
         return Err(Failure::Unavailable);
     }
     // SAFETY: descriptor three was inherited for this binding and now duplicated.

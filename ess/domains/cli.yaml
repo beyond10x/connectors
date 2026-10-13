@@ -332,6 +332,8 @@ types:
   # The named form a guarantee takes where it holds only weaker:
   # - owner_private_copy: the image is a mode 0500 copy in a mode 0700 directory,
   #   digest-checked before exec; other users cannot change it, the same user can.
+  #   A copy that is refused or never launched is removed with its directory;
+  #   a launched copy is removed once, by the launch, after the exec it serves.
   # - adapter_channel_close: an adapter exits when its inherited channel closes;
   #   a consumer has no such channel and outlives a dead launcher.
   # - child_reap_lock: a child is signalled by process id, under the same lock
@@ -342,7 +344,9 @@ types:
   #   concurrent exec in the same process in between inherits the descriptor.
   # - separate_pid_query: the uid and gid are the connect-time snapshot; the pid
   #   is a separate query, used by the owner and supervisor only for its sign;
-  #   an adapter also requires it to equal its parent's process id.
+  #   an adapter also requires it to equal its parent's process id. A peer that
+  #   has already closed has no pid: the owner and supervisor admit it by its
+  #   uid, an adapter refuses it.
   # - deny_write_copy: the image is a copy in an owner-only directory, opened for
   #   reading without write or delete sharing before its digest check and held
   #   until the child is created; from that open no process can open it for

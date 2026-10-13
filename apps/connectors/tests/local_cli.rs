@@ -2,6 +2,9 @@ use serde_json::Value;
 #[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
 mod clock_fixture;
 #[cfg(unix)]
+#[path = "support/owner.rs"]
+mod owner_start;
+#[cfg(unix)]
 #[path = "support/socket.rs"]
 mod sockets;
 #[cfg(unix)]
@@ -438,7 +441,7 @@ fn start_owner_with(
     if let Some(idle_ms) = idle_ms {
         owner.env("CONNECTORS_TEST_OWNER_IDLE_MS", idle_ms.to_string());
     }
-    let owner = owner
+    let mut owner = owner
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
         .arg(binary)
@@ -448,16 +451,12 @@ fn start_owner_with(
             owner_end,
         )))
         .stdout(std::process::Stdio::from(lock))
-        .stderr(std::process::Stdio::null())
+        .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
     // Nobody greets on the startup channel; the owner keeps serving its socket.
     drop(startup);
-    let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
-    while !state.join("owner.sock").exists() {
-        assert!(std::time::Instant::now() < until, "owner never listened");
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
+    owner_start::wait_listening(&mut owner, root.path());
     OwnerProcess(owner)
 }
 
@@ -666,6 +665,50 @@ fn adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest() {
     assert!(earlier.get("build").is_none(), "{earlier}");
     let current = greet(Some(&"0".repeat(64)));
     assert_eq!(current["build"], Value::from(expected), "{current}");
+}
+
+/// The owner waits for a greeting that arrives after the connection does. Its
+/// listener is non-blocking, and a macOS `accept` hands that on to the stream
+/// it returns (Linux's does not); an owner reading such a stream found nothing
+/// yet, ended the read as a timeout and closed the stream without a reply. A
+/// same-build CLI then saw a silent close and named the owner another build
+/// or unavailable.
+#[cfg(unix)]
+#[test]
+fn an_owner_answers_a_greeting_sent_after_the_connection_settled() {
+    use std::io::Write;
+    let root = adversary_owner_root();
+    let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
+    let _owner = start_owner(binary, &root);
+    let state = root.path().join("state");
+    let authority = Command::new("sqlite3")
+        .arg("-readonly")
+        .arg(state.join("metadata.sqlite3"))
+        .arg("SELECT authority_id FROM local_authority WHERE singleton=1")
+        .output()
+        .unwrap();
+    let authority = String::from_utf8(authority.stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
+    assert_eq!(authority.len(), 36, "authority {authority:?}");
+    let mut stream = sockets::connect(&state, "owner.sock");
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .unwrap();
+    // Long past the owner's accept, short of its 10 s greeting deadline.
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let hello = serde_json::json!({
+        "kind": "hello", "version": "connectors-owner/1",
+        "challenge": "00000000-0000-4000-8000-000000000003",
+        "configuration": root.path().join("config/config.toml"), "authority": authority,
+        "build": "0".repeat(64)
+    });
+    stream
+        .write_all(&adversary_frame(&hello))
+        .unwrap_or_else(|error| panic!("the owner closed the stream before the greeting: {error}"));
+    let reply = adversary_read_control(&mut stream);
+    assert_eq!(reply["kind"], "hello", "{reply}");
 }
 
 #[cfg(unix)]

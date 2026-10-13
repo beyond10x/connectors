@@ -163,7 +163,7 @@ fn redirect_head(flow: &Flow) -> String {
 
 /// The listener's whole answer on `stream`, or what arrived within `wait`.
 fn answer(stream: &mut TcpStream, wait: Duration) -> String {
-    stream.set_read_timeout(Some(wait)).unwrap();
+    crate::local::test_streams::set_read_timeout(stream, wait);
     let mut bytes = Vec::new();
     let _ = stream.read_to_end(&mut bytes);
     String::from_utf8_lossy(&bytes).into_owned()
@@ -280,9 +280,7 @@ fn chrome_opens_one_connection_per_navigation() {
     let seen: Vec<(Duration, usize)> = connections
         .iter_mut()
         .map(|(at, stream)| {
-            stream
-                .set_read_timeout(Some(Duration::from_millis(200)))
-                .unwrap();
+            crate::local::test_streams::set_read_timeout(stream, Duration::from_millis(200));
             let mut bytes = vec![0; 8192];
             let read = stream.read(&mut bytes).unwrap_or(0);
             (*at, read)
