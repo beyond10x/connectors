@@ -1097,7 +1097,7 @@ mod tests {
             |url| vec![format!("/?pad={}", "p".repeat(HEAD_LIMIT)), consented(url)],
         );
         assert!(result.is_ok(), "{:?}", code(&result));
-        assert_eq!(record.exchanged.len(), 1);
+        assert_eq!(record.exchanged.len(), 1, "{:?}", record.presented);
         let answers = record.answers();
         assert!(answers[0].is_empty(), "{:?}", answers[0].lines().next());
         assert!(answers[1].starts_with("HTTP/1.1 200 "), "{:?}", answers[1]);

@@ -93,13 +93,58 @@ fn terminal_fixture() {
         assert!(result.is_ok());
         assert!(result.unwrap().0 == br#"{"token":"fictional-input"}"#);
     }
+    // `terminal` has returned, so its settings are restored. Stay in the
+    // session until the parent has read them (or the deadline passes): on
+    // macOS the session leader's exit revokes its controlling terminal, and
+    // the parent's descriptor of it with it.
+    if let Ok(release) = std::env::var("CONNECTORS_TERMINAL_FIXTURE_RELEASE") {
+        use std::io::Write;
+        let mut stdout = std::io::stdout().lock();
+        writeln!(stdout, "{TERMINAL_RETURNED}").unwrap();
+        stdout.flush().unwrap();
+        let until = Instant::now() + TERMINAL_BUDGET;
+        while !std::path::Path::new(&release).exists() && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
 }
+/// What `terminal_fixture` prints once `terminal` has returned.
+const TERMINAL_RETURNED: &str = "terminal-fixture-returned";
+/// A child process, killed and reaped on drop. The reap is bounded: a macOS
+/// process can stay unreapable in exit while it drains its terminal (XNU
+/// `proc_exit` waits for the controlling terminal's output queue), and an
+/// unbounded `wait` there would hang the test binary instead of letting the
+/// failure that dropped this guard be reported.
 struct Child(std::process::Child);
 impl Drop for Child {
     fn drop(&mut self) {
         let _ = self.0.kill();
-        let _ = self.0.wait();
+        let until = Instant::now() + Duration::from_secs(10);
+        while matches!(self.0.try_wait(), Ok(None)) && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
+}
+/// Reads whatever the terminal's master end holds now into `observed`. A pty
+/// slave's output stays queued until the master reads it, and on macOS a
+/// process exiting with its controlling terminal's output queued waits for it
+/// to drain; the parent therefore drains while it waits on the child.
+fn drain(master: &mut File, observed: &mut Vec<u8>) {
+    let mut bytes = [0; 256];
+    while let Ok(n) = master.read(&mut bytes) {
+        if n == 0 {
+            break;
+        }
+        observed.extend_from_slice(&bytes[..n]);
+    }
+}
+/// What `file` holds from its start, read without moving the offset a child
+/// writing through the same open file shares.
+fn contents(file: &File) -> String {
+    use std::os::unix::fs::FileExt;
+    let mut bytes = vec![0; 64 * 1024];
+    let n = file.read_at(&mut bytes, 0).unwrap_or(0);
+    String::from_utf8_lossy(&bytes[..n]).into_owned()
 }
 /// `--exact <name>` that matches nothing exits 0 with "0 passed", so a child's
 /// exit status alone does not show its fixture ran.
@@ -164,6 +209,7 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         // The child's own assertion message is the only record of why it
         // failed; keep it where the failure below can report it.
         let diagnostics = tempfile::tempfile().unwrap();
+        let release = tempfile::tempdir().unwrap();
         let report = tempfile::tempfile().unwrap();
         let mut command = Command::new(std::env::current_exe().unwrap());
         command
@@ -173,6 +219,10 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
                 "--nocapture",
             ])
             .env("CONNECTORS_TERMINAL_FIXTURE", mode)
+            .env(
+                "CONNECTORS_TERMINAL_FIXTURE_RELEASE",
+                release.path().join("release"),
+            )
             .env(
                 "CONNECTORS_TERMINAL_FIXTURE_DEADLINE_MS",
                 (connectors_sdk::now_ms() + TERMINAL_BUDGET.as_millis() as u64).to_string(),
@@ -214,11 +264,25 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         } else {
             master.write_all(b"\n").unwrap();
         }
+        // The settings `terminal` restored on return, read while the fixture
+        // still holds the session (contracts/cli/v1alpha1/semantics.md:484,
+        // "restores settings on success/failure/interruption").
+        let mut restored = None;
         let status = loop {
+            drain(&mut master, &mut observed);
+            if restored.is_none() && contents(&report).contains(TERMINAL_RETURNED) {
+                restored = Some(attrs(&slave));
+                File::create(release.path().join("release")).unwrap();
+            }
             if let Some(status) = child.0.try_wait().unwrap() {
                 break status;
             }
-            assert!(Instant::now() < until, "fixture did not finish");
+            assert!(
+                Instant::now() < until,
+                "fixture did not finish ({mode}); terminal output {:?}; its stdout {:?}",
+                String::from_utf8_lossy(&observed).replace("fictional-input", "<REDACTED>"),
+                contents(&report)
+            );
             std::thread::sleep(Duration::from_millis(5));
         };
         assert!(status.success(), "fixture assertion failed ({mode}): {}", {
@@ -228,17 +292,25 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
             diagnostics.read_to_string(&mut stderr).unwrap();
             stderr
         });
+        let restored = restored.unwrap_or_else(|| {
+            panic!(
+                "fixture exited without reporting its return ({mode}): {:?}",
+                contents(&report)
+            )
+        });
         assert_ran_one(report, "terminal_fixture");
-        let restored = attrs(&slave);
         assert_eq!(restored.c_lflag, original.c_lflag);
         assert_eq!(restored.c_cc, original.c_cc);
-        let mut bytes = [0; 256];
-        while let Ok(n) = master.read(&mut bytes) {
-            if n == 0 {
-                break;
-            }
-            observed.extend_from_slice(&bytes[..n]);
+        // Linux keeps the terminal of an exited session leader: the settings
+        // stay restored after the fixture's exit too. macOS revokes it, so
+        // there is nothing left to read on this descriptor.
+        #[cfg(target_os = "linux")]
+        {
+            let after = attrs(&slave);
+            assert_eq!(after.c_lflag, original.c_lflag);
+            assert_eq!(after.c_cc, original.c_cc);
         }
+        drain(&mut master, &mut observed);
         assert!(
             !observed
                 .windows(b"fictional-input".len())
