@@ -34,7 +34,9 @@ jobs:
         run: cargo clippy --locked -p connectors-host -p connectors --all-targets -- -D warnings
       - name: Test the host and the CLI
         shell: bash
-        run: cargo test --locked -p connectors-host -p connectors
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: cargo test --locked --no-fail-fast -p connectors-host -p connectors
 
   sign:
     name: signed release binary on macos-latest
