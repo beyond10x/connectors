@@ -554,4 +554,40 @@ mod tests {
         assert!(child.wait().unwrap().success());
         assert!(child.exited().unwrap());
     }
+
+    /// A capture that is never launched, as on every refusal between capture
+    /// and spawn (the consumer launch's custody and lifecycle refusals after
+    /// its capture, the owner spawn's channel setup), must not leave its copy
+    /// and directory behind in the temporary directory.
+    #[test]
+    fn a_capture_dropped_without_a_launch_leaves_no_copy_behind() {
+        let root = tempfile::tempdir().unwrap();
+        let (path, hash) = source(root.path(), MACH_O_64);
+        let snapshot = capture(File::open(&path).unwrap(), &hash, until()).unwrap();
+        let directory = path_of(&snapshot).unwrap().parent().unwrap().to_path_buf();
+        assert!(directory.exists());
+        drop(snapshot);
+        assert!(
+            !directory.exists(),
+            "an unlaunched capture left {directory:?} behind"
+        );
+    }
+
+    /// `launch_path` promises that a descriptor capture did not make is
+    /// refused and never removed. A file of this user's own, merely named
+    /// like a capture, is not one capture made.
+    #[test]
+    fn launch_path_refuses_a_file_named_like_a_capture() {
+        let root = tempfile::tempdir().unwrap();
+        let forged = root.path().join(format!("{DIRECTORY_PREFIX}forged"));
+        std::fs::create_dir(&forged).unwrap();
+        let (path, _) = source(&forged, MACH_O_64);
+        let image = forged.join(IMAGE);
+        std::fs::rename(&path, &image).unwrap();
+        let launched = launch_path(&File::open(&image).unwrap());
+        let refused = matches!(launched, Err(Failure::Unavailable));
+        drop(launched);
+        assert!(image.exists(), "launch_path removed a file it did not make");
+        assert!(refused, "launch_path admitted a file it did not make");
+    }
 }
