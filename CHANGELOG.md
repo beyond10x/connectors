@@ -16,7 +16,8 @@
   part count and the value's SHA-256, written last, and a read checks every part and the digest.
   Every binding holds values up to 64 KiB, which covers the largest material of every shipped
   auth profile. No binding falls back to another, to a file or to an environment variable.
-- macOS keychain items admit any application of the user, so an upgraded binary keeps reading them.
+- macOS keychain items are created with an access whose decrypt ACL admits any application of the
+  user.
 - `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
   `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
   target.
@@ -37,6 +38,10 @@
   launch, filesystem admission and terminal entry are Linux-only, so the `connectors` binary
   does not build there. Only `connectors-custody` builds and is tested on those platforms, in the
   `Custody platforms` workflow.
+- On macOS a second binary, such as an upgraded `connectors`, is refused an item an earlier binary
+  wrote: OS status -25293 (`errSecAuthFailed`), observed on the CI runner. The cause is inferred to
+  be the item's partition list, which names the creating binary; changing it needs the keychain
+  password. Upgrade access is planned with the macOS host port.
 
 ## 0.45.0 — 2026-10-10
 

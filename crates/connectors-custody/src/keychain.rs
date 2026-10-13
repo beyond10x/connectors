@@ -62,7 +62,9 @@ type PromptSelector = u16;
 #[link(name = "Security", kind = "framework")]
 unsafe extern "C" {
     fn SecKeychainGetStatus(keychain: SecKeychainRef, status: *mut u32) -> OSStatus;
+    #[cfg(any(test, feature = "test-support"))]
     fn SecKeychainLock(keychain: SecKeychainRef) -> OSStatus;
+    #[cfg(any(test, feature = "test-support"))]
     fn SecKeychainDelete(keychain: SecKeychainRef) -> OSStatus;
     static kSecAttrAccess: CFStringRef;
     static kSecACLAuthorizationDecrypt: CFStringRef;
@@ -397,7 +399,7 @@ impl Backend for Keychain {
         }
         match self.add(version, material)? {
             0 => {}
-            errSecDuplicateItem => return Err(Failure::Conflict),
+            status if status == errSecDuplicateItem => return Err(Failure::Conflict),
             ERR_SEC_INTERACTION_NOT_ALLOWED => return Err(Failure::Unavailable),
             _ => return Err(Failure::OutcomeUnknown),
         }

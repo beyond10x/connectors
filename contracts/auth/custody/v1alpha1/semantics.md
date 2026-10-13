@@ -138,7 +138,7 @@ prompts.
 | Platform | Binding | Store | Value bound | Locked or absent store |
 |---|---|---|---|---|
 | Linux | `secret_service` | the qualified Secret Service `login` collection ([local Secret Service](../../../../docs/local-secret-service.md)) | 64 KiB | `Unavailable` |
-| macOS | `macos_keychain` | generic password items in the user's login keychain, user interaction disallowed; each item is created with an access that admits any application of the user, so an upgraded or rebuilt binary reads the items an earlier one wrote, the same exposure as the Secret Service on Linux; the data-protection keychain needs entitlements and is not used | 64 KiB | `Unavailable`, never an unlock prompt |
+| macOS | `macos_keychain` | generic password items in the user's login keychain, user interaction disallowed; each item is created with an access whose decrypt ACL admits any application of the user; a second binary is still refused (OS status -25293, `errSecAuthFailed`, observed on the CI runner), inferred to be the item's partition list, which names the creating binary, so an upgraded binary does not yet read what an earlier one wrote; the data-protection keychain needs entitlements and is not used | 64 KiB | `Unavailable`, never an unlock prompt |
 | Windows | `windows_credential_manager` | generic credentials with local-machine persistence, never roaming; a value over one blob (`CRED_MAX_CREDENTIAL_BLOB_SIZE`, 2,560 bytes) is split over numbered part entries of its version, written first, then one header entry naming the part count and the value's SHA-256, written last | 64 KiB | `Unavailable` |
 
 On Windows a version exists only once its header exists. A read needs the header and every part and
