@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0470-slack-message-send
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.47.0: Slack message send, boolean guard checks, non-empty body keys'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261013a-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-13T05:01:17Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-13T11:49:05Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
