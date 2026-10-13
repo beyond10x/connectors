@@ -393,7 +393,9 @@ impl Consumer {
         // macOS has no /proc/self/fd: the image copy is executed by its path,
         // which becomes argv[0] (consumer-launch.md §7).
         #[cfg(target_os = "macos")]
-        let mut command = Command::new(image_path(&self.executable)?);
+        let launch = launch_path(&self.executable)?;
+        #[cfg(target_os = "macos")]
+        let mut command = Command::new(&launch);
         #[cfg(target_os = "macos")]
         let end = descriptor_end()?;
         command
@@ -495,33 +497,13 @@ fn close_on_exec_above_three() -> std::io::Result<()> {
     Ok(())
 }
 
-/// The path of the image copy `executable` refers to, read with `F_GETPATH`
-/// and accepted only while that path still names the same regular file.
+/// The path to execute the image copy `executable` refers to. The capture
+/// owns that copy, so this is a refusing stand-in until the capture's own
+/// macOS path is wired in here; the value it returns must stay alive until
+/// `spawn` returns.
 #[cfg(target_os = "macos")]
-fn image_path(executable: &File) -> Result<std::path::PathBuf> {
-    use std::os::unix::{ffi::OsStringExt, fs::MetadataExt};
-    let mut buffer = [0u8; libc::PATH_MAX as usize];
-    // SAFETY: F_GETPATH writes at most PATH_MAX bytes, NUL included, into the
-    // live buffer.
-    if unsafe { libc::fcntl(executable.as_raw_fd(), libc::F_GETPATH, buffer.as_mut_ptr()) } != 0 {
-        return Err(Failure::Unavailable);
-    }
-    let length = buffer
-        .iter()
-        .position(|byte| *byte == 0)
-        .ok_or(Failure::Unavailable)?;
-    let path = std::path::PathBuf::from(OsString::from_vec(buffer[..length].to_vec()));
-    let (held, named) = (
-        executable.metadata().map_err(|_| Failure::Unavailable)?,
-        std::fs::symlink_metadata(&path).map_err(|_| Failure::Unavailable)?,
-    );
-    if !path.is_absolute()
-        || !named.is_file()
-        || (held.dev(), held.ino()) != (named.dev(), named.ino())
-    {
-        return Err(Failure::Unavailable);
-    }
-    Ok(path)
+fn launch_path(_executable: &File) -> Result<std::path::PathBuf> {
+    Err(Failure::Unsupported)
 }
 
 /// One past the highest descriptor number this process can hold: the
