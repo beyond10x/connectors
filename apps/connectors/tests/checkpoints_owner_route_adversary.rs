@@ -12,6 +12,7 @@ use connectors_host::local::{
     config::{Config, Paths},
     registry, runtime,
 };
+#[cfg(unix)]
 #[path = "support/owner.rs"]
 mod owner_start;
 use serde_json::{Value, json};
@@ -19,6 +20,15 @@ use std::{
     collections::BTreeSet,
     fs,
     process::{Command, Output},
+};
+
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
 };
 
 const READ: &str = "item.read";
@@ -35,6 +45,7 @@ fn command(root: &tempfile::TempDir, args: &[&str]) -> Output {
 }
 
 /// Exit status, stdout and stderr as JSON, for comparing two runs.
+#[cfg(unix)]
 fn answer(output: &Output) -> (Option<i32>, Value, Value) {
     let parse = |bytes: &[u8]| {
         if bytes.is_empty() {
@@ -107,7 +118,7 @@ fn configured() -> tempfile::TempDir {
     let config_path = root.path().join("config/config.toml");
     let adapter = |alias: &str, instance: &str| {
         format!(
-            "\n[adapters.{alias}]\ninstance_id='{instance}'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=['{READ}']\n",
+            "\n[adapters.{alias}]\ninstance_id='{instance}'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=['{READ}']\n",
             "a".repeat(64)
         )
     };
@@ -127,7 +138,9 @@ fn configured() -> tempfile::TempDir {
 }
 
 /// The test's own owner child; a failing assertion must not leave it serving.
+#[cfg(unix)]
 struct OwnerProcess(std::process::Child);
+#[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
         if self.0.try_wait().ok().flatten().is_none() {
@@ -139,6 +152,7 @@ impl Drop for OwnerProcess {
 
 /// Starts `__connectors-owner` of this build the way the CLI does (startup
 /// channel on fd 3, lifetime lock on fd 4), as owner_idle_exit_adversary.rs.
+#[cfg(unix)]
 fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
     use std::os::unix::{fs::OpenOptionsExt, net::UnixStream};
     let state = root.path().join("state");
@@ -172,6 +186,7 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
 
 /// Each read answers the same with an owner of this build running as with
 /// none: the routed read keeps the direct read's answer and refusal codes.
+#[cfg(unix)]
 #[test]
 fn routed_metadata_reads_answer_as_the_direct_read_does() {
     let root = configured();
@@ -217,6 +232,7 @@ fn routed_metadata_reads_answer_as_the_direct_read_does() {
 
 /// A real running owner, not a test-held flock, makes the enable answer
 /// `lifecycle_conflict` and changes nothing.
+#[cfg(unix)]
 #[test]
 fn a_real_running_owner_refuses_the_enable() {
     let root = configured();

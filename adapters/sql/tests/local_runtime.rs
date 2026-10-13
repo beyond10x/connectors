@@ -3,6 +3,7 @@
 //! needed. Query semantics stay in `protocol.rs`; this file proves the local
 //! composition — bootstrap, protected entry, session validation, identity and
 //! dispatch — reaches the provider at all.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

@@ -1,6 +1,7 @@
 //! The Loki executable through the host's private runtime, against a local TLS
 //! fixture serving the recorded answers in `tests/fixtures` (Loki v3.7.0 HTTP
 //! API shapes). No real Loki is contacted and no real credential is used.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

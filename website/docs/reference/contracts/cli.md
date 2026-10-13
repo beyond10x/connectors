@@ -904,10 +904,65 @@ runtime acceptance above applies on macOS with each Linux mechanism replaced by
 its row here: stop is exercised through the reap lock, and the owner-only
 descriptor and socket-peer checks through `LOCAL_PEERCRED`.
 
-Windows has no row: `connectors.cli.OperatingSystem` names it for custody, and no
-Windows host exists. Every Linux rule above stands as written. These macOS rows
-are specified; until the host and CLI suites run on a macOS runner, none of them
+Windows has its own rows, in the next section. Every Linux rule above stands
+as written. These macOS rows are specified; until the host and CLI suites run on a macOS runner, none of them
 is observed.
+
+### Windows platform guarantees
+
+The same seven guarantees apply on Windows, stated by the same invariants of
+`connectors.cli.PlatformGuaranteeStatement`. Linux and macOS keep their rows
+above. On Windows four hold and three hold only in a named weaker form:
+
+| Guarantee | Linux | macOS | Windows | Windows mechanism |
+|---|---|---|---|---|
+| `sealed_executable` | holds | weaker: `owner_private_copy` | weaker: `deny_write_copy` | no memfd: the image is copied into a fresh owner-only directory inside the state directory's owner-only `run` directory, never the system's temporary directory, and the copy is opened for reading without `FILE_SHARE_WRITE` or `FILE_SHARE_DELETE` before its digest and PE header are checked on that handle. The handle, and one on its directory without delete sharing, are held until the child is created, so from that open no process can write, rename or delete the copy or rename its directory; after creation the mapped image keeps it unwritable, and the child's current directory, which is the copy's directory, keeps that directory in place. A copy is removed with its directory on every refusal; one left by a process that died is removed when the next owner starts, unless a running process still holds it. A writable mapping that a process of the same user made of the copy before that open is not excluded. |
+| `parent_death_kill` | holds | weaker: `adapter_channel_close` | holds | no parent-death signal: every child is created inside a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, through `PROC_THREAD_ATTRIBUTE_JOB_LIST`, so it is never outside the job, and its launcher holds the job's only handle. When the launcher dies the handle closes and the job ends every process in it, consumers included. An adapter's job permits no breakaway. A consumer's job permits breakaway on request (`JOB_OBJECT_LIMIT_BREAKAWAY_OK`, never `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK`), so a process the consumer creates with `CREATE_BREAKAWAY_FROM_JOB`, such as an owner, leaves it; the consumer itself stays in it. |
+| `exact_process_signal` | holds | weaker: `child_reap_lock` | holds | no pidfd: the launcher holds the child's process handle, which names exactly that process and keeps its id from reuse while open. Exit is observed by waiting on the handle, and stop terminates through it (`TerminateProcess`); Windows has no signal to send first. |
+| `own_image_build_measure` | holds | weaker: `launch_path_read` | weaker: `launch_path_read` | no `/proc/self/exe`: the owner build digest is read from the path `GetModuleFileNameW` reports. A running image cannot be written in place, but it can be renamed and another file put at its path; that file is measured as a new build and refused as `owner_build_mismatch`. |
+| `atomic_no_replace_rename` | holds | holds | holds | `MoveFileExW` with `MOVEFILE_WRITE_THROUGH` and without `MOVEFILE_REPLACE_EXISTING` refuses an existing destination in the same call, on NTFS. A state directory on any other filesystem is refused. |
+| `atomic_close_on_exec` | holds | weaker: `set_after_receive` | holds | no descriptor passing: a handle reaches the other process through `DuplicateHandle` with inheritance off, so it is not inheritable from the moment it exists there. A child is created with `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, and only the handles listed there reach it. |
+| `peer_credential_snapshot` | holds | weaker: `separate_pid_query` | weaker: `client_token_query` | no Unix socket: the owner listens on a named pipe whose access control list grants the current user's SID alone, so the kernel admits no other user at connect. `GetNamedPipeClientProcessId` gives the client's process id as recorded at connect; the client's SID is then read from that process's token, a separate query, and must be the current user's. If the client exited and its id was reused before the query, the token read is another process's. The token's integrity level must also equal the reader's own, and the token must not be restricted: an elevated and a non-elevated process of one user, or a restricted one, do not admit each other, on either end, and refuse with `lifecycle_conflict`. The owner opens an admitted client's process once from that id; the checks and every handle duplicated into the client go through that one process handle. |
+
+Owner-only files keep their rule (§5) with another mechanism, and no guarantee
+row changes. Ownership and permission are checked on the opened handle: the
+owner SID is the current user's, the discretionary access control list exists,
+and every entry that allows access names the current user, LocalSystem or the
+built-in Administrators group, which correspond to what root may read on Linux
+whatever the mode bits say. Any entry allowing another SID refuses, as group or
+other mode bits do. A file is opened with `FILE_FLAG_OPEN_REPARSE_POINT` and
+refused when it, or any directory on its path, is a reparse point (a symbolic
+link or junction); it must have one link. Files and directories the host
+creates get a protected list naming only the current user. Protected stdin
+admits a protected regular file; a pipe on stdin is refused on Windows until a
+producer check is specified for it.
+
+Where a rule above fsyncs a directory (`setup init`, the metadata database's
+creation and each migration), Windows takes no directory step: a directory is
+held open for listing only, and Windows flushes no directory through such a
+handle. A file the host publishes is made durable by its own flush and by
+`MoveFileExW` with `MOVEFILE_WRITE_THROUGH`, which returns only once the rename
+is written; the metadata database's files are flushed by SQLite, which on
+Windows syncs files and never their directory.
+
+Hidden terminal entry opens `CONIN$` and `CONOUT$`, clears
+`ENABLE_ECHO_INPUT` and restores the saved console mode on success, failure and
+interruption. A process with no console has no trusted terminal and refuses as
+on Linux.
+
+The clock reading of the [clock binding](./clock.md) uses
+`QueryUnbiasedInterruptTimePrecise`, which stops while the machine sleeps, in
+place of the suspend-exclusive clock, and `QueryInterruptTimePrecise`, which
+counts sleep, in place of the suspend-inclusive one. The non-precise forms move
+only at each timer interrupt, coarser than the 1 ms the binding requires.
+
+Exact stop (§4) is held through the process handle on Windows, which is the
+"equivalent non-reusable kernel process ownership" §4 requires. The runtime
+acceptance above applies on Windows with each Linux mechanism replaced by its
+row here and in the owner, adapter
+and consumer Windows sections. These Windows
+rows are specified; until the host and CLI suites run on a Windows runner, none
+of them is observed.
 
 ## Operations by family
 

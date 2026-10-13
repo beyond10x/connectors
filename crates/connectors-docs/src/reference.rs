@@ -644,6 +644,7 @@ mod tests {
         assert!(resolve_contract_link(&a, page, "http://example.test/", &links).is_none());
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_symlink_out_of_the_owner_is_not_published() {
         let dir = tempfile::tempdir().unwrap();

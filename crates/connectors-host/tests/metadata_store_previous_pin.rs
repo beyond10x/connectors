@@ -6,6 +6,9 @@
 //! Entity Runtime 0.26.0 and Eventlog `6983cc25`, the pins connectors 0.31.0
 //! released with; its README says how. A fresh store seeded the same way
 //! under the current pins is the oracle: the fixture must answer exactly as it.
+//!
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 
 use connectors_host::local::{
     metadata::{Checkpoints, Metadata},

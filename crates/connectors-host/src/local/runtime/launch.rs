@@ -13,26 +13,38 @@
 //! contract states: the credential is an unlinked read-only file, the socket
 //! carries `SO_NOSIGPIPE`, received descriptors are marked close-on-exec right
 //! after the receive, and the image copy is executed by its path.
+//!
+//! Windows changes delivery as section 8 of the contract states: the
+//! credential is a read-only handle on a file whose name was removed with
+//! POSIX semantics, and the image and credential handles reach the CLI by
+//! `DuplicateHandle` into it, inheritance off, their values in a frame in
+//! place of `SCM_RIGHTS` ([`send`], [`receive`]).
 use super::{Failure, Result};
-use std::{
-    collections::BTreeSet,
-    ffi::OsString,
-    fs::File,
-    io::Write,
-    os::{
-        fd::{AsRawFd, FromRawFd, RawFd},
-        unix::{ffi::OsStrExt, net::UnixStream, process::CommandExt, process::ExitStatusExt},
-    },
-    process::{Command, Stdio},
-    time::Instant,
+#[cfg(unix)]
+use std::os::{
+    fd::{AsRawFd, FromRawFd, RawFd},
+    unix::{ffi::OsStrExt, net::UnixStream, process::CommandExt, process::ExitStatusExt},
 };
+#[cfg(unix)]
+use std::process::{Command, Stdio};
+use std::{collections::BTreeSet, ffi::OsString, fs::File};
+#[cfg(unix)]
+use std::{io::Write, time::Instant};
 
 /// The consumer image, then the credential.
 pub(crate) const DESCRIPTORS: usize = 2;
 /// Received descriptors are held at or above this number, clear of the
 /// standard streams and of descriptor 3, which belongs to the credential.
+#[cfg(unix)]
 const FLOOR: RawFd = 10;
+#[cfg(unix)]
 const MARKER: u8 = 0x4c;
+
+/// The Windows credential, handle passing and their tests.
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+pub(crate) use windows::{receive, sealed, send};
 
 /// A sealed, read-only copy of `material`, positioned at its start. The seals
 /// forbid every later write, growth, shrink and seal change; the returned
@@ -157,6 +169,7 @@ pub(crate) fn sealed(material: &[u8]) -> Result<File> {
     Ok(readable)
 }
 
+#[cfg(unix)]
 fn remaining(until: Instant) -> Result<std::time::Duration> {
     until
         .checked_duration_since(Instant::now())
@@ -164,6 +177,7 @@ fn remaining(until: Instant) -> Result<std::time::Duration> {
         .ok_or(Failure::Timeout)
 }
 
+#[cfg(unix)]
 fn control_space(count: usize) -> usize {
     // SAFETY: CMSG_SPACE is a pure size computation.
     unsafe { libc::CMSG_SPACE((count * std::mem::size_of::<RawFd>()) as u32) as usize }
@@ -171,6 +185,7 @@ fn control_space(count: usize) -> usize {
 
 /// Pass `files` to the peer as one marker byte carrying `SCM_RIGHTS`. Only the
 /// descriptors travel; no byte of their content is read or written here.
+#[cfg(unix)]
 pub(crate) fn send(stream: &UnixStream, files: &[&File], until: Instant) -> Result<()> {
     let descriptors: Vec<RawFd> = files.iter().map(|file| file.as_raw_fd()).collect();
     let marker = [MARKER];
@@ -250,6 +265,7 @@ pub(crate) fn send(stream: &UnixStream, files: &[&File], until: Instant) -> Resu
 /// Receive exactly `count` descriptors sent by [`send`]. Anything else — no
 /// marker, a truncated or foreign control message, another count — closes
 /// whatever arrived and refuses.
+#[cfg(unix)]
 pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Result<Vec<File>> {
     let mut marker = [0u8];
     let mut vector = libc::iovec {
@@ -379,6 +395,7 @@ impl Consumer {
     /// signal ended it. Ends the consumer with `SIGTERM` if this thread exits
     /// first on Linux; on macOS, which has no parent-death signal, the
     /// consumer keeps running, and the image copy is executed by its path.
+    #[cfg(unix)]
     pub fn run(
         self,
         extra: &[String],
@@ -461,6 +478,206 @@ impl Consumer {
         drop(interrupts);
         status.map(code).map_err(|_| Failure::Unavailable)
     }
+
+    /// Start the consumer and wait for it, on Windows (consumer-launch.md §8).
+    /// No shell and no search path: the captured copy is created by its full
+    /// path, argv\[0\], with the pinned argv prefix and `extra` quoted into one
+    /// command line, and the copy's directory as its current directory. The
+    /// environment holds only the `caller` variables whose names start with a
+    /// passed prefix in any letter case, none named
+    /// [`CREDENTIAL_HANDLE_VARIABLE`] or `SystemRoot` in any letter case, then
+    /// this process's `SystemRoot` and that variable with the credential
+    /// handle's value in decimal. The consumer inherits the caller's standard
+    /// handles and one read-only credential handle, the only handles in its
+    /// `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`. It is created inside a job with
+    /// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only handle this call holds,
+    /// so it ends if this process dies first; the job permits breakaway on
+    /// request, and every process the consumer started without it ends when
+    /// the job closes after the consumer's exit. While it runs, this process
+    /// ignores `CTRL_C_EVENT` and `CTRL_BREAK_EVENT`, which the shared console
+    /// delivers to the consumer. Returns its exit code. The copy is removed
+    /// on every return, a refusal before creation included.
+    #[cfg(windows)]
+    pub fn run(
+        self,
+        extra: &[String],
+        caller: impl IntoIterator<Item = (OsString, OsString)>,
+    ) -> Result<i32> {
+        use super::artifact;
+        use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
+        use windows_sys::Win32::{
+            Foundation::{HANDLE, INVALID_HANDLE_VALUE},
+            Storage::FileSystem::FILE_GENERIC_READ,
+            System::Console::{
+                GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+            },
+        };
+        let Self {
+            executable,
+            credential: sealed,
+            args,
+            pass_env,
+        } = self;
+        // The copy's custody, before any refusal: every early return below
+        // removes the copy and its directory.
+        let mut launch = artifact::launch_path(executable)?;
+        if extra.iter().any(|arg| arg.contains('\0')) {
+            return Err(Failure::InvalidInput);
+        }
+        // Read-only, inheritable only for this creation.
+        let credential = artifact::inheritable(sealed.as_raw_handle(), Some(FILE_GENERIC_READ))?;
+        let mut standard = [std::ptr::null_mut(); 3];
+        let mut held = Vec::new();
+        for (slot, which) in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]
+            .into_iter()
+            .enumerate()
+        {
+            // SAFETY: no preconditions; the result is borrowed, not owned.
+            let handle: HANDLE = unsafe { GetStdHandle(which) };
+            if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+                continue;
+            }
+            let duplicate = artifact::inheritable(handle, None)?;
+            standard[slot] = duplicate.as_raw_handle();
+            held.push(duplicate);
+        }
+        let mut inherited: Vec<HANDLE> = held.iter().map(|h| h.as_raw_handle()).collect();
+        inherited.push(credential.as_raw_handle());
+        let mut environment: Vec<(OsString, OsString)> = caller
+            .into_iter()
+            .filter(|(name, _)| {
+                let name: Vec<u16> = name.encode_wide().collect();
+                pass_env
+                    .iter()
+                    .any(|prefix| name.starts_with_any_case(prefix))
+                    && !name.eq_any_case(CREDENTIAL_HANDLE_VARIABLE)
+                    && !name.eq_any_case(SYSTEM_ROOT)
+            })
+            .collect();
+        // Windows needs it to start the network stack, as an adapter does; it
+        // carries no credential.
+        if let Some(root) = std::env::var_os(SYSTEM_ROOT) {
+            environment.push((SYSTEM_ROOT.into(), root));
+        }
+        environment.push((
+            CREDENTIAL_HANDLE_VARIABLE.into(),
+            (credential.as_raw_handle() as usize).to_string().into(),
+        ));
+        let arguments: Vec<OsString> = args.iter().chain(extra).map(OsString::from).collect();
+        let job = artifact::Job::consumer().map_err(|_| Failure::Unavailable)?;
+        let mut child = artifact::create(
+            &artifact::Creation {
+                application: launch.path(),
+                arguments: &arguments,
+                environment: &environment,
+                standard,
+                inherited: &inherited,
+                flags: 0,
+            },
+            &job,
+        )
+        .map_err(|_| Failure::Unavailable)?;
+        launch.created();
+        drop(held);
+        drop(credential);
+        drop(sealed);
+        let interrupts = Interrupts::ignore();
+        let status = child.wait();
+        drop(interrupts);
+        drop(job);
+        drop(launch);
+        // An exit code is a DWORD; one with the top bit set, such as an NTSTATUS
+        // the consumer ended with, reads as negative.
+        status
+            .map(|code| code as i32)
+            .map_err(|_| Failure::Unavailable)
+    }
+}
+
+/// The consumer's environment variable that names the credential handle on
+/// Windows (`connectors.cli.ConsumerCredentialDeliveryStatement`,
+/// `handle_variable` for `inherited_handle`).
+#[cfg(windows)]
+pub(crate) const CREDENTIAL_HANDLE_VARIABLE: &str = "CONNECTORS_CREDENTIAL_HANDLE";
+
+/// The variable Windows needs to start the network stack, given to every
+/// consumer as to every adapter (consumer-launch.md §8, "Environment").
+#[cfg(windows)]
+const SYSTEM_ROOT: &str = "SystemRoot";
+
+/// Name comparison without regard to letter case, as Windows compares
+/// environment variable names: each UTF-16 unit is compared by its simple
+/// uppercase form where that is one unit of the Basic Multilingual Plane.
+#[cfg(windows)]
+trait WideName {
+    fn eq_any_case(&self, other: &str) -> bool;
+    fn starts_with_any_case(&self, prefix: &str) -> bool;
+}
+#[cfg(windows)]
+fn fold(unit: u16) -> u16 {
+    let Some(character) = char::from_u32(u32::from(unit)) else {
+        return unit;
+    };
+    let mut upper = character.to_uppercase();
+    match (upper.next(), upper.next()) {
+        (Some(single), None) => u16::try_from(u32::from(single)).unwrap_or(unit),
+        _ => unit,
+    }
+}
+/// The length of `prefix` in UTF-16 units, when `name` starts with it in any
+/// letter case.
+#[cfg(windows)]
+fn leads_any_case(name: &[u16], prefix: &str) -> Option<usize> {
+    let mut length = 0;
+    for unit in prefix.encode_utf16() {
+        if fold(*name.get(length)?) != fold(unit) {
+            return None;
+        }
+        length += 1;
+    }
+    Some(length)
+}
+#[cfg(windows)]
+impl WideName for [u16] {
+    fn eq_any_case(&self, other: &str) -> bool {
+        leads_any_case(self, other) == Some(self.len())
+    }
+    fn starts_with_any_case(&self, prefix: &str) -> bool {
+        leads_any_case(self, prefix).is_some()
+    }
+}
+
+/// `CTRL_C_EVENT` and `CTRL_BREAK_EVENT` handled by ignoring them until
+/// dropped. A handler, unlike `SetConsoleCtrlHandler(NULL, TRUE)`, is not
+/// inherited, so the consumer receives both from the console it shares.
+#[cfg(windows)]
+struct Interrupts(bool);
+#[cfg(windows)]
+impl Interrupts {
+    fn ignore() -> Self {
+        // SAFETY: registers a handler that is a plain function for the life
+        // of this value.
+        Self(
+            unsafe { windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(ignore), 1) }
+                != 0,
+        )
+    }
+}
+#[cfg(windows)]
+impl Drop for Interrupts {
+    fn drop(&mut self) {
+        if self.0 {
+            // SAFETY: removes the handler `ignore` registered.
+            unsafe { windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(ignore), 0) };
+        }
+    }
+}
+/// Handles an interrupt or break by doing nothing; anything else, such as a
+/// console close, goes on to the default handler.
+#[cfg(windows)]
+unsafe extern "system" fn ignore(event: u32) -> windows_sys::core::BOOL {
+    use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
+    i32::from(event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT)
 }
 
 /// Exactly descriptors 0 to 3 reach a consumer: mark every descriptor from 4
@@ -551,6 +768,7 @@ fn close_on_exec_from_four(end: libc::c_int) {
 }
 
 /// A consumer's exit code, or 128 plus the signal number that ended it.
+#[cfg(unix)]
 pub(crate) fn code(status: std::process::ExitStatus) -> i32 {
     status
         .code()
@@ -558,7 +776,9 @@ pub(crate) fn code(status: std::process::ExitStatus) -> i32 {
 }
 
 /// `SIGINT` and `SIGQUIT` ignored until dropped, then restored.
+#[cfg(unix)]
 struct Interrupts([libc::sigaction; 2]);
+#[cfg(unix)]
 impl Interrupts {
     fn ignore() -> Self {
         // SAFETY: zeroed sigaction is valid; sigaction only reads `ignore` and
@@ -574,6 +794,7 @@ impl Interrupts {
         }
     }
 }
+#[cfg(unix)]
 impl Drop for Interrupts {
     fn drop(&mut self) {
         for (index, signal) in [libc::SIGINT, libc::SIGQUIT].into_iter().enumerate() {
@@ -585,5 +806,9 @@ impl Drop for Interrupts {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests;
+
+/// The consumer launch on the Windows runner.
+#[cfg(all(test, windows))]
+mod consumer_tests;

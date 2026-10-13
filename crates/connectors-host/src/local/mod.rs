@@ -29,6 +29,8 @@ pub mod runtime;
 mod security_replay_tests;
 pub mod service;
 #[cfg(test)]
+pub(crate) mod test_executable;
+#[cfg(test)]
 mod test_streams;
 
 /// Closed, credential-free local failures. Never include OS, parser or DB text.

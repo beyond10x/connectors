@@ -24,6 +24,7 @@
 //! saw. A merge request whose IID is `403`, `404`, `405` or `409` answers every
 //! write with that status, so a provider refusal is observed by name; its
 //! discussion reads as usual, so the resolve guard's preflight holds first.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

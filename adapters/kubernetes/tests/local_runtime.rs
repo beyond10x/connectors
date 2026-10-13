@@ -1,5 +1,6 @@
 //! Deterministic private-runtime journey against a local TLS fixture cluster.
 //! No real Kubernetes cluster is contacted and no real credential is used.
+#![cfg(unix)]
 use base64::Engine as _;
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},

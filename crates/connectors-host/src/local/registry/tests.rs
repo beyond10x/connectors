@@ -1,9 +1,8 @@
 use super::lifecycle::custody_version;
 use super::*;
-use std::{
-    os::unix::fs::PermissionsExt,
-    sync::{Arc, Barrier},
-};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::sync::{Arc, Barrier};
 
 pub(super) const NOW: u64 = 1_788_998_400_000;
 
@@ -816,7 +815,10 @@ fn concurrent_revoke_repair_publication_and_read_dispatch_share_one_fence() {
 
 pub(super) fn fixture() -> (tempfile::TempDir, Registry) {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     super::super::filesystem::directory(root.path(), false, true).unwrap();
     drop(Metadata::initialize(root.path()).unwrap());
     let registry = Registry::new(root.path());
@@ -1722,7 +1724,10 @@ fn write_floor_file(root: &Path, last_seen_ms: u64) {
         serde_json::to_vec(&serde_json::json!({ "last_seen_ms": last_seen_ms })).unwrap(),
     )
     .unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(&path);
 }
 
 /// One registry transaction that does nothing but sample the clock.
@@ -1805,7 +1810,10 @@ fn a_corrupt_floor_file_falls_back_to_the_recorded_floor_plus_the_interval() {
     tick(&registry, NOW + 10).unwrap();
     let path = root.path().join(FLOOR_FILE);
     std::fs::write(&path, b"not a floor").unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(&path);
     assert_eq!(
         tick(&registry, NOW + 59_999),
         Err(Failure::MetadataUnavailable)
@@ -1934,7 +1942,10 @@ fn saved_replay_fixture(
         return (root, registry, reference);
     };
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     for name in ["metadata.sqlite3", "metadata.lock"] {
         let target = root.path().join(name);
         if name == "metadata.lock" {
@@ -1942,7 +1953,10 @@ fn saved_replay_fixture(
         } else {
             std::fs::copy(stored.join(name), &target).unwrap();
         }
+        #[cfg(unix)]
         std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        #[cfg(windows)]
+        crate::local::filesystem::windows::owner_only(&target);
     }
     let reference = std::fs::read_to_string(stored.join("reference")).unwrap();
     let registry = Registry::new(root.path());

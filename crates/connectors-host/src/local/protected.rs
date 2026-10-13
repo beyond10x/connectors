@@ -5,31 +5,46 @@ use super::{
     runtime::EntryField,
 };
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests;
+#[cfg(windows)]
+mod windows;
+#[cfg(all(test, windows))]
+mod windows_tests;
 use connectors_sdk::Secret;
 #[cfg(target_os = "linux")]
 use std::os::unix::ffi::OsStrExt;
 use std::{
-    fs::{File, OpenOptions},
+    fs::File,
     io::{Read, Write},
+    path::Path,
+    sync::atomic::{AtomicBool, Ordering},
+};
+#[cfg(unix)]
+use std::{
+    fs::OpenOptions,
     os::{
         fd::{AsRawFd, FromRawFd},
         unix::fs::{MetadataExt, OpenOptionsExt},
     },
-    path::Path,
-    sync::atomic::{AtomicBool, Ordering},
 };
+#[cfg(windows)]
+pub use windows::Signals;
+#[cfg(windows)]
+use windows::{Terminal, duplicate, read_ready};
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+#[cfg(unix)]
 extern "C" fn interrupt(_: i32) {
     INTERRUPTED.store(true, Ordering::SeqCst);
 }
+#[cfg(unix)]
 pub struct Signals {
     old_int: libc::sigaction,
     old_term: libc::sigaction,
 }
+#[cfg(unix)]
 impl Signals {
     pub fn install() -> Result<Self> {
         if ACTIVE
@@ -69,6 +84,7 @@ impl Signals {
         INTERRUPTED.load(Ordering::SeqCst)
     }
 }
+#[cfg(unix)]
 impl Drop for Signals {
     fn drop(&mut self) {
         // SAFETY: these are the saved handlers installed by this exclusive guard.
@@ -98,6 +114,7 @@ pub(crate) fn cancellation() -> Result<()> {
 fn source_error(_: impl Sized) -> Error {
     Code::InvalidInput.into()
 }
+#[cfg(unix)]
 fn duplicate(fd: i32) -> Result<File> {
     // SAFETY: fcntl validates the source and returns a new owned descriptor.
     let raw = unsafe { libc::fcntl(fd, libc::F_DUPFD_CLOEXEC, 10) };
@@ -108,6 +125,9 @@ fn duplicate(fd: i32) -> Result<File> {
 }
 fn private(file: &File) -> Result<()> {
     fs::check_private_file(file).map_err(source_error)?;
+    // Windows has no read-only or read/write mode bits: the owner-only access
+    // control list checked above is the whole rule.
+    #[cfg(unix)]
     if !matches!(
         file.metadata().map_err(source_error)?.mode() & 0o777,
         0o400 | 0o600
@@ -161,6 +181,12 @@ pub fn file_until(path: &Path, until: std::time::Instant, limit: usize) -> Resul
 }
 pub fn stdin(deadline: u64) -> Result<Secret> {
     let file = duplicate(0)?;
+    #[cfg(windows)]
+    {
+        private(&file)?;
+        windows::admit_stdin(&file)?;
+    }
+    #[cfg(unix)]
     let info = file.metadata().map_err(source_error)?;
     #[cfg(target_os = "macos")]
     if info.is_file() {
@@ -253,6 +279,7 @@ fn process_uid(pid: libc::pid_t) -> Option<libc::uid_t> {
 /// saw before this read runs, possibly before its SIGINT is handled; the empty
 /// non-blocking read then waits again, so the interrupt is reported, not the
 /// empty queue.
+#[cfg(unix)]
 fn read_ready(file: &mut (impl Read + AsRawFd), buffer: &mut [u8], deadline: u64) -> Result<usize> {
     loop {
         wait(file, deadline)?;
@@ -265,6 +292,7 @@ fn read_ready(file: &mut (impl Read + AsRawFd), buffer: &mut [u8], deadline: u64
         }
     }
 }
+#[cfg(unix)]
 fn wait(file: &impl AsRawFd, deadline: u64) -> Result<()> {
     loop {
         check(deadline)?;
@@ -307,6 +335,12 @@ fn read(mut file: File, limit: usize, deadline: u64) -> Result<Secret> {
     Ok(data)
 }
 fn document_file(path: Option<&Path>) -> Result<File> {
+    #[cfg(windows)]
+    return match path {
+        Some(path) => windows::document_file(path),
+        None => duplicate(0),
+    };
+    #[cfg(unix)]
     if let Some(path) = path {
         let file = OpenOptions::new()
             .read(true)
@@ -361,19 +395,30 @@ pub fn document_until(
             .saturating_duration_since(std::time::Instant::now())
             .as_millis()
             .min(100) as i32;
-        let mut poll = libc::pollfd {
-            fd: file.as_raw_fd(),
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        // SAFETY: a live descriptor and one initialized pollfd; bounded wait.
-        let ready = unsafe { libc::poll(&mut poll, 1, ms.max(1)) };
-        check()?;
-        if ready < 0 {
-            return Err(Code::InvalidInput.into());
+        #[cfg(unix)]
+        {
+            let mut poll = libc::pollfd {
+                fd: file.as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            };
+            // SAFETY: a live descriptor and one initialized pollfd; bounded wait.
+            let ready = unsafe { libc::poll(&mut poll, 1, ms.max(1)) };
+            check()?;
+            if ready < 0 {
+                return Err(Code::InvalidInput.into());
+            }
+            if ready == 0 {
+                continue;
+            }
         }
-        if ready == 0 {
-            continue;
+        #[cfg(windows)]
+        {
+            let ready = windows::ready(&file, ms.max(1) as u32)?;
+            check()?;
+            if !ready {
+                continue;
+            }
         }
         let remaining = (limit + 1 - bytes.len()).min(buffer.len());
         let count = file.read(&mut buffer[..remaining]).map_err(source_error)?;
@@ -388,10 +433,12 @@ pub fn document_until(
     check()?;
     String::from_utf8(bytes).map_err(source_error)
 }
+#[cfg(unix)]
 struct Terminal {
     file: File,
     original: libc::termios,
 }
+#[cfg(unix)]
 impl Drop for Terminal {
     fn drop(&mut self) {
         // SAFETY: original termios came from this held controlling terminal.
@@ -403,37 +450,50 @@ impl Drop for Terminal {
         }
     }
 }
+#[cfg(unix)]
+impl Terminal {
+    fn open() -> Result<Self> {
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOCTTY | libc::O_NONBLOCK)
+            .open("/dev/tty")
+            .map_err(source_error)?;
+        let fd = file.as_raw_fd();
+        // SAFETY: scalar terminal/session queries. The current process must own its
+        // foreground controlling session; no supplied terminal descriptor is used.
+        if unsafe { libc::getuid() } != fs::uid()
+            || unsafe { libc::tcgetsid(fd) } != unsafe { libc::getsid(0) }
+            || unsafe { libc::tcgetpgrp(fd) } != unsafe { libc::getpgrp() }
+        {
+            return Err(Code::InvalidInput.into());
+        }
+        let mut original = unsafe { std::mem::zeroed::<libc::termios>() };
+        if unsafe { libc::tcgetattr(fd, &mut original) } != 0 {
+            return Err(Code::InvalidInput.into());
+        }
+        let terminal = Terminal { file, original };
+        let mut mode = original;
+        mode.c_lflag &= !(libc::ECHO | libc::ECHONL | libc::ICANON);
+        mode.c_cc[libc::VMIN] = 1;
+        mode.c_cc[libc::VTIME] = 0;
+        if unsafe { libc::tcsetattr(fd, libc::TCSAFLUSH, &mode) } != 0 {
+            return Err(Code::InvalidInput.into());
+        }
+        Ok(terminal)
+    }
+    fn write_all(&mut self, bytes: &[u8]) -> std::io::Result<()> {
+        self.file.write_all(bytes)
+    }
+    fn read_byte(&mut self, buffer: &mut [u8], deadline: u64) -> Result<usize> {
+        read_ready(&mut self.file, buffer, deadline)
+    }
+}
 pub fn terminal(fields: &[EntryField], deadline: u64) -> Result<Secret> {
     if fields.is_empty() || fields.len() > 16 {
         return Err(Code::InvalidInput.into());
     }
-    let file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .custom_flags(libc::O_CLOEXEC | libc::O_NOCTTY | libc::O_NONBLOCK)
-        .open("/dev/tty")
-        .map_err(source_error)?;
-    let fd = file.as_raw_fd();
-    // SAFETY: scalar terminal/session queries. The current process must own its
-    // foreground controlling session; no supplied terminal descriptor is used.
-    if unsafe { libc::getuid() } != fs::uid()
-        || unsafe { libc::tcgetsid(fd) } != unsafe { libc::getsid(0) }
-        || unsafe { libc::tcgetpgrp(fd) } != unsafe { libc::getpgrp() }
-    {
-        return Err(Code::InvalidInput.into());
-    }
-    let mut original = unsafe { std::mem::zeroed::<libc::termios>() };
-    if unsafe { libc::tcgetattr(fd, &mut original) } != 0 {
-        return Err(Code::InvalidInput.into());
-    }
-    let mut terminal = Terminal { file, original };
-    let mut mode = original;
-    mode.c_lflag &= !(libc::ECHO | libc::ECHONL | libc::ICANON);
-    mode.c_cc[libc::VMIN] = 1;
-    mode.c_cc[libc::VTIME] = 0;
-    if unsafe { libc::tcsetattr(fd, libc::TCSAFLUSH, &mode) } != 0 {
-        return Err(Code::InvalidInput.into());
-    }
+    let mut terminal = Terminal::open()?;
     let mut document = Secret(Vec::with_capacity(65536));
     append(&mut document, b"{")?;
     for (index, field) in fields.iter().enumerate() {
@@ -446,14 +506,13 @@ pub fn terminal(fields: &[EntryField], deadline: u64) -> Result<Secret> {
             return Err(Code::InvalidInput.into());
         }
         terminal
-            .file
             .write_all(field.label.as_bytes())
-            .and_then(|_| terminal.file.write_all(b": "))
+            .and_then(|_| terminal.write_all(b": "))
             .map_err(source_error)?;
         let mut value = Secret(Vec::with_capacity(field.max_bytes as usize));
         let mut byte = Secret(vec![0]);
         loop {
-            let count = read_ready(&mut terminal.file, &mut byte.0, deadline)?;
+            let count = terminal.read_byte(&mut byte.0, deadline)?;
             if count == 0 {
                 return Err(Code::InvalidInput.into());
             }
@@ -478,7 +537,7 @@ pub fn terminal(fields: &[EntryField], deadline: u64) -> Result<Secret> {
                 }
             }
         }
-        terminal.file.write_all(b"\n").map_err(source_error)?;
+        terminal.write_all(b"\n").map_err(source_error)?;
         if index > 0 {
             append(&mut document, b",")?;
         }

@@ -6,6 +6,7 @@
 //! disposable HTTPS fixture whose answer is fixed per test. The duplicate-`operationId`
 //! refusal is driven on the guard preflight and on every feed binding, the two sites
 //! the unit's own suite does not reach. No live Runpod account, no network.
+#![cfg(unix)]
 use connectors_catalog::{
     bundle::{self, Bundle},
     ingest, inventory,

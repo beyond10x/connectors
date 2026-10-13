@@ -5,6 +5,13 @@ use runtime::channel;
 use sha2::{Digest, Sha256};
 use std::{
     fs::File,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+};
+#[cfg(unix)]
+use std::{
     os::{
         fd::{AsRawFd, FromRawFd},
         unix::{
@@ -14,14 +21,18 @@ use std::{
         },
     },
     process::{Command, Stdio},
-    sync::{
-        Arc,
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-    },
 };
 
+/// The owner pipe, its locks and a starting owner's handles on Windows.
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows::{Listener, inherited, salt, socket_path, spawn, try_lock};
+#[cfg(unix)]
+type Listener = UnixListener;
+
 pub struct Client {
-    stream: UnixStream,
+    stream: channel::Stream,
     pub host_incarnation: String,
     /// The owner's executable digest; `None` for an owner that predates the
     /// build handshake, which is by definition another build.
@@ -47,8 +58,9 @@ fn own_image() -> std::io::Result<Vec<u8>> {
 }
 /// macOS has no `/proc/self/exe`: the file at the running executable's path
 /// is read (`own_image_build_measure`: `launch_path_read`), so a file replaced
-/// there is measured as a new build.
-#[cfg(target_os = "macos")]
+/// there is measured as a new build. Windows reads the path
+/// `GetModuleFileNameW` reports, which `current_exe` returns, the same way.
+#[cfg(any(target_os = "macos", windows))]
 fn own_image() -> std::io::Result<Vec<u8>> {
     std::fs::read(std::env::current_exe()?)
 }
@@ -79,7 +91,7 @@ pub struct Capture {
     pub profile: runtime::Profile,
 }
 fn read_reply(
-    stream: &mut UnixStream,
+    stream: &mut channel::Stream,
     deadline: Instant,
     limit: usize,
 ) -> Result<channel::Frame<Reply>> {
@@ -164,6 +176,10 @@ impl Client {
         // starts does so before it answers.
         let authority = Metadata::authority_at(&paths.state)?.to_string();
         let directory = fs::directory(&paths.state, false, true)?;
+        // The pipe name's salt, published by the first caller and refused by
+        // name when it is not owner-only.
+        #[cfg(windows)]
+        salt(&directory)?;
         let socket = socket_path(&directory);
         #[cfg(target_os = "macos")]
         admit_socket(&socket)?;
@@ -192,34 +208,35 @@ impl Client {
                 return Err(Code::Unavailable.into());
             }
             let lock = lock(&directory)?;
-            // SAFETY: the held owner-only file is the one admitted lifetime lock.
-            if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-                if let Ok(stream) = connect_socket(&socket) {
-                    return Self::greet_running(
-                        &socket, stream, paths, &authority, version, deadline,
+            match try_lock(&lock) {
+                Ok(()) => {
+                    if let Ok(stream) = connect_socket(&socket) {
+                        return Self::greet_running(
+                            &socket, stream, paths, &authority, version, deadline,
+                        );
+                    }
+                    // Held to the end of this block: the owner measures its build
+                    // before it answers the greeting (or never will), and only
+                    // then may its launch copy go.
+                    let (stream, mut process, _launched) = spawn(paths, &lock, deadline)?;
+                    let result = Self::greet(
+                        stream,
+                        paths,
+                        &authority,
+                        version,
+                        Some(own_build()?),
+                        deadline,
                     );
+                    if result.is_err() {
+                        let _ = process.kill();
+                        let _ = process.wait();
+                    }
+                    return result;
                 }
-                // Held to the end of this block: the owner measures its build
-                // before it answers the greeting (or never will), and only
-                // then may its launch copy go.
-                let (stream, mut process, _launched) = spawn(paths, &lock, deadline)?;
-                let result = Self::greet(
-                    stream,
-                    paths,
-                    &authority,
-                    version,
-                    Some(own_build()?),
-                    deadline,
-                );
-                if result.is_err() {
-                    let _ = process.kill();
-                    let _ = process.wait();
+                Err(error) if error.kind() != std::io::ErrorKind::WouldBlock => {
+                    return Err(Code::Unavailable.into());
                 }
-                return result;
-            }
-            let error = std::io::Error::last_os_error();
-            if error.kind() != std::io::ErrorKind::WouldBlock {
-                return Err(Code::Unavailable.into());
+                Err(_) => {}
             }
             if Instant::now() >= deadline {
                 return Err(Code::Timeout.into());
@@ -239,7 +256,7 @@ impl Client {
     /// keeps its own code. No work request is sent during identification.
     fn greet_running(
         socket: &std::path::Path,
-        mut stream: UnixStream,
+        mut stream: channel::Stream,
         paths: &Paths,
         authority: &str,
         version: &str,
@@ -313,7 +330,7 @@ impl Client {
         }
     }
     fn greet(
-        stream: UnixStream,
+        stream: channel::Stream,
         paths: &Paths,
         authority: &str,
         selected_version: &str,
@@ -325,7 +342,7 @@ impl Client {
     /// The outer `Err` means the stream closed before any reply arrived; the
     /// inner result is the owner's answer.
     fn hello(
-        mut stream: UnixStream,
+        mut stream: channel::Stream,
         paths: &Paths,
         authority: &str,
         selected_version: &str,
@@ -512,8 +529,11 @@ impl Client {
             Reply::Failed { error } => return Err(error),
             _ => return Err(Code::Unavailable.into()),
         };
+        // Windows reads the handle values as a frame, which needs the stream
+        // mutably; `SCM_RIGHTS` on Unix does not.
+        #[cfg_attr(unix, allow(clippy::unnecessary_mut_passed))]
         let mut files =
-            runtime::launch::receive(&self.stream, runtime::launch::DESCRIPTORS, deadline)?;
+            runtime::launch::receive(&mut self.stream, runtime::launch::DESCRIPTORS, deadline)?;
         let credential = files.pop().ok_or(Code::Unavailable)?;
         let executable = files.pop().ok_or(Code::Unavailable)?;
         // The owner's final answer follows the release of its read use.
@@ -604,7 +624,7 @@ impl Client {
         self.answer_within(deadline, channel::DEPTH)
     }
     /// A read's answer as `invoke` reads it ([`read_shape`]).
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     fn read_answer(&mut self, deadline: Instant) -> Result<Value> {
         read_shape(
             self.answer_within(deadline, channel::DEPTH + 1)
@@ -735,11 +755,12 @@ fn admit_socket(socket: &std::path::Path) -> Result<()> {
         _ => Ok(()),
     }
 }
-fn connect_socket(path: &std::path::Path) -> Result<UnixStream> {
+fn connect_socket(path: &std::path::Path) -> Result<channel::Stream> {
     connect_identified(path).map(|(stream, _)| stream)
 }
 /// Also returns the identity of the socket file connected to, so that a caller
 /// can tell whether the owner behind it has since removed it.
+#[cfg(unix)]
 fn connect_identified(path: &std::path::Path) -> Result<(UnixStream, (u64, u64))> {
     let info = std::fs::symlink_metadata(path).map_err(|_| Code::Unavailable)?;
     if !info.file_type().is_socket() || info.uid() != fs::uid() || info.mode() & 0o077 != 0 {
@@ -749,6 +770,18 @@ fn connect_identified(path: &std::path::Path) -> Result<(UnixStream, (u64, u64))
     channel::peer(&stream)?;
     Ok((stream, (info.dev(), info.ino())))
 }
+/// On Windows the identity is the pipe server's process id (owner.md,
+/// "Windows"): a pipe whose owner retired is gone, and one a newer owner
+/// created has another server.
+#[cfg(windows)]
+fn connect_identified(path: &std::path::Path) -> Result<(channel::Stream, u32)> {
+    windows::connect(path)
+}
+#[cfg(windows)]
+fn socket_identity(path: &std::path::Path) -> Option<u32> {
+    windows::identity(path)
+}
+#[cfg(unix)]
 fn socket_identity(path: &std::path::Path) -> Option<(u64, u64)> {
     std::fs::symlink_metadata(path)
         .ok()
@@ -764,21 +797,31 @@ pub fn enable_checkpoints(paths: &Paths) -> Result<super::super::metadata::Check
     let directory =
         fs::directory(&paths.state, false, true).map_err(|_| Code::MetadataUnavailable)?;
     let lock = lock(&directory).map_err(|_| Code::MetadataUnavailable)?;
-    // SAFETY: `lock` owns the live owner-only lifetime lock descriptor; dropping
-    // it on return releases the lock.
-    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-        return Err(
-            if std::io::Error::last_os_error().kind() == std::io::ErrorKind::WouldBlock {
-                Code::LifecycleConflict
-            } else {
-                Code::MetadataUnavailable
-            }
-            .into(),
-        );
+    // Dropping `lock` on return releases the lock.
+    if let Err(error) = try_lock(&lock) {
+        return Err(if error.kind() == std::io::ErrorKind::WouldBlock {
+            Code::LifecycleConflict
+        } else {
+            Code::MetadataUnavailable
+        }
+        .into());
     }
     let enabled = Metadata::enable_checkpoints(&paths.state)?;
     drop(lock);
     Ok(enabled)
+}
+
+/// The owner lifetime lock, taken now or not at all: `flock(LOCK_EX |
+/// LOCK_NB)` on the lock file. Windows takes a startup and a lifetime byte
+/// lock instead ([`windows::try_lock`]).
+#[cfg(unix)]
+fn try_lock(lock: &File) -> std::io::Result<()> {
+    // SAFETY: the held owner-only file is the one admitted lifetime lock.
+    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
 }
 
 fn lock(directory: &File) -> Result<File> {
@@ -801,6 +844,7 @@ fn lock(directory: &File) -> Result<File> {
 struct Launched;
 #[cfg(target_os = "macos")]
 type Launched = runtime::artifact::Launch;
+#[cfg(unix)]
 fn spawn(
     paths: &Paths,
     lock: &File,
@@ -916,20 +960,38 @@ pub fn serve(paths: Paths) -> Result<()> {
     drop(metadata);
     fs::check_private_file(&lifetime)?;
     let expected = fs::private_file_at(&directory, std::ffi::OsStr::new("owner.lock"))?;
-    let (a, b) = (
-        lifetime.metadata().map_err(|_| Code::Unavailable)?,
-        expected.metadata().map_err(|_| Code::Unavailable)?,
-    );
-    if a.dev() != b.dev() || a.ino() != b.ino() {
-        return Err(Code::InvalidConfiguration.into());
+    #[cfg(unix)]
+    {
+        let (a, b) = (
+            lifetime.metadata().map_err(|_| Code::Unavailable)?,
+            expected.metadata().map_err(|_| Code::Unavailable)?,
+        );
+        if a.dev() != b.dev() || a.ino() != b.ino() {
+            return Err(Code::InvalidConfiguration.into());
+        }
+        // SAFETY: the inherited file is verified against the exact owner lock inode.
+        if unsafe { libc::flock(lifetime.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+            return Err(Code::Unavailable.into());
+        }
     }
-    // SAFETY: the inherited file is verified against the exact owner lock inode.
-    if unsafe { libc::flock(lifetime.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
-        return Err(Code::Unavailable.into());
+    // The lifetime byte, which the starting CLI releases once this process
+    // exists; held through this process's own open of the lock file.
+    #[cfg(windows)]
+    {
+        if fs::windows::identity(&lifetime)? != fs::windows::identity(&expected)? {
+            return Err(Code::InvalidConfiguration.into());
+        }
+        windows::hold_lifetime(&lifetime, Instant::now() + Duration::from_secs(10))?;
+        // Scratch in the state directory's `run`, never the system's
+        // temporary directory; copies a dead owner left there go now.
+        runtime::artifact::enter(&directory).map_err(|_| Code::InvalidConfiguration)?;
+        salt(&directory)?;
     }
     let socket = socket_path(&directory);
     #[cfg(target_os = "macos")]
     admit_socket(&socket)?;
+    // On Windows the pipe's first instance refuses a name that exists.
+    #[cfg(unix)]
     if let Ok(metadata) = std::fs::symlink_metadata(&socket) {
         if !metadata.file_type().is_socket()
             || metadata.uid() != fs::uid()
@@ -974,6 +1036,8 @@ pub fn serve(paths: Paths) -> Result<()> {
     if let Err(error) = owner.pool.shutdown() {
         result = Err(error);
     }
+    // A pipe is gone with its last instance, which `listener` held.
+    #[cfg(unix)]
     if !retired && std::fs::remove_file(socket).is_err() {
         result = Err(Code::Unavailable.into());
     }
@@ -984,7 +1048,7 @@ pub fn serve(paths: Paths) -> Result<()> {
 fn accept(
     owner: &Arc<Owner>,
     recovery: &maintenance::Background,
-    listener: &mut UnixListener,
+    listener: &mut Listener,
     socket: &std::path::Path,
     bound: Duration,
 ) -> (Result<()>, bool) {
@@ -1049,6 +1113,7 @@ fn idle_bound() -> Duration {
 fn idle_bound() -> Duration {
     IDLE_EXIT
 }
+#[cfg(unix)]
 fn listen(socket: &std::path::Path) -> Result<UnixListener> {
     let listener = UnixListener::bind(socket).map_err(|_| Code::Unavailable)?;
     std::fs::set_permissions(socket, std::fs::Permissions::from_mode(0o600))
@@ -1057,6 +1122,37 @@ fn listen(socket: &std::path::Path) -> Result<UnixListener> {
         .set_nonblocking(true)
         .map_err(|_| Code::Unavailable)?;
     Ok(listener)
+}
+/// The owner pipe's first instance: a pipe of that name that already exists
+/// refuses ([`windows::Listener::bind`]).
+#[cfg(windows)]
+fn listen(socket: &std::path::Path) -> Result<Listener> {
+    Listener::bind(socket)
+}
+/// Makes `socket` unreachable for every later connect: the socket file is
+/// removed. Whether that succeeded.
+#[cfg(unix)]
+fn unlink(_: &mut Listener, socket: &std::path::Path) -> bool {
+    std::fs::remove_file(socket).is_ok()
+}
+/// The pipe's waiting instance is closed: a connect finds no instance of this
+/// owner once the ones being served close too.
+#[cfg(windows)]
+fn unlink(listener: &mut Listener, _: &std::path::Path) -> bool {
+    listener.close().is_ok()
+}
+/// Listens again after [`unlink`]: a new socket at the same path.
+#[cfg(unix)]
+fn relisten(socket: &std::path::Path, _served: bool) -> Result<Listener> {
+    listen(socket)
+}
+/// Listens again after [`unlink`]. With nothing served since, no instance of
+/// this owner's pipe is left and its first instance is created anew; with a
+/// connection still being served the pipe still exists, and a new instance
+/// joins it ([`windows::Listener::rebind`]).
+#[cfg(windows)]
+fn relisten(socket: &std::path::Path, served: bool) -> Result<Listener> {
+    Listener::rebind(socket, served)
 }
 /// Work that restarts the idle clock: a connected client (including the startup
 /// channel) or a queued or running job. Recovery restarts it only by settling an
@@ -1086,10 +1182,10 @@ enum Retirement {
 fn retire(
     owner: &Arc<Owner>,
     recovery: &maintenance::Background,
-    listener: &mut UnixListener,
+    listener: &mut Listener,
     socket: &std::path::Path,
 ) -> Retirement {
-    if std::fs::remove_file(socket).is_err() {
+    if !unlink(listener, socket) {
         return Retirement::Serve;
     }
     // A connect that resolved the path just before removal is queued here.
@@ -1114,7 +1210,7 @@ fn retire(
         owner.shutdown.store(true, Ordering::SeqCst);
         return Retirement::Exit;
     }
-    match listen(socket) {
+    match relisten(socket, arrived) {
         Ok(next) => {
             // Anything still queued on the unlinked listener is served first.
             while let Ok((stream, _)) = listener.accept() {
@@ -1137,6 +1233,7 @@ fn retire(
         }
     }
 }
+#[cfg(unix)]
 fn inherited() -> Result<(UnixStream, File)> {
     let duplicate = |fd| -> Result<File> {
         // SAFETY: fcntl rejects a missing descriptor; it never transfers the
@@ -1162,15 +1259,35 @@ fn inherited() -> Result<(UnixStream, File)> {
     }
     Ok((stream, lifetime))
 }
-fn handle(owner: Arc<Owner>, mut stream: UnixStream) -> Result<()> {
+fn handle(owner: Arc<Owner>, mut stream: channel::Stream) -> Result<()> {
     // The listener is non-blocking, and on macOS an accepted stream inherits
     // that (Linux's accept(2) does not): every read before the caller's bytes
     // arrived would end at once as a timeout, and the owner would close the
-    // stream without a reply. Each exchange waits on its own deadlines.
+    // stream without a reply. Each exchange waits on its own deadlines. A
+    // Windows pipe has no such mode: each of its reads waits to a deadline.
+    #[cfg(unix)]
     stream
         .set_nonblocking(false)
         .map_err(|_| Code::Unavailable)?;
+    #[cfg(unix)]
     channel::peer(&stream)?;
+    // A client of the current user at another integrity level, or with a
+    // restricted token, is answered by name rather than dropped (owner.md,
+    // "Windows", "Pipe peer").
+    #[cfg(windows)]
+    if let Err(failure) = channel::peer(&stream) {
+        let code = windows::peer_refusal(failure);
+        if code == Code::LifecycleConflict {
+            let _ = channel::write(
+                &mut stream,
+                &Reply::Failed { error: code.into() },
+                None,
+                &[],
+                Instant::now() + Duration::from_millis(500),
+            );
+        }
+        return Err(code.into());
+    }
     if owner.clients.fetch_add(1, Ordering::SeqCst) >= 32 {
         owner.clients.fetch_sub(1, Ordering::SeqCst);
         // Answer instead of closing silently: a stream closed without any reply
@@ -1192,6 +1309,9 @@ fn handle(owner: Arc<Owner>, mut stream: UnixStream) -> Result<()> {
         .name("connectors-local-request".into())
         .spawn(move || {
             let _ = exchange(&owner, &mut stream);
+            // Closed before it stops counting: an owner that retires once no
+            // client is counted finds no pipe instance of this one still open.
+            drop(stream);
             owner.clients.fetch_sub(1, Ordering::SeqCst);
         })
         .is_err()
@@ -1201,7 +1321,7 @@ fn handle(owner: Arc<Owner>, mut stream: UnixStream) -> Result<()> {
     }
     Ok(())
 }
-fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
+fn exchange(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let until = Instant::now() + Duration::from_secs(10);
     let hello = channel::read::<Request>(stream, until, false, 0)?;
     let Request::Hello {
@@ -1268,7 +1388,7 @@ fn exchange(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
     written?;
     Ok(())
 }
-fn exchange_write(owner: &Owner, stream: &mut UnixStream) -> Result<()> {
+fn exchange_write(owner: &Owner, stream: &mut channel::Stream) -> Result<()> {
     let frame = channel::read::<WriteRequest>(
         stream,
         Instant::now() + Duration::from_secs(10),
@@ -1383,7 +1503,7 @@ fn write_action(
 }
 fn action(
     owner: &Owner,
-    stream: &mut UnixStream,
+    stream: &mut channel::Stream,
     request: Request,
     document: Vec<u8>,
 ) -> Result<Value> {
@@ -1689,7 +1809,7 @@ fn action(
 /// the delivery: the sealed copy is the consumer's from then on.
 fn launch(
     owner: &Owner,
-    stream: &mut UnixStream,
+    stream: &mut channel::Stream,
     alias: &str,
     config: &Config,
     connection: &str,
@@ -1775,7 +1895,7 @@ fn launch(
 /// its deadline, its own timeout included, and that answer decides the
 /// failure. A sent invoke whose answer never arrives may have been
 /// dispatched, so its outcome is unknown, never the host's admission.
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod invoke_answer_tests {
     use super::*;
 
@@ -1836,7 +1956,7 @@ mod invoke_answer_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod read_answer_depth_tests {
     use super::*;
 
@@ -1886,7 +2006,7 @@ mod read_answer_depth_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::sync::Mutex;
@@ -2274,7 +2394,7 @@ mod macos_tests {
 
 /// story:owner-idle-exit with the real accept loop, recovery thread and pool,
 /// and an idle bound spanning several 5 s recovery sweeps.
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod idle_sweep_tests {
     use super::*;
     use crate::local::{mutations as ledger, registry};

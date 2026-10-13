@@ -11,14 +11,27 @@
 //! CLI's own build whose answer carries the owner's code for the conflict, and
 //! the owner's own conversions are asserted directly.
 use connectors_host::local::{self, owner, registry};
+#[cfg(unix)]
 #[path = "support/socket.rs"]
 mod sockets;
 use serde_json::{Value, json};
 use std::{
     fs,
+    process::{Command, Output},
+};
+#[cfg(unix)]
+use std::{
     io::{Read, Write},
     os::unix::{fs::PermissionsExt, net::UnixStream},
-    process::{Command, Output},
+};
+
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
 };
 
 fn command(root: &tempfile::TempDir, args: &[&str]) -> Output {
@@ -39,7 +52,7 @@ fn configured() -> tempfile::TempDir {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -52,6 +65,7 @@ fn failure(output: &Output) -> Value {
     serde_json::from_slice::<Value>(&output.stderr).unwrap()["error"]["data"].clone()
 }
 
+#[cfg(unix)]
 fn read_frame(stream: &mut UnixStream) -> Value {
     let mut sizes = [0u8; 12];
     stream.read_exact(&mut sizes).unwrap();
@@ -61,6 +75,7 @@ fn read_frame(stream: &mut UnixStream) -> Value {
     serde_json::from_slice(&rest[..size(0)]).unwrap()
 }
 
+#[cfg(unix)]
 fn write_frame(stream: &mut UnixStream, control: &Value) {
     let control = serde_json::to_vec(control).unwrap();
     let mut frame = Vec::new();
@@ -71,6 +86,7 @@ fn write_frame(stream: &mut UnixStream, control: &Value) {
     stream.write_all(&frame).unwrap();
 }
 
+#[cfg(unix)]
 fn sha256_hex(bytes: &[u8]) -> String {
     ring::digest::digest(&ring::digest::SHA256, bytes)
         .as_ref()
@@ -81,6 +97,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 /// One connection served as an owner of the CLI's own build, answering its one
 /// work request with the owner's definite failure for a revision conflict.
+#[cfg(unix)]
 fn stand_in_owner(root: &tempfile::TempDir) -> std::thread::JoinHandle<Vec<String>> {
     let state = root.path().join("state");
     let listener = sockets::bind(&state, "owner.sock");
@@ -128,6 +145,7 @@ fn the_owner_reports_a_revision_conflict_under_its_own_code() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn a_revision_conflict_reaches_the_cli_as_revision_conflict() {
     let root = configured();

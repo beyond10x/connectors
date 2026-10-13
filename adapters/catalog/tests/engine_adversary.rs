@@ -2,6 +2,7 @@
 //! required query parameters, and what the rebuilt bundles did to the revisions
 //! an operator binds approvals to. Each case drives the engine or the shipped
 //! binary from what the unit's own story and guide say.
+#![cfg(unix)]
 use connectors_catalog::{bundle, ingest, inventory};
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_core::{ErrorCode, Result};

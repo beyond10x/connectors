@@ -6,6 +6,7 @@
 //! encoding of reserved characters in JQL and in a continuation token, that an
 //! undeclared parameter is refused before any request, and that the basic
 //! credential appears in no argv, no environment and no failure of the child.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

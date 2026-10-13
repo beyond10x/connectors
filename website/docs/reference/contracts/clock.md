@@ -108,6 +108,13 @@ moves only by time asleep. Darwin's CLOCK_MONOTONIC is subject to frequency and
 time adjustments and is not used. The rate bound then covers the oscillator
 alone.
 
+On Windows the same rule holds with `QueryUnbiasedInterruptTimePrecise` in place
+of CLOCK_MONOTONIC and `QueryInterruptTimePrecise` in place of CLOCK_BOOTTIME:
+both read the interrupt time in 100 ns units, and only the first excludes the
+time the machine sleeps, so their offset moves only by time asleep.
+`QueryUnbiasedInterruptTime` and `QueryInterruptTime` advance only at each timer
+interrupt, about 15.6 ms by default, and are not used.
+
 Let S and R be monotonic readings before nonce creation and after receipt, N the
 current reading, p the admitted parts-per-million rate error, and q=1,000,000.
 For measured elapsed d, conservative real elapsed bounds are

@@ -6,6 +6,7 @@
 //! against the pinned Discovery document, and where the claim is about bytes,
 //! drives the provider child against a disposable HTTPS fixture. Fixture
 //! secrets are fictional and only ever compared, never printed. No network.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

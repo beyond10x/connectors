@@ -682,11 +682,17 @@ pub(super) fn provider_open(path: &Path) -> Result<OpenVerification> {
     Ok(opened)
 }
 
+#[cfg(unix)]
 fn file_identity(path: &Path) -> Option<(u64, u64)> {
     use std::os::unix::fs::MetadataExt;
-    std::fs::symlink_metadata(path)
-        .ok()
-        .map(|metadata| (metadata.dev(), metadata.ino()))
+    let metadata = std::fs::symlink_metadata(path).ok()?;
+    Some((metadata.dev(), metadata.ino()))
+}
+
+/// Windows: the volume serial and file index, without following a final link.
+#[cfg(windows)]
+fn file_identity(path: &Path) -> Option<(u64, u64)> {
+    super::fs::windows::path_identity(path)
 }
 
 fn take(path: &Path, authority: &Authority, source_level: i64) -> Option<ErAuthority> {

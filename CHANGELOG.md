@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.49.0 — 2026-10-13
+
+### Added
+
+- The CLI and its local host build and run on Windows, with credentials in the Windows Credential
+  Manager. The owner listens on a named pipe whose access control list grants the current user
+  alone, under a name salted per state directory; the CLI and the owner compare the peer's user,
+  integrity level and token restriction before anything is sent. Handles reach the other process
+  through `DuplicateHandle` in place of `SCM_RIGHTS`. An admitted executable runs from an
+  owner-only copy held without write sharing, its digest and PE header checked through that
+  handle. Every child is created inside a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
+  Owner-only files are checked by their owner SID and access control list on the opened handle,
+  the no-replace rename is `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING` on NTFS, and the
+  trusted clock reads `QueryUnbiasedInterruptTimePrecise` and `QueryInterruptTimePrecise`.
+  Windows holds four of the seven platform guarantees and three in a named weaker form
+  ([Windows platform guarantees](contracts/cli/v1alpha1/semantics.md#windows-platform-guarantees);
+  `connectors.cli.PlatformGuaranteeStatement`).
+- A consumer on Windows receives its credential as one inherited read-only handle whose value is
+  in `CONNECTORS_CREDENTIAL_HANDLE` (`connectors.cli.ConsumerCredentialDelivery`;
+  [consumer launch](contracts/cli/v1alpha1/consumer-launch.md#8-windows)), in place of
+  descriptor 3.
+- The `Windows host` workflow builds the workspace and runs the lint and test suites of
+  `connectors-host` and `connectors` on `windows-latest` for every pull request and push to `main`.
+- `connectors-build ignored --inventory` also names the tests that run on Unix only.
+
+### Limitations
+
+- No Windows release binary is built; the CLI is built from source on Windows.
+- Tests whose fixtures need Unix mode bits, descriptors, file locks or the Secret Service run on
+  Unix only; the inventory names them.
+- On Windows every process a consumer starts without `CREATE_BREAKAWAY_FROM_JOB` is in the
+  consumer's kill-on-close job and ends when the consumer exits; on Linux `PR_SET_PDEATHSIG`
+  covers the consumer alone and such a process outlives it. An owner a consumer starts breaks
+  away and keeps running.
+- On Windows an admitted executable runs from a copy in the state directory, so DLLs installed
+  beside the original executable are not found: adapters and consumers are self-contained.
+- On Windows an inheritable handle exists for the duration of one consumer or owner creation, so a
+  concurrent creation with handle inheritance elsewhere in the same process could inherit it; the
+  host and the CLI make no such creation.
+- On Windows `-wal` and `-shm` files that a crashed elevated session left in the state directory,
+  owned by the Administrators group, are refused by a later session that is not elevated until
+  they are removed.
+- A CLI and an owner of the same user at different integrity levels (an elevated terminal beside
+  a normal one) refuse each other with `lifecycle_conflict` until the running owner retires.
+
 ## 0.48.0 — 2026-10-13
 
 ### Added

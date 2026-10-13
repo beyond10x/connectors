@@ -5,6 +5,11 @@
 //! has no memfd: [`macos`] captures an owner-private copy, launches it by path
 //! and owns the launched process (contracts/cli/v1alpha1/semantics.md, "macOS
 //! platform guarantees").
+//!
+//! Windows has no memfd either: [`windows`] captures a copy that no process
+//! can write, rename or delete while its handle is held, creates the child
+//! from its path in a kill-on-close job and owns it through its process handle
+//! (contracts/cli/v1alpha1/semantics.md, "Windows platform guarantees").
 #[cfg(target_os = "linux")]
 use super::{Failure, Result};
 #[cfg(target_os = "linux")]
@@ -24,6 +29,14 @@ use std::{
 mod macos;
 #[cfg(target_os = "macos")]
 pub(crate) use macos::{ExactChild, Image, Launch, capture, launch_path, path_of, received, sent};
+
+#[cfg(windows)]
+pub(crate) mod windows;
+#[cfg(windows)]
+pub(crate) use windows::{
+    Creation, Image, Job, Launch, Process, capture, create, enter, exited, inheritable,
+    launch_path, quote, run_directory, scratch, terminate,
+};
 
 /// What [`capture`] returns: on Linux the sealed memfd itself.
 #[cfg(target_os = "linux")]

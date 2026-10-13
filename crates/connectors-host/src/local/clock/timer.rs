@@ -25,12 +25,53 @@ const SUSPEND_INCLUSIVE: libc::clockid_t = libc::CLOCK_MONOTONIC_RAW;
 #[cfg(target_os = "macos")]
 const SUSPEND_EXCLUSIVE: libc::clockid_t = libc::CLOCK_UPTIME_RAW;
 
+// Windows keeps the guarantee: QueryInterruptTimePrecise counts sleep,
+// QueryUnbiasedInterruptTimePrecise does not, and both read the interrupt time
+// in 100 ns units, so their offset moves only by time asleep
+// (contracts/service/clock.md). QueryInterruptTime and
+// QueryUnbiasedInterruptTime advance only at each timer interrupt, about
+// 15.6 ms by default, coarser than the 1 ms bound, and are not used.
+#[cfg(windows)]
+const SUSPEND_INCLUSIVE: bool = true;
+#[cfg(windows)]
+const SUSPEND_EXCLUSIVE: bool = false;
+#[cfg(windows)]
+fn read(suspend_inclusive: bool) -> Result<u64> {
+    use windows_sys::Win32::System::WindowsProgramming::{
+        QueryInterruptTimePrecise, QueryUnbiasedInterruptTimePrecise,
+    };
+    let mut units = 0u64;
+    // SAFETY: both functions write one u64 through a valid pointer.
+    unsafe {
+        if suspend_inclusive {
+            QueryInterruptTimePrecise(&mut units);
+        } else {
+            QueryUnbiasedInterruptTimePrecise(&mut units);
+        }
+    }
+    units.checked_mul(100).ok_or(Failure::Unavailable)
+}
+/// The precise interrupt-time functions read the performance counter, whose
+/// resolution is far below 1 ms; Windows has no resolution query for them.
+/// Two successive readings of each clock must not run backwards.
+#[cfg(windows)]
+pub(super) fn qualify_resolution() -> Result<()> {
+    for clock in [SUSPEND_EXCLUSIVE, SUSPEND_INCLUSIVE] {
+        let first = read(clock)?;
+        if read(clock)? < first {
+            return Err(Failure::Unavailable);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 pub(super) struct Stamp {
     pub monotonic: u64,
     pub offset_lower: i128,
     pub offset_upper: i128,
 }
+#[cfg(unix)]
 fn ns(t: libc::timespec) -> Result<u64> {
     if t.tv_sec < 0 || !(0..1_000_000_000).contains(&t.tv_nsec) {
         return Err(Failure::Unavailable);
@@ -40,6 +81,7 @@ fn ns(t: libc::timespec) -> Result<u64> {
         .and_then(|n| n.checked_add(t.tv_nsec as u64))
         .ok_or(Failure::Unavailable)
 }
+#[cfg(unix)]
 fn read(clock: libc::clockid_t) -> Result<u64> {
     let mut t = libc::timespec {
         tv_sec: 0,
@@ -51,6 +93,7 @@ fn read(clock: libc::clockid_t) -> Result<u64> {
     }
     ns(t)
 }
+#[cfg(unix)]
 pub(super) fn qualify_resolution() -> Result<()> {
     for clock in [SUSPEND_EXCLUSIVE, SUSPEND_INCLUSIVE] {
         let mut t = libc::timespec {
@@ -117,6 +160,51 @@ mod macos_tests {
     fn slept_time_refuses_the_continuation() {
         let first = Stamp::read().unwrap();
         let mut slept = Stamp::read().unwrap();
+        slept.offset_lower += 3_000_000;
+        slept.offset_upper += 3_000_000;
+        assert!(matches!(
+            first.continuous_with(slept),
+            Err(Failure::Unavailable)
+        ));
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    /// Both interrupt-time clocks qualify and are monotone.
+    #[test]
+    fn interrupt_clocks_qualify_and_are_monotone() {
+        qualify_resolution().unwrap();
+        for clock in [SUSPEND_EXCLUSIVE, SUSPEND_INCLUSIVE] {
+            let first = read(clock).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            let second = read(clock).unwrap();
+            assert!(second > first);
+        }
+    }
+
+    /// The unbiased clock excludes sleep, so it is never ahead of the clock
+    /// that counts it, read just after.
+    #[test]
+    fn the_unbiased_clock_is_not_ahead_of_the_biased_one() {
+        for _ in 0..1000 {
+            let unbiased = read(SUSPEND_EXCLUSIVE).unwrap();
+            let biased = read(SUSPEND_INCLUSIVE).unwrap();
+            assert!(unbiased <= biased);
+        }
+    }
+
+    /// While awake the offset holds within the 1 ms tolerance; a moved offset
+    /// refuses the continuation.
+    #[test]
+    fn offset_holds_while_awake_and_sleep_refuses() {
+        let first = Stamp::read().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        let second = Stamp::read().unwrap();
+        first.continuous_with(second).unwrap();
+        let mut slept = second;
         slept.offset_lower += 3_000_000;
         slept.offset_upper += 3_000_000;
         assert!(matches!(

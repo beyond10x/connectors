@@ -9,6 +9,7 @@
 //! returned body are asserted, and every list walks to the end condition the
 //! guide documents. Every key, id and name in the fixture is synthetic. No live
 //! credential and no network.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

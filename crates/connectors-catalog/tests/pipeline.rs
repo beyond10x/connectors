@@ -1,3 +1,4 @@
+#![cfg(unix)]
 use connectors_catalog::bundle::{INDEX_FILE, load, read_index};
 use connectors_catalog::pipeline::{ORDER, Progress, Request, Step, run};
 use connectors_catalog::{Refusal, ingest};

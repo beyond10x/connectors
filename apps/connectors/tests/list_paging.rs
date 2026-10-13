@@ -15,6 +15,15 @@ use std::{
     process::{Command, Output},
 };
 
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
+};
+
 const OPERATIONS: [&str; 3] = ["item.read", "item.list", "item.write"];
 
 fn command(root: &tempfile::TempDir, args: &[&str]) -> Output {
@@ -53,7 +62,7 @@ fn refusal(output: &Output) -> Value {
 
 fn adapter_entry(alias: &str, revision: &str) -> String {
     format!(
-        "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='{revision}'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=['{}','{}','{}']\n",
+        "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='{revision}'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=['{}','{}','{}']\n",
         "a".repeat(64),
         OPERATIONS[0],
         OPERATIONS[1],

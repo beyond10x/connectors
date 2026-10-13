@@ -9,6 +9,7 @@
 //! created pod, a 400 refusal, a connection dropped after the request was read,
 //! a 5xx, a terminate answered 204, 200 and 404. No live Runpod account, no
 //! network, and the key is fictional.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

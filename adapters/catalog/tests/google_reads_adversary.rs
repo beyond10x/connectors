@@ -2,6 +2,7 @@
 //! Each case asserts a claim the story, the guide or an existing test makes,
 //! against the code that is supposed to keep it. Fixture secrets are
 //! fictional and only ever compared, never printed.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
