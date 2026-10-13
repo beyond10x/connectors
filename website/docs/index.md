@@ -50,8 +50,8 @@ capability with the test that holds it. In short:
 
 ## What it is not
 
-- Not a hosted service. Nothing here deploys anything; binary and package distribution are not
-  configured.
+- Not a hosted service. Nothing here deploys anything; release pages carry Linux and macOS
+  binaries of the `connectors` command, and package distribution is not configured.
 - Not a credential vault. Custody is the local Secret Service keyring; a credential never travels
   in operation input, and the federation host never holds a provider credential.
 - Not a retry layer. No host retries a provider request on its own; an uncertain write stays

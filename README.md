@@ -47,7 +47,8 @@ The macOS and Windows bindings have a CI job that runs the custody contract suit
 real stores. The CLI and its local host also build and run on macOS: a CI job runs their lint and
 test suites on `macos-latest`, and the guarantees macOS holds only in a weaker form are listed in
 the [CLI semantics](contracts/cli/v1alpha1/semantics.md#macos-platform-guarantees). They do not
-yet run on Windows. A release page carries source archives only. See the [catalog provider guide](docs/local-catalog-provider.md),
+yet run on Windows. A release page carries Linux and macOS binaries besides the source
+archives ([install a release binary](#install-a-release-binary)). See the [catalog provider guide](docs/local-catalog-provider.md),
 the [Kubernetes CLI guide](docs/local-kubernetes-cli.md) and the
 [runtime binding](docs/local-runtime-foundation.md).
 
@@ -158,11 +159,49 @@ issued no second merge. The wider write failure matrix remains open. MCP binding
 acceptance remain implementation work. The executable
 also provides `describe`, `invoke` and `serve`.
 
-Build this source release locally; binary/package distribution and deployment
-are not configured. Historical
+Install the `connectors` binary from a release page or build this source
+locally; package distribution and deployment are not configured. Historical
 [runtime verification](docs/verification.md) and the
 [specification checkpoint](docs/evidence/core-model-closure-20260909/checkpoint.md)
 describe what was checked and its limits.
+
+## Install a release binary
+
+Each release page carries `connectors-<version>-<target>.tar.gz` for
+`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
+`aarch64-apple-darwin`, and a `SHA256SUMS` file; releases cut before
+[`release-binaries.yml`](.github/workflows/release-binaries.yml) existed carry source archives
+only. There is no Windows binary. Each archive holds a directory with the `connectors` binary,
+`README.md` and `CHANGELOG.md`. The Linux binaries are built on Ubuntu 24.04 and need its glibc
+or a newer one.
+
+On Linux, with the version and target you want:
+
+```sh
+version=X.Y.Z
+target=x86_64-unknown-linux-gnu
+base="https://github.com/beyond10x/connectors/releases/download/v$version"
+curl -fsSLO "$base/connectors-$version-$target.tar.gz"
+curl -fsSLO "$base/SHA256SUMS"
+grep " connectors-$version-$target.tar.gz\$" SHA256SUMS | sha256sum -c -
+tar -xzf "connectors-$version-$target.tar.gz"
+mkdir -p ~/.local/bin
+install -m 0755 "connectors-$version-$target/connectors" ~/.local/bin/connectors
+connectors --version
+```
+
+On macOS, use `target=aarch64-apple-darwin` (Apple silicon) or `x86_64-apple-darwin` (Intel),
+and check the archive with `shasum -a 256 -c -` in place of `sha256sum -c -`; the other commands
+are the same. The macOS binaries are not signed yet. A binary downloaded with `curl` runs as is;
+one downloaded through a browser carries Gatekeeper's quarantine attribute and is refused until
+you remove it, from the extracted directory:
+
+```sh
+xattr -d com.apple.quarantine connectors
+```
+
+An unsigned binary also cannot read login keychain items that an earlier build of `connectors`
+wrote, so credentials are stored again after an upgrade.
 
 ## Get started
 
