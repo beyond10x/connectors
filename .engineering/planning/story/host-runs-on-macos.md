@@ -2,17 +2,18 @@
 format: aep.planning-md/3
 id: story:host-runs-on-macos
 kind: story
-status: active
+status: implemented
 title: The connectors binary builds and runs on macOS
 relations:
 - decomposes: epic:local-cli-on-macos-and-windows
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
 - informed_by: decision-blocker:macos-keychain-partition
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-13T04:58:49Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-13T04:58:49Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-13T11:49:13Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1,"review_outcome":1}}}
 ---
 ## Outcome
 

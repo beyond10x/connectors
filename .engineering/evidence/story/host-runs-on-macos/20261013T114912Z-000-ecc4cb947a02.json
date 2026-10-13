@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-13T11:49:12Z",
+  "actor": "human:timo",
+  "artifact": "story:host-runs-on-macos",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/38386593205 (macOS host: clippy and tests of connectors-host and connectors on macos-latest, success on f326e69a5)"
+  }
+}
