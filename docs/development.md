@@ -89,9 +89,13 @@ generate the reference from the same specification as the committed package.
 `connectors-build cli --check`, which the gate runs, needs no ledger.
 
 The gate selects `--ess`, then `CONNECTORS_ESS`, then `ess` on PATH, and likewise
-`--aep`, then `CONNECTORS_AEP`, then `aep` on PATH. A candidate is accepted only when
-its `--version` names the pinned release exactly; an explicit selection that does
-not refuses without fallback. Resolution never installs or replaces a binary.
+`--aep`, then `CONNECTORS_AEP`, then `aep` on PATH. Both flags belong to
+`connectors-build` itself and come before the subcommand
+(`cargo run --locked -p connectors-build -- --aep <path> gate`); after it, as in
+`gate --aep <path>`, they are refused as unknown arguments. A candidate is accepted
+only when its `--version` names the pinned release exactly; an explicit selection
+that does not refuses without fallback. Resolution never installs or replaces a
+binary.
 
 Do not transcribe a `review-result` into a `verification-report` (practice stopped
 2026-09-15). Record findings in the review-result itself, in its findings block;
