@@ -6,6 +6,7 @@
 //! leaves the directory exactly as it was — including the index" — and its
 //! Acceptance sentence that a run's index entry is what `bundle::read_index`
 //! reports.
+#![cfg(unix)]
 
 use connectors_catalog::bundle::{INDEX_FILE, Index, load, read_index};
 use connectors_catalog::pipeline::{ORDER, Request, Run, Step, run};

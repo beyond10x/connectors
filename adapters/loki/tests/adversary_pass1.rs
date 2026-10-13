@@ -6,6 +6,7 @@
 //! `src/local.rs`. The TLS and redirect cases build the HTTP port exactly as
 //! `Local::load` does (`allow_plaintext: false`, `bearer: true`, the CA bytes
 //! replacing the roots) and add the credential as `Local::authenticated` does.
+#![cfg(unix)]
 use connectors_core::ErrorCode;
 use connectors_host::http::{HttpConfig, ScopedHttp};
 use connectors_loki::{Loki, auth};

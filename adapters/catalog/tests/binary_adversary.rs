@@ -2,6 +2,7 @@
 //! recording port; transport cases run the real `ScopedHttp` against a plain loopback server so
 //! framing, compression and header carriage are the transport's, not a fixture's. Every origin,
 //! path and byte is synthetic.
+#![cfg(unix)]
 use connectors_catalog::{bundle::Bundle, ingest, inventory};
 use connectors_catalog_provider::{Engine, NoHosts, Selection, origin};
 use connectors_core::{ErrorCode, Result};

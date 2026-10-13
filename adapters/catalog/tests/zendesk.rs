@@ -9,6 +9,7 @@
 //! returned body bytes are asserted, every list walks two pages to the end
 //! condition the guide documents, and the current-user identity read yields the
 //! user id. Every record is synthetic. No live credential and no network.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

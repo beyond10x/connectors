@@ -21,6 +21,7 @@
 //! own approval signer and verifier against a subject built from the child's
 //! descriptor; the signing key is the public RFC 8032 section 7.1 test vector,
 //! never a deployment key.
+#![cfg(unix)]
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

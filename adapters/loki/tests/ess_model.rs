@@ -2,6 +2,7 @@
 //! (`spec/ess/domains/connection.yaml`): the schemas the pinned `ess` generates
 //! from it, and their invariants, accept what the executable accepts and
 //! advertises, and refuse what it refuses.
+#![cfg(unix)]
 use connectors_host::local::runtime::Bootstrap;
 use connectors_loki::auth;
 use serde_json::{Value, json};

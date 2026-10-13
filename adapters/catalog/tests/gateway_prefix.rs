@@ -7,6 +7,7 @@
 //!
 //! Each gateway case runs the configuration example the product guide shows,
 //! against a disposable HTTPS fixture. No live credential and no network.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

@@ -43,6 +43,7 @@
 //! `APIEntitiesBranch`, `APIEntitiesProject` and the namespace, the fields the
 //! guards read) with synthetic ids, keeps its state, and records each request
 //! with its content type, so "no request was sent" is a count of what it saw.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

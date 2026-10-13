@@ -2,6 +2,7 @@
 //! suite; the live cases need a disposable MySQL 8.0 server named by
 //! `CONNECTORS_MYSQL_ADVERSARY_PORT` on loopback (user `reader`, password
 //! `reader-pw`, databases `fixture` and `other`) and are ignored otherwise.
+#![cfg(unix)]
 #[path = "mysql/fixture.rs"]
 mod fixture;
 

@@ -9,6 +9,7 @@
 //! and every list walks two pages to the end condition the guide documents,
 //! read from the body alone. The credential and the auth profile are the ones
 //! the Jira guide uses. No live credential and no network.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

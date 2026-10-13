@@ -1,5 +1,6 @@
 //! Adversary cases for the MySQL engine: each drives the implementation from a
 //! document the unit wrote about itself (the reads contract, the ESS model).
+#![cfg(unix)]
 #[path = "mysql/fixture.rs"]
 mod fixture;
 

@@ -18,6 +18,7 @@
 //! transport the host's approval coordinator drives. The fixture records each
 //! write's method, route and body, so "no write was sent" is a count of what
 //! the fixture saw.
+#![cfg(unix)]
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{
     Check, Effect, Engine, Expectation, Guard, Postflight, Preflight, ResponseKind, Selection,

@@ -1,6 +1,7 @@
 //! The Prometheus executable through the host's private runtime, against a local TLS
 //! fixture serving the recorded answers in `tests/fixtures` (Prometheus HTTP
 //! API shapes). No real Prometheus is contacted and no real credential is used.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

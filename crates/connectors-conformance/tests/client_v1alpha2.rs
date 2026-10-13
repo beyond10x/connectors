@@ -2,6 +2,7 @@
 //! (contracts/service/compatibility.md § 2, § 2.1). The client crate keeps its
 //! Rust 1.88 check with `--all-targets`, so its host-backed cases live here,
 //! beside the host.
+#![cfg(unix)]
 mod support;
 
 use axum::{Router, http::StatusCode, routing::post};

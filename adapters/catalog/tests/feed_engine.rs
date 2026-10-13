@@ -3,6 +3,7 @@
 //! cannot carry is refused when the engine is built, before any request; and the local service
 //! declares both operations from its `operations_file`. The suite run is
 //! `crates/connectors-build/src/catalog_feed_conformance.rs`.
+#![cfg(unix)]
 use connectors_catalog::{
     bundle::{self, Bundle},
     ingest, inventory,
