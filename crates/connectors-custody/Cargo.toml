@@ -1,0 +1,38 @@
+[package]
+name = "connectors-custody"
+description = "Credential custody of the local host: the backend trait, an in-memory reference and one platform binding each for the Secret Service, the macOS login keychain and the Windows Credential Manager."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Hooks the host's private Secret Service fixtures use: a direct bus
+# connection, a failing durability barrier and native attribute tampering.
+# Never enabled by a production build of the host.
+test-support = ["dep:tempfile"]
+
+[dependencies]
+sha2.workspace = true
+subtle.workspace = true
+uuid.workspace = true
+zeroize.workspace = true
+tempfile = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+hex.workspace = true
+libc = "0.2"
+zbus = "=5.19.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "=0.10.1"
+libc = "0.2"
+security-framework = "=3.7.0"
+security-framework-sys = "=2.17.0"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Credentials", "Win32_System_Threading"] }
+
+[dev-dependencies]
+clap.workspace = true
+tempfile.workspace = true

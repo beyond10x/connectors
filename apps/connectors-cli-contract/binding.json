@@ -10194,6 +10194,14 @@
             "config_path": {
               "kind": "string"
             },
+            "custody_backend": {
+              "kind": "enum",
+              "variants": [
+                "secret_service",
+                "macos_keychain",
+                "windows_credential_manager"
+              ]
+            },
             "keyring": {
               "kind": "enum",
               "variants": [
@@ -10205,7 +10213,9 @@
             "os": {
               "kind": "enum",
               "variants": [
-                "linux"
+                "linux",
+                "macos",
+                "windows"
               ]
             },
             "prerequisites": {
@@ -10879,7 +10889,9 @@
             "os": {
               "kind": "enum",
               "variants": [
-                "linux"
+                "linux",
+                "macos",
+                "windows"
               ]
             },
             "state_path": {

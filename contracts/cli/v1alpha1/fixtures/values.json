@@ -204,6 +204,7 @@
         "state_path": "/home/fixture/.local/state/connectors",
         "os": "linux",
         "keyring": "locked",
+        "custody_backend": "secret_service",
         "prerequisites": [
           {
             "name": "os-keyring",

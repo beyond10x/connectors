@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0450-binary-slack-files-kubernetes-exec
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.45.0: binary catalog reads, Slack files, Jira attachments, Kubernetes logs, contexts and exec'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261010e-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-10T17:09:56Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-12T20:34:18Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 

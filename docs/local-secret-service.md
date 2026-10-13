@@ -1,7 +1,14 @@
 # Local Secret Service custody binding
 
-The host's `local::keyring::custody` module implements immutable scoped writes and
-exact-version reads against one qualified Linux Secret Service implementation.
+The Linux custody binding (`secret_service`) implements immutable scoped writes and
+exact-version reads against one qualified Linux Secret Service implementation. It is
+one of the three platform bindings that
+[custody semantics §5.1](../contracts/auth/custody/v1alpha1/semantics.md#51-platform-bindings-of-the-local-host)
+names, beside the macOS login keychain and the Windows Credential Manager; the binding
+is fixed when the binary is built, `setup check` reports it as `custody_backend`, and
+none falls back to another. Its code is `crates/connectors-custody/src/secret_service`,
+behind the `connectors-custody` backend trait; the host's `local::keyring::custody`
+coordinator keeps the writer lock, the guards and the receipts and calls that trait.
 It is infrastructure for the persistent GitLab journey. The
 [SQLite coordinator](local-connection-registry.md) now binds connection publication
 and guarded retirement. [Protected CLI entry and supervised GitLab reads](local-catalog-provider.md)
@@ -123,6 +130,15 @@ CARGO_BUILD_JOBS=2 cargo build --locked --offline -p connectors
 export CONNECTORS_TEST_CLI="$CARGO_TARGET_DIR/debug/connectors"
 CARGO_BUILD_JOBS=2 cargo test --locked --offline -p connectors-host --lib \
   local::keyring -- --include-ignored --nocapture
+```
+
+The fixture lives beside the binding (`connectors_custody::secret_service::fixture`).
+The custody contract suite, which every binding answers, runs against this binding in
+the same kind of private fixture:
+
+```sh
+CARGO_BUILD_JOBS=2 cargo test --locked --offline -p connectors-custody -- \
+  --ignored tests::secret_service_answers_the_custody_contract
 ```
 
 Set `TMPDIR` and `CARGO_TARGET_DIR` to the task-owned paths described in the
