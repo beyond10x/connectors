@@ -18,6 +18,19 @@
   auth profile. No binding falls back to another, to a file or to an environment variable.
 - macOS keychain items are created with an access whose decrypt ACL admits any application of the
   user.
+- Slack message send through the catalog provider (`docs/catalog-slack.md`, *Messages*): the bot
+  selection set gains two writes under approval, `chat.postMessage` (`channel` and `text`,
+  optionally `thread_ts`, `mrkdwn` and `unfurl_links`; scope `chat:write`; answers `channel`, `ts`
+  and `message`) and `conversations.open` (`users`, one user id or a comma-separated list, and
+  optionally `return_im`; scope `im:write`, `mpim:write` for a group; answers `channel.id`). A
+  direct message is two invocations, open then post. Each write reads the token's `auth.test`
+  first and is refused, with nothing sent, unless it answers `ok` true; Slack's answer must carry
+  `ok` true to be applied, so Slack's own refusal, `200` with `ok` false, is `outcome_unknown`
+  and its `error` string is not returned. The cited amendment
+  `adapters/slack/upstream/slack-web.amendments.json` records both with a JSON request body; the
+  Slack bundle's source record names it. The Slack ESS model gains the send and open inputs and
+  answers. Verified against a local fixture only; `chat.update` and `chat.delete` are not
+  selected.
 - `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
   `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
   target.
