@@ -127,6 +127,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         body_keys: Vec::new(),
         body_types: BTreeMap::new(),
         body_required: Vec::new(),
+        body_nonempty: Vec::new(),
         body_fixed: BTreeMap::new(),
     }
 }
@@ -898,15 +899,17 @@ async fn a_boolean_expectation_holds_only_for_that_json_boolean() {
         .await,
         Ok("applied")
     );
-    // A literal is unchanged: compared as text, the string and the boolean alike.
+    // A literal is unchanged: compared as text, the string and the number
+    // alike. A literal `"true"` or `"false"` no longer loads
+    // (`a_boolean_spelled_as_a_literal_is_refused_at_load`).
     let engine = boolean_merge(
-        literal_check("/blocked", "false"),
-        literal_check("/merged", "true"),
+        literal_check("/blocked", "0"),
+        literal_check("/merged", "1"),
         vec![],
     );
     for (before, after) in [
-        (json!({"blocked": false}), json!({"merged": true})),
-        (json!({"blocked": "false"}), json!({"merged": "true"})),
+        (json!({"blocked": 0}), json!({"merged": 1})),
+        (json!({"blocked": "0"}), json!({"merged": "1"})),
     ] {
         assert_eq!(boolean_outcome(&engine, before, after).await, Ok("applied"));
     }
@@ -2028,6 +2031,208 @@ fn body_types_and_body_required_are_refused_at_load_unless_they_name_closed_keys
         json!({"type": "object", "properties": {"sha": {"type": "string"}},
                "required": ["sha"], "additionalProperties": false})
     );
+}
+
+/// A write closed to `id` and `note`, both strings, requiring `id` and
+/// holding `id` and `note` non-empty when present.
+fn nonempty_thing() -> Engine {
+    let selection = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["id", "note", "flag"],
+        "body_types": {"id": "string", "note": "string", "flag": "boolean"},
+        "body_required": ["id"],
+        "body_nonempty": ["id", "note"]
+    }));
+    Engine::new(&shapes_bundle(), "/v1", &[selection]).unwrap()
+}
+
+/// `body_nonempty` names string body keys that must not be empty: a body
+/// carrying one as `""` is `invalid_input` before any request, the
+/// declaration types it with `minLength: 1`, and a non-empty value is sent
+/// unchanged. A key it names but the body omits is not required by it. The
+/// member round-trips and is omitted when empty.
+#[tokio::test]
+async fn an_empty_body_nonempty_string_is_refused_before_any_request() {
+    let engine = nonempty_thing();
+    assert_eq!(
+        engine.declarations(&[Effect::Write])[0].input_schema["properties"]["body"],
+        json!({"type": "object",
+               "properties": {"id": {"type": "string", "minLength": 1},
+                              "note": {"type": "string", "minLength": 1},
+                              "flag": {"type": "boolean"}},
+               "required": ["id"], "additionalProperties": false})
+    );
+    for body in [
+        json!({"id": ""}),
+        json!({"id": "t-1", "note": ""}),
+        json!({"id": "", "note": "n"}),
+    ] {
+        let http = reads(vec![]);
+        let error = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "thing.create",
+                json!({"body": body}),
+            )
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{body} was prepared"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{body}");
+        assert!(http.calls.lock().unwrap().is_empty(), "{body}");
+    }
+    for body in [
+        json!({"id": "t-1"}),
+        json!({"id": " ", "note": "n", "flag": false}),
+    ] {
+        let http = reads(vec![]);
+        let prepared = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "thing.create",
+                json!({"body": body.clone()}),
+            )
+            .await
+            .unwrap_or_else(|error| panic!("{body}: {}", error.message));
+        let sent: Sent = Arc::default();
+        let outcome = prepared
+            .execute(Box::new(Send {
+                sent: sent.clone(),
+                response: Some(response(200, json!({"id": "t-1"}))),
+            }))
+            .await;
+        assert!(matches!(outcome, WriteOutcome::Applied(Ok(_))), "{body}");
+        assert_eq!(sent.lock().unwrap()[0].2, body);
+    }
+    let typed = written(json!({
+        "id": "thing.create", "operation_id": "createThing", "effect": "write",
+        "body_keys": ["id"], "body_types": {"id": "string"}, "body_nonempty": ["id"]
+    }));
+    assert_eq!(
+        serde_json::to_value(&typed).unwrap()["body_nonempty"],
+        json!(["id"])
+    );
+    let plain = serde_json::to_value(select("thing.create", "createThing", Effect::Write)).unwrap();
+    assert!(plain.get("body_nonempty").is_none(), "{plain}");
+}
+
+/// `body_nonempty` names only string keys of a closed body the caller sends:
+/// a name `body_keys` does not admit, one `body_types` does not type as a
+/// string, one the selection fixes, a repeated name, or the member without
+/// `body_keys`, is refused when the selection loads.
+#[test]
+fn body_nonempty_is_refused_at_load_unless_it_names_closed_string_keys() {
+    for (label, selection) in [
+        (
+            "without body_keys",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_nonempty": ["id"]}),
+        ),
+        (
+            "an unknown key",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id"], "body_types": {"id": "string"},
+                   "body_nonempty": ["other"]}),
+        ),
+        (
+            "an untyped key",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id"], "body_nonempty": ["id"]}),
+        ),
+        (
+            "a boolean key",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id", "flag"], "body_types": {"flag": "boolean"},
+                   "body_nonempty": ["flag"]}),
+        ),
+        (
+            "an integer key",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["count"], "body_types": {"count": "integer"},
+                   "body_nonempty": ["count"]}),
+        ),
+        (
+            "a fixed key",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id", "kind"], "body_types": {"kind": "string"},
+                   "body_fixed": {"kind": "k"}, "body_nonempty": ["kind"]}),
+        ),
+        (
+            "a repeated key",
+            json!({"id": "thing.create", "operation_id": "createThing", "effect": "write",
+                   "body_keys": ["id"], "body_types": {"id": "string"},
+                   "body_nonempty": ["id", "id"]}),
+        ),
+    ] {
+        let error = Engine::new(&shapes_bundle(), "/v1", &[written(selection)])
+            .err()
+            .unwrap_or_else(|| panic!("{label} loaded"));
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{label}");
+        assert!(
+            error.message.contains("body_nonempty"),
+            "{label}: {}",
+            error.message
+        );
+    }
+}
+
+/// A `literal` expectation of `"true"` or `"false"` compares as text, so the
+/// string `"true"` would pass where a JSON boolean is meant. The bundle does
+/// not record the type of an answer member, so every check, before the write
+/// and after it and in `any_of`, refuses those two literals when the selection
+/// loads; `{"boolean": …}` is how a guard compares a boolean. Other literals
+/// load as before.
+#[test]
+fn a_boolean_spelled_as_a_literal_is_refused_at_load() {
+    type Place<'a> = &'a dyn Fn(&mut Guard, Check);
+    let places: [(&str, Place); 3] = [
+        ("preflight", &|guard, check| {
+            guard.preflight.checks.push(check)
+        }),
+        ("postflight", &|guard, check| {
+            guard.postflight.checks.push(check)
+        }),
+        ("any_of", &|guard, check| {
+            guard.postflight.any_of = vec![check, literal_check("/state", "merged")]
+        }),
+    ];
+    for (place, put) in places {
+        for literal in ["true", "false"] {
+            let mut guard = mr_guard(
+                &[("id", "id"), ("merge_request_iid", "merge_request_iid")],
+                vec![input_check("/sha", "body.sha")],
+                vec![literal_check("/state", "merged")],
+            );
+            put(&mut guard, literal_check("/merged", literal));
+            let selection = Selection {
+                guard: Some(guard),
+                ..select("merge_request.merge", "mergeMergeRequest", Effect::Write)
+            };
+            let error = Engine::new(&bundle(), "/api/v4", &[selection])
+                .err()
+                .unwrap_or_else(|| panic!("{place} literal `{literal}` loaded"));
+            assert_eq!(error.code, ErrorCode::InvalidInput, "{place} {literal}");
+            assert!(
+                error.message.contains("boolean"),
+                "{place} {literal}: {}",
+                error.message
+            );
+        }
+    }
+    for literal in ["True", "merged", "1"] {
+        let guard = mr_guard(
+            &[("id", "id"), ("merge_request_iid", "merge_request_iid")],
+            vec![input_check("/sha", "body.sha")],
+            vec![literal_check("/state", literal)],
+        );
+        let selection = Selection {
+            guard: Some(guard),
+            ..select("merge_request.merge", "mergeMergeRequest", Effect::Write)
+        };
+        Engine::new(&bundle(), "/api/v4", &[selection])
+            .unwrap_or_else(|error| panic!("`{literal}`: {}", error.message));
+    }
 }
 
 #[tokio::test]

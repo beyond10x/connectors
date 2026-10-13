@@ -1788,12 +1788,14 @@ fn the_two_writes_ship_as_guarded_writes_with_a_closed_json_body() {
         ["channel", "text", "thread_ts", "mrkdwn", "unfurl_links"]
     );
     assert_eq!(post.body_required, ["channel", "text"]);
+    assert_eq!(post.body_nonempty, ["channel", "text", "thread_ts"]);
     let open = shipped()
         .into_iter()
         .find(|s| s.id == "conversations.open")
         .unwrap();
     assert_eq!(open.body_keys, ["users", "return_im"]);
     assert_eq!(open.body_required, ["users"]);
+    assert_eq!(open.body_nonempty, ["users"]);
 
     let two = Provider::writing(false);
     let child = Child::spawn(&two.selection()).unwrap();

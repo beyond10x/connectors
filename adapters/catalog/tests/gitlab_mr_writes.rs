@@ -709,7 +709,7 @@ fn resolve_declares_a_closed_body_of_resolved_which_its_guard_reads() {
                           "values": {"id": "id", "noteable_id": "noteable_id",
                                      "discussion_id": "discussion_id"},
                           "checks": [{"pointer": "/id", "expect": {"input": "discussion_id"}},
-                                     {"pointer": "/resolvable", "expect": {"literal": "true"}}]},
+                                     {"pointer": "/resolvable", "expect": {"boolean": true}}]},
             "postflight": {"checks": [{"pointer": "/id", "expect": {"input": "discussion_id"}},
                                       {"pointer": "/resolved", "expect": {"input": "body.resolved"}}]}})
     );

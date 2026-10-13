@@ -104,6 +104,14 @@ fn every_shipped_guard_is_a_value_of_the_catalog_guard_model() {
             && invariants.contains("not (defined(absent)) or defined(read)"),
         "the model no longer holds absent to true beside a read: {invariants}"
     );
+    // A boolean is compared with `boolean`, never a literal of its text; the engine refuses
+    // those two literals when the selection loads (`adapters/catalog/tests/engine.rs`).
+    let expectation =
+        schema["$defs"]["connectors_catalog.guard.Expectation"]["x-ess-invariants"].to_string();
+    assert!(
+        expectation.contains("literal != true") && expectation.contains("literal != false"),
+        "the model no longer refuses a literal boolean spelling: {expectation}"
+    );
     let validator = jsonschema::validator_for(&schema).unwrap();
     let guarded = guarded();
     for member in [
@@ -129,7 +137,13 @@ fn every_shipped_guard_is_a_value_of_the_catalog_guard_model() {
 
 #[test]
 fn every_shipped_closed_body_is_a_value_of_the_catalog_selection_model() {
-    const MEMBERS: [&str; 4] = ["body_keys", "body_types", "body_required", "body_fixed"];
+    const MEMBERS: [&str; 5] = [
+        "body_keys",
+        "body_types",
+        "body_required",
+        "body_nonempty",
+        "body_fixed",
+    ];
     let schema = compiled("connectors_catalog.selection.ClosedBody");
     let invariants =
         schema["$defs"]["connectors_catalog.selection.ClosedBody"]["x-ess-invariants"].to_string();
