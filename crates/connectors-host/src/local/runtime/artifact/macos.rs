@@ -2,7 +2,8 @@
 //! "macOS platform guarantees").
 //!
 //! - [`capture`]: `sealed_executable` holds only as `owner_private_copy`.
-//! - [`launch_path`]: the copy is executed by its path, then removed.
+//! - [`launch_path`]: the copy is executed by its path, then removed; an
+//!   [`Image`] dropped before its launch, or before it was [`sent`], removes it.
 //! - [`ExactChild`]: `exact_process_signal` holds only as `child_reap_lock`.
 use super::super::{Failure, Result};
 use sha2::{Digest, Sha256};
@@ -39,17 +40,153 @@ const MACH_O: [[u8; 4]; 4] = [
 /// checks the configured SHA-256 and the Mach-O header against that copy, as
 /// exec will read it. Returns a read-only descriptor on the copy, held at 10 or
 /// above. Other users cannot change the copy; a process of this user can
-/// rewrite it before exec (`owner_private_copy`). A refused copy is removed.
-pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -> Result<File> {
+/// rewrite it before exec (`owner_private_copy`). A refused copy is removed,
+/// and so is one whose [`Image`] is dropped before it was launched or sent.
+pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -> Result<Image> {
     source
         .seek(SeekFrom::Start(0))
         .map_err(|_| Failure::InvalidConfiguration)?;
     let image = private_directory()?.join(IMAGE);
-    let captured = copy_and_check(&mut source, &image, expected_sha256, until);
-    if captured.is_err() {
-        discard(&image);
+    // The copy is recorded by the path its descriptor names (`F_GETPATH`),
+    // which a launch executes: TMPDIR may lead to it through a link.
+    let captured = copy_and_check(&mut source, &image, expected_sha256, until).and_then(|file| {
+        let id = identity(&file.metadata().map_err(|_| Failure::Unavailable)?);
+        let path = path_of(&file).map_err(|_| Failure::Unavailable)?;
+        Ok((file, id, path))
+    });
+    match captured {
+        Ok((file, id, path)) => {
+            copies().push(Held {
+                id,
+                path,
+                custody: Custody::Captured,
+            });
+            Ok(Image { file, id })
+        }
+        Err(error) => {
+            discard(&image);
+            Err(error)
+        }
     }
-    captured
+}
+
+/// Who removes a copy this process knows of. Each copy is removed exactly once:
+/// by its [`Image`] while `Captured`, by its [`Launch`] once `Launched`. A
+/// `Released` copy has left its image's custody, sent to the process that will
+/// launch it or received from the owner that captured it, and only a launch
+/// removes it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Custody {
+    Captured,
+    Released,
+    Launched,
+}
+struct Held {
+    id: (u64, u64),
+    path: PathBuf,
+    custody: Custody,
+}
+/// The copies this process captured or received and has not yet removed. Only
+/// a descriptor on one of them is ever launched, so only they are removed.
+static COPIES: Mutex<Vec<Held>> = Mutex::new(Vec::new());
+fn copies() -> MutexGuard<'static, Vec<Held>> {
+    COPIES.lock().unwrap_or_else(PoisonError::into_inner)
+}
+fn identity(metadata: &std::fs::Metadata) -> (u64, u64) {
+    (metadata.dev(), metadata.ino())
+}
+/// The open file's identity, if it is one of this process's copies.
+fn known(file: &File) -> Option<(u64, u64)> {
+    let id = identity(&file.metadata().ok()?);
+    copies().iter().any(|copy| copy.id == id).then_some(id)
+}
+
+/// A captured copy and a read-only descriptor on it; it reads as that
+/// descriptor. Dropping it before the copy was launched or sent removes the
+/// copy and its directory, so a refusal between capture and spawn leaves
+/// nothing behind.
+pub(crate) struct Image {
+    file: File,
+    id: (u64, u64),
+}
+impl std::ops::Deref for Image {
+    type Target = File;
+    fn deref(&self) -> &File {
+        &self.file
+    }
+}
+impl std::ops::DerefMut for Image {
+    fn deref_mut(&mut self) -> &mut File {
+        &mut self.file
+    }
+}
+impl Drop for Image {
+    fn drop(&mut self) {
+        let mut copies = copies();
+        if let Some(index) = copies
+            .iter()
+            .position(|copy| copy.id == self.id && copy.custody == Custody::Captured)
+        {
+            discard(&copies.swap_remove(index).path);
+        }
+    }
+}
+/// The descriptor alone, for a launch to come: the copy leaves the image's
+/// custody, and only its [`Launch`] removes it.
+impl From<Image> for File {
+    fn from(image: Image) -> File {
+        release(image.id);
+        let image = std::mem::ManuallyDrop::new(image);
+        // SAFETY: `image` is never dropped, so its file is moved out once.
+        unsafe { std::ptr::read(&image.file) }
+    }
+}
+fn release(id: (u64, u64)) {
+    for copy in copies().iter_mut() {
+        if copy.id == id && copy.custody == Custody::Captured {
+            copy.custody = Custody::Released;
+        }
+    }
+}
+
+/// Called once `files` reached the peer: a captured copy among them is the
+/// receiver's to launch and remove from now on, so dropping its [`Image`]
+/// here leaves it in place.
+pub(crate) fn sent(files: &[&File]) {
+    for file in files {
+        if let Some(id) = known(file) {
+            release(id);
+        }
+    }
+}
+
+/// Called on each descriptor received from the owner: a copy the owner
+/// captured, named as [`capture`] names one and still that file, becomes this
+/// process's to launch and remove. Anything else is left as it is.
+pub(crate) fn received(file: &File) {
+    let Ok(path) = path_of(file) else { return };
+    let ours = path.file_name() == Some(OsStr::new(IMAGE))
+        && path
+            .parent()
+            .and_then(Path::file_name)
+            .is_some_and(|name| name.as_bytes().starts_with(DIRECTORY_PREFIX.as_bytes()));
+    let (Ok(named), Ok(open)) = (std::fs::symlink_metadata(&path), file.metadata()) else {
+        return;
+    };
+    let id = identity(&open);
+    if !ours || !named.file_type().is_file() || identity(&named) != id {
+        return;
+    }
+    let mut copies = copies();
+    // In one process, as in tests, the copy is already known: its sender
+    // released it, and it is the same copy.
+    if !copies.iter().any(|copy| copy.id == id) {
+        copies.push(Held {
+            id,
+            path,
+            custody: Custody::Released,
+        });
+    }
 }
 
 fn copy_and_check(
@@ -162,37 +299,52 @@ pub(crate) fn path_of(file: &File) -> std::io::Result<PathBuf> {
     Ok(PathBuf::from(OsStr::from_bytes(&buffer[..length])))
 }
 
-/// The path to execute a captured copy by. Dropping it removes the copy and
-/// its directory, so it is held until spawn has returned, which is after exec.
-pub(crate) struct Launch(PathBuf);
+/// The path to execute a captured copy by. It takes the removal over from the
+/// copy's [`Image`]: dropping it removes the copy and its directory, so it is
+/// held until spawn has returned, which is after exec, or longer where the
+/// launched process reads its own image.
+pub(crate) struct Launch {
+    id: (u64, u64),
+    path: PathBuf,
+}
 impl Launch {
     pub(crate) fn path(&self) -> &Path {
-        &self.0
+        &self.path
     }
 }
 impl Drop for Launch {
     fn drop(&mut self) {
-        discard(&self.0);
+        let mut copies = copies();
+        if let Some(index) = copies
+            .iter()
+            .position(|copy| copy.id == self.id && copy.custody == Custody::Launched)
+        {
+            copies.swap_remove(index);
+        }
+        discard(&self.path);
     }
 }
 
-/// The launch path of a descriptor [`capture`] returned. Anything else, by
-/// name or by file identity, is `Unavailable` and is never removed.
+/// The launch path of a descriptor on a copy this process captured or received
+/// from its owner, still at the path it was made at and not launched yet.
+/// Anything else, by provenance, path or file identity, is `Unavailable` and is
+/// never removed.
 pub(crate) fn launch_path(image: &File) -> Result<Launch> {
-    let path = path_of(image).map_err(|_| Failure::Unavailable)?;
-    let ours = path.file_name() == Some(OsStr::new(IMAGE))
-        && path
-            .parent()
-            .and_then(Path::file_name)
-            .is_some_and(|name| name.as_bytes().starts_with(DIRECTORY_PREFIX.as_bytes()));
-    let (named, open) = (
-        std::fs::symlink_metadata(&path).map_err(|_| Failure::Unavailable)?,
-        image.metadata().map_err(|_| Failure::Unavailable)?,
-    );
-    if !ours || named.dev() != open.dev() || named.ino() != open.ino() {
+    let open = identity(&image.metadata().map_err(|_| Failure::Unavailable)?);
+    let mut copies = copies();
+    let copy = copies
+        .iter_mut()
+        .find(|copy| copy.id == open && copy.custody != Custody::Launched)
+        .ok_or(Failure::Unavailable)?;
+    let named = std::fs::symlink_metadata(&copy.path).map_err(|_| Failure::Unavailable)?;
+    if !named.file_type().is_file() || identity(&named) != open {
         return Err(Failure::Unavailable);
     }
-    Ok(Launch(path))
+    copy.custody = Custody::Launched;
+    Ok(Launch {
+        id: open,
+        path: copy.path.clone(),
+    })
 }
 
 /// A spawned child that is signalled by process id only under the lock that

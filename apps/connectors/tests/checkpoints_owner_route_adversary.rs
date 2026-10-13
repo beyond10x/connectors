@@ -12,9 +12,10 @@ use connectors_host::local::{
     config::{Config, Paths},
     registry, runtime,
 };
-use serde_json::{Value, json};
 #[cfg(unix)]
-use std::time::{Duration, Instant};
+#[path = "support/owner.rs"]
+mod owner_start;
+use serde_json::{Value, json};
 use std::{
     collections::BTreeSet,
     fs,
@@ -155,7 +156,7 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
         .open(state.join("owner.lock"))
         .unwrap();
     let (startup, owner_end) = UnixStream::pair().unwrap();
-    let owner = Command::new("/bin/sh")
+    let mut owner = Command::new("/bin/sh")
         .env("CONNECTORS_TEST_OWNER_IDLE_MS", "120000")
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
@@ -166,15 +167,11 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
             owner_end,
         )))
         .stdout(std::process::Stdio::from(lock))
-        .stderr(std::process::Stdio::null())
+        .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
     drop(startup);
-    let until = Instant::now() + Duration::from_secs(20);
-    while !state.join("owner.sock").exists() {
-        assert!(Instant::now() < until, "owner never listened");
-        std::thread::sleep(Duration::from_millis(20));
-    }
+    owner_start::wait_listening(&mut owner, root.path());
     OwnerProcess(owner)
 }
 

@@ -489,7 +489,7 @@ impl Executable {
     pub(crate) fn capture(
         &self,
         until: std::time::Instant,
-    ) -> super::runtime::Result<std::fs::File> {
+    ) -> super::runtime::Result<super::runtime::artifact::Image> {
         let source = self
             .source()
             .map_err(|_| super::runtime::Failure::InvalidConfiguration)?;

@@ -231,6 +231,9 @@ pub(crate) fn send(stream: &UnixStream, files: &[&File], until: Instant) -> Resu
         // SAFETY: message and everything it points at are live for the call.
         let sent = unsafe { libc::sendmsg(stream.as_raw_fd(), &message, flags) };
         if sent == 1 {
+            // A captured image copy is the receiver's to launch and remove now.
+            #[cfg(target_os = "macos")]
+            super::artifact::sent(files);
             return Ok(());
         }
         let error = std::io::Error::last_os_error();
@@ -261,8 +264,7 @@ pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Resu
     message.msg_iovlen = 1;
     message.msg_control = control.as_mut_ptr().cast();
     message.msg_controllen = space as _;
-    stream
-        .set_read_timeout(Some(remaining(until)?))
+    super::channel::set_read_timeout(stream, remaining(until)?)
         .map_err(|_| Failure::Unavailable)?;
     #[cfg(target_os = "linux")]
     let flags = libc::MSG_CMSG_CLOEXEC;
@@ -327,7 +329,11 @@ pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Resu
                 return Err(Failure::Unavailable);
             }
             // SAFETY: successful duplication transfers ownership to File.
-            Ok(unsafe { File::from_raw_fd(fd) })
+            let file = unsafe { File::from_raw_fd(fd) };
+            // The owner's image copy is this process's to launch and remove.
+            #[cfg(target_os = "macos")]
+            super::artifact::received(&file);
+            Ok(file)
         })
         .collect()
 }
@@ -343,14 +349,15 @@ pub struct Consumer {
 }
 
 impl Consumer {
+    /// `executable` is the captured image, as a capture or as received.
     pub(crate) fn new(
-        executable: File,
+        executable: impl Into<File>,
         credential: File,
         args: Vec<String>,
         pass_env: BTreeSet<String>,
     ) -> Self {
         Self {
-            executable,
+            executable: executable.into(),
             credential,
             args,
             pass_env,

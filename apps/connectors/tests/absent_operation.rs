@@ -8,6 +8,9 @@ use connectors_host::local::{
     registry, runtime,
 };
 #[cfg(unix)]
+#[path = "support/owner.rs"]
+mod owner_start;
+#[cfg(unix)]
 #[path = "support/socket.rs"]
 mod sockets;
 use serde_json::{Value, json};
@@ -316,7 +319,7 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
     // SAFETY: a live descriptor owned by `lock`.
     assert_eq!(unsafe { flock(lock.as_raw_fd(), LOCK_EX | LOCK_NB) }, 0);
     let (startup, owner_end) = UnixStream::pair().unwrap();
-    let owner = Command::new("/bin/sh")
+    let mut owner = Command::new("/bin/sh")
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
         .arg(env!("CARGO_BIN_EXE_connectors"))
@@ -326,15 +329,11 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
             owner_end,
         )))
         .stdout(std::process::Stdio::from(lock))
-        .stderr(std::process::Stdio::null())
+        .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
     drop(startup);
-    let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
-    while !state.join("owner.sock").exists() {
-        assert!(std::time::Instant::now() < until, "owner never listened");
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
+    owner_start::wait_listening(&mut owner, root.path());
     OwnerProcess(owner)
 }
 
