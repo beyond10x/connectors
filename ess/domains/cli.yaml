@@ -341,7 +341,8 @@ types:
   # - set_after_receive: close-on-exec is set right after the receive returns; a
   #   concurrent exec in the same process in between inherits the descriptor.
   # - separate_pid_query: the uid and gid are the connect-time snapshot; the pid
-  #   is a separate query, used only for its sign.
+  #   is a separate query, used by the owner and supervisor only for its sign;
+  #   an adapter also requires it to equal its parent's process id.
   - name: connectors.cli.PlatformGuaranteeWeakerForm
     kind: enum
     variants: [owner_private_copy, adapter_channel_close, child_reap_lock, launch_path_read, set_after_receive, separate_pid_query]

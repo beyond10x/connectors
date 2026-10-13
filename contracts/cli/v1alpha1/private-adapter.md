@@ -168,7 +168,9 @@ names:
 - **Channel peer** (`peer_credential_snapshot`: `separate_pid_query`). The peer
   UID comes from `LOCAL_PEERCRED`, a connect-time snapshot, and must match the
   owner as on Linux; the pid comes from a separate `LOCAL_PEERPID` query and is
-  used only for its sign. The spawned process is still identified by the
+  used by the supervisor only for its sign. The adapter also requires it to
+  equal its parent's process id, as on Linux: the owner that made the socket
+  pair. The spawned process is still identified by the
   supervisor's own Child handle, never by a peer pid.
 - **Parent death** (`parent_death_kill`: `adapter_channel_close`). There is no
   parent-death signal. The adapter exits when its inherited channel reaches end

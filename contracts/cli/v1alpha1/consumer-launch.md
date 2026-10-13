@@ -176,9 +176,13 @@ states:
   no `MSG_CMSG_CLOEXEC`; the CLI sets close-on-exec on the image and credential
   right after the receive returns.
 - **Execution.** The CLI executes the image copy by path, not through
-  `/proc/self/fd/N`; argv\[0\] is that path. It spawns with `posix_spawn` and
-  `POSIX_SPAWN_CLOEXEC_DEFAULT`, so the consumer still starts with exactly
-  descriptors 0–3.
+  `/proc/self/fd/N`; argv\[0\] is that path, which stays in place until the
+  consumer is reaped. Between fork and exec the child marks every descriptor
+  from 4 up to the descriptor limit (the `RLIMIT_NOFILE` soft limit, bounded by
+  `kern.maxfilesperproc`, read before the spawn) close-on-exec, so the consumer
+  still starts with exactly descriptors 0–3. `posix_spawn` with
+  `POSIX_SPAWN_CLOEXEC_DEFAULT` is not used: the libc binding has no
+  `posix_spawn_file_actions_addinherit_np` to keep descriptor 3 across it.
 - **Launcher death** (`parent_death_kill`: `adapter_channel_close`). The weaker
   form covers adapters only: a consumer has no channel, so **if the CLI dies
   first, the consumer keeps running** and receives no `SIGTERM`.

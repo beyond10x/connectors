@@ -886,7 +886,16 @@ On macOS one holds and six hold only in a named weaker form:
 | `own_image_build_measure` | holds | weaker: `launch_path_read` | no `/proc/self/exe`: the owner build digest is read from the executable's path. A file replaced there is measured as a new build and refused as `owner_build_mismatch`. |
 | `atomic_no_replace_rename` | holds | holds | `renamex_np` with `RENAME_EXCL`, on a filesystem that reports `VOL_CAP_INT_RENAME_EXCL` (APFS). A state directory on any other filesystem is refused. |
 | `atomic_close_on_exec` | holds | weaker: `set_after_receive` | no `MSG_CMSG_CLOEXEC`: `FD_CLOEXEC` is set on each received descriptor right after `recvmsg` returns. An exec by another thread of the same process in between inherits it. |
-| `peer_credential_snapshot` | holds | weaker: `separate_pid_query` | no `SO_PEERCRED`: `LOCAL_PEERCRED` gives the connect-time uid and gid, and `LOCAL_PEERPID` the pid in a separate query. The uid check is unchanged; the pid is used only for its sign. |
+| `peer_credential_snapshot` | holds | weaker: `separate_pid_query` | no `SO_PEERCRED`: `LOCAL_PEERCRED` gives the connect-time uid and gid, and `LOCAL_PEERPID` the pid in a separate query. The uid check is unchanged. The owner and the supervisor use the pid only for its sign; an adapter also requires it to equal its parent's process id, the owner that made the socket pair, as on Linux. |
+
+Protected stdin (§5) keeps its rule on macOS with other mechanisms, and no
+guarantee row changes. A protected regular file is checked as on Linux, its
+parent directory found through `F_GETPATH`. macOS names no `pipe:[…]`: an
+inherited anonymous pipe is a FIFO owned by the admitted UID for which
+`F_GETPATH` returns no path, and a FIFO with a path is a named FIFO and
+refuses. The producer check reads the parent's owner through `proc_pidinfo`
+in place of `/proc/<parent>`: the parent must not be pid 1, must share this
+process's session, and must be owned by the admitted UID.
 
 Exact stop (§4) requires "Linux pidfd or equivalent non-reusable kernel process
 ownership"; on macOS the equivalent is `child_reap_lock`, which covers the
