@@ -35,15 +35,14 @@ pub(crate) fn wait_readable(stream: &UnixStream) -> Result<()> {
 #[cfg(target_os = "linux")]
 pub(crate) type Peer = libc::ucred;
 /// A socket peer's credentials on macOS (`peer_credential_snapshot`, weaker
-/// form `separate_pid_query`): `uid` and `gid` are the connect-time
-/// `LOCAL_PEERCRED` snapshot; `pid` comes from a separate `LOCAL_PEERPID`
-/// query and is held only to its sign.
+/// form `separate_pid_query`): `uid` is the connect-time `LOCAL_PEERCRED`
+/// snapshot; `pid` comes from a separate `LOCAL_PEERPID` query and is held
+/// only to its sign.
 #[cfg(target_os = "macos")]
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Peer {
     pub pid: libc::pid_t,
     pub uid: libc::uid_t,
-    pub gid: libc::gid_t,
 }
 /// The connected peer of `stream`, which must run as the configured user and
 /// carry a positive pid. Anything else is `Unavailable`.
@@ -65,8 +64,6 @@ pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
     } != 0
         || size as usize != std::mem::size_of::<libc::xucred>()
         || credentials.cr_version != libc::XUCRED_VERSION
-        || credentials.cr_ngroups < 1
-        || credentials.cr_uid != super::super::filesystem::uid()
     {
         return Err(Failure::Unavailable);
     }
@@ -87,11 +84,14 @@ pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
     {
         return Err(Failure::Unavailable);
     }
-    Ok(Peer {
+    let peer = Peer {
         pid,
         uid: credentials.cr_uid,
-        gid: credentials.cr_groups[0],
-    })
+    };
+    if peer.uid != super::super::filesystem::uid() {
+        return Err(Failure::Unavailable);
+    }
+    Ok(peer)
 }
 #[cfg(target_os = "linux")]
 pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
@@ -410,9 +410,9 @@ mod tests {
 
     /// `peer_credential_snapshot` on macOS, weaker form `separate_pid_query`
     /// (contracts/cli/v1alpha1/semantics.md, macOS platform guarantees): the
-    /// uid and gid are `LOCAL_PEERCRED`'s connect-time snapshot and the uid
-    /// must be this user's; the pid is a separate `LOCAL_PEERPID` query, held
-    /// only to a positive sign. A socket with no peer is refused.
+    /// uid is `LOCAL_PEERCRED`'s connect-time snapshot and must be this
+    /// user's; the pid is a separate `LOCAL_PEERPID` query, held only to a
+    /// positive sign. A socket with no peer is refused.
     #[cfg(target_os = "macos")]
     #[test]
     fn a_socket_pair_peer_is_this_user_with_a_positive_pid_and_an_unconnected_socket_is_refused() {
@@ -421,8 +421,6 @@ mod tests {
         for end in [&left, &right] {
             let peer = peer(end).unwrap();
             assert_eq!(peer.uid, crate::local::filesystem::uid());
-            // SAFETY: getegid has no preconditions.
-            assert_eq!(peer.gid, unsafe { libc::getegid() });
             assert!(peer.pid > 0, "{}", peer.pid);
         }
         // SAFETY: documented scalar arguments; the result is a new owned descriptor.
