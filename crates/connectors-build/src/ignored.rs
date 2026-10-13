@@ -763,16 +763,7 @@ fn seccomp_notification_abi_available() -> bool {
 /// Build every default-feature workspace test target, then query the actual
 /// libtest executables. Cargo metadata maps opaque package IDs to names.
 fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString>)> {
-    let metadata: Value = serde_json::from_slice(
-        &crate::run(Command::new("cargo").current_dir(root).args([
-            "metadata",
-            "--locked",
-            "--offline",
-            "--no-deps",
-            "--format-version=1",
-        ]))?
-        .stdout,
-    )?;
+    let metadata = cargo_metadata(root)?;
     let members = metadata["workspace_members"]
         .as_array()
         .ok_or("Cargo workspace members missing")?;
@@ -851,6 +842,88 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
     Ok((suites, environment))
 }
 
+fn cargo_metadata(root: &Path) -> Result<Value> {
+    Ok(serde_json::from_slice(
+        &crate::run(Command::new("cargo").current_dir(root).args([
+            "metadata",
+            "--locked",
+            "--offline",
+            "--no-deps",
+            "--format-version=1",
+        ]))?
+        .stdout,
+    )?)
+}
+
+/// Every libtest harness target of every workspace member, with its crate root.
+pub(crate) fn test_targets(root: &Path) -> Result<Vec<crate::platform_gated::Target>> {
+    let metadata = cargo_metadata(root)?;
+    let members = metadata["workspace_members"]
+        .as_array()
+        .ok_or("Cargo workspace members missing")?;
+    let mut targets = Vec::new();
+    for package in metadata["packages"]
+        .as_array()
+        .ok_or("Cargo packages missing")?
+        .iter()
+        .filter(|package| members.contains(&package["id"]))
+    {
+        let name = package["name"]
+            .as_str()
+            .ok_or("Cargo package name missing")?;
+        for target in package["targets"]
+            .as_array()
+            .ok_or("Cargo targets missing")?
+            .iter()
+            .filter(|target| target["test"] == true)
+        {
+            targets.push(crate::platform_gated::Target {
+                package: name.into(),
+                target: target["name"]
+                    .as_str()
+                    .ok_or("Cargo target name missing")?
+                    .into(),
+                root: target["src_path"]
+                    .as_str()
+                    .ok_or("Cargo target source missing")?
+                    .into(),
+            });
+        }
+    }
+    Ok(targets)
+}
+
+/// Every test a compiled libtest executable lists, ignored or not.
+fn compiled_tests(suite: &Suite) -> Result<BTreeSet<String>> {
+    let output = crate::run(Command::new(&suite.executable).args(["--list", "--format", "terse"]))?;
+    Ok(std::str::from_utf8(&output.stdout)?
+        .lines()
+        .filter_map(|line| line.strip_suffix(": test"))
+        .map(str::to_owned)
+        .collect())
+}
+
+/// The platform-gated tests, checked against this platform's compiled lists.
+fn platform_gated(root: &Path, suites: &[Suite]) -> Result<Value> {
+    use crate::platform_gated::{Platform, scan, verify};
+    let gated = scan(&test_targets(root)?)?;
+    if let Some(current) = Platform::current() {
+        let mut compiled: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+        for suite in suites {
+            compiled
+                .entry((suite.package.clone(), suite.target.clone()))
+                .or_default()
+                .extend(compiled_tests(suite)?);
+        }
+        verify(&gated, current, |package, target, test| {
+            compiled
+                .get(&(package.into(), target.into()))
+                .is_some_and(|names| names.contains(test))
+        })?;
+    }
+    Ok(serde_json::json!({"count": gated.len(), "tests": gated}))
+}
+
 /// The user this process runs as, owner of every fixture temporary directory.
 #[cfg(target_os = "linux")]
 fn own_uid() -> std::io::Result<u32> {
@@ -926,6 +999,9 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
     if entries.is_empty() {
         return Err("workspace ignored inventory is empty".into());
     }
+    // Tests a cfg keeps off a platform compile nowhere there, so no binary
+    // above lists them; the source scan names them for every platform.
+    let gated = platform_gated(root, &suites)?;
     let report_path = root.join(&options.report);
     let logs = report_path.with_extension("logs");
     std::fs::create_dir_all(&logs)?;
@@ -958,7 +1034,7 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
             execute_test(&entry.suite, &entry.name, temp.path(), &logs, &environment)
         },
     );
-    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report});
+    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
     crate::save_json(&report_path, &value)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     if !report.accepted(options.required) {

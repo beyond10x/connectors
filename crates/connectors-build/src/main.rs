@@ -26,6 +26,7 @@ mod gitlab_feed_conformance;
 mod ignored;
 mod metadata_conformance;
 mod metadata_entities;
+mod platform_gated;
 mod source_hashes;
 mod upstream_redaction;
 
