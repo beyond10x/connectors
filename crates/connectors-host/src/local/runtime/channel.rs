@@ -1,17 +1,29 @@
 use super::*;
 use connectors_sdk::Secret;
 use serde::de::DeserializeOwned;
+use std::time::{Duration, Instant};
+#[cfg(unix)]
 use std::{
     io::{Read, Write},
     os::unix::net::UnixStream,
-    time::{Duration, Instant},
 };
+
+/// The Windows channel: a named pipe in place of a Unix socket.
+#[cfg(windows)]
+pub(crate) mod windows;
+#[cfg(windows)]
+pub(crate) use windows::{Peer, Pipe as Stream, peer, wait_readable};
+
+/// One end of a channel: a connected Unix stream socket.
+#[cfg(unix)]
+pub(crate) type Stream = UnixStream;
 
 pub(crate) struct Frame<T> {
     pub control: T,
     pub secret: Secret,
     pub document: Vec<u8>,
 }
+#[cfg(unix)]
 pub(crate) fn wait_readable(stream: &UnixStream) -> Result<()> {
     use std::os::fd::AsRawFd;
     let mut descriptor = libc::pollfd {
@@ -110,6 +122,7 @@ pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
 /// has closed (`EINVAL`); Linux accepts it. What the peer sent before closing
 /// is still queued and a read of such a stream returns at once, so that
 /// refusal is passed over while the stream reports itself readable now.
+#[cfg(unix)]
 pub(crate) fn set_read_timeout(stream: &UnixStream, timeout: Duration) -> std::io::Result<()> {
     match stream.set_read_timeout(Some(timeout)) {
         #[cfg(target_os = "macos")]
@@ -170,8 +183,59 @@ fn io(error: std::io::Error) -> Failure {
         _ => Failure::Unavailable,
     }
 }
+/// Each read waits at most to `until`, and with `cancel` at most 250 ms
+/// between checks, as on Unix; the pipe's own wait is cancelled when it passes.
+#[cfg(windows)]
 fn read_exact(
-    stream: &mut UnixStream,
+    stream: &mut Stream,
+    mut bytes: &mut [u8],
+    until: Instant,
+    cancel: Option<&dyn Fn() -> Result<()>>,
+) -> Result<()> {
+    while !bytes.is_empty() {
+        if let Some(check) = cancel {
+            check()?;
+        }
+        let remaining = remaining(until)?;
+        let wait = if cancel.is_some() {
+            remaining.min(Duration::from_millis(250))
+        } else {
+            remaining
+        };
+        let count = match stream.read_within(bytes, wait) {
+            Ok(count) => count,
+            Err(error)
+                if cancel.is_some()
+                    && matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
+            {
+                continue;
+            }
+            Err(error) => return Err(io(error)),
+        };
+        if count == 0 {
+            return Err(Failure::Unavailable);
+        }
+        bytes = &mut bytes[count..];
+    }
+    Ok(())
+}
+#[cfg(windows)]
+fn write_all(stream: &mut Stream, mut bytes: &[u8], until: Instant) -> Result<()> {
+    while !bytes.is_empty() {
+        let count = stream.write_within(bytes, remaining(until)?).map_err(io)?;
+        if count == 0 {
+            return Err(Failure::Unavailable);
+        }
+        bytes = &bytes[count..];
+    }
+    Ok(())
+}
+#[cfg(unix)]
+fn read_exact(
+    stream: &mut Stream,
     mut bytes: &mut [u8],
     until: Instant,
     cancel: Option<&dyn Fn() -> Result<()>>,
@@ -210,6 +274,7 @@ fn read_exact(
     }
     Ok(())
 }
+#[cfg(unix)]
 fn write_all(stream: &mut UnixStream, mut bytes: &[u8], until: Instant) -> Result<()> {
     while !bytes.is_empty() {
         stream
@@ -224,7 +289,7 @@ fn write_all(stream: &mut UnixStream, mut bytes: &[u8], until: Instant) -> Resul
     Ok(())
 }
 pub(crate) fn read<T: DeserializeOwned>(
-    stream: &mut UnixStream,
+    stream: &mut Stream,
     until: Instant,
     secret_allowed: bool,
     document_limit: usize,
@@ -232,7 +297,7 @@ pub(crate) fn read<T: DeserializeOwned>(
     read_with_cancel(stream, until, secret_allowed, document_limit, None)
 }
 pub(crate) fn read_with_cancel<T: DeserializeOwned>(
-    stream: &mut UnixStream,
+    stream: &mut Stream,
     until: Instant,
     secret_allowed: bool,
     document_limit: usize,
@@ -272,7 +337,7 @@ pub(crate) fn read_with_cancel<T: DeserializeOwned>(
     })
 }
 pub(crate) fn write(
-    stream: &mut UnixStream,
+    stream: &mut Stream,
     control: &impl Serialize,
     secret: Option<&Secret>,
     document: &[u8],
@@ -332,7 +397,7 @@ pub(crate) fn depth_within(bytes: &[u8], limit: usize) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     fn deadline() -> Instant {

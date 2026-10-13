@@ -1,10 +1,9 @@
 use super::*;
 use connectors_sdk::Secret;
 use serde_json::Value;
-use std::{
-    os::{fd::FromRawFd, unix::net::UnixStream},
-    time::{Duration, Instant},
-};
+#[cfg(unix)]
+use std::os::{fd::FromRawFd, unix::net::UnixStream};
+use std::time::{Duration, Instant};
 
 /// Implemented by trusted executable composition, not the provider business
 /// library. Its methods receive only this command's protected material.
@@ -54,6 +53,7 @@ pub trait Adapter: Send + Sync {
 
 /// Private inherited descriptor three is the only accepted entry. No user path,
 /// stdio fallback or process-wide credential environment is consulted.
+#[cfg(unix)]
 pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
     if fd != 3 {
         return Err(Failure::InvalidInput);
@@ -65,7 +65,7 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
         return Err(Failure::Unavailable);
     }
     // SAFETY: the descriptor will be checked as a connected Unix socket before use.
-    let mut channel = unsafe { UnixStream::from_raw_fd(raw) };
+    let channel = unsafe { UnixStream::from_raw_fd(raw) };
     let peer = channel::peer(&channel)?;
     #[cfg(target_os = "linux")]
     let pid = Some(peer.pid);
@@ -80,6 +80,24 @@ pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
     unsafe {
         libc::close(fd);
     }
+    run(channel, adapter)
+}
+/// On Windows the private entry is the inherited client end of the owner's
+/// pipe, whose handle value `fd` is (private-adapter.md, "Windows"). It is
+/// taken over as a handle that is not inheritable and the inherited one is
+/// closed; the pipe's server must be this process's parent and run as the
+/// current user (`client_token_query`). The adapter is never told a pipe name.
+#[cfg(windows)]
+pub fn serve(fd: i32, adapter: impl Adapter) -> Result<()> {
+    let handle = usize::try_from(fd).map_err(|_| Failure::InvalidInput)?;
+    let channel = channel::Stream::from_owned(channel::windows::adopt(handle)?)?;
+    let peer = channel::peer(&channel)?;
+    if Some(peer.pid) != channel::windows::parent_process_id() {
+        return Err(Failure::Unavailable);
+    }
+    run(channel, adapter)
+}
+fn run(mut channel: channel::Stream, adapter: impl Adapter) -> Result<()> {
     let until = Instant::now() + Duration::from_secs(10);
     let hello = channel::read::<Request>(&mut channel, until, false, 0)?;
     let Request::Hello {

@@ -231,6 +231,23 @@ impl Deadline {
             .checked_add(std::time::Duration::from_nanos(remaining))
             .ok_or_else(|| Code::Timeout.into())
     }
+    /// The suspend-exclusive interrupt time in nanoseconds, Windows' counterpart
+    /// of `CLOCK_MONOTONIC` (contracts/service/clock.md): the CLI and the owner
+    /// read the same clock, so a deadline crosses between them as ticks.
+    #[cfg(windows)]
+    fn now() -> Result<u64, Error> {
+        let mut units = 0u64;
+        // SAFETY: writes one u64 through a valid pointer.
+        unsafe {
+            windows_sys::Win32::System::WindowsProgramming::QueryUnbiasedInterruptTimePrecise(
+                &mut units,
+            )
+        };
+        units
+            .checked_mul(100)
+            .ok_or_else(|| Code::Unavailable.into())
+    }
+    #[cfg(unix)]
     fn now() -> Result<u64, Error> {
         let mut stamp = libc::timespec {
             tv_sec: 0,

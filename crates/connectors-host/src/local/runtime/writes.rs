@@ -2,7 +2,7 @@
 use super::*;
 use connectors_sdk::WriteOutcome;
 use serde_json::Value;
-use std::{os::unix::net::UnixStream, time::Instant};
+use std::time::Instant;
 
 /// Trusted executable composition retains the immutable native request and its
 /// command-local credential. Preparation may read; only consumption may write.
@@ -95,7 +95,7 @@ pub(super) fn remaining(until: Instant, deadline_ms: u64) -> Result<()> {
 }
 
 pub(super) fn serve_write(
-    channel: &mut UnixStream,
+    channel: &mut channel::Stream,
     executor: &tokio::runtime::Runtime,
     adapter: &impl Adapter,
     bootstrap: &Bootstrap,
