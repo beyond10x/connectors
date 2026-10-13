@@ -194,10 +194,12 @@ guarantees change as the [platform guarantee table](semantics.md#windows-platfor
 states:
 
 - **Admission** (`sealed_executable`: `deny_write_copy`). There is no memfd.
-  The supervisor copies the admitted bytes into a fresh owner-only directory,
-  opens the copy for reading without `FILE_SHARE_WRITE` or `FILE_SHARE_DELETE`,
-  verifies the configured SHA-256 and the PE format through that handle, and
-  holds it until the child is created from the copy's path. Path replacement
+  The supervisor copies the admitted bytes into a fresh owner-only directory
+  inside the state directory's owner-only `run` directory ([owner](owner.md#windows),
+  "Scratch"), opens the copy for reading without `FILE_SHARE_WRITE` or
+  `FILE_SHARE_DELETE`, verifies the configured SHA-256 and the PE format
+  through that handle, and holds it, with a handle on its directory that does
+  not share deletion, until the child is created from the copy's path. Path replacement
   and writes to the original cannot change what runs, and from that open no
   process can write, rename or delete the copy. A writable mapping that a
   process of the same user made of the copy before the open is not excluded.
@@ -215,10 +217,14 @@ states:
   process handle `CreateProcessW` returned, never by a process id. The adapter requires the pipe's server process
   (`GetNamedPipeServerProcessId`) to equal its parent's process id and to run as
   the current user.
-- **Parent death** (`parent_death_kill`: holds). Every adapter is in the
-  owner's job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` before it runs
-  (created suspended and assigned, or created with
-  `PROC_THREAD_ATTRIBUTE_JOB_LIST`); when the owner dies, the job ends it. The adapter also
+- **Current directory.** The adapter starts with the copy's owner-only
+  directory as its current directory, never the owner's. A Windows adapter is
+  self-contained: a DLL beside the original executable is not beside the copy
+  and is not found.
+- **Parent death** (`parent_death_kill`: holds). Every adapter is created
+  inside the owner's job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and
+  no breakaway, through `PROC_THREAD_ATTRIBUTE_JOB_LIST`, so it is never
+  outside the job; when the owner dies, the job ends it. The adapter also
   exits when its channel reaches end of file. No retained spawning thread is
   needed.
 - **Stop and cleanup** (`exact_process_signal`: holds). The owned child is

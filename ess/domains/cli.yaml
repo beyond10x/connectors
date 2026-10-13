@@ -347,23 +347,32 @@ types:
   #   an adapter also requires it to equal its parent's process id. A peer that
   #   has already closed has no pid: the owner and supervisor admit it by its
   #   uid, an adapter refuses it.
-  # - deny_write_copy: the image is a copy in an owner-only directory, opened for
-  #   reading without write or delete sharing before its digest check and held
-  #   until the child is created; from that open no process can open it for
-  #   writing, rename or delete it. A writable mapping a process of the same user
-  #   made before that open is not excluded.
+  # - deny_write_copy: the image is a copy in a fresh owner-only directory inside
+  #   the state directory's owner-only run directory, opened for reading without
+  #   write or delete sharing before its digest check and held, with its
+  #   directory, until the child is created; from that open no process can open it
+  #   for writing, rename or delete it or its directory. A writable mapping a
+  #   process of the same user made before that open is not excluded.
   # - client_token_query: the pipe's access control admits the current user alone
   #   at connect; the client's process id is the connect-time record, and its user
   #   is read afterwards from that process's token, a separate query that reads
-  #   another process if the client exited and its id was reused.
+  #   another process if the client exited and its id was reused. Besides the user,
+  #   that token's integrity level must equal this process's and it must not be
+  #   restricted, on both ends: a peer of the same user at another integrity level,
+  #   or with a restricted token, is refused as lifecycle_conflict, by an owner with
+  #   that reply rather than a closed stream.
   - name: connectors.cli.PlatformGuaranteeWeakerForm
     kind: enum
     variants: [owner_private_copy, adapter_channel_close, child_reap_lock, launch_path_read, set_after_receive, separate_pid_query, deny_write_copy, client_token_query]
   # One row of the platform guarantee table. Linux holds every guarantee. macOS
   # holds atomic_no_replace_rename (renamex_np RENAME_EXCL on a filesystem that
   # reports VOL_CAP_INT_RENAME_EXCL, APFS) and holds each other one only in its
-  # named weaker form. Windows holds parent_death_kill (a job object with
-  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE), exact_process_signal (the held process
+  # named weaker form. Windows holds parent_death_kill (every child created in a
+  # job object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE through
+  # PROC_THREAD_ATTRIBUTE_JOB_LIST; an adapter's job permits no breakaway, a
+  # consumer's permits breakaway on request, JOB_OBJECT_LIMIT_BREAKAWAY_OK and
+  # never the silent form, so an owner a consumer starts can leave it, while the
+  # consumer itself stays in it), exact_process_signal (the held process
   # handle), atomic_no_replace_rename (MoveFileExW without
   # MOVEFILE_REPLACE_EXISTING, on NTFS) and atomic_close_on_exec (handles
   # duplicated non-inheritable, children given an explicit handle list), and holds
@@ -452,7 +461,9 @@ types:
   #   inherits, the only handle besides its standard ones in the
   #   PROC_THREAD_ATTRIBUTE_HANDLE_LIST it is created with; the environment
   #   variable CONNECTORS_CREDENTIAL_HANDLE holds the handle's value in decimal
-  #   (Windows). The variable carries the handle value, never the document.
+  #   (Windows). The variable carries the handle value, never the document. The
+  #   consumer's environment is otherwise the caller's variables its entry's
+  #   pass_env prefixes select, names matched in any letter case, and SystemRoot.
   - name: connectors.cli.ConsumerCredentialDelivery
     kind: enum
     variants: [descriptor_3, inherited_handle]

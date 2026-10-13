@@ -198,15 +198,20 @@ delivery for each platform (`descriptor_3` on Linux and macOS,
 [platform guarantee table](semantics.md#windows-platform-guarantees) states:
 
 - **Image** (`sealed_executable`: `deny_write_copy`). There is no memfd. The
-  owner copies the consumer image into a fresh owner-only directory, opens the
-  copy for reading without `FILE_SHARE_WRITE` or `FILE_SHARE_DELETE`, and
-  verifies its digest and PE header through that handle before reading the
-  credential; a wrong digest is still refused before the consumer is created.
-  That handle is held, by the owner and then by the CLI, until the consumer is
-  created. A writable mapping that a process of the same user made of the copy
-  before the open is not excluded.
+  owner copies the consumer image into a fresh owner-only directory inside
+  the state directory's owner-only `run` directory ([owner](owner.md#windows),
+  "Scratch"), opens the copy for reading without `FILE_SHARE_WRITE` or
+  `FILE_SHARE_DELETE`, and verifies its digest and PE header through that
+  handle before reading the credential; a wrong digest is still refused
+  before the consumer is created. That handle is held, by the owner and then
+  by the CLI, until the consumer is created, and the CLI holds a handle on the
+  copy's directory that does not share deletion from before it checks the
+  copy's path until the consumer has exited. Every launch the CLI refuses or
+  fails, an argument holding NUL or a failed creation included, removes the
+  copy and its directory. A writable mapping that a process of the same user
+  made of the copy before the open is not excluded.
 - **Credential.** The owner writes the material verbatim into a file in a fresh
-  owner-only directory, removes the file's name with POSIX delete semantics
+  owner-only directory inside `run`, removes the file's name with POSIX delete semantics
   while it stays open, and keeps only a read-only handle positioned at its
   start, in place of the sealed memfd.
 - **Handles in place of descriptors** (`atomic_close_on_exec`: holds). The
@@ -223,6 +228,18 @@ delivery for each platform (`descriptor_3` on Linux and macOS,
   value, never the document, and the CLI sets it after the `pass_env`
   selection: a caller's variable of that name, in any letter case, is not
   passed.
+- **Environment.** Windows compares variable names without regard to letter
+  case, and so does the `pass_env` selection: a prefix selects every caller
+  variable whose name starts with it in any letter case, so `PATH` selects
+  `Path`. Besides the selected variables and `CONNECTORS_CREDENTIAL_HANDLE`,
+  the consumer gets `SystemRoot`, with the CLI's own value, as an adapter
+  does: Windows needs it to start the network stack, and it carries no
+  credential. A caller's variable named `SystemRoot`, in any letter case, is
+  not passed.
+- **Current directory.** The consumer starts with the image copy's owner-only
+  directory as its current directory, never the CLI's or the caller's. A
+  Windows consumer is self-contained: a DLL beside the original executable is
+  not beside the copy and is not found.
 - **Execution.** No shell runs and no search path is used: the CLI creates the
   consumer with `CreateProcessW` from the image copy's full path as the
   application name. argv\[0\] is that path, followed by the pinned prefix and
@@ -237,6 +254,18 @@ delivery for each platform (`descriptor_3` on Linux and macOS,
   `CTRL_BREAK_EVENT` in a handler of its own, so the console delivers them to
   the consumer, which shares it.
 - **Launcher death** (`parent_death_kill`: holds). The CLI creates the
-  consumer in a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only
-  handle it holds, before the consumer runs. **If the CLI dies first, the job
-  ends the consumer**, by termination: Windows has no `SIGTERM` to send.
+  consumer inside a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose
+  only handle it holds, through `PROC_THREAD_ATTRIBUTE_JOB_LIST`, so the
+  consumer never runs outside it. **If the CLI dies first, the job ends the
+  consumer**, by termination: Windows has no `SIGTERM` to send.
+- **Breakaway.** The consumer's job permits breakaway on request
+  (`JOB_OBJECT_LIMIT_BREAKAWAY_OK`, never
+  `JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK`): a process the consumer creates with
+  `CREATE_BREAKAWAY_FROM_JOB` leaves the job, as the CLI does when it starts an
+  owner ([owner](owner.md#windows), "Detaching from the CLI"), so an owner a
+  consumer starts outlives that consumer.
+- **The consumer's own children.** Every process the consumer creates without
+  breakaway is in the consumer's job, and the CLI closes the job once the
+  consumer has exited: those processes end then, though the CLI did not die.
+  This differs from Linux, where `PR_SET_PDEATHSIG` covers the consumer alone
+  and a process the consumer starts outlives it.
