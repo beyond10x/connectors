@@ -35,8 +35,13 @@
 - A catalog guard check can expect a JSON boolean, `{"boolean": true}` or `false`
   (`docs/local-catalog-provider.md`, `guard`; `connectors_catalog.guard.Expectation`): it holds
   only for that JSON boolean, and a string, a number or `null` in its place differs. `input` and
-  `literal` still compare as text, so a literal `"true"` holds for the boolean and the string
-  alike; the GitLab and Jira guards that use one are unchanged.
+  `literal` still compare as text.
+- A catalog selection can hold string body keys non-empty, `body_nonempty`
+  (`docs/local-catalog-provider.md`; `connectors_catalog.selection.ClosedBody`): a body carrying
+  one as `""` is refused as `invalid_input` before any request, and the declared input schema
+  gives it `minLength: 1`. Slack's `chat.postMessage` holds `channel`, `text` and `thread_ts`
+  non-empty, and `conversations.open` holds `users`, which Slack would otherwise answer with `ok`
+  false and leave as `outcome_unknown`.
 - `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
   `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
   target.
@@ -50,6 +55,13 @@
   documentation pages are regenerated and carry the committed model change:
   `connectors.cli.OperatingSystem` gains `macos` and `windows`, and
   `connectors.cli.SetupCheckResult` gains `custody_backend`.
+- A catalog guard check written `{"literal": "true"}` or `{"literal": "false"}` is refused when the
+  selection loads, on every check, since as text it holds for the string `"true"` too; write
+  `{"boolean": true}` or `false`. GitLab's `merge_request.discussion.resolve` (`/resolvable`) and
+  `merge_request.auto_merge` (`/merge_when_pipeline_succeeds`) and Jira's `issue.transition.run`
+  (`/transitions/0/isAvailable`) compare those members as JSON booleans, as the pinned documents
+  type them, so a string `"true"` no longer satisfies them. Migration: a configuration carrying
+  its own selection file with either literal no longer loads until it is rewritten.
 
 ### Limitations
 

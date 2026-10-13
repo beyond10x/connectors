@@ -38,7 +38,8 @@ pub enum Effect {
 /// (a top-level key, or `body.<key>`) or a literal written in the selection,
 /// both compared as text; or a boolean written in the selection, compared by
 /// JSON type, so only that JSON boolean holds and a string, a number or `null`
-/// in its place differs.
+/// in its place differs. A literal `"true"` or `"false"` is refused when the
+/// selection loads, since as text it would hold for a look-alike string.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Expectation {
@@ -440,6 +441,14 @@ pub struct Selection {
     /// required already. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_required: Vec<String>,
+    /// Closed body keys `body_types` types as `string` that must not be
+    /// empty: a body carrying one as `""` is refused before any request, and
+    /// the declaration gives it `minLength: 1`. It does not require the key;
+    /// `body_required` does. A name the closed body does not admit, one not
+    /// typed as a string, a fixed key or a repeated name is refused when the
+    /// selection loads. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub body_nonempty: Vec<String>,
     /// Closed body keys fixed to one value each: a string, an integer or a
     /// boolean, of the key's `body_types` type when it has one. The engine
     /// sends exactly that value under that key on every write, and a caller's
@@ -981,6 +990,18 @@ impl Engine {
                         selection.id
                     )));
                 }
+                // A literal compares as text, so `"true"` or `"false"` would
+                // hold for a look-alike string where a JSON boolean is meant.
+                // The bundle records no answer member's type, so the two are
+                // refused on every check; `boolean` compares a boolean.
+                if let Some(check) = checks.iter().find(|check| {
+                    matches!(&check.expect, Expectation::Literal(text) if text == "true" || text == "false")
+                }) {
+                    return Err(refuse(format!(
+                        "guard of `{}` compares `{}` with a literal boolean spelling; write the expectation as {{\"boolean\": …}}",
+                        selection.id, check.pointer
+                    )));
+                }
                 if guard.further_preflights.len() > 3
                     || guard
                         .further_preflights
@@ -1088,6 +1109,20 @@ impl Engine {
             {
                 return Err(refuse(format!(
                     "selection `{}` declares body_required that do not name distinct keys its body_keys admit",
+                    selection.id
+                )));
+            }
+            // A non-empty key is a caller's string: admitted, typed as a
+            // string, not fixed, and named once.
+            let mut nonempty = std::collections::BTreeSet::new();
+            if !selection.body_nonempty.iter().all(|key| {
+                admitted(key)
+                    && selection.body_types.get(key) == Some(&ValueType::String)
+                    && !selection.body_fixed.contains_key(key)
+                    && nonempty.insert(key)
+            }) {
+                return Err(refuse(format!(
+                    "selection `{}` declares body_nonempty that do not name distinct string keys its body_keys admit and the caller sends",
                     selection.id
                 )));
             }
@@ -1513,6 +1548,15 @@ impl Engine {
             {
                 return Err(refuse(format!(
                     "body key `{key}` is not of its declared type"
+                )));
+            }
+            if let Some(key) = exposed.selection.body_nonempty.iter().find(|key| {
+                body.get(key.as_str())
+                    .and_then(Value::as_str)
+                    .is_some_and(str::is_empty)
+            }) {
+                return Err(refuse(format!(
+                    "body key `{key}` is empty, which its selection does not admit"
                 )));
             }
         }
@@ -2158,7 +2202,11 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
                 .filter(|key| !selection.body_fixed.contains_key(*key))
                 .map(|key| {
                     let schema = if let Some(value_type) = selection.body_types.get(key) {
-                        body_type_schema(*value_type)
+                        let mut schema = body_type_schema(*value_type);
+                        if selection.body_nonempty.contains(key) {
+                            schema["minLength"] = json!(1);
+                        }
+                        schema
                     } else if scalars.contains(key.as_str()) {
                         declared_type(None)
                     } else {
@@ -2370,6 +2418,7 @@ fn check_download(selection: &Selection, download: &Download) -> Result<()> {
         || !selection.body_keys.is_empty()
         || !selection.body_types.is_empty()
         || !selection.body_required.is_empty()
+        || !selection.body_nonempty.is_empty()
         || !selection.body_fixed.is_empty()
     {
         Some("beside members that bind a bundle operation")
