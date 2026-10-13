@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use connectors_core::{Error, ErrorCode, Result};
 use connectors_sdk::{Credential, Secret, SecretStore};
 use serde::{Deserialize, Serialize};
+#[cfg(unix)]
 use std::os::unix::{
     ffi::OsStrExt,
     fs::{MetadataExt, OpenOptionsExt},
@@ -37,7 +38,21 @@ impl Credential for CredentialRef {
                         "required credential is unavailable",
                     )
                 })?;
-                bounded_secret(value.as_os_str().as_bytes().to_vec())
+                #[cfg(unix)]
+                let value = value.as_os_str().as_bytes().to_vec();
+                // Windows environment values are UTF-16; a value that is not
+                // valid Unicode is not a credential.
+                #[cfg(windows)]
+                let value = value
+                    .into_string()
+                    .map_err(|_| {
+                        Error::new(
+                            ErrorCode::Unauthorized,
+                            "required credential is unavailable",
+                        )
+                    })?
+                    .into_bytes();
+                bounded_secret(value)
             }
             Self::File { path } => read_secret_file(path),
         }
@@ -60,6 +75,29 @@ fn bounded_secret(mut value: Vec<u8>) -> Result<Secret> {
     Ok(Secret(value))
 }
 
+/// Windows: the same rule on the opened handle, the owner SID and access
+/// control list in place of uid and mode bits; a final reparse point refuses.
+#[cfg(windows)]
+fn read_secret_file(path: &Path) -> Result<Secret> {
+    use crate::local::filesystem::windows;
+    let mut file = windows::open_no_follow(path)
+        .map_err(|_| Error::new(ErrorCode::Unavailable, "credential file unavailable"))?;
+    let metadata = file.metadata().map_err(|_| Error::unavailable())?;
+    if !metadata.is_file() || windows::check_owner_only(&file).is_err() || metadata.len() > 8192 {
+        return Err(Error::new(
+            ErrorCode::Forbidden,
+            "credential file must be private, owner-bound and bounded",
+        ));
+    }
+    let mut bytes = Vec::new();
+    Read::by_ref(&mut file)
+        .take(8193)
+        .read_to_end(&mut bytes)
+        .map_err(|_| Error::unavailable())?;
+    bounded_secret(bytes)
+}
+
+#[cfg(unix)]
 fn read_secret_file(path: &Path) -> Result<Secret> {
     let mut file = std::fs::OpenOptions::new()
         .read(true)

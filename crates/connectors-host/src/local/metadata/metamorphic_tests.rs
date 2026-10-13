@@ -14,9 +14,10 @@ use crate::local::{
     mutations, registry, runtime,
 };
 use serde_json::{Map, Value, json};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     collections::{BTreeMap, BTreeSet},
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -228,6 +229,7 @@ fn baseline(subject: &str, now: u64) -> registry::ValidatedBaseline {
 
 fn root() -> (tempfile::TempDir, PathBuf) {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     let path = root.path().join("state");
     fs::directory(&path, true, true).unwrap();
@@ -582,6 +584,7 @@ fn mr2_fresh_and_migrated_installations_record_the_same_subjects() {
     let fresh = views(&world.path);
     let (_legacy_root, legacy) = {
         let root = tempfile::tempdir().unwrap();
+        #[cfg(unix)]
         std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
         let path = root.path().join("state");
         (root, path)
@@ -1150,6 +1153,17 @@ fn hold_worker(path: &Path) -> rusqlite::Connection {
     blocker
 }
 
+#[cfg(windows)]
+fn lifecycle_owned(path: &Path) -> bool {
+    let lock = std::fs::File::open(path.join(super::LOCK)).unwrap();
+    match lock.try_lock() {
+        Ok(()) => false,
+        Err(std::fs::TryLockError::WouldBlock) => true,
+        Err(error) => panic!("lock probe failed: {error}"),
+    }
+}
+
+#[cfg(unix)]
 fn lifecycle_owned(path: &Path) -> bool {
     use std::os::fd::AsRawFd;
     let lock = std::fs::File::open(path.join(super::LOCK)).unwrap();
