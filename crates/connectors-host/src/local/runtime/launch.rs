@@ -25,12 +25,9 @@ use std::os::{
     fd::{AsRawFd, FromRawFd, RawFd},
     unix::{ffi::OsStrExt, net::UnixStream, process::CommandExt, process::ExitStatusExt},
 };
-use std::{
-    collections::BTreeSet,
-    ffi::OsString,
-    fs::File,
-    process::{Command, Stdio},
-};
+#[cfg(unix)]
+use std::process::{Command, Stdio};
+use std::{collections::BTreeSet, ffi::OsString, fs::File};
 #[cfg(unix)]
 use std::{io::Write, time::Instant};
 
@@ -398,6 +395,7 @@ impl Consumer {
     /// signal ended it. Ends the consumer with `SIGTERM` if this thread exits
     /// first on Linux; on macOS, which has no parent-death signal, the
     /// consumer keeps running, and the image copy is executed by its path.
+    #[cfg(unix)]
     pub fn run(
         self,
         extra: &[String],
@@ -480,6 +478,162 @@ impl Consumer {
         drop(interrupts);
         status.map(code).map_err(|_| Failure::Unavailable)
     }
+
+    /// Start the consumer and wait for it, on Windows (consumer-launch.md §8).
+    /// No shell and no search path: the captured copy is created by its full
+    /// path, argv\[0\], with the pinned argv prefix and `extra` quoted into one
+    /// command line. The environment holds only the `caller` variables whose
+    /// names start with a passed prefix, none named
+    /// [`CREDENTIAL_HANDLE_VARIABLE`] in any letter case, and then that
+    /// variable with the credential handle's value in decimal. The consumer
+    /// inherits the caller's standard handles and one read-only credential
+    /// handle, the only handles in its `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`. It
+    /// runs in a job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only handle
+    /// this call holds, so it ends if this process dies first. While it runs,
+    /// this process ignores `CTRL_C_EVENT` and `CTRL_BREAK_EVENT`, which the
+    /// shared console delivers to the consumer. Returns its exit code.
+    #[cfg(windows)]
+    pub fn run(
+        self,
+        extra: &[String],
+        caller: impl IntoIterator<Item = (OsString, OsString)>,
+    ) -> Result<i32> {
+        use super::artifact;
+        use std::os::windows::{ffi::OsStrExt, io::AsRawHandle};
+        use windows_sys::Win32::{
+            Foundation::{HANDLE, INVALID_HANDLE_VALUE},
+            Storage::FileSystem::FILE_GENERIC_READ,
+            System::Console::{
+                GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+            },
+        };
+        if extra.iter().any(|arg| arg.contains('\0')) {
+            return Err(Failure::InvalidInput);
+        }
+        let launch = artifact::launch_path(&self.executable)?;
+        // Read-only, inheritable only for this creation.
+        let credential =
+            artifact::inheritable(self.credential.as_raw_handle(), Some(FILE_GENERIC_READ))?;
+        let mut standard = [std::ptr::null_mut(); 3];
+        let mut held = Vec::new();
+        for (slot, which) in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]
+            .into_iter()
+            .enumerate()
+        {
+            // SAFETY: no preconditions; the result is borrowed, not owned.
+            let handle: HANDLE = unsafe { GetStdHandle(which) };
+            if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+                continue;
+            }
+            let duplicate = artifact::inheritable(handle, None)?;
+            standard[slot] = duplicate.as_raw_handle();
+            held.push(duplicate);
+        }
+        let mut inherited: Vec<HANDLE> = held.iter().map(|h| h.as_raw_handle()).collect();
+        inherited.push(credential.as_raw_handle());
+        let mut environment: Vec<(OsString, OsString)> = caller
+            .into_iter()
+            .filter(|(name, _)| {
+                let name: Vec<u16> = name.encode_wide().collect();
+                self.pass_env.iter().any(|prefix| {
+                    let prefix: Vec<u16> = prefix.encode_utf16().collect();
+                    name.starts_with(&prefix)
+                }) && !name.eq_ignore_ascii_case_wide(CREDENTIAL_HANDLE_VARIABLE)
+            })
+            .collect();
+        environment.push((
+            CREDENTIAL_HANDLE_VARIABLE.into(),
+            (credential.as_raw_handle() as usize).to_string().into(),
+        ));
+        let arguments: Vec<OsString> = self.args.iter().chain(extra).map(OsString::from).collect();
+        let job = artifact::Job::new().map_err(|_| Failure::Unavailable)?;
+        let mut child = artifact::create(
+            &artifact::Creation {
+                application: launch.path(),
+                arguments: &arguments,
+                environment: &environment,
+                standard,
+                inherited: &inherited,
+                flags: 0,
+            },
+            &job,
+        )
+        .map_err(|_| Failure::Unavailable)?;
+        drop(held);
+        drop(credential);
+        drop(self.credential);
+        drop(self.executable);
+        let interrupts = Interrupts::ignore();
+        let status = child.wait();
+        drop(interrupts);
+        drop(job);
+        drop(launch);
+        // An exit code is a DWORD; one with the top bit set, such as an NTSTATUS
+        // the consumer ended with, reads as negative.
+        status
+            .map(|code| code as i32)
+            .map_err(|_| Failure::Unavailable)
+    }
+}
+
+/// The consumer's environment variable that names the credential handle on
+/// Windows (`connectors.cli.ConsumerCredentialDeliveryStatement`,
+/// `handle_variable` for `inherited_handle`).
+#[cfg(windows)]
+pub(crate) const CREDENTIAL_HANDLE_VARIABLE: &str = "CONNECTORS_CREDENTIAL_HANDLE";
+
+/// Equality without regard to ASCII letter case, as Windows compares
+/// environment variable names.
+#[cfg(windows)]
+trait WideName {
+    fn eq_ignore_ascii_case_wide(&self, other: &str) -> bool;
+}
+#[cfg(windows)]
+impl WideName for [u16] {
+    fn eq_ignore_ascii_case_wide(&self, other: &str) -> bool {
+        let fold = |unit: u16| {
+            if (u16::from(b'a')..=u16::from(b'z')).contains(&unit) {
+                unit - 32
+            } else {
+                unit
+            }
+        };
+        let other: Vec<u16> = other.encode_utf16().collect();
+        self.len() == other.len() && self.iter().zip(&other).all(|(a, b)| fold(*a) == fold(*b))
+    }
+}
+
+/// `CTRL_C_EVENT` and `CTRL_BREAK_EVENT` handled by ignoring them until
+/// dropped. A handler, unlike `SetConsoleCtrlHandler(NULL, TRUE)`, is not
+/// inherited, so the consumer receives both from the console it shares.
+#[cfg(windows)]
+struct Interrupts(bool);
+#[cfg(windows)]
+impl Interrupts {
+    fn ignore() -> Self {
+        // SAFETY: registers a handler that is a plain function for the life
+        // of this value.
+        Self(
+            unsafe { windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(ignore), 1) }
+                != 0,
+        )
+    }
+}
+#[cfg(windows)]
+impl Drop for Interrupts {
+    fn drop(&mut self) {
+        if self.0 {
+            // SAFETY: removes the handler `ignore` registered.
+            unsafe { windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(ignore), 0) };
+        }
+    }
+}
+/// Handles an interrupt or break by doing nothing; anything else, such as a
+/// console close, goes on to the default handler.
+#[cfg(windows)]
+unsafe extern "system" fn ignore(event: u32) -> windows_sys::core::BOOL {
+    use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT};
+    i32::from(event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT)
 }
 
 /// Exactly descriptors 0 to 3 reach a consumer: mark every descriptor from 4
@@ -570,6 +724,7 @@ fn close_on_exec_from_four(end: libc::c_int) {
 }
 
 /// A consumer's exit code, or 128 plus the signal number that ended it.
+#[cfg(unix)]
 pub(crate) fn code(status: std::process::ExitStatus) -> i32 {
     status
         .code()
@@ -577,7 +732,9 @@ pub(crate) fn code(status: std::process::ExitStatus) -> i32 {
 }
 
 /// `SIGINT` and `SIGQUIT` ignored until dropped, then restored.
+#[cfg(unix)]
 struct Interrupts([libc::sigaction; 2]);
+#[cfg(unix)]
 impl Interrupts {
     fn ignore() -> Self {
         // SAFETY: zeroed sigaction is valid; sigaction only reads `ignore` and
@@ -593,6 +750,7 @@ impl Interrupts {
         }
     }
 }
+#[cfg(unix)]
 impl Drop for Interrupts {
     fn drop(&mut self) {
         for (index, signal) in [libc::SIGINT, libc::SIGQUIT].into_iter().enumerate() {
@@ -606,3 +764,7 @@ impl Drop for Interrupts {
 
 #[cfg(all(test, unix))]
 mod tests;
+
+/// The consumer launch on the Windows runner.
+#[cfg(all(test, windows))]
+mod consumer_tests;
