@@ -3,6 +3,10 @@
 //! before any owner, keyring or consumer starts. The delivery itself, lapsed
 //! evidence and a locked collection need the disposable Secret Service and are
 //! the ignored host journey `disposable_consumer_launch_delivers_fd3_and_refuses_by_code`.
+//!
+//! Unix only: the configuration pins `/usr/bin/true` as the consumer and the
+//! process uid as `owner_uid`.
+#![cfg(unix)]
 use serde_json::Value;
 use std::{
     fs,

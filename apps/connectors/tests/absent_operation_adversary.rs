@@ -5,10 +5,11 @@ use connectors_host::local::{
     registry, runtime,
 };
 use serde_json::{Value, json};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     collections::BTreeSet,
     fs,
-    os::unix::fs::PermissionsExt,
     process::{Command, Output},
 };
 
@@ -168,6 +169,7 @@ fn invoke(root: &tempfile::TempDir, operation: &str, schema: &str, revision: &st
 fn prepare(root: &tempfile::TempDir, operation: &str, schema: &str, revision: &str) -> Output {
     let input = root.path().join("input.json");
     fs::write(&input, r#"{"name":"item"}"#).unwrap();
+    #[cfg(unix)]
     fs::set_permissions(&input, fs::Permissions::from_mode(0o600)).unwrap();
     command(
         root,

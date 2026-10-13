@@ -8,10 +8,11 @@ use connectors_host::local::{
     registry, runtime,
 };
 use serde_json::{Value, json};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     collections::BTreeSet,
     fs,
-    os::unix::fs::PermissionsExt,
     process::{Command, Output},
 };
 
@@ -75,9 +76,11 @@ fn every_adapter_command_answers_an_unknown_alias_at_admission() {
     let root = initialized();
     let input = root.path().join("input.json");
     fs::write(&input, r#"{"operations":[]}"#).unwrap();
+    #[cfg(unix)]
     fs::set_permissions(&input, fs::Permissions::from_mode(0o600)).unwrap();
     let credential = root.path().join("credential");
     fs::write(&credential, "x").unwrap();
+    #[cfg(unix)]
     fs::set_permissions(&credential, fs::Permissions::from_mode(0o600)).unwrap();
     let proof = root.path().join("proof");
     let (input, credential, proof) = (
@@ -359,6 +362,7 @@ fn c05_wrong_business_input_codes() {
         ("bytes", oversized.as_str()),
     ] {
         fs::write(&file, document).unwrap();
+        #[cfg(unix)]
         fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
         let output = command(
             &root,
@@ -525,6 +529,7 @@ fn c05_depth_past_the_decoder_limit_is_cli_dynamic_input() {
     for arrays in [65, 126, 127, 200] {
         let document = format!("{{\"name\":{}0{}}}", "[".repeat(arrays), "]".repeat(arrays));
         fs::write(&file, document).unwrap();
+        #[cfg(unix)]
         fs::set_permissions(&file, fs::Permissions::from_mode(0o600)).unwrap();
         let mut args = invoke_args(&["operations", "invoke"], "forge", &schema);
         args.extend(["--input-file", file.to_str().unwrap()]);

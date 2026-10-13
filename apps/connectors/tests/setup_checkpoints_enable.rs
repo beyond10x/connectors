@@ -5,12 +5,17 @@
 //! again. The existing store is the one Entity Runtime 0.26.0 wrote.
 use rusqlite::{Connection, OpenFlags};
 use serde_json::Value;
+#[cfg(unix)]
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    os::{fd::AsRawFd, unix::fs::MetadataExt, unix::fs::PermissionsExt},
-    path::{Path, PathBuf},
+    path::Path,
     process::{Command, Output},
+};
+#[cfg(unix)]
+use std::{
+    os::{fd::AsRawFd, unix::fs::MetadataExt, unix::fs::PermissionsExt},
+    path::PathBuf,
 };
 
 const NAME: &str = "metadata.sqlite3";
@@ -37,6 +42,7 @@ fn initialized() -> tempfile::TempDir {
     root
 }
 
+#[cfg(unix)]
 fn previous_pin_fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../crates/connectors-host/tests/fixtures/metadata-store-er-0.26.0")
@@ -44,6 +50,8 @@ fn previous_pin_fixture() -> PathBuf {
 
 /// Replaces the initialized store with a copy of the store Entity Runtime
 /// 0.26.0 wrote, handed to the uid running the test, as a restore would.
+/// Unix only: the store records the owner as a uid.
+#[cfg(unix)]
 fn restore_previous_store(root: &Path) {
     let state = root.join("state");
     for suffix in ["", "-wal", "-shm"] {
@@ -92,6 +100,7 @@ fn continuity(root: &Path) -> bool {
 }
 
 /// Every file of the state directory but the owner lock, by name and digest.
+#[cfg(unix)]
 fn state_files(root: &Path) -> Vec<(String, String)> {
     let mut files = fs::read_dir(root.join("state"))
         .unwrap()
@@ -133,6 +142,7 @@ fn a_store_setup_init_creates_already_has_checkpoints() {
     assert_eq!(answer["disposition"], "already_enabled", "{answer}");
 }
 
+#[cfg(unix)]
 #[test]
 fn an_existing_store_is_enabled_only_when_confirmed_and_once() {
     let root = initialized();
@@ -194,6 +204,7 @@ fn an_existing_store_is_enabled_only_when_confirmed_and_once() {
     assert_eq!(metadata["state"], "ready", "{metadata}");
 }
 
+#[cfg(unix)]
 #[test]
 fn a_running_owner_refuses_the_enable_with_the_store_unchanged() {
     let root = initialized();
