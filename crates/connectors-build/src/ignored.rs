@@ -535,9 +535,15 @@ fn execute_test(
     // SAFETY: this Linux process adopts orphans, so fixture group members can
     // be reaped after their parent exits. Every wait below selects its own
     // group, never children of another concurrently executing fixture.
+    #[cfg(target_os = "linux")]
     if unsafe { libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) } < 0 {
         return Err(std::io::Error::last_os_error().into());
     }
+    // macOS has no subreaper. A fixture member whose parent exits is adopted
+    // by launchd but keeps its process group, so the group SIGKILL in
+    // `FixtureGroup::finish` still stops it; launchd, not this runner, reaps
+    // it, and `finish` ends at ECHILD once the runner's own children of the
+    // group are reaped. The group id cannot be reused while a member lives.
     let child = Command::new(&suite.executable)
         .args([
             "--ignored",
@@ -798,6 +804,18 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
     Ok((suites, environment))
 }
 
+/// The user this process runs as, owner of every fixture temporary directory.
+#[cfg(target_os = "linux")]
+fn own_uid() -> std::io::Result<u32> {
+    Ok(std::fs::metadata("/proc/self")?.uid())
+}
+/// macOS has no `/proc`: the effective uid, the owner `/proc/self` reports on Linux.
+#[cfg(target_os = "macos")]
+fn own_uid() -> std::io::Result<u32> {
+    // SAFETY: geteuid has no preconditions.
+    Ok(unsafe { libc::geteuid() })
+}
+
 fn temporary(root: &Path, selected: Option<&Path>) -> Result<tempfile::TempDir> {
     let base = selected
         .map(|path| root.join(path))
@@ -810,9 +828,7 @@ fn temporary(root: &Path, selected: Option<&Path>) -> Result<tempfile::TempDir> 
         return Err("fixture temporary directory must be a physical path, without symlinks or parent traversal".into());
     }
     let stat = std::fs::metadata(&base)?;
-    if stat.uid() != std::fs::metadata("/proc/self")?.uid()
-        || (selected.is_some() && stat.mode() & 0o077 != 0)
-    {
+    if stat.uid() != own_uid()? || (selected.is_some() && stat.mode() & 0o077 != 0) {
         return Err(
             "--tmpdir must be an owner-private directory (mode 700) owned by this user".into(),
         );
@@ -1154,12 +1170,34 @@ fn selected_fixture() {{
         )
     }
 
+    /// Linux: the runner is the subreaper and has reaped the descendant, so
+    /// any non-zombie status is a live process.
+    #[cfg(target_os = "linux")]
+    fn descendant_running(pid: &str) -> bool {
+        std::fs::read_to_string(format!("/proc/{pid}/status"))
+            .is_ok_and(|status| !status.lines().any(|line| line.starts_with("State:\tZ")))
+    }
+    /// macOS: launchd adopts and reaps the killed descendant, so it exists
+    /// briefly as a zombie; it is running if it still exists two seconds on.
+    #[cfg(target_os = "macos")]
+    fn descendant_running(pid: &str) -> bool {
+        let pid: libc::pid_t = pid.trim().parse().unwrap();
+        let until = Instant::now() + Duration::from_secs(2);
+        // SAFETY: signal 0 only checks that the process exists; it sends nothing.
+        while unsafe { libc::kill(pid, 0) } == 0 {
+            if Instant::now() >= until {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        false
+    }
+
     fn adversary_assert_descendants_stopped(panics: bool) {
         let (root, suite) = adversary_descendant_fixture(panics);
         let outcome = execute_one(&suite, "selected_fixture", root.path());
         let pid = std::fs::read_to_string(root.path().join("descendant.pid")).unwrap();
-        let running = std::fs::read_to_string(format!("/proc/{pid}/status"))
-            .is_ok_and(|status| !status.lines().any(|line| line.starts_with("State:\tZ")));
+        let running = descendant_running(&pid);
         // Clean exactly the descendant this test created before any assertion can panic.
         if running {
             let killed = Command::new("/bin/kill")

@@ -223,7 +223,120 @@ pub(crate) fn require_absent(parent: &File, child: &OsStr) -> Result<()> {
 
 /// Publish one durable private file, atomically refusing any existing name.
 pub fn publish_new(parent: &File, child: &OsStr, contents: &[u8]) -> Result<()> {
-    publish(parent, child, contents, libc::RENAME_NOREPLACE)
+    publish(parent, child, contents, NO_REPLACE)
+}
+
+/// The rename flag that refuses an existing destination name atomically.
+#[cfg(target_os = "linux")]
+const NO_REPLACE: libc::c_uint = libc::RENAME_NOREPLACE;
+#[cfg(target_os = "macos")]
+const NO_REPLACE: libc::c_uint = libc::RENAME_EXCL;
+
+#[cfg(target_os = "linux")]
+fn rename_at(directory: &File, from: &CString, to: &CString, flags: libc::c_uint) -> libc::c_int {
+    // SAFETY: valid directory descriptors and C strings; RENAME_NOREPLACE
+    // gives concurrent creators a single winner, including symlink targets.
+    // Without it the rename replaces the name itself, never a link target.
+    unsafe {
+        libc::renameat2(
+            directory.as_raw_fd(),
+            from.as_ptr(),
+            directory.as_raw_fd(),
+            to.as_ptr(),
+            flags,
+        )
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn rename_at(directory: &File, from: &CString, to: &CString, flags: libc::c_uint) -> libc::c_int {
+    // SAFETY: valid directory descriptors and C strings; RENAME_EXCL gives
+    // concurrent creators a single winner and, like RENAME_NOREPLACE, treats
+    // any existing name, a dangling link included, as taken. Without it the
+    // rename replaces the name itself, never a link target.
+    unsafe {
+        libc::renameatx_np(
+            directory.as_raw_fd(),
+            from.as_ptr(),
+            directory.as_raw_fd(),
+            to.as_ptr(),
+            flags,
+        )
+    }
+}
+
+/// Whether a volume reports the exclusive rename as a valid, set capability.
+#[cfg(target_os = "macos")]
+fn admits_rename_excl(volume: &libc::vol_capabilities_attr_t) -> bool {
+    let interfaces = libc::VOL_CAPABILITIES_INTERFACES;
+    let bit = libc::VOL_CAP_INT_RENAME_EXCL;
+    volume.valid[interfaces] & bit != 0 && volume.capabilities[interfaces] & bit != 0
+}
+
+/// Admit a directory for no-replace publication only on a volume that reports
+/// `VOL_CAP_INT_RENAME_EXCL` (APFS). Any other volume is refused the way Linux
+/// refuses a filesystem without `RENAME_NOREPLACE`: `InvalidConfiguration`.
+/// Volume attributes are read from the volume's root, which must be the same
+/// device as the directory.
+#[cfg(target_os = "macos")]
+fn qualify_rename_excl(directory: &File) -> Result<()> {
+    use std::os::unix::fs::OpenOptionsExt;
+    let mut volume = std::mem::MaybeUninit::<libc::statfs>::uninit();
+    // SAFETY: a live descriptor and a writable statfs buffer.
+    if unsafe { libc::fstatfs(directory.as_raw_fd(), volume.as_mut_ptr()) } != 0 {
+        return Err(Failure::InvalidConfiguration);
+    }
+    // SAFETY: successful fstatfs initialized the buffer.
+    let volume = unsafe { volume.assume_init() };
+    let mount = volume.f_mntonname.map(|c| c as u8);
+    let mount =
+        std::ffi::CStr::from_bytes_until_nul(&mount).map_err(|_| Failure::InvalidConfiguration)?;
+    let root = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY)
+        .open(OsStr::from_bytes(mount.to_bytes()))
+        .map_err(|_| Failure::InvalidConfiguration)?;
+    let device = |file: &File| file.metadata().map(|stat| stat.dev());
+    if !matches!((device(&root), device(directory)), (Ok(a), Ok(b)) if a == b) {
+        return Err(Failure::InvalidConfiguration);
+    }
+    let mut request = libc::attrlist {
+        bitmapcount: libc::ATTR_BIT_MAP_COUNT,
+        reserved: 0,
+        commonattr: 0,
+        volattr: libc::ATTR_VOL_INFO | libc::ATTR_VOL_CAPABILITIES,
+        dirattr: 0,
+        fileattr: 0,
+        forkattr: 0,
+    };
+    // getattrlist(2) packs a u32 total length, then the requested attribute.
+    #[repr(C)]
+    struct Reply {
+        length: u32,
+        volume: libc::vol_capabilities_attr_t,
+    }
+    let mut reply = std::mem::MaybeUninit::<Reply>::zeroed();
+    // SAFETY: a live descriptor, a valid request and a writable buffer of the
+    // size passed; the kernel writes at most that many bytes.
+    let status = unsafe {
+        libc::fgetattrlist(
+            root.as_raw_fd(),
+            (&mut request as *mut libc::attrlist).cast(),
+            reply.as_mut_ptr().cast(),
+            std::mem::size_of::<Reply>(),
+            0,
+        )
+    };
+    if status != 0 {
+        return Err(Failure::InvalidConfiguration);
+    }
+    // SAFETY: the buffer was zero-initialized and every field is plain integers.
+    let reply = unsafe { reply.assume_init() };
+    if (reply.length as usize) < std::mem::size_of::<Reply>() || !admits_rename_excl(&reply.volume)
+    {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok(())
 }
 
 /// Publish one durable private file, atomically replacing any file at the name:
@@ -233,6 +346,10 @@ pub fn publish_replace(parent: &File, child: &OsStr, contents: &[u8]) -> Result<
 }
 
 fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: libc::c_uint) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    if flags & NO_REPLACE != 0 {
+        qualify_rename_excl(parent)?;
+    }
     let temporary = format!(".connectors-{}", uuid::Uuid::new_v4());
     let temp_name = OsStr::new(&temporary);
     let mut file = open_at(
@@ -248,18 +365,7 @@ fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: libc::c_uint) -
         file.write_all(contents)
             .map_err(|_| Failure::InvalidConfiguration)?;
         file.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
-        // SAFETY: valid directory descriptors and C strings; RENAME_NOREPLACE
-        // gives concurrent creators a single winner, including symlink targets.
-        // Without it the rename replaces the name itself, never a link target.
-        let status = unsafe {
-            libc::renameat2(
-                parent.as_raw_fd(),
-                temporary_c.as_ptr(),
-                parent.as_raw_fd(),
-                child_c.as_ptr(),
-                flags,
-            )
-        };
+        let status = rename_at(parent, &temporary_c, &child_c, flags);
         if status != 0 {
             return Err(
                 if std::io::Error::last_os_error().kind() == std::io::ErrorKind::AlreadyExists {
@@ -277,4 +383,59 @@ fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: libc::c_uint) -
         libc::unlinkat(parent.as_raw_fd(), temporary_c.as_ptr(), 0);
     }
     result
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod macos_tests {
+    use super::*;
+
+    fn capabilities(valid: u32, set: u32) -> libc::vol_capabilities_attr_t {
+        let mut value = libc::vol_capabilities_attr_t {
+            capabilities: [0; 4],
+            valid: [0; 4],
+        };
+        value.valid[libc::VOL_CAPABILITIES_INTERFACES] = valid;
+        value.capabilities[libc::VOL_CAPABILITIES_INTERFACES] = set;
+        value
+    }
+
+    /// A volume admits the exclusive rename only when it reports the
+    /// capability as both valid and set.
+    #[test]
+    fn rename_excl_admission_needs_a_valid_set_capability() {
+        let bit = libc::VOL_CAP_INT_RENAME_EXCL;
+        assert!(admits_rename_excl(&capabilities(bit, bit)));
+        assert!(!admits_rename_excl(&capabilities(bit, 0)));
+        assert!(!admits_rename_excl(&capabilities(0, bit)));
+        assert!(!admits_rename_excl(&capabilities(0, 0)));
+    }
+
+    /// `atomic_no_replace_rename` holds on APFS: the temporary directory
+    /// qualifies, and an existing name, a dangling link included, keeps its
+    /// content while the second publication is refused.
+    #[test]
+    fn atomic_no_replace_rename_holds_on_apfs() {
+        let root = tempfile::tempdir().unwrap();
+        let directory = File::open(root.path()).unwrap();
+        qualify_rename_excl(&directory).unwrap();
+        publish_new(&directory, OsStr::new("first"), b"one").unwrap();
+        assert_eq!(
+            publish_new(&directory, OsStr::new("first"), b"two"),
+            Err(Failure::ConfigurationExists)
+        );
+        assert_eq!(std::fs::read(root.path().join("first")).unwrap(), b"one");
+        std::os::unix::fs::symlink(root.path().join("absent"), root.path().join("link")).unwrap();
+        assert_eq!(
+            publish_new(&directory, OsStr::new("link"), b"three"),
+            Err(Failure::ConfigurationExists)
+        );
+        assert!(!root.path().join("absent").exists());
+        publish_replace(&directory, OsStr::new("first"), b"four").unwrap();
+        assert_eq!(std::fs::read(root.path().join("first")).unwrap(), b"four");
+        let names: Vec<_> = std::fs::read_dir(root.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(names.len(), 2, "no temporary file is left: {names:?}");
+    }
 }
