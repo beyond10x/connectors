@@ -13,7 +13,8 @@ use std::{net::TcpStream, time::Duration};
 pub(crate) fn set_read_timeout(stream: &TcpStream, wait: Duration) {
     match stream.set_read_timeout(Some(wait)) {
         Ok(()) => {}
-        Err(error) if cfg!(target_os = "macos") && error.raw_os_error() == Some(libc::EINVAL) => {
+        #[cfg(target_os = "macos")]
+        Err(error) if error.raw_os_error() == Some(libc::EINVAL) => {
             assert!(
                 readable_now(stream),
                 "the read timeout was refused ({error}) on a stream that is not readable now"
@@ -24,6 +25,7 @@ pub(crate) fn set_read_timeout(stream: &TcpStream, wait: Duration) {
 }
 
 /// Whether a read of `stream` returns without waiting.
+#[cfg(target_os = "macos")]
 fn readable_now(stream: &TcpStream) -> bool {
     use std::os::fd::AsRawFd;
     let mut descriptor = libc::pollfd {

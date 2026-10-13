@@ -1035,10 +1035,18 @@ mod tests {
         assert!(error.upstream_answer, "a sent request's timeout");
         server.abort();
         // Nothing listening: no request was sent, so no provider answered.
+        // Windows retries a refused connection for about two seconds before it
+        // reports the refusal, so this client's bound must outlast that, or
+        // the refusal is observed as a connect timeout instead.
         let closed = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = closed.local_addr().unwrap();
         drop(closed);
-        let error = client
+        let refused = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(20))
+            .build()
+            .unwrap();
+        let error = refused
             .get(format!("http://{address}/"))
             .send()
             .await

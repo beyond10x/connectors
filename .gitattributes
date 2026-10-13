@@ -1,0 +1,5 @@
+# Check out every text file with LF on every platform. Tests compare checked-in
+# text (help.txt, the generated completion, contract and guide markdown) byte for
+# byte through include_str! and read_to_string, which Windows core.autocrlf
+# would otherwise rewrite to CRLF.
+* text=auto eol=lf

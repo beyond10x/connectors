@@ -1,6 +1,7 @@
 //! Conformance scenario `v1alpha2-invoke-write-applied-names-attempt`
 //! (contracts/service/compatibility.md § 2.1), run through the released
 //! client's v1alpha2 binding against the real HTTP host.
+#![cfg(unix)]
 mod support;
 
 use connectors_client::Client;

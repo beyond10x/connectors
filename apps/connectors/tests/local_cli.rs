@@ -1,14 +1,26 @@
 use serde_json::Value;
 #[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
 mod clock_fixture;
+#[cfg(unix)]
 #[path = "support/owner.rs"]
 mod owner_start;
+#[cfg(unix)]
 #[path = "support/socket.rs"]
 mod sockets;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     fs,
-    os::unix::fs::PermissionsExt,
     process::{Command, Output},
+};
+
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
 };
 
 fn command(root: &tempfile::TempDir, args: &[&str]) -> Output {
@@ -66,7 +78,7 @@ fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
     let address = socket.local_addr().unwrap();
     let config = |key: String| {
         format!(
-            "{original}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{address}'\npublic_key='{key}'\nmax_rate_error_ppm=10000\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "{original}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{address}'\npublic_key='{key}'\nmax_rate_error_ppm=10000\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         )
     };
@@ -184,7 +196,7 @@ fn setup_init_admits_an_adapter_entry_that_selects_its_private_protocol() {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -205,7 +217,7 @@ fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &s
         .unwrap()
         .replace("connectors-local/2", format)
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n{private_protocol}[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n{private_protocol}[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -260,7 +272,7 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -372,14 +384,20 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     let error: Value = serde_json::from_slice(&unavailable.stderr).unwrap();
     assert_eq!(error["error"]["data"]["code"], "metadata_unavailable");
     assert!(!root.path().join("state/metadata.sqlite3").exists());
-    fs::set_permissions(&config_path, fs::Permissions::from_mode(0o644)).unwrap();
-    let output = command(&root, &["adapters", "list"]);
-    assert_eq!(output.status.code(), Some(2));
-    assert!(!String::from_utf8_lossy(&output.stderr).contains("config.toml"));
+    // Unix only: a configuration readable by group and other is refused.
+    #[cfg(unix)]
+    {
+        fs::set_permissions(&config_path, fs::Permissions::from_mode(0o644)).unwrap();
+        let output = command(&root, &["adapters", "list"]);
+        assert_eq!(output.status.code(), Some(2));
+        assert!(!String::from_utf8_lossy(&output.stderr).contains("config.toml"));
+    }
 }
 
 /// The test's own owner child; a failing assertion must not leave it serving.
+#[cfg(unix)]
 struct OwnerProcess(std::process::Child);
+#[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
         if self.0.try_wait().ok().flatten().is_none() {
@@ -391,6 +409,7 @@ impl Drop for OwnerProcess {
 
 /// Starts `__connectors-owner` from `binary` the way the CLI does, with the
 /// startup channel on descriptor 3 and the lifetime lock on descriptor 4.
+#[cfg(unix)]
 fn start_owner(binary: &std::path::Path, root: &tempfile::TempDir) -> OwnerProcess {
     start_owner_with(binary, root, None)
 }
@@ -398,6 +417,7 @@ fn start_owner(binary: &std::path::Path, root: &tempfile::TempDir) -> OwnerProce
 /// As [`start_owner`], taking the lifetime lock the way the CLI does: the lock
 /// file may already exist, and the start refuses unless no owner holds it.
 /// `idle_ms` shortens the owner's idle exit bound (honoured by debug builds only).
+#[cfg(unix)]
 fn start_owner_with(
     binary: &std::path::Path,
     root: &tempfile::TempDir,
@@ -450,6 +470,7 @@ fn start_owner_with(
 }
 
 /// A second build of the same CLI: identical behaviour, different executable digest.
+#[cfg(unix)]
 fn other_build(root: &tempfile::TempDir) -> std::path::PathBuf {
     let directory = root.path().join("other-build");
     fs::create_dir(&directory).unwrap();
@@ -461,6 +482,7 @@ fn other_build(root: &tempfile::TempDir) -> std::path::PathBuf {
     binary
 }
 
+#[cfg(unix)]
 #[test]
 fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
     let root = tempfile::tempdir().unwrap();
@@ -468,7 +490,7 @@ fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -510,13 +532,14 @@ fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
 }
 
 /// Config with one adapter whose executable is never launched by `adapters status`.
+#[cfg(unix)]
 fn adversary_owner_root() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -524,6 +547,7 @@ fn adversary_owner_root() -> tempfile::TempDir {
 }
 
 /// Owner-channel frame: three big-endian u32 section sizes, then the sections.
+#[cfg(unix)]
 fn adversary_frame(control: &Value) -> Vec<u8> {
     let bytes = serde_json::to_vec(control).unwrap();
     let mut frame = Vec::new();
@@ -534,6 +558,7 @@ fn adversary_frame(control: &Value) -> Vec<u8> {
     frame
 }
 
+#[cfg(unix)]
 fn adversary_read_control(stream: &mut std::os::unix::net::UnixStream) -> Value {
     use std::io::Read;
     let mut sizes = [0u8; 12];
@@ -551,6 +576,7 @@ fn adversary_read_control(stream: &mut std::os::unix::net::UnixStream) -> Value 
 /// transport.rs `handle`) must not be reported as another build. The proxy below
 /// drops the first connection exactly as that capacity refusal does and relays
 /// every later one to the real owner.
+#[cfg(unix)]
 #[test]
 fn adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mismatch() {
     use std::os::unix::net::UnixStream;
@@ -605,6 +631,7 @@ fn adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mis
 /// Adversary: owner.md promises "A caller that sends no `build` gets none back,
 /// so earlier callers still read the reply" and "the owner's reply returns its
 /// own" digest. Drives the real owner with raw greetings from both kinds of caller.
+#[cfg(unix)]
 #[test]
 fn adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest() {
     use std::io::Write;
@@ -655,6 +682,7 @@ fn adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest() {
 /// yet, ended the read as a timeout and closed the stream without a reply. A
 /// same-build CLI then saw a silent close and named the owner another build
 /// or unavailable.
+#[cfg(unix)]
 #[test]
 fn an_owner_answers_a_greeting_sent_after_the_connection_settled() {
     use std::io::Write;
@@ -692,6 +720,7 @@ fn an_owner_answers_a_greeting_sent_after_the_connection_settled() {
     assert_eq!(reply["kind"], "hello", "{reply}");
 }
 
+#[cfg(unix)]
 #[test]
 fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
     let root = tempfile::tempdir().unwrap();
@@ -699,7 +728,7 @@ fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -747,6 +776,7 @@ fn protected_sources_are_not_consumed_before_configuration_admission() {
 /// decides, from the first frame's control JSON, whether this connection is
 /// closed without a reply; every other connection is relayed byte for byte.
 /// Returns the number of connections relayed to the real owner.
+#[cfg(unix)]
 fn adversary2_relay(
     root: &tempfile::TempDir,
     drop_first: impl Fn(usize, &Value) -> bool + Send + 'static,
@@ -803,6 +833,7 @@ fn adversary2_relay(
     relayed
 }
 
+#[cfg(unix)]
 fn adversary2_code(output: &Output) -> Value {
     serde_json::from_slice::<Value>(&output.stderr)
         .map(|error| error["error"]["data"]["code"].clone())
@@ -821,6 +852,7 @@ fn adversary2_code(output: &Output) -> Value {
 /// idle clients fill the real owner, the CLI of the SAME build asks for status,
 /// and one held client is released at a seeded random point. No run may report
 /// the owner as another build.
+#[cfg(unix)]
 #[test]
 fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_runs() {
     let root = adversary_owner_root();
@@ -867,6 +899,7 @@ fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_run
 /// its client limit. The first (build) greeting is closed silently in front of
 /// the owner; the probe greeting then reaches the real owner holding 32 clients.
 /// The CLI must say `capacity`, not another build and not `unavailable`.
+#[cfg(unix)]
 #[test]
 fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
     let root = adversary_owner_root();
@@ -891,6 +924,7 @@ fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
 /// never answers a greeting carrying `build` sends the CLI round the loop. The
 /// CLI must stop at its 10-second connect deadline, must not report another
 /// build, and must not open connections without bound while it waits.
+#[cfg(unix)]
 #[test]
 fn adversary2_the_identification_retry_loop_ends_at_its_deadline_without_flooding_the_owner() {
     let root = adversary_owner_root();
@@ -922,6 +956,7 @@ fn adversary2_the_identification_retry_loop_ends_at_its_deadline_without_floodin
 /// a REAL earlier owner, which answers neither `build` nor the `build` request,
 /// is refused by name, left running, and can still be shut down. Then the
 /// reverse: that earlier CLI against an owner of this build.
+#[cfg(unix)]
 #[test]
 #[ignore]
 fn adversary2_a_real_pre_handshake_owner_is_refused_by_name_and_the_reverse_is_observed() {
@@ -967,6 +1002,7 @@ fn adversary2_a_real_pre_handshake_owner_is_refused_by_name_and_the_reverse_is_o
 /// built before the handshake (e.g. after a rollback) greets without `build`
 /// and then asks for work. Only the owner can refuse it, and this owner serves
 /// it. Measured with a real 0.15.1 CLI too (the ignored case above prints it).
+#[cfg(unix)]
 #[test]
 fn an_owner_still_serves_a_caller_that_never_named_its_build() {
     use std::io::Write;
@@ -1006,6 +1042,7 @@ fn an_owner_still_serves_a_caller_that_never_named_its_build() {
 }
 
 /// Waits for `owner` to exit on its own within `limit`; `None` if it is still running.
+#[cfg(unix)]
 fn owner_exit(
     owner: &mut OwnerProcess,
     limit: std::time::Duration,
@@ -1022,6 +1059,7 @@ fn owner_exit(
     }
 }
 
+#[cfg(unix)]
 fn shutdown_owner(root: &tempfile::TempDir) {
     let paths = connectors_host::local::config::Paths::resolve(
         Some(&root.path().join("config/config.toml")),
@@ -1035,6 +1073,7 @@ fn shutdown_owner(root: &tempfile::TempDir) {
 
 /// story:owner-idle-exit: an owner with no client and no child work for its
 /// idle bound exits cleanly, and the next start gets a new owner.
+#[cfg(unix)]
 #[test]
 #[cfg_attr(
     not(debug_assertions),
@@ -1068,6 +1107,7 @@ fn an_idle_owner_exits_and_the_next_start_gets_a_new_owner() {
 
 /// A connected client keeps an owner alive across its idle bound, and the idle
 /// interval restarts only once that client is gone.
+#[cfg(unix)]
 #[test]
 #[cfg_attr(
     not(debug_assertions),

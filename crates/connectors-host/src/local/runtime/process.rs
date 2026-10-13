@@ -2,23 +2,28 @@ use super::*;
 use connectors_sdk::Secret;
 #[cfg(target_os = "linux")]
 use std::fs::File;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(all(unix, any(target_os = "linux", test)))]
 use std::os::fd::FromRawFd;
 use std::{
     marker::PhantomData,
+    rc::Rc,
+    time::{Duration, Instant},
+};
+#[cfg(unix)]
+use std::{
     os::{
         fd::AsRawFd,
         unix::{net::UnixStream, process::CommandExt},
     },
     process::{Command, Stdio},
-    rc::Rc,
-    time::{Duration, Instant},
 };
 
 /// Owned process, never reconstructed from a PID or readiness file. It is not
 /// Send: its spawning thread must remain alive for the Linux parent-death lease.
 /// On macOS the process is an [`artifact::ExactChild`]: signalled only under
-/// the lock that reaps it, with no pidfd (`child_reap_lock`).
+/// the lock that reaps it, with no pidfd (`child_reap_lock`). On Windows it is
+/// an [`artifact::Process`], owned through its process handle, in the owner's
+/// kill-on-close job; its image copy is removed once it has exited.
 pub struct Child {
     #[cfg(target_os = "linux")]
     process: std::process::Child,
@@ -26,7 +31,12 @@ pub struct Child {
     pidfd: File,
     #[cfg(target_os = "macos")]
     process: artifact::ExactChild,
-    channel: UnixStream,
+    #[cfg(windows)]
+    process: artifact::Process,
+    /// Dropped after the process has been ended and waited for.
+    #[cfg(windows)]
+    _image: artifact::Launch,
+    channel: channel::Stream,
     bootstrap: Bootstrap,
     incarnation: String,
     protocol: PrivateProtocol,
@@ -43,10 +53,16 @@ impl Child {
     ) -> Result<Self> {
         let until = deadline.min(Instant::now() + Duration::from_secs(10));
         let executable = config.executable.capture(until)?;
+        #[cfg(windows)]
+        let (process, image, channel) = spawn_windows(config, executable)?;
+        #[cfg(unix)]
         let (channel, child_channel) = UnixStream::pair().map_err(|_| Failure::Unavailable)?;
+        #[cfg(unix)]
         channel::peer(&channel)?;
+        #[cfg(unix)]
         let child_fd = child_channel.as_raw_fd();
         // SAFETY: getpid has no preconditions.
+        #[cfg(unix)]
         let parent = unsafe { libc::getpid() };
         #[cfg(target_os = "linux")]
         let mut command = Command::new(format!("/proc/self/fd/{}", executable.as_raw_fd()));
@@ -55,6 +71,7 @@ impl Child {
         let launch = artifact::launch_path(&executable)?;
         #[cfg(target_os = "macos")]
         let mut command = Command::new(launch.path());
+        #[cfg(unix)]
         command
             .args(&config.executable.args)
             .args(["--connectors-private-fd", "3"])
@@ -64,6 +81,7 @@ impl Child {
             .stderr(Stdio::null());
         // SAFETY: the hook uses only async-signal-safe syscalls, captured scalar
         // values and fixed errors. Both source descriptors remain held by spawn.
+        #[cfg(unix)]
         unsafe {
             command.pre_exec(move || {
                 #[cfg(target_os = "linux")]
@@ -89,7 +107,9 @@ impl Child {
         #[cfg(target_os = "macos")]
         let process =
             artifact::ExactChild::spawn(&mut command).map_err(|_| Failure::Unavailable)?;
+        #[cfg(unix)]
         drop(child_channel);
+        #[cfg(unix)]
         drop(executable);
         #[cfg(target_os = "macos")]
         drop(launch);
@@ -112,6 +132,8 @@ impl Child {
             process,
             #[cfg(target_os = "linux")]
             pidfd,
+            #[cfg(windows)]
+            _image: image,
             channel,
             bootstrap: Bootstrap {
                 instance: String::new(),
@@ -188,6 +210,13 @@ impl Child {
     #[cfg(target_os = "macos")]
     pub(crate) fn termination_handle(&self) -> Result<artifact::ExactChild> {
         self.process.try_clone().map_err(|_| Failure::Unavailable)
+    }
+    /// Duplicate the process handle for the owner's independent stop path.
+    #[cfg(windows)]
+    pub(crate) fn termination_handle(&self) -> Result<std::os::windows::io::OwnedHandle> {
+        self.process
+            .try_clone_handle()
+            .map_err(|_| Failure::Unavailable)
     }
     pub fn running(&mut self) -> Result<bool> {
         if self.live
@@ -554,11 +583,72 @@ impl Child {
             self.live = false;
         }
     }
+    /// Terminates through the process handle and waits on it
+    /// (`exact_process_signal`): there is no signal to send first.
+    #[cfg(windows)]
+    fn terminate(&mut self) {
+        if self.live {
+            let _ = self.process.kill();
+            let _ = self.process.wait();
+            self.live = false;
+        }
+    }
 }
 impl Drop for Child {
     fn drop(&mut self) {
         self.terminate();
     }
+}
+
+/// Starts an adapter on Windows (private-adapter.md, "Windows"): from the
+/// captured copy's path, whose deny-write handle is held until the child
+/// exists (`deny_write_copy`), inside the owner's kill-on-close job, which
+/// permits no breakaway (`parent_death_kill`), with the copy's directory as
+/// its current directory. The owner's pipe pair was checked to be connected to
+/// this process alone; the adapter inherits its client end as the only handle
+/// in its handle list, its value given as `--connectors-private-fd`, with no
+/// standard handles and an environment of `SystemRoot` alone, which Windows
+/// needs to start its network stack and which carries no credential.
+#[cfg(windows)]
+fn spawn_windows(
+    config: &super::super::config::Adapter,
+    executable: artifact::Image,
+) -> Result<(artifact::Process, artifact::Launch, channel::Stream)> {
+    use std::os::windows::io::AsRawHandle;
+    // The copy's custody, from before any fallible step: every early return
+    // removes it.
+    let mut launch = artifact::Launch::from(executable);
+    let (channel, client) = channel::windows::pair()?;
+    let client = artifact::inheritable(client.as_raw_handle(), None)?;
+    let value = client.as_raw_handle() as usize;
+    let mut arguments: Vec<std::ffi::OsString> = config
+        .executable
+        .args
+        .iter()
+        .map(std::ffi::OsString::from)
+        .collect();
+    arguments.push("--connectors-private-fd".into());
+    arguments.push(value.to_string().into());
+    let environment: Vec<_> = std::env::var_os("SystemRoot")
+        .map(|root| ("SystemRoot".into(), root))
+        .into_iter()
+        .collect();
+    let process = artifact::create(
+        &artifact::Creation {
+            application: launch.path(),
+            arguments: &arguments,
+            environment: &environment,
+            standard: [std::ptr::null_mut(); 3],
+            inherited: &[client.as_raw_handle()],
+            flags: windows_sys::Win32::System::Threading::CREATE_NO_WINDOW,
+        },
+        artifact::Job::adapters()?,
+    )
+    .map_err(|_| Failure::Unavailable)?;
+    drop(client);
+    // Held until the child was created from the copy; released, not removed.
+    launch.created();
+    Ok((process, launch, channel))
 }
 
 /// Live process-only preparation. Dropping it kills/reaps the exact child so
@@ -689,7 +779,6 @@ impl Drop for PreparedInvocation<'_> {
 mod tests {
     use super::*;
     use crate::local::config::{Adapter, Executable, Restart, Startup};
-    use sha2::{Digest, Sha256};
 
     pub(super) fn bootstrap() -> Bootstrap {
         Bootstrap {
@@ -725,8 +814,11 @@ mod tests {
             .iter()
             .find(|a| a.starts_with("fixture-mode-"))
             .unwrap();
+        #[cfg(unix)]
         // SAFETY: only the spawned fixture path owns inherited descriptor three.
         let mut stream = unsafe { UnixStream::from_raw_fd(3) };
+        #[cfg(windows)]
+        let mut stream = private_channel();
         channel::peer(&stream).unwrap();
         let until = Instant::now() + Duration::from_secs(10);
         let hello = channel::read::<Request>(&mut stream, until, false, 0).unwrap();
@@ -839,8 +931,7 @@ mod tests {
 
     #[test]
     fn malformed_replies_terminate_and_reap_only_the_owned_child() {
-        let path = std::env::current_exe().unwrap();
-        let hash = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
+        let (path, hash) = crate::local::test_executable::path_and_sha256();
         for mode in ["json", "schema", "identity"] {
             let config = Adapter {
                 private_protocol: None,
@@ -885,7 +976,7 @@ mod tests {
     /// like any malformed reply, and the child is terminated.
     #[test]
     fn a_reason_on_a_failed_validation_is_a_protocol_violation() {
-        let path = std::env::current_exe().unwrap();
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let config = Adapter {
             private_protocol: None,
             permissions: Default::default(),
@@ -896,7 +987,7 @@ mod tests {
             startup: Startup::OnDemand,
             restart: Restart::Never,
             executable: Executable {
-                sha256: hex::encode(Sha256::digest(std::fs::read(&path).unwrap())),
+                sha256,
                 path,
                 args: vec![
                     "--exact".into(),
@@ -922,7 +1013,7 @@ mod tests {
     }
 
     fn fixture_child(mode: &str) -> Child {
-        let path = std::env::current_exe().unwrap();
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
         Child::spawn(&Adapter {
             private_protocol: None,
             permissions: Default::default(),
@@ -933,7 +1024,7 @@ mod tests {
             startup: Startup::OnDemand,
             restart: Restart::Never,
             executable: Executable {
-                sha256: hex::encode(Sha256::digest(std::fs::read(&path).unwrap())),
+                sha256,
                 path,
                 args: vec![
                     "--exact".into(),
@@ -998,9 +1089,15 @@ mod tests {
     fn an_adapter_exits_when_the_owner_end_of_its_channel_closes() {
         let mut child = fixture_child("fixture-mode-json");
         assert!(child.process.try_wait().unwrap().is_none());
+        #[cfg(unix)]
         drop(std::mem::replace(
             &mut child.channel,
             UnixStream::pair().unwrap().0,
+        ));
+        #[cfg(windows)]
+        drop(std::mem::replace(
+            &mut child.channel,
+            channel::windows::pair().unwrap().0,
         ));
         let deadline = Instant::now() + Duration::from_secs(10);
         while child.process.try_wait().unwrap().is_none() {
@@ -1024,6 +1121,76 @@ mod tests {
         drop(child);
         assert!(handle.exited().unwrap());
         assert!(!handle.signal(libc::SIGKILL).unwrap());
+    }
+
+    /// The value of `--connectors-private-fd`: on Windows the inherited
+    /// client end's handle value.
+    #[cfg(windows)]
+    pub(super) fn private_fd() -> i32 {
+        let args: Vec<_> = std::env::args().collect();
+        let index = args
+            .iter()
+            .position(|a| a == "--connectors-private-fd")
+            .unwrap();
+        args[index + 1].parse().unwrap()
+    }
+
+    /// The fixture's end of its channel on Windows: the inherited client end,
+    /// taken over as `serve` takes it.
+    #[cfg(windows)]
+    pub(super) fn private_channel() -> channel::Stream {
+        let handle = channel::windows::adopt(private_fd() as usize).unwrap();
+        channel::Stream::from_owned(handle).unwrap()
+    }
+
+    /// `exact_process_signal` on Windows: the owner's stop handle is a
+    /// duplicate of the child's process handle. It ends exactly that child,
+    /// reports its exit, and is no error once the child has gone.
+    #[cfg(windows)]
+    #[test]
+    fn a_stop_handle_terminates_exactly_its_child() {
+        let mut child = fixture_child("fixture-mode-json");
+        let other = fixture_child("fixture-mode-json");
+        let handle = child.termination_handle().unwrap();
+        assert!(!artifact::exited(&handle).unwrap());
+        artifact::terminate(&handle).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while child.process.try_wait().unwrap().is_none() {
+            assert!(Instant::now() < deadline, "the child outlived its stop");
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(artifact::exited(&handle).unwrap());
+        assert!(!child.running().unwrap());
+        drop(child);
+        artifact::terminate(&handle).unwrap();
+        let mut other = other;
+        assert!(other.running().unwrap());
+    }
+
+    /// `parent_death_kill` on Windows: every adapter is in this process's
+    /// kill-on-close job before it runs, and its image copy is removed once
+    /// it has exited.
+    #[cfg(windows)]
+    #[test]
+    fn an_adapter_runs_in_the_owner_job_and_its_copy_goes_with_it() {
+        use std::os::windows::io::AsRawHandle;
+        let child = fixture_child("fixture-mode-json");
+        let copy = child._image.path().to_path_buf();
+        assert!(copy.exists());
+        let mut member = 0;
+        // SAFETY: a live process handle, the null job (any job of this
+        // process's) and one writable flag.
+        let ok = unsafe {
+            windows_sys::Win32::System::JobObjects::IsProcessInJob(
+                child.process.try_clone_handle().unwrap().as_raw_handle(),
+                artifact::Job::adapters().unwrap().raw(),
+                &mut member,
+            )
+        };
+        assert_ne!(ok, 0);
+        assert_ne!(member, 0, "the adapter is in the owner's job");
+        drop(child);
+        assert!(!copy.exists(), "the copy outlived its adapter");
     }
 }
 

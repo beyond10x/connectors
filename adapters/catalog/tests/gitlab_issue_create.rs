@@ -11,6 +11,7 @@
 //! declares no write at all. The fixture records each request's method, route
 //! and body, so "no request was sent" is a count of what it saw. The fixture
 //! token is fictional and only ever compared, never printed.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{

@@ -6,6 +6,10 @@
 //! 10 ms. The production idle bound is 600 s, so 120 empty sweeps fall inside
 //! it. The unit's own tests use a 1.5 s bound, which no sweep ever crosses.
 //! These cases use a bound longer than one sweep interval, as production does.
+//!
+//! Unix only: the owner is started as the CLI starts it on Unix, with its
+//! startup channel on descriptor 3 and its lifetime lock on descriptor 4.
+#![cfg(unix)]
 #[path = "support/owner.rs"]
 mod owner_start;
 use serde_json::Value;

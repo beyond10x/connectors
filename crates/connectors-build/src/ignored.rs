@@ -3,14 +3,15 @@ use crate::Result;
 use clap::{Args, ValueEnum};
 use serde::Serialize;
 use serde_json::Value;
+#[cfg(unix)]
+use std::os::unix::{
+    fs::{DirBuilderExt, MetadataExt, PermissionsExt},
+    process::{CommandExt, ExitStatusExt},
+};
 use std::{
     collections::{BTreeMap, BTreeSet},
     ffi::OsString,
     fs::File,
-    os::unix::{
-        fs::{DirBuilderExt, MetadataExt, PermissionsExt},
-        process::{CommandExt, ExitStatusExt},
-    },
     path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
     time::{Duration, Instant},
@@ -446,6 +447,34 @@ struct FixtureGroup {
     finished: bool,
     leader_status: Option<ExitStatus>,
 }
+/// Windows: no process groups and, without Win32 bindings in this crate, no
+/// job object. Cleanup ends the fixture and the descendants it still parents
+/// with `taskkill /T /F`; a descendant whose parent already exited is not
+/// reached.
+#[cfg(windows)]
+impl FixtureGroup {
+    fn exited(&mut self) -> Result<bool> {
+        if let Some(status) = self.child.try_wait()? {
+            self.leader_status = Some(status);
+        }
+        Ok(self.leader_status.is_some())
+    }
+    fn finish(&mut self) -> Result<ExitStatus> {
+        if !self.signalled {
+            Command::new("taskkill")
+                .args(["/T", "/F", "/PID", &self.child.id().to_string()])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()?;
+            self.signalled = true;
+        }
+        let status = self.child.wait()?;
+        self.finished = true;
+        Ok(*self.leader_status.get_or_insert(status))
+    }
+}
+#[cfg(unix)]
 impl FixtureGroup {
     fn exited(&self) -> Result<bool> {
         // SAFETY: zero is a valid initial siginfo_t; waitid initializes its
@@ -544,7 +573,8 @@ fn execute_test(
     // `FixtureGroup::finish` still stops it; launchd, not this runner, reaps
     // it, and `finish` ends at ECHILD once the runner's own children of the
     // group are reaped. The group id cannot be reused while a member lives.
-    let child = Command::new(&suite.executable)
+    let mut command = Command::new(&suite.executable);
+    command
         .args([
             "--ignored",
             "--exact",
@@ -557,9 +587,10 @@ fn execute_test(
         .env("TMPDIR", temp)
         .stdin(Stdio::null())
         .stdout(file.try_clone()?)
-        .stderr(file)
-        .process_group(0)
-        .spawn()?;
+        .stderr(file);
+    #[cfg(unix)]
+    command.process_group(0);
+    let child = command.spawn()?;
     let mut group = FixtureGroup {
         child,
         signalled: false,
@@ -594,9 +625,26 @@ fn execute_one(suite: &Suite, name: &str, temp: &Path) -> Result<bool> {
     execute_test(suite, name, temp, temp, &BTreeMap::new())
 }
 
+#[cfg(unix)]
 fn executable(path: &Path) -> bool {
     std::fs::metadata(path)
         .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+}
+/// Windows has no execute bit: a regular file.
+#[cfg(windows)]
+fn executable(path: &Path) -> bool {
+    std::fs::metadata(path).is_ok_and(|metadata| metadata.is_file())
+}
+
+/// A kubeconfig must be owner-only. Windows: this crate has no access control
+/// bindings to check that, so the prerequisite is never met there.
+#[cfg(unix)]
+fn owner_only(metadata: &std::fs::Metadata) -> bool {
+    metadata.permissions().mode() & 0o077 == 0
+}
+#[cfg(windows)]
+fn owner_only(_: &std::fs::Metadata) -> bool {
+    false
 }
 fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static str, String> {
     let mut missing = BTreeMap::new();
@@ -676,8 +724,7 @@ fn prerequisites(environment: &BTreeMap<&str, OsString>) -> BTreeMap<&'static st
     for key in [CA, TOKEN, KUBECONFIG] {
         if !std::env::var_os(key).is_some_and(|path| {
             std::fs::metadata(path).is_ok_and(|metadata| {
-                metadata.is_file()
-                    && (key != KUBECONFIG || metadata.permissions().mode() & 0o077 == 0)
+                metadata.is_file() && (key != KUBECONFIG || owner_only(&metadata))
             })
         }) {
             missing.insert(
@@ -716,16 +763,7 @@ fn seccomp_notification_abi_available() -> bool {
 /// Build every default-feature workspace test target, then query the actual
 /// libtest executables. Cargo metadata maps opaque package IDs to names.
 fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString>)> {
-    let metadata: Value = serde_json::from_slice(
-        &crate::run(Command::new("cargo").current_dir(root).args([
-            "metadata",
-            "--locked",
-            "--offline",
-            "--no-deps",
-            "--format-version=1",
-        ]))?
-        .stdout,
-    )?;
+    let metadata = cargo_metadata(root)?;
     let members = metadata["workspace_members"]
         .as_array()
         .ok_or("Cargo workspace members missing")?;
@@ -804,6 +842,88 @@ fn workspace(root: &Path) -> Result<(Vec<Suite>, BTreeMap<&'static str, OsString
     Ok((suites, environment))
 }
 
+fn cargo_metadata(root: &Path) -> Result<Value> {
+    Ok(serde_json::from_slice(
+        &crate::run(Command::new("cargo").current_dir(root).args([
+            "metadata",
+            "--locked",
+            "--offline",
+            "--no-deps",
+            "--format-version=1",
+        ]))?
+        .stdout,
+    )?)
+}
+
+/// Every libtest harness target of every workspace member, with its crate root.
+pub(crate) fn test_targets(root: &Path) -> Result<Vec<crate::platform_gated::Target>> {
+    let metadata = cargo_metadata(root)?;
+    let members = metadata["workspace_members"]
+        .as_array()
+        .ok_or("Cargo workspace members missing")?;
+    let mut targets = Vec::new();
+    for package in metadata["packages"]
+        .as_array()
+        .ok_or("Cargo packages missing")?
+        .iter()
+        .filter(|package| members.contains(&package["id"]))
+    {
+        let name = package["name"]
+            .as_str()
+            .ok_or("Cargo package name missing")?;
+        for target in package["targets"]
+            .as_array()
+            .ok_or("Cargo targets missing")?
+            .iter()
+            .filter(|target| target["test"] == true)
+        {
+            targets.push(crate::platform_gated::Target {
+                package: name.into(),
+                target: target["name"]
+                    .as_str()
+                    .ok_or("Cargo target name missing")?
+                    .into(),
+                root: target["src_path"]
+                    .as_str()
+                    .ok_or("Cargo target source missing")?
+                    .into(),
+            });
+        }
+    }
+    Ok(targets)
+}
+
+/// Every test a compiled libtest executable lists, ignored or not.
+fn compiled_tests(suite: &Suite) -> Result<BTreeSet<String>> {
+    let output = crate::run(Command::new(&suite.executable).args(["--list", "--format", "terse"]))?;
+    Ok(std::str::from_utf8(&output.stdout)?
+        .lines()
+        .filter_map(|line| line.strip_suffix(": test"))
+        .map(str::to_owned)
+        .collect())
+}
+
+/// The platform-gated tests, checked against this platform's compiled lists.
+fn platform_gated(root: &Path, suites: &[Suite]) -> Result<Value> {
+    use crate::platform_gated::{Platform, scan, verify};
+    let gated = scan(&test_targets(root)?)?;
+    if let Some(current) = Platform::current() {
+        let mut compiled: BTreeMap<(String, String), BTreeSet<String>> = BTreeMap::new();
+        for suite in suites {
+            compiled
+                .entry((suite.package.clone(), suite.target.clone()))
+                .or_default()
+                .extend(compiled_tests(suite)?);
+        }
+        verify(&gated, current, |package, target, test| {
+            compiled
+                .get(&(package.into(), target.into()))
+                .is_some_and(|names| names.contains(test))
+        })?;
+    }
+    Ok(serde_json::json!({"count": gated.len(), "tests": gated}))
+}
+
 /// The user this process runs as, owner of every fixture temporary directory.
 #[cfg(target_os = "linux")]
 fn own_uid() -> std::io::Result<u32> {
@@ -816,6 +936,7 @@ fn own_uid() -> std::io::Result<u32> {
     Ok(unsafe { libc::geteuid() })
 }
 
+#[cfg(unix)]
 fn temporary(root: &Path, selected: Option<&Path>) -> Result<tempfile::TempDir> {
     let base = selected
         .map(|path| root.join(path))
@@ -839,6 +960,30 @@ fn temporary(root: &Path, selected: Option<&Path>) -> Result<tempfile::TempDir> 
         .tempdir_in(base)?)
 }
 
+/// Windows: the default `.local/tmp` inside the checkout only. Without access
+/// control bindings in this crate the owner-private rule for `--tmpdir` cannot
+/// be checked, so a selected directory is refused rather than admitted
+/// unchecked. The directory must still be a physical path.
+#[cfg(windows)]
+fn temporary(root: &Path, selected: Option<&Path>) -> Result<tempfile::TempDir> {
+    if selected.is_some() {
+        return Err(
+            "--tmpdir is not supported on Windows; the fixture directory is .local/tmp".into(),
+        );
+    }
+    let base = root.join(".local").join("tmp");
+    std::fs::create_dir_all(&base)?;
+    let canonical = base.canonicalize()?;
+    let canonical = canonical.to_string_lossy();
+    let physical = canonical.strip_prefix(r"\\?\").unwrap_or(&canonical);
+    if !physical.eq_ignore_ascii_case(&base.to_string_lossy()) {
+        return Err("fixture temporary directory must be a physical path, without symlinks or parent traversal".into());
+    }
+    Ok(tempfile::Builder::new()
+        .prefix("ignored-")
+        .tempdir_in(base)?)
+}
+
 pub fn run(root: &Path, options: Options) -> Result<()> {
     let (suites, environment) = workspace(root)?;
     let mut entries = Vec::new();
@@ -854,6 +999,9 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
     if entries.is_empty() {
         return Err("workspace ignored inventory is empty".into());
     }
+    // Tests a cfg keeps off a platform compile nowhere there, so no binary
+    // above lists them; the source scan names them for every platform.
+    let gated = platform_gated(root, &suites)?;
     let report_path = root.join(&options.report);
     let logs = report_path.with_extension("logs");
     std::fs::create_dir_all(&logs)?;
@@ -886,7 +1034,7 @@ pub fn run(root: &Path, options: Options) -> Result<()> {
             execute_test(&entry.suite, &entry.name, temp.path(), &logs, &environment)
         },
     );
-    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report});
+    let value = serde_json::json!({"format":"connectors.ignored-suites/1", "mode":if options.inventory { "inventory" } else { "execute" }, "scope":"workspace default features", "families":options.family, "required":options.required, "test_binaries":suites.len(), "logs":logs, "result":report, "platform_gated":gated});
     crate::save_json(&report_path, &value)?;
     println!("{}", serde_json::to_string_pretty(&value)?);
     if !report.accepted(options.required) {
@@ -925,7 +1073,9 @@ mod local {{
 }}
 {}
 "#, !fail, if unknown { "#[test] #[ignore] fn unclassified() {}" } else { "" })).unwrap();
-        let executable = root.path().join("fixture");
+        let executable = root
+            .path()
+            .join(format!("fixture{}", std::env::consts::EXE_SUFFIX));
         let output = Command::new("rustc")
             .args(["--test", "--edition=2024"])
             .arg(&source)
@@ -1000,6 +1150,8 @@ mod local {{
         assert!(report.accepted(true));
         assert_eq!(report.outcomes.len(), 3);
     }
+    // Mode bits and symlinks; Windows refuses --tmpdir outright.
+    #[cfg(unix)]
     #[test]
     fn missing_prerequisite_is_explicit() {
         let root = tempfile::Builder::new()
@@ -1063,6 +1215,7 @@ mod local {{
         assert_eq!(report.executed, 0);
         assert!(!report.accepted(false));
     }
+    #[cfg(unix)]
     #[test]
     fn adversary_nonprivate_kubeconfig_is_missing_before_dispatch() {
         const CHILD: &str = "CONNECTORS_CLASSIFIER_MODE_PROBE";
@@ -1127,6 +1280,8 @@ mod local {{
         assert_eq!((report.selected, report.executed, report.failed), (1, 0, 1));
         assert!(!report.accepted(false));
     }
+    // Process groups and signals.
+    #[cfg(unix)]
     fn adversary_descendant_fixture(panics: bool) -> (tempfile::TempDir, Suite) {
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("descendant.rs");
@@ -1193,6 +1348,7 @@ fn selected_fixture() {{
         false
     }
 
+    #[cfg(unix)]
     fn adversary_assert_descendants_stopped(panics: bool) {
         let (root, suite) = adversary_descendant_fixture(panics);
         let outcome = execute_one(&suite, "selected_fixture", root.path());
@@ -1213,16 +1369,19 @@ fn selected_fixture() {{
         );
     }
 
+    #[cfg(unix)]
     #[test]
     fn adversary_passing_fixture_does_not_leave_running_descendants() {
         adversary_assert_descendants_stopped(false);
     }
 
+    #[cfg(unix)]
     #[test]
     fn adversary_failing_fixture_does_not_leave_running_descendants() {
         adversary_assert_descendants_stopped(true);
     }
 
+    #[cfg(unix)]
     #[test]
     fn adversary_error_drops_live_group_without_reaping_another_fixture() {
         let spawn = || {

@@ -1,6 +1,9 @@
 //! Adversarial cases for the HTTP host's execution-audit anchor on
 //! `POST /v1alpha2/invoke` (contracts/service/audit.md § 2-3,
 //! contracts/service/v1alpha2/semantics.md § 5-6).
+//!
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 use async_trait::async_trait;
 use connectors_core::{
     Descriptor, Operation, Result, WIRE_VERSION,

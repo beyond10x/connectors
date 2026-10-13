@@ -308,7 +308,7 @@ types:
     variants: [secret_service, macos_keychain, windows_credential_manager]
   # The operating-system guarantees the local host builds on, each fixed by the
   # platform the binary was built for (contracts/cli/v1alpha1/semantics.md §7,
-  # "macOS platform guarantees"):
+  # "macOS platform guarantees" and "Windows platform guarantees"):
   # - sealed_executable: an admitted adapter or consumer image cannot change
   #   between its digest check and exec (private-adapter.md, consumer-launch.md §3).
   # - parent_death_kill: a launched child is ended when the process that
@@ -347,15 +347,36 @@ types:
   #   an adapter also requires it to equal its parent's process id. A peer that
   #   has already closed has no pid: the owner and supervisor admit it by its
   #   uid, an adapter refuses it.
+  # - deny_write_copy: the image is a copy in a fresh owner-only directory inside
+  #   the state directory's owner-only run directory, opened for reading without
+  #   write or delete sharing before its digest check and held, with its
+  #   directory, until the child is created; from that open no process can open it
+  #   for writing, rename or delete it or its directory. A writable mapping a
+  #   process of the same user made before that open is not excluded.
+  # - client_token_query: the pipe's access control admits the current user alone
+  #   at connect; the client's process id is the connect-time record, and its user
+  #   is read afterwards from that process's token, a separate query that reads
+  #   another process if the client exited and its id was reused. Besides the user,
+  #   that token's integrity level must equal this process's and it must not be
+  #   restricted, on both ends: a peer of the same user at another integrity level,
+  #   or with a restricted token, is refused as lifecycle_conflict, by an owner with
+  #   that reply rather than a closed stream.
   - name: connectors.cli.PlatformGuaranteeWeakerForm
     kind: enum
-    variants: [owner_private_copy, adapter_channel_close, child_reap_lock, launch_path_read, set_after_receive, separate_pid_query]
+    variants: [owner_private_copy, adapter_channel_close, child_reap_lock, launch_path_read, set_after_receive, separate_pid_query, deny_write_copy, client_token_query]
   # One row of the platform guarantee table. Linux holds every guarantee. macOS
   # holds atomic_no_replace_rename (renamex_np RENAME_EXCL on a filesystem that
   # reports VOL_CAP_INT_RENAME_EXCL, APFS) and holds each other one only in its
-  # named weaker form. The invariants are the table.
-  # UNMAPPED: Windows. connectors.cli.OperatingSystem names it for custody, but no
-  # Windows host exists; no row is claimed for it.
+  # named weaker form. Windows holds parent_death_kill (every child created in a
+  # job object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE through
+  # PROC_THREAD_ATTRIBUTE_JOB_LIST; an adapter's job permits no breakaway, a
+  # consumer's permits breakaway on request, JOB_OBJECT_LIMIT_BREAKAWAY_OK and
+  # never the silent form, so an owner a consumer starts can leave it, while the
+  # consumer itself stays in it), exact_process_signal (the held process
+  # handle), atomic_no_replace_rename (MoveFileExW without
+  # MOVEFILE_REPLACE_EXISTING, on NTFS) and atomic_close_on_exec (handles
+  # duplicated non-inheritable, children given an explicit handle list), and holds
+  # each other one only in its named weaker form. The invariants are the table.
   # ESS-LIMIT: the type states what a row must say, not that the table has one
   # row per (os, guarantee); the contracts list them.
   - name: connectors.cli.PlatformGuaranteeStatement
@@ -404,6 +425,71 @@ types:
           - not: {os: macos}
           - not: {guarantee: peer_credential_snapshot}
           - all: [{support: weaker}, {weaker_form: separate_pid_query}]
+      - any:
+          - not: {os: windows}
+          - not: {guarantee: sealed_executable}
+          - all: [{support: weaker}, {weaker_form: deny_write_copy}]
+      - any:
+          - not: {os: windows}
+          - not: {guarantee: parent_death_kill}
+          - {support: holds}
+      - any:
+          - not: {os: windows}
+          - not: {guarantee: exact_process_signal}
+          - {support: holds}
+      - any:
+          - not: {os: windows}
+          - not: {guarantee: own_image_build_measure}
+          - all: [{support: weaker}, {weaker_form: launch_path_read}]
+      - any:
+          - not: {os: windows}
+          - not: {guarantee: atomic_no_replace_rename}
+          - {support: holds}
+      - any:
+          - not: {os: windows}
+          - not: {guarantee: atomic_close_on_exec}
+          - {support: holds}
+      - any:
+          - not: {os: windows}
+          - not: {guarantee: peer_credential_snapshot}
+          - all: [{support: weaker}, {weaker_form: client_token_query}]
+  # How `connections launch` hands the consumer its credential, fixed by the
+  # platform the binary was built for (contracts/cli/v1alpha1/consumer-launch.md
+  # §3 and §8):
+  # - descriptor_3: the credential is a read-only descriptor at 3 (Linux, macOS).
+  # - inherited_handle: the credential is one read-only handle the consumer
+  #   inherits, the only handle besides its standard ones in the
+  #   PROC_THREAD_ATTRIBUTE_HANDLE_LIST it is created with; the environment
+  #   variable CONNECTORS_CREDENTIAL_HANDLE holds the handle's value in decimal
+  #   (Windows). The variable carries the handle value, never the document. The
+  #   consumer's environment is otherwise the caller's variables its entry's
+  #   pass_env prefixes select, names matched in any letter case, and SystemRoot.
+  - name: connectors.cli.ConsumerCredentialDelivery
+    kind: enum
+    variants: [descriptor_3, inherited_handle]
+  # One row of the consumer delivery table. The invariants are the table.
+  # ESS-LIMIT: as for PlatformGuaranteeStatement, the type states what a row must
+  # say, not that the table has one row per os; consumer-launch.md lists them.
+  - name: connectors.cli.ConsumerCredentialDeliveryStatement
+    kind: struct
+    fields:
+      - {name: os, type: "connectors.cli.OperatingSystem"}
+      - {name: delivery, type: "connectors.cli.ConsumerCredentialDelivery"}
+      - {name: handle_variable, type: "Optional<String>"}
+    invariants:
+      # A handle variable is named exactly when the credential is an inherited handle.
+      - any:
+          - {delivery: inherited_handle}
+          - {handle_variable: {exists: false}}
+      - any:
+          - not: {delivery: inherited_handle}
+          - handle_variable == "CONNECTORS_CREDENTIAL_HANDLE"
+      - any:
+          - {os: windows}
+          - {delivery: descriptor_3}
+      - any:
+          - not: {os: windows}
+          - {delivery: inherited_handle}
   - name: connectors.cli.KeyringState
     kind: enum
     variants: [available, locked, unavailable]
@@ -749,7 +835,9 @@ types:
   # Selectors and the caller's arguments. args is one JSON array of strings, appended
   # verbatim after the consumer's pinned argv prefix; the handler refuses any other value,
   # or an element holding NUL, as invalid_input. The protected document reaches the consumer
-  # on descriptor 3, never a field, response, argv, environment or file.
+  # on descriptor 3, never a field, response, argv, environment or file. On Windows it is an
+  # inherited handle whose value, not the document, is in the environment
+  # (connectors.cli.ConsumerCredentialDelivery).
   # See contracts/cli/v1alpha1/consumer-launch.md.
   - name: connectors.cli.ConnectionLaunchInput
     kind: struct
@@ -1078,7 +1166,7 @@ commands:
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
     # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:456) and the host
-    # removal path (er.rs:4075-4077) only expires Active cursors. The error name is
+    # removal path (er.rs:4081-4083) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:

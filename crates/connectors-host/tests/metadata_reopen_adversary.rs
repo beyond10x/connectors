@@ -2,6 +2,9 @@
 //! process already verified. A full replay in a fresh process is the oracle:
 //! a store opened at a path the process has never opened is replayed in full,
 //! exactly as every open did before authorities were kept.
+//!
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 
 use connectors_host::local::{
     metadata::Metadata,

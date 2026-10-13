@@ -7,16 +7,28 @@ use connectors_host::local::{
     config::{Config, Paths},
     registry, runtime,
 };
+#[cfg(unix)]
 #[path = "support/owner.rs"]
 mod owner_start;
+#[cfg(unix)]
 #[path = "support/socket.rs"]
 mod sockets;
 use serde_json::{Value, json};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     collections::BTreeSet,
     fs,
-    os::unix::fs::PermissionsExt,
     process::{Command, Output},
+};
+
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
 };
 
 const ABSENT: &str = "nosuch.op";
@@ -120,7 +132,7 @@ fn configured() -> (tempfile::TempDir, String) {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{GRANTED_READ}','{GRANTED_WRITE}']\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{GRANTED_READ}','{GRANTED_WRITE}']\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
@@ -176,6 +188,7 @@ fn invoke(root: &tempfile::TempDir, operation: &str, schema: &str, revision: &st
 fn prepare(root: &tempfile::TempDir, operation: &str, schema: &str, revision: &str) -> Output {
     let input = root.path().join("input.json");
     fs::write(&input, r#"{"name":"item"}"#).unwrap();
+    #[cfg(unix)]
     fs::set_permissions(&input, fs::Permissions::from_mode(0o600)).unwrap();
     command(
         root,
@@ -282,7 +295,9 @@ fn operations_list_keeps_hiding_ungranted_operations() {
 // The owner's own `invoke` request repeats admission; drive it directly on the
 // owner socket, since the CLI's preflight refuses before reaching it.
 
+#[cfg(unix)]
 struct OwnerProcess(std::process::Child);
+#[cfg(unix)]
 impl Drop for OwnerProcess {
     fn drop(&mut self) {
         let _ = self.0.kill();
@@ -290,6 +305,7 @@ impl Drop for OwnerProcess {
     }
 }
 
+#[cfg(unix)]
 fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
     use std::os::{
         fd::AsRawFd,
@@ -331,6 +347,7 @@ fn start_owner(root: &tempfile::TempDir) -> OwnerProcess {
 }
 
 /// Owner-channel frame: three big-endian u32 section sizes, then the sections.
+#[cfg(unix)]
 fn frame(control: &Value, document: &[u8]) -> Vec<u8> {
     let bytes = serde_json::to_vec(control).unwrap();
     let mut frame = Vec::new();
@@ -342,6 +359,7 @@ fn frame(control: &Value, document: &[u8]) -> Vec<u8> {
     frame
 }
 
+#[cfg(unix)]
 fn read_control(stream: &mut std::os::unix::net::UnixStream) -> Value {
     use std::io::Read;
     let mut sizes = [0u8; 12];
@@ -354,6 +372,7 @@ fn read_control(stream: &mut std::os::unix::net::UnixStream) -> Value {
     serde_json::from_slice(&control).unwrap()
 }
 
+#[cfg(unix)]
 fn owner_invoke(
     root: &tempfile::TempDir,
     authority: &str,
@@ -390,6 +409,7 @@ fn owner_invoke(
     read_control(&mut stream)
 }
 
+#[cfg(unix)]
 #[test]
 fn the_owner_invoke_request_answers_not_found_before_the_grant() {
     let (root, schema) = configured();

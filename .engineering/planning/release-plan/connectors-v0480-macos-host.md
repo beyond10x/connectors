@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0480-macos-host
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.48.0: the CLI on macOS, and binaries on every release'
 relations:
 - serves: vision:independent-contract-adapters
 - informed_by: decision-blocker:wave-20261013b-scope
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-13T11:49:04Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-13T15:32:00Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

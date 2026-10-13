@@ -5,6 +5,7 @@
 //! against a TLS fixture that answers the exec subresource's WebSocket
 //! upgrade with recorded `v5.channel.k8s.io` messages. No cluster is
 //! contacted and no real credential is used.
+#![cfg(unix)]
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,

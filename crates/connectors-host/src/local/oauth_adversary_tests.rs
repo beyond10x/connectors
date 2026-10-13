@@ -10,10 +10,11 @@ use super::{
     runtime::{Acquisition, EntryField, Profile},
 };
 use connectors_sdk::Secret;
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use std::{
     io::{Read, Write},
     net::TcpStream,
-    os::unix::process::CommandExt,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     time::{Duration, Instant},
@@ -121,6 +122,8 @@ fn start() -> Flow {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(std::fs::File::create(&stderr).unwrap());
+    // Windows has no sessions to detach the fixture into.
+    #[cfg(unix)]
     // SAFETY: setsid is async-signal-safe and touches only the child.
     unsafe {
         command.pre_exec(|| {

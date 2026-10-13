@@ -709,10 +709,11 @@ mod tests {
         protected, registry,
         runtime::{Acquisition, EntryField},
     };
+    #[cfg(unix)]
+    use std::process::{Command, Stdio};
     use std::{
         io::{Read, Write},
         net::TcpStream,
-        process::{Command, Stdio},
         time::Instant,
     };
     use url::Url;
@@ -1212,6 +1213,8 @@ mod tests {
         assert_eq!(exchanged, 0);
     }
 
+    // Interrupts its child with SIGINT.
+    #[cfg(unix)]
     #[test]
     fn cancellation_stores_nothing() {
         struct Child(std::process::Child);

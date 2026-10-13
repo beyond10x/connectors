@@ -165,3 +165,75 @@ names:
 - **Socket path.** There is no `/proc/self/fd`: the owner socket is bound and
   reached by its full path, which must fit the 104-byte `sun_path`. A state
   directory whose socket path is longer is refused before an owner starts.
+
+## Windows
+
+The rules above are the Linux transport and stand unchanged. On Windows the
+owner keeps its lifetime lock, handshake and refusals; the transport and the
+guarantees change as the [platform guarantee table](semantics.md#windows-platform-guarantees)
+states:
+
+- **Pipe.** There is no Unix socket. The owner listens on a named pipe whose
+  name is derived from the current user's SID, the state directory's
+  canonical path and a random salt of 32 bytes kept, in hexadecimal, in the
+  owner-only file `owner.pipe` in the state directory, so another local user
+  cannot compute the name and create the pipe first. The first CLI or owner
+  that finds no salt publishes one without replacing an existing file, and
+  every later one reads it; a salt file that is not owner-only or not 64
+  hexadecimal digits refuses as `invalid_configuration`. The pipe is created with `FILE_FLAG_FIRST_PIPE_INSTANCE` and an access
+  control list granting the current user's SID alone. An owner that cannot
+  create the first instance does not serve. Before sending anything, the CLI
+  checks that the pipe's server process (`GetNamedPipeServerProcessId`) runs as
+  the current user; a pipe held by another user refuses as no owner, never as an
+  owner of another build. Removing the socket at idle exit is closing every
+  instance of the pipe, after which no later connect reaches the owner.
+- **Lifetime lock.** The kernel file lock is an exclusive `LockFileEx` on the
+  lock file in the state directory, released at process exit.
+- **Pipe peer** (`peer_credential_snapshot`: `client_token_query`). The pipe's
+  access control list admits only the current user at connect. The owner reads
+  the client's process id with `GetNamedPipeClientProcessId`, opens that process
+  once, and requires its token's SID to be the current user's, its integrity
+  level to equal the owner's own and the token not to be restricted; the
+  process handle opened then is the one every later handle duplication into
+  that client goes through. A client of the current user that fails the
+  integrity or restriction check is answered with a `lifecycle_conflict`
+  failure before the owner closes the stream, never dropped without a reply.
+  The CLI applies the same checks to the pipe's server process: an owner at
+  another integrity level than the CLI, or with a restricted token, refuses as
+  `lifecycle_conflict` (stage `admission`) before anything is sent, and no
+  second owner is started.
+- **Handles in place of descriptors** (`atomic_close_on_exec`: holds). Where
+  the Linux transport sends descriptors with `SCM_RIGHTS`, the owner duplicates
+  each handle into the client process with `DuplicateHandle`, inheritance off and
+  no more access than the receiver needs, and sends the handle's value in the
+  control section. A handle the client does not take over is closed by the
+  owner with `DUPLICATE_CLOSE_SOURCE` from the same process handle.
+- **Build** (`own_image_build_measure`: `launch_path_read`). There is no
+  `/proc/self/exe`. `build` is the SHA-256 of the file at the path
+  `GetModuleFileNameW` reports, read once. A running image cannot be written in
+  place but can be renamed; a file put at its path is measured as a new build,
+  and a caller of that build is refused with `owner_build_mismatch`.
+- **Children** (`parent_death_kill`: holds; `exact_process_signal`: holds).
+  Adapter children are created inside a job object with
+  `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and no breakaway, through
+  `PROC_THREAD_ATTRIBUTE_JOB_LIST`, whose only handle the owner holds, so
+  they end when the owner does; no retained worker thread is needed for that.
+  Exact stop terminates the owned child through its process handle, and waiting
+  on that handle reports its exit.
+- **Detaching from the CLI.** The CLI starts the owner with
+  `CREATE_BREAKAWAY_FROM_JOB` and `DETACHED_PROCESS`, so the owner outlives the
+  launching CLI. A CLI that runs inside a job that does not permit breakaway
+  starts an owner that lives only as long as that job. The startup channel and
+  the lifetime lock reach the starting owner as inherited handles, the only ones
+  besides its standard handles in its `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, in place of descriptors 3 and 4.
+  Its environment holds the variable naming those handles, `SystemRoot`, and
+  `TMP` and `TEMP` set to the state directory's `run` directory.
+- **Scratch.** The owner's working files, the image copies and the
+  credential's transient file, are made in the owner-only directory `run` in
+  the state directory, never in the system's temporary directory, which for a
+  process started with this environment would otherwise be the Windows
+  directory. `TMP` and `TEMP` name it too, so the store's own temporary files
+  are made there. The CLI creates it owner-only before it starts an owner, and
+  the owner refuses one that is not owner-only. When an owner starts, it
+  removes every image copy directory left in `run` whose copy it can delete,
+  so one that a running process still holds stays.

@@ -8,6 +8,9 @@
 //! two opens the durable file is damaged outside SQLite. Every open before
 //! this unit ran `PRAGMA quick_check(1)` and refused a file failing it as
 //! `MetadataUnavailable`.
+//!
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 use connectors_host::local::{Failure, metadata::Metadata};
 use rusqlite::Connection;
 use std::{

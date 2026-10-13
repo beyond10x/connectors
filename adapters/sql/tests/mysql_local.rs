@@ -2,6 +2,7 @@
 //! configuration keeps its bytes and revision, a MySQL configuration advertises
 //! its own profile and authority, and the private runtime connects, revalidates
 //! and reads through the MySQL wire fixture on loopback.
+#![cfg(unix)]
 #[path = "mysql/fixture.rs"]
 mod fixture;
 

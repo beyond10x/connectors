@@ -2,6 +2,7 @@
 //! rewritten "Array and required query parameters" section of
 //! `docs/local-catalog-provider.md` against the host that binds an instance to
 //! its configuration revision.
+#![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_host::local::{
     filesystem, metadata::Metadata, registry::Registry, runtime::Bootstrap,

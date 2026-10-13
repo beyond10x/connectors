@@ -239,6 +239,30 @@ pub async fn serve(config: ServiceConfig, adapter: Arc<dyn Adapter>) -> Result<(
         router_with_state(adapter, Arc::new(config.service_credential), state),
     )
     .with_graceful_shutdown(async {
+        // Windows has no SIGTERM: Ctrl+C or Ctrl+Break, and closing or
+        // shutting down the console, end the service.
+        #[cfg(windows)]
+        {
+            use tokio::signal::windows;
+            match (
+                windows::ctrl_break(),
+                windows::ctrl_close(),
+                windows::ctrl_shutdown(),
+            ) {
+                (Ok(mut brk), Ok(mut close), Ok(mut shutdown)) => {
+                    tokio::select! {
+                        _=tokio::signal::ctrl_c()=>{},
+                        _=brk.recv()=>{},
+                        _=close.recv()=>{},
+                        _=shutdown.recv()=>{},
+                    }
+                }
+                _ => {
+                    let _ = tokio::signal::ctrl_c().await;
+                }
+            }
+        }
+        #[cfg(unix)]
         match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
             Ok(mut terminate) => {
                 tokio::select! { _=tokio::signal::ctrl_c()=>{}, _=terminate.recv()=>{} }

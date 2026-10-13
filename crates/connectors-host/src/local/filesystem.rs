@@ -1,21 +1,35 @@
 //! Descriptor-relative Linux path admission. No component follows a symlink.
+//! Windows admits paths through the owner SID and DACL of each opened handle
+//! (`windows`).
 use super::{Failure, Result};
+#[cfg(unix)]
 use std::{
-    ffi::{CString, OsStr},
-    fs::File,
-    io::{Read, Write},
+    ffi::CString,
+    io::Write,
     os::{
         fd::{AsRawFd, FromRawFd},
         unix::{ffi::OsStrExt, fs::MetadataExt},
     },
-    path::{Component, Path},
+    path::Component,
+};
+use std::{ffi::OsStr, fs::File, io::Read, path::Path};
+
+#[cfg(windows)]
+pub(crate) mod windows;
+#[cfg(windows)]
+pub(crate) use windows::require_absent;
+#[cfg(windows)]
+pub use windows::{
+    check_private_file, directory, private_file_at, private_file_metadata_if_present_at, uid,
 };
 
+#[cfg(unix)]
 pub fn uid() -> u32 {
     // SAFETY: geteuid has no preconditions.
     unsafe { libc::geteuid() }
 }
 
+#[cfg(unix)]
 fn name(value: &OsStr) -> Result<CString> {
     if value.is_empty() || value == "." || value == ".." || value.as_bytes().contains(&b'/') {
         return Err(Failure::InvalidConfiguration);
@@ -23,6 +37,7 @@ fn name(value: &OsStr) -> Result<CString> {
     CString::new(value.as_bytes()).map_err(|_| Failure::InvalidConfiguration)
 }
 
+#[cfg(unix)]
 fn open_at(parent: &File, name: &OsStr, flags: i32, mode: u32) -> std::io::Result<File> {
     let name =
         self::name(name).map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
@@ -42,6 +57,7 @@ fn open_at(parent: &File, name: &OsStr, flags: i32, mode: u32) -> std::io::Resul
     Ok(unsafe { File::from_raw_fd(fd) })
 }
 
+#[cfg(unix)]
 fn admitted_directory(file: &File, private: bool) -> Result<()> {
     let stat = file.metadata().map_err(|_| Failure::InvalidConfiguration)?;
     if !stat.is_dir()
@@ -54,6 +70,13 @@ fn admitted_directory(file: &File, private: bool) -> Result<()> {
     Ok(())
 }
 
+/// An absolute local path on a drive (`C:\…`) with plain, literal names.
+#[cfg(windows)]
+pub fn validate_path(path: &Path) -> Result<()> {
+    windows::validate_path(path).map(|_| ())
+}
+
+#[cfg(unix)]
 pub fn validate_path(path: &Path) -> Result<()> {
     if !path.is_absolute()
         || path.as_os_str().as_bytes().len() > 4096
@@ -68,6 +91,7 @@ pub fn validate_path(path: &Path) -> Result<()> {
 
 /// Open an admitted directory, optionally creating missing components privately.
 /// Existing directories are never chmodded or repaired implicitly.
+#[cfg(unix)]
 pub fn directory(path: &Path, create: bool, private: bool) -> Result<File> {
     validate_path(path)?;
     let mut current = File::open("/").map_err(|_| Failure::InvalidConfiguration)?;
@@ -102,6 +126,7 @@ pub fn directory(path: &Path, create: bool, private: bool) -> Result<File> {
     Ok(current)
 }
 
+#[cfg(unix)]
 pub fn private_file_at(parent: &File, child: &OsStr) -> Result<File> {
     let file =
         open_at(parent, child, libc::O_RDONLY, 0).map_err(|_| Failure::InvalidConfiguration)?;
@@ -122,6 +147,7 @@ pub fn private_file_metadata_at(parent: &File, child: &OsStr) -> Result<()> {
 /// The same check in one `fstatat`, reporting absence rather than refusing it.
 /// SQLite retires sidecars on its last close; a separate existence probe
 /// before this check would refuse one that was retired in between.
+#[cfg(unix)]
 pub fn private_file_metadata_if_present_at(parent: &File, child: &OsStr) -> Result<bool> {
     let child = name(child)?;
     let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
@@ -158,6 +184,7 @@ pub fn private_file_metadata_if_present_at(parent: &File, child: &OsStr) -> Resu
     Ok(true)
 }
 
+#[cfg(unix)]
 pub fn check_private_file(file: &File) -> Result<()> {
     let stat = file.metadata().map_err(|_| Failure::InvalidConfiguration)?;
     if !stat.is_file() || stat.uid() != uid() || stat.mode() & 0o077 != 0 || stat.nlink() != 1 {
@@ -198,7 +225,20 @@ pub fn read_bounded(file: File, limit: usize) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+/// Make a held directory's entries durable: an fsync on Linux and macOS. On
+/// Windows the handle is open for listing only and nothing is flushed: a name
+/// is durable through its write-through rename (`windows::publish`) and the
+/// metadata database through SQLite's own file syncs.
+pub fn sync_directory(directory: &File) -> Result<()> {
+    #[cfg(unix)]
+    directory.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
+    #[cfg(windows)]
+    let _ = directory;
+    Ok(())
+}
+
 /// Inspect a held directory without following the destination or creating it.
+#[cfg(unix)]
 pub(crate) fn require_absent(parent: &File, child: &OsStr) -> Result<()> {
     let child = name(child)?;
     // SAFETY: fstatat initializes the live stat buffer on success. NOFOLLOW
@@ -231,6 +271,14 @@ pub fn publish_new(parent: &File, child: &OsStr, contents: &[u8]) -> Result<()> 
 const NO_REPLACE: libc::c_uint = libc::RENAME_NOREPLACE;
 #[cfg(target_os = "macos")]
 const NO_REPLACE: libc::c_uint = libc::RENAME_EXCL;
+/// `MoveFileExW` without `MOVEFILE_REPLACE_EXISTING`.
+#[cfg(windows)]
+const NO_REPLACE: u32 = 1;
+
+#[cfg(windows)]
+fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: u32) -> Result<()> {
+    windows::publish(parent, child, contents, flags & NO_REPLACE == 0)
+}
 
 #[cfg(target_os = "linux")]
 fn rename_at(directory: &File, from: &CString, to: &CString, flags: libc::c_uint) -> libc::c_int {
@@ -345,6 +393,7 @@ pub fn publish_replace(parent: &File, child: &OsStr, contents: &[u8]) -> Result<
     publish(parent, child, contents, 0)
 }
 
+#[cfg(unix)]
 fn publish(parent: &File, child: &OsStr, contents: &[u8], flags: libc::c_uint) -> Result<()> {
     #[cfg(target_os = "macos")]
     if flags & NO_REPLACE != 0 {

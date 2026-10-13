@@ -10,6 +10,10 @@ use std::{fs::File, os::fd::AsRawFd};
 pub(super) type Handle = File;
 #[cfg(target_os = "macos")]
 pub(super) type Handle = runtime::artifact::ExactChild;
+/// On Windows a duplicate of the child's process handle
+/// (`exact_process_signal`: holds).
+#[cfg(windows)]
+pub(super) type Handle = std::os::windows::io::OwnedHandle;
 
 pub(super) struct Owned {
     pub handle: Handle,
@@ -114,6 +118,36 @@ pub(super) fn exited(handle: &File) -> Result<bool> {
     }
     Ok(poll.revents & libc::POLLIN != 0)
 }
+/// Waiting on the process handle without blocking.
+#[cfg(windows)]
+pub(super) fn exited(handle: &Handle) -> Result<bool> {
+    runtime::artifact::exited(handle).map_err(|_| Code::Unavailable.into())
+}
+/// Ends the child at once, through its process handle; one already gone is
+/// sent nothing.
+#[cfg(unix)]
+pub(super) fn kill(handle: &Handle) -> Result<()> {
+    signal(handle, libc::SIGKILL)
+}
+#[cfg(windows)]
+pub(super) fn kill(handle: &Handle) -> Result<()> {
+    runtime::artifact::terminate(handle).map_err(|_| Code::Unavailable.into())
+}
+/// Windows has no signal to send first: the child is terminated through its
+/// process handle, and its exit awaited until `deadline`. The worker still
+/// waits for it through its retained Child.
+#[cfg(windows)]
+pub(super) fn terminate(handle: &Handle, deadline: Instant) -> Result<()> {
+    kill(handle)?;
+    while Instant::now() < deadline {
+        if exited(handle)? {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    Ok(())
+}
+#[cfg(unix)]
 pub(super) fn terminate(handle: &Handle, deadline: Instant) -> Result<()> {
     signal(handle, libc::SIGTERM)?;
     while Instant::now() < deadline {

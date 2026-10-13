@@ -17,6 +17,15 @@ use std::{
     process::{Command, Output},
 };
 
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
+};
+
 /// A consumer of the feed family. Everything it knows is in this module.
 mod consumer {
     use serde_json::Value;
@@ -259,7 +268,7 @@ fn add_adapter(
         .collect();
     let config = fs::read_to_string(&paths.config).unwrap()
         + &format!(
-            "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='{adapter_id}'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='/not-installed/connectors-{adapter_id}'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=[{}]\n",
+            "\n[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='{adapter_id}'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.{alias}.executable]\npath='{NOT_INSTALLED}/connectors-{adapter_id}'\nsha256='{}'\nargs=[]\n[adapters.{alias}.permissions]\nprofiles=['token']\noperations=[{}]\n",
             "a".repeat(64),
             granted.join(",")
         );

@@ -217,11 +217,11 @@ async fn main() -> Result<()> {
     let key_path = temp.path().join("server.key");
     std::fs::write(&cert_path, cert.cert.pem())?;
     use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .mode(0o600)
+    let mut key_file = std::fs::OpenOptions::new();
+    key_file.create_new(true).write(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut key_file, 0o600);
+    key_file
         .open(&key_path)?
         .write_all(cert.signing_key.serialize_pem().as_bytes())?;
     docker(&[

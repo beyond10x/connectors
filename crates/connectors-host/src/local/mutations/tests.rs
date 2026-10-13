@@ -1,5 +1,6 @@
 use super::*;
 use serde_json::json;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::sync::{
     Arc, Barrier, Mutex,
@@ -27,7 +28,10 @@ impl TestClock {
 }
 fn fixture() -> (tempfile::TempDir, Store<TestClock>, Candidate) {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     drop(Metadata::initialize(root.path()).unwrap());
     let mut metadata = Metadata::update_mutations(root.path()).unwrap();
     // Synthetic admitted-registry coordinates, not provider/custody evidence.
@@ -126,7 +130,10 @@ fn existing(store: &Store<TestClock>, candidate: &Candidate) -> Observation {
 #[test]
 fn pending_scan_does_not_install_mutation_state() {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     drop(Metadata::initialize(root.path()).unwrap());
     let version = || {
         Metadata::inspect(root.path())
@@ -730,7 +737,10 @@ fn unkeyed_attempts_still_require_the_gate_and_retain_outcome() {
 #[test]
 fn version_three_inspection_is_read_only_and_admitted_upgrade_preserves_authority() {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     let authority = crate::local::metadata::legacy_fixture(root.path(), 3);
     let connection = rusqlite::Connection::open(root.path().join("metadata.sqlite3")).unwrap();
     connection
