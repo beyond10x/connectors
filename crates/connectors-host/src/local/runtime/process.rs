@@ -1,10 +1,13 @@
 use super::*;
 use connectors_sdk::Secret;
+#[cfg(target_os = "linux")]
+use std::fs::File;
+#[cfg(any(target_os = "linux", test))]
+use std::os::fd::FromRawFd;
 use std::{
-    fs::File,
     marker::PhantomData,
     os::{
-        fd::{AsRawFd, FromRawFd},
+        fd::AsRawFd,
         unix::{net::UnixStream, process::CommandExt},
     },
     process::{Command, Stdio},
@@ -14,9 +17,15 @@ use std::{
 
 /// Owned process, never reconstructed from a PID or readiness file. It is not
 /// Send: its spawning thread must remain alive for the Linux parent-death lease.
+/// On macOS the process is an [`artifact::ExactChild`]: signalled only under
+/// the lock that reaps it, with no pidfd (`child_reap_lock`).
 pub struct Child {
+    #[cfg(target_os = "linux")]
     process: std::process::Child,
+    #[cfg(target_os = "linux")]
     pidfd: File,
+    #[cfg(target_os = "macos")]
+    process: artifact::ExactChild,
     channel: UnixStream,
     bootstrap: Bootstrap,
     incarnation: String,
@@ -39,7 +48,13 @@ impl Child {
         let child_fd = child_channel.as_raw_fd();
         // SAFETY: getpid has no preconditions.
         let parent = unsafe { libc::getpid() };
+        #[cfg(target_os = "linux")]
         let mut command = Command::new(format!("/proc/self/fd/{}", executable.as_raw_fd()));
+        // macOS executes the owner-private copy by its path (`owner_private_copy`).
+        #[cfg(target_os = "macos")]
+        let launch = artifact::launch_path(&executable)?;
+        #[cfg(target_os = "macos")]
+        let mut command = Command::new(launch.path());
         command
             .args(&config.executable.args)
             .args(["--connectors-private-fd", "3"])
@@ -51,9 +66,16 @@ impl Child {
         // values and fixed errors. Both source descriptors remain held by spawn.
         unsafe {
             command.pre_exec(move || {
+                #[cfg(target_os = "linux")]
                 if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0
                     || libc::getppid() != parent
                 {
+                    return Err(std::io::Error::from_raw_os_error(libc::ECHILD));
+                }
+                // macOS has no parent-death signal (`adapter_channel_close`):
+                // the adapter exits when its channel on descriptor 3 closes.
+                #[cfg(target_os = "macos")]
+                if libc::getppid() != parent {
                     return Err(std::io::Error::from_raw_os_error(libc::ECHILD));
                 }
                 if libc::dup2(child_fd, 3) < 0 || libc::fcntl(3, libc::F_SETFD, 0) < 0 {
@@ -62,23 +84,33 @@ impl Child {
                 Ok(())
             });
         }
+        #[cfg(target_os = "linux")]
         let mut process = command.spawn().map_err(|_| Failure::Unavailable)?;
+        #[cfg(target_os = "macos")]
+        let process =
+            artifact::ExactChild::spawn(&mut command).map_err(|_| Failure::Unavailable)?;
         drop(child_channel);
         drop(executable);
+        #[cfg(target_os = "macos")]
+        drop(launch);
         // SAFETY: pidfd_open takes the just-spawned child's PID and zero flags.
+        #[cfg(target_os = "linux")]
         let raw = unsafe { libc::syscall(libc::SYS_pidfd_open, process.id(), 0) } as i32;
+        #[cfg(target_os = "linux")]
         if raw < 0 {
             let _ = process.kill();
             let _ = process.wait();
             return Err(Failure::Unavailable);
         }
         // SAFETY: the successful syscall returned a new owned descriptor.
+        #[cfg(target_os = "linux")]
         let pidfd = unsafe { File::from_raw_fd(raw) };
         let incarnation = uuid::Uuid::new_v4().to_string();
         let nonce = uuid::Uuid::new_v4().to_string();
         // Build an owned guard before any fallible channel work.
         let mut child = Self {
             process,
+            #[cfg(target_os = "linux")]
             pidfd,
             channel,
             bootstrap: Bootstrap {
@@ -148,8 +180,14 @@ impl Child {
         &self.incarnation
     }
     /// Duplicate this owned kernel handle for the owner's independent stop path.
+    #[cfg(target_os = "linux")]
     pub(crate) fn termination_handle(&self) -> Result<File> {
         self.pidfd.try_clone().map_err(|_| Failure::Unavailable)
+    }
+    /// Share this child's reap lock with the owner's independent stop path.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn termination_handle(&self) -> Result<artifact::ExactChild> {
+        self.process.try_clone().map_err(|_| Failure::Unavailable)
     }
     pub fn running(&mut self) -> Result<bool> {
         if self.live
@@ -489,6 +527,16 @@ impl Child {
             Err(Failure::Unavailable)
         }
     }
+    /// Kills and reaps under the child's reap lock (`child_reap_lock`).
+    #[cfg(target_os = "macos")]
+    fn terminate(&mut self) {
+        if self.live {
+            let _ = self.process.kill();
+            let _ = self.process.wait();
+            self.live = false;
+        }
+    }
+    #[cfg(target_os = "linux")]
     fn terminate(&mut self) {
         if self.live {
             // SAFETY: pidfd is an owned handle to this child, never a numeric PID
@@ -941,6 +989,41 @@ mod tests {
         );
         assert!(!validation.live);
         assert!(validation.process.try_wait().unwrap().is_some());
+    }
+
+    /// `parent_death_kill`: `adapter_channel_close`, the form macOS gives. The
+    /// owner holds the only end of the adapter's channel, so closing it, as
+    /// the owner's death does, ends the adapter with no signal sent.
+    #[test]
+    fn an_adapter_exits_when_the_owner_end_of_its_channel_closes() {
+        let mut child = fixture_child("fixture-mode-json");
+        assert!(child.process.try_wait().unwrap().is_none());
+        drop(std::mem::replace(
+            &mut child.channel,
+            UnixStream::pair().unwrap().0,
+        ));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while child.process.try_wait().unwrap().is_none() {
+            assert!(
+                Instant::now() < deadline,
+                "the adapter outlived its channel"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// `exact_process_signal`: `child_reap_lock`, through the owner's stop
+    /// handle: it reports the child exited and signals nothing once the
+    /// child that owns the process has reaped it.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_stop_handle_signals_nothing_after_its_child_is_reaped() {
+        let child = fixture_child("fixture-mode-json");
+        let handle = child.termination_handle().unwrap();
+        assert!(!handle.exited().unwrap());
+        drop(child);
+        assert!(handle.exited().unwrap());
+        assert!(!handle.signal(libc::SIGKILL).unwrap());
     }
 }
 
