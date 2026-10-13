@@ -70,7 +70,9 @@ SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
 for the ticket export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)),
 GitLab for the project search path ([Project code search](#project-code-search))
 and for the JSON bodies of commit create, file update and project create
-([Pipeline, commit, branch and project writes](#pipeline-commit-branch-and-project-writes)).
+([Pipeline, commit, branch and project writes](#pipeline-commit-branch-and-project-writes)),
+and Slack for the JSON bodies of `chat.postMessage` and `conversations.open`
+([Slack guide](catalog-slack.md#source-and-bundle)).
 The GitLab build passes it:
 
 ```sh
@@ -91,7 +93,7 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Confluence guide](catalog-confluence.md), HubSpot CRM in
 [the HubSpot guide](catalog-hubspot.md), Zendesk Support in
 [the Zendesk guide](catalog-zendesk.md), Runpod pods in
-[the Runpod guide](catalog-runpod.md) and Slack conversations in
+[the Runpod guide](catalog-runpod.md) and Slack conversations and messages in
 [the Slack guide](catalog-slack.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
@@ -617,6 +619,16 @@ The complete configuration used against the sandbox is
   `body_required` repeats, or a guard reading a path nested under a typed key
   is refused when the selection loads. Like `body_keys`, they are declared by
   the selection from the pinned document and not checked against it.
+- `body_nonempty` is optional, beside `body_types`: `["<key>", …]` names closed
+  body keys typed `string` that must not be empty. A body carrying one as `""`
+  is refused as `invalid_input` before any request, as a mistyped key is, and
+  the declared input schema gives it `minLength: 1`; a key it names but the
+  body omits is not required by it (`body_required` does that). Slack's
+  `chat.postMessage` holds `channel`, `text` and `thread_ts` non-empty, and
+  `conversations.open` holds `users`: Slack answers an empty one with `ok`
+  `false`, which would leave an attempt to reconcile. A name `body_keys` does
+  not admit, one `body_types` does not type as `string`, a fixed key or a
+  repeated name is refused when the selection loads.
 - `body_fixed` is optional, beside `body_keys`: `{"<key>": <value>}` fixes a
   closed body key to one JSON string, integer or boolean. The provider sends
   exactly that value under that key on every write, and a body naming the key
@@ -630,16 +642,25 @@ The complete configuration used against the sandbox is
   that is not a string, an integer or a boolean or not of the key's
   `body_types` type, a key `body_required` names and a key a guard reads are
   refused when the selection loads: a guard compares a fixed value as a
-  `literal`. `body_keys`, `body_types`, `body_required` and `body_fixed` are
-  modelled as `connectors_catalog.selection.ClosedBody` in
+  `literal`. `body_keys`, `body_types`, `body_required`, `body_nonempty` and
+  `body_fixed` are modelled as `connectors_catalog.selection.ClosedBody` in
   `adapters/catalog/spec/ess`, and every shipped selection is checked against
   it.
 - `guard` is optional and declarative. The preflight reads another GET from the
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
   `pointer` in the observed body with `{"input": "<key>"}` (a top-level input or
-  `body.<key>`) or `{"literal": "<value>"}`. The postflight applies its checks to
-  the write's own response; a difference there leaves the outcome uncertain and
+  `body.<key>`) or `{"literal": "<value>"}`, both as text, so a literal `"7"`
+  holds for the number `7` and the string `"7"` alike; or with
+  `{"boolean": true}` (or `false`), by JSON type, which holds only for that
+  JSON boolean, never a string, a number or `null`, as for Slack's `ok`. The
+  model's `connectors_catalog.guard.Expectation` holds exactly one of the
+  three. A `literal` of `"true"` or `"false"` is refused when the selection
+  loads, on every check: the bundle does not record an answer member's type,
+  and as text it would hold for a look-alike string where a boolean is meant.
+  GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
+  `/transitions/0/isAvailable` are compared with `{"boolean": true}`. The
+  postflight applies its checks to the write's own response; a difference there leaves the outcome uncertain and
   never refused, because the provider may already have applied the write. No
   corrective request is ever issued. This is the C14 boundary the operator
   accepted for create and update, written as data.

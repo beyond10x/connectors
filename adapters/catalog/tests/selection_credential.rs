@@ -320,7 +320,7 @@ fn body_keys_and_preflight_values_naming_the_credential_are_refused() {
     let guard = |key: &str| {
         json!({
             "preflight": {"operation_id": "team_info", "values": {key: "team_ref"},
-                          "checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]},
+                          "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
             "postflight": {"checks": []}
         })
     };
@@ -372,7 +372,7 @@ async fn the_credential_leaves_the_guards_probe() {
         "effect": "write", "credential": credential,
         "guard": {
             "preflight": {"operation_id": "team_info", "values": {"team": "team_ref"},
-                          "checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]},
+                          "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
             "postflight": {"checks": []}
         }})
     };

@@ -8,9 +8,12 @@ summary: Slack-owned provider records the parity units read or write — convers
 # (`conversations.history`, `conversations.replies`; found by `search.messages` on a
 # user-token connection), User (`users.list`), Emoji (`emoji.list`), Workspace
 # (`team.info`) and File (`files.list`, `files.info`, and its content by the
-# download `file.download`). The selections of the four
-# methods whose pinned `token` is required name it as their `credential`, so the
-# token travels only in the connection's header.
+# download `file.download`). Written through the catalog provider, each under an
+# approval: a Message is posted by `chat.postMessage` (MessagePost in, MessagePosted
+# out) and a direct-message Conversation is opened by `conversations.open`
+# (DirectMessageOpen in, DirectMessageOpened out). The selections of the four read
+# methods whose pinned `token` is required, and of both writes, name it as their
+# `credential`, so the token travels only in the connection's header.
 # Normative owner: adapters/slack/design.md. Shared ESS includes none of this root
 # and imports none of its types (adapters/README.md:70-74).
 #
@@ -42,6 +45,77 @@ types:
     fields:
       - {name: conversation_id, type: String}
       - {name: ts, type: String}
+
+  # The closed input of the catalog selection `chat.postMessage` (operationId
+  # `chat_postMessage`, src:10830, `POST /api/chat.postMessage`, scope `chat:write`):
+  # the body keys it admits, each a member the pinned document declares. Wire member
+  # `channel` (src:10860, required) is conversation_id; `text` (src:10903) is
+  # required here although the document leaves it optional beside `blocks` and
+  # `attachments`, which the selection does not admit; `thread_ts` (src:10909) makes
+  # the message a reply to that thread's parent; `mrkdwn` (src:10885) false turns
+  # Slack markup off; `unfurl_links` (src:10915) true unfurls text links.
+  # Nothing about the message exists to compare before a create, so the same input
+  # approved and sent again posts a second message.
+  - name: connectors_slack.records.MessagePost
+    kind: struct
+    fields:
+      - {name: conversation_id, type: String}
+      - {name: text, type: String}
+      - {name: thread_ts, type: Optional<String>}
+      - {name: mrkdwn, type: Optional<Boolean>}
+      - {name: unfurl_links, type: Optional<Boolean>}
+    invariants:
+      - conversation_id.count: {gte: 1}
+      - text.count: {gte: 1}
+    # ESS-LIMIT: `conversation_id` may be a channel id or a name (src:10860); the
+    # model does not tell them apart, and the provider sends either as given.
+
+  # The applied answer of `chat.postMessage`: its 200 schema (src:10960) requires
+  # `ok`, `channel` (defs_channel, ^[CGD][A-Z0-9]{8,}$), `ts` (defs_ts) and
+  # `message` (objs_message, src:1524, which requires `text`, `type` and `ts`).
+  # `channel` and `ts` are the posted Message's MessageRef and `message.text` its
+  # text as Slack stored it; the provider returns the whole answer under `body`.
+  - name: connectors_slack.records.MessagePosted
+    kind: struct
+    fields:
+      - {name: message_ref, type: connectors_slack.records.MessageRef}
+      - {name: text, type: String}
+
+  # The closed input of the catalog selection `conversations.open` (operationId
+  # `conversations_open`, src:13455, `POST /api/conversations.open`, scope `im:write`,
+  # and `mpim:write` for a group). Wire member `users` (src:13472) is one user id for
+  # a direct message, or a comma-separated list for a multi-person one; `return_im`
+  # (src:13478) asks for the full conversation in the answer. The document's
+  # `channel` member, which resumes a conversation by id, is not admitted.
+  - name: connectors_slack.records.DirectMessageOpen
+    kind: struct
+    fields:
+      - {name: users, type: String}
+      - {name: return_im, type: Optional<Boolean>}
+    invariants:
+      - users.count: {gte: 1}
+
+  # The applied answer of `conversations.open`: its 200 schema (src:13549) requires
+  # `ok` and `channel`, whose `id` (defs_dm_id, ^[D][A-Z0-9]{8,}$, for a direct
+  # message) is the opened Conversation's conversation_id, the channel
+  # `chat.postMessage` then names. The schema also declares `already_open` and
+  # `no_op` for a conversation that was open before.
+  - name: connectors_slack.records.DirectMessageOpened
+    kind: struct
+    fields:
+      - {name: conversation_id, type: String}
+
+  # The outcome of either write, as the catalog engine classifies it. applied: a 2xx
+  # answer with `ok` true. refused: nothing was sent (no approval, an input outside
+  # the closed body, or the token's `auth.test` read before the write answering `ok`
+  # false), or Slack answered a status the engine reads as a definite refusal.
+  # unknown: anything else after the request was sent, a lost connection, a 5xx, and
+  # Slack's own refusal, which it answers `200` with `ok` false: the engine classifies
+  # by status and reads only `ok`, so such an answer is never recorded as applied,
+  # and Slack's `error` string is not carried. Unknown is never retried.
+  - name: connectors_slack.records.WriteOutcome
+    kind: enum
+    variants: [applied, refused, unknown]
 
 entities:
   # A conversation is what a message is sent to or read from: a channel, or the
@@ -104,6 +178,8 @@ entities:
   # `slack.thread` (fx:151-153, parity:210 `conversations.replies`); found by
   # `slack.search` (parity:213 `search.messages`, fluxplane entity `slack.message`
   # fx:170); written by send, edit and delete (parity:211, parity:217, parity:220).
+  # Send is the catalog selection `chat.postMessage` (MessagePost, MessagePosted);
+  # edit and delete are not selected.
   - name: connectors_slack.records.Message
     identity:
       name: message_ref
@@ -242,8 +318,12 @@ entities:
 # UNMAPPED: Conversation ↔ User membership. fluxplane's `slack.channel_member`
 #   datasource lists a channel's members (fx:166) and usage:155 requires membership;
 #   no unit operation reads it, and no source states the cardinality on the user side.
-# UNMAPPED: a direct-message conversation → its User. fx:120 opens one from a user id
-#   (parity:211 `conversations.open`); no source states the member or cardinality.
+# UNMAPPED: a direct-message conversation → its User. fx:120 opens one from a user id,
+#   and the catalog selection `conversations.open` does (DirectMessageOpen). The
+#   pinned answer's direct-message variant declares `user` (defs_user_id, src:13549),
+#   but `channel` is written as a list of alternative shapes and a multi-person
+#   conversation names several users, so neither the member nor the cardinality is
+#   settled.
 #
 # Out of scope, 0 calls and in no unit (parity:837): bookmarks, presence, reactions,
 # unreads, mentions, channel join and mark-read, and the fluxplane-local index.
