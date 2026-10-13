@@ -3,6 +3,9 @@
 //! contracts/service/audit.md § 1-3, ess/domains/mutations.yaml "The HTTP
 //! host's attempt ledger", ess/domains/execution_audit.yaml "Final-observation
 //! recovery").
+//!
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 use async_trait::async_trait;
 use connectors_core::{
     Descriptor, Operation, Result, WIRE_VERSION,

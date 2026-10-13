@@ -1,5 +1,8 @@
 //! The HTTP host's execution-audit anchor on `POST /v1alpha2/invoke`
 //! (contracts/service/audit.md § 1-4, contracts/service/compatibility.md § 2.1).
+//!
+//! Unix only: its fixtures use Unix mode bits, descriptors or file locks.
+#![cfg(unix)]
 use async_trait::async_trait;
 use connectors_core::{
     Descriptor, Operation, Result, WIRE_VERSION,
