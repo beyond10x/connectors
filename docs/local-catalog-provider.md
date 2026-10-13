@@ -70,7 +70,9 @@ SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
 for the ticket export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-and-bundle)),
 GitLab for the project search path ([Project code search](#project-code-search))
 and for the JSON bodies of commit create, file update and project create
-([Pipeline, commit, branch and project writes](#pipeline-commit-branch-and-project-writes)).
+([Pipeline, commit, branch and project writes](#pipeline-commit-branch-and-project-writes)),
+and Slack for the JSON bodies of `chat.postMessage` and `conversations.open`
+([Slack guide](catalog-slack.md#source-and-bundle)).
 The GitLab build passes it:
 
 ```sh
@@ -91,7 +93,7 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Confluence guide](catalog-confluence.md), HubSpot CRM in
 [the HubSpot guide](catalog-hubspot.md), Zendesk Support in
 [the Zendesk guide](catalog-zendesk.md), Runpod pods in
-[the Runpod guide](catalog-runpod.md) and Slack conversations in
+[the Runpod guide](catalog-runpod.md) and Slack conversations and messages in
 [the Slack guide](catalog-slack.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration

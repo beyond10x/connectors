@@ -13,14 +13,19 @@
 //! yields the token's user id. `auth.test`, `team.info`, `emoji.list` and
 //! `search.messages`, whose pinned `token` parameter is required, ship with
 //! `token` named as the selection's credential; withholding it instead is
-//! still refused. Every id, name and message is synthetic. No live credential
+//! still refused. The two writes, `chat.postMessage` and `conversations.open`,
+//! run on private protocol two through prepare and commit, the transport the
+//! host drives once it holds an approval: the exact JSON request after the
+//! guard's `auth.test` read, refusal without an approval, an ambiguous
+//! dispatch left unknown and sent once, and Slack's `200` with `ok: false`
+//! never applied. Every id, name and message is synthetic. No live credential
 //! and no network.
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
-    runtime::{Bootstrap, Child, Failure},
+    runtime::{self, Bootstrap, Child, Failure, PrivateProtocol, WriteEffect, WriteResult},
 };
 use connectors_sdk::Secret;
 use serde_json::{Value, json};
@@ -116,7 +121,7 @@ fn pinned() -> Value {
 }
 
 #[test]
-fn shipped_slack_selections_are_exactly_the_bot_reads_and_the_user_search() {
+fn shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_search() {
     let bundle = committed();
     assert_eq!(bundle.auth_profile, PROFILE);
     for (selections, shipped) in [
@@ -132,13 +137,24 @@ fn shipped_slack_selections_are_exactly_the_bot_reads_and_the_user_search() {
         declared.sort();
         // The bot set's file download names no bundle operation; it is pinned
         // in `tests/slack_files.rs`.
+        // The bot set's two writes are pinned in
+        // `the_two_writes_ship_as_guarded_writes_with_a_closed_json_body`.
         let mut expected: Vec<&str> = shipped.iter().map(|(id, _, _)| *id).collect();
+        let mut writes: Vec<&str> = Vec::new();
         if shipped.len() == SHIPPED.len() {
             expected.push("file.download");
+            writes = WRITES.iter().map(|(id, _, _)| *id).collect();
+            expected.extend(&writes);
         }
         expected.sort();
         assert_eq!(declared, expected);
-        assert!(engine.declarations(&[Effect::Write]).is_empty());
+        let mut declared_writes: Vec<String> = engine
+            .declarations(&[Effect::Write])
+            .into_iter()
+            .map(|o| o.id)
+            .collect();
+        declared_writes.sort();
+        assert_eq!(declared_writes, writes);
         for (id, operation_id, path) in shipped.iter().copied() {
             let selection = selections.iter().find(|s| s.id == id).unwrap();
             assert_eq!(selection.operation_id, operation_id, "`{id}`");
@@ -532,6 +548,36 @@ fn the_documented_profile_is_a_bearer_bot_token_with_auth_test_as_identity() {
 /// Route, `Authorization` header, and whether a `token` header was sent, of
 /// each fixture request.
 type Requests = Arc<Mutex<Vec<(String, Option<String>, bool)>>>;
+/// Method, route, `Content-Type` and JSON body (`null` when none) of each
+/// fixture request.
+type Exchanges = Arc<Mutex<Vec<(String, String, Option<String>, Value)>>>;
+
+/// The `ts` the fixture gives every posted message.
+const POSTED_TS: &str = "1780000700.000700";
+/// The direct-message conversation the fixture opens with `U0FIXTURE11`.
+const DM: &str = "D0FIXTURE11";
+
+/// What `chat.postMessage` answers: to `C0FIXTURE01` or the opened direct
+/// message, the pinned success schema's `ok`, `channel`, `ts` and `message`;
+/// to any other channel, Slack's refusal, `200` with `ok: false`.
+fn posted(body: &Value) -> Value {
+    match body["channel"].as_str() {
+        Some(channel @ ("C0FIXTURE01" | DM)) => json!({
+            "ok": true, "channel": channel, "ts": POSTED_TS,
+            "message": {"type": "message", "user": "U0FIXTURE01", "bot_id": "B0FIXTURE01",
+                        "text": body["text"], "ts": POSTED_TS}}),
+        _ => json!({"ok": false, "error": "channel_not_found"}),
+    }
+}
+/// What `conversations.open` answers: the direct message with `U0FIXTURE11`,
+/// or Slack's refusal for any other user.
+fn opened(body: &Value) -> Value {
+    if body["users"] == "U0FIXTURE11" {
+        json!({"ok": true, "channel": {"id": DM}})
+    } else {
+        json!({"ok": false, "error": "user_not_found"})
+    }
+}
 
 fn channel(n: u64) -> Value {
     json!({"id": format!("C0FIXTURE{n:02}"), "name": format!("fixture-channel-{n}"),
@@ -666,6 +712,10 @@ struct Provider {
     _root: tempfile::TempDir,
     config: PathBuf,
     requests: Requests,
+    /// Method, route, `Content-Type` and body of each fixture request.
+    exchanges: Exchanges,
+    /// The private protocol the child speaks; two carries writes.
+    protocol: Option<PrivateProtocol>,
     /// The fixture's own origin, `https://localhost:<port>`.
     origin: String,
 }
@@ -676,12 +726,17 @@ impl Provider {
     /// The search connection: the guide's `slack.user` configuration and the
     /// user selection set.
     fn user() -> Self {
-        Self::start(false, true, None)
+        Self::start(false, true, None, None)
     }
     /// `refuse_identity`: answer `auth.test` as Slack answers a revoked
     /// token, `200` with `ok: false` and no `user_id`.
     fn serving(refuse_identity: bool) -> Self {
-        Self::start(refuse_identity, false, None)
+        Self::start(refuse_identity, false, None, None)
+    }
+    /// The bot connection on private protocol two, which carries the two
+    /// writes; `refuse_identity` as for [`Provider::serving`].
+    fn writing(refuse_identity: bool) -> Self {
+        Self::start(refuse_identity, false, None, Some(PrivateProtocol::V2))
     }
     /// The bot connection admitting the fixture's own origin as a file host,
     /// with or without the credential, beside the shipped set: one more
@@ -689,9 +744,14 @@ impl Provider {
     /// but reaching that origin, since the fixture cannot serve
     /// `files.slack.com`.
     fn files(credential: bool) -> Self {
-        Self::start(false, false, Some(credential))
+        Self::start(false, false, Some(credential), None)
     }
-    fn start(refuse_identity: bool, user: bool, files: Option<bool>) -> Self {
+    fn start(
+        refuse_identity: bool,
+        user: bool,
+        files: Option<bool>,
+        protocol: Option<PrivateProtocol>,
+    ) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -713,6 +773,8 @@ impl Provider {
         let (stop, mut stopped) = oneshot::channel();
         let requests: Requests = Arc::new(Mutex::new(Vec::new()));
         let observed = requests.clone();
+        let exchanges: Exchanges = Arc::new(Mutex::new(Vec::new()));
+        let exchanged = exchanges.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -750,6 +812,62 @@ impl Provider {
                         line.split_once(':')
                             .is_some_and(|(name, _)| name.eq_ignore_ascii_case("token"))
                     });
+                    let header_value = |wanted: &str| {
+                        request.lines().find_map(|line| {
+                            line.split_once(':')
+                                .filter(|(name, _)| name.eq_ignore_ascii_case(wanted))
+                                .map(|(_, value)| value.trim().to_owned())
+                        })
+                    };
+                    let method = request.split_whitespace().next().unwrap_or_default().to_owned();
+                    let length: usize = header_value("content-length")
+                        .map(|value| value.parse().unwrap())
+                        .unwrap_or(0);
+                    assert!(length <= 65_536);
+                    let mut sent = vec![0; length];
+                    if stream.read_exact(&mut sent).await.is_err() {
+                        continue;
+                    }
+                    let sent: Value = if sent.is_empty() {
+                        Value::Null
+                    } else {
+                        serde_json::from_slice(&sent).unwrap_or(Value::Null)
+                    };
+                    let route = path.split('?').next().unwrap_or_default().to_owned();
+                    exchanged.lock().unwrap().push((
+                        method.clone(),
+                        route.clone(),
+                        header_value("content-type"),
+                        sent.clone(),
+                    ));
+                    // The two writes, to the bot token alone. A post to
+                    // `C0FIXTUREDROP` is read and then left unanswered, the
+                    // connection closed: the dispatch is ambiguous.
+                    if method == "POST" && authorization.as_deref() == Some(HEADER) {
+                        let answer = match route.as_str() {
+                            "/api/chat.postMessage" if sent["channel"] == "C0FIXTUREDROP" => {
+                                observed.lock().unwrap().push((path, authorization, token_header));
+                                continue;
+                            }
+                            "/api/chat.postMessage" if sent["channel"] == "C0FIXTURE500" => {
+                                Some((500, json!({"ok": false, "error": "fatal_error"})))
+                            }
+                            "/api/chat.postMessage" => Some((200, posted(&sent))),
+                            "/api/conversations.open" => Some((200, opened(&sent))),
+                            _ => None,
+                        };
+                        if let Some((status, answer)) = answer {
+                            observed.lock().unwrap().push((path, authorization, token_header));
+                            let answer = serde_json::to_vec(&answer).unwrap();
+                            let header = format!(
+                                "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                                answer.len()
+                            );
+                            let _ = stream.write_all(header.as_bytes()).await;
+                            let _ = stream.write_all(&answer).await;
+                            continue;
+                        }
+                    }
                     // The file host: the content to the bot token alone, a
                     // `403` without it, as bytes that are not JSON.
                     if path.starts_with("/files-pri/") {
@@ -835,6 +953,8 @@ impl Provider {
             _root: root,
             config,
             requests,
+            exchanges,
+            protocol,
             origin,
         }
     }
@@ -856,7 +976,7 @@ impl Provider {
             .canonicalize()
             .unwrap();
         Adapter {
-            private_protocol: None,
+            private_protocol: self.protocol,
             permissions: Default::default(),
             instance_id: "fixture-slack".into(),
             adapter_id: "catalog".into(),
@@ -876,6 +996,17 @@ impl Provider {
     }
     fn requests(&self) -> Vec<(String, Option<String>, bool)> {
         self.requests.lock().unwrap().clone()
+    }
+    fn exchanges(&self) -> Vec<(String, String, Option<String>, Value)> {
+        self.exchanges.lock().unwrap().clone()
+    }
+    /// Only the POSTs the fixture saw, as route and body.
+    fn posts(&self) -> Vec<(String, Value)> {
+        self.exchanges()
+            .into_iter()
+            .filter(|(method, ..)| method == "POST")
+            .map(|(_, route, _, body)| (route, body))
+            .collect()
     }
 }
 impl Drop for Provider {
@@ -1533,4 +1664,328 @@ fn a_connection_admitting_a_host_no_selection_reaches_does_not_load() {
             .unwrap();
         assert!(!output.status.success(), "{hosts} loaded");
     }
+}
+
+// ── Message send: `chat.postMessage` and `conversations.open` ─────────────────
+
+/// The bot set's two writes, their pinned `operationId` and the path the
+/// bundle records. A renamed, dropped or added write fails here.
+const WRITES: [(&str, &str, &str); 2] = [
+    (
+        "chat.postMessage",
+        "chat_postMessage",
+        "/api/chat.postMessage",
+    ),
+    (
+        "conversations.open",
+        "conversations_open",
+        "/api/conversations.open",
+    ),
+];
+
+/// Prepare and commit one write on this child: the transport the host's
+/// approval coordinator drives once it holds a verified, spent approval. A
+/// refusal in prepare is the `Err`.
+fn write(child: &mut Child, operation: &str, input: &Value) -> Result<WriteResult, Failure> {
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let prepared = child.prepare_write(
+        operation,
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(input).unwrap(),
+        deadline(),
+    )?;
+    Ok(prepared.commit())
+}
+fn post_input(channel: &str) -> Value {
+    json!({"body": {"channel": channel, "text": "fixture message posted",
+                    "thread_ts": "1780000100.000100", "unfurl_links": false}})
+}
+
+/// Both writes ship as reviewed: `effect: write` over the pinned POST, the
+/// token as the credential, a closed typed body with its required keys, and a
+/// guard that reads `auth.test` before the write and requires `ok` true both
+/// there and in Slack's answer. The bundle records each with a JSON request
+/// body by a cited amendment, since the engine sends nothing else. On private
+/// protocol two the bootstrap lists each as a write of `slack.bot`, which is
+/// what makes the host require an approval; protocol one lists no write.
+#[test]
+fn the_two_writes_ship_as_guarded_writes_with_a_closed_json_body() {
+    let bundle = committed();
+    let amendments = bundle
+        .source
+        .amendments
+        .as_ref()
+        .expect("an amendment record");
+    assert_eq!(amendments.file_name, "slack-web.amendments.json");
+    let engine = Engine::new(&bundle, BASE, &shipped()).unwrap();
+    let mut writes: Vec<String> = engine
+        .declarations(&[Effect::Write])
+        .into_iter()
+        .map(|o| o.id)
+        .collect();
+    writes.sort();
+    assert_eq!(writes, ["chat.postMessage", "conversations.open"]);
+    let document = pinned();
+    for (id, operation_id, path) in WRITES {
+        let selection = shipped().into_iter().find(|s| s.id == id).unwrap();
+        assert_eq!(selection.operation_id, operation_id, "`{id}`");
+        assert_eq!(selection.effect, Effect::Write, "`{id}`");
+        assert_eq!(selection.credential, ["token"], "`{id}`");
+        assert!(selection.withhold.is_empty(), "`{id}`");
+        let operation = bundle
+            .inventory
+            .operations
+            .iter()
+            .find(|o| o.operation_id.as_deref() == Some(operation_id))
+            .unwrap();
+        assert_eq!(operation.method, "post", "`{id}`");
+        assert_eq!(operation.path, path, "`{id}`");
+        assert_eq!(
+            operation.request_media_types,
+            ["application/json"],
+            "`{id}`"
+        );
+        let source = &document["paths"][path.strip_prefix(BASE).unwrap()]["post"];
+        assert_eq!(source["operationId"], operation_id, "`{id}`");
+        // Every admitted body key is a member the pinned document declares.
+        for key in &selection.body_keys {
+            assert!(
+                source["parameters"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|p| p["name"] == key.as_str() && p["in"] == "formData"),
+                "`{id}` admits `{key}`, which the pinned document does not declare"
+            );
+        }
+        let guard = selection.guard.as_ref().expect("a guard");
+        assert_eq!(guard.preflight.operation_id, "auth_test", "`{id}`");
+        let ok = json!([{"pointer": "/ok", "expect": {"literal": "true"}}]);
+        assert_eq!(serde_json::to_value(&guard.preflight.checks).unwrap(), ok);
+        assert_eq!(serde_json::to_value(&guard.postflight.checks).unwrap(), ok);
+        let declaration = engine
+            .declarations(&[Effect::Write])
+            .into_iter()
+            .find(|o| o.id == id)
+            .unwrap();
+        let schema = &declaration.input_schema;
+        assert_eq!(schema["required"], json!(["body"]), "`{id}`");
+        assert_eq!(
+            schema["properties"]["body"]["additionalProperties"],
+            json!(false)
+        );
+        assert!(schema["properties"].get("token").is_none(), "`{id}`");
+    }
+    let post = shipped()
+        .into_iter()
+        .find(|s| s.id == "chat.postMessage")
+        .unwrap();
+    assert_eq!(
+        post.body_keys,
+        ["channel", "text", "thread_ts", "mrkdwn", "unfurl_links"]
+    );
+    assert_eq!(post.body_required, ["channel", "text"]);
+    let open = shipped()
+        .into_iter()
+        .find(|s| s.id == "conversations.open")
+        .unwrap();
+    assert_eq!(open.body_keys, ["users", "return_im"]);
+    assert_eq!(open.body_required, ["users"]);
+
+    let two = Provider::writing(false);
+    let child = Child::spawn(&two.selection()).unwrap();
+    for (id, _, _) in WRITES {
+        let requirement = child
+            .bootstrap()
+            .requirements
+            .iter()
+            .find(|r| r.operation == id)
+            .unwrap_or_else(|| panic!("`{id}` is not a protocol-two requirement"));
+        assert!(requirement.effect == runtime::Effect::Write, "`{id}`");
+        assert_eq!(requirement.profile, PROFILE);
+    }
+    let one = Provider::new();
+    let child = Child::spawn(&one.selection()).unwrap();
+    assert!(
+        child
+            .bootstrap()
+            .requirements
+            .iter()
+            .all(|r| WRITES.iter().all(|(id, _, _)| r.operation != *id)),
+        "protocol one lists a Slack write"
+    );
+    assert!(two.exchanges().is_empty() && one.exchanges().is_empty());
+}
+
+/// Approved, `chat.postMessage` reads `auth.test`, then sends exactly one
+/// `POST /api/chat.postMessage` with the body as supplied, as JSON, with the
+/// bearer token and no `token` parameter, and returns Slack's answer, whose
+/// `channel` and `ts` are the posted message's address.
+#[test]
+fn an_approved_post_sends_one_json_body_and_returns_channel_and_ts() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let input = post_input("C0FIXTURE01");
+    let result = write(&mut child, "chat.postMessage", &input)
+        .unwrap_or_else(|failure| panic!("`chat.postMessage` refused in prepare: {failure:?}"));
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let result = result.result.unwrap();
+    assert_eq!(result["status"], 200);
+    assert_eq!(result["body"]["ok"], true);
+    assert_eq!(result["body"]["channel"], "C0FIXTURE01");
+    assert_eq!(result["body"]["ts"], POSTED_TS);
+    assert_eq!(result["body"]["message"]["text"], "fixture message posted");
+    assert_eq!(result["provenance"]["instance"], "fixture-slack");
+    let exchanges = provider.exchanges();
+    assert_eq!(exchanges.len(), 2, "{exchanges:?}");
+    assert_eq!(exchanges[0].0, "GET");
+    assert_eq!(exchanges[0].1, "/api/auth.test");
+    assert_eq!(exchanges[1].0, "POST");
+    assert_eq!(exchanges[1].1, "/api/chat.postMessage");
+    assert!(
+        exchanges[1]
+            .2
+            .as_deref()
+            .is_some_and(|kind| kind.starts_with("application/json")),
+        "{:?}",
+        exchanges[1].2
+    );
+    assert_eq!(exchanges[1].3, input["body"]);
+    for (path, authorization, token_header) in provider.requests() {
+        assert_eq!(authorization.as_deref(), Some(HEADER), "{path}");
+        assert!(!token_header && !path.contains("token="), "{path}");
+    }
+}
+
+/// Without an approval there is no route to the request: on protocol two the
+/// read transport refuses both writes as unsupported, and on protocol one
+/// neither is an operation and prepare is unsupported. An input outside the
+/// closed body is refused in prepare. Nothing reaches Slack.
+#[test]
+fn a_send_without_an_approval_is_refused_before_any_request() {
+    let two = Provider::writing(false);
+    let mut child = Child::spawn(&two.selection()).unwrap();
+    for (id, input) in [
+        ("chat.postMessage", post_input("C0FIXTURE01")),
+        (
+            "conversations.open",
+            json!({"body": {"users": "U0FIXTURE11"}}),
+        ),
+    ] {
+        let outcome = attempt(&mut child, id, &input);
+        assert!(
+            matches!(outcome, Err(Failure::Unsupported)),
+            "`{id}`: {outcome:?}"
+        );
+    }
+    for input in [
+        json!({"body": {"channel": "C0FIXTURE01"}}),
+        json!({"body": {"channel": "C0FIXTURE01", "text": "x", "as_user": true}}),
+        json!({"body": {"channel": "C0FIXTURE01", "text": "x", "token": TOKEN}}),
+        json!({"body": {"channel": "C0FIXTURE01", "text": "x", "mrkdwn": "false"}}),
+    ] {
+        let outcome = write(&mut child, "chat.postMessage", &input);
+        assert!(
+            matches!(outcome, Err(Failure::InvalidInput)),
+            "{input}: {:?}",
+            outcome.map(|result| result.effect)
+        );
+    }
+    let one = Provider::new();
+    let mut child = Child::spawn(&one.selection()).unwrap();
+    let outcome = attempt(&mut child, "chat.postMessage", &post_input("C0FIXTURE01"));
+    assert!(matches!(outcome, Err(Failure::NotFound)), "{outcome:?}");
+    let outcome = write(&mut child, "chat.postMessage", &post_input("C0FIXTURE01"));
+    assert!(
+        matches!(outcome, Err(Failure::Unsupported)),
+        "{:?}",
+        outcome.map(|result| result.effect)
+    );
+    assert!(two.exchanges().is_empty(), "protocol two sent a request");
+    assert!(one.exchanges().is_empty(), "protocol one sent a request");
+}
+
+/// A token Slack does not accept answers `auth.test` with `ok: false`: the
+/// guard refuses before the write, and no post is sent.
+#[test]
+fn a_token_slack_refuses_stops_the_post_before_dispatch() {
+    let provider = Provider::writing(true);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let outcome = write(&mut child, "chat.postMessage", &post_input("C0FIXTURE01"));
+    assert!(
+        matches!(outcome, Err(Failure::Forbidden)),
+        "{:?}",
+        outcome.map(|result| result.effect)
+    );
+    assert!(provider.posts().is_empty(), "a post was sent");
+}
+
+/// A post whose connection closes unanswered, or that Slack answers `500`,
+/// may have been posted: the outcome is unknown, and the post was sent
+/// exactly once, never again by itself.
+#[test]
+fn an_ambiguous_post_is_outcome_unknown_and_sent_once() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for channel in ["C0FIXTUREDROP", "C0FIXTURE500"] {
+        let result = write(&mut child, "chat.postMessage", &post_input(channel))
+            .unwrap_or_else(|failure| panic!("`{channel}` refused in prepare: {failure:?}"));
+        assert_eq!(result.effect, WriteEffect::Unknown, "`{channel}`");
+        assert!(result.result.is_err(), "`{channel}`");
+    }
+    let posts = provider.posts();
+    assert_eq!(posts.len(), 2, "each post was sent exactly once: {posts:?}");
+    assert_eq!(posts[0].1, post_input("C0FIXTUREDROP")["body"]);
+    assert_eq!(posts[1].1, post_input("C0FIXTURE500")["body"]);
+}
+
+/// Slack refuses a post as `200` with `ok: false` (`channel_not_found`).
+/// The engine classifies by status, so the guard's check of `ok` after the
+/// write is what keeps such an answer from being recorded as applied: it is
+/// unknown, never applied, and not sent again.
+#[test]
+fn a_slack_refusal_answered_ok_false_is_never_applied() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let result = write(&mut child, "chat.postMessage", &post_input("C0FIXTURE99")).unwrap();
+    assert_eq!(result.effect, WriteEffect::Unknown);
+    assert!(result.result.is_err());
+    assert_eq!(provider.posts().len(), 1);
+}
+
+/// `conversations.open` naming one user returns the direct message's channel
+/// id, and `chat.postMessage` to that channel posts there: two writes, each
+/// prepared and committed on its own, as each needs its own approval.
+#[test]
+fn conversations_open_returns_the_dm_channel_and_a_post_to_it_lands_there() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let open = json!({"body": {"users": "U0FIXTURE11"}});
+    let result = write(&mut child, "conversations.open", &open).unwrap();
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let channel = result.result.unwrap()["body"]["channel"]["id"].clone();
+    assert_eq!(channel, DM);
+    let input = post_input(channel.as_str().unwrap());
+    let result = write(&mut child, "chat.postMessage", &input).unwrap();
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let result = result.result.unwrap();
+    assert_eq!(result["body"]["channel"], DM);
+    assert_eq!(result["body"]["ts"], POSTED_TS);
+    assert_eq!(
+        provider.posts(),
+        [
+            ("/api/conversations.open".to_owned(), open["body"].clone()),
+            ("/api/chat.postMessage".to_owned(), input["body"].clone()),
+        ]
+    );
+    // A user Slack cannot open is answered `ok: false`: unknown, not applied.
+    let result = write(
+        &mut child,
+        "conversations.open",
+        &json!({"body": {"users": "U0NOBODY"}}),
+    )
+    .unwrap();
+    assert_eq!(result.effect, WriteEffect::Unknown);
 }

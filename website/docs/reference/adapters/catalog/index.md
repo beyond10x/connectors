@@ -27,7 +27,7 @@ approval, audit and attempt controls, with an optional guard declared as data.
 | Google Calendar | calendar lists and events; guarded event writes | OAuth refresh token | local fixtures | [Calendar guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-calendar.md) |
 | Gmail | messages, threads, history and labels; guarded drafts, no direct `messages.send` | OAuth refresh token | local fixtures | [Gmail guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-gmail.md) |
 | Runpod | `pod.create`, `pods.list`, `pod.terminate` | API key as a bearer token; the identity is the configured connection | a local fixture | [Runpod guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-runpod.md) |
-| Slack | conversations, users, the workspace, custom emoji and the token's identity; files and their content; message search with a user token | bot token as a bearer token, identity from `auth.test`; a user token for search | a local fixture | `docs/catalog-slack.md` in the repository |
+| Slack | conversations, users, the workspace, custom emoji and the token's identity; files and their content; posting a message and opening a direct message under approval; message search with a user token | bot token as a bearer token, identity from `auth.test`; a user token for search | a local fixture | `docs/catalog-slack.md` in the repository |
 
 Google consent and the shared OAuth client setup are in the
 [Google OAuth guide](https://github.com/beyond10x/connectors/blob/main/docs/catalog-google-oauth.md).
@@ -48,7 +48,10 @@ Jira and Confluence share one Atlassian profile, so one account and API token se
   `response_metadata.next_cursor`. Its pinned Swagger 2.0 document is projected to OpenAPI 3.1.0
   by `connectors-build swagger`, and the document's `token` query parameter is withheld.
   `file.download` reads a file's `url_private` on `https://files.slack.com`, which the connection
-  must admit with the credential in its `hosts`.
+  must admit with the credential in its `hosts`. `chat.postMessage` and `conversations.open` are
+  writes under approval, sent as a JSON body after the token's `auth.test` read answers
+  `"ok": true`; a write Slack answers with `"ok": false` is `unknown`, never applied, and is not
+  sent again.
 - **Binary reads.** A selection can read an answer as bytes: the result carries the media type,
   length, SHA-256 and the bytes in base64, at most 2 MiB, refused as `capacity` above that and
   never truncated. A redirect is followed at most three times, only to an origin the selection

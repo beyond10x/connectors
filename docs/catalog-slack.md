@@ -3,11 +3,12 @@
 The catalog provider reads Slack conversations — the channels a bot token can
 see, a channel's messages and one thread — the workspace's users, the
 workspace itself, its custom emoji, the token's identity and the files the token
-can see, with their content, from the pinned Slack Web API document, and, on a
+can see, with their content, from the pinned Slack Web API document, posts
+messages, a direct message included, under approval, and, on a
 second connection with a user token, searches messages. Nothing here is
 Slack-specific code: the Swagger 2.0 document is projected into OpenAPI 3.1.0, the projection is compiled into a
-bundle, two reviewed selection sets expose ten reads for a bot token and
-search for a user token, and the engine described in
+bundle, two reviewed selection sets expose ten reads and two writes for a bot
+token and search for a user token, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there;
 this page covers what differs for Slack.
@@ -32,11 +33,20 @@ cargo run --locked -p connectors-build -- catalog \
   --derived-from adapters/slack/upstream/slack_web_openapi_v2_without_examples.json \
   --directory adapters/catalog/generated/bundles \
   --auth-profile slack.bot \
+  --amendments adapters/slack/upstream/slack-web.amendments.json \
   --replace
 ```
 
 `--replace` is needed because the committed index already carries `slack`;
 without it the second command is refused with "provider is already indexed".
+`--amendments` applies
+[`slack-web.amendments.json`](../adapters/slack/upstream/slack-web.amendments.json),
+bound to the projection's SHA-256: it records `chat_postMessage` and
+`conversations_open` with an `application/json` request body, the one body the
+engine sends ([cited amendments](local-catalog-provider.md#build-the-bundle)).
+The pinned document lists `application/json` in both operations' `consumes`
+beside the form type, but writes their parameters as `formData`, which the
+projection carries only under the form media type.
 The first command writes `slack-web.openapi.json` and its projection record
 `slack-web.openapi.projection.json`: all 174 operations are projected. The
 document's host `slack.com` and base path `/api` become the projection's one
@@ -51,8 +61,9 @@ run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/slack/operations.json`](../adapters/catalog/providers/slack/operations.json)
-exposes ten reads for a bot token, each `effect: read`, and nothing else;
-there are no writes.
+exposes ten reads for a bot token, each `effect: read`, and two writes,
+`chat.postMessage` and `conversations.open`, each `effect: write`
+([Messages](#messages)).
 [`adapters/catalog/providers/slack/user-operations.json`](../adapters/catalog/providers/slack/user-operations.json)
 exposes `search.messages` alone, for a user token
 ([Search](#search-on-a-user-token-connection)). A selection id is the Slack
@@ -178,6 +189,55 @@ Without it the configuration still loads and every other read works, but
 `credential`, the request carries no token and Slack's file host refuses it.
 Adding `hosts` changes the configuration revision.
 
+## Messages
+
+Two writes post a message. Each is a mutation: the host requires an approval
+that binds the operation and the whole input by digest, records the attempt,
+and sends the request once
+([the catalog provider guide](local-catalog-provider.md)).
+
+| id | pinned `operationId` | request | scope | body | answer |
+|---|---|---|---|---|---|
+| `chat.postMessage` | `chat_postMessage` | `POST /api/chat.postMessage`, JSON body | `chat:write` | `channel` and `text` required; `thread_ts`, `mrkdwn`, `unfurl_links` | `channel`, `ts` and `message` |
+| `conversations.open` | `conversations_open` | `POST /api/conversations.open`, JSON body | `im:write`; `mpim:write` for a group | `users` required; `return_im` | `channel.id` |
+
+- **The body is closed.** Only the keys above are admitted, `channel`, `text`,
+  `thread_ts` and `users` as strings and the rest as JSON booleans; any other
+  key, `token` included, is refused before any request. `blocks`,
+  `attachments`, `as_user` and the other members the pinned document declares
+  are not admitted.
+- **`chat.postMessage`** posts `text` to `channel`, a channel id or the direct
+  message `conversations.open` answers; the bot must be in the channel.
+  `thread_ts`, the parent message's `ts`, makes it a reply in that thread.
+  `mrkdwn` set to `false` turns Slack markup off; `unfurl_links` set to `true`
+  unfurls text links. The answer's `channel` and `ts` are the posted message's
+  address, the pair `conversations.replies` and a later edit take. Nothing
+  about a new message exists to compare before it is sent, so the same input
+  approved and sent again posts a second message.
+- **`conversations.open`** takes `users`: one user id (`U…`) for a direct
+  message, or a comma-separated list of user ids for a multi-person one.
+  `return_im` set to `true` asks for the whole conversation in the answer. Its
+  `channel.id` (`D…` for a direct message) is the `channel` to post to; the
+  pinned answer declares `already_open` and `no_op` for a conversation that
+  was open before. A direct message
+  is two invocations, open then post, each with its own approval and attempt.
+- **The guard.** Before each write the provider reads `GET /api/auth.test`
+  with the connection's token, which needs no scope, and refuses as
+  `forbidden` unless it answers `"ok": true`: the write is `not_attempted` and
+  nothing is posted
+  ([Invoke](local-catalog-provider.md#invoke)). After the
+  write Slack's answer must carry `"ok": true` too.
+- **What the caller sees.** A `2xx` answer with `"ok": true` is applied, and
+  the provider returns `status`, `body` (Slack's answer) and `provenance`.
+  Slack refuses a write — `channel_not_found`, `not_in_channel`,
+  `missing_scope`, `user_not_found` — as HTTP `200` with `"ok": false`. The
+  engine classifies by status, so the guard's check of `ok` is what keeps that
+  answer from being recorded as applied: it is `outcome_unknown`, and Slack's
+  `error` string is not returned. Read the conversation to see whether the
+  message is there. A dispatch without a definite answer, a lost connection or
+  a `5xx`, is `outcome_unknown` as well. An unknown write is never sent again
+  by the provider or the host.
+
 ## Errors are answers
 
 Slack reports most failures of a read — `channel_not_found`, `not_in_channel`,
@@ -200,7 +260,8 @@ operations need the read scopes the pinned document names:
 `mpim:history` for the two message reads, each for the conversation types read,
 `users:read` for `users.list`, `team:read` for `team.info`, `emoji:read` for
 `emoji.list` and `files:read` for `files.list` and `files.info`; `auth.test` needs
-none.
+none. The writes need `chat:write` for `chat.postMessage` and `im:write` for
+`conversations.open`, with `mpim:write` to open a multi-person conversation.
 A bot reads a channel's history only after it has joined that channel.
 
 Connecting proves the token with `GET /api/auth.test` (`auth_test`). Its
@@ -292,7 +353,14 @@ Connect with the credential document `{"token": "<user token>"}`.
   non-UTF-8 body from a fixture file host admitted with and without the
   credential, refused when the connection does not admit the host or the URL
   leaves `/files-pri/`; the fixture serves its own origin in place of
-  `files.slack.com`. No live Slack workspace has been called.
+  `files.slack.com`. The writes are checked through prepare and commit on
+  private protocol two: the `auth.test` read and then one JSON `POST` with the
+  body as supplied, the `channel` and `ts` of the answer, refusal without an
+  approval or with a key outside the closed body, refusal before the write when
+  `auth.test` answers `ok: false`, a dropped connection and a `500` left
+  unknown and sent once, an `ok: false` answer left unknown, and a direct
+  message opened and posted to. The host's approval and attempt record are
+  not part of these tests. No live Slack workspace has been called.
 - The engine parses and re-serialises the body. The fixture's bodies are
   compact JSON with sorted keys, and the test asserts the returned body is
   those exact bytes; a Slack body with other spacing or key order is returned
@@ -300,9 +368,10 @@ Connect with the credential document `{"token": "<user token>"}`.
 - The provider does not walk pages itself, and does not bound `limit` on the
   message reads or `users.list`: the pinned document states no maximum for
   them.
-- Only these eleven reads are selected. One user by id or e-mail
-  (`users.info`, `users.lookupByEmail`), message writes, file upload and
-  delete, reactions and every other method of the document are not selected.
+- Only these eleven reads and two writes are selected. One user by id or
+  e-mail (`users.info`, `users.lookupByEmail`), message edit and delete
+  (`chat.update`, `chat.delete`), file upload and delete, reactions and every
+  other method of the document are not selected.
   A file upload is a binary request body, which the catalog does not send.
 
 ## Credential parameters

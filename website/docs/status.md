@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-10: 42 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-10: 43 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -55,6 +55,7 @@ As of 2026-10-10: 42 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Runpod pods](./reference/adapters/catalog/index.md) | ● shipped | pod.create, pods.list and pod.terminate with the API key in custody; a create without a definite answer is unknown and never sent again; verified against a local fixture only (since 0.36.0). |
 | [Swagger 2.0 sources](./guides/build-a-catalog-bundle.md) | ● shipped | A Swagger 2.0 document is ingested through an exact, recorded projection to OpenAPI 3.1.0; a construct without an exact row is refused by name (since 0.37.0). |
 | [Slack conversations](./reference/adapters/catalog/index.md) | ● shipped | conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only. |
+| [Slack messages](./reference/adapters/catalog/index.md) | ● shipped | chat.postMessage posts a message, a thread reply included, and conversations.open opens a direct message to post to, each under approval after the token's auth.test read; a dispatch without a definite answer, or Slack's 200 with ok false, is unknown and never sent again; verified against a local fixture only. |
 | [Slack files](./reference/adapters/catalog/index.md) | ● shipped | files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only. |
 | [Catalog index service](./reference/contracts/catalog.md) | ◐ decided | Listing and locating precompiled bundles with provenance is specified; directly configured adapters need no index. |
 
