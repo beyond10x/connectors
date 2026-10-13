@@ -34,6 +34,21 @@ pub const TARGET_PREFIX: &str = "connectors/";
 
 const MAGIC: &[u8; 8] = b"CCPARTS1";
 const HEADER_BYTES: usize = MAGIC.len() + 4 + 4 + 32;
+const DELETE_ROUNDS: usize = 4;
+const DELETE_ROUND_PAUSE: std::time::Duration = std::time::Duration::from_millis(50);
+
+/// Delete rounds that still found an entry, with the entry's name: kept in
+/// tests only, so a run shows whether a second round was ever needed.
+#[cfg(test)]
+pub(crate) static REMAINDERS: std::sync::Mutex<Vec<(usize, String)>> =
+    std::sync::Mutex::new(Vec::new());
+
+#[cfg(test)]
+fn record_remainder(round: usize, name: String) {
+    if let Ok(mut remainders) = REMAINDERS.lock() {
+        remainders.push((round, name));
+    }
+}
 
 /// The header entry's name: the prefix and the version's item name.
 pub fn header_name(version: Version) -> String {
@@ -267,25 +282,39 @@ impl<E: Entries> Backend for Parted<E> {
         self.admit(version)?;
         guard()?;
         let header = header_name(version);
-        self.entries
-            .delete(&header)
-            .map_err(|_| Failure::OutcomeUnknown)?;
-        for index in (0..MAX_PARTS).rev() {
+        // On the Windows runner a read right after successful deletes has
+        // found one of the version's entries again (every call succeeded).
+        // Each round deletes the header, then every part, then reads them all;
+        // a remainder is deleted again, and only one still found after the
+        // last round is an unknown outcome.
+        for round in 0..DELETE_ROUNDS {
+            if round > 0 {
+                std::thread::sleep(DELETE_ROUND_PAUSE);
+            }
             self.entries
-                .delete(&part_name(version, index))
+                .delete(&header)
                 .map_err(|_| Failure::OutcomeUnknown)?;
+            for index in (0..MAX_PARTS).rev() {
+                self.entries
+                    .delete(&part_name(version, index))
+                    .map_err(|_| Failure::OutcomeUnknown)?;
+            }
+            let mut remaining = None;
+            for name in std::iter::once(header.clone())
+                .chain((0..MAX_PARTS).map(|index| part_name(version, index)))
+            {
+                if self.present(&name).map_err(|_| Failure::OutcomeUnknown)? {
+                    remaining = Some(name);
+                    break;
+                }
+            }
+            let Some(_name) = remaining else {
+                return Ok(());
+            };
+            #[cfg(test)]
+            record_remainder(round, _name);
         }
-        let mut names = (0..MAX_PARTS).map(|index| part_name(version, index));
-        let remains = self.present(&header).map_err(|_| Failure::OutcomeUnknown)?
-            || names
-                .try_fold(false, |found, name| {
-                    Ok::<_, Failure>(found || self.present(&name)?)
-                })
-                .map_err(|_| Failure::OutcomeUnknown)?;
-        if remains {
-            return Err(Failure::OutcomeUnknown);
-        }
-        Ok(())
+        Err(Failure::OutcomeUnknown)
     }
 }
 
@@ -307,6 +336,9 @@ pub mod fake {
         entries: BTreeMap<String, Zeroizing<Vec<u8>>>,
         /// Mutations admitted before every later one fails, as a crash would.
         mutations_left: Option<usize>,
+        /// Deletes that report success and leave the entry in place, as a
+        /// delete not yet visible to a following read would.
+        deletes_unseen: usize,
         writes: usize,
         deletes: usize,
     }
@@ -334,6 +366,10 @@ pub mod fake {
         /// Admit `count` more mutations, then fail every one after.
         pub fn crash_after(&self, count: usize) {
             self.inner().mutations_left = Some(count);
+        }
+        /// Let the next `count` deletes succeed without removing their entry.
+        pub fn leave_after_delete(&self, count: usize) {
+            self.inner().deletes_unseen = count;
         }
         /// Admit every mutation again.
         pub fn recover(&self) {
@@ -408,6 +444,10 @@ pub mod fake {
             let mut inner = self.inner();
             inner.deletes += 1;
             Self::mutate(&mut inner)?;
+            if inner.deletes_unseen > 0 && inner.entries.contains_key(name) {
+                inner.deletes_unseen -= 1;
+                return Ok(());
+            }
             inner.entries.remove(name);
             Ok(())
         }
