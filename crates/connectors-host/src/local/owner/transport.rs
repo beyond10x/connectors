@@ -1163,6 +1163,13 @@ fn inherited() -> Result<(UnixStream, File)> {
     Ok((stream, lifetime))
 }
 fn handle(owner: Arc<Owner>, mut stream: UnixStream) -> Result<()> {
+    // The listener is non-blocking, and on macOS an accepted stream inherits
+    // that (Linux's accept(2) does not): every read before the caller's bytes
+    // arrived would end at once as a timeout, and the owner would close the
+    // stream without a reply. Each exchange waits on its own deadlines.
+    stream
+        .set_nonblocking(false)
+        .map_err(|_| Code::Unavailable)?;
     channel::peer(&stream)?;
     if owner.clients.fetch_add(1, Ordering::SeqCst) >= 32 {
         owner.clients.fetch_sub(1, Ordering::SeqCst);
@@ -2142,25 +2149,33 @@ mod macos_tests {
     #[test]
     fn a_socket_path_past_sun_path_is_refused_before_an_owner_starts() {
         let root = tempfile::tempdir().unwrap();
-        let fits = fs::directory(root.path(), false, true).unwrap();
+        let fits = fs::directory(root.path(), false, true)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", root.path().display()));
         let socket = socket_path(&fits);
         assert_eq!(
             socket,
             std::fs::canonicalize(root.path())
                 .unwrap()
-                .join("owner.sock")
+                .join("owner.sock"),
+            "F_GETPATH of {}",
+            root.path().display()
         );
-        admit_socket(&socket).unwrap();
+        admit_socket(&socket).unwrap_or_else(|error| panic!("{}: {error:?}", socket.display()));
 
         let state = root.path().join("s".repeat(100)).join("state");
         let paths =
             Paths::resolve(Some(&root.path().join("config/config.toml")), Some(&state)).unwrap();
-        Config::initialize(&paths).unwrap();
-        let directory = fs::directory(&paths.state, false, true).unwrap();
-        assert!(socket_path(&directory).as_os_str().len() >= 104);
+        Config::initialize(&paths)
+            .unwrap_or_else(|error| panic!("initialize {}: {error:?}", state.display()));
+        let directory = fs::directory(&paths.state, false, true)
+            .unwrap_or_else(|error| panic!("{}: {error:?}", state.display()));
+        let long = socket_path(&directory);
+        assert!(long.as_os_str().len() >= 104, "{}", long.display());
         assert_eq!(
-            admit_socket(&socket_path(&directory)).unwrap_err().code,
-            Code::InvalidConfiguration
+            admit_socket(&long).err().map(|error| error.code),
+            Some(Code::InvalidConfiguration),
+            "{}",
+            long.display()
         );
         assert_eq!(
             Client::connect(&paths, true).err().map(|error| error.code),
@@ -2236,7 +2251,7 @@ mod macos_tests {
     fn a_socket_path_of_sun_path_bytes_is_refused_and_one_shorter_admitted() {
         let path = |length: usize| {
             let mut path = String::from("/");
-            path.push_str(&"s".repeat(length - "/owner.sock".len()));
+            path.push_str(&"s".repeat(length - "/".len() - "/owner.sock".len()));
             path.push_str("/owner.sock");
             assert_eq!(path.len(), length);
             std::path::PathBuf::from(path)
