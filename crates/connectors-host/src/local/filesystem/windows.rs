@@ -35,7 +35,8 @@ use windows_sys::Win32::{
         InitializeSecurityDescriptor, OBJECT_INHERIT_ACE, OWNER_SECURITY_INFORMATION, PSID,
         SE_DACL_PROTECTED, SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR, SECURITY_MAX_SID_SIZE,
         SetSecurityDescriptorControl, SetSecurityDescriptorDacl, SetSecurityDescriptorOwner,
-        TOKEN_QUERY, TOKEN_USER, TokenUser, WinBuiltinAdministratorsSid, WinLocalSystemSid,
+        TOKEN_ELEVATION, TOKEN_OWNER, TOKEN_QUERY, TOKEN_USER, TokenElevation, TokenOwner,
+        TokenUser, WinBuiltinAdministratorsSid, WinLocalSystemSid,
     },
     Storage::FileSystem::{
         BY_HANDLE_FILE_INFORMATION, CREATE_NEW, CreateDirectoryW, CreateFileW, DELETE, DeleteFileW,
@@ -227,6 +228,66 @@ fn owner_only_trustee(sid: PSID) -> Result<bool> {
     Ok(current_user()?.equals(sid) || local_system()?.equals(sid) || administrators()?.equals(sid))
 }
 
+/// Whether `owner` counts as the current user's for the owner-only rule:
+/// the user's own SID, or BUILTIN\Administrators when this process's token
+/// is elevated and makes that group the default owner of what it creates, as
+/// Windows does in an elevated administrator session for files a library
+/// creates without an explicit owner (SQLite's `-wal` and `-shm`, for one).
+/// Otherwise an Administrators owner refuses, as before.
+fn admitted_owner(owner: PSID) -> Result<bool> {
+    Ok(current_user()?.equals(owner)
+        || (administrators()?.equals(owner) && elevated_administrators_owner()))
+}
+
+/// Whether this process's token is elevated and names BUILTIN\Administrators
+/// as the default owner of objects it creates. Read once; a token that cannot
+/// be read is neither.
+fn elevated_administrators_owner() -> bool {
+    static ELEVATED: OnceLock<bool> = OnceLock::new();
+    *ELEVATED.get_or_init(|| {
+        let mut token: HANDLE = std::ptr::null_mut();
+        // SAFETY: the pseudo handle of this process and a writable out pointer.
+        if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
+            return false;
+        }
+        let mut elevation = TOKEN_ELEVATION { TokenIsElevated: 0 };
+        let mut length = 0u32;
+        // SAFETY: a live token and a TOKEN_ELEVATION of the size passed.
+        let elevated = unsafe {
+            GetTokenInformation(
+                token,
+                TokenElevation,
+                (&mut elevation as *mut TOKEN_ELEVATION).cast(),
+                std::mem::size_of::<TOKEN_ELEVATION>() as u32,
+                &mut length,
+            )
+        } != 0
+            && elevation.TokenIsElevated != 0;
+        let mut buffer = vec![0u64; 16];
+        // SAFETY: the buffer is 128 bytes, passed as its size, and aligned
+        // for TOKEN_OWNER followed by the SID it points at.
+        let owned = elevated
+            && unsafe {
+                GetTokenInformation(
+                    token,
+                    TokenOwner,
+                    buffer.as_mut_ptr().cast(),
+                    (buffer.len() * 8) as u32,
+                    &mut length,
+                )
+            } != 0;
+        // SAFETY: the token handle was opened above and is closed once.
+        unsafe { CloseHandle(token) };
+        owned
+            && administrators().is_ok_and(|sid| {
+                // SAFETY: a successful TokenOwner query wrote a TOKEN_OWNER at
+                // the start, whose SID lies in the same buffer.
+                let owner = unsafe { (*(buffer.as_ptr() as *const TOKEN_OWNER)).Owner };
+                sid.equals(owner)
+            })
+    })
+}
+
 /// The owner SID and DACL of an opened handle.
 struct Security {
     descriptor: *mut c_void,
@@ -306,10 +367,10 @@ impl Security {
         Ok(entries)
     }
 
-    /// Owner-only: the current user owns it and only the three admitted
-    /// trustees are allowed any access.
+    /// Owner-only: the current user owns it (see [`admitted_owner`]) and only
+    /// the three admitted trustees are allowed any access.
     fn owner_only(&self) -> Result<()> {
-        if !current_user()?.equals(self.owner) {
+        if !admitted_owner(self.owner)? {
             return Err(Failure::InvalidConfiguration);
         }
         for (sid, _) in self.allowed()? {
@@ -923,6 +984,41 @@ mod tests {
         assert!(validate_path(Path::new(r"\\server\share\x")).is_err());
         assert!(validate_path(Path::new("relative")).is_err());
         assert_eq!(validate_path(Path::new(r"c:\Users")).unwrap(), 'C');
+    }
+
+    /// An elevated administrator session makes BUILTIN\Administrators the
+    /// owner of files created without an explicit owner. Such a file is
+    /// admitted as the user's own exactly when the token is elevated and names
+    /// that group as its default owner; otherwise the owner check refuses it.
+    #[test]
+    fn an_administrators_owner_is_admitted_only_in_an_elevated_session() {
+        let (_root, directory, state) = root();
+        publish(&directory, OsStr::new("owned"), b"one", false).unwrap();
+        private_file_at(&directory, OsStr::new("owned")).unwrap();
+        let path = state.join("owned");
+        // Only a token in which the group is enabled can make it the owner.
+        let set = std::process::Command::new("icacls")
+            .arg(&path)
+            .args(["/setowner", "*S-1-5-32-544"])
+            .creation_flags(0x0800_0000)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .unwrap()
+            .success();
+        let admitted = private_file_at(&directory, OsStr::new("owned")).is_ok();
+        if set {
+            assert_eq!(admitted, elevated_administrators_owner());
+        } else {
+            assert!(!elevated_administrators_owner());
+            assert!(admitted, "the owner is still the user's own");
+        }
+        assert!(admitted_owner(current_user().unwrap().as_psid()).unwrap());
+        assert!(!admitted_owner(local_system().unwrap().as_psid()).unwrap());
+        assert_eq!(
+            admitted_owner(administrators().unwrap().as_psid()).unwrap(),
+            elevated_administrators_owner()
+        );
     }
 
     /// The configured owner number is the user SID's relative identifier.
