@@ -689,6 +689,12 @@ fn file_identity(path: &Path) -> Option<(u64, u64)> {
     Some((metadata.dev(), metadata.ino()))
 }
 
+/// Windows: the volume serial and file index, without following a final link.
+#[cfg(windows)]
+fn file_identity(path: &Path) -> Option<(u64, u64)> {
+    super::fs::windows::path_identity(path)
+}
+
 fn take(path: &Path, authority: &Authority, source_level: i64) -> Option<ErAuthority> {
     let file = file_identity(path);
     let (taken, replaced) = {
@@ -7239,10 +7245,4 @@ mod tests {
         );
         transition(&authority, &candidate, &stored(65_536), acknowledge).unwrap();
     }
-}
-
-/// Windows: the volume serial and file index, without following a final link.
-#[cfg(windows)]
-fn file_identity(path: &Path) -> Option<(u64, u64)> {
-    super::fs::windows::path_identity(path)
 }
