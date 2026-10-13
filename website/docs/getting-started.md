@@ -27,7 +27,25 @@ connectors 0.37.0
 ```
 
 Ordinary builds read checked-in generated Rust and need no ESS. Cargo downloads dependencies on
-the first build. Binary and package distribution are not configured.
+the first build. Package distribution is not configured.
+
+## Or install a release binary
+
+The walkthrough below builds from source because it also needs the Kubernetes adapter. For the
+`connectors` command alone, each release page carries `connectors-<version>-<target>.tar.gz` for
+`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
+`aarch64-apple-darwin`, with a `SHA256SUMS` file; releases cut before the binaries workflow
+existed carry source archives only, and there is no Windows binary. Download the archive for
+your platform and `SHA256SUMS`, check the archive's line with `sha256sum -c -` (on macOS
+`shasum -a 256 -c -`), extract it and put `connectors` on your `PATH`; the repository's
+[install instructions](https://github.com/beyond10x/connectors#install-a-release-binary) give
+the commands.
+
+The macOS binaries are not signed yet. A binary downloaded through a browser carries
+Gatekeeper's quarantine attribute and is refused until you remove it with
+`xattr -d com.apple.quarantine connectors`; one downloaded with `curl` runs as is. An unsigned
+binary also cannot read login keychain items an earlier build wrote, so credentials are stored
+again after an upgrade.
 
 ## Start an adapter service
 

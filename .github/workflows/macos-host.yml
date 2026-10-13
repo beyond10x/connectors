@@ -4,7 +4,6 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ['v*']
 
 permissions:
   contents: read
@@ -16,7 +15,6 @@ concurrency:
 jobs:
   host:
     name: host and CLI on macos-latest
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
@@ -37,81 +35,3 @@ jobs:
         env:
           TMPDIR: ${{ runner.temp }}
         run: cargo test --locked --no-fail-fast -p connectors-host -p connectors
-
-  sign:
-    name: signed release binary on macos-latest
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-    runs-on: macos-latest
-    timeout-minutes: 60
-    env:
-      MACOS_SIGNING_CERT_P12_BASE64: ${{ secrets.MACOS_SIGNING_CERT_P12_BASE64 }}
-      MACOS_SIGNING_CERT_PASSWORD: ${{ secrets.MACOS_SIGNING_CERT_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-    steps:
-      - name: Signing secrets
-        id: secrets
-        shell: bash
-        run: |
-          if [ -n "$MACOS_SIGNING_CERT_P12_BASE64" ] && [ -n "$MACOS_SIGNING_CERT_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            echo "sign=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "sign=false" >> "$GITHUB_OUTPUT"
-            echo "Signing skipped: MACOS_SIGNING_CERT_P12_BASE64, MACOS_SIGNING_CERT_PASSWORD and APPLE_TEAM_ID are not all set on this repository." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
-          if [ -n "$APPLE_API_KEY_P8" ] && [ -n "$APPLE_API_ISSUER_ID" ] && [ -n "$APPLE_API_KEY_ID" ]; then
-            echo "notarize=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "notarize=false" >> "$GITHUB_OUTPUT"
-            echo "Notarization skipped: APPLE_API_KEY_P8, APPLE_API_ISSUER_ID and APPLE_API_KEY_ID are not all set on this repository." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: ${{ steps.secrets.outputs.sign == 'true' }}
-        with:
-          persist-credentials: false
-      - name: Install Rust 1.98.1
-        if: ${{ steps.secrets.outputs.sign == 'true' }}
-        shell: bash
-        run: |
-          rustup toolchain install 1.98.1 --profile minimal
-          rustup default 1.98.1
-      - name: Build the release binary
-        if: ${{ steps.secrets.outputs.sign == 'true' }}
-        shell: bash
-        run: cargo build --locked --release -p connectors
-      - name: Sign with the Developer ID certificate
-        if: ${{ steps.secrets.outputs.sign == 'true' }}
-        shell: bash
-        run: |
-          keychain="$RUNNER_TEMP/signing.keychain-db"
-          keychain_password=$(uuidgen)
-          printf '%s' "$MACOS_SIGNING_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
-          security create-keychain -p "$keychain_password" "$keychain"
-          security set-keychain-settings -lut 3600 "$keychain"
-          security unlock-keychain -p "$keychain_password" "$keychain"
-          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -P "$MACOS_SIGNING_CERT_PASSWORD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
-          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          identity=$(security find-identity -v -p codesigning "$keychain" | awk -v team="($APPLE_TEAM_ID)" 'index($0, team) {print $2; exit}')
-          test -n "$identity"
-          codesign --force --options runtime --timestamp --sign "$identity" target/release/connectors
-          codesign --verify --strict --verbose=2 target/release/connectors
-          codesign --display --verbose=2 target/release/connectors 2>&1 | grep -F "TeamIdentifier=$APPLE_TEAM_ID"
-          rm -f "$RUNNER_TEMP/signing.p12"
-      - name: Notarize
-        if: ${{ steps.secrets.outputs.sign == 'true' && steps.secrets.outputs.notarize == 'true' }}
-        shell: bash
-        run: |
-          printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/api-key.p8"
-          ditto -c -k target/release/connectors "$RUNNER_TEMP/connectors.zip"
-          xcrun notarytool submit "$RUNNER_TEMP/connectors.zip" --key "$RUNNER_TEMP/api-key.p8" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --wait
-          rm -f "$RUNNER_TEMP/api-key.p8"
-      - name: Keep the signed binary as a workflow artifact
-        if: ${{ steps.secrets.outputs.sign == 'true' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: connectors-aarch64-apple-darwin
-          path: target/release/connectors
-          retention-days: 30
