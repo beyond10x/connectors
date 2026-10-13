@@ -27,7 +27,7 @@ use std::{
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
-use windows::{Listener, inherited, socket_path, spawn, try_lock};
+use windows::{Listener, inherited, salt, socket_path, spawn, try_lock};
 #[cfg(unix)]
 type Listener = UnixListener;
 
@@ -176,6 +176,10 @@ impl Client {
         // starts does so before it answers.
         let authority = Metadata::authority_at(&paths.state)?.to_string();
         let directory = fs::directory(&paths.state, false, true)?;
+        // The pipe name's salt, published by the first caller and refused by
+        // name when it is not owner-only.
+        #[cfg(windows)]
+        salt(&directory)?;
         let socket = socket_path(&directory);
         #[cfg(target_os = "macos")]
         admit_socket(&socket)?;
@@ -978,6 +982,10 @@ pub fn serve(paths: Paths) -> Result<()> {
             return Err(Code::InvalidConfiguration.into());
         }
         windows::hold_lifetime(&lifetime, Instant::now() + Duration::from_secs(10))?;
+        // Scratch in the state directory's `run`, never the system's
+        // temporary directory; copies a dead owner left there go now.
+        runtime::artifact::enter(&directory).map_err(|_| Code::InvalidConfiguration)?;
+        salt(&directory)?;
     }
     let socket = socket_path(&directory);
     #[cfg(target_os = "macos")]
@@ -1261,7 +1269,25 @@ fn handle(owner: Arc<Owner>, mut stream: channel::Stream) -> Result<()> {
     stream
         .set_nonblocking(false)
         .map_err(|_| Code::Unavailable)?;
+    #[cfg(unix)]
     channel::peer(&stream)?;
+    // A client of the current user at another integrity level, or with a
+    // restricted token, is answered by name rather than dropped (owner.md,
+    // "Windows", "Pipe peer").
+    #[cfg(windows)]
+    if let Err(failure) = channel::peer(&stream) {
+        let code = windows::peer_refusal(failure);
+        if code == Code::LifecycleConflict {
+            let _ = channel::write(
+                &mut stream,
+                &Reply::Failed { error: code.into() },
+                None,
+                &[],
+                Instant::now() + Duration::from_millis(500),
+            );
+        }
+        return Err(code.into());
+    }
     if owner.clients.fetch_add(1, Ordering::SeqCst) >= 32 {
         owner.clients.fetch_sub(1, Ordering::SeqCst);
         // Answer instead of closing silently: a stream closed without any reply
@@ -1283,6 +1309,9 @@ fn handle(owner: Arc<Owner>, mut stream: channel::Stream) -> Result<()> {
         .name("connectors-local-request".into())
         .spawn(move || {
             let _ = exchange(&owner, &mut stream);
+            // Closed before it stops counting: an owner that retires once no
+            // client is counted finds no pipe instance of this one still open.
+            drop(stream);
             owner.clients.fetch_sub(1, Ordering::SeqCst);
         })
         .is_err()

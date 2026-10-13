@@ -50,13 +50,7 @@ fn a_consumer_reads_its_credential_from_the_inherited_handle() {
         Instant::now() + Duration::from_secs(30),
     )
     .unwrap();
-    let copy = super::super::artifact::launch_path(&image)
-        .map(|launch| {
-            let path = launch.path().to_path_buf();
-            std::mem::forget(launch);
-            path
-        })
-        .unwrap();
+    let copy = crate::local::filesystem::windows::final_path(&image).unwrap();
     let consumer = Consumer::new(
         image,
         sealed(b"fictional credential").unwrap(),
@@ -110,3 +104,6 @@ fn an_argument_holding_nul_is_invalid_input() {
         Err(Failure::InvalidInput)
     ));
 }
+
+/// Adversary cases on the capture, the consumer launch and the consumer job.
+mod adversary_b;

@@ -66,6 +66,31 @@ fn the_pipe_name_derives_from_the_state_directory() {
     assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
 }
 
+/// owner.md, "Pipe": the name also derives from a random salt kept owner-only
+/// in the state directory, so it cannot be computed from the directory's path
+/// and the user alone: another salt is another name. A salt file that is not
+/// 64 hexadecimal digits refuses by name and gives no pipe.
+#[test]
+fn the_pipe_name_derives_from_a_random_salt_kept_in_the_state_directory() {
+    let root = tempfile::tempdir().unwrap();
+    let state = directory(root.path());
+    let first = socket_path(&state);
+    let kept = std::fs::read_to_string(root.path().join("owner.pipe")).unwrap();
+    assert_eq!(salt(&state).unwrap(), kept);
+    assert_eq!(kept.len(), 64);
+    win::check_private_file(&File::open(root.path().join("owner.pipe")).unwrap()).unwrap();
+    std::fs::remove_file(root.path().join("owner.pipe")).unwrap();
+    let second = socket_path(&state);
+    assert_ne!(first, second, "a new salt gives a new name");
+    std::fs::remove_file(root.path().join("owner.pipe")).unwrap();
+    fs::publish_new(&state, OsStr::new("owner.pipe"), b"not a salt").unwrap();
+    assert_eq!(
+        salt(&state).err().map(|error| error.code),
+        Some(Code::InvalidConfiguration)
+    );
+    assert_eq!(socket_path(&state), PathBuf::new());
+}
+
 /// No connect or listen admits the empty name an unreadable directory gives.
 #[test]
 fn an_empty_name_is_no_owner() {

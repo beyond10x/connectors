@@ -342,3 +342,122 @@ fn an_idle_wait_returns_on_bytes_and_on_close() {
     wait_readable(&reader).unwrap();
     assert!(started.elapsed() < Duration::from_secs(1));
 }
+
+/// owner.md, "Pipe peer": a CLI in an elevated session has the same user SID
+/// as the owner a session that is not elevated started, so it reaches that
+/// owner by the same pipe name. The mandatory integrity policy (no write-up)
+/// denies the medium-integrity owner `PROCESS_DUP_HANDLE` on the elevated
+/// client, and the integrity levels differ: the owner refuses that client by
+/// name (`SESSION_MISMATCH`, answered as `lifecycle_conflict`), never as no
+/// peer, so it can answer it instead of closing the stream without a reply.
+/// The owner is played by this thread impersonating a medium-integrity copy
+/// of this process's token, the elevated client by this process. Meaningful
+/// only where the test process is elevated, as on the hosted runner;
+/// elsewhere it returns early.
+#[test]
+fn a_medium_integrity_owner_refuses_an_elevated_client_of_its_user_by_name() {
+    use windows_sys::Win32::Security::{
+        Authorization::ConvertStringSidToSidW, DuplicateTokenEx, GetSidSubAuthority,
+        GetSidSubAuthorityCount, ImpersonateLoggedOnUser, RevertToSelf, SID_AND_ATTRIBUTES,
+        SecurityImpersonation, SetTokenInformation, TOKEN_ADJUST_DEFAULT, TOKEN_DUPLICATE,
+        TOKEN_IMPERSONATE, TOKEN_MANDATORY_LABEL, TokenImpersonation, TokenIntegrityLevel,
+    };
+    /// SECURITY_MANDATORY_HIGH_RID.
+    const HIGH: u32 = 0x3000;
+    /// SE_GROUP_INTEGRITY.
+    const INTEGRITY: u32 = 0x20;
+    fn level(token: HANDLE) -> u32 {
+        let mut buffer = vec![0u64; 16];
+        let mut length = 0u32;
+        // SAFETY: the buffer is 128 bytes, passed as its size, and aligned.
+        assert_ne!(
+            unsafe {
+                GetTokenInformation(
+                    token,
+                    TokenIntegrityLevel,
+                    buffer.as_mut_ptr().cast(),
+                    (buffer.len() * 8) as u32,
+                    &mut length,
+                )
+            },
+            0
+        );
+        // SAFETY: a successful query wrote a TOKEN_MANDATORY_LABEL whose SID
+        // follows it in the buffer.
+        unsafe {
+            let label = &*(buffer.as_ptr() as *const TOKEN_MANDATORY_LABEL);
+            let count = *GetSidSubAuthorityCount(label.Label.Sid);
+            *GetSidSubAuthority(label.Label.Sid, u32::from(count) - 1)
+        }
+    }
+    let mut own: HANDLE = std::ptr::null_mut();
+    // SAFETY: this process's pseudo handle and a writable out handle.
+    assert_ne!(
+        unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY | TOKEN_DUPLICATE, &mut own,) },
+        0
+    );
+    // SAFETY: OpenProcessToken returned a new owned handle.
+    let own = unsafe { OwnedHandle::from_raw_handle(own as _) };
+    if level(own.as_raw_handle() as HANDLE) < HIGH {
+        return;
+    }
+    let mut medium: HANDLE = std::ptr::null_mut();
+    // SAFETY: a live token opened with TOKEN_DUPLICATE and a writable out handle.
+    assert_ne!(
+        unsafe {
+            DuplicateTokenEx(
+                own.as_raw_handle() as HANDLE,
+                TOKEN_QUERY | TOKEN_IMPERSONATE | TOKEN_ADJUST_DEFAULT,
+                std::ptr::null(),
+                SecurityImpersonation,
+                TokenImpersonation,
+                &mut medium,
+            )
+        },
+        0
+    );
+    // SAFETY: DuplicateTokenEx returned a new owned handle.
+    let medium = unsafe { OwnedHandle::from_raw_handle(medium as _) };
+    let text: Vec<u16> = "S-1-16-8192".encode_utf16().chain(Some(0)).collect();
+    let mut sid: PSID = std::ptr::null_mut();
+    // SAFETY: a NUL-terminated SID string and a writable out SID, which this
+    // test never frees.
+    assert_ne!(
+        unsafe { ConvertStringSidToSidW(text.as_ptr(), &mut sid) },
+        0
+    );
+    let label = TOKEN_MANDATORY_LABEL {
+        Label: SID_AND_ATTRIBUTES {
+            Sid: sid,
+            Attributes: INTEGRITY,
+        },
+    };
+    // SAFETY: a live token opened with TOKEN_ADJUST_DEFAULT and a label of
+    // the size passed, its SID included.
+    assert_ne!(
+        unsafe {
+            SetTokenInformation(
+                medium.as_raw_handle() as HANDLE,
+                TokenIntegrityLevel,
+                (&label as *const TOKEN_MANDATORY_LABEL).cast(),
+                std::mem::size_of::<TOKEN_MANDATORY_LABEL>() as u32 + GetLengthSid(sid),
+            )
+        },
+        0
+    );
+    assert!(level(medium.as_raw_handle() as HANDLE) < HIGH);
+    let (server, _client) = ends();
+    // SAFETY: a live impersonation token; reverted below on every path.
+    assert_ne!(
+        unsafe { ImpersonateLoggedOnUser(medium.as_raw_handle() as HANDLE) },
+        0
+    );
+    let refused = peer(&server).err();
+    // SAFETY: ends this thread's impersonation.
+    unsafe { RevertToSelf() };
+    assert_eq!(
+        refused,
+        Some(SESSION_MISMATCH),
+        "a medium-integrity owner did not refuse an elevated client of its own user by name"
+    );
+}

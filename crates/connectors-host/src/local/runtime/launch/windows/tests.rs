@@ -159,3 +159,96 @@ fn a_send_to_a_closed_peer_is_refused() {
     let image = fixture(b"image");
     assert!(send(&mut owner, &[&image], until()).is_err());
 }
+
+/// The owner calls `sealed` for every consumer launch (owner/transport.rs,
+/// `launch`). The CLI starts the owner with `CONNECTORS_OWNER_HANDLES`,
+/// `SystemRoot`, and `TMP` and `TEMP` naming the state directory's `run`
+/// directory (owner/transport/windows.rs, `spawn`), and the owner enters that
+/// directory as its scratch (`artifact::enter`). Without `TMP` and `TEMP`,
+/// `std::env::temp_dir` (`GetTempPath2W`) would fall back to the Windows
+/// directory. This test runs itself again in exactly the owner's environment:
+/// the credential is sealed in `run`, which the system's temporary directory
+/// also names, and leaves nothing there.
+#[test]
+fn a_credential_is_sealed_in_the_environment_the_owner_runs_with() {
+    const CHILD: &str = "CONNECTORS_TEST_SEALED_IN_OWNER_ENVIRONMENT";
+    const NAME: &str = "a_credential_is_sealed_in_the_environment_the_owner_runs_with";
+    if let Some(state) = std::env::var_os(CHILD) {
+        let state = fs::directory(Path::new(&state), false, true).unwrap();
+        let run = artifact::enter(&state).expect("the owner enters its run directory");
+        let temporary = std::env::temp_dir();
+        assert_eq!(
+            temporary
+                .to_string_lossy()
+                .trim_end_matches('\\')
+                .to_lowercase(),
+            run.to_string_lossy().to_lowercase(),
+            "TMP and TEMP name the run directory"
+        );
+        let material = b"fictional credential material";
+        let mut credential =
+            sealed(material).expect("a credential sealed in the owner's environment");
+        let mut read = Vec::new();
+        credential.read_to_end(&mut read).unwrap();
+        assert_eq!(read, material);
+        assert_eq!(
+            std::fs::read_dir(&run).unwrap().count(),
+            0,
+            "the credential left its directory in run"
+        );
+        return;
+    }
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("state");
+    let run = artifact::run_directory(&fs::directory(&state, true, true).unwrap()).unwrap();
+    let mut command = std::process::Command::new(std::env::current_exe().unwrap());
+    command
+        .env_clear()
+        .env(CHILD, &state)
+        .env("TMP", &run)
+        .env("TEMP", &run)
+        .args([NAME, "--test-threads=1", "--nocapture"]);
+    if let Some(root) = std::env::var_os("SystemRoot") {
+        command.env("SystemRoot", root);
+    }
+    let output = command.output().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success() && stdout.contains("1 passed"),
+        "sealed in the owner's environment:\n{stdout}\n{stderr}"
+    );
+}
+
+/// One handle value named twice would be two `File`s over one handle, closed
+/// twice, the second time whatever handle then has that value. A receive
+/// refuses a frame that names any value more than once, and closes the handle
+/// that arrived: the sender does not close it again, since by then the value
+/// may name another handle of this process.
+#[test]
+fn a_receive_refuses_one_handle_value_named_twice() {
+    let (mut owner, mut cli) = ends();
+    let image = fixture(b"image");
+    let peer = channel::peer(&owner).unwrap();
+    let values = duplicate_into(&peer, &[&image]).unwrap();
+    channel::write(
+        &mut owner,
+        &Handles {
+            handles: vec![values[0], values[0]],
+        },
+        None,
+        &[],
+        until(),
+    )
+    .unwrap();
+    let received = receive(&mut cli, 2, until());
+    let refused = matches!(received, Err(Failure::Protocol));
+    if let Ok(files) = received {
+        // Close the one handle once; the second File names the same value.
+        files.into_iter().skip(1).for_each(std::mem::forget);
+    }
+    assert!(
+        refused,
+        "a frame naming one handle value twice was taken over twice"
+    );
+}

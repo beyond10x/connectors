@@ -602,8 +602,9 @@ impl Drop for Child {
 
 /// Starts an adapter on Windows (private-adapter.md, "Windows"): from the
 /// captured copy's path, whose deny-write handle is held until the child
-/// exists (`deny_write_copy`), in the owner's kill-on-close job before it runs
-/// (`parent_death_kill`). The owner's pipe pair was checked to be connected to
+/// exists (`deny_write_copy`), inside the owner's kill-on-close job, which
+/// permits no breakaway (`parent_death_kill`), with the copy's directory as
+/// its current directory. The owner's pipe pair was checked to be connected to
 /// this process alone; the adapter inherits its client end as the only handle
 /// in its handle list, its value given as `--connectors-private-fd`, with no
 /// standard handles and an environment of `SystemRoot` alone, which Windows
@@ -614,7 +615,9 @@ fn spawn_windows(
     executable: artifact::Image,
 ) -> Result<(artifact::Process, artifact::Launch, channel::Stream)> {
     use std::os::windows::io::AsRawHandle;
-    let launch = artifact::launch_path(&executable)?;
+    // The copy's custody, from before any fallible step: every early return
+    // removes it.
+    let mut launch = artifact::Launch::from(executable);
     let (channel, client) = channel::windows::pair()?;
     let client = artifact::inheritable(client.as_raw_handle(), None)?;
     let value = client.as_raw_handle() as usize;
@@ -644,7 +647,7 @@ fn spawn_windows(
     .map_err(|_| Failure::Unavailable)?;
     drop(client);
     // Held until the child was created from the copy; released, not removed.
-    drop(std::fs::File::from(executable));
+    launch.created();
     Ok((process, launch, channel))
 }
 
