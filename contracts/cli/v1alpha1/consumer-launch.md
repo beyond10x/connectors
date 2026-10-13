@@ -186,3 +186,57 @@ states:
 - **Launcher death** (`parent_death_kill`: `adapter_channel_close`). The weaker
   form covers adapters only: a consumer has no channel, so **if the CLI dies
   first, the consumer keeps running** and receives no `SIGTERM`.
+
+## 8. Windows
+
+Sections 1–5 are the Linux binding, and section 7 the macOS one; both stand
+unchanged. On Windows every configuration rule, admission refusal and boundary
+above holds, except that the credential is not on descriptor 3: Windows has no
+descriptor 3. `connectors.cli.ConsumerCredentialDeliveryStatement` states the
+delivery for each platform (`descriptor_3` on Linux and macOS,
+`inherited_handle` on Windows). Delivery and process rules change as the
+[platform guarantee table](semantics.md#windows-platform-guarantees) states:
+
+- **Image** (`sealed_executable`: `deny_write_copy`). There is no memfd. The
+  owner copies the consumer image into a fresh owner-only directory, opens the
+  copy for reading without `FILE_SHARE_WRITE` or `FILE_SHARE_DELETE`, and
+  verifies its digest and PE header through that handle before reading the
+  credential; a wrong digest is still refused before the consumer is created.
+  That handle is held, by the owner and then by the CLI, until the consumer is
+  created. A writable mapping that a process of the same user made of the copy
+  before the open is not excluded.
+- **Credential.** The owner writes the material verbatim into a file in a fresh
+  owner-only directory, removes the file's name with POSIX delete semantics
+  while it stays open, and keeps only a read-only handle positioned at its
+  start, in place of the sealed memfd.
+- **Handles in place of descriptors** (`atomic_close_on_exec`: holds). The
+  owner duplicates the image and credential handles into the CLI with
+  `DuplicateHandle`, inheritance off, and sends their values in place of the
+  two `SCM_RIGHTS` descriptors.
+- **Delivery** (`inherited_handle`). The CLI makes the credential handle
+  inheritable only for the creation of the consumer and lists it, with the
+  consumer's standard handles and nothing else, in
+  `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`. The consumer's environment variable
+  `CONNECTORS_CREDENTIAL_HANDLE` holds that handle's value as a decimal
+  integer; an inherited handle keeps its value in the child. The consumer
+  reads the credential from that handle. The variable carries the handle's
+  value, never the document, and the CLI sets it after the `pass_env`
+  selection: a caller's variable of that name, in any letter case, is not
+  passed.
+- **Execution.** No shell runs and no search path is used: the CLI creates the
+  consumer with `CreateProcessW` from the image copy's full path as the
+  application name. argv\[0\] is that path, followed by the pinned prefix and
+  the `--args` elements, quoted into one command line by the convention the
+  Microsoft C runtime parses, so each element reaches a consumer that parses
+  its command line that way unchanged. A batch file is not a PE image and is
+  refused at admission. The consumer starts with exactly its standard handles
+  and the credential handle: no other handle of the CLI, inheritable or not,
+  reaches it.
+- **Exit status.** The CLI exits with the consumer's exit code, read from its
+  process handle. While the consumer runs, the CLI ignores `CTRL_C_EVENT` and
+  `CTRL_BREAK_EVENT` in a handler of its own, so the console delivers them to
+  the consumer, which shares it.
+- **Launcher death** (`parent_death_kill`: holds). The CLI creates the
+  consumer in a job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only
+  handle it holds, before the consumer runs. **If the CLI dies first, the job
+  ends the consumer**, by termination: Windows has no `SIGTERM` to send.

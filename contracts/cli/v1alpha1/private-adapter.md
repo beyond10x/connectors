@@ -183,3 +183,46 @@ names:
 
 Writes on the channel use `SO_NOSIGPIPE` in place of `MSG_NOSIGNAL`, with the
 same effect.
+
+## Windows
+
+The rules above are the Linux binding and stand unchanged. On Windows the
+supervisor keeps every refusal and deadline above; the channel and the
+guarantees change as the [platform guarantee table](semantics.md#windows-platform-guarantees)
+states:
+
+- **Admission** (`sealed_executable`: `deny_write_copy`). There is no memfd.
+  The supervisor copies the admitted bytes into a fresh owner-only directory,
+  opens the copy for reading without `FILE_SHARE_WRITE` or `FILE_SHARE_DELETE`,
+  verifies the configured SHA-256 and the PE format through that handle, and
+  holds it until the child is created from the copy's path. Path replacement
+  and writes to the original cannot change what runs, and from that open no
+  process can write, rename or delete the copy. A writable mapping that a
+  process of the same user made of the copy before the open is not excluded.
+- **Channel.** There is no Unix socket pair. The channel is a named pipe the
+  owner creates with `FILE_FLAG_FIRST_PIPE_INSTANCE`, a unique name and an
+  access control list granting the current user's SID alone; the owner opens
+  its client end and the adapter inherits that end as the only handle besides
+  its standard handles in its `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`. The adapter
+  is never told a pipe name and connects to nothing.
+- **Channel peer** (`peer_credential_snapshot`: `client_token_query`). The pipe
+  has one instance, and the owner requires its client process id
+  (`GetNamedPipeClientProcessId`) to be its own before the child is created: a
+  client that connected first fails the launch. The peer is then the
+  supervisor's own child, which inherited that client end, identified by the
+  process handle `CreateProcessW` returned, never by a process id. The adapter requires the pipe's server process
+  (`GetNamedPipeServerProcessId`) to equal its parent's process id and to run as
+  the current user.
+- **Parent death** (`parent_death_kill`: holds). Every adapter is in the
+  owner's job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` before it runs
+  (created suspended and assigned, or created with
+  `PROC_THREAD_ATTRIBUTE_JOB_LIST`); when the owner dies, the job ends it. The adapter also
+  exits when its channel reaches end of file. No retained spawning thread is
+  needed.
+- **Stop and cleanup** (`exact_process_signal`: holds). The owned child is
+  terminated through its process handle and its exit observed by waiting on
+  that handle. A PID recovered from metadata is still never used to end a
+  process.
+
+Writes on the channel to a closed pipe fail with `ERROR_NO_DATA` or
+`ERROR_BROKEN_PIPE`, which the supervisor treats as `MSG_NOSIGNAL`'s `EPIPE`.
