@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- OAuth consent: a request that reaches the loopback listener after the redirect decided the
+  flow, but before the flow returns, is answered `400` instead of being closed unanswered. The
+  listener's drain now polls once more after it is told to stop.
+
 ## 0.49.0 — 2026-10-13
 
 ### Added
