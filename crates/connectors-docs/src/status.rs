@@ -293,7 +293,14 @@ pub const CAPABILITIES: &[Capability] = &[
         "Catalog provider",
         "Slack conversations",
         "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only.",
-        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_the_user_search",
+        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_search",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "Slack messages",
+        "chat.postMessage posts a message, a thread reply included, and conversations.open opens a direct message to post to, each under approval after the token's auth.test read; a dispatch without a definite answer, or Slack's 200 with ok false, is unknown and never sent again; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::an_approved_post_sends_one_json_body_and_returns_channel_and_ts",
         "/docs/reference/adapters/catalog",
     ),
     shipped(

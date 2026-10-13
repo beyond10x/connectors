@@ -543,7 +543,7 @@ async fn a_guard_cannot_send_a_caller_value_as_the_credential() {
          "credential": ["token"],
          "guard": {
              "preflight": {"operation_id": "team_info", "values": {"token": "team_ref"},
-                           "checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]},
+                           "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
              "postflight": {"checks": []}
          }}
     ]);

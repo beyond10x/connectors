@@ -1,0 +1,24 @@
+{
+  "format": "connectors-source-amendments/1",
+  "source_sha256": "f010337d9d8aa99ae1dc905cd46f68fecc66e42ce6868379f040b9149789128b",
+  "amendments": [
+    {
+      "operation_id": "chat_postMessage",
+      "correct_media_type": {
+        "from": "application/x-www-form-urlencoded",
+        "to": "application/json"
+      },
+      "cite": "https://api.slack.com/web#posting_json",
+      "reason": "Slack's Web API reference accepts a JSON body with a bearer token for write methods, and the pinned document's own consumes for chat.postMessage lists application/json beside the form type; the Swagger projection keeps only the form type because the parameters are written as formData."
+    },
+    {
+      "operation_id": "conversations_open",
+      "correct_media_type": {
+        "from": "application/x-www-form-urlencoded",
+        "to": "application/json"
+      },
+      "cite": "https://api.slack.com/web#posting_json",
+      "reason": "Slack's Web API reference accepts a JSON body with a bearer token for write methods, and the pinned document's own consumes for conversations.open lists application/json beside the form type; the Swagger projection keeps only the form type because the parameters are written as formData."
+    }
+  ]
+}

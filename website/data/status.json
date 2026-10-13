@@ -214,6 +214,13 @@
     },
     {
       "area": "Catalog provider",
+      "detail": "chat.postMessage posts a message, a thread reply included, and conversations.open opens a direct message to post to, each under approval after the token's auth.test read; a dispatch without a definite answer, or Slack's 200 with ok false, is unknown and never sent again; verified against a local fixture only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Slack messages",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
       "detail": "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Slack files",

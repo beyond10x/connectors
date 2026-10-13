@@ -2,13 +2,14 @@ domain: connectors_catalog.selection
 summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, and those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request.
 
 # Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`bounds`, `body_keys`,
-# `body_types`, `body_required`, `body_fixed`). The engine reads these as members of a
+# `body_types`, `body_required`, `body_nonempty`, `body_fixed`). The engine reads these as members of a
 # selection; each is omitted when empty, so a selection without it keeps its serialised form.
 #
 # The bundle records no request body schema, so every name here is declared by the selection
 # from the pinned document and not checked against it. What the engine refuses when a selection
 # loads beyond these invariants (an empty, dotted or repeated key, a key the other members name
-# that `body_keys` does not admit, a fixed key a guard reads or `body_required` names, a fixed
+# that `body_keys` does not admit, a fixed key a guard reads or `body_required` or `body_nonempty`
+# names, a `body_nonempty` key `body_types` does not type as a string, a fixed
 # value that is not a string, an integer or a boolean, or not of the key's `body_types` type) is
 # stated in the owner and pinned by the engine's tests; ESS 0.57 has no set-membership
 # constraint between two members, and no untagged scalar to type a fixed value by.
@@ -20,7 +21,12 @@ types:
     variants: [string, integer, boolean]
 
   # `body_keys` closes the body to exactly those top-level keys. `body_types` types some of them
-  # and `body_required` requires some of them, of the caller's body.
+  # and `body_required` requires some of them, of the caller's body. `body_nonempty` holds some
+  # string keys non-empty: a caller's body carrying one as the empty string is refused before
+  # any request, as a mistyped key is. It names only keys `body_types` types as `string` that the
+  # selection does not fix, and does not require them; `body_required` does that. It is for a
+  # write whose provider answers an empty member with a refusal that reads as a success, such as
+  # Slack's `chat.postMessage` `text` or `conversations.open` `users`.
   #
   # `body_fixed` fixes a key to one value: the engine sends exactly that value under that key on
   # every write, whatever the caller gives, and a caller's body carrying the key at all is
@@ -36,10 +42,12 @@ types:
       - {name: body_keys, type: "Optional<List<String>>"}
       - {name: body_types, type: "Optional<Map<String, connectors_catalog.selection.BodyType>>"}
       - {name: body_required, type: "Optional<List<String>>"}
+      - {name: body_nonempty, type: "Optional<List<String>>"}
       - {name: body_fixed, type: "Optional<Map<String, Json>>"}
     invariants:
       - any: [{not: defined(body_types)}, defined(body_keys)]
       - any: [{not: defined(body_required)}, defined(body_keys)]
+      - any: [{not: defined(body_nonempty)}, defined(body_types)]
       - any: [{not: defined(body_fixed)}, defined(body_keys)]
 
   # `bounds` narrows a query parameter the source declares, keyed by its name. Exactly one form per

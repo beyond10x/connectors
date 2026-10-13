@@ -103,8 +103,9 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 11] = [
 
 /// The cited amendments applied to a provider's pinned source, relative to this
 /// crate. A provider absent here is built from its source as written.
-const AMENDMENTS: [(&str, &str); 2] = [
+const AMENDMENTS: [(&str, &str); 3] = [
     ("gitlab", "../gitlab/upstream/openapi_v3.amendments.json"),
+    ("slack", "../slack/upstream/slack-web.amendments.json"),
     (
         "zendesk",
         "../zendesk/upstream/zendesk-support.amendments.json",

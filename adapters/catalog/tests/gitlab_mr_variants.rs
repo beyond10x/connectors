@@ -455,7 +455,7 @@ fn both_variants_are_shipped_as_guarded_writes_with_one_fixed_body_value() {
                               "checks": [{"pointer": "/sha", "expect": {"input": "body.sha"}},
                                          {"pointer": "/state", "expect": {"literal": "opened"}}]},
                 "postflight": {"checks": [{"pointer": "/sha", "expect": {"input": "body.sha"}}],
-                               "any_of": [{"pointer": "/merge_when_pipeline_succeeds", "expect": {"literal": "true"}},
+                               "any_of": [{"pointer": "/merge_when_pipeline_succeeds", "expect": {"boolean": true}},
                                           {"pointer": "/state", "expect": {"literal": "merged"}}]}},
             "response": null,
             "body_keys": ["auto_merge", "sha"],

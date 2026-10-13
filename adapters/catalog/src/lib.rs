@@ -35,16 +35,21 @@ pub enum Effect {
 }
 
 /// What an observed value is compared with: the input value a reference names
-/// (a top-level key, or `body.<key>`), or a literal written in the selection.
+/// (a top-level key, or `body.<key>`) or a literal written in the selection,
+/// both compared as text; or a boolean written in the selection, compared by
+/// JSON type, so only that JSON boolean holds and a string, a number or `null`
+/// in its place differs. A literal `"true"` or `"false"` is refused when the
+/// selection loads, since as text it would hold for a look-alike string.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Expectation {
     Input(String),
     Literal(String),
+    Boolean(bool),
 }
 
-/// One comparison: the scalar at `pointer` in an observed body must equal what
-/// `expect` resolves to.
+/// One comparison: the value at `pointer` in an observed body must equal what
+/// `expect` resolves to, as text or, for a `boolean`, by JSON type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Check {
@@ -292,7 +297,7 @@ impl Guard {
             .map(|(_, reference)| reference)
             .chain(self.checks().filter_map(|check| match &check.expect {
                 Expectation::Input(path) => Some(path),
-                Expectation::Literal(_) => None,
+                Expectation::Literal(_) | Expectation::Boolean(_) => None,
             }))
     }
 }
@@ -436,6 +441,14 @@ pub struct Selection {
     /// required already. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub body_required: Vec<String>,
+    /// Closed body keys `body_types` types as `string` that must not be
+    /// empty: a body carrying one as `""` is refused before any request, and
+    /// the declaration gives it `minLength: 1`. It does not require the key;
+    /// `body_required` does. A name the closed body does not admit, one not
+    /// typed as a string, a fixed key or a repeated name is refused when the
+    /// selection loads. Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub body_nonempty: Vec<String>,
     /// Closed body keys fixed to one value each: a string, an integer or a
     /// boolean, of the key's `body_types` type when it has one. The engine
     /// sends exactly that value under that key on every write, and a caller's
@@ -508,6 +521,34 @@ fn reference<'a>(input: &'a Value, path: &str) -> Option<&'a Value> {
         current = current.get(key)?;
     }
     Some(current)
+}
+
+/// What a resolved check compares an observed value with: text, from an input
+/// or a literal, or a JSON boolean.
+#[derive(Clone, Debug)]
+enum Pinned {
+    Text(String),
+    Boolean(bool),
+}
+
+impl Pinned {
+    /// Whether an observed value is present in the form this comparison
+    /// reads: a scalar for text, any JSON value for a boolean.
+    fn present(&self, observed: Option<&Value>) -> bool {
+        match self {
+            Pinned::Text(_) => observed.and_then(scalar).is_some(),
+            Pinned::Boolean(_) => observed.is_some(),
+        }
+    }
+
+    /// Whether an observed value holds: text equal as text, or exactly the
+    /// JSON boolean.
+    fn holds(&self, observed: Option<&Value>) -> bool {
+        match self {
+            Pinned::Text(text) => observed.and_then(scalar).as_deref() == Some(text.as_str()),
+            Pinned::Boolean(flag) => observed == Some(&Value::Bool(*flag)),
+        }
+    }
 }
 
 /// A scalar as the string a parameter or a comparison carries.
@@ -638,9 +679,9 @@ pub struct Prepared {
     segments: Vec<String>,
     query: Vec<(String, String)>,
     body: Value,
-    postflight: Vec<(String, String)>,
+    postflight: Vec<(String, Pinned)>,
     /// The postflight's `any_of`: at least one must hold, when declared.
-    alternatives: Vec<(String, String)>,
+    alternatives: Vec<(String, Pinned)>,
     /// The bound read the postflight checks, when the guard declares one.
     reread: Option<Request>,
     /// Whether the read after the write must answer 404 (`postflight.absent`).
@@ -949,6 +990,18 @@ impl Engine {
                         selection.id
                     )));
                 }
+                // A literal compares as text, so `"true"` or `"false"` would
+                // hold for a look-alike string where a JSON boolean is meant.
+                // The bundle records no answer member's type, so the two are
+                // refused on every check; `boolean` compares a boolean.
+                if let Some(check) = checks.iter().find(|check| {
+                    matches!(&check.expect, Expectation::Literal(text) if text == "true" || text == "false")
+                }) {
+                    return Err(refuse(format!(
+                        "guard of `{}` compares `{}` with a literal boolean spelling; write the expectation as {{\"boolean\": …}}",
+                        selection.id, check.pointer
+                    )));
+                }
                 if guard.further_preflights.len() > 3
                     || guard
                         .further_preflights
@@ -1056,6 +1109,20 @@ impl Engine {
             {
                 return Err(refuse(format!(
                     "selection `{}` declares body_required that do not name distinct keys its body_keys admit",
+                    selection.id
+                )));
+            }
+            // A non-empty key is a caller's string: admitted, typed as a
+            // string, not fixed, and named once.
+            let mut nonempty = std::collections::BTreeSet::new();
+            if !selection.body_nonempty.iter().all(|key| {
+                admitted(key)
+                    && selection.body_types.get(key) == Some(&ValueType::String)
+                    && !selection.body_fixed.contains_key(key)
+                    && nonempty.insert(key)
+            }) {
+                return Err(refuse(format!(
+                    "selection `{}` declares body_nonempty that do not name distinct string keys its body_keys admit and the caller sends",
                     selection.id
                 )));
             }
@@ -1483,6 +1550,15 @@ impl Engine {
                     "body key `{key}` is not of its declared type"
                 )));
             }
+            if let Some(key) = exposed.selection.body_nonempty.iter().find(|key| {
+                body.get(key.as_str())
+                    .and_then(Value::as_str)
+                    .is_some_and(str::is_empty)
+            }) {
+                return Err(refuse(format!(
+                    "body key `{key}` is empty, which its selection does not admit"
+                )));
+            }
         }
         // The credential is never sent from caller input, so a body naming
         // it under any ASCII case is refused here as well as in the
@@ -1518,17 +1594,18 @@ impl Engine {
         if let Some(guard) = &exposed.selection.guard {
             // Every expectation resolves before any request: an absent input is
             // a refusal with nothing sent, not a surprise after the preflight.
-            let expected = |checks: &[Check]| -> Result<Vec<(String, String)>> {
+            let expected = |checks: &[Check]| -> Result<Vec<(String, Pinned)>> {
                 checks
                     .iter()
                     .map(|check| {
                         let value = match &check.expect {
-                            Expectation::Input(path) => {
+                            Expectation::Input(path) => Pinned::Text(
                                 reference(&input, path).and_then(scalar).ok_or_else(|| {
                                     refuse(format!("guard expects input `{path}`, which is absent"))
-                                })?
-                            }
-                            Expectation::Literal(text) => text.clone(),
+                                })?,
+                            ),
+                            Expectation::Literal(text) => Pinned::Text(text.clone()),
+                            Expectation::Boolean(flag) => Pinned::Boolean(*flag),
                         };
                         Ok((check.pointer.clone(), value))
                     })
@@ -1581,15 +1658,16 @@ impl Engine {
                 }
                 let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
                 for (pointer, expected) in preflight {
-                    let current = observed.pointer(pointer).and_then(scalar).ok_or_else(|| {
-                        Error::new(
+                    let current = observed.pointer(pointer);
+                    if !expected.present(current) {
+                        return Err(Error::new(
                             ErrorCode::UpstreamProtocol,
                             format!("guard preflight answered without a value at `{pointer}`"),
-                        )
-                    })?;
+                        ));
+                    }
                     // The only point at which a difference is definite. After
                     // dispatch the same difference is uncertainty, not a refusal.
-                    if current != *expected {
+                    if !expected.holds(current) {
                         return Err(Error::new(
                             ErrorCode::Forbidden,
                             format!(
@@ -1632,9 +1710,10 @@ impl Prepared {
     /// least one of its comparisons holds, or it declares none.
     fn accepts_one(&self, observed: &Value) -> bool {
         self.alternatives.is_empty()
-            || self.alternatives.iter().any(|(pointer, expected)| {
-                observed.pointer(pointer).and_then(scalar).as_deref() == Some(expected.as_str())
-            })
+            || self
+                .alternatives
+                .iter()
+                .any(|(pointer, expected)| expected.holds(observed.pointer(pointer)))
     }
 
     /// Send once and classify. Only documented definite refusals are refused;
@@ -1705,7 +1784,7 @@ impl Prepared {
         // is issued. The comparison is best effort, not detection.
         let Some((segments, query)) = &self.reread else {
             for (pointer, expected) in &self.postflight {
-                if body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+                if !expected.holds(body.pointer(pointer)) {
                     return WriteOutcome::Unknown(Error::new(
                         ErrorCode::UpstreamProtocol,
                         format!(
@@ -1771,7 +1850,7 @@ impl Prepared {
             );
         };
         for (pointer, expected) in &self.postflight {
-            if observed.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+            if !expected.holds(observed.pointer(pointer)) {
                 return unknown(format!(
                     "the guard's read after the write answered with a value at `{pointer}` other than the pinned one; the effect is possible"
                 ));
@@ -2123,7 +2202,11 @@ fn declare(selection: &Selection, operation: &Operation) -> connectors_core::Ope
                 .filter(|key| !selection.body_fixed.contains_key(*key))
                 .map(|key| {
                     let schema = if let Some(value_type) = selection.body_types.get(key) {
-                        body_type_schema(*value_type)
+                        let mut schema = body_type_schema(*value_type);
+                        if selection.body_nonempty.contains(key) {
+                            schema["minLength"] = json!(1);
+                        }
+                        schema
                     } else if scalars.contains(key.as_str()) {
                         declared_type(None)
                     } else {
@@ -2335,6 +2418,7 @@ fn check_download(selection: &Selection, download: &Download) -> Result<()> {
         || !selection.body_keys.is_empty()
         || !selection.body_types.is_empty()
         || !selection.body_required.is_empty()
+        || !selection.body_nonempty.is_empty()
         || !selection.body_fixed.is_empty()
     {
         Some("beside members that bind a bundle operation")
