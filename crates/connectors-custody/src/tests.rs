@@ -744,8 +744,17 @@ fn largest_materials_round_trip<B: Backend>(open: &dyn Fn(Scope) -> Result<B>) {
             "{name}: {len} bytes; failing OS calls: {}",
             os_errors()
         );
-        assert!(backend.read(version).unwrap().ct_eq(&material), "{name}");
-        assert_eq!(backend.delete(version, until(), || Ok(())), Ok(()));
+        assert!(
+            backend.read(version).unwrap().ct_eq(&material),
+            "{name}; failing OS calls: {}",
+            os_errors()
+        );
+        assert_eq!(
+            backend.delete(version, until(), || Ok(())),
+            Ok(()),
+            "{name}: delete; failing OS calls: {}",
+            os_errors()
+        );
     }
     let signing = Scope::approval_signing(authority, allocation).unwrap();
     let backend = open(signing).unwrap();
@@ -753,10 +762,17 @@ fn largest_materials_round_trip<B: Backend>(open: &dyn Fn(Scope) -> Result<B>) {
     let seed = [0x5a; SIGNING_SEED_BYTES];
     assert_eq!(
         backend.write_new(version, &Material::from_slice(&seed), until(), || Ok(())),
-        Ok(())
+        Ok(()),
+        "signing seed; failing OS calls: {}",
+        os_errors()
     );
     assert!(backend.read(version).unwrap().ct_eq(&seed));
-    assert_eq!(backend.delete(version, until(), || Ok(())), Ok(()));
+    assert_eq!(
+        backend.delete(version, until(), || Ok(())),
+        Ok(()),
+        "signing seed: delete; failing OS calls: {}",
+        os_errors()
+    );
 }
 
 /// The story's measurement, held to the 64 KiB bound of every platform: every
