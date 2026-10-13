@@ -156,3 +156,51 @@ names:
 - **Socket path.** There is no `/proc/self/fd`: the owner socket is bound and
   reached by its full path, which must fit the 104-byte `sun_path`. A state
   directory whose socket path is longer is refused before an owner starts.
+
+## Windows
+
+The rules above are the Linux transport and stand unchanged. On Windows the
+owner keeps its lifetime lock, handshake and refusals; the transport and the
+guarantees change as the [platform guarantee table](semantics.md#windows-platform-guarantees)
+states:
+
+- **Pipe.** There is no Unix socket. The owner listens on a named pipe whose
+  name is derived from the current user's SID and the state directory's
+  canonical path, created with `FILE_FLAG_FIRST_PIPE_INSTANCE` and an access
+  control list granting the current user's SID alone. An owner that cannot
+  create the first instance does not serve. Before sending anything, the CLI
+  checks that the pipe's server process (`GetNamedPipeServerProcessId`) runs as
+  the current user; a pipe held by another user refuses as no owner, never as an
+  owner of another build. Removing the socket at idle exit is closing every
+  instance of the pipe, after which no later connect reaches the owner.
+- **Lifetime lock.** The kernel file lock is an exclusive `LockFileEx` on the
+  lock file in the state directory, released at process exit.
+- **Pipe peer** (`peer_credential_snapshot`: `client_token_query`). The pipe's
+  access control list admits only the current user at connect. The owner reads
+  the client's process id with `GetNamedPipeClientProcessId`, opens that process
+  once, and requires its token's SID to be the current user's; the process
+  handle opened then is the one every later handle duplication into that client
+  goes through.
+- **Handles in place of descriptors** (`atomic_close_on_exec`: holds). Where
+  the Linux transport sends descriptors with `SCM_RIGHTS`, the owner duplicates
+  each handle into the client process with `DuplicateHandle`, inheritance off and
+  no more access than the receiver needs, and sends the handle's value in the
+  control section. A handle the client does not take over is closed by the
+  owner with `DUPLICATE_CLOSE_SOURCE` from the same process handle.
+- **Build** (`own_image_build_measure`: `launch_path_read`). There is no
+  `/proc/self/exe`. `build` is the SHA-256 of the file at the path
+  `GetModuleFileNameW` reports, read once. A running image cannot be written in
+  place but can be renamed; a file put at its path is measured as a new build,
+  and a caller of that build is refused with `owner_build_mismatch`.
+- **Children** (`parent_death_kill`: holds; `exact_process_signal`: holds).
+  Adapter children are created in a job object with
+  `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only handle the owner holds, so
+  they end when the owner does; no retained worker thread is needed for that.
+  Exact stop terminates the owned child through its process handle, and waiting
+  on that handle reports its exit.
+- **Detaching from the CLI.** The CLI starts the owner with
+  `CREATE_BREAKAWAY_FROM_JOB` and `DETACHED_PROCESS`, so the owner outlives the
+  launching CLI. A CLI that runs inside a job that does not permit breakaway
+  starts an owner that lives only as long as that job. The startup channel and
+  the lifetime lock reach the starting owner as inherited handles, the only ones
+  besides its standard handles in its `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, in place of descriptors 3 and 4.
