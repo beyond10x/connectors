@@ -482,7 +482,7 @@ fn transition_run_is_shipped_as_a_guarded_write_of_do_transition() {
                 {"operation_id": "getTransitions",
                  "values": {"issueIdOrKey": "issueIdOrKey", "transitionId": "body.transition.id"},
                  "checks": [{"pointer": "/transitions/0/id", "expect": {"input": "body.transition.id"}},
-                            {"pointer": "/transitions/0/isAvailable", "expect": {"literal": "true"}},
+                            {"pointer": "/transitions/0/isAvailable", "expect": {"boolean": true}},
                             {"pointer": "/transitions/0/to/id", "expect": {"input": "target_status"}}]}],
             "postflight": {"read": {"operation_id": "getIssue",
                                     "values": {"issueIdOrKey": "issueIdOrKey"}},

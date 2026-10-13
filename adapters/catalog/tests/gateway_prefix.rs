@@ -143,24 +143,28 @@ fn refusal(config: &Value) -> String {
 /// `branch.create`, `branch.delete` and `project.create`, whose cited media
 /// type corrections also rebuilt the GitLab bundle, and again when
 /// `file.update` proved its write by reading the branch, not the revision
-/// `commits/{branch}` that a same-named tag wins.
+/// `commits/{branch}` that a same-named tag wins, and again when the guards of
+/// `merge_request.discussion.resolve` and `merge_request.auto_merge` compared
+/// `/resolvable` and `/merge_when_pipeline_succeeds` as JSON booleans.
 /// The Jira example loads its shipped selection set too, so its pair was
 /// re-pinned when that set gained `issue.get`, `issue.create_meta` and
 /// `users.search`, again when it gained `issue.transitions`, and again when it
 /// gained the guarded write `issue.transition.run`, and again when it gained
-/// the binary read `attachment.content`.
+/// the binary read `attachment.content`, and again when the guard of
+/// `issue.transition.run` compared `/transitions/0/isAvailable` as a JSON
+/// boolean.
 const UNPREFIXED: [(&str, &str, &str, &str); 3] = [
     (
         "local-catalog-provider.md",
         "gitlab",
-        "f1e56d54ab3acdbedb01b9683bc7ea002e92e20714ed89168a3b782a838e720d",
-        "222bce75c9f8307b93515556b95694e198ef9e0929005c5357443c63ec2438d4",
+        "79a7cf2b033dab759f522a27c4c09349d91da7cbe3f8dd0db9139bd12bce6390",
+        "4579dfff70a4d1d107c2e71f56f96210bbee67243126d65b61dc0e51b3c2bd96",
     ),
     (
         "catalog-jira.md",
         "jira",
-        "0f1fb08e6a17ed2d4cf8f60cd1b322378d831a78ccaf273b0a019402f1922fff",
-        "d7a86083ea26c4f5d94e392d3310ae45cd8289167d69e38f6b8a8ece0c0c3348",
+        "fc1371482f23629fd8fec4b2dd8eeba8e5f450a77e17ee22b5dc9a6888348654",
+        "6794558b21b53fe9995de5028325b88e8338b17754c641bd1c7a5b80c3299b59",
     ),
     // The Confluence guide declares an `access` probe since #102, which is part of
     // its configuration and so of its revision.
