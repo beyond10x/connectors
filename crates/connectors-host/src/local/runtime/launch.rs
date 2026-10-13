@@ -13,26 +13,41 @@
 //! contract states: the credential is an unlinked read-only file, the socket
 //! carries `SO_NOSIGPIPE`, received descriptors are marked close-on-exec right
 //! after the receive, and the image copy is executed by its path.
+//!
+//! Windows changes delivery as section 8 of the contract states: the
+//! credential is a read-only handle on a file whose name was removed with
+//! POSIX semantics, and the image and credential handles reach the CLI by
+//! `DuplicateHandle` into it, inheritance off, their values in a frame in
+//! place of `SCM_RIGHTS` ([`send`], [`receive`]).
 use super::{Failure, Result};
+#[cfg(unix)]
+use std::os::{
+    fd::{AsRawFd, FromRawFd, RawFd},
+    unix::{ffi::OsStrExt, net::UnixStream, process::CommandExt, process::ExitStatusExt},
+};
 use std::{
     collections::BTreeSet,
     ffi::OsString,
     fs::File,
-    io::Write,
-    os::{
-        fd::{AsRawFd, FromRawFd, RawFd},
-        unix::{ffi::OsStrExt, net::UnixStream, process::CommandExt, process::ExitStatusExt},
-    },
     process::{Command, Stdio},
-    time::Instant,
 };
+#[cfg(unix)]
+use std::{io::Write, time::Instant};
 
 /// The consumer image, then the credential.
 pub(crate) const DESCRIPTORS: usize = 2;
 /// Received descriptors are held at or above this number, clear of the
 /// standard streams and of descriptor 3, which belongs to the credential.
+#[cfg(unix)]
 const FLOOR: RawFd = 10;
+#[cfg(unix)]
 const MARKER: u8 = 0x4c;
+
+/// The Windows credential, handle passing and their tests.
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+pub(crate) use windows::{receive, sealed, send};
 
 /// A sealed, read-only copy of `material`, positioned at its start. The seals
 /// forbid every later write, growth, shrink and seal change; the returned
@@ -157,6 +172,7 @@ pub(crate) fn sealed(material: &[u8]) -> Result<File> {
     Ok(readable)
 }
 
+#[cfg(unix)]
 fn remaining(until: Instant) -> Result<std::time::Duration> {
     until
         .checked_duration_since(Instant::now())
@@ -164,6 +180,7 @@ fn remaining(until: Instant) -> Result<std::time::Duration> {
         .ok_or(Failure::Timeout)
 }
 
+#[cfg(unix)]
 fn control_space(count: usize) -> usize {
     // SAFETY: CMSG_SPACE is a pure size computation.
     unsafe { libc::CMSG_SPACE((count * std::mem::size_of::<RawFd>()) as u32) as usize }
@@ -171,6 +188,7 @@ fn control_space(count: usize) -> usize {
 
 /// Pass `files` to the peer as one marker byte carrying `SCM_RIGHTS`. Only the
 /// descriptors travel; no byte of their content is read or written here.
+#[cfg(unix)]
 pub(crate) fn send(stream: &UnixStream, files: &[&File], until: Instant) -> Result<()> {
     let descriptors: Vec<RawFd> = files.iter().map(|file| file.as_raw_fd()).collect();
     let marker = [MARKER];
@@ -250,6 +268,7 @@ pub(crate) fn send(stream: &UnixStream, files: &[&File], until: Instant) -> Resu
 /// Receive exactly `count` descriptors sent by [`send`]. Anything else — no
 /// marker, a truncated or foreign control message, another count — closes
 /// whatever arrived and refuses.
+#[cfg(unix)]
 pub(crate) fn receive(stream: &UnixStream, count: usize, until: Instant) -> Result<Vec<File>> {
     let mut marker = [0u8];
     let mut vector = libc::iovec {
@@ -585,5 +604,5 @@ impl Drop for Interrupts {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests;
