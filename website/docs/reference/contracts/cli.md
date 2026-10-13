@@ -937,6 +937,14 @@ creates get a protected list naming only the current user. Protected stdin
 admits a protected regular file; a pipe on stdin is refused on Windows until a
 producer check is specified for it.
 
+Where a rule above fsyncs a directory (`setup init`, the metadata database's
+creation and each migration), Windows takes no directory step: a directory is
+held open for listing only, and Windows flushes no directory through such a
+handle. A file the host publishes is made durable by its own flush and by
+`MoveFileExW` with `MOVEFILE_WRITE_THROUGH`, which returns only once the rename
+is written; the metadata database's files are flushed by SQLite, which on
+Windows syncs files and never their directory.
+
 Hidden terminal entry opens `CONIN$` and `CONOUT$`, clears
 `ENABLE_ECHO_INPUT` and restores the saved console mode on success, failure and
 interruption. A process with no console has no trusted terminal and refuses as

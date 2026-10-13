@@ -21,7 +21,7 @@ startup = "on-demand"
 restart = "never"
 
 [adapters.forge.executable]
-path = "/not-installed/connectors-catalog-provider"
+path = "NOT_INSTALLED/connectors-catalog-provider"
 sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 args = []
 "#;
@@ -76,7 +76,17 @@ fn configured() -> (tempfile::TempDir, Vec<u8>) {
     let root = tempfile::tempdir().unwrap();
     let created = success(&command(&root, &["setup", "init"]));
     assert_eq!(created["disposition"], "created", "{created}");
-    let text = fs::read_to_string(config_path(&root)).unwrap() + ENTRY;
+    // An entry's executable is an absolute local path (`contracts/cli/v1alpha1/semantics.md`
+    // §3); on Windows an absolute path names its drive.
+    let entry = ENTRY.replace(
+        "NOT_INSTALLED",
+        if cfg!(windows) {
+            "C:/not-installed"
+        } else {
+            "/not-installed"
+        },
+    );
+    let text = fs::read_to_string(config_path(&root)).unwrap() + &entry;
     fs::write(config_path(&root), &text).unwrap();
     success(&command(
         &root,

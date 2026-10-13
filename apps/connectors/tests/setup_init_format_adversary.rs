@@ -4,6 +4,15 @@ use std::{
     process::{Command, Output},
 };
 
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
+};
+
 fn command(root: &tempfile::TempDir, args: &[&str]) -> Output {
     Command::new(env!("CARGO_BIN_EXE_connectors"))
         .args(["--output", "json", "--config"])
@@ -41,6 +50,15 @@ fn documented_entry(doc: &str) -> String {
     rest[open..open + close]
         .replace("REPLACE_FROM_BOOTSTRAP", "cfg-1")
         .replace("REPLACE_WITH_EXECUTABLE_SHA256", &"a".repeat(64))
+        // The guides write a Linux path; on Windows an absolute path names its drive.
+        .replace(
+            "\"/absolute/path/",
+            if cfg!(windows) {
+                "\"C:/absolute/path/"
+            } else {
+                "\"/absolute/path/"
+            },
+        )
 }
 
 fn follow_documented_steps(doc: &str) {
@@ -82,7 +100,7 @@ fn legacy_root(with_entry: bool) -> (tempfile::TempDir, std::path::PathBuf, Vec<
     assert!(text.contains("format = \"connectors-local/1\""));
     if with_entry {
         text += &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     }

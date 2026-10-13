@@ -11,7 +11,7 @@ mod local;
 struct VersionFlag;
 
 fn main() {
-    let args: Vec<_> = std::env::args_os().collect();
+    let mut args: Vec<_> = std::env::args_os().collect();
     if args.get(1).is_some_and(|arg| arg == "__connectors-owner") {
         let result = if args.len() == 4 {
             connectors_host::local::config::Paths::resolve(
@@ -31,6 +31,11 @@ fn main() {
             eprintln!("connectors owner: {code}");
         }
         std::process::exit(if result.is_ok() { 0 } else { 1 });
+    }
+    // Every usage line names the binding's binary, `connectors` (help.txt). clap takes
+    // the displayed name from argv[0], which on Windows is `connectors.exe`.
+    if let Some(name) = args.first_mut() {
+        *name = "connectors".into();
     }
     if let Err(error) = <VersionFlag as clap::Parser>::try_parse_from(&args)
         && error.kind() == clap::error::ErrorKind::DisplayVersion

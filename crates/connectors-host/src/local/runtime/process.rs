@@ -779,7 +779,6 @@ impl Drop for PreparedInvocation<'_> {
 mod tests {
     use super::*;
     use crate::local::config::{Adapter, Executable, Restart, Startup};
-    use sha2::{Digest, Sha256};
 
     pub(super) fn bootstrap() -> Bootstrap {
         Bootstrap {
@@ -932,8 +931,7 @@ mod tests {
 
     #[test]
     fn malformed_replies_terminate_and_reap_only_the_owned_child() {
-        let path = std::env::current_exe().unwrap();
-        let hash = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
+        let (path, hash) = crate::local::test_executable::path_and_sha256();
         for mode in ["json", "schema", "identity"] {
             let config = Adapter {
                 private_protocol: None,
@@ -978,7 +976,7 @@ mod tests {
     /// like any malformed reply, and the child is terminated.
     #[test]
     fn a_reason_on_a_failed_validation_is_a_protocol_violation() {
-        let path = std::env::current_exe().unwrap();
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
         let config = Adapter {
             private_protocol: None,
             permissions: Default::default(),
@@ -989,7 +987,7 @@ mod tests {
             startup: Startup::OnDemand,
             restart: Restart::Never,
             executable: Executable {
-                sha256: hex::encode(Sha256::digest(std::fs::read(&path).unwrap())),
+                sha256,
                 path,
                 args: vec![
                     "--exact".into(),
@@ -1015,7 +1013,7 @@ mod tests {
     }
 
     fn fixture_child(mode: &str) -> Child {
-        let path = std::env::current_exe().unwrap();
+        let (path, sha256) = crate::local::test_executable::path_and_sha256();
         Child::spawn(&Adapter {
             private_protocol: None,
             permissions: Default::default(),
@@ -1026,7 +1024,7 @@ mod tests {
             startup: Startup::OnDemand,
             restart: Restart::Never,
             executable: Executable {
-                sha256: hex::encode(Sha256::digest(std::fs::read(&path).unwrap())),
+                sha256,
                 path,
                 args: vec![
                     "--exact".into(),

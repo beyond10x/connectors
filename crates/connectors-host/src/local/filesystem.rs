@@ -225,6 +225,18 @@ pub fn read_bounded(file: File, limit: usize) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+/// Make a held directory's entries durable: an fsync on Linux and macOS. On
+/// Windows the handle is open for listing only and nothing is flushed: a name
+/// is durable through its write-through rename (`windows::publish`) and the
+/// metadata database through SQLite's own file syncs.
+pub fn sync_directory(directory: &File) -> Result<()> {
+    #[cfg(unix)]
+    directory.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
+    #[cfg(windows)]
+    let _ = directory;
+    Ok(())
+}
+
 /// Inspect a held directory without following the destination or creating it.
 #[cfg(unix)]
 pub(crate) fn require_absent(parent: &File, child: &OsStr) -> Result<()> {

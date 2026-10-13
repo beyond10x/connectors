@@ -33,6 +33,17 @@ jobs:
       - name: Lint the host and the CLI
         shell: bash
         run: cargo clippy --locked -p connectors-host -p connectors --all-targets -- -D warnings
+      # The admission refuses a directory, or an ancestor, that another trustee
+      # may write (filesystem/windows.rs, `trusted_ancestor`). Recorded so a
+      # refusal of the build or temporary directory can be read from the log.
+      - name: Show the access lists of the build and temporary directories
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          $workspace = $env:GITHUB_WORKSPACE
+          $drive = Split-Path -Qualifier $workspace
+          foreach ($p in @("$drive\", (Split-Path (Split-Path $workspace)), (Split-Path $workspace), $workspace, "$workspace\target\debug\deps", $env:RUNNER_TEMP, $env:TMP)) { icacls $p }
+          whoami /user /groups
       - name: Test the host and the CLI
         shell: bash
         env:

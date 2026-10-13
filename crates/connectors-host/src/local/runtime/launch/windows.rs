@@ -24,7 +24,8 @@ use windows_sys::Win32::{
     },
     Storage::FileSystem::{
         DELETE, DeleteFileW, FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
-        FILE_DISPOSITION_INFO_EX, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ, FILE_TYPE_DISK,
+        FILE_DISPOSITION_INFO_EX, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ,
+        FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_TYPE_DISK,
         FileDispositionInfoEx, GetFileType, RemoveDirectoryW, SetFileInformationByHandle,
     },
     System::Threading::GetCurrentProcess,
@@ -95,14 +96,26 @@ pub(crate) fn sealed(material: &[u8]) -> Result<File> {
         .map_err(|_| Failure::Unavailable)?;
     let written = identity(&writable).map_err(|_| Failure::Unavailable)?;
     drop(writable);
-    let deleting = OpenOptions::new()
-        .access_mode(FILE_GENERIC_READ | DELETE)
-        .share_mode(0)
+    // The read-only handle is a file object of its own. A POSIX delete
+    // removes the name when the file object that set it is cleaned up, which
+    // is when its last handle closes: a duplicate of the deleting handle
+    // would keep the name, and the directory, in place. Neither open shares
+    // writing, so no writer can open the file from here on.
+    let readable = OpenOptions::new()
+        .access_mode(FILE_GENERIC_READ)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_DELETE)
         .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
         .open(&path)
         .map_err(|_| Failure::Unavailable)?;
-    if identity(&deleting).map_err(|_| Failure::Unavailable)? != written
-        || deleting.metadata().map_err(|_| Failure::Unavailable)?.len() != material.len() as u64
+    let deleting = OpenOptions::new()
+        .access_mode(DELETE | FILE_READ_ATTRIBUTES)
+        .share_mode(FILE_SHARE_READ)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .open(&path)
+        .map_err(|_| Failure::Unavailable)?;
+    if identity(&readable).map_err(|_| Failure::Unavailable)? != written
+        || identity(&deleting).map_err(|_| Failure::Unavailable)? != written
+        || readable.metadata().map_err(|_| Failure::Unavailable)?.len() != material.len() as u64
     {
         return Err(Failure::Unavailable);
     }
@@ -121,25 +134,8 @@ pub(crate) fn sealed(material: &[u8]) -> Result<File> {
     {
         return Err(Failure::Unavailable);
     }
-    let mut readable: HANDLE = std::ptr::null_mut();
-    // SAFETY: duplicates within this process with read access alone, not
-    // inheritable; a returned handle is new and owned.
-    if unsafe {
-        DuplicateHandle(
-            GetCurrentProcess(),
-            deleting.as_raw_handle() as HANDLE,
-            GetCurrentProcess(),
-            &mut readable,
-            FILE_GENERIC_READ,
-            0,
-            0,
-        )
-    } == 0
-    {
-        return Err(Failure::Unavailable);
-    }
-    // SAFETY: DuplicateHandle returned a new owned handle.
-    let readable = unsafe { File::from_raw_handle(readable as _) };
+    // Closing the deleting handle removes the name; `readable`, opened by
+    // `OpenOptions` without inheritance and at offset 0, stays.
     drop(deleting);
     drop(scratch);
     if std::fs::symlink_metadata(&path).is_ok() || std::fs::symlink_metadata(&held).is_ok() {

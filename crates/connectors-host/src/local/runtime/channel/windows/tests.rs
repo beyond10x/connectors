@@ -307,8 +307,12 @@ fn an_adopted_handle_is_not_inheritable_and_the_inherited_one_is_closed() {
     std::mem::forget(client);
     let adopted = adopt(value).unwrap();
     assert!(!inheritable(adopted.as_raw_handle() as HANDLE).unwrap());
+    // `DUPLICATE_CLOSE_SOURCE` within one process frees the inherited slot,
+    // and the handle table may hand that same value to the duplicate. Either
+    // the value names nothing, or it is the adopted handle itself, which is
+    // not inheritable: the inherited handle no longer exists.
     assert!(
-        inheritable(value as HANDLE).is_err(),
+        inheritable(value as HANDLE).is_err() || adopted.as_raw_handle() as usize == value,
         "the inherited value is closed"
     );
     Pipe::from_owned(adopted).unwrap();
