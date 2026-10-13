@@ -139,6 +139,8 @@ types:
     fields:
       - {name: profiles, type: "List<String>"}
       - {name: operations, type: "List<String>"}
+  # secret_service_socket selects the Secret Service bus on Linux only; the macOS and
+  # Windows backends take no binding and refuse one.
   - name: connectors.cli.LocalCustodyBinding
     kind: struct
     fields:
@@ -296,7 +298,14 @@ types:
     variants: [never]
   - name: connectors.cli.OperatingSystem
     kind: enum
-    variants: [linux]
+    variants: [linux, macos, windows]
+  # The protected store custody uses, fixed by the platform the binary was built for:
+  # the freedesktop Secret Service on Linux, the login keychain on macOS, the
+  # Credential Manager on Windows (contracts/auth/custody/v1alpha1/semantics.md §5.1).
+  # There is no plain-text variant.
+  - name: connectors.cli.CustodyBackend
+    kind: enum
+    variants: [secret_service, macos_keychain, windows_credential_manager]
   - name: connectors.cli.KeyringState
     kind: enum
     variants: [available, locked, unavailable]
@@ -489,6 +498,7 @@ types:
       - {name: state_path, type: "String"}
       - {name: os, type: "connectors.cli.OperatingSystem"}
       - {name: keyring, type: "connectors.cli.KeyringState"}
+      - {name: custody_backend, type: "connectors.cli.CustodyBackend"}
       - {name: prerequisites, type: "List<connectors.cli.Prerequisite>"}
   # Enabling durable open checkpoints installs Eventlog's triggers and continuity
   # tables. Entity Runtime 0.28.0 and earlier, and so connectors 0.32.0 and earlier,

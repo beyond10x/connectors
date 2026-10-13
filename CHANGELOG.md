@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Credential custody backends per platform, in the new crate `connectors-custody`
+  ([custody semantics §5.1](contracts/auth/custody/v1alpha1/semantics.md#51-platform-bindings-of-the-local-host)):
+  one backend trait (write a new scoped version, read an exact version, delete, inspect the
+  store), an in-memory reference, and one binding per platform, fixed when the binary is built.
+  Linux keeps the qualified Secret Service binding, moved unchanged behind the trait. macOS stores
+  generic password items in the login keychain with user interaction disallowed, so a locked
+  keychain is `Unavailable` and never prompts. Windows stores generic credentials in the
+  Credential Manager with local-machine persistence; since one credential holds at most
+  2,560 bytes, every value is written as numbered part entries, then a header entry naming the
+  part count and the value's SHA-256, written last, and a read checks every part and the digest.
+  Every binding holds values up to 64 KiB, which covers the largest material of every shipped
+  auth profile. No binding falls back to another, to a file or to an environment variable.
+- macOS keychain items are created with an access whose decrypt ACL admits any application of the
+  user.
+- `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
+  `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
+  target.
+
+### Changed
+
+- ESS 0.59.0 (from 0.57.0): the seven ESS crates and the pinned toolchain; Entity Runtime Core
+  stays 0.28.0 through `ess-entity-runtime`, and Entity Runtime stays 0.30.3. Install ESS 0.59.0
+  (`b10x upgrade`) or select it with `--ess`/`CONNECTORS_ESS`. The generated CLI contract runtime
+  is unchanged. Its binding, the local metadata Entity Runtime definitions and the generated
+  documentation pages are regenerated and carry the committed model change:
+  `connectors.cli.OperatingSystem` gains `macos` and `windows`, and
+  `connectors.cli.SetupCheckResult` gains `custody_backend`.
+
+### Limitations
+
+- The CLI and its local host do not yet run on macOS or Windows: owner transport, consumer
+  launch, filesystem admission and terminal entry are Linux-only, so the `connectors` binary
+  does not build there. Only `connectors-custody` builds and is tested on those platforms, in the
+  `Custody platforms` workflow.
+- On macOS a second binary, such as an upgraded `connectors`, is refused an item an earlier binary
+  wrote: OS status -25293 (`errSecAuthFailed`), observed on the CI runner. The cause is inferred to
+  be the item's partition list, which names the creating binary; changing it needs the keychain
+  password. Upgrade access is planned with the macOS host port.
+
 ## 0.45.0 — 2026-10-10
 
 ### Added

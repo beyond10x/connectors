@@ -1,0 +1,62 @@
+name: Custody platforms
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: custody-platforms-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  custody:
+    name: custody on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Rust 1.98.1
+        shell: bash
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --component clippy
+          rustup default 1.98.1
+          rustc --version
+      - name: Lint the custody crate
+        shell: bash
+        run: cargo clippy --locked -p connectors-custody --all-targets -- -D warnings
+      - name: Test the custody crate against the platform store
+        shell: bash
+        run: cargo test --locked -p connectors-custody -- --include-ignored
+      # An observation, not a check: a second executable reads a login keychain
+      # item the first created, with the access the custody binding gives every
+      # item. A second binary is refused today (OS status -25293); the outcome is
+      # recorded in the summary and does not fail the job. A crash of the writer
+      # does.
+      - name: A second binary reads a keychain item
+        if: ${{ !cancelled() && runner.os == 'macOS' }}
+        shell: bash
+        run: |
+          cargo build --locked -p connectors-custody --example keychain_probe_writer --example keychain_probe_reader
+          ids=$(target/debug/examples/keychain_probe_writer write)
+          read_status=0
+          observed=$(target/debug/examples/keychain_probe_reader $ids) || read_status=$?
+          echo "$observed"
+          target/debug/examples/keychain_probe_writer delete $ids
+          {
+            echo "### Keychain item read by a second binary"
+            echo
+            echo '```'
+            echo "$observed"
+            echo "reader exit: $read_status"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

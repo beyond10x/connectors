@@ -8,7 +8,8 @@ relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-slack-reads
-revision: 2
+- depends_on: story:slack-message-send
+revision: 3
 ---
 ## Outcome
 
@@ -16,9 +17,9 @@ Slack message send, edit and delete — parity unit U08 of `docs/fluxplane-plugi
 
 ## Operations
 
-`slack.message.send`, `slack.message.edit`, `slack.message.delete`
+`slack.message.edit`, `slack.message.delete` (30 calls since 2026-09-09).
 
-162 calls since 2026-09-09 (declared and mapped undeclared names), provider `slack`, planned wave W2.
+`slack.message.send` (132 calls) moved to `story:slack-message-send` on 2026-10-12; it lands first, and this story reuses its write path.
 
 ## Surface
 
