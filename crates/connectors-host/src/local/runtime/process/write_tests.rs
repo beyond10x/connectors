@@ -189,10 +189,15 @@ fn fixture() {
         root,
         mode: mode.clone(),
     };
+    // Descriptor 3 on Unix; on Windows the inherited handle's value.
+    #[cfg(unix)]
+    let fd = 3;
+    #[cfg(windows)]
+    let fd = super::tests::private_fd();
     if mode == "legacy" {
-        let _ = serve(3, Legacy(adapter));
+        let _ = serve(fd, Legacy(adapter));
     } else {
-        let _ = serve(3, adapter);
+        let _ = serve(fd, adapter);
     }
 }
 
@@ -200,7 +205,10 @@ fn peer_fixture(root: &Path, mode: &str) {
     // An independent peer writes literal JSON instead of the production v2
     // codecs. This checks host admission and failure handling, not just a
     // round-trip between two implementations of the same enum.
+    #[cfg(unix)]
     let mut stream = unsafe { UnixStream::from_raw_fd(3) };
+    #[cfg(windows)]
+    let mut stream = super::tests::private_channel();
     let until = Instant::now() + Duration::from_secs(10);
     let hello = channel::read::<Value>(&mut stream, until, false, 0).unwrap();
     let protocol = if mode == "peer-ready-version" {
@@ -610,11 +618,18 @@ fn drop_eof_and_original_deadline_destroy_pending_without_a_write() {
                     Child::spawn(&selection(root.path(), mode, PrivateProtocol::V2)).unwrap();
                 let pending = prepare(&mut child, HANG_BUDGET_MS).unwrap();
                 if mode == "eof" {
+                    #[cfg(unix)]
                     pending
                         .child
                         .channel
                         .shutdown(std::net::Shutdown::Both)
                         .unwrap();
+                    // A pipe has no half-close: closing the owner's end is the EOF.
+                    #[cfg(windows)]
+                    drop(std::mem::replace(
+                        &mut pending.child.channel,
+                        channel::windows::pair().unwrap().0,
+                    ));
                     // The child exits on EOF; retain the exact owned handle until it does.
                     pending.child.process.wait().unwrap();
                     assert_eq!(count(root.path(), "destroy"), 1);

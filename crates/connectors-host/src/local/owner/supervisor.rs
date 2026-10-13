@@ -489,7 +489,7 @@ impl Pool {
         for (_, worker) in workers {
             if let Ok(control) = worker.control.lock() {
                 if let Some(child) = &control.child
-                    && let Err(error) = lifecycle::signal(&child.handle, libc::SIGKILL)
+                    && let Err(error) = lifecycle::kill(&child.handle)
                 {
                     result = Err(error);
                 }

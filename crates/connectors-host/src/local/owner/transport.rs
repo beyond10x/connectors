@@ -620,7 +620,7 @@ impl Client {
         self.answer_within(deadline, channel::DEPTH)
     }
     /// A read's answer as `invoke` reads it ([`read_shape`]).
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     fn read_answer(&mut self, deadline: Instant) -> Result<Value> {
         read_shape(
             self.answer_within(deadline, channel::DEPTH + 1)
