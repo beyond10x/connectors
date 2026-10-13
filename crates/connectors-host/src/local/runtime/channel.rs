@@ -31,7 +31,70 @@ pub(crate) fn wait_readable(stream: &UnixStream) -> Result<()> {
         }
     }
 }
-pub(crate) fn peer(stream: &UnixStream) -> Result<libc::ucred> {
+/// A socket peer's credentials: the kernel's `ucred` on Linux.
+#[cfg(target_os = "linux")]
+pub(crate) type Peer = libc::ucred;
+/// A socket peer's credentials on macOS (`peer_credential_snapshot`, weaker
+/// form `separate_pid_query`): `uid` is the connect-time `LOCAL_PEERCRED`
+/// snapshot; `pid` comes from a separate `LOCAL_PEERPID` query and is held
+/// only to its sign.
+#[cfg(target_os = "macos")]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Peer {
+    pub pid: libc::pid_t,
+    pub uid: libc::uid_t,
+}
+/// The connected peer of `stream`, which must run as the configured user and
+/// carry a positive pid. Anything else is `Unavailable`.
+#[cfg(target_os = "macos")]
+pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
+    use std::os::fd::AsRawFd;
+    // SAFETY: zero is a valid xucred; getsockopt writes at most `size` bytes.
+    let mut credentials: libc::xucred = unsafe { std::mem::zeroed() };
+    let mut size = std::mem::size_of::<libc::xucred>() as libc::socklen_t;
+    // SAFETY: buffers have the requested sizes and the socket is held.
+    if unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_LOCAL,
+            libc::LOCAL_PEERCRED,
+            (&mut credentials as *mut libc::xucred).cast(),
+            &mut size,
+        )
+    } != 0
+        || size as usize != std::mem::size_of::<libc::xucred>()
+        || credentials.cr_version != libc::XUCRED_VERSION
+    {
+        return Err(Failure::Unavailable);
+    }
+    let mut pid: libc::pid_t = 0;
+    let mut size = std::mem::size_of::<libc::pid_t>() as libc::socklen_t;
+    // SAFETY: buffers have the requested sizes and the socket is held.
+    if unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_LOCAL,
+            libc::LOCAL_PEERPID,
+            (&mut pid as *mut libc::pid_t).cast(),
+            &mut size,
+        )
+    } != 0
+        || size as usize != std::mem::size_of::<libc::pid_t>()
+        || pid <= 0
+    {
+        return Err(Failure::Unavailable);
+    }
+    let peer = Peer {
+        pid,
+        uid: credentials.cr_uid,
+    };
+    if peer.uid != super::super::filesystem::uid() {
+        return Err(Failure::Unavailable);
+    }
+    Ok(peer)
+}
+#[cfg(target_os = "linux")]
+pub(crate) fn peer(stream: &UnixStream) -> Result<Peer> {
     use std::os::fd::AsRawFd;
     let mut credentials = libc::ucred {
         pid: 0,
@@ -343,6 +406,29 @@ mod tests {
             read::<Request>(&mut reader, until, false, 0),
             Err(Failure::Timeout)
         ));
+    }
+
+    /// `peer_credential_snapshot` on macOS, weaker form `separate_pid_query`
+    /// (contracts/cli/v1alpha1/semantics.md, macOS platform guarantees): the
+    /// uid is `LOCAL_PEERCRED`'s connect-time snapshot and must be this
+    /// user's; the pid is a separate `LOCAL_PEERPID` query, held only to a
+    /// positive sign. A socket with no peer is refused.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_socket_pair_peer_is_this_user_with_a_positive_pid_and_an_unconnected_socket_is_refused() {
+        use std::os::fd::FromRawFd;
+        let (left, right) = UnixStream::pair().unwrap();
+        for end in [&left, &right] {
+            let peer = peer(end).unwrap();
+            assert_eq!(peer.uid, crate::local::filesystem::uid());
+            assert!(peer.pid > 0, "{}", peer.pid);
+        }
+        // SAFETY: documented scalar arguments; the result is a new owned descriptor.
+        let raw = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_STREAM, 0) };
+        assert!(raw >= 0);
+        // SAFETY: socket returned a new owned descriptor.
+        let unconnected = unsafe { UnixStream::from_raw_fd(raw) };
+        assert!(matches!(peer(&unconnected), Err(Failure::Unavailable)));
     }
 
     #[test]
