@@ -503,7 +503,7 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 
 ### `Failure`
 
-`connectors.cli.Failure` is a record of 14 fields:
+`connectors.cli.Failure` is a record of 16 fields:
 
 - `kind` — `connectors.cli.FailureKind`
 - `code` — `connectors.cli.FailureCode`
@@ -519,10 +519,12 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 - `source_audit` — `Optional<connectors.service_wire.SourceAudit>`, which may be absent
 - `configuration_format` — `Optional<connectors.cli.ConfigurationFormat>`, which may be absent
 - `instance_id` — `Optional<String>`, which may be absent
+- `store_version` — `Optional<String>`, which may be absent
+- `binary_version` — `Optional<String>`, which may be absent
 
 ### `FailureCode`
 
-`connectors.cli.FailureCode` is one of `invalid_input`, `invalid_configuration`, `configuration_exists`, `protected_entry_unavailable`, `custody_unavailable`, `metadata_unavailable`, `revision_conflict`, `outcome_unknown`, `identity_mismatch`, `lifecycle_conflict`, `incarnation_mismatch`, `readiness_mismatch`, `description_unavailable`, `stale_description`, `not_found`, `revoked`, `forbidden`, `not_granted`, `unavailable`, `timeout`, `capacity`, `stale_cursor`, `unsupported`, `interrupted`, `service_failure`, `approval_required`, `approval_refused`, `approval_replayed`, `idempotency_conflict`, `owner_build_mismatch` and `confirmation_required`.
+`connectors.cli.FailureCode` is one of `invalid_input`, `invalid_configuration`, `configuration_exists`, `protected_entry_unavailable`, `custody_unavailable`, `metadata_unavailable`, `revision_conflict`, `outcome_unknown`, `identity_mismatch`, `lifecycle_conflict`, `incarnation_mismatch`, `readiness_mismatch`, `description_unavailable`, `stale_description`, `not_found`, `revoked`, `forbidden`, `not_granted`, `unavailable`, `timeout`, `capacity`, `stale_cursor`, `unsupported`, `interrupted`, `service_failure`, `approval_required`, `approval_refused`, `approval_replayed`, `idempotency_conflict`, `owner_build_mismatch`, `confirmation_required` and `metadata_schema_newer`.
 
 ### `FailureKind`
 
@@ -685,7 +687,7 @@ Every value satisfies `(delivery == inherited_handle or not (defined(handle_vari
 
 ### `NextAction`
 
-`connectors.cli.NextAction` is one of `check_configuration`, `select_protected_source`, `unlock_keyring`, `retry_status`, `repair_connection`, `revalidate_connection`, `create_connection`, `refresh_description`, `request_permission`, `retry_explicitly`, `stop_owner` and `none`.
+`connectors.cli.NextAction` is one of `check_configuration`, `select_protected_source`, `unlock_keyring`, `retry_status`, `repair_connection`, `revalidate_connection`, `create_connection`, `refresh_description`, `request_permission`, `retry_explicitly`, `stop_owner`, `upgrade` and `none`.
 
 ### `OperatingSystem`
 
@@ -1024,6 +1026,42 @@ It has one state, so there is no move to permit or to forbid.
 
 One view projects it: [`LocalRuntimeRecords`](#localruntimerecords).
 
+### `StoreWriter`
+
+`connectors.cli.StoreWriter`.
+
+An instance is identified by `store`, a `String`. The name is part of the model and not a convention: a view projects the identity under that name, so a projection inventing its own would disagree with the view.
+
+It holds:
+
+- `binary_version` — `String`
+- `model_digest` — `String`
+
+It declares no relation to another entity, and no other entity names it.
+
+No invariant is declared, so nothing here constrains an instance at rest.
+
+Its state is a `connectors.cli.StoreWriter.State`, one of `Recorded`. That enum is synthesised from the lifecycle rather than declared beside it, so the states a view's filter compares and the states drawn below cannot disagree.
+
+An instance is created in `Recorded`. `Recorded` is terminal, so an instance may rest there forever. That is declared rather than inferred from having no way out: an entity that cannot leave a state is either finished or stuck, and only its author knows which.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Recorded
+    Recorded --> Recorded: raise (RaiseStoreWriter)
+    Recorded --> [*]
+```
+
+Each move is taken by a declared command outcome, and a move nothing takes is refused as `missing_causation` rather than left as a state change nobody can trigger:
+
+- `raise` — taken by `connectors.cli.RaiseStoreWriter` on its `raised` outcome
+
+An instance is brought into existence by `connectors.cli.RecordStoreWriter` on its `recorded` outcome.
+
+It has one state, so there is no move to permit or to forbid.
+
+No view projects it, so nothing outside this context is promised a way to observe one.
+
 ## Views
 
 A view is what the outside world is promised it can observe. Each one says which instances it contains and how soon it reflects a command that has already returned, because "you can read this" without "how soon" is the promise every flaky suite is built on.
@@ -1089,6 +1127,20 @@ It has two outcomes.
 
 **`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.cli.ConnectionListCursor` in `Expired`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.cli.CursorStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
+### `RaiseStoreWriter`
+
+`connectors.cli.RaiseStoreWriter`.
+
+It takes:
+
+- `store` — `String`
+- `binary_version` — `String`
+- `model_digest` — `String`
+
+It has one outcome.
+
+**`raised`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.cli.StoreWriter` from `Recorded` to `Recorded`, along the declared move `raise`. The instance is the one named by the input field `store`. It emits `connectors.cli.StoreWriterRaised`. It sets `binary_version` from `input.binary_version` and `model_digest` from `input.model_digest`. A test reaches it by constructing an input that satisfies no other outcome's condition.
+
 ### `RecordConnectionListCursor`
 
 `connectors.cli.RecordConnectionListCursor`.
@@ -1124,6 +1176,20 @@ It takes:
 It has one outcome.
 
 **`recorded`** — The default branch, taken when no other outcome's condition matched. It creates a `connectors.cli.LocalRuntimeRecord`, which starts in `Retained`. The new instance's identity is published as `instance_id` on `connectors.cli.LocalRuntimeRecorded`. It emits `connectors.cli.LocalRuntimeRecorded`. It sets `suppressed` from `input.suppressed`, `selection` from `input.selection`, `bootstrap` from `input.bootstrap`, `observed_at` from `input.observed_at` and `build_version` from `input.build_version`. A test reaches it by constructing an input that satisfies no other outcome's condition.
+
+### `RecordStoreWriter`
+
+`connectors.cli.RecordStoreWriter`.
+
+It takes:
+
+- `store` — `String`
+- `binary_version` — `String`
+- `model_digest` — `String`
+
+It has one outcome.
+
+**`recorded`** — The default branch, taken when no other outcome's condition matched. It creates a `connectors.cli.StoreWriter`, which starts in `Recorded`. The new instance's identity is published as `store` on `connectors.cli.StoreWriterRecorded`. It emits `connectors.cli.StoreWriterRecorded`. It sets `binary_version` from `input.binary_version` and `model_digest` from `input.model_digest`. A test reaches it by constructing an input that satisfies no other outcome's condition.
 
 ### `RememberLocalRuntimeBootstrap`
 
@@ -1217,6 +1283,32 @@ Emitted by `connectors.cli.SetLocalRuntimeSuppression` on its `updated` outcome.
 
 Nothing in this system reacts to it.
 
+### `StoreWriterRaised`
+
+`connectors.cli.StoreWriterRaised`.
+
+It carries:
+
+- `store` — `String`
+- `binary_version` — `String`
+
+Emitted by `connectors.cli.RaiseStoreWriter` on its `raised` outcome.
+
+Nothing in this system reacts to it.
+
+### `StoreWriterRecorded`
+
+`connectors.cli.StoreWriterRecorded`.
+
+It carries:
+
+- `store` — `String`
+- `binary_version` — `String`
+
+Emitted by `connectors.cli.RecordStoreWriter` on its `recorded` outcome.
+
+Nothing in this system reacts to it.
+
 ## Errors
 
 ### `CursorStateConflict`
@@ -1235,9 +1327,9 @@ An actor is who may ask this context for something. Every grant below points at 
 
 `connectors.cli.LocalHost`.
 
-It may invoke [`ExpireConnectionListCursor`](#expireconnectionlistcursor), [`RecordConnectionListCursor`](#recordconnectionlistcursor), [`RecordLocalRuntime`](#recordlocalruntime), [`RememberLocalRuntimeBootstrap`](#rememberlocalruntimebootstrap) and [`SetLocalRuntimeSuppression`](#setlocalruntimesuppression).
+It may invoke [`ExpireConnectionListCursor`](#expireconnectionlistcursor), [`RaiseStoreWriter`](#raisestorewriter), [`RecordConnectionListCursor`](#recordconnectionlistcursor), [`RecordLocalRuntime`](#recordlocalruntime), [`RecordStoreWriter`](#recordstorewriter), [`RememberLocalRuntimeBootstrap`](#rememberlocalruntimebootstrap) and [`SetLocalRuntimeSuppression`](#setlocalruntimesuppression).
 
 
 ---
 
-Generated from connectors v1 · model digest `d96a37a980fe964c68203dcc5a324ec4daae10305fb07309b910400fb5918366` · contract digest `slice-sha256/2:ea584617005139a7387314f9ffc1521d01a35111bc27073bda9a96dea0ddc4b6`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `206aae3ed0c0500ad4399aaf3441de984a632534209a46753bce564d172a4813` · contract digest `slice-sha256/2:21f0cca9cfd7e7caf4447029ef52de1269724a540f84ed04394a973fe15a149a`. Do not edit this file; change the specification and regenerate it with `ess generate`.

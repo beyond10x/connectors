@@ -384,6 +384,42 @@ batches of at most 128 before the batch carrying the command's own change; a
 refused expiry batch leaves earlier ones committed and the command's change
 unapplied, with its failure unchanged.
 
+### Store writer marker and binaries of different versions
+
+The metadata store records its newest writer in one `StoreWriter` record
+(identity `store`): the release version of the newest binary that wrote it and
+the digest of the record model that binary persists, a SHA-256 over the Entity
+Runtime definitions the store's records are checked against. Two releases that
+persist the same record shapes have the same digest. A binary records the marker
+in the batch of its first write when the store has none, and raises it in the
+batch of its first write when its own release version is newer; an equal or
+older binary leaves it as it is, so the marker is never lowered. A store written
+before the marker existed has none, is admitted, and gets one on its next write.
+
+Every command that opens the metadata store, `setup check` included, compares
+the marker with its own release version and model digest after it opens the
+store and before it reads a record. When the digests differ and the marker's
+version is newer than the binary's, the command refuses `metadata_schema_newer`
+(`kind = operational`, exit 1, `stage = admission`, `next_action = upgrade`),
+and the `Failure` names `store_version` (the marker's version) and
+`binary_version` (its own); it reads and writes nothing. The same digest under a
+newer version, a release that changed no persisted record, is admitted. A command
+an owner of its own build answers reports the owner's refusal the same way.
+Independently of the marker, a write the Entity Runtime refuses because a record
+carries a field this binary's model does not declare is `metadata_schema_newer`
+too, with `store_version = "unrecorded"` unless a newer marker names the writer;
+it is never `metadata_unavailable` or `retry_status`, because running the same
+binary again cannot change the record. Neither refusal changes the store.
+
+So once a binary has written a state directory, an older binary may not use it:
+binaries of different versions share one state directory only while the oldest
+of them is at least the newest that wrote it. Releases before the marker cannot
+read it and answer such a store as they always did, with `metadata_unavailable`
+(`next_action = retry_status`), which retrying does not change. A consumer pinned
+to a version keeps its own state directory with `--state-dir`, initialises it
+with `setup init`, and connects there; connections, cursors, approvals and
+cached descriptions recorded in another state directory are not visible in it.
+
 ## 4. Lifecycle and bounded startup
 
 The executable owner binding is specified in [local owner transport](owner.md).
@@ -595,6 +631,7 @@ never replay a possible write after interruption, timeout or lost response.
 | `setup checkpoints-enable` without `--confirm one-way`; nothing changed (`stage = arguments`, `next_action = retry_explicitly`) | `confirmation_required` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
+| store written by a newer binary whose record model differs, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
