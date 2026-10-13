@@ -156,9 +156,14 @@ earlier local-only Connectors publication boundary for these releases.
    `--latest=false` only when the release is deliberately not the newest. A page
    that is not Latest is invisible on the repository's front page, which is how
    v0.8.0 and v0.9.0 went unnoticed after they shipped. Verify the created page's
-   author, its Latest state and that it resolves to the tag's peeled commit. No
-   workflow builds release artifacts; the page carries the source archives GitHub
-   generates and nothing else.
+   author, its Latest state and that it resolves to the tag's peeled commit. Besides
+   the source archives GitHub generates, the page carries the four archives
+   `connectors-<version>-<target>.tar.gz` (`x86_64-unknown-linux-gnu`,
+   `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`) and
+   `SHA256SUMS`, which [`release-binaries.yml`](.github/workflows/release-binaries.yml)
+   builds on the tag push and uploads once the page exists; it never creates or
+   edits the page. The release is verified only when those five assets are on the
+   page and `sha256sum -c SHA256SUMS` passes on the downloaded archives.
 
 v0.8.0–v0.11.0 were cut from a checkout with no GitHub remote and published by
 replaying its history onto the `next` branch with `git commit-tree`, so each of

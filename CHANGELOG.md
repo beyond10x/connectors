@@ -13,10 +13,15 @@
   `connectors.cli.PlatformGuarantee`, `PlatformGuaranteeStatement`): Linux holds all seven, macOS
   holds one and six in a named weaker form.
 - The `macOS host` workflow runs the lint and test suites of `connectors-host` and `connectors` on
-  `macos-latest` for every pull request and push to `main`. On a release tag it builds a release
-  binary and signs and notarizes it when the repository holds the signing secrets; without them
-  it writes a skip line to the run summary. A signed binary is a workflow artifact, not a release
-  asset.
+  `macos-latest` for every pull request and push to `main`.
+- Release pages carry pre-built `connectors` binaries: on a `v<version>` tag push,
+  `release-binaries.yml` checks the tag's provenance, builds `connectors-<version>-<target>.tar.gz`
+  for `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
+  `aarch64-apple-darwin` on native runners, checks that each binary's `--version` names the
+  version, and uploads the archives with a `SHA256SUMS` file once the release page exists. macOS
+  binaries are signed and notarized when the repository holds the signing secrets; without them
+  the run summary says so. The README's *Install a release binary* gives the install and checksum
+  commands. No Windows binary is built.
 
 ### Limitations
 
@@ -26,6 +31,10 @@
   digest check and exec.
 - The release binary is not signed yet, so an upgraded binary on macOS still cannot read keychain
   items an earlier build wrote (0.46.0, *Limitations*) and has to store its credentials again.
+- The macOS release archives hold an unsigned binary until the signing secrets exist: one
+  downloaded through a browser is quarantined by Gatekeeper until
+  `xattr -d com.apple.quarantine connectors` removes the attribute. Releases cut before
+  `release-binaries.yml` carry source archives only.
 - Tests that need the Secret Service fixture, or a socket path past the 104-byte macOS
   `sun_path`, run on Linux only. Windows does not run the CLI yet.
 
