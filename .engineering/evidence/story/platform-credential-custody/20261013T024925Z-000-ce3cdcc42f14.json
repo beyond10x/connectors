@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-13T02:49:25Z",
+  "actor": "human:timo",
+  "artifact": "story:platform-credential-custody",
+  "kind": "story",
+  "revision": 4,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/159 Rust gate and Custody platforms (macos-latest, windows-latest) pass on 1f3e52a68, Custody platforms re-run twice pass; package gates on 60eeaa592: 883 passed 0 failed; custody 19 passed on 1f3e52a68",
+    "reference": "crates/connectors-custody/src/tests.rs"
+  }
+}
