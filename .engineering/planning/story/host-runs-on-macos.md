@@ -9,7 +9,7 @@ relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
 - informed_by: decision-blocker:macos-keychain-partition
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-13T04:58:49Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-13T04:58:49Z", actor: "human:timo", revision: 5}
@@ -75,3 +75,14 @@ Inferred, not observed: the cause is the item's partition list, checked beside t
 This story makes an upgraded binary read what an earlier one wrote, and the second-binary step becomes a failing check again.
 
 Open item: signing the release binary, so that the item's partition is the team id and survives upgrades, needs an Apple developer account. That is decided when this story starts.
+
+## Decisions taken in the wave
+
+Taken 2026-10-13 inside this story's approved scope:
+
+- (a) Consumer execution: the contract follows the code. `consumer-launch.md` § 7 said `posix_spawn` with `POSIX_SPAWN_CLOEXEC_DEFAULT`; the CLI forks and execs the image copy by path and marks every descriptor from 4 up to the descriptor limit close-on-exec before exec, because libc 0.2.190 has no `posix_spawn_file_actions_addinherit_np` to keep descriptor 3. The section now says so.
+- (b) Peer pid: the adapter entry (`runtime/server.rs`) requires the peer pid to equal its parent's process id on both platforms, which is stricter than "used only for its sign". The owner and the supervisor use it only for its sign. The semantics table row and `private-adapter.md` now say both.
+- (c) Protected stdin on macOS: the same rule through other mechanisms (a FIFO with no `F_GETPATH` path; the parent's owner through `proc_pidinfo`, same session, not pid 1). A paragraph in the semantics macOS section; no guarantee row changes.
+- (d) `setup check` reporting the weakened guarantees is not in this wave: `story:setup-check-reports-weakened-guarantees` (draft).
+
+Gated to Linux, because they need the Secret Service fixture or a socket path past the macOS `sun_path`: the custody and approval-key test modules of `connectors-host`, `production_cli_approval_issuance_and_restart`, and `apps/connectors/tests/socket_path_adversary.rs`.
