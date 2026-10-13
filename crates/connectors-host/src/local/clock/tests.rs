@@ -232,6 +232,7 @@ fn timeout_and_excessive_signed_radius_supply_no_capability() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn inherited_clock_refuses_in_an_actual_fork() {
     let mut c = clock();

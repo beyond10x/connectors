@@ -4,7 +4,9 @@ use super::tests::{
     NOW, binding, fixture, prepared, publish_fixture, recorded_clock_floor_events, recorded_events,
 };
 use super::*;
-use std::{collections::BTreeMap, os::unix::fs::PermissionsExt, time::Duration};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+use std::{collections::BTreeMap, time::Duration};
 
 /// The transactions of one `operations invoke` of a read operation with an
 /// owner running, in the process that performs each: the CLI reads the
@@ -82,6 +84,7 @@ struct Step {
     costs: BTreeMap<&'static str, (u64, Duration)>,
 }
 
+#[cfg(unix)]
 fn own_usage() -> libc::rusage {
     // SAFETY: `getrusage` writes only the struct it is handed.
     unsafe {
@@ -91,6 +94,7 @@ fn own_usage() -> libc::rusage {
     }
 }
 
+#[cfg(unix)]
 fn process_cpu() -> Duration {
     let usage = own_usage();
     let time = |value: libc::timeval| {
@@ -102,8 +106,32 @@ fn process_cpu() -> Duration {
 /// This process's peak resident set so far, in MiB. It only rises, so it
 /// says something about one store size only in a process that measured no
 /// other (Linux reports `ru_maxrss` in KiB).
+#[cfg(unix)]
 fn peak_rss_mb() -> i64 {
     own_usage().ru_maxrss / 1024
+}
+
+/// Windows: user and kernel time of this process, from `GetProcessTimes`.
+#[cfg(windows)]
+fn process_cpu() -> Duration {
+    use windows_sys::Win32::{
+        Foundation::FILETIME,
+        System::Threading::{GetCurrentProcess, GetProcessTimes},
+    };
+    let mut times = [FILETIME::default(); 4];
+    let [creation, exit, kernel, user] = &mut times;
+    // SAFETY: the pseudo handle of this process and four writable FILETIMEs.
+    unsafe { GetProcessTimes(GetCurrentProcess(), creation, exit, kernel, user) };
+    let units =
+        |time: &FILETIME| (u64::from(time.dwHighDateTime) << 32) | u64::from(time.dwLowDateTime);
+    Duration::from_nanos((units(&times[2]) + units(&times[3])) * 100)
+}
+
+/// Windows: the peak resident set is not read here (its query needs the
+/// process status bindings, which the host does not enable); -1 says so.
+#[cfg(windows)]
+fn peak_rss_mb() -> i64 {
+    -1
 }
 
 /// Set in a process `read_invoke_cost_by_store_size` started to measure the
@@ -195,7 +223,10 @@ const FLOOR_FILE: &str = "registry-clock.floor";
 
 fn load(stored: &Path) -> (tempfile::TempDir, Registry, String) {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     let target = root.path().join("metadata.sqlite3");
     std::fs::copy(stored.join("metadata.sqlite3"), &target).unwrap();
     std::fs::write(root.path().join("metadata.lock"), b"").unwrap();
@@ -205,11 +236,14 @@ fn load(stored: &Path) -> (tempfile::TempDir, Registry, String) {
         names.push(FLOOR_FILE);
     }
     for name in names {
+        #[cfg(unix)]
         std::fs::set_permissions(
             root.path().join(name),
             std::fs::Permissions::from_mode(0o600),
         )
         .unwrap();
+        #[cfg(windows)]
+        crate::local::filesystem::windows::owner_only(&root.path().join(name));
     }
     let reference = std::fs::read_to_string(stored.join("reference")).unwrap();
     let registry = Registry::new(root.path());

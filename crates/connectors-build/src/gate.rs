@@ -502,7 +502,8 @@ mod tests {
 
 /// Adversary cases: the runner the gate configures is executed the way Cargo executes it,
 /// `<runner...> <test binary> <args...>`, against real programs.
-#[cfg(test)]
+/// The runner is `sh -c`; these run on Unix only.
+#[cfg(all(test, unix))]
 mod adversary_tests {
     use super::cargo;
     use std::{os::unix::fs::symlink, path::Path, process::Command};
@@ -619,7 +620,7 @@ mod adversary_tests {
 
 /// Adversary pass 2: the `sh -c` runner must be transparent to the test binary's exit
 /// status, its signals and the arguments Cargo appends, and must hand over any root.
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod adversary_pass2_tests {
     use super::cargo;
     use std::{

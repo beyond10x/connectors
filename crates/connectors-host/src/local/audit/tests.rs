@@ -1,16 +1,20 @@
 use super::*;
 use crate::local::mutations;
 use serde_json::json;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     cell::Cell,
-    os::unix::fs::PermissionsExt,
     sync::{Arc, Barrier, atomic::Ordering},
 };
 
 const NOW: i64 = 1_789_056_000_000;
 pub(crate) fn fixture() -> (tempfile::TempDir, Store) {
     let root = tempfile::tempdir().unwrap();
+    #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::owner_only(root.path());
     drop(Metadata::initialize(root.path()).unwrap());
     let mut metadata = Metadata::update(root.path(), false).unwrap();
     metadata.connection.execute_batch("INSERT INTO registry_instances VALUES ('alpha','adapter','config',0),('beta','adapter','config',0);").unwrap();
@@ -705,11 +709,14 @@ fn corrupted_or_unavailable_metadata_is_not_absence_or_recovered_acknowledgement
         store.append(&reference, &final_value()),
         Err(Failure::MetadataUnavailable)
     );
+    #[cfg(unix)]
     std::fs::set_permissions(
         root.path().join("metadata.sqlite3"),
         std::fs::Permissions::from_mode(0o644),
     )
     .unwrap();
+    #[cfg(windows)]
+    crate::local::filesystem::windows::grant_everyone_read(&root.path().join("metadata.sqlite3"));
     assert_eq!(
         store.observe(&Reference {
             instance: "alpha".into(),
