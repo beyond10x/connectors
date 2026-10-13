@@ -2,14 +2,17 @@
 format: aep.planning-md/3
 id: story:host-runs-on-macos
 kind: story
-status: draft
+status: active
 title: The connectors binary builds and runs on macOS
 relations:
 - decomposes: epic:local-cli-on-macos-and-windows
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
 - informed_by: decision-blocker:macos-keychain-partition
-revision: 2
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-13T04:58:49Z", actor: "human:timo", revision: 4}
+- {from: "proposed", to: "active", at: "2026-10-13T04:58:49Z", actor: "human:timo", revision: 5}
 ---
 ## Outcome
 
@@ -18,12 +21,18 @@ process, with custody in the macOS Keychain (`story:platform-credential-custody`
 
 ## Today
 
-`connectors-host` calls Linux-only items with no platform gating: `SO_PEERCRED`/`ucred` peer checks
-(`local/keyring.rs`, `local/runtime/channel.rs`), `memfd_create` and fd passing for consumer launch
-(`local/runtime/launch.rs`, `local/runtime/artifact.rs`), pidfd process control
-(`local/runtime/process.rs`, `local/owner/lifecycle.rs`, `local/owner/supervisor.rs`),
-`renameat2` and `fstatfs` (`local/filesystem.rs`), `prctl` and `close_range`.
-`apps/connectors/src/local.rs:337,359` reports `"os":"linux"` unconditionally.
+Read 2026-10-13 from the tree at 4b938b086. `apps/connectors/src/local.rs:337,359` already reports `std::env::consts::OS`, and `connectors.cli.OperatingSystem` already names `macos` (`ess/domains/cli.yaml:299-301`). Linux-only calls in `crates/connectors-host/src/local/` with no platform gating:
+
+- Peer credentials: `SO_PEERCRED` in `runtime/channel.rs:34-58`.
+- Executable and credential capture: sealed `memfd_create` in `runtime/artifact.rs:22-24,74-76` (with an ELF-only header check at `:71`) and `runtime/launch.rs:39-62`; exec through `/proc/self/fd/N` at `launch.rs:266`, `runtime/process.rs:42`, `owner/transport.rs:694,783`; `MSG_NOSIGNAL` and `MSG_CMSG_CLOEXEC` at `launch.rs:118,156`.
+- Process control: pidfds in `runtime/process.rs:69,497-503`, `owner/lifecycle.rs:66-87`, `owner/supervisor.rs:466,478`; `PR_SET_PDEATHSIG` at `launch.rs:283` and `process.rs:54`; `close_range` at `launch.rs:317`.
+- Filesystem: `renameat2(RENAME_NOREPLACE)` at `filesystem.rs:226,255`.
+- Clock: `CLOCK_BOOTTIME` at `clock/timer.rs:30,44,46`.
+- Own build: `/proc/self/exe` at `owner/transport.rs:37`.
+- Protected stdin: `/proc/self/fd/0`, `pipe:[` and `/proc/<parent>` at `protected.rs:168-186`.
+- Outside the host: `crates/connectors-build/src/ignored.rs:538` calls `prctl(PR_SET_CHILD_SUBREAPER)` unguarded.
+
+No new crate: libc 0.2.190 (`Cargo.lock`) has every Apple call named below.
 
 ## Design questions to settle in the specification first
 
@@ -32,6 +41,22 @@ process, with custody in the macOS Keychain (`story:platform-credential-custody`
   `EVFILT_PROC`), each keeping the guarantee the Linux path gives or naming the one it cannot.
 - Atomic no-replace rename: `renamex_np(RENAME_EXCL)`.
 - Filesystem qualification: which macOS filesystems are admitted (APFS).
+
+- Guarantees macOS cannot give the same way (scoped 2026-10-13, inferred until run): a sealed executable (a 0500 copy in a 0700 directory can be rewritten by the same user before exec), parent-death kill (no `PR_SET_PDEATHSIG`; an adapter can watch its fd-3 channel, a consumer cannot), atomic close-on-exec on received descriptors, exact-process signalling unless reaping and signalling share one lock, and measuring the running image after the file is replaced. Each is named in the specification as a platform guarantee, with the Linux value unchanged.
+
+## Units
+
+Disjoint files, D first:
+
+- D, specification and CLI tests: `ess/domains/cli.yaml` (a platform guarantee enum), `contracts/cli/v1alpha1/{private-adapter,consumer-launch,owner,semantics}.md`, `apps/connectors/tests/{support/socket.rs,consumer_launch.rs,failed_connect.rs,failed_connect_adversary.rs}`.
+- A, peer credentials, sockets and stdin: `runtime/channel.rs`, `runtime/launch.rs`, `protected.rs`, and their tests.
+- B, capture and process control: `runtime/artifact.rs`, `runtime/process.rs`, `owner/lifecycle.rs`, `owner/supervisor.rs`, `owner/transport.rs`.
+- C, filesystem, clock and build tooling: `filesystem.rs`, `clock/timer.rs`, `crates/connectors-build/src/ignored.rs`.
+- The coordinator keeps the Cargo manifests, the workflows (a `macos-latest` job running clippy and the tests of `connectors-host` and `connectors`), the changelog and the generated docs.
+
+## Release signing
+
+The signing job reads `MACOS_SIGNING_CERT_P12_BASE64`, `MACOS_SIGNING_CERT_PASSWORD` and `APPLE_TEAM_ID`; notarization reads `APPLE_API_KEY_P8`, `APPLE_API_ISSUER_ID` and `APPLE_API_KEY_ID`. Until they are set on the repository, the job skips with a line saying so, the upgrade-access check stays recorded and not failing, and the release notes tell macOS users that an upgraded binary re-stores its credentials.
 
 ## Acceptance
 
