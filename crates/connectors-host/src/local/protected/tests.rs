@@ -139,8 +139,8 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
                     &mut master_fd,
                     &mut slave_fd,
                     std::ptr::null_mut(),
-                    std::ptr::null(),
-                    std::ptr::null(),
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
                 )
             },
             0
@@ -184,7 +184,7 @@ fn controlling_terminal_hides_input_and_restores_echo_after_sigint() {
         // owned slave. Parent retains both fds; no foreign process is signalled.
         unsafe {
             command.pre_exec(move || {
-                if libc::setsid() < 0 || libc::ioctl(slave_fd, libc::TIOCSCTTY, 0) < 0 {
+                if libc::setsid() < 0 || libc::ioctl(slave_fd, libc::TIOCSCTTY as _, 0) < 0 {
                     return Err(std::io::Error::last_os_error());
                 }
                 Ok(())
@@ -314,8 +314,8 @@ fn flush_fixture() {
                 &mut master_fd,
                 &mut slave_fd,
                 std::ptr::null_mut(),
-                std::ptr::null(),
-                std::ptr::null(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
             )
         },
         0
@@ -397,6 +397,23 @@ fn interrupt_that_flushes_polled_input_before_the_read_is_reported_as_interrupte
 // pin that the retry waits in `poll` rather than spinning or inventing an
 // interrupt. They run in the shared test process, where no test installs the
 // signal guard, so `INTERRUPTED` stays false here.
+#[cfg(target_os = "macos")]
+fn adversary_nonblocking_pipe() -> (File, File) {
+    let mut fds = [-1; 2];
+    // SAFETY: two initialized output slots for pipe.
+    assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0);
+    // SAFETY: both descriptors were just created and are owned here alone.
+    let pair = unsafe { (File::from_raw_fd(fds[0]), File::from_raw_fd(fds[1])) };
+    for fd in fds {
+        // SAFETY: flag changes on descriptors this test owns.
+        unsafe {
+            assert_eq!(libc::fcntl(fd, libc::F_SETFL, libc::O_NONBLOCK), 0);
+            assert_eq!(libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC), 0);
+        }
+    }
+    pair
+}
+#[cfg(target_os = "linux")]
 fn adversary_nonblocking_pipe() -> (File, File) {
     let mut fds = [-1; 2];
     // SAFETY: two initialized output slots for pipe2.
@@ -500,4 +517,77 @@ fn adversary_empty_read_then_writer_closes_reports_end_of_input() {
     assert_eq!(stolen.first, Some(std::io::ErrorKind::WouldBlock));
     assert_eq!(result.map_err(|e| e.code), Ok(0));
     assert_eq!(stolen.reads, 2);
+}
+
+// Re-entered in its own process by the macOS stdin case below, with the
+// standard input that case chose. Reports the outcome on one tagged line.
+#[cfg(target_os = "macos")]
+#[test]
+fn stdin_fixture() {
+    if std::env::var_os("CONNECTORS_STDIN_FIXTURE").is_none() {
+        return;
+    }
+    match stdin(connectors_sdk::now_ms() + 10_000) {
+        Ok(secret) => println!("STDIN ok {}", secret.0.len()),
+        Err(error) => println!("STDIN refused {:?}", error.code),
+    }
+}
+
+/// Protected stdin on macOS, where there is no `/proc`: a regular file's
+/// directory comes from `F_GETPATH` and is admitted as on Linux; a pipe is
+/// admitted only when it is anonymous (`S_IFIFO` with no path, where Linux
+/// reads `pipe:[…]`), and its producer, the parent, must be this user's
+/// (`proc_pidinfo`, where Linux reads `/proc/<parent>`). A named FIFO is
+/// refused.
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_stdin_admits_an_anonymous_pipe_and_a_private_file_and_refuses_a_named_fifo() {
+    use std::os::unix::ffi::OsStrExt;
+    let run = |input: Stdio, write: Option<&[u8]>| -> String {
+        let mut child = Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "local::protected::tests::stdin_fixture",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env("CONNECTORS_STDIN_FIXTURE", "1")
+            .stdin(input)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        if let Some(bytes) = write {
+            child.stdin.take().unwrap().write_all(bytes).unwrap();
+        }
+        let output = child.wait_with_output().unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        stdout
+            .lines()
+            .find_map(|line| line.split_once("STDIN ").map(|(_, rest)| rest.to_owned()))
+            .unwrap_or_else(|| panic!("the fixture reported nothing: {output:?}"))
+    };
+    assert_eq!(run(Stdio::piped(), Some(b"fictional")), "ok 9");
+
+    let root = tempfile::tempdir().unwrap();
+    std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+    let path = root.path().join("input");
+    std::fs::write(&path, b"fictional").unwrap();
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(run(Stdio::from(File::open(&path).unwrap()), None), "ok 9");
+
+    let fifo = root.path().join("fifo");
+    let name = std::ffi::CString::new(fifo.as_os_str().as_bytes()).unwrap();
+    // SAFETY: a live NUL-terminated path.
+    assert_eq!(unsafe { libc::mkfifo(name.as_ptr(), 0o600) }, 0);
+    // A reader opened without blocking lets the writer open at once.
+    let reader = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(&fifo)
+        .unwrap();
+    let mut writer = std::fs::OpenOptions::new().write(true).open(&fifo).unwrap();
+    writer.write_all(b"fictional").unwrap();
+    drop(writer);
+    assert_eq!(run(Stdio::from(reader), None), "refused InvalidInput");
 }

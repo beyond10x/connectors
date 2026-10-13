@@ -6,19 +6,20 @@
 use super::*;
 use crate::local::{
     config::{Config, Executable, Paths},
-    keyring::custody,
     owner::{self, Code},
+};
+#[cfg(target_os = "linux")]
+use crate::local::{
+    keyring::custody,
     registry::{self, Registry},
 };
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 use std::{
-    collections::BTreeSet,
-    io::Read,
-    os::unix::process::ExitStatusExt,
-    path::{Path, PathBuf},
-    process::ExitStatus,
-    time::Duration,
+    collections::BTreeSet, io::Read, os::unix::process::ExitStatusExt, path::Path,
+    process::ExitStatus, time::Duration,
 };
 
 fn until() -> Instant {
@@ -49,6 +50,7 @@ fn close_on_exec(file: &File) -> bool {
     unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFD) & libc::FD_CLOEXEC != 0 }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn a_sealed_credential_is_read_only_at_its_start_and_refuses_every_change() {
     let (_, document) = fictional_document();
@@ -85,6 +87,70 @@ fn a_sealed_credential_is_read_only_at_its_start_and_refuses_every_change() {
             .raw_os_error(),
         Some(libc::EPERM)
     );
+}
+
+/// The macOS credential (contracts/cli/v1alpha1/consumer-launch.md §7): no
+/// memfd, so the material is written into a file in a fresh mode 0700
+/// directory that is unlinked before the read-only descriptor is handed out.
+/// The descriptor reads the material from its start, has no name left to
+/// reopen, and refuses every write, shrink and growth through itself.
+#[cfg(target_os = "macos")]
+#[test]
+fn an_unlinked_credential_is_read_only_at_its_start_and_has_no_name() {
+    use std::os::unix::fs::MetadataExt;
+    let (_, document) = fictional_document();
+    let mut file = sealed(&document).unwrap();
+    let mut read = Vec::new();
+    file.read_to_end(&mut read).unwrap();
+    assert_eq!(read, document);
+    assert!(close_on_exec(&file));
+    let metadata = file.metadata().unwrap();
+    assert!(metadata.is_file());
+    assert_eq!(metadata.nlink(), 0, "the credential file is still linked");
+    assert_eq!(metadata.mode() & 0o777, 0o400);
+    assert_eq!(metadata.uid(), crate::local::filesystem::uid());
+    // SAFETY: F_GETFL on a live descriptor.
+    let access = unsafe { libc::fcntl(file.as_raw_fd(), libc::F_GETFL) } & libc::O_ACCMODE;
+    assert_eq!(access, libc::O_RDONLY);
+    assert!(file.write(b"x").is_err());
+    assert!(file.set_len(0).is_err());
+    assert!(file.set_len(document.len() as u64 + 1).is_err());
+    // Neither attempt changed a byte.
+    let mut again = Vec::new();
+    std::io::Seek::rewind(&mut file).unwrap();
+    file.read_to_end(&mut again).unwrap();
+    assert_eq!(again, document);
+}
+
+/// `MSG_NOSIGNAL` has no macOS form; the channel socket carries
+/// `SO_NOSIGPIPE` instead (private-adapter.md, macOS), with the same effect:
+/// a send to a closed peer is refused, and the process is not killed by
+/// `SIGPIPE`. The Rust runtime already ignores `SIGPIPE` in this test process,
+/// so the option on the socket is what this case observes.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_send_to_a_closed_peer_is_refused_without_sigpipe() {
+    let (left, right) = UnixStream::pair().unwrap();
+    drop(right);
+    let credential = sealed(b"fictional").unwrap();
+    assert!(matches!(
+        send(&left, &[&credential], until()),
+        Err(Failure::Unavailable)
+    ));
+    let mut value: libc::c_int = 0;
+    let mut size = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
+    // SAFETY: an initialized c_int buffer of the stated size on a live socket.
+    let result = unsafe {
+        libc::getsockopt(
+            left.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_NOSIGPIPE,
+            (&mut value as *mut libc::c_int).cast(),
+            &mut size,
+        )
+    };
+    assert_eq!(result, 0);
+    assert_ne!(value, 0);
 }
 
 #[test]
@@ -126,6 +192,7 @@ fn descriptors_cross_the_owner_socket_above_the_standard_range_and_close_on_exec
     ));
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn a_consumer_reads_the_credential_on_descriptor_three_and_its_exit_code_is_the_launchs() {
     // `test` stands in for a consumer: an argv-pinned image, no shell, no PATH.
@@ -145,6 +212,37 @@ fn a_consumer_reads_the_credential_on_descriptor_three_and_its_exit_code_is_the_
     assert_eq!(run(&["-r", "/proc/self/fd/3"], &document), 0);
     assert_eq!(run(&["-s", "/proc/self/fd/3"], &document), 0);
     assert_eq!(run(&["-s", "/proc/self/fd/3"], b""), 1);
+    assert_eq!(run(&["-n", ""], &document), 1);
+    assert_eq!(code(ExitStatus::from_raw(7 << 8)), 7);
+    assert_eq!(
+        code(ExitStatus::from_raw(libc::SIGKILL)),
+        128 + libc::SIGKILL
+    );
+}
+
+/// The macOS form of the case above (consumer-launch.md §7): the image copy is
+/// executed by path and the credential is read on descriptor 3, which macOS
+/// names `/dev/fd/3`.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_consumer_reads_the_credential_on_descriptor_three_by_dev_fd_and_its_exit_code_is_the_launchs()
+{
+    let image = Path::new("/bin/test");
+    let run = |args: &[&str], material: &[u8]| {
+        let selected = pinned(image, args);
+        Consumer::new(
+            selected.capture(until()).unwrap(),
+            sealed(material).unwrap(),
+            selected.args.clone(),
+            BTreeSet::new(),
+        )
+        .run(&[], std::iter::empty())
+        .unwrap()
+    };
+    let (_, document) = fictional_document();
+    assert_eq!(run(&["-r", "/dev/fd/3"], &document), 0);
+    assert_eq!(run(&["-s", "/dev/fd/3"], &document), 0);
+    assert_eq!(run(&["-s", "/dev/fd/3"], b""), 1);
     assert_eq!(run(&["-n", ""], &document), 1);
     assert_eq!(code(ExitStatus::from_raw(7 << 8)), 7);
     assert_eq!(
@@ -366,6 +464,7 @@ fn a_caller_argument_holding_nul_is_refused_before_anything_runs() {
     assert!(matches!(launched, Err(Failure::InvalidInput)));
 }
 
+#[cfg(target_os = "linux")]
 /// Publish one ready connection through the registry's own lifecycle, its
 /// material in the disposable Secret Service, valid for `lifetime_ms`.
 fn publish(
@@ -413,8 +512,10 @@ fn publish(
         .unwrap()
 }
 
+#[cfg(target_os = "linux")]
 /// Stops the owner the CLI started, whatever the journey's outcome.
 struct OwnerStop(Paths);
+#[cfg(target_os = "linux")]
 impl Drop for OwnerStop {
     fn drop(&mut self) {
         if let Ok(client) = owner::Client::connect(&self.0, false) {
@@ -424,12 +525,14 @@ impl Drop for OwnerStop {
     }
 }
 
+#[cfg(target_os = "linux")]
 fn contains(haystack: &[u8], needle: &str) -> bool {
     haystack
         .windows(needle.len())
         .any(|window| window == needle.as_bytes())
 }
 
+#[cfg(target_os = "linux")]
 fn files(directory: &Path, found: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(directory).unwrap() {
         let entry = entry.unwrap();
@@ -442,6 +545,7 @@ fn files(directory: &Path, found: &mut Vec<PathBuf>) {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 #[ignore = "requires qualified GNOME, dbus-daemon, task-owned TMPDIR and CONNECTORS_TEST_CLI"]
 fn disposable_consumer_launch_delivers_fd3_and_refuses_by_code() {
@@ -578,6 +682,7 @@ mod review_conformance {
     /// Subprocess helper: the pinned consumer. Reports the descriptors open at
     /// its start, its environment, the digest of descriptor 3's bytes, and the
     /// errno of every attempt to change descriptor 3's file.
+    #[cfg(target_os = "linux")]
     #[test]
     #[ignore = "subprocess helper: runs only as the reviewing consumer"]
     fn reviewing_consumer_fixture() {
@@ -646,6 +751,84 @@ mod review_conformance {
                 "shrink": shrink,
                 "grow": grow,
                 "add_seal": add_seal,
+                "map_shared_write": map_shared_write,
+            })
+        };
+        let mut stdout = std::io::stdout().lock();
+        writeln!(stdout, "REVIEW {report}").unwrap();
+        stdout.flush().unwrap();
+        std::process::exit(0);
+    }
+
+    /// Subprocess helper: the pinned consumer on macOS, where there is no
+    /// `/proc` and no seal. Reports the descriptors open at its start (from
+    /// `/dev/fd`), its environment, the digest of descriptor 3's bytes,
+    /// descriptor 3's link count and access mode, and the errno of every
+    /// attempt to change descriptor 3's file.
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "subprocess helper: runs only as the reviewing consumer"]
+    fn reviewing_consumer_fixture() {
+        use std::{io::Write, os::unix::fs::MetadataExt};
+        let listed: Vec<i32> = std::fs::read_dir("/dev/fd")
+            .unwrap()
+            .map(|entry| {
+                entry
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .parse()
+                    .unwrap()
+            })
+            .collect();
+        // The listing's own directory descriptor is closed by now.
+        // SAFETY: F_GETFD only probes a descriptor number.
+        let descriptors: Vec<i32> = listed
+            .into_iter()
+            .filter(|fd| unsafe { libc::fcntl(*fd, libc::F_GETFD) } >= 0)
+            .collect();
+        // SAFETY: descriptor 3 is the launch's; ManuallyDrop keeps it open.
+        let mut credential = ManuallyDrop::new(unsafe { File::from_raw_fd(3) });
+        let mut bytes = Vec::new();
+        credential.read_to_end(&mut bytes).unwrap();
+        let metadata = credential.metadata().unwrap();
+        // SAFETY: plain syscalls on descriptor numbers and a live buffer.
+        let report = unsafe {
+            let access = libc::fcntl(3, libc::F_GETFL) & libc::O_ACCMODE;
+            let write_fd3 = errno(libc::write(3, b"x".as_ptr().cast(), 1));
+            let reopened = libc::open(c"/dev/fd/3".as_ptr(), libc::O_RDWR | libc::O_CLOEXEC);
+            let reopen = errno(reopened);
+            let target = if reopened >= 0 { reopened } else { 3 };
+            let write_reopened = errno(libc::write(target, b"x".as_ptr().cast(), 1));
+            let shrink = errno(libc::ftruncate(target, 0));
+            let grow = errno(libc::ftruncate(target, bytes.len() as i64 + 4096));
+            let map = libc::mmap(
+                std::ptr::null_mut(),
+                4096,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_SHARED,
+                target,
+                0,
+            );
+            let map_shared_write = if map == libc::MAP_FAILED {
+                std::io::Error::last_os_error().raw_os_error().unwrap_or(-1)
+            } else {
+                libc::munmap(map, 4096);
+                0
+            };
+            json!({
+                "sha256": digest(&bytes),
+                "descriptors": descriptors.iter().map(|fd| (fd, "")).collect::<Vec<_>>(),
+                "env": std::env::vars_os()
+                    .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
+                    .collect::<Vec<_>>(),
+                "nlink": metadata.nlink(),
+                "read_only": access == libc::O_RDONLY,
+                "write_fd3": write_fd3,
+                "reopen_rdwr": reopen,
+                "write_reopened": write_reopened,
+                "shrink": shrink,
+                "grow": grow,
                 "map_shared_write": map_shared_write,
             })
         };
@@ -774,6 +957,26 @@ mod review_conformance {
     /// Invariants 2 and 7 from inside the consumer: descriptor 3 carries the
     /// material byte for byte, and no write, reopen-and-write, shrink, grow,
     /// added seal or shared writable mapping succeeds.
+    /// Invariants 2 and 7 on macOS (consumer-launch.md §7): descriptor 3
+    /// carries the material byte for byte through a read-only descriptor of
+    /// an unlinked file, so there is no name to reopen it writable, and no
+    /// write, writable reopen, shrink, grow or shared writable mapping
+    /// succeeds.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn review_the_consumer_cannot_change_descriptor_three() {
+        let (material, report) = review(false);
+        assert_eq!(report["sha256"], json!(material), "{report}");
+        assert_eq!(report["nlink"], json!(0), "{report}");
+        assert_eq!(report["read_only"], json!(true), "{report}");
+        assert_eq!(report["write_fd3"], json!(libc::EBADF), "{report}");
+        assert_ne!(report["reopen_rdwr"], json!(0), "{report}");
+        for attempt in ["write_reopened", "shrink", "grow", "map_shared_write"] {
+            assert_ne!(report[attempt], json!(0), "{attempt}: {report}");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
     #[test]
     fn review_the_consumer_cannot_change_descriptor_three_or_its_seals() {
         let (material, report) = review(false);
