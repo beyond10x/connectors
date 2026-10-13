@@ -173,8 +173,8 @@ repository is worked through pull requests to `main`; `next` stopped at the
 v0.11.0 plan close (`dec210fc8`) and is not a release destination.
 
 A local commit or local tag alone is not a cut release, and neither is a pushed
-tag with no release page. Source release does not implicitly include a
-binary/package or container-registry publication, website/cloud deployment, or
+tag with no release page. A release includes the Linux and macOS archives of step 7; it does not include a
+package-registry or container-registry publication, website/cloud deployment, or
 Atlas registration; those need their own requested scope. If a release step is blocked, record the exact blocker and
 report the release as incomplete.
 
