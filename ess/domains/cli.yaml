@@ -306,6 +306,99 @@ types:
   - name: connectors.cli.CustodyBackend
     kind: enum
     variants: [secret_service, macos_keychain, windows_credential_manager]
+  # The operating-system guarantees the local host builds on, each fixed by the
+  # platform the binary was built for (contracts/cli/v1alpha1/semantics.md §7,
+  # "macOS platform guarantees"):
+  # - sealed_executable: an admitted adapter or consumer image cannot change
+  #   between its digest check and exec (private-adapter.md, consumer-launch.md §3).
+  # - parent_death_kill: a launched child is ended when the process that
+  #   launched it dies.
+  # - exact_process_signal: stop and cleanup signal only the exact owned child,
+  #   never a reused process id.
+  # - own_image_build_measure: the owner build digest is the image running,
+  #   not the file at its launch path (owner.md).
+  # - atomic_no_replace_rename: a durable publication rename refuses an existing
+  #   destination in the same call.
+  # - atomic_close_on_exec: a descriptor received over the owner socket is
+  #   close-on-exec from the moment it is received.
+  # - peer_credential_snapshot: a socket peer's uid and pid are read together, as
+  #   the kernel recorded them at connect.
+  - name: connectors.cli.PlatformGuarantee
+    kind: enum
+    variants: [sealed_executable, parent_death_kill, exact_process_signal, own_image_build_measure, atomic_no_replace_rename, atomic_close_on_exec, peer_credential_snapshot]
+  - name: connectors.cli.GuaranteeSupport
+    kind: enum
+    variants: [holds, weaker, absent]
+  # The named form a guarantee takes where it holds only weaker:
+  # - owner_private_copy: the image is a mode 0500 copy in a mode 0700 directory,
+  #   digest-checked before exec; other users cannot change it, the same user can.
+  # - adapter_channel_close: an adapter exits when its inherited channel closes;
+  #   a consumer has no such channel and outlives a dead launcher.
+  # - child_reap_lock: a child is signalled by process id, under the same lock
+  #   that reaps it, so the id cannot be reused between the check and the signal.
+  # - launch_path_read: the digest is read from the executable's path; a file
+  #   replaced there is measured as a new build (owner_build_mismatch).
+  # - set_after_receive: close-on-exec is set right after the receive returns; a
+  #   concurrent exec in the same process in between inherits the descriptor.
+  # - separate_pid_query: the uid and gid are the connect-time snapshot; the pid
+  #   is a separate query, used only for its sign.
+  - name: connectors.cli.PlatformGuaranteeWeakerForm
+    kind: enum
+    variants: [owner_private_copy, adapter_channel_close, child_reap_lock, launch_path_read, set_after_receive, separate_pid_query]
+  # One row of the platform guarantee table. Linux holds every guarantee. macOS
+  # holds atomic_no_replace_rename (renamex_np RENAME_EXCL on a filesystem that
+  # reports VOL_CAP_INT_RENAME_EXCL, APFS) and holds each other one only in its
+  # named weaker form. The invariants are the table.
+  # UNMAPPED: Windows. connectors.cli.OperatingSystem names it for custody, but no
+  # Windows host exists; no row is claimed for it.
+  # ESS-LIMIT: the type states what a row must say, not that the table has one
+  # row per (os, guarantee); the contracts list them.
+  - name: connectors.cli.PlatformGuaranteeStatement
+    kind: struct
+    fields:
+      - {name: os, type: "connectors.cli.OperatingSystem"}
+      - {name: guarantee, type: "connectors.cli.PlatformGuarantee"}
+      - {name: support, type: "connectors.cli.GuaranteeSupport"}
+      - {name: weaker_form, type: "Optional<connectors.cli.PlatformGuaranteeWeakerForm>"}
+    invariants:
+      # A weaker form is named exactly when the guarantee holds weaker.
+      - any:
+          - {support: weaker}
+          - {weaker_form: {exists: false}}
+      - any:
+          - not: {support: weaker}
+          - {weaker_form: {exists: true}}
+      - any:
+          - not: {os: linux}
+          - {support: holds}
+      - any:
+          - not: {os: macos}
+          - not: {guarantee: sealed_executable}
+          - all: [{support: weaker}, {weaker_form: owner_private_copy}]
+      - any:
+          - not: {os: macos}
+          - not: {guarantee: parent_death_kill}
+          - all: [{support: weaker}, {weaker_form: adapter_channel_close}]
+      - any:
+          - not: {os: macos}
+          - not: {guarantee: exact_process_signal}
+          - all: [{support: weaker}, {weaker_form: child_reap_lock}]
+      - any:
+          - not: {os: macos}
+          - not: {guarantee: own_image_build_measure}
+          - all: [{support: weaker}, {weaker_form: launch_path_read}]
+      - any:
+          - not: {os: macos}
+          - not: {guarantee: atomic_no_replace_rename}
+          - {support: holds}
+      - any:
+          - not: {os: macos}
+          - not: {guarantee: atomic_close_on_exec}
+          - all: [{support: weaker}, {weaker_form: set_after_receive}]
+      - any:
+          - not: {os: macos}
+          - not: {guarantee: peer_credential_snapshot}
+          - all: [{support: weaker}, {weaker_form: separate_pid_query}]
   - name: connectors.cli.KeyringState
     kind: enum
     variants: [available, locked, unavailable]
