@@ -1,23 +1,9 @@
 # Changelog
 
-## 0.46.0 — 2026-10-13
+## Unreleased
 
 ### Added
 
-- Credential custody backends per platform, in the new crate `connectors-custody`
-  ([custody semantics §5.1](contracts/auth/custody/v1alpha1/semantics.md#51-platform-bindings-of-the-local-host)):
-  one backend trait (write a new scoped version, read an exact version, delete, inspect the
-  store), an in-memory reference, and one binding per platform, fixed when the binary is built.
-  Linux keeps the qualified Secret Service binding, moved unchanged behind the trait. macOS stores
-  generic password items in the login keychain with user interaction disallowed, so a locked
-  keychain is `Unavailable` and never prompts. Windows stores generic credentials in the
-  Credential Manager with local-machine persistence; since one credential holds at most
-  2,560 bytes, every value is written as numbered part entries, then a header entry naming the
-  part count and the value's SHA-256, written last, and a read checks every part and the digest.
-  Every binding holds values up to 64 KiB, which covers the largest material of every shipped
-  auth profile. No binding falls back to another, to a file or to an environment variable.
-- macOS keychain items are created with an access whose decrypt ACL admits any application of the
-  user.
 - Slack message send through the catalog provider (`docs/catalog-slack.md`, *Messages*): the bot
   selection set gains two writes under approval, `chat.postMessage` (`channel` and `text`,
   optionally `thread_ts`, `mrkdwn` and `unfurl_links`; scope `chat:write`; answers `channel`, `ts`
@@ -42,6 +28,35 @@
   gives it `minLength: 1`. Slack's `chat.postMessage` holds `channel`, `text` and `thread_ts`
   non-empty, and `conversations.open` holds `users`, which Slack would otherwise answer with `ok`
   false and leave as `outcome_unknown`.
+
+### Changed
+
+- A catalog guard check written `{"literal": "true"}` or `{"literal": "false"}` is refused when the
+  selection loads, on every check, since as text it holds for the string `"true"` too; write
+  `{"boolean": true}` or `false`. GitLab's `merge_request.discussion.resolve` (`/resolvable`) and
+  `merge_request.auto_merge` (`/merge_when_pipeline_succeeds`) and Jira's `issue.transition.run`
+  (`/transitions/0/isAvailable`) compare those members as JSON booleans, as the pinned documents
+  type them, so a string `"true"` no longer satisfies them. Migration: a configuration carrying
+  its own selection file with either literal no longer loads until it is rewritten.
+
+## 0.46.0 — 2026-10-13
+
+### Added
+
+- Credential custody backends per platform, in the new crate `connectors-custody`
+  ([custody semantics §5.1](contracts/auth/custody/v1alpha1/semantics.md#51-platform-bindings-of-the-local-host)):
+  one backend trait (write a new scoped version, read an exact version, delete, inspect the
+  store), an in-memory reference, and one binding per platform, fixed when the binary is built.
+  Linux keeps the qualified Secret Service binding, moved unchanged behind the trait. macOS stores
+  generic password items in the login keychain with user interaction disallowed, so a locked
+  keychain is `Unavailable` and never prompts. Windows stores generic credentials in the
+  Credential Manager with local-machine persistence; since one credential holds at most
+  2,560 bytes, every value is written as numbered part entries, then a header entry naming the
+  part count and the value's SHA-256, written last, and a read checks every part and the digest.
+  Every binding holds values up to 64 KiB, which covers the largest material of every shipped
+  auth profile. No binding falls back to another, to a file or to an environment variable.
+- macOS keychain items are created with an access whose decrypt ACL admits any application of the
+  user.
 - `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
   `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
   target.
@@ -55,13 +70,6 @@
   documentation pages are regenerated and carry the committed model change:
   `connectors.cli.OperatingSystem` gains `macos` and `windows`, and
   `connectors.cli.SetupCheckResult` gains `custody_backend`.
-- A catalog guard check written `{"literal": "true"}` or `{"literal": "false"}` is refused when the
-  selection loads, on every check, since as text it holds for the string `"true"` too; write
-  `{"boolean": true}` or `false`. GitLab's `merge_request.discussion.resolve` (`/resolvable`) and
-  `merge_request.auto_merge` (`/merge_when_pipeline_succeeds`) and Jira's `issue.transition.run`
-  (`/transitions/0/isAvailable`) compare those members as JSON booleans, as the pinned documents
-  type them, so a string `"true"` no longer satisfies them. Migration: a configuration carrying
-  its own selection file with either literal no longer loads until it is rewritten.
 
 ### Limitations
 
