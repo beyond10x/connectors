@@ -2,14 +2,17 @@
 format: aep.planning-md/3
 id: story:host-runs-on-windows
 kind: story
-status: draft
+status: active
 title: The connectors binary builds and runs on Windows
 relations:
 - decomposes: epic:local-cli-on-macos-and-windows
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
 - depends_on: story:host-runs-on-macos
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-13T06:25:56Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-13T06:25:57Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
