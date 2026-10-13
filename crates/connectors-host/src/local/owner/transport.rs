@@ -2149,6 +2149,14 @@ mod macos_tests {
     #[test]
     fn a_socket_path_past_sun_path_is_refused_before_an_owner_starts() {
         let root = tempfile::tempdir().unwrap();
+        // The socket's directory is the private state directory; tempfile
+        // creates its directory 0777 less the umask, which that admission
+        // refuses as not private.
+        std::fs::set_permissions(
+            root.path(),
+            std::os::unix::fs::PermissionsExt::from_mode(0o700),
+        )
+        .unwrap();
         let fits = fs::directory(root.path(), false, true)
             .unwrap_or_else(|error| panic!("{}: {error:?}", root.path().display()));
         let socket = socket_path(&fits);
