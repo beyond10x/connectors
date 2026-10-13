@@ -156,6 +156,15 @@ test executable with Rust's `--ignored --list`, then runs each selected test by
 its exact name. Unknown classifications refuse all execution. The existing
 `gate` command is unchanged; this lane is not automatically enrolled in CI.
 
+A test that a `cfg` keeps off a platform (`#[cfg(unix)]`, `#![cfg(unix)]`,
+`#[cfg(target_os = "linux")]` and the like) does not compile there, so no binary
+on that platform lists it. The report's `platform_gated` field names each such
+test from a scan of the test targets' sources: package, target, libtest name,
+the platforms it runs on (`linux`, `macos`, `windows`) and the count. The scan
+decides only `unix`, `windows`, `target_os` and `target_family`; tests a macro
+expands to are not seen. A scanned test that runs on the current platform but is
+missing from its compiled binary's list refuses the command.
+
 ```sh
 cargo run --locked -p connectors-build -- ignored --inventory
 cargo run --locked -p connectors-build -- ignored
