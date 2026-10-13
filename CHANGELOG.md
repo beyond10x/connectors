@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Slack message send through the catalog provider (`docs/catalog-slack.md`, *Messages*): the bot
+  selection set gains two writes under approval, `chat.postMessage` (`channel` and `text`,
+  optionally `thread_ts`, `mrkdwn` and `unfurl_links`; scope `chat:write`; answers `channel`, `ts`
+  and `message`) and `conversations.open` (`users`, one user id or a comma-separated list, and
+  optionally `return_im`; scope `im:write`, `mpim:write` for a group; answers `channel.id`). A
+  direct message is two invocations, open then post. Each write reads the token's `auth.test`
+  first and is refused, with nothing sent, unless it answers `ok` as the JSON boolean `true`;
+  Slack's answer must carry the same to be applied, so Slack's own refusal, `200` with `ok`
+  false, and a look-alike such as the string `"true"` are `outcome_unknown`, and Slack's `error`
+  string is not returned. The cited amendment
+  `adapters/slack/upstream/slack-web.amendments.json` records both with a JSON request body; the
+  Slack bundle's source record names it. The Slack ESS model gains the send and open inputs and
+  answers. Verified against a local fixture only; `chat.update` and `chat.delete` are not
+  selected.
+- A catalog guard check can expect a JSON boolean, `{"boolean": true}` or `false`
+  (`docs/local-catalog-provider.md`, `guard`; `connectors_catalog.guard.Expectation`): it holds
+  only for that JSON boolean, and a string, a number or `null` in its place differs. `input` and
+  `literal` still compare as text.
+- A catalog selection can hold string body keys non-empty, `body_nonempty`
+  (`docs/local-catalog-provider.md`; `connectors_catalog.selection.ClosedBody`): a body carrying
+  one as `""` is refused as `invalid_input` before any request, and the declared input schema
+  gives it `minLength: 1`. Slack's `chat.postMessage` holds `channel`, `text` and `thread_ts`
+  non-empty, and `conversations.open` holds `users`, which Slack would otherwise answer with `ok`
+  false and leave as `outcome_unknown`.
+
+### Changed
+
+- A catalog guard check written `{"literal": "true"}` or `{"literal": "false"}` is refused when the
+  selection loads, on every check, since as text it holds for the string `"true"` too; write
+  `{"boolean": true}` or `false`. GitLab's `merge_request.discussion.resolve` (`/resolvable`) and
+  `merge_request.auto_merge` (`/merge_when_pipeline_succeeds`) and Jira's `issue.transition.run`
+  (`/transitions/0/isAvailable`) compare those members as JSON booleans, as the pinned documents
+  type them, so a string `"true"` no longer satisfies them. Migration: a configuration carrying
+  its own selection file with either literal no longer loads until it is rewritten.
+
 ## 0.46.0 — 2026-10-13
 
 ### Added

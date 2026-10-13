@@ -35,4 +35,4 @@ an installed capability: the runtime column says what runs.
 
 MCP has specified invocation, projection, auth lifecycle, mutation replay and composition
 contracts in the repository's `adapters/mcp/` directory and no runtime. Slack and WebRTC have no
-native adapter documentation; Slack conversations are read through the catalog provider.
+native adapter documentation; Slack conversations are read, and messages posted, through the catalog provider.
