@@ -649,6 +649,49 @@ fn adversary_owner_answers_build_only_when_asked_and_answers_its_own_digest() {
     assert_eq!(current["build"], Value::from(expected), "{current}");
 }
 
+/// The owner waits for a greeting that arrives after the connection does. Its
+/// listener is non-blocking, and a macOS `accept` hands that on to the stream
+/// it returns (Linux's does not); an owner reading such a stream found nothing
+/// yet, ended the read as a timeout and closed the stream without a reply. A
+/// same-build CLI then saw a silent close and named the owner another build
+/// or unavailable.
+#[test]
+fn an_owner_answers_a_greeting_sent_after_the_connection_settled() {
+    use std::io::Write;
+    let root = adversary_owner_root();
+    let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
+    let _owner = start_owner(binary, &root);
+    let state = root.path().join("state");
+    let authority = Command::new("sqlite3")
+        .arg("-readonly")
+        .arg(state.join("metadata.sqlite3"))
+        .arg("SELECT authority_id FROM local_authority WHERE singleton=1")
+        .output()
+        .unwrap();
+    let authority = String::from_utf8(authority.stdout)
+        .unwrap()
+        .trim()
+        .to_owned();
+    assert_eq!(authority.len(), 36, "authority {authority:?}");
+    let mut stream = sockets::connect(&state, "owner.sock");
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+        .unwrap();
+    // Long past the owner's accept, short of its 10 s greeting deadline.
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let hello = serde_json::json!({
+        "kind": "hello", "version": "connectors-owner/1",
+        "challenge": "00000000-0000-4000-8000-000000000003",
+        "configuration": root.path().join("config/config.toml"), "authority": authority,
+        "build": "0".repeat(64)
+    });
+    stream
+        .write_all(&adversary_frame(&hello))
+        .unwrap_or_else(|error| panic!("the owner closed the stream before the greeting: {error}"));
+    let reply = adversary_read_control(&mut stream);
+    assert_eq!(reply["kind"], "hello", "{reply}");
+}
+
 #[test]
 fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
     let root = tempfile::tempdir().unwrap();
