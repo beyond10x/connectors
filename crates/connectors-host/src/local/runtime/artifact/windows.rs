@@ -2,14 +2,18 @@
 //! "Windows platform guarantees").
 //!
 //! - [`capture`]: `sealed_executable` holds only as `deny_write_copy`. The copy
-//!   is opened for reading without `FILE_SHARE_WRITE` or `FILE_SHARE_DELETE`
-//!   and checked through that handle, which is held until the child exists.
-//! - [`launch_path`]: the copy is created by its path and removed once the
+//!   is made in a fresh owner-only directory inside the state directory's
+//!   owner-only `run` directory ([`enter`]), never the system's temporary
+//!   directory, and opened for reading without `FILE_SHARE_WRITE` or
+//!   `FILE_SHARE_DELETE` and checked through that handle, which is held, with
+//!   one on its directory that does not share deletion, until the child exists.
+//! - [`Launch`]: the copy is created by its path and removed once the
 //!   launched process has exited; an [`Image`] dropped before it was launched
-//!   or released removes it.
-//! - [`Job`]: `parent_death_kill` holds. Every child is created suspended,
-//!   assigned to a job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only
-//!   handle its launcher holds, and only then runs.
+//!   removes it, and so does a [`Launch`] dropped on any early return.
+//! - [`Job`]: `parent_death_kill` holds. Every child is created inside a job
+//!   with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only handle its launcher
+//!   holds (`PROC_THREAD_ATTRIBUTE_JOB_LIST`), so it never runs outside it.
+//!   An adapter's job permits no breakaway; a consumer's permits it on request.
 //! - [`Process`]: `exact_process_signal` holds. The child's process handle
 //!   names exactly that process; exit is waited for on it and stop terminates
 //!   through it.
@@ -40,17 +44,16 @@ use windows_sys::Win32::{
     },
     System::{
         JobObjects::{
-            AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            CreateJobObjectW, JOB_OBJECT_LIMIT_BREAKAWAY_OK, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
             SetInformationJobObject,
         },
         Threading::{
-            CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
-            DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess,
-            GetExitCodeProcess, INFINITE, InitializeProcThreadAttributeList,
-            PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROCESS_INFORMATION, ResumeThread,
-            STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute,
-            WaitForSingleObject,
+            CREATE_UNICODE_ENVIRONMENT, CreateProcessW, DeleteProcThreadAttributeList,
+            EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess, GetExitCodeProcess, INFINITE,
+            InitializeProcThreadAttributeList, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+            PROC_THREAD_ATTRIBUTE_JOB_LIST, PROCESS_INFORMATION, STARTF_USESTDHANDLES,
+            STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
         },
     },
 };
@@ -58,22 +61,85 @@ use windows_sys::Win32::{
 const LIMIT: usize = 512 * 1024 * 1024;
 const DIRECTORY_PREFIX: &str = "connectors-image-";
 const IMAGE: &str = "image.exe";
+/// The owner-only directory in the state directory that holds every scratch
+/// file of the owner (owner.md, "Windows", "Scratch").
+const RUN: &str = "run";
 /// The leading bytes kept for the PE check: the DOS header names the offset
 /// of the PE signature, which linkers place well inside this.
 const HEAD: usize = 4096;
 
-/// Copies `source` into a fresh owner-only directory, opens the copy for
-/// reading without `FILE_SHARE_WRITE` or `FILE_SHARE_DELETE`, and checks the
-/// configured SHA-256 and the PE header through that handle, as process
-/// creation will read the file. From that open, no process can write, rename
-/// or delete the copy while the handle, or a duplicate of it, is open
-/// (`deny_write_copy`). A refused copy is removed with its directory.
+/// The `run` directory this process makes its scratch in, once [`enter`] set it.
+static SCRATCH: OnceLock<PathBuf> = OnceLock::new();
+
+/// The owner-only `run` directory of the state directory held as `state`,
+/// created owner-only when missing, as its final path. One that exists and is
+/// not owner-only, or is a reparse point, is `InvalidConfiguration`.
+pub(crate) fn run_directory(state: &File) -> Result<PathBuf> {
+    let path = final_path(state)
+        .map_err(|_| Failure::InvalidConfiguration)?
+        .join(RUN);
+    let directory = fs::directory(&path, true, true).map_err(|_| Failure::InvalidConfiguration)?;
+    final_path(&directory).map_err(|_| Failure::InvalidConfiguration)
+}
+
+/// Makes the state directory's `run` directory this process's scratch for
+/// image copies and credentials, and removes every image copy directory a
+/// process that died left there whose copy can be deleted: a copy a running
+/// process still holds, or runs as its image, stays.
+pub(crate) fn enter(state: &File) -> Result<PathBuf> {
+    let run = run_directory(state)?;
+    if *SCRATCH.get_or_init(|| run.clone()) != run {
+        return Err(Failure::Unavailable);
+    }
+    sweep(&run);
+    Ok(run)
+}
+
+/// The scratch directory, which [`enter`] set. A process that has not
+/// entered a state directory has none and makes no copy; the system's
+/// temporary directory is never used, except by this crate's own unit tests,
+/// which have no owner.
+pub(crate) fn scratch() -> Result<PathBuf> {
+    match SCRATCH.get() {
+        Some(run) => Ok(run.clone()),
+        None if cfg!(test) => Ok(std::env::temp_dir()),
+        None => Err(Failure::Unavailable),
+    }
+}
+
+/// Removes each `connectors-image-*` directory in `run` whose copy can be
+/// deleted, with the directory. A name that is not a plain directory, a
+/// junction or symbolic link included, is left alone.
+fn sweep(run: &Path) {
+    let Ok(entries) = std::fs::read_dir(run) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let plain = entry
+            .file_type()
+            .is_ok_and(|kind| kind.is_dir() && !kind.is_symlink());
+        let ours = entry
+            .file_name()
+            .to_str()
+            .is_some_and(|name| name.starts_with(DIRECTORY_PREFIX));
+        if plain && ours {
+            discard(&entry.path().join(IMAGE));
+        }
+    }
+}
+
+/// Copies `source` into a fresh owner-only directory in the scratch directory,
+/// opens the copy for reading without `FILE_SHARE_WRITE` or
+/// `FILE_SHARE_DELETE`, and checks the configured SHA-256 and the PE header
+/// through that handle, as process creation will read the file. From that
+/// open, no process can write, rename or delete the copy while the handle, or
+/// a duplicate of it, is open, nor rename its directory while the [`Image`]
+/// holds it (`deny_write_copy`). A refused copy is removed with its directory.
 pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -> Result<Image> {
     source
         .seek(SeekFrom::Start(0))
         .map_err(|_| Failure::InvalidConfiguration)?;
-    let requested =
-        std::env::temp_dir().join(format!("{DIRECTORY_PREFIX}{}", uuid::Uuid::new_v4()));
+    let requested = scratch()?.join(format!("{DIRECTORY_PREFIX}{}", uuid::Uuid::new_v4()));
     if std::fs::symlink_metadata(&requested).is_ok() {
         return Err(Failure::Unavailable);
     }
@@ -86,15 +152,14 @@ pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -
             return Err(Failure::Unavailable);
         }
     };
-    let captured = copy_and_check(&mut source, &image, expected_sha256, until);
-    // The directory is held, unrenameable, while the copy is made and opened.
-    drop(directory);
-    match captured {
+    match copy_and_check(&mut source, &image, expected_sha256, until) {
         Ok(file) => Ok(Image {
             file: Some(file),
+            directory: Some(directory),
             path: image,
         }),
         Err(error) => {
+            drop(directory);
             discard(&image);
             Err(error)
         }
@@ -200,13 +265,15 @@ fn discard(image: &Path) -> bool {
     removed
 }
 
-/// A captured copy and the deny-write handle on it; it reads as that handle.
+/// A captured copy and the deny-write handle on it, with a handle on its
+/// directory that does not share deletion; it reads as the copy's handle.
 /// Dropping it while it still holds the handle removes the copy and its
 /// directory, so a refusal between capture and creation leaves nothing behind.
 /// A copy whose handle was duplicated into another process cannot be removed
 /// while that duplicate is open, and stays for that process's [`Launch`].
 pub(crate) struct Image {
     file: Option<File>,
+    directory: Option<File>,
     path: PathBuf,
 }
 impl std::ops::Deref for Image {
@@ -228,12 +295,13 @@ impl Drop for Image {
     fn drop(&mut self) {
         if let Some(file) = self.file.take() {
             drop(file);
+            drop(self.directory.take());
             discard(&self.path);
         }
     }
 }
-/// The handle alone, for a launch to come: the copy leaves the image's
-/// custody, and only its [`Launch`] removes it.
+/// The handle alone, for a launch to come, here or in another process: the
+/// copy leaves the image's custody, and only a [`Launch`] removes it.
 impl From<Image> for File {
     fn from(mut image: Image) -> File {
         image
@@ -242,20 +310,43 @@ impl From<Image> for File {
             .expect("an image holds its handle until dropped")
     }
 }
+/// The copy's custody passes whole to the launch, with both handles.
+impl From<Image> for Launch {
+    fn from(mut image: Image) -> Launch {
+        Launch {
+            image: image.file.take(),
+            directory: image.directory.take(),
+            path: std::mem::take(&mut image.path),
+        }
+    }
+}
 
-/// The path to create a captured copy's process from. Dropping it removes the
-/// copy and its directory, so it is held until the launched process has
+/// The path to create a captured copy's process from, and the custody of the
+/// copy: from the moment it exists, dropping it, on any early return
+/// included, removes the copy and its directory. It holds the copy's
+/// deny-write handle until [`Launch::created`], and a handle on the copy's
+/// directory that does not share deletion until it is dropped, so neither can
+/// be renamed while the path is in use. Held until the launched process has
 /// exited: a running image cannot be removed.
 pub(crate) struct Launch {
+    image: Option<File>,
+    directory: Option<File>,
     path: PathBuf,
 }
 impl Launch {
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
+    /// The child exists: its mapped image keeps the copy unwritable from now
+    /// on, so the deny-write handle is closed.
+    pub(crate) fn created(&mut self) {
+        self.image = None;
+    }
 }
 impl Drop for Launch {
     fn drop(&mut self) {
+        drop(self.image.take());
+        drop(self.directory.take());
         // The image section of a process that has just exited may outlive its
         // exit by a moment.
         for _ in 0..20 {
@@ -267,22 +358,33 @@ impl Drop for Launch {
     }
 }
 
-/// The launch path of a handle on a copy [`capture`] made, here or in the
-/// owner that sent it: named as a capture names one, and the file at that
-/// name is the handle's own. Anything else is `Unavailable`, and is never
-/// removed.
-pub(crate) fn launch_path(image: &File) -> Result<Launch> {
-    let path = final_path(image).map_err(|_| Failure::Unavailable)?;
+/// Takes custody of a handle on a copy [`capture`] made, here or in the owner
+/// that sent it: named as a capture names one, in an owner-only directory now
+/// held against renaming, and the file at that name is the handle's own.
+/// Anything else is `Unavailable`, and is never removed.
+pub(crate) fn launch_path(image: File) -> Result<Launch> {
+    let path = final_path(&image).map_err(|_| Failure::Unavailable)?;
     let ours = path.file_name() == Some(OsStr::new(IMAGE))
         && path
             .parent()
             .and_then(Path::file_name)
             .and_then(OsStr::to_str)
             .is_some_and(|name| name.starts_with(DIRECTORY_PREFIX));
-    if !ours || path_identity(&path) != Some(identity(image).map_err(|_| Failure::Unavailable)?) {
+    if !ours {
         return Err(Failure::Unavailable);
     }
-    Ok(Launch { path })
+    let parent = path.parent().ok_or(Failure::Unavailable)?;
+    let directory = fs::directory(parent, false, true).map_err(|_| Failure::Unavailable)?;
+    if final_path(&directory).map_err(|_| Failure::Unavailable)? != parent
+        || path_identity(&path) != Some(identity(&image).map_err(|_| Failure::Unavailable)?)
+    {
+        return Err(Failure::Unavailable);
+    }
+    Ok(Launch {
+        image: Some(image),
+        directory: Some(directory),
+        path,
+    })
 }
 
 /// Appends `argument` to a command line as the Microsoft C runtime and Rust's
@@ -349,12 +451,24 @@ pub(crate) fn inheritable(handle: HANDLE, access: Option<u32>) -> Result<OwnedHa
     Ok(unsafe { OwnedHandle::from_raw_handle(duplicate as _) })
 }
 
-/// A job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` and no breakaway,
-/// whose only handle this value is: when it closes, as it does when its
-/// holder dies, every process in the job ends (`parent_death_kill`).
+/// A job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, whose only handle
+/// this value is: when it closes, as it does when its holder dies, every
+/// process in the job ends (`parent_death_kill`).
 pub(crate) struct Job(OwnedHandle);
 impl Job {
+    /// A job that permits no breakaway, as an adapter's.
     pub(crate) fn new() -> std::io::Result<Self> {
+        Self::with_limits(JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE)
+    }
+    /// A consumer's job (consumer-launch.md §8, "Breakaway"): a process the
+    /// consumer creates with `CREATE_BREAKAWAY_FROM_JOB`, such as an owner,
+    /// leaves it (`JOB_OBJECT_LIMIT_BREAKAWAY_OK`); one created without stays
+    /// and ends with the job. Never the silent form, which would take every
+    /// process the consumer creates out of the job.
+    pub(crate) fn consumer() -> std::io::Result<Self> {
+        Self::with_limits(JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK)
+    }
+    fn with_limits(flags: u32) -> std::io::Result<Self> {
         // SAFETY: default security, so the handle is not inheritable, and no
         // name, so no other process can open it.
         let handle = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
@@ -365,7 +479,7 @@ impl Job {
         let job = Self(unsafe { OwnedHandle::from_raw_handle(handle as _) });
         // SAFETY: zero is a valid JOBOBJECT_EXTENDED_LIMIT_INFORMATION.
         let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { std::mem::zeroed() };
-        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        limits.BasicLimitInformation.LimitFlags = flags;
         // SAFETY: a live job handle and a structure of the size passed.
         if unsafe {
             SetInformationJobObject(
@@ -423,11 +537,12 @@ fn environment_block(environment: &[(OsString, OsString)]) -> Vec<u16> {
     block
 }
 
-/// Creates `creation.application` suspended with exactly `creation.inherited`
-/// inherited (`PROC_THREAD_ATTRIBUTE_HANDLE_LIST`), assigns it to `job`, and
-/// only then lets it run. No shell and no search path: the application is the
-/// full path, and argv\[0\] is that path. A child that cannot join the job is
-/// terminated before it ran.
+/// Creates `creation.application` inside `job` (`PROC_THREAD_ATTRIBUTE_JOB_LIST`),
+/// so it never runs outside the job, with exactly `creation.inherited`
+/// inherited (`PROC_THREAD_ATTRIBUTE_HANDLE_LIST`) and the application's own
+/// directory, the copy's owner-only directory, as its current directory,
+/// never this process's. No shell and no search path: the application is the
+/// full path, and argv\[0\] is that path.
 pub(crate) fn create(creation: &Creation<'_>, job: &Job) -> std::io::Result<Process> {
     let mut line = Vec::new();
     quote(creation.application.as_os_str(), &mut line);
@@ -436,6 +551,12 @@ pub(crate) fn create(creation: &Creation<'_>, job: &Job) -> std::io::Result<Proc
     }
     line.push(0);
     let environment = environment_block(creation.environment);
+    let directory = wide(
+        creation
+            .application
+            .parent()
+            .ok_or(std::io::ErrorKind::InvalidInput)?,
+    );
     struct List(Vec<u64>);
     impl Drop for List {
         fn drop(&mut self) {
@@ -443,23 +564,39 @@ pub(crate) fn create(creation: &Creation<'_>, job: &Job) -> std::io::Result<Proc
             unsafe { DeleteProcThreadAttributeList(self.0.as_mut_ptr().cast()) };
         }
     }
-    let list = if creation.inherited.is_empty() {
-        None
-    } else {
-        let mut size = 0usize;
-        // SAFETY: a size query with a null list.
-        unsafe { InitializeProcThreadAttributeList(std::ptr::null_mut(), 1, 0, &mut size) };
-        let mut storage = vec![0u64; size.div_ceil(8)];
-        // SAFETY: the storage holds `size` bytes, aligned.
-        if unsafe {
-            InitializeProcThreadAttributeList(storage.as_mut_ptr().cast(), 1, 0, &mut size)
-        } == 0
-        {
-            return Err(std::io::Error::last_os_error());
-        }
-        let mut list = List(storage);
-        // SAFETY: the handle array outlives the list's use in CreateProcessW.
-        if unsafe {
+    let inherit = !creation.inherited.is_empty();
+    let count = 1 + u32::from(inherit);
+    let mut size = 0usize;
+    // SAFETY: a size query with a null list.
+    unsafe { InitializeProcThreadAttributeList(std::ptr::null_mut(), count, 0, &mut size) };
+    let mut storage = vec![0u64; size.div_ceil(8)];
+    // SAFETY: the storage holds `size` bytes, aligned.
+    if unsafe {
+        InitializeProcThreadAttributeList(storage.as_mut_ptr().cast(), count, 0, &mut size)
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error());
+    }
+    let mut list = List(storage);
+    let jobs = [job.raw()];
+    // SAFETY: the job array outlives the list's use in CreateProcessW.
+    if unsafe {
+        UpdateProcThreadAttribute(
+            list.0.as_mut_ptr().cast(),
+            0,
+            PROC_THREAD_ATTRIBUTE_JOB_LIST as usize,
+            jobs.as_ptr().cast(),
+            std::mem::size_of_val(&jobs),
+            std::ptr::null_mut(),
+            std::ptr::null(),
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error());
+    }
+    // SAFETY: the handle array outlives the list's use in CreateProcessW.
+    if inherit
+        && unsafe {
             UpdateProcThreadAttribute(
                 list.0.as_mut_ptr().cast(),
                 0,
@@ -470,11 +607,9 @@ pub(crate) fn create(creation: &Creation<'_>, job: &Job) -> std::io::Result<Proc
                 std::ptr::null(),
             )
         } == 0
-        {
-            return Err(std::io::Error::last_os_error());
-        }
-        Some(list)
-    };
+    {
+        return Err(std::io::Error::last_os_error());
+    }
     // SAFETY: zero is a valid STARTUPINFOEXW.
     let mut startup: STARTUPINFOEXW = unsafe { std::mem::zeroed() };
     startup.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
@@ -484,26 +619,24 @@ pub(crate) fn create(creation: &Creation<'_>, job: &Job) -> std::io::Result<Proc
         startup.StartupInfo.hStdOutput,
         startup.StartupInfo.hStdError,
     ] = creation.standard;
-    let mut flags = creation.flags | CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT;
-    if let Some(list) = &list {
-        startup.lpAttributeList = list.0.as_ptr().cast_mut().cast();
-        flags |= EXTENDED_STARTUPINFO_PRESENT;
-    }
+    startup.lpAttributeList = list.0.as_mut_ptr().cast();
+    let flags = creation.flags | CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT;
     // SAFETY: zero is a valid PROCESS_INFORMATION.
     let mut information: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
     let application = wide(creation.application);
-    // SAFETY: NUL-terminated application and writable command line, a
-    // double-NUL-terminated environment block, and live startup information.
+    // SAFETY: NUL-terminated application, current directory and writable
+    // command line, a double-NUL-terminated environment block, and live
+    // startup information whose attribute list names live handles.
     if unsafe {
         CreateProcessW(
             application.as_ptr(),
             line.as_mut_ptr(),
             std::ptr::null(),
             std::ptr::null(),
-            i32::from(list.is_some()),
+            i32::from(inherit),
             flags,
             environment.as_ptr().cast(),
-            std::ptr::null(),
+            directory.as_ptr(),
             &startup.StartupInfo,
             &mut information,
         )
@@ -512,25 +645,13 @@ pub(crate) fn create(creation: &Creation<'_>, job: &Job) -> std::io::Result<Proc
         return Err(std::io::Error::last_os_error());
     }
     drop(list);
-    // SAFETY: CreateProcessW returned new owned handles.
-    let (mut process, thread) = unsafe {
-        (
-            Process::new(OwnedHandle::from_raw_handle(information.hProcess as _)),
-            OwnedHandle::from_raw_handle(information.hThread as _),
-        )
-    };
-    // SAFETY: live job, process and thread handles; the process has not run.
-    let started = unsafe {
-        AssignProcessToJobObject(job.raw(), process.raw()) != 0
-            && ResumeThread(thread.as_raw_handle() as HANDLE) != u32::MAX
-    };
-    if !started {
-        let error = std::io::Error::last_os_error();
-        let _ = process.kill();
-        let _ = process.wait();
-        return Err(error);
+    // SAFETY: CreateProcessW returned new owned handles; the thread's is not kept.
+    unsafe {
+        drop(OwnedHandle::from_raw_handle(information.hThread as _));
+        Ok(Process::new(OwnedHandle::from_raw_handle(
+            information.hProcess as _,
+        )))
     }
-    Ok(process)
 }
 
 /// A created child, owned through its process handle, which keeps its id
@@ -689,18 +810,67 @@ mod tests {
     fn a_launch_path_names_only_a_captured_copy_and_removes_it_after_use() {
         let (_root, path, hash) = source();
         assert!(matches!(
-            launch_path(&File::open(&path).unwrap()),
+            launch_path(File::open(&path).unwrap()),
             Err(Failure::Unavailable)
         ));
         let image = capture(File::open(&path).unwrap(), &hash, until()).unwrap();
-        let launch = launch_path(&image).unwrap();
-        let copy = launch.path().to_path_buf();
-        // Released to a launch, the copy outlives its image.
-        drop(File::from(image));
+        let copy = image.path.clone();
+        // Released as a handle, as the owner sends it, the copy outlives its
+        // image, and the launch that takes the handle takes its custody.
+        let mut launch = launch_path(File::from(image)).unwrap();
+        assert_eq!(launch.path(), copy);
+        launch.created();
         assert!(copy.exists());
         drop(launch);
         assert!(!copy.exists());
+        assert!(!copy.parent().unwrap().exists());
         assert!(path.exists());
+    }
+
+    /// The owner sweeps its `run` directory when it starts: a copy no process
+    /// holds is removed with its directory, one still held stays.
+    #[test]
+    fn a_sweep_removes_left_copies_that_no_process_holds() {
+        let (root, path, _) = source();
+        let run = root.path().join("run");
+        std::fs::create_dir(&run).unwrap();
+        let left = run.join(format!("{DIRECTORY_PREFIX}left"));
+        std::fs::create_dir(&left).unwrap();
+        std::fs::copy(&path, left.join(IMAGE)).unwrap();
+        let held = run.join(format!("{DIRECTORY_PREFIX}held"));
+        std::fs::create_dir(&held).unwrap();
+        std::fs::copy(&path, held.join(IMAGE)).unwrap();
+        let holder = OpenOptions::new()
+            .read(true)
+            .share_mode(FILE_SHARE_READ)
+            .open(held.join(IMAGE))
+            .unwrap();
+        let other = run.join("other");
+        std::fs::create_dir(&other).unwrap();
+        sweep(&run);
+        assert!(!left.exists(), "a copy no process holds was left");
+        assert!(held.join(IMAGE).exists(), "a held copy was removed");
+        assert!(
+            other.exists(),
+            "a directory not named as a copy was removed"
+        );
+        drop(holder);
+    }
+
+    /// `deny_write_copy`: while an image or its launch holds the copy, its
+    /// directory cannot be renamed, so the launch path names the copy until the
+    /// child exists.
+    #[test]
+    fn the_directory_of_a_held_copy_cannot_be_renamed() {
+        let (root, path, hash) = source();
+        let image = capture(File::open(&path).unwrap(), &hash, until()).unwrap();
+        let directory = image.path.parent().unwrap().to_path_buf();
+        let moved = root.path().join("moved");
+        assert!(std::fs::rename(&directory, &moved).is_err());
+        let launch = launch_path(File::from(image)).unwrap();
+        assert!(std::fs::rename(&directory, &moved).is_err());
+        drop(launch);
+        assert!(!directory.exists());
     }
 
     /// The process a job test starts: it only waits, until the job ends it.

@@ -3,8 +3,9 @@
 //! locks in place of `flock`, and inherited handles in place of descriptors
 //! 3 and 4 for a starting owner.
 //!
-//! The pipe's name is derived from the current user's SID and the state
-//! directory's final path, as the socket's path is from the state directory.
+//! The pipe's name is derived from the current user's SID, the state
+//! directory's final path and a random salt kept owner-only in that
+//! directory, as the socket's path is from the state directory.
 //! Its first instance is created with `FILE_FLAG_FIRST_PIPE_INSTANCE` and every
 //! instance with a list granting the current user's SID alone. A CLI requires
 //! the pipe's server process to run as the current user before it sends
@@ -59,7 +60,7 @@ use windows_sys::Win32::{
 
 /// The variable that tells a starting owner its inherited startup channel and
 /// lock file handles, as two decimal values. The CLI starts the owner with
-/// nothing else in its environment but `SystemRoot`.
+/// nothing else in its environment but `SystemRoot`, `TMP` and `TEMP`.
 const STARTUP_HANDLES: &str = "CONNECTORS_OWNER_HANDLES";
 /// The lifetime lock's byte, then the startup lock's.
 const LIFETIME: u32 = 0;
@@ -73,12 +74,45 @@ fn wide(value: &OsStr) -> Vec<u16> {
     value.encode_wide().chain(Some(0)).collect()
 }
 
+/// The owner-only file in the state directory that keeps the pipe name's salt.
+const SALT: &str = "owner.pipe";
+
+/// The pipe name's salt for the state directory held as `directory`
+/// (owner.md, "Windows", "Pipe"): 32 random bytes in hexadecimal, kept in the
+/// owner-only file [`SALT`]. The first caller that finds none publishes one,
+/// never replacing a file that exists meanwhile; every caller then reads the
+/// file. A salt file that is not owner-only, or not 64 hexadecimal digits, is
+/// `InvalidConfiguration`.
+pub(super) fn salt(directory: &File) -> Result<String> {
+    let name = OsStr::new(SALT);
+    if !fs::private_file_metadata_if_present_at(directory, name)? {
+        let mut fresh = [0u8; 32];
+        fresh[..16].copy_from_slice(uuid::Uuid::new_v4().as_bytes());
+        fresh[16..].copy_from_slice(uuid::Uuid::new_v4().as_bytes());
+        match fs::publish_new(directory, name, hex::encode(fresh).as_bytes()) {
+            Ok(()) | Err(crate::local::Failure::ConfigurationExists) => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    let salt = fs::read_bounded(fs::private_file_at(directory, name)?, 64)?;
+    if salt.len() != 64 || !salt.iter().all(u8::is_ascii_hexdigit) {
+        return Err(Code::InvalidConfiguration.into());
+    }
+    String::from_utf8(salt).map_err(|_| Code::InvalidConfiguration.into())
+}
+
 /// The owner pipe of the state directory held as `directory`:
 /// `\\.\pipe\connectors-owner-` and the SHA-256 of the current user's SID, a
-/// zero byte and the directory's final path. An unreadable SID or path gives
-/// an empty name, which no connect or listen admits.
+/// zero byte, the directory's final path, a zero byte and the directory's
+/// [`salt`], so a user who cannot read the salt cannot compute the name. An
+/// unreadable SID, path or salt gives an empty name, which no connect or
+/// listen admits; a caller checks the salt first ([`salt`]) to refuse by name.
 pub(super) fn socket_path(directory: &File) -> PathBuf {
-    let (Ok(user), Ok(path)) = (win::current_user(), win::final_path(directory)) else {
+    let (Ok(user), Ok(path), Ok(salt)) = (
+        win::current_user(),
+        win::final_path(directory),
+        salt(directory),
+    ) else {
         return PathBuf::new();
     };
     // SAFETY: a valid SID, read for its own length.
@@ -94,16 +128,33 @@ pub(super) fn socket_path(directory: &File) -> PathBuf {
     for unit in path.as_os_str().encode_wide() {
         digest.update(unit.to_le_bytes());
     }
+    digest.update([0]);
+    digest.update(salt.as_bytes());
     PathBuf::from(format!(
         r"\\.\pipe\connectors-owner-{}",
         hex::encode(digest.finalize())
     ))
 }
 
+/// The code a peer refusal is reported with: one of the current user at
+/// another integrity level, or with a restricted token, is
+/// `lifecycle_conflict` (owner.md, "Windows", "Pipe peer"); any other is no
+/// owner.
+pub(super) fn peer_refusal(failure: runtime::Failure) -> Code {
+    if failure == channel::windows::SESSION_MISMATCH {
+        Code::LifecycleConflict
+    } else {
+        Code::Unavailable
+    }
+}
+
 /// Connects to the owner pipe at `path`. A missing pipe, one whose every
 /// instance stays busy for half a second, one the current user may not open,
 /// and one whose server process runs as another user are all no owner
-/// (`Unavailable`). Returns the server's process id, the pipe's identity.
+/// (`Unavailable`). An owner of the current user at another integrity level
+/// than this process, or with a restricted token, is `LifecycleConflict`,
+/// before anything is sent. Returns the server's process id, the pipe's
+/// identity.
 pub(super) fn connect(path: &Path) -> Result<(Stream, u32)> {
     if path.as_os_str().is_empty() {
         return Err(Code::Unavailable.into());
@@ -114,7 +165,7 @@ pub(super) fn connect(path: &Path) -> Result<(Stream, u32)> {
         match channel::windows::open_client(&name) {
             Ok(handle) => {
                 let stream = Stream::from_owned(handle).map_err(|_| Code::Unavailable)?;
-                let peer = channel::peer(&stream).map_err(|_| Code::Unavailable)?;
+                let peer = channel::peer(&stream).map_err(peer_refusal)?;
                 return Ok((stream, peer.pid));
             }
             Err(error)
@@ -495,8 +546,11 @@ fn create(
 /// job, so it outlives the CLI. A job that permits no breakaway keeps the
 /// owner, which then lives as long as that job. The startup channel's client
 /// end and a separate open of the lock file are the only handles it inherits;
-/// their values are in [`STARTUP_HANDLES`]. Once the owner exists, this CLI
-/// releases the lifetime byte for it and keeps the startup byte.
+/// their values are in [`STARTUP_HANDLES`]. Its environment is that variable,
+/// `SystemRoot`, and `TMP` and `TEMP` naming the state directory's owner-only
+/// `run` directory, created here when missing (owner.md, "Scratch"). Once the
+/// owner exists, this CLI releases the lifetime byte for it and keeps the
+/// startup byte.
 ///
 /// The owner measures its build from its executable's path
 /// (`own_image_build_measure`: `launch_path_read`); a file put at that path
@@ -533,6 +587,16 @@ pub(super) fn spawn(
     if let Some(root) = std::env::var_os("SystemRoot") {
         environment.extend("SystemRoot=".encode_utf16());
         environment.extend(root.encode_wide());
+        environment.push(0);
+    }
+    // The owner's scratch, and SQLite's: never the Windows directory, where
+    // the system's temporary directory falls back to without them.
+    let run = runtime::artifact::run_directory(&fs::directory(&paths.state, false, true)?)
+        .map_err(|_| Code::InvalidConfiguration)?;
+    for variable in ["TEMP", "TMP"] {
+        environment.extend(variable.encode_utf16());
+        environment.push(u16::from(b'='));
+        environment.extend(run.as_os_str().encode_wide());
         environment.push(0);
     }
     environment.push(0);

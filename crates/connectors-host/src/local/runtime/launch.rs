@@ -482,16 +482,21 @@ impl Consumer {
     /// Start the consumer and wait for it, on Windows (consumer-launch.md §8).
     /// No shell and no search path: the captured copy is created by its full
     /// path, argv\[0\], with the pinned argv prefix and `extra` quoted into one
-    /// command line. The environment holds only the `caller` variables whose
-    /// names start with a passed prefix, none named
-    /// [`CREDENTIAL_HANDLE_VARIABLE`] in any letter case, and then that
-    /// variable with the credential handle's value in decimal. The consumer
-    /// inherits the caller's standard handles and one read-only credential
-    /// handle, the only handles in its `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`. It
-    /// runs in a job with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only handle
-    /// this call holds, so it ends if this process dies first. While it runs,
-    /// this process ignores `CTRL_C_EVENT` and `CTRL_BREAK_EVENT`, which the
-    /// shared console delivers to the consumer. Returns its exit code.
+    /// command line, and the copy's directory as its current directory. The
+    /// environment holds only the `caller` variables whose names start with a
+    /// passed prefix in any letter case, none named
+    /// [`CREDENTIAL_HANDLE_VARIABLE`] or `SystemRoot` in any letter case, then
+    /// this process's `SystemRoot` and that variable with the credential
+    /// handle's value in decimal. The consumer inherits the caller's standard
+    /// handles and one read-only credential handle, the only handles in its
+    /// `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`. It is created inside a job with
+    /// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` whose only handle this call holds,
+    /// so it ends if this process dies first; the job permits breakaway on
+    /// request, and every process the consumer started without it ends when
+    /// the job closes after the consumer's exit. While it runs, this process
+    /// ignores `CTRL_C_EVENT` and `CTRL_BREAK_EVENT`, which the shared console
+    /// delivers to the consumer. Returns its exit code. The copy is removed
+    /// on every return, a refusal before creation included.
     #[cfg(windows)]
     pub fn run(
         self,
@@ -507,13 +512,20 @@ impl Consumer {
                 GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
             },
         };
+        let Self {
+            executable,
+            credential: sealed,
+            args,
+            pass_env,
+        } = self;
+        // The copy's custody, before any refusal: every early return below
+        // removes the copy and its directory.
+        let mut launch = artifact::launch_path(executable)?;
         if extra.iter().any(|arg| arg.contains('\0')) {
             return Err(Failure::InvalidInput);
         }
-        let launch = artifact::launch_path(&self.executable)?;
         // Read-only, inheritable only for this creation.
-        let credential =
-            artifact::inheritable(self.credential.as_raw_handle(), Some(FILE_GENERIC_READ))?;
+        let credential = artifact::inheritable(sealed.as_raw_handle(), Some(FILE_GENERIC_READ))?;
         let mut standard = [std::ptr::null_mut(); 3];
         let mut held = Vec::new();
         for (slot, which) in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]
@@ -535,18 +547,24 @@ impl Consumer {
             .into_iter()
             .filter(|(name, _)| {
                 let name: Vec<u16> = name.encode_wide().collect();
-                self.pass_env.iter().any(|prefix| {
-                    let prefix: Vec<u16> = prefix.encode_utf16().collect();
-                    name.starts_with(&prefix)
-                }) && !name.eq_ignore_ascii_case_wide(CREDENTIAL_HANDLE_VARIABLE)
+                pass_env
+                    .iter()
+                    .any(|prefix| name.starts_with_any_case(prefix))
+                    && !name.eq_any_case(CREDENTIAL_HANDLE_VARIABLE)
+                    && !name.eq_any_case(SYSTEM_ROOT)
             })
             .collect();
+        // Windows needs it to start the network stack, as an adapter does; it
+        // carries no credential.
+        if let Some(root) = std::env::var_os(SYSTEM_ROOT) {
+            environment.push((SYSTEM_ROOT.into(), root));
+        }
         environment.push((
             CREDENTIAL_HANDLE_VARIABLE.into(),
             (credential.as_raw_handle() as usize).to_string().into(),
         ));
-        let arguments: Vec<OsString> = self.args.iter().chain(extra).map(OsString::from).collect();
-        let job = artifact::Job::new().map_err(|_| Failure::Unavailable)?;
+        let arguments: Vec<OsString> = args.iter().chain(extra).map(OsString::from).collect();
+        let job = artifact::Job::consumer().map_err(|_| Failure::Unavailable)?;
         let mut child = artifact::create(
             &artifact::Creation {
                 application: launch.path(),
@@ -559,10 +577,10 @@ impl Consumer {
             &job,
         )
         .map_err(|_| Failure::Unavailable)?;
+        launch.created();
         drop(held);
         drop(credential);
-        drop(self.credential);
-        drop(self.executable);
+        drop(sealed);
         let interrupts = Interrupts::ignore();
         let status = child.wait();
         drop(interrupts);
@@ -582,24 +600,50 @@ impl Consumer {
 #[cfg(windows)]
 pub(crate) const CREDENTIAL_HANDLE_VARIABLE: &str = "CONNECTORS_CREDENTIAL_HANDLE";
 
-/// Equality without regard to ASCII letter case, as Windows compares
-/// environment variable names.
+/// The variable Windows needs to start the network stack, given to every
+/// consumer as to every adapter (consumer-launch.md §8, "Environment").
+#[cfg(windows)]
+const SYSTEM_ROOT: &str = "SystemRoot";
+
+/// Name comparison without regard to letter case, as Windows compares
+/// environment variable names: each UTF-16 unit is compared by its simple
+/// uppercase form where that is one unit of the Basic Multilingual Plane.
 #[cfg(windows)]
 trait WideName {
-    fn eq_ignore_ascii_case_wide(&self, other: &str) -> bool;
+    fn eq_any_case(&self, other: &str) -> bool;
+    fn starts_with_any_case(&self, prefix: &str) -> bool;
+}
+#[cfg(windows)]
+fn fold(unit: u16) -> u16 {
+    let Some(character) = char::from_u32(u32::from(unit)) else {
+        return unit;
+    };
+    let mut upper = character.to_uppercase();
+    match (upper.next(), upper.next()) {
+        (Some(single), None) => u16::try_from(u32::from(single)).unwrap_or(unit),
+        _ => unit,
+    }
+}
+/// The length of `prefix` in UTF-16 units, when `name` starts with it in any
+/// letter case.
+#[cfg(windows)]
+fn leads_any_case(name: &[u16], prefix: &str) -> Option<usize> {
+    let mut length = 0;
+    for unit in prefix.encode_utf16() {
+        if fold(*name.get(length)?) != fold(unit) {
+            return None;
+        }
+        length += 1;
+    }
+    Some(length)
 }
 #[cfg(windows)]
 impl WideName for [u16] {
-    fn eq_ignore_ascii_case_wide(&self, other: &str) -> bool {
-        let fold = |unit: u16| {
-            if (u16::from(b'a')..=u16::from(b'z')).contains(&unit) {
-                unit - 32
-            } else {
-                unit
-            }
-        };
-        let other: Vec<u16> = other.encode_utf16().collect();
-        self.len() == other.len() && self.iter().zip(&other).all(|(a, b)| fold(*a) == fold(*b))
+    fn eq_any_case(&self, other: &str) -> bool {
+        leads_any_case(self, other) == Some(self.len())
+    }
+    fn starts_with_any_case(&self, prefix: &str) -> bool {
+        leads_any_case(self, prefix).is_some()
     }
 }
 

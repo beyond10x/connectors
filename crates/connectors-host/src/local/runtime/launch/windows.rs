@@ -1,7 +1,7 @@
 //! Consumer launch delivery on Windows (consumer-launch.md §8): the owner's
 //! credential handle and the transfer of the image and credential handles to
 //! the launching CLI. Creating the consumer from them is the CLI's.
-use super::super::{Failure, Result, channel};
+use super::super::{Failure, Result, artifact, channel};
 use crate::local::filesystem::{
     self as fs,
     windows::{create_new, final_path, identity},
@@ -19,7 +19,9 @@ use std::{
     time::Instant,
 };
 use windows_sys::Win32::{
-    Foundation::{DUPLICATE_CLOSE_SOURCE, DuplicateHandle, HANDLE, INVALID_HANDLE_VALUE},
+    Foundation::{
+        CloseHandle, DUPLICATE_CLOSE_SOURCE, DuplicateHandle, HANDLE, INVALID_HANDLE_VALUE,
+    },
     Storage::FileSystem::{
         DELETE, DeleteFileW, FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
         FILE_DISPOSITION_INFO_EX, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ, FILE_TYPE_DISK,
@@ -41,32 +43,52 @@ fn wide(path: &Path) -> Vec<u16> {
 }
 
 /// The credential (consumer-launch.md §8, "Credential"): `material` is
-/// written verbatim into a file in a fresh owner-only directory, the file's
-/// name is removed with POSIX delete semantics while a handle stays open, and
-/// only a read-only handle positioned at its start is returned, not
-/// inheritable. No path names the bytes afterwards; the directory is removed.
+/// written verbatim into a file in a fresh owner-only directory in the
+/// scratch directory, the state directory's `run` ([`artifact::scratch`]),
+/// never the system's temporary directory; the file's name is removed with
+/// POSIX delete semantics while a handle stays open, and only a read-only
+/// handle positioned at its start is returned, not inheritable. No path names
+/// the bytes afterwards; the directory is removed.
 pub(crate) fn sealed(material: &[u8]) -> Result<File> {
-    /// Removes the credential file, then its directory, on every exit.
-    struct Scratch(Vec<u16>, Vec<u16>);
+    /// Removes the credential file, then its directory, on every exit, after
+    /// closing its own handle on the directory, which does not share deletion.
+    struct Scratch {
+        directory: Option<File>,
+        held: Vec<u16>,
+        path: Vec<u16>,
+    }
     impl Drop for Scratch {
         fn drop(&mut self) {
+            drop(self.directory.take());
             // SAFETY: NUL-terminated paths this function created; a name
             // already gone is a harmless failure.
             unsafe {
-                DeleteFileW(self.1.as_ptr());
-                RemoveDirectoryW(self.0.as_ptr());
+                DeleteFileW(self.path.as_ptr());
+                RemoveDirectoryW(self.held.as_ptr());
             }
         }
     }
     let requested =
-        std::env::temp_dir().join(format!("connectors-credential-{}", uuid::Uuid::new_v4()));
+        artifact::scratch()?.join(format!("connectors-credential-{}", uuid::Uuid::new_v4()));
     if std::fs::symlink_metadata(&requested).is_ok() {
         return Err(Failure::Unavailable);
     }
     let directory = fs::directory(&requested, true, true).map_err(|_| Failure::Unavailable)?;
-    let held = final_path(&directory).map_err(|_| Failure::Unavailable)?;
+    let held = match final_path(&directory) {
+        Ok(held) => held,
+        Err(_) => {
+            drop(directory);
+            // SAFETY: a NUL-terminated path this function created.
+            unsafe { RemoveDirectoryW(wide(&requested).as_ptr()) };
+            return Err(Failure::Unavailable);
+        }
+    };
     let path = held.join("credential");
-    let scratch = Scratch(wide(&held), wide(&path));
+    let scratch = Scratch {
+        directory: Some(directory),
+        held: wide(&held),
+        path: wide(&path),
+    };
     let mut writable = create_new(&path).map_err(|_| Failure::Unavailable)?;
     writable
         .write_all(material)
@@ -119,7 +141,6 @@ pub(crate) fn sealed(material: &[u8]) -> Result<File> {
     // SAFETY: DuplicateHandle returned a new owned handle.
     let readable = unsafe { File::from_raw_handle(readable as _) };
     drop(deleting);
-    drop(directory);
     drop(scratch);
     if std::fs::symlink_metadata(&path).is_ok() || std::fs::symlink_metadata(&held).is_ok() {
         return Err(Failure::Unavailable);
@@ -199,34 +220,58 @@ pub(crate) fn send(stream: &mut channel::Stream, files: &[&File], until: Instant
     sent
 }
 
-/// Receive exactly `count` handles sent by [`send`]. Anything else, another
-/// count or a value that is not an open file handle that a child would not
-/// inherit, refuses; handles already taken over are closed.
+/// Whether `handle` is one the owner could have duplicated in: an open file
+/// handle that a child would not inherit.
+fn arrived(handle: HANDLE) -> bool {
+    !handle.is_null()
+        && handle != INVALID_HANDLE_VALUE
+        // SAFETY: GetFileType only queries a handle value.
+        && unsafe { GetFileType(handle) } == FILE_TYPE_DISK
+        && !channel::windows::inheritable(handle).unwrap_or(true)
+}
+
+/// Receive exactly `count` handles sent by [`send`]. Anything else refuses:
+/// another count, a value named twice, which would be taken over twice and
+/// closed twice, or a value that is not an open file handle that a child
+/// would not inherit. A refused frame leaves nothing open: every distinct
+/// value it names that is such a handle, one the owner duplicated in, is
+/// closed; none is taken over.
 pub(crate) fn receive(
     stream: &mut channel::Stream,
     count: usize,
     until: Instant,
 ) -> Result<Vec<File>> {
     let frame = channel::read::<Handles>(stream, until, false, 0)?;
-    if frame.control.handles.len() != count {
+    let values: Vec<HANDLE> = frame
+        .control
+        .handles
+        .iter()
+        .map(|value| usize::try_from(*value).map_or(INVALID_HANDLE_VALUE, |value| value as HANDLE))
+        .collect();
+    let distinct: std::collections::BTreeSet<usize> =
+        values.iter().map(|handle| *handle as usize).collect();
+    if values.len() != count
+        || distinct.len() != values.len()
+        || !values.iter().all(|handle| arrived(*handle))
+    {
+        for value in distinct {
+            let handle = value as HANDLE;
+            if arrived(handle) {
+                // SAFETY: a handle the owner duplicated into this process for
+                // this frame, never taken over, closed once.
+                unsafe { CloseHandle(handle) };
+            }
+        }
         return Err(Failure::Protocol);
     }
-    let mut files = Vec::with_capacity(count);
-    for value in frame.control.handles {
-        let handle = usize::try_from(value).map_err(|_| Failure::Protocol)? as HANDLE;
-        if handle.is_null()
-            || handle == INVALID_HANDLE_VALUE
-            // SAFETY: GetFileType only queries a handle value.
-            || unsafe { GetFileType(handle) } != FILE_TYPE_DISK
-            || channel::windows::inheritable(handle).unwrap_or(true)
-        {
-            return Err(Failure::Protocol);
-        }
-        // SAFETY: the owner duplicated this handle into this process for this
-        // receive; it is taken over exactly once.
-        files.push(unsafe { File::from_raw_handle(handle as _) });
-    }
-    Ok(files)
+    Ok(values
+        .into_iter()
+        .map(|handle| {
+            // SAFETY: the owner duplicated each of these distinct handles into
+            // this process for this receive; each is taken over exactly once.
+            unsafe { File::from_raw_handle(handle as _) }
+        })
+        .collect())
 }
 
 #[cfg(test)]

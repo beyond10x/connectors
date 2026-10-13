@@ -34,8 +34,8 @@ pub(crate) use macos::{ExactChild, Image, Launch, capture, launch_path, path_of,
 pub(crate) mod windows;
 #[cfg(windows)]
 pub(crate) use windows::{
-    Creation, Image, Job, Launch, Process, capture, create, exited, inheritable, launch_path,
-    quote, terminate,
+    Creation, Image, Job, Launch, Process, capture, create, enter, exited, inheritable,
+    launch_path, quote, run_directory, scratch, terminate,
 };
 
 /// What [`capture`] returns: on Linux the sealed memfd itself.

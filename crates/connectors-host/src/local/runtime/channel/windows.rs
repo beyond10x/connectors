@@ -12,8 +12,9 @@
 //! the process at the other end, by the id the pipe recorded at connect
 //! (`GetNamedPipeClientProcessId` on a server end,
 //! `GetNamedPipeServerProcessId` on a client end). That process is opened once;
-//! its token's user SID must be the current user's, and the process handle
-//! opened then is the one every later handle duplication goes through.
+//! its token's user SID must be the current user's, its integrity level this
+//! thread's and the token not restricted, and the process handle opened then
+//! is the one every later handle duplication goes through.
 use super::super::{Failure, Result};
 use crate::local::filesystem::windows::current_user;
 use std::{
@@ -24,16 +25,18 @@ use std::{
 };
 use windows_sys::Win32::{
     Foundation::{
-        DUPLICATE_CLOSE_SOURCE, DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_BROKEN_PIPE,
-        ERROR_IO_PENDING, ERROR_NO_DATA, ERROR_OPERATION_ABORTED, ERROR_PIPE_CONNECTED,
-        ERROR_PIPE_NOT_CONNECTED, GetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT,
-        INVALID_HANDLE_VALUE, WAIT_OBJECT_0,
+        DUPLICATE_CLOSE_SOURCE, DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_ACCESS_DENIED,
+        ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_NO_DATA, ERROR_OPERATION_ABORTED,
+        ERROR_PIPE_CONNECTED, ERROR_PIPE_NOT_CONNECTED, GetHandleInformation, HANDLE,
+        HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE, WAIT_OBJECT_0,
     },
     Security::{
         ACCESS_ALLOWED_ACE, ACL, ACL_REVISION, AddAccessAllowedAceEx, EqualSid, GetLengthSid,
-        GetTokenInformation, InitializeAcl, InitializeSecurityDescriptor, PSID, SE_DACL_PROTECTED,
+        GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, InitializeAcl,
+        InitializeSecurityDescriptor, IsTokenRestricted, PSID, SE_DACL_PROTECTED,
         SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR, SetSecurityDescriptorControl,
-        SetSecurityDescriptorDacl, SetSecurityDescriptorOwner, TOKEN_QUERY, TOKEN_USER, TokenUser,
+        SetSecurityDescriptorDacl, SetSecurityDescriptorOwner, TOKEN_MANDATORY_LABEL, TOKEN_QUERY,
+        TOKEN_USER, TokenIntegrityLevel, TokenUser,
     },
     Storage::FileSystem::{
         CreateFileW, FILE_ALL_ACCESS, FILE_FLAG_FIRST_PIPE_INSTANCE, FILE_FLAG_OVERLAPPED,
@@ -227,9 +230,27 @@ fn failed(read: bool, error: u32) -> std::io::Result<usize> {
     }
 }
 
+/// The refusal [`peer`] and [`admit`] give a peer of the current user whose
+/// token has another integrity level than this thread's effective token, or
+/// is restricted. Every caller that answers or reports a peer maps it to
+/// `lifecycle_conflict` (owner.md, "Windows", "Pipe peer"); a peer of another
+/// user is `Unavailable`, as no owner.
+pub(crate) const SESSION_MISMATCH: Failure = Failure::Forbidden;
+
+/// `GetCurrentThreadEffectiveToken()`: the pseudo handle of the token this
+/// thread acts with, its impersonation token while it impersonates and the
+/// process token otherwise. It needs no closing.
+const EFFECTIVE_TOKEN: HANDLE = -6isize as HANDLE;
+
 /// The peer of `pipe`: the process at its other end, which must run as the
-/// current user. Read once per pipe and then kept, so the SID check and every
+/// current user, at this thread's integrity level, with a token that is not
+/// restricted. Read once per pipe and then kept, so the checks and every
 /// handle duplication into the peer go through the one process handle.
+///
+/// A process at a higher integrity level refuses `PROCESS_DUP_HANDLE` to this
+/// one. Only then is it opened a second time, for its token alone, so that a
+/// peer of the current user at another level is refused by name
+/// ([`SESSION_MISMATCH`]) rather than as no peer.
 pub(crate) fn peer(pipe: &Pipe) -> Result<Peer> {
     if let Some(peer) = pipe.peer.get() {
         return Ok(peer.clone());
@@ -246,23 +267,17 @@ pub(crate) fn peer(pipe: &Pipe) -> Result<Peer> {
     if found == 0 || pid == 0 {
         return Err(Failure::Unavailable);
     }
-    // SAFETY: documented scalar arguments; a returned handle is new and owned.
-    let process = unsafe {
-        OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_DUP_HANDLE,
-            0,
-            pid,
-        )
-    };
-    if process.is_null() {
+    let user = current_user().map_err(|_| Failure::Unavailable)?.as_psid();
+    let Some(process) = open_process(pid, PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_DUP_HANDLE)
+    else {
+        if last_error() == ERROR_ACCESS_DENIED
+            && let Some(query) = open_process(pid, PROCESS_QUERY_LIMITED_INFORMATION)
+        {
+            admit(&query, user)?;
+        }
         return Err(Failure::Unavailable);
-    }
-    // SAFETY: OpenProcess returned a new owned handle.
-    let process = unsafe { OwnedHandle::from_raw_handle(process as _) };
-    admit(
-        &process,
-        current_user().map_err(|_| Failure::Unavailable)?.as_psid(),
-    )?;
+    };
+    admit(&process, user)?;
     let peer = Peer {
         pid,
         process: Arc::new(process),
@@ -270,7 +285,17 @@ pub(crate) fn peer(pipe: &Pipe) -> Result<Peer> {
     Ok(pipe.peer.get_or_init(|| peer).clone())
 }
 
-/// Requires the user SID of `process`'s token to be `expected`.
+fn open_process(pid: u32, access: u32) -> Option<OwnedHandle> {
+    // SAFETY: documented scalar arguments; a returned handle is new and owned.
+    let process = unsafe { OpenProcess(access, 0, pid) };
+    // SAFETY: OpenProcess returned a new owned handle.
+    (!process.is_null()).then(|| unsafe { OwnedHandle::from_raw_handle(process as _) })
+}
+
+/// Requires the user SID of `process`'s token to be `expected`
+/// (`Unavailable` otherwise), and then its integrity level to equal this
+/// thread's effective token's and the token not to be restricted
+/// ([`SESSION_MISMATCH`] otherwise).
 pub(crate) fn admit(process: &OwnedHandle, expected: PSID) -> Result<()> {
     let mut token: HANDLE = std::ptr::null_mut();
     // SAFETY: a live process handle and a writable out pointer.
@@ -280,12 +305,13 @@ pub(crate) fn admit(process: &OwnedHandle, expected: PSID) -> Result<()> {
     }
     // SAFETY: OpenProcessToken returned a new owned handle.
     let token = unsafe { OwnedHandle::from_raw_handle(token as _) };
+    let token = token.as_raw_handle() as HANDLE;
     let mut buffer = vec![0u64; 64];
     let mut length = 0u32;
     // SAFETY: the buffer is 512 bytes, passed as its size, and aligned for TOKEN_USER.
     if unsafe {
         GetTokenInformation(
-            token.as_raw_handle() as HANDLE,
+            token,
             TokenUser,
             buffer.as_mut_ptr().cast(),
             (buffer.len() * 8) as u32,
@@ -301,7 +327,43 @@ pub(crate) fn admit(process: &OwnedHandle, expected: PSID) -> Result<()> {
     if unsafe { EqualSid(expected, user.User.Sid) } == 0 {
         return Err(Failure::Unavailable);
     }
+    // SAFETY: a live token opened with TOKEN_QUERY.
+    let restricted = unsafe { IsTokenRestricted(token) } != 0;
+    if restricted || integrity_level(token)? != integrity_level(EFFECTIVE_TOKEN)? {
+        return Err(SESSION_MISMATCH);
+    }
     Ok(())
+}
+
+/// The relative identifier of a token's mandatory integrity label, such as
+/// 0x2000 for medium and 0x3000 for high.
+fn integrity_level(token: HANDLE) -> Result<u32> {
+    let mut buffer = vec![0u64; 16];
+    let mut length = 0u32;
+    // SAFETY: the buffer is 128 bytes, passed as its size, and aligned for
+    // TOKEN_MANDATORY_LABEL.
+    if unsafe {
+        GetTokenInformation(
+            token,
+            TokenIntegrityLevel,
+            buffer.as_mut_ptr().cast(),
+            (buffer.len() * 8) as u32,
+            &mut length,
+        )
+    } == 0
+    {
+        return Err(Failure::Unavailable);
+    }
+    // SAFETY: a successful query wrote a TOKEN_MANDATORY_LABEL whose SID
+    // follows it in the buffer; the SID's sub-authorities are read within it.
+    unsafe {
+        let label = &*(buffer.as_ptr() as *const TOKEN_MANDATORY_LABEL);
+        let count = *GetSidSubAuthorityCount(label.Label.Sid);
+        if count == 0 {
+            return Err(Failure::Unavailable);
+        }
+        Ok(*GetSidSubAuthority(label.Label.Sid, u32::from(count) - 1))
+    }
 }
 
 /// Waits until `pipe` has bytes to read or its peer has closed, without a
