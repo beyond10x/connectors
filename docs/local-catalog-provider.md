@@ -640,7 +640,12 @@ The complete configuration used against the sandbox is
   bundle, binding its parameters from the write's input, and refuses before any
   request unless every check holds. A check compares the scalar at a JSON
   `pointer` in the observed body with `{"input": "<key>"}` (a top-level input or
-  `body.<key>`) or `{"literal": "<value>"}`. The postflight applies its checks to
+  `body.<key>`) or `{"literal": "<value>"}`, both as text, so a literal
+  `"true"` holds for the boolean `true` and the string `"true"` alike; or with
+  `{"boolean": true}` (or `false`), by JSON type, which holds only for that
+  JSON boolean, never a string, a number or `null`, as for Slack's `ok`. The
+  model's `connectors_catalog.guard.Expectation` holds exactly one of the
+  three. The postflight applies its checks to
   the write's own response; a difference there leaves the outcome uncertain and
   never refused, because the provider may already have applied the write. No
   corrective request is ever issued. This is the C14 boundary the operator

@@ -46,8 +46,8 @@
      "body_required": ["channel", "text"],
      "guard": {
        "preflight": {"operation_id": "auth_test", "values": {},
-                     "checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]},
-       "postflight": {"checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]}}},
+                     "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
+       "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}]}}},
     {"id": "conversations.open", "operation_id": "conversations_open", "effect": "write",
      "description": "Open, or resume, the direct message with the users body.users names: one user id for a direct message, or a comma-separated list of user ids for a multi-person one; body.return_im true asks for the whole conversation. Answers channel.id, the conversation chat.postMessage then names as channel. Needs im:write, and mpim:write for a multi-person conversation. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses (user_not_found, missing_scope) as status 200 with ok false; the answer must carry ok true to be applied, so such a refusal is outcome_unknown, never applied, and Slack's error string is not returned",
      "credential": ["token"],
@@ -56,7 +56,7 @@
      "body_required": ["users"],
      "guard": {
        "preflight": {"operation_id": "auth_test", "values": {},
-                     "checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]},
-       "postflight": {"checks": [{"pointer": "/ok", "expect": {"literal": "true"}}]}}}
+                     "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
+       "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}]}}}
   ]
 }

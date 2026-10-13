@@ -1762,7 +1762,8 @@ fn the_two_writes_ship_as_guarded_writes_with_a_closed_json_body() {
         }
         let guard = selection.guard.as_ref().expect("a guard");
         assert_eq!(guard.preflight.operation_id, "auth_test", "`{id}`");
-        let ok = json!([{"pointer": "/ok", "expect": {"literal": "true"}}]);
+        // `ok` as the JSON boolean Slack's schema pins, never compared as text.
+        let ok = json!([{"pointer": "/ok", "expect": {"boolean": true}}]);
         assert_eq!(serde_json::to_value(&guard.preflight.checks).unwrap(), ok);
         assert_eq!(serde_json::to_value(&guard.postflight.checks).unwrap(), ok);
         let declaration = engine
