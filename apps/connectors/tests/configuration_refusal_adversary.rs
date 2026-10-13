@@ -7,6 +7,15 @@ use serde_json::Value;
 use std::os::unix::fs::PermissionsExt;
 use std::{fs, process::Command};
 
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
+};
+
 fn command(root: &tempfile::TempDir, args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_connectors"))
         .args(["--output", "json", "--config"])
@@ -26,7 +35,7 @@ fn mismatched_v1(root: &tempfile::TempDir) {
         .unwrap()
         .replace("connectors-local/2", "connectors-local/1")
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();

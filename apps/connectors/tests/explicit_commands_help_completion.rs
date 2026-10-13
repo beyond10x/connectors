@@ -67,6 +67,24 @@ fn script() -> String {
     stdout
 }
 
+/// The Bash that runs the completion. On Windows `Command::new("bash")` searches
+/// the system directory before `PATH` and finds `System32\bash.exe`, the WSL
+/// launcher, so the first `bash.exe` on `PATH` outside the Windows directory
+/// (Git Bash on the runner) is taken instead.
+fn bash() -> std::path::PathBuf {
+    if !cfg!(windows) {
+        return "bash".into();
+    }
+    let windows = std::env::var_os("SystemRoot")
+        .map(|root| root.to_string_lossy().to_lowercase())
+        .unwrap_or_else(|| r"c:\windows".to_owned());
+    std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())
+        .filter(|dir| !dir.to_string_lossy().to_lowercase().starts_with(&windows))
+        .map(|dir| dir.join("bash.exe"))
+        .find(|candidate| candidate.is_file())
+        .expect("a bash.exe on PATH outside the Windows directory")
+}
+
 /// Sources the emitted script in bash, finds the function `complete -p` registers
 /// for `connectors`, and drives it with `words` (the last one is being completed).
 fn complete(words: &[&str]) -> BTreeSet<String> {
@@ -88,13 +106,19 @@ COMPREPLY=()
 "$func" connectors "${COMP_WORDS[COMP_CWORD]}" "$prev"
 printf '%s\n' "${COMPREPLY[@]}"
 "#;
-    let output = Command::new("bash")
+    // Git Bash reads a drive path written with forward slashes.
+    let script_path = if cfg!(windows) {
+        path.to_string_lossy().replace('\\', "/")
+    } else {
+        path.to_string_lossy().into_owned()
+    };
+    let output = Command::new(bash())
         .arg("--norc")
         .arg("--noprofile")
         .arg("-c")
         .arg(driver)
         .arg("driver")
-        .arg(&path)
+        .arg(script_path)
         .args(words)
         .output()
         .unwrap();

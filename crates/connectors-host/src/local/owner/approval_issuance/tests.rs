@@ -191,7 +191,13 @@ fn setup(root: &Path, socket: Option<&Path>, clock_address: &str) -> Target {
     }
 }
 fn root() -> tempfile::TempDir {
+    #[cfg(unix)]
     let root = tempfile::tempdir_in(std::env::var_os("TMPDIR").unwrap()).unwrap();
+    // Windows reads its temporary directory from `TMP`, under the user's
+    // profile; CI's `TMPDIR` is on the runner's work volume, whose ancestors
+    // grant another trustee write and are refused (`filesystem::directory`).
+    #[cfg(windows)]
+    let root = tempfile::tempdir().unwrap();
     #[cfg(unix)]
     std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
     #[cfg(windows)]

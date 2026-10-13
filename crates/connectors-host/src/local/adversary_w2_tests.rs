@@ -1,7 +1,6 @@
 //! Adversary cases for story:host-suite-subprocess-bounds (wave 2 unit C).
 use crate::local::config;
 use crate::local::runtime::{Child, Failure, PrivateProtocol};
-use sha2::{Digest, Sha256};
 use std::{
     path::Path,
     process::Command,
@@ -9,8 +8,7 @@ use std::{
 };
 
 fn selection(root: &Path, mode: &str) -> config::Adapter {
-    let path = std::env::current_exe().unwrap();
-    let hash = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
+    let (path, hash) = crate::local::test_executable::path_and_sha256();
     config::Adapter {
         instance_id: "fixture".into(),
         adapter_id: "fixture".into(),

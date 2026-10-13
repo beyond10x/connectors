@@ -414,10 +414,7 @@ impl Metadata {
                 .map_err(unavailable)?;
         }
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
-        metadata
-            ._directory
-            .sync_all()
-            .map_err(|_| Failure::OutcomeUnknown)?;
+        fs::sync_directory(&metadata._directory)?;
         metadata.validate()?;
         metadata.adopt_er()?;
         metadata.migrate(3)?;
@@ -712,9 +709,7 @@ impl Metadata {
             er::advance_projection_level(authority, level)?;
             self.connection = er::projection(authority_id, authority)?;
         }
-        self._directory
-            .sync_all()
-            .map_err(|_| Failure::OutcomeUnknown)?;
+        fs::sync_directory(&self._directory)?;
         self.validate()
     }
 
@@ -839,9 +834,7 @@ impl Metadata {
         tx.pragma_update(None, "user_version", er::LEVEL)
             .map_err(unavailable)?;
         tx.commit().map_err(|_| Failure::OutcomeUnknown)?;
-        self._directory
-            .sync_all()
-            .map_err(|_| Failure::OutcomeUnknown)?;
+        fs::sync_directory(&self._directory)?;
         #[cfg(test)]
         if take_migration_fault(2) {
             return Err(Failure::OutcomeUnknown);

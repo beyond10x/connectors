@@ -2,11 +2,9 @@ use super::*;
 use crate::local::config;
 use connectors_sdk::WriteOutcome;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::{
     io::Write,
     path::{Path, PathBuf},
-    sync::OnceLock,
 };
 
 fn record(root: &Path, name: &str) {
@@ -382,12 +380,7 @@ fn malformed_preparation_cancel_and_result_replies_reap_the_exact_child() {
     }
 }
 fn selection(root: &Path, mode: &str, protocol: PrivateProtocol) -> config::Adapter {
-    static EXECUTABLE: OnceLock<(PathBuf, String)> = OnceLock::new();
-    let (path, hash) = EXECUTABLE.get_or_init(|| {
-        let path = std::env::current_exe().unwrap();
-        let hash = hex::encode(Sha256::digest(std::fs::read(&path).unwrap()));
-        (path, hash)
-    });
+    let (path, hash) = crate::local::test_executable::path_and_sha256();
     config::Adapter {
         instance_id: "fixture".into(),
         adapter_id: "fixture".into(),
@@ -398,8 +391,8 @@ fn selection(root: &Path, mode: &str, protocol: PrivateProtocol) -> config::Adap
         restart: config::Restart::Never,
         permissions: Default::default(),
         executable: config::Executable {
-            path: path.clone(),
-            sha256: hash.clone(),
+            path,
+            sha256: hash,
             args: vec![
                 "--exact".into(),
                 "local::runtime::process::write_tests::fixture".into(),

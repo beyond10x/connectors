@@ -365,7 +365,7 @@ impl Config {
         }
         let state = fs::directory(&paths.state, true, true)?;
         super::metadata::Metadata::initialize(&paths.state)?;
-        state.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
+        fs::sync_directory(&state)?;
         let config = Self {
             format: "connectors-local/2".into(),
             owner_uid: fs::uid(),
@@ -404,7 +404,7 @@ impl Config {
         Self::load(&paths.config).map_err(|_| Failure::ConfigurationExists)?;
         let state = fs::directory(&paths.state, true, true)?;
         super::metadata::Metadata::initialize(&paths.state)?;
-        state.sync_all().map_err(|_| Failure::OutcomeUnknown)?;
+        fs::sync_directory(&state)?;
         Ok(Initialized::StateInitialized)
     }
 }

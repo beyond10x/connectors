@@ -22,6 +22,15 @@ use std::{
     process::{Command, Output},
 };
 
+/// A directory holding no executable. An entry's executable is an absolute local
+/// path (`contracts/cli/v1alpha1/semantics.md` §3), and on Windows an absolute path
+/// names its drive: `/not-installed` there is refused as `invalid_configuration`.
+const NOT_INSTALLED: &str = if cfg!(windows) {
+    "C:/not-installed"
+} else {
+    "/not-installed"
+};
+
 const ABSENT: &str = "nosuch.op";
 const GRANTED_READ: &str = "item.read";
 const GRANTED_WRITE: &str = "item.write";
@@ -123,7 +132,7 @@ fn configured() -> (tempfile::TempDir, String) {
     let config_path = root.path().join("config/config.toml");
     let config = fs::read_to_string(&config_path).unwrap()
         + &format!(
-            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='/not-installed/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{GRANTED_READ}','{GRANTED_WRITE}']\n",
+            "\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n[adapters.forge.permissions]\nprofiles=['token']\noperations=['{GRANTED_READ}','{GRANTED_WRITE}']\n",
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
