@@ -796,9 +796,7 @@ mod tests {
             self.browser
                 .iter_mut()
                 .map(|stream| {
-                    stream
-                        .set_read_timeout(Some(Duration::from_secs(5)))
-                        .unwrap();
+                    crate::local::test_streams::set_read_timeout(stream, Duration::from_secs(5));
                     let mut bytes = Vec::new();
                     let _ = stream.read_to_end(&mut bytes);
                     String::from_utf8_lossy(&bytes).into_owned()
@@ -995,9 +993,7 @@ mod tests {
 
     /// A browser's answer on `stream`, or what arrived within five seconds.
     fn read_answer(stream: &mut TcpStream) -> String {
-        stream
-            .set_read_timeout(Some(Duration::from_secs(5)))
-            .unwrap();
+        crate::local::test_streams::set_read_timeout(stream, Duration::from_secs(5));
         let mut bytes = Vec::new();
         let _ = stream.read_to_end(&mut bytes);
         String::from_utf8_lossy(&bytes).into_owned()
