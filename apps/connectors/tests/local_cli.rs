@@ -1,6 +1,8 @@
 use serde_json::Value;
 #[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
 mod clock_fixture;
+#[path = "support/owner.rs"]
+mod owner_start;
 #[path = "support/socket.rs"]
 mod sockets;
 use std::{
@@ -428,7 +430,7 @@ fn start_owner_with(
     if let Some(idle_ms) = idle_ms {
         owner.env("CONNECTORS_TEST_OWNER_IDLE_MS", idle_ms.to_string());
     }
-    let owner = owner
+    let mut owner = owner
         .arg("-c")
         .arg(r#"exec "$0" __connectors-owner "$1" "$2" 3<&0 4<&1 </dev/null >/dev/null"#)
         .arg(binary)
@@ -438,16 +440,12 @@ fn start_owner_with(
             owner_end,
         )))
         .stdout(std::process::Stdio::from(lock))
-        .stderr(std::process::Stdio::null())
+        .stderr(owner_start::stderr(root.path()))
         .spawn()
         .unwrap();
     // Nobody greets on the startup channel; the owner keeps serving its socket.
     drop(startup);
-    let until = std::time::Instant::now() + std::time::Duration::from_secs(20);
-    while !state.join("owner.sock").exists() {
-        assert!(std::time::Instant::now() < until, "owner never listened");
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
+    owner_start::wait_listening(&mut owner, root.path());
     OwnerProcess(owner)
 }
 
