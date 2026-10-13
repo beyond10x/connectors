@@ -1,6 +1,6 @@
 //! A single local SQLite authority. Schema installation grants no connection,
 //! credential custody, approval or business dispatch authority.
-use super::{Failure, Result, filesystem as fs};
+use super::{Failure, Release, Result, filesystem as fs};
 #[cfg(test)]
 mod checkpoint_tests;
 mod er;
@@ -494,6 +494,57 @@ impl Metadata {
         Ok(authority)
     }
 
+    /// Test support: records `version` and `digest` as the store's writer
+    /// marker, as a binary of that release persisting that record model would,
+    /// whatever the marker named before. Only tests build it.
+    ///
+    /// # Errors
+    /// The store's open or the batch's refusal.
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn record_writer_for_tests(path: &Path, version: &str, digest: &str) -> Result<()> {
+        let metadata = Self::update(path, false)?;
+        er::record_writer_for_tests(
+            metadata.er.as_ref().ok_or(Failure::MetadataUnavailable)?,
+            version,
+            digest,
+        )
+    }
+
+    /// Test support: a level-9 store at `path` without a writer marker, as every
+    /// release before the marker left one: a level-3 store adopted into Entity
+    /// Runtime by an open that writes no batch. Only tests build it.
+    ///
+    /// # Errors
+    /// The adopting open.
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn unmarked_store_for_tests(path: &Path) -> Result<()> {
+        legacy_fixture(path, 3);
+        drop(Self::update(path, false)?);
+        Ok(())
+    }
+
+    /// Test support: the store's writer marker as (release version, model
+    /// digest), read without the admission check. Only tests build it.
+    ///
+    /// # Errors
+    /// The store's open.
+    #[cfg(any(test, feature = "test-support"))]
+    #[doc(hidden)]
+    pub fn writer_for_tests(path: &Path) -> Result<Option<(String, String)>> {
+        let metadata = Self::update(path, false)?;
+        er::writer_for_tests(metadata.er.as_ref().ok_or(Failure::MetadataUnavailable)?)
+    }
+
+    /// The digest of the record model this binary persists (semantics.md §3).
+    ///
+    /// # Errors
+    /// [`Failure::MetadataUnavailable`] when the built-in definitions do not decode.
+    pub fn model_digest() -> Result<&'static str> {
+        er::model_digest()
+    }
+
     /// The owner's open when it starts: an admitted mutating open (migrating a
     /// level 1–8 database) that verifies the whole store before the owner
     /// serves anything, whether or not the provider opened from a checkpoint.
@@ -919,6 +970,9 @@ impl Metadata {
         if imported_digest != digest {
             return Err(Failure::MetadataUnavailable);
         }
+        // Before any record is projected or read: a store a newer binary with
+        // another record model wrote is refused by name (semantics.md §3).
+        er::admit_writer(&authority)?;
         let projection = er::projection(authority_id, &authority)?;
         self.connection = projection;
         self.er = Some(authority);
@@ -1248,7 +1302,7 @@ fn acquire_lifecycle_lock(file: &std::fs::File) -> Result<()> {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub(super) fn legacy_fixture(path: &Path, target: i64) -> uuid::Uuid {
     let directory = fs::directory(path, true, true).unwrap();
     fs::publish_new(&directory, OsStr::new(NAME), &[]).unwrap();
@@ -1292,6 +1346,95 @@ pub(super) fn legacy_fixture(path: &Path, target: i64) -> uuid::Uuid {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::local::runtime::state::{BUILD_VERSION, State};
+
+    /// A model digest no build persists.
+    const OTHER_MODEL: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+    const NEWER: Release = Release {
+        major: 999,
+        minor: 0,
+        patch: 0,
+    };
+
+    fn fresh_store() -> (tempfile::TempDir, PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        fs::directory(&path, true, true).unwrap();
+        drop(Metadata::initialize(&path).unwrap());
+        (root, path)
+    }
+
+    fn own_writer() -> Option<(String, String)> {
+        Some((
+            BUILD_VERSION.to_owned(),
+            Metadata::model_digest().unwrap().to_owned(),
+        ))
+    }
+
+    #[test]
+    fn the_build_version_is_a_release_and_releases_order_numerically() {
+        assert_eq!(Release::current().to_string(), BUILD_VERSION);
+        assert!(Release::parse("0.10.0") > Release::parse("0.9.12"));
+        for refused in ["0.50", "0.50.0.1", "0.50.0-rc.1", "0..1", "", "v0.50.0"] {
+            assert_eq!(Release::parse(refused), None, "{refused}");
+        }
+    }
+
+    /// semantics.md §3: a store whose marker names a newer release with another
+    /// record model is refused by name by every open, reading and writing nothing.
+    #[test]
+    fn a_store_a_newer_binary_with_another_model_wrote_is_refused_by_every_open() {
+        let (_root, path) = fresh_store();
+        Metadata::record_writer_for_tests(&path, "999.0.0", OTHER_MODEL).unwrap();
+        let refused = Some(Failure::MetadataSchemaNewer(Some(NEWER)));
+        assert_eq!(Metadata::inspect(&path).err(), refused);
+        assert_eq!(Metadata::update(&path, false).err(), refused);
+        assert_eq!(Metadata::update_observation(&path).err(), refused);
+        assert_eq!(Metadata::start_owner(&path).err(), refused);
+        assert_eq!(
+            State::new(&path).suppress("fixture", true).err(),
+            refused,
+            "a write is refused before it reads a record"
+        );
+    }
+
+    #[test]
+    fn the_same_model_under_a_newer_release_is_admitted_and_never_lowered() {
+        let (_root, path) = fresh_store();
+        let model = Metadata::model_digest().unwrap();
+        Metadata::record_writer_for_tests(&path, "999.0.0", model).unwrap();
+        assert!(Metadata::inspect(&path).is_ok());
+        State::new(&path).suppress("fixture", true).unwrap();
+        assert!(State::new(&path).suppressed("fixture").unwrap());
+        assert_eq!(
+            Metadata::writer_for_tests(&path).unwrap(),
+            Some(("999.0.0".to_owned(), model.to_owned())),
+            "an older writer never lowers the marker"
+        );
+    }
+
+    #[test]
+    fn an_older_marker_is_admitted_and_raised_by_the_next_write() {
+        let (_root, path) = fresh_store();
+        Metadata::record_writer_for_tests(&path, "0.1.0", OTHER_MODEL).unwrap();
+        assert!(Metadata::inspect(&path).is_ok());
+        State::new(&path).suppress("fixture", true).unwrap();
+        assert_eq!(Metadata::writer_for_tests(&path).unwrap(), own_writer());
+    }
+
+    /// Every store written before the marker existed has none: admitted, and
+    /// marked by its next write.
+    #[test]
+    fn a_store_without_a_marker_is_admitted_and_marked_by_its_first_write() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        Metadata::unmarked_store_for_tests(&path).unwrap();
+        assert_eq!(disk_version(&path), 9);
+        assert_eq!(Metadata::writer_for_tests(&path).unwrap(), None);
+        assert!(Metadata::inspect(&path).is_ok());
+        State::new(&path).suppress("fixture", true).unwrap();
+        assert_eq!(Metadata::writer_for_tests(&path).unwrap(), own_writer());
+    }
 
     #[test]
     fn only_the_handing_parent_binds_a_lock_wait() {

@@ -1,9 +1,9 @@
 use super::{
     APPROVAL_KEYS_MIGRATION, APPROVAL_MIGRATION, APPROVAL_POLICY_MIGRATION, AUDIT_MIGRATION,
-    Failure, MIGRATION as BASE_MIGRATION, MUTATION_MIGRATION, REGISTRY_MIGRATION,
+    Failure, MIGRATION as BASE_MIGRATION, MUTATION_MIGRATION, REGISTRY_MIGRATION, Release,
     RUNTIME_MIGRATION, Result, WAIT_BOUND, migration_digest as base_migration_digest, unavailable,
 };
-use entity_core::{EntityDefinition, EntityInstance, OperationFieldAction, Registry};
+use entity_core::{CoreError, EntityDefinition, EntityInstance, OperationFieldAction, Registry};
 use entity_eventlog::{
     Authority, CapturePolicy, EventlogOperationContext, OpenVerification, RecordedProviderFacade,
     sync::{
@@ -776,6 +776,169 @@ pub(super) fn registry() -> Result<Registry> {
 fn definition_bundle() -> Result<DefinitionBundle> {
     serde_json::from_slice(include_bytes!("entity-runtime-definitions.json"))
         .map_err(|_| Failure::MetadataUnavailable)
+}
+
+/// The store writer marker (`ess/domains/cli.yaml`, `connectors.cli.StoreWriter`):
+/// one subject per store, never projected to SQL.
+const WRITER_ENTITY: &str = "connectors.cli.StoreWriter";
+const WRITER_ID: &str = "s:store";
+
+fn writer_key(key: &(String, String)) -> bool {
+    key.0 == WRITER_ENTITY
+}
+
+/// The digest of the record model this binary persists: SHA-256 over the
+/// canonical JSON of the Entity Runtime definitions its records are checked
+/// against (the bundle's `definitions`, without its source or synthesis
+/// digests). Two builds whose persisted records have the same shapes lower the
+/// same definitions, so they have the same digest even when the ESS source
+/// around them, its comments or the tool that generated it changed.
+pub(super) fn model_digest() -> Result<&'static str> {
+    static DIGEST: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+    DIGEST
+        .get_or_init(|| {
+            let bundle: Value =
+                serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).ok()?;
+            let definitions = serde_json::to_vec(bundle.get("definitions")?).ok()?;
+            Some(hex::encode(Sha256::digest(definitions)))
+        })
+        .as_deref()
+        .ok_or(Failure::MetadataUnavailable)
+}
+
+/// The release and model digest the store's writer marker names, if it has one.
+fn recorded_writer(baseline: &Baseline) -> Result<Option<(Release, String)>> {
+    let Some(row) = baseline.get(&(WRITER_ENTITY.to_owned(), WRITER_ID.to_owned())) else {
+        return Ok(None);
+    };
+    let release = row
+        .fields
+        .get("binary_version")
+        .and_then(Value::as_str)
+        .and_then(Release::parse)
+        .ok_or(Failure::MetadataUnavailable)?;
+    let digest = row
+        .fields
+        .get("model_digest")
+        .and_then(Value::as_str)
+        .ok_or(Failure::MetadataUnavailable)?;
+    Ok(Some((release, digest.to_owned())))
+}
+
+/// Refuses a store whose marker names a newer release with another model
+/// digest, before any record of it is read. The same digest under a newer
+/// release, an older or equal release and a store without a marker are admitted.
+pub(super) fn admit_writer(er: &ErAuthority) -> Result<()> {
+    match recorded_writer(&er.baseline)? {
+        Some((release, digest)) if release > Release::current() && digest != model_digest()? => {
+            Err(Failure::MetadataSchemaNewer(Some(release)))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// The marker change a write records in its own batch: the marker when the
+/// store has none, a raise when it names an older release, nothing otherwise.
+/// It is never lowered.
+fn writer_action(
+    baseline: &Baseline,
+    registry: &Registry,
+    commands: &BTreeMap<String, CommandEntry>,
+) -> Result<Option<BatchAction>> {
+    let own = Release::current();
+    let mut next = RowImage {
+        entity: WRITER_ENTITY.into(),
+        id: WRITER_ID.into(),
+        revision: 1,
+        lifecycle_state: "Recorded".into(),
+        fields: Map::from_iter([
+            ("binary_version".to_owned(), json!(own.to_string())),
+            ("model_digest".to_owned(), json!(model_digest()?)),
+        ]),
+    };
+    let Some(current) = baseline.get(&(WRITER_ENTITY.to_owned(), WRITER_ID.to_owned())) else {
+        return create_action(registry, commands, &next, "connectors.cli.RecordStoreWriter")
+            .map(Some);
+    };
+    match recorded_writer(baseline)? {
+        Some((release, _)) if release < own => {
+            next.revision = current.revision + 1;
+            command_action(
+                registry,
+                commands,
+                baseline,
+                current,
+                &next,
+                "connectors.cli.RaiseStoreWriter",
+            )
+            .map(Some)
+        }
+        _ => Ok(None),
+    }
+}
+
+#[cfg(any(test, feature = "test-support"))]
+pub(super) fn record_writer_for_tests(er: &ErAuthority, version: &str, digest: &str) -> Result<()> {
+    let bundle = definition_bundle()?;
+    let commands = bundle
+        .commands
+        .into_iter()
+        .map(|command| (command.name.clone(), command))
+        .collect::<BTreeMap<_, _>>();
+    let registry = registry()?;
+    let mut next = RowImage {
+        entity: WRITER_ENTITY.into(),
+        id: WRITER_ID.into(),
+        revision: 1,
+        lifecycle_state: "Recorded".into(),
+        fields: Map::from_iter([
+            ("binary_version".to_owned(), json!(version)),
+            ("model_digest".to_owned(), json!(digest)),
+        ]),
+    };
+    let key = (WRITER_ENTITY.to_owned(), WRITER_ID.to_owned());
+    let action = match er.baseline.get(&key) {
+        None => create_action(&registry, &commands, &next, "connectors.cli.RecordStoreWriter")?,
+        Some(current) => {
+            next.revision = current.revision + 1;
+            command_action(
+                &registry,
+                &commands,
+                &er.baseline,
+                current,
+                &next,
+                "connectors.cli.RaiseStoreWriter",
+            )?
+        }
+    };
+    er.facade
+        .execute_batch(
+            context("metadata-writer-test"),
+            BatchKey::Named(format!("connectors-writer-test-{}", uuid::Uuid::new_v4())),
+            vec![action],
+            batch_wait(),
+        )
+        .map(|_| ())
+        .map_err(map_execution_failure)
+}
+
+#[cfg(any(test, feature = "test-support"))]
+pub(super) fn writer_for_tests(er: &ErAuthority) -> Result<Option<(String, String)>> {
+    Ok(recorded_writer(&er.baseline)?.map(|(release, digest)| (release.to_string(), digest)))
+}
+
+/// A refused write names the marker's newer release when it has one.
+fn named_writer(baseline: &Baseline, failure: Failure) -> Failure {
+    match failure {
+        Failure::MetadataSchemaNewer(None) => Failure::MetadataSchemaNewer(
+            recorded_writer(baseline)
+                .ok()
+                .flatten()
+                .map(|(release, _)| release)
+                .filter(|release| *release > Release::current()),
+        ),
+        other => other,
+    }
 }
 
 fn presence(name: &str) -> String {
@@ -3365,6 +3528,10 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         // table. Reject any attempt to use this path for a registry clock
         // or another owner's row before preparing an authored batch.
         let changed_non_runtime = er.baseline.keys().chain(desired.keys()).any(|key| {
+            if writer_key(key) {
+                // The writer marker has no SQL row; only this batch changes it.
+                return false;
+            }
             let changed = match (er.baseline.get(key), desired.get(key)) {
                 (Some(current), Some(next)) => {
                     current.fields != next.fields || current.lifecycle_state != next.lifecycle_state
@@ -3383,6 +3550,9 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         // The two admitted observation callers may only persist their
         // registry clock. This check also covers additions and removals.
         let changed_non_clock = reference.keys().chain(desired.keys()).any(|key| {
+            if writer_key(key) {
+                return false;
+            }
             let changed = match (reference.get(key), desired.get(key)) {
                 (Some(current), Some(next)) => {
                     current.fields != next.fields || current.lifecycle_state != next.lifecycle_state
@@ -3408,6 +3578,9 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
     // Recorded expiries of transient subjects whose SQL rows disappeared.
     let mut expiries = Vec::new();
     for (key, current) in reference {
+        if writer_key(key) {
+            continue;
+        }
         match desired.get(key) {
             Some(next)
                 if next.fields == current.fields
@@ -3497,6 +3670,11 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
     if actions.is_empty() {
         return Ok(());
     }
+    // A write records or raises the store's writer marker in its own batch,
+    // against the newest marker this handle has read.
+    if let Some(action) = writer_action(&er.baseline, &runtime_registry, &commands)? {
+        actions.push(action);
+    }
     let batch = BatchKey::Named(format!(
         "connectors-metadata-batch-{}",
         uuid::Uuid::new_v4()
@@ -3513,7 +3691,7 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
             batch_wait(),
         )
     })
-    .map_err(map_execution_failure)?;
+    .map_err(|error| named_writer(&er.baseline, map_execution_failure(error)))?;
     let receipt = outcome.receipt().ok_or(Failure::MetadataUnavailable)?;
     let clocks_before = er
         .baseline
@@ -3686,7 +3864,7 @@ fn record_expiries(er: &mut ErAuthority, expiries: Vec<BatchAction>) -> Result<(
             batch_wait(),
         )
     })
-    .map_err(map_execution_failure)?;
+    .map_err(|error| named_writer(&er.baseline, map_execution_failure(error)))?;
     #[cfg(test)]
     EXPIRY_TIMES.with(|times| times.borrow_mut().push(started.elapsed()));
     let receipt = outcome.receipt().ok_or(Failure::MetadataUnavailable)?;
@@ -3783,7 +3961,9 @@ fn refuse_changed_since_baseline(
     let decided = er.baseline.clone();
     catch_up(er, None)?;
     let changed = decided.keys().chain(er.baseline.keys()).any(|key| {
+        // No decision reads the writer marker; this batch raises the newest one.
         decided.get(key) != er.baseline.get(key)
+            && !writer_key(key)
             && !(runtime_records_may_differ && runtime_record_key(key))
     });
     if changed {
@@ -4247,6 +4427,7 @@ fn identity_field(entity: &str) -> Option<&'static str> {
         "connectors.credential_evidence.ReadUse" => Some("use_id"),
         "connectors.cli.ConnectionListCursor" => Some("cursor_id"),
         "connectors.cli.LocalRuntimeRecord" => Some("instance_id"),
+        "connectors.cli.StoreWriter" => Some("store"),
         "connectors.mutations.AttemptRecord" => Some("attempt_id"),
         "connectors.idempotency.KeyReservation" => Some("reservation_id"),
         "connectors.execution_audit.AuditRecord" => Some("audit_record_ref"),
@@ -4349,9 +4530,23 @@ fn map_execution_failure(error: entity_eventlog::sync::SyncExecutionError) -> Fa
         entity_eventlog::sync::SyncExecutionError::Execution(ExecutionError::Write(
             WriteFailure::Uncertain { .. },
         )) => Failure::OutcomeUnknown,
+        // A newer binary's record: running this binary again cannot change it.
+        entity_eventlog::sync::SyncExecutionError::Execution(ExecutionError::Core(
+            CoreError::Validation(errors),
+        )) if errors.iter().any(undeclared_record_field) => Failure::MetadataSchemaNewer(None),
         entity_eventlog::sync::SyncExecutionError::Rejected(_)
         | entity_eventlog::sync::SyncExecutionError::Execution(_) => Failure::MetadataUnavailable,
     }
+}
+
+/// A record field the subject carries and this binary's definition does not
+/// declare. Entity Runtime 0.30.3 reports it as a `CoreError::Validation`
+/// whose `ValidationError` has only a path and a message, no kind, so the
+/// message text is matched (`entity-core` `validation.rs`, "{noun} is not
+/// declared in the schema"); the `fields.` path keeps it to stored record
+/// fields, not command arguments this binary composed.
+fn undeclared_record_field(error: &entity_core::ValidationError) -> bool {
+    error.path.starts_with("fields.") && error.message == "field is not declared in the schema"
 }
 
 fn projection_from_connection(connection: &Connection) -> Result<ProjectionRows> {
@@ -4462,6 +4657,118 @@ pub(super) fn migration_digest() -> String {
 mod tests {
     use super::*;
     use entity_store::asynchronous::RecordedEntry;
+
+    /// The definitions a newer binary would persist: this binary's, with
+    /// `connectors.cli.LocalRuntimeRecord` carrying one more optional field
+    /// its creation records, as `build_version` once arrived.
+    fn newer_registry() -> Registry {
+        let mut bundle: Value =
+            serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).unwrap();
+        let definition = bundle["definitions"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|entry| entry["name"] == "connectors.cli.LocalRuntimeRecord")
+            .unwrap();
+        let definition = &mut definition["definition"];
+        let optional = definition["schema"]["fields"]["build_version"].clone();
+        definition["schema"]["fields"]["newer_field"] = optional.clone();
+        definition["create"]["arguments"]["fields"]["input"]["properties"]["newer_field"] =
+            optional;
+        definition["create"]["outcomes"][0]["set"]["newer_field"] =
+            json!("$args.input.newer_field");
+        let mut registry = Registry::new();
+        for entry in bundle["definitions"].as_array().unwrap() {
+            registry
+                .register(serde_json::from_value(entry["definition"].clone()).unwrap())
+                .unwrap();
+        }
+        registry.validate_all().unwrap();
+        registry
+    }
+
+    /// The reproduction's failing write: a newer binary recorded a runtime
+    /// record with a field this binary's schema does not declare, and no marker
+    /// names it newer. This binary's next write of that record is refused by
+    /// the Entity Runtime; the refusal is `metadata_schema_newer`, unrecorded,
+    /// never `metadata_unavailable`.
+    #[test]
+    fn a_record_field_this_model_does_not_declare_is_a_newer_store_unrecorded() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        crate::local::filesystem::directory(&path, true, true).unwrap();
+        drop(crate::local::metadata::Metadata::initialize(&path).unwrap());
+        let state = crate::local::runtime::state::State::new(&path);
+        state.suppress("fixture", false).unwrap();
+        let (logical_scope, tenant, stream_identity): (String, String, String) =
+            Connection::open(path.join("metadata.sqlite3"))
+                .unwrap()
+                .query_row(
+                    "SELECT logical_scope,tenant,stream_identity FROM connectors_er_authority",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .unwrap();
+        let newer = RecordedProviderFacade::start_with_read_policy(
+            newer_registry(),
+            EventlogRecordedStoreOwner::Sqlite {
+                path: utf8_path(&path.join("metadata.sqlite3")).unwrap(),
+                prefix: PREFIX.into(),
+                authority: Authority {
+                    logical_scope,
+                    tenant,
+                    stream_identity,
+                },
+                limits: LIMITS,
+            },
+            bridge_config(),
+            CapturePolicy::ProviderTracked,
+        )
+        .unwrap();
+        newer
+            .execute_batch(
+                context("newer-binary"),
+                BatchKey::Named(format!("newer-binary-{}", uuid::Uuid::new_v4())),
+                vec![BatchAction::Create(CreateRequest {
+                    subject: Subject::new("connectors.cli.LocalRuntimeRecord", "s:newer").unwrap(),
+                    definition_version: 1,
+                    fields: json!({"input": {"instance_id": "newer", "suppressed": false,
+                        "newer_field": "written by a newer binary"}, "bound": {}}),
+                    recording: recording("newer-binary").unwrap(),
+                })],
+                call_wait(),
+            )
+            .unwrap();
+        drop(newer);
+        assert_eq!(
+            state.suppress("newer", true),
+            Err(Failure::MetadataSchemaNewer(None)),
+            "a record a newer model wrote is not an unavailable store"
+        );
+    }
+
+    #[test]
+    fn only_an_undeclared_record_field_names_a_newer_store() {
+        let refused = |path: &str, message: &str| {
+            map_execution_failure(entity_eventlog::sync::SyncExecutionError::Execution(
+                ExecutionError::Core(CoreError::Validation(vec![
+                    entity_core::ValidationError::new(path, message),
+                ])),
+            ))
+        };
+        assert_eq!(
+            refused("fields.build_version", "field is not declared in the schema"),
+            Failure::MetadataSchemaNewer(None)
+        );
+        assert_eq!(
+            refused("arguments.input.bogus", "field is not declared in the schema"),
+            Failure::MetadataUnavailable
+        );
+        assert_eq!(
+            refused("fields.suppressed", "required field is missing"),
+            Failure::MetadataUnavailable
+        );
+    }
 
     #[test]
     fn postcommit_business_projection_requires_its_own_clock_state() {

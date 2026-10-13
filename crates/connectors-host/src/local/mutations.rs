@@ -16,6 +16,9 @@ const RETENTION_MS: i64 = 86_400_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {
     MetadataUnavailable,
+    /// The store was written by a newer binary with another record model
+    /// (`super::Failure::MetadataSchemaNewer`); public code `metadata_schema_newer`.
+    MetadataSchemaNewer(Option<super::Release>),
     OutcomeUnknown,
     ClockUnavailable,
     InvalidInput,
@@ -290,6 +293,7 @@ impl<C: Clock> Store<C> {
                 prepared.check_live_approval(tx, authority)?;
                 spent.check(tx, &prepared).map_err(|failure| match failure {
                     super::approvals::Failure::MetadataUnavailable => Failure::MetadataUnavailable,
+                    super::approvals::Failure::MetadataSchemaNewer(store) => Failure::MetadataSchemaNewer(store),
                     _ => Failure::Conflict,
                 })?;
             } else {
@@ -669,6 +673,7 @@ fn db(_: rusqlite::Error) -> Failure {
 fn host_error(error: super::Failure) -> Failure {
     match error {
         super::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
+        super::Failure::MetadataSchemaNewer(store) => Failure::MetadataSchemaNewer(store),
         _ => Failure::MetadataUnavailable,
     }
 }

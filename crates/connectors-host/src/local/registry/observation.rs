@@ -58,7 +58,7 @@ impl Registry {
             return Err(Failure::InvalidInput);
         }
         let mut metadata =
-            Metadata::inspect(&self.path).map_err(|_| Failure::MetadataUnavailable)?;
+            Metadata::inspect(&self.path).map_err(super::host_failure)?;
         let tx = metadata.connection.transaction().map_err(db)?;
         let row = Self::connection(&tx, reference)?;
         visible(&row, &binding.instance_id, &binding.adapter_id)?;

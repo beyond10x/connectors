@@ -53,6 +53,9 @@ pub enum Code {
     DescriptionUnavailable,
     ServiceFailure,
     OwnerBuildMismatch,
+    /// The store was written by a newer binary with another record model;
+    /// [`Error::store_version`] names its release or `unrecorded`.
+    MetadataSchemaNewer,
 }
 /// Who refused. The same [`Code`] can be the host's own admission refusal or
 /// the provider's answer to a dispatched call; the CLI reports them at
@@ -98,6 +101,10 @@ pub struct Error {
     /// (`registry::Failure::EvidenceExpired`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub revalidate: bool,
+    /// On `metadata_schema_newer` only: the release the store's writer marker
+    /// names, or `unrecorded` (semantics.md §3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store_version: Option<String>,
 }
 impl From<Code> for Error {
     fn from(code: Code) -> Self {
@@ -110,12 +117,23 @@ impl From<Code> for Error {
             origin: Origin::Host,
             reconnect: false,
             revalidate: false,
+            store_version: None,
         }
+    }
+}
+impl Error {
+    /// `metadata_schema_newer`, naming the marker's release or `unrecorded`.
+    #[must_use]
+    pub fn schema_newer(store: Option<super::Release>) -> Self {
+        let mut error = Self::from(Code::MetadataSchemaNewer);
+        error.store_version = Some(store.map_or_else(|| "unrecorded".to_owned(), |release| release.to_string()));
+        error
     }
 }
 impl From<super::Failure> for Error {
     fn from(e: super::Failure) -> Self {
         match e {
+            super::Failure::MetadataSchemaNewer(store) => return Self::schema_newer(store),
             super::Failure::InvalidConfiguration | super::Failure::ConfigurationExists => {
                 Code::InvalidConfiguration
             }
@@ -129,11 +147,15 @@ impl From<super::Failure> for Error {
 impl From<registry::Failure> for Error {
     fn from(e: registry::Failure) -> Self {
         use registry::Failure as F;
+        if let F::MetadataSchemaNewer(store) = e {
+            return Self::schema_newer(store);
+        }
         // Only a new connection helps: repair refuses a changed binding.
         let reconnect = matches!(e, F::BindingChanged | F::UpgradeIdentityMismatch);
         let mut error = Error::from(match e {
             F::BindingChanged => Code::LifecycleConflict,
             F::MetadataUnavailable => Code::MetadataUnavailable,
+            F::MetadataSchemaNewer(_) => Code::MetadataSchemaNewer,
             F::ConcurrentRevision => Code::RevisionConflict,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
@@ -211,6 +233,7 @@ impl From<runtime::Failure> for Error {
             origin,
             reconnect: false,
             revalidate: false,
+            store_version: None,
         }
     }
 }
