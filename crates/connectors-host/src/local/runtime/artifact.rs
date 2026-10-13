@@ -23,7 +23,11 @@ use std::{
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "macos")]
-pub(crate) use macos::{ExactChild, Launch, capture, launch_path, path_of};
+pub(crate) use macos::{ExactChild, Image, Launch, capture, launch_path, path_of, received, sent};
+
+/// What [`capture`] returns: on Linux the sealed memfd itself.
+#[cfg(target_os = "linux")]
+pub(crate) type Image = File;
 
 #[cfg(target_os = "linux")]
 pub(crate) fn capture(mut source: File, expected_sha256: &str, until: Instant) -> Result<File> {

@@ -865,7 +865,7 @@ On macOS one holds and six hold only in a named weaker form:
 
 | Guarantee | Linux | macOS | macOS mechanism |
 |---|---|---|---|
-| `sealed_executable` | holds | weaker: `owner_private_copy` | no memfd: the image is copied into a mode 0500 file in a fresh mode 0700 directory, and the digest and Mach-O header are checked on that copy before exec by its path. Other users cannot change it; a process of the same user can rewrite it between the check and exec. |
+| `sealed_executable` | holds | weaker: `owner_private_copy` | no memfd: the image is copied into a mode 0500 file in a fresh mode 0700 directory, and the digest and Mach-O header are checked on that copy before exec by its path. Other users cannot change it; a process of the same user can rewrite it between the check and exec. A copy that is refused or never launched is removed with its directory; a launched copy is removed by its launch once the exec it serves no longer needs it. |
 | `parent_death_kill` | holds | weaker: `adapter_channel_close` | no `PR_SET_PDEATHSIG`: an adapter exits when its inherited channel on descriptor 3 reaches end of file. A consumer has no channel and outlives a launcher that dies. |
 | `exact_process_signal` | holds | weaker: `child_reap_lock` | no pidfd: kqueue `EVFILT_PROC` with `NOTE_EXIT` observes exit, and `kill` signals the child's process id only while holding the lock that reaps it, so the id cannot be reused between the check and the signal. |
 | `own_image_build_measure` | holds | weaker: `launch_path_read` | no `/proc/self/exe`: the owner build digest is read from the executable's path. A file replaced there is measured as a new build and refused as `owner_build_mismatch`. |
