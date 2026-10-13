@@ -788,6 +788,168 @@ async fn multi_check_guard_holds_every_check_before_and_after_dispatch() {
     }
 }
 
+fn boolean_check(pointer: &str, boolean: bool) -> Check {
+    Check {
+        pointer: pointer.into(),
+        expect: Expectation::Boolean(boolean),
+    }
+}
+
+/// The merge guarded on JSON booleans: before, `/blocked` must be `false`;
+/// after, `/merged` must be `true`, and one of `/state` `merged` (text) or
+/// `/queued` `true` (boolean) must hold.
+fn boolean_merge(preflight: Check, postflight: Check, any_of: Vec<Check>) -> Engine {
+    let mut guard = mr_guard(
+        &[("id", "id"), ("merge_request_iid", "merge_request_iid")],
+        vec![preflight],
+        vec![postflight],
+    );
+    guard.postflight.any_of = any_of;
+    let selection = Selection {
+        guard: Some(guard),
+        ..select("merge_request.merge", "mergeMergeRequest", Effect::Write)
+    };
+    Engine::new(&bundle(), "/api/v4", &[selection]).unwrap()
+}
+
+async fn boolean_outcome(
+    engine: &Engine,
+    before: Value,
+    after: Value,
+) -> std::result::Result<&'static str, ErrorCode> {
+    let http = reads(vec![response(200, before)]);
+    let input = json!({"id": "org/project", "merge_request_iid": 7, "body": {"sha": SHA}});
+    let prepared = engine
+        .prepare(http.as_ref(), "fixture", "merge_request.merge", input)
+        .await
+        .map_err(|error| error.code)?;
+    let sent = Arc::new(Mutex::new(Vec::new()));
+    let outcome = prepared
+        .execute(Box::new(Send {
+            sent: sent.clone(),
+            response: Some(response(200, after)),
+        }))
+        .await;
+    assert_eq!(sent.lock().unwrap().len(), 1);
+    Ok(classify(outcome))
+}
+
+/// A `boolean` expectation compares by JSON type: only that JSON boolean
+/// holds, and a string, number or `null` look-alike differs, before the write
+/// (refused, nothing sent) and after it (unknown). A `literal` keeps comparing
+/// as text, so `"true"` still holds for the boolean and the string alike.
+#[tokio::test]
+async fn a_boolean_expectation_holds_only_for_that_json_boolean() {
+    let engine = boolean_merge(
+        boolean_check("/blocked", false),
+        boolean_check("/merged", true),
+        vec![
+            literal_check("/state", "merged"),
+            boolean_check("/queued", true),
+        ],
+    );
+    let ready = json!({"blocked": false});
+    let merged = json!({"merged": true, "state": "merged"});
+    assert_eq!(
+        boolean_outcome(&engine, ready.clone(), merged.clone()).await,
+        Ok("applied")
+    );
+    // Before the write: a look-alike differs and is refused with nothing sent;
+    // an absent value is a protocol error, as for a literal.
+    for (before, code) in [
+        (json!({"blocked": "false"}), ErrorCode::Forbidden),
+        (json!({"blocked": 0}), ErrorCode::Forbidden),
+        (json!({"blocked": null}), ErrorCode::Forbidden),
+        (json!({"blocked": true}), ErrorCode::Forbidden),
+        (json!({"blocked": {}}), ErrorCode::Forbidden),
+        (json!({}), ErrorCode::UpstreamProtocol),
+    ] {
+        let http = reads(vec![response(200, before.clone())]);
+        let input = json!({"id": "org/project", "merge_request_iid": 7, "body": {"sha": SHA}});
+        let error = engine
+            .prepare(http.as_ref(), "fixture", "merge_request.merge", input)
+            .await
+            .err()
+            .unwrap_or_else(|| panic!("{before} was not refused"));
+        assert_eq!(error.code, code, "{before}");
+    }
+    // After the write: a look-alike, in a check or in every `any_of`
+    // comparison, leaves the effect possible.
+    for after in [
+        json!({"merged": "true", "state": "merged"}),
+        json!({"merged": 1, "state": "merged"}),
+        json!({"merged": null, "state": "merged"}),
+        json!({"state": "merged"}),
+        json!({"merged": true, "state": "opened", "queued": "true"}),
+        json!({"merged": true, "queued": 1}),
+    ] {
+        assert_eq!(
+            boolean_outcome(&engine, ready.clone(), after.clone()).await,
+            Ok("unknown"),
+            "{after}"
+        );
+    }
+    assert_eq!(
+        boolean_outcome(
+            &engine,
+            ready.clone(),
+            json!({"merged": true, "queued": true})
+        )
+        .await,
+        Ok("applied")
+    );
+    // A literal is unchanged: compared as text, the string and the boolean alike.
+    let engine = boolean_merge(
+        literal_check("/blocked", "false"),
+        literal_check("/merged", "true"),
+        vec![],
+    );
+    for (before, after) in [
+        (json!({"blocked": false}), json!({"merged": true})),
+        (json!({"blocked": "false"}), json!({"merged": "true"})),
+    ] {
+        assert_eq!(boolean_outcome(&engine, before, after).await, Ok("applied"));
+    }
+}
+
+/// A `boolean` expectation is written `{"boolean": <true|false>}`, reads and
+/// writes back unchanged, holds a JSON boolean only, and is no guard input.
+#[test]
+fn a_boolean_expectation_is_written_as_a_json_boolean() {
+    let check: Check =
+        serde_json::from_value(json!({"pointer": "/ok", "expect": {"boolean": true}})).unwrap();
+    assert_eq!(check, boolean_check("/ok", true));
+    assert_eq!(
+        serde_json::to_value(&check).unwrap(),
+        json!({"pointer": "/ok", "expect": {"boolean": true}})
+    );
+    for expect in [
+        json!({"boolean": "true"}),
+        json!({"boolean": 1}),
+        json!({"boolean": null}),
+        json!({"boolean": true, "literal": "true"}),
+    ] {
+        assert!(
+            serde_json::from_value::<Check>(json!({"pointer": "/ok", "expect": expect.clone()}))
+                .is_err(),
+            "{expect}"
+        );
+    }
+    let engine = boolean_merge(
+        boolean_check("/blocked", false),
+        boolean_check("/merged", true),
+        vec![],
+    );
+    let declaration = &engine.declarations(&[Effect::Write])[0];
+    let required = declaration.input_schema["required"].as_array().unwrap();
+    assert!(
+        !required
+            .iter()
+            .any(|key| key == "blocked" || key == "merged"),
+        "{required:?}"
+    );
+}
+
 /// A selection written as data, as a shipped selection file carries it.
 fn written(value: Value) -> Selection {
     serde_json::from_value(value).unwrap()

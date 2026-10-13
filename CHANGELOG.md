@@ -24,13 +24,19 @@
   and `message`) and `conversations.open` (`users`, one user id or a comma-separated list, and
   optionally `return_im`; scope `im:write`, `mpim:write` for a group; answers `channel.id`). A
   direct message is two invocations, open then post. Each write reads the token's `auth.test`
-  first and is refused, with nothing sent, unless it answers `ok` true; Slack's answer must carry
-  `ok` true to be applied, so Slack's own refusal, `200` with `ok` false, is `outcome_unknown`
-  and its `error` string is not returned. The cited amendment
+  first and is refused, with nothing sent, unless it answers `ok` as the JSON boolean `true`;
+  Slack's answer must carry the same to be applied, so Slack's own refusal, `200` with `ok`
+  false, and a look-alike such as the string `"true"` are `outcome_unknown`, and Slack's `error`
+  string is not returned. The cited amendment
   `adapters/slack/upstream/slack-web.amendments.json` records both with a JSON request body; the
   Slack bundle's source record names it. The Slack ESS model gains the send and open inputs and
   answers. Verified against a local fixture only; `chat.update` and `chat.delete` are not
   selected.
+- A catalog guard check can expect a JSON boolean, `{"boolean": true}` or `false`
+  (`docs/local-catalog-provider.md`, `guard`; `connectors_catalog.guard.Expectation`): it holds
+  only for that JSON boolean, and a string, a number or `null` in its place differs. `input` and
+  `literal` still compare as text, so a literal `"true"` holds for the boolean and the string
+  alike; the GitLab and Jira guards that use one are unchanged.
 - `setup check` reports `custody_backend` (`secret_service`, `macos_keychain` or
   `windows_credential_manager`), and `setup init` and `setup check` report `os` from the build
   target.

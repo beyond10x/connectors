@@ -35,16 +35,20 @@ pub enum Effect {
 }
 
 /// What an observed value is compared with: the input value a reference names
-/// (a top-level key, or `body.<key>`), or a literal written in the selection.
+/// (a top-level key, or `body.<key>`) or a literal written in the selection,
+/// both compared as text; or a boolean written in the selection, compared by
+/// JSON type, so only that JSON boolean holds and a string, a number or `null`
+/// in its place differs.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Expectation {
     Input(String),
     Literal(String),
+    Boolean(bool),
 }
 
-/// One comparison: the scalar at `pointer` in an observed body must equal what
-/// `expect` resolves to.
+/// One comparison: the value at `pointer` in an observed body must equal what
+/// `expect` resolves to, as text or, for a `boolean`, by JSON type.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Check {
@@ -292,7 +296,7 @@ impl Guard {
             .map(|(_, reference)| reference)
             .chain(self.checks().filter_map(|check| match &check.expect {
                 Expectation::Input(path) => Some(path),
-                Expectation::Literal(_) => None,
+                Expectation::Literal(_) | Expectation::Boolean(_) => None,
             }))
     }
 }
@@ -510,6 +514,34 @@ fn reference<'a>(input: &'a Value, path: &str) -> Option<&'a Value> {
     Some(current)
 }
 
+/// What a resolved check compares an observed value with: text, from an input
+/// or a literal, or a JSON boolean.
+#[derive(Clone, Debug)]
+enum Pinned {
+    Text(String),
+    Boolean(bool),
+}
+
+impl Pinned {
+    /// Whether an observed value is present in the form this comparison
+    /// reads: a scalar for text, any JSON value for a boolean.
+    fn present(&self, observed: Option<&Value>) -> bool {
+        match self {
+            Pinned::Text(_) => observed.and_then(scalar).is_some(),
+            Pinned::Boolean(_) => observed.is_some(),
+        }
+    }
+
+    /// Whether an observed value holds: text equal as text, or exactly the
+    /// JSON boolean.
+    fn holds(&self, observed: Option<&Value>) -> bool {
+        match self {
+            Pinned::Text(text) => observed.and_then(scalar).as_deref() == Some(text.as_str()),
+            Pinned::Boolean(flag) => observed == Some(&Value::Bool(*flag)),
+        }
+    }
+}
+
 /// A scalar as the string a parameter or a comparison carries.
 fn scalar(value: &Value) -> Option<String> {
     match value {
@@ -638,9 +670,9 @@ pub struct Prepared {
     segments: Vec<String>,
     query: Vec<(String, String)>,
     body: Value,
-    postflight: Vec<(String, String)>,
+    postflight: Vec<(String, Pinned)>,
     /// The postflight's `any_of`: at least one must hold, when declared.
-    alternatives: Vec<(String, String)>,
+    alternatives: Vec<(String, Pinned)>,
     /// The bound read the postflight checks, when the guard declares one.
     reread: Option<Request>,
     /// Whether the read after the write must answer 404 (`postflight.absent`).
@@ -1518,17 +1550,18 @@ impl Engine {
         if let Some(guard) = &exposed.selection.guard {
             // Every expectation resolves before any request: an absent input is
             // a refusal with nothing sent, not a surprise after the preflight.
-            let expected = |checks: &[Check]| -> Result<Vec<(String, String)>> {
+            let expected = |checks: &[Check]| -> Result<Vec<(String, Pinned)>> {
                 checks
                     .iter()
                     .map(|check| {
                         let value = match &check.expect {
-                            Expectation::Input(path) => {
+                            Expectation::Input(path) => Pinned::Text(
                                 reference(&input, path).and_then(scalar).ok_or_else(|| {
                                     refuse(format!("guard expects input `{path}`, which is absent"))
-                                })?
-                            }
-                            Expectation::Literal(text) => text.clone(),
+                                })?,
+                            ),
+                            Expectation::Literal(text) => Pinned::Text(text.clone()),
+                            Expectation::Boolean(flag) => Pinned::Boolean(*flag),
                         };
                         Ok((check.pointer.clone(), value))
                     })
@@ -1581,15 +1614,16 @@ impl Engine {
                 }
                 let observed = read_body(&response, false, &exposed.selection.rate_limit_reasons)?;
                 for (pointer, expected) in preflight {
-                    let current = observed.pointer(pointer).and_then(scalar).ok_or_else(|| {
-                        Error::new(
+                    let current = observed.pointer(pointer);
+                    if !expected.present(current) {
+                        return Err(Error::new(
                             ErrorCode::UpstreamProtocol,
                             format!("guard preflight answered without a value at `{pointer}`"),
-                        )
-                    })?;
+                        ));
+                    }
                     // The only point at which a difference is definite. After
                     // dispatch the same difference is uncertainty, not a refusal.
-                    if current != *expected {
+                    if !expected.holds(current) {
                         return Err(Error::new(
                             ErrorCode::Forbidden,
                             format!(
@@ -1632,9 +1666,10 @@ impl Prepared {
     /// least one of its comparisons holds, or it declares none.
     fn accepts_one(&self, observed: &Value) -> bool {
         self.alternatives.is_empty()
-            || self.alternatives.iter().any(|(pointer, expected)| {
-                observed.pointer(pointer).and_then(scalar).as_deref() == Some(expected.as_str())
-            })
+            || self
+                .alternatives
+                .iter()
+                .any(|(pointer, expected)| expected.holds(observed.pointer(pointer)))
     }
 
     /// Send once and classify. Only documented definite refusals are refused;
@@ -1705,7 +1740,7 @@ impl Prepared {
         // is issued. The comparison is best effort, not detection.
         let Some((segments, query)) = &self.reread else {
             for (pointer, expected) in &self.postflight {
-                if body.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+                if !expected.holds(body.pointer(pointer)) {
                     return WriteOutcome::Unknown(Error::new(
                         ErrorCode::UpstreamProtocol,
                         format!(
@@ -1771,7 +1806,7 @@ impl Prepared {
             );
         };
         for (pointer, expected) in &self.postflight {
-            if observed.pointer(pointer).and_then(scalar).as_deref() != Some(expected.as_str()) {
+            if !expected.holds(observed.pointer(pointer)) {
                 return unknown(format!(
                     "the guard's read after the write answered with a value at `{pointer}` other than the pinned one; the effect is possible"
                 ));

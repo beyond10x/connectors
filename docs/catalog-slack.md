@@ -222,11 +222,16 @@ and sends the request once
   was open before. A direct message
   is two invocations, open then post, each with its own approval and attempt.
 - **The guard.** Before each write the provider reads `GET /api/auth.test`
-  with the connection's token, which needs no scope, and refuses as
-  `forbidden` unless it answers `"ok": true`: the write is `not_attempted` and
-  nothing is posted
-  ([Invoke](local-catalog-provider.md#invoke)). After the
-  write Slack's answer must carry `"ok": true` too.
+  with the connection's token, which needs no scope, and refuses the write
+  unless it answers `"ok": true`, the JSON boolean: the write is
+  `not_attempted` and nothing is posted
+  ([Invoke](local-catalog-provider.md#invoke)). The refusal is `forbidden`
+  when `auth.test` answers `"ok"` with anything else (`false`, or a look-alike
+  such as the string `"true"`) or answers `404`; `upstream_protocol` when its
+  answer carries no `ok` or is not JSON; and otherwise as its status reads, as
+  for any read: `unauthorized` for a `401`, `rate_limited` for a `429`,
+  `unavailable` for a `5xx`. After the write Slack's answer must carry
+  `"ok": true` too, as the boolean.
 - **What the caller sees.** A `2xx` answer with `"ok": true` is applied, and
   the provider returns `status`, `body` (Slack's answer) and `provenance`.
   Slack refuses a write — `channel_not_found`, `not_in_channel`,
