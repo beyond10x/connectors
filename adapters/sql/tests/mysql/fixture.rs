@@ -44,6 +44,7 @@ pub const JSON: u8 = 0xf5;
 pub const NEWDECIMAL: u8 = 0xf6;
 pub const VAR_STRING: u8 = 0xfd;
 pub const UNSIGNED: u16 = 0x20;
+pub const ENUM_FLAG: u16 = 0x100;
 pub const BINARY_CHARSET: u16 = 63;
 pub const UTF8MB4: u16 = 255;
 
@@ -116,8 +117,11 @@ pub struct Script {
     pub columns: Vec<Col>,
     pub rows: Vec<Vec<Cell>>,
     pub params: u16,
-    /// `(code, sqlstate)` answered to the first statement preparation.
+    /// `(code, sqlstate)` answered to every statement preparation.
     pub prepare_error: Option<(u16, &'static str)>,
+    /// `(code, sqlstate)` answered to the preparation of the derived-table wrapper only,
+    /// after the caller's own statement prepared.
+    pub wrapped_prepare_error: Option<(u16, &'static str)>,
     /// `(code, sqlstate)` answered to statement execution.
     pub execute_error: Option<(u16, &'static str)>,
     /// `(code, sqlstate)` answered to authentication.
@@ -147,6 +151,7 @@ impl Default for Script {
             rows: vec![vec![int4(42), None]],
             params: 0,
             prepare_error: None,
+            wrapped_prepare_error: None,
             execute_error: None,
             auth_error: None,
             stall: None,
@@ -496,6 +501,12 @@ async fn session(io: Box<dyn Io>, script: Script, log: Arc<Mutex<Log>>, killed: 
                     log.prepares.push(query.clone());
                 }
                 if let Some((code, state)) = script.prepare_error {
+                    wire.error(code, state).await;
+                    continue;
+                }
+                if let Some((code, state)) = script.wrapped_prepare_error
+                    && query.starts_with("SELECT * FROM (")
+                {
                     wire.error(code, state).await;
                     continue;
                 }

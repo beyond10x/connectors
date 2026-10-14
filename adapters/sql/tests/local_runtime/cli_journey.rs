@@ -778,7 +778,9 @@ fn postgres_cli_cannot_escape_read_only_transaction() {
                 "INSERT INTO {}.events VALUES (99,1,'minor',now()) RETURNING id",
                 pg.schema
             ),
-            "invalid_input",
+            // It prepares with a column but cannot be a derived table: the wrapper's
+            // syntax error means it is not a query, as a data-modifying WITH is not.
+            "unsupported",
         ),
         (
             format!(
