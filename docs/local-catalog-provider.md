@@ -298,6 +298,10 @@ CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-ca
 sha256sum target/release/connectors-catalog-provider
 ```
 
+Release archives after 0.50.0 carry both binaries for each target
+([install a release binary](../README.md#install-a-release-binary)); with one installed, use its
+`connectors` and `connectors-catalog-provider` wherever this guide names `target/release/…`.
+
 ```json
 {
   "format": "connectors-catalog-local/2",
