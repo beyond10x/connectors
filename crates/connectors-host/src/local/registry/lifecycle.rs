@@ -153,6 +153,20 @@ impl Registry {
     /// This single metadata commit couples generation, custody, evidence, the
     /// private fence and the acquisition result. Repair preserves public revision.
     pub fn publish(&self, stored: StoredCandidate, now: u64) -> Result<String> {
+        self.publish_with(stored, now, false)
+    }
+
+    /// `exclusive` is the read-only binding's rule that one item backs one
+    /// connection, held inside the publishing commit: two connects that both
+    /// passed the early check publish at most one connection of the profile,
+    /// and the other is refused as `CustodyReadOnly`. A repair republishes its
+    /// own connection and is not counted.
+    pub(super) fn publish_with(
+        &self,
+        stored: StoredCandidate,
+        now: u64,
+        exclusive: bool,
+    ) -> Result<String> {
         let prepared = stored.prepared;
         self.transaction(now, false, |tx, _, now| {
             let acquired = completing(tx, &prepared.acquisition, &prepared.owner, now)?;
@@ -160,6 +174,11 @@ impl Registry {
             live(&row)?;
             if acquired.candidate.as_deref()!=Some(&prepared.version_id) || acquired.generation!=prepared.generation
                 || row.fence!=acquired.fence || row.binding!=prepared.binding { return Err(Failure::Conflict); }
+            if exclusive {
+                let held: i64 = tx.query_row("SELECT count(*) FROM registry_connections WHERE instance_id=?1 AND profile_key=?2 AND public=1 AND state!='revoked' AND connection_ref!=?3",
+                    params![row.binding.instance_id,profile_key(&row.binding)?,row.reference], |r| r.get(0)).map_err(db)?;
+                if held > 0 { return Err(Failure::CustodyReadOnly); }
+            }
             if row.identity.as_ref().is_some_and(|old| old!=&prepared.baseline.identity) { return Err(Failure::IdentityMismatch); }
             let consumed = acquired.consumed.ok_or(Failure::MetadataUnavailable)?;
             prepared.baseline.validate(&row.binding, consumed, now)?;
@@ -206,6 +225,60 @@ impl Registry {
             })?;
         let stored = self.acknowledge(prepared, receipt, clock())?;
         self.publish(stored, clock())
+    }
+
+    /// The read-only binding's composition of the same boundaries: no write.
+    /// `reading` is the item read once under every check, the bytes the
+    /// provider validated; the binding pins them to the prepared version while
+    /// the coordinator's guard holds, and that acknowledgement, not a write,
+    /// is what publication consumes.
+    #[cfg(target_os = "linux")]
+    pub fn pin_and_publish(
+        &self,
+        prepared: PreparedCandidate,
+        item: &custody::Item,
+        reading: &connectors_custody::mounted::Reading,
+        store: &custody::Store,
+        clock: impl Fn() -> u64,
+    ) -> Result<String> {
+        if reading.material().len() != prepared.byte_size {
+            return Err(Failure::InvalidInput);
+        }
+        let mut refusal = None;
+        let receipt = store
+            .pin_guarded(prepared.version, item, reading, || {
+                self.write_allowed(&prepared, clock()).map_err(|error| {
+                    refusal = Some(error);
+                    custody::Failure::Denied
+                })
+            })
+            .map_err(|error| {
+                refusal.unwrap_or(match error {
+                    custody::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
+                    custody::Failure::ReadOnly => Failure::CustodyReadOnly,
+                    _ => Failure::CustodyUnavailable,
+                })
+            })?;
+        let stored = self.acknowledge(prepared, receipt, clock())?;
+        self.publish_with(stored, clock(), true)
+    }
+
+    /// Whether the binding's instance holds a published, unrevoked connection
+    /// of the binding's profile. Under the read-only binding one item backs one
+    /// connection, so a second one of the same profile is refused.
+    pub fn holds_profile(&self, binding: &Binding, now: u64) -> Result<bool> {
+        binding.validate()?;
+        let key = profile_key(binding)?;
+        self.transaction_observation(now, |tx, _, _| {
+            let held: i64 = tx
+                .query_row(
+                    "SELECT count(*) FROM registry_connections WHERE instance_id=?1 AND profile_key=?2 AND public=1 AND state!='revoked'",
+                    params![binding.instance_id, key],
+                    |r| r.get(0),
+                )
+                .map_err(db)?;
+            Ok(held > 0)
+        })
     }
 
     pub fn fail(&self, claim: &Claim, now: u64) -> Result<()> {

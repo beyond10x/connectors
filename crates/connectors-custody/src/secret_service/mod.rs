@@ -9,8 +9,8 @@ mod fs;
 mod gnome;
 
 use crate::{
-    Backend, CustodyBackend, Failure, MAX_BYTES, Material, Purpose, Result, Scope, State, Version,
-    admit_material,
+    Backend, CustodyBackend, Failure, MAX_BYTES, Material, Purpose, ReadBackend, Result, Scope,
+    State, Version, admit_material,
 };
 use std::{
     collections::HashMap,
@@ -315,7 +315,7 @@ impl SecretService {
     }
 }
 
-impl Backend for SecretService {
+impl ReadBackend for SecretService {
     fn kind(&self) -> CustodyBackend {
         CustodyBackend::SecretService
     }
@@ -340,6 +340,34 @@ impl Backend for SecretService {
         Ok(())
     }
 
+    fn read(&self, version: Version) -> Result<Material> {
+        self.admit(version)?;
+        let item = self.find(version)?.ok_or(Failure::Missing)?;
+        let proxy = self
+            .service
+            .proxy(item.as_str(), ITEM_INTERFACE)
+            .map_err(unavailable)?;
+        let ((session, parameters, bytes, content_type),): (WireSecret,) = proxy
+            .call("GetSecret", &(&self.session,))
+            .map_err(unavailable)?;
+        let secret = Material::new(bytes);
+        if session != self.session
+            || !parameters.is_empty()
+            // This qualified GNOME implementation always returns text/plain,
+            // including for binary values. The custody contract treats bytes as
+            // opaque; this backend label cannot select a parser or authority.
+            || content_type != "text/plain"
+            || secret.is_empty()
+            || secret.len() > MAX_BYTES
+        {
+            return Err(Failure::Unavailable);
+        }
+        self.admit(version)?;
+        Ok(secret)
+    }
+}
+
+impl Backend for SecretService {
     /// A successful method call alone is insufficient. Verify the exact stored
     /// bytes, then synchronize the encrypted backing file and its directories.
     /// Any failure once CreateItem may have been sent is OutcomeUnknown. Never
@@ -404,32 +432,6 @@ impl Backend for SecretService {
             .map_err(|_| Failure::OutcomeUnknown)?;
         self.admit(version).map_err(|_| Failure::OutcomeUnknown)?;
         Ok(())
-    }
-
-    fn read(&self, version: Version) -> Result<Material> {
-        self.admit(version)?;
-        let item = self.find(version)?.ok_or(Failure::Missing)?;
-        let proxy = self
-            .service
-            .proxy(item.as_str(), ITEM_INTERFACE)
-            .map_err(unavailable)?;
-        let ((session, parameters, bytes, content_type),): (WireSecret,) = proxy
-            .call("GetSecret", &(&self.session,))
-            .map_err(unavailable)?;
-        let secret = Material::new(bytes);
-        if session != self.session
-            || !parameters.is_empty()
-            // This qualified GNOME implementation always returns text/plain,
-            // including for binary values. The custody contract treats bytes as
-            // opaque; this backend label cannot select a parser or authority.
-            || content_type != "text/plain"
-            || secret.is_empty()
-            || secret.len() > MAX_BYTES
-        {
-            return Err(Failure::Unavailable);
-        }
-        self.admit(version)?;
-        Ok(secret)
     }
 
     /// Recovery of a staged signing key only. Readback alone never converts a

@@ -1,12 +1,17 @@
 //! Credential custody of the local host: immutable, scoped versions held in one
-//! protected platform store (`contracts/auth/custody/v1alpha1/semantics.md` §5.1).
+//! protected platform store (`contracts/auth/custody/v1alpha1/semantics.md` §5.1),
+//! or read from an explicitly selected read-only mounted directory (§5.2).
 //!
-//! [`Backend`] is what every binding answers: write a new scoped version, read
-//! an exact version, delete one, and inspect the store's state. Each platform
-//! has exactly one binding, fixed when the binary is built ([`PLATFORM`]): the
-//! freedesktop Secret Service on Linux, the login keychain on macOS and the
-//! Credential Manager on Windows. None falls back to another binding, to a file
-//! or to an environment variable, and none activates, unlocks or prompts.
+//! A binding has two capabilities. [`ReadBackend`] is what every binding answers:
+//! read an exact version and inspect the store's state. [`Backend`] adds the
+//! writes: write a new scoped version, confirm one and delete one. Each platform
+//! has exactly one writable binding, fixed when the binary is built
+//! ([`PLATFORM`]): the freedesktop Secret Service on Linux, the login keychain on
+//! macOS and the Credential Manager on Windows. [`mounted`] (Linux) implements
+//! only the read capability, so no write reaches it: the compiler refuses one.
+//! It is used only when the owner configuration names it. None falls back to
+//! another binding, to a file or to an environment variable, and none
+//! activates, unlocks or prompts.
 //! [`memory`] is the reference every platform runs the same contract suite
 //! against.
 //!
@@ -29,6 +34,8 @@ pub mod credential_manager;
 #[cfg(target_os = "macos")]
 pub mod keychain;
 #[cfg(target_os = "linux")]
+pub mod mounted;
+#[cfg(target_os = "linux")]
 pub mod secret_service;
 
 /// The largest value the custody model admits (64 KiB), on every platform.
@@ -38,13 +45,15 @@ pub const MAX_BYTES: usize = 64 * 1024;
 /// The exact size of an approval signing seed.
 pub const SIGNING_SEED_BYTES: usize = 32;
 
-/// The protected store a binding uses (`connectors.cli.CustodyBackend`).
-/// There is no plain-text variant.
+/// The store a binding uses (`connectors.cli.CustodyBackend`). There is no
+/// fallback variant: `MountedSecret` is read-only and chosen only by an
+/// explicit selection in the owner configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CustodyBackend {
     SecretService,
     MacosKeychain,
     WindowsCredentialManager,
+    MountedSecret,
 }
 
 impl CustodyBackend {
@@ -54,14 +63,24 @@ impl CustodyBackend {
             Self::SecretService => "secret_service",
             Self::MacosKeychain => "macos_keychain",
             Self::WindowsCredentialManager => "windows_credential_manager",
+            Self::MountedSecret => "mounted_secret",
         }
     }
 
-    /// The largest value this binding stores: [`MAX_BYTES`] for every one.
+    /// The largest value this binding stores or reads: [`MAX_BYTES`] for every one.
     pub fn max_bytes(self) -> usize {
         match self {
-            Self::SecretService | Self::MacosKeychain | Self::WindowsCredentialManager => MAX_BYTES,
+            Self::SecretService
+            | Self::MacosKeychain
+            | Self::WindowsCredentialManager
+            | Self::MountedSecret => MAX_BYTES,
         }
+    }
+
+    /// Whether the binding writes, confirms and deletes versions. A read-only
+    /// binding provides none of them (§4).
+    pub fn writable(self) -> bool {
+        !matches!(self, Self::MountedSecret)
     }
 }
 
@@ -94,6 +113,8 @@ pub enum Failure {
     InvalidMaterial,
     Conflict,
     OutcomeUnknown,
+    /// The binding is read-only: it writes, confirms and deletes nothing.
+    ReadOnly,
 }
 
 impl fmt::Display for Failure {
@@ -105,6 +126,7 @@ impl fmt::Display for Failure {
             Self::InvalidMaterial => "custody material invalid",
             Self::Conflict => "custody version conflict",
             Self::OutcomeUnknown => "custody outcome unknown",
+            Self::ReadOnly => "custody binding read-only",
         })
     }
 }
@@ -261,13 +283,10 @@ pub fn admit_material(scope: Scope, material: &Material, max_bytes: usize) -> Re
     Ok(())
 }
 
-/// One binding opened for one admitted scope. A version of another scope is
-/// `Denied` by every method.
-///
-/// The guards are the coordinator's: each runs after the backend holds its own
-/// store-level exclusion and before the store changes, and its refusal is
-/// returned unchanged with nothing written or deleted.
-pub trait Backend {
+/// The read capability of one binding opened for one admitted scope: what
+/// every binding answers, the read-only `mounted_secret` included. A version of
+/// another scope is `Denied` by every method.
+pub trait ReadBackend {
     /// The binding this backend realizes.
     fn kind(&self) -> CustodyBackend;
     /// The one scope this handle admits.
@@ -280,6 +299,17 @@ pub trait Backend {
     fn state(&self) -> State;
     /// Admit a version: its scope is this handle's and the store is usable.
     fn admit(&self, version: Version) -> Result<()>;
+    /// Read one exact version; an absent one is `Missing`.
+    fn read(&self, version: Version) -> Result<Material>;
+}
+
+/// The write capability of a binding: every platform binding has it and a
+/// read-only binding does not, so a write against one does not compile.
+///
+/// The guards are the coordinator's: each runs after the backend holds its own
+/// store-level exclusion and before the store changes, and its refusal is
+/// returned unchanged with nothing written or deleted.
+pub trait Backend: ReadBackend {
     /// Write a new immutable version. An existing version is `Conflict` and is
     /// never overwritten. A failure after the store may have changed is
     /// `OutcomeUnknown`; it is never retried here. A success is a definite
@@ -291,8 +321,6 @@ pub trait Backend {
         until: Instant,
         guard: impl FnOnce() -> Result<()>,
     ) -> Result<()>;
-    /// Read one exact version; an absent one is `Missing`.
-    fn read(&self, version: Version) -> Result<Material>;
     /// Re-establish an existing version under the store's exclusion: run the
     /// guard, read the version, admit it as material and hand it to
     /// `validate`, then make it durable. Used to recover a staged signing key.
