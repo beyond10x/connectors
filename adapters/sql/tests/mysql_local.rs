@@ -3,6 +3,8 @@
 //! its own profile and authority, and the private runtime connects, revalidates
 //! and reads through the MySQL wire fixture on loopback.
 #![cfg(unix)]
+#[path = "mysql/calls.rs"]
+mod calls;
 #[path = "mysql/fixture.rs"]
 mod fixture;
 
@@ -256,4 +258,73 @@ fn mysql_connects_revalidates_and_reads_through_the_private_runtime() {
     let log = server.log.lock().unwrap();
     assert_eq!(log.logins.len(), 4);
     assert_eq!(log.statements[0], "SET SESSION TRANSACTION READ ONLY");
+}
+
+/// A configuration with read profiles advertises `profile.read` as a declared read with
+/// its own revision, and the private runtime answers it through `invoke`: the host checks
+/// the answer against the published output schema before it reaches the caller.
+#[test]
+fn read_profiles_are_served_through_the_private_runtime_as_a_declared_read() {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let server = runtime.block_on(fixture::start(calls::script(Some(3))));
+    let (_root, directory) = private_directory();
+    let plain = bootstrap(&directory, &document(Some("mysql"), server.port)).unwrap();
+    let mut configured = document(Some("mysql"), server.port);
+    configured["read_profiles"] = json!([calls::profile()]);
+    let with = bootstrap(&directory, &configured).unwrap();
+    assert_ne!(with.configuration_revision, plain.configuration_revision);
+    let requirement = with
+        .requirements
+        .iter()
+        .find(|r| r.operation == "profile.read")
+        .unwrap();
+    assert!(requirement.effect == Effect::Read);
+    assert_eq!(requirement.profile, "mysql.password");
+    assert!(
+        plain
+            .requirements
+            .iter()
+            .all(|r| r.operation != "profile.read")
+    );
+    // An empty list is no profile at all: the same configuration as none.
+    let mut empty = document(Some("mysql"), server.port);
+    empty["read_profiles"] = json!([]);
+    let empty = bootstrap(&directory, &empty).unwrap();
+    assert_eq!(empty.configuration_revision, plain.configuration_revision);
+    assert_eq!(empty.descriptor, plain.descriptor);
+
+    let config = directory.join("sql.json");
+    let mut adapter = selection(&directory, server.port);
+    write_private(&config, &configured);
+    adapter.configuration_revision = with.configuration_revision.clone();
+    let mut child = Child::spawn(&adapter).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let mut cursor: Option<String> = None;
+    let mut keys = Vec::new();
+    loop {
+        let output = child
+            .invoke(
+                "profile.read",
+                &revision,
+                "one",
+                &password(fixture::PASSWORD),
+                &serde_json::to_vec(&calls::input(cursor.as_deref(), 5)).unwrap(),
+                deadline(),
+            )
+            .unwrap();
+        let page: Value = serde_json::from_slice(&output).unwrap();
+        for item in page["items"].as_array().unwrap() {
+            assert!(item["caller"].as_str().unwrap().starts_with('*'));
+            keys.push(item["row_key"].as_str().unwrap().to_owned());
+        }
+        if page["complete"] == true {
+            break;
+        }
+        cursor = Some(page["next_cursor"].as_str().unwrap().to_owned());
+    }
+    let expected: Vec<String> = calls::expected()
+        .iter()
+        .map(|r| r.row_key.to_string())
+        .collect();
+    assert_eq!(keys, expected);
 }

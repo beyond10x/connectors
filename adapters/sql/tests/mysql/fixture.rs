@@ -126,7 +126,16 @@ pub struct Script {
     pub stall: Option<Arc<Notify>>,
     /// Ignore the `KILL QUERY` and never answer the stalled execution.
     pub ignore_kill: bool,
+    /// Return at most this many rows to any execution, whatever its `LIMIT`
+    /// asks for, as a server or a proxy in front of it may.
+    pub row_cap: Option<usize>,
+    /// Answer an execution with only the rows this admits, given the values
+    /// bound to it and the row's index in `rows`: how a test scripts a
+    /// statement's `WHERE`, including a keyset cursor.
+    pub select: Option<Select>,
 }
+/// A scripted `WHERE`: the bound values (null as `None`) and a row index.
+pub type Select = Arc<dyn Fn(&[Option<String>], usize) -> bool + Send + Sync>;
 impl Default for Script {
     fn default() -> Self {
         Self {
@@ -142,6 +151,8 @@ impl Default for Script {
             auth_error: None,
             stall: None,
             ignore_kill: false,
+            row_cap: None,
+            select: None,
         }
     }
 }
@@ -336,6 +347,11 @@ fn plan(script: &Script, query: &str) -> Plan {
             .map(|(_, n)| n.trim().parse().unwrap())
             .unwrap()
     });
+    // A keyset continuation binds one more value, after the derived table.
+    let continuation = wrapped
+        && query
+            .rsplit_once("\n) AS result (")
+            .is_some_and(|(_, tail)| tail.contains(" WHERE "));
     Plan {
         columns: script
             .columns
@@ -350,7 +366,7 @@ fn plan(script: &Script, query: &str) -> Plan {
                 (column.clone(), name)
             })
             .collect(),
-        params: script.params,
+        params: script.params + u16::from(continuation),
         limit,
     }
 }
@@ -526,7 +542,7 @@ async fn session(io: Box<dyn Io>, script: Script, log: Arc<Mutex<Log>>, killed: 
                         rest = &rest[len..];
                     }
                 }
-                log.lock().unwrap().executions.push(values);
+                log.lock().unwrap().executions.push(values.clone());
                 if let Some(stall) = &script.stall {
                     stall.notify_one();
                     killed.notified().await;
@@ -550,8 +566,19 @@ async fn session(io: Box<dyn Io>, script: Script, log: Arc<Mutex<Log>>, killed: 
                 for (column, name) in &statement.columns {
                     wire.write(&definition(column, name)).await;
                 }
-                let rows = statement.limit.unwrap_or(usize::MAX).min(script.rows.len());
-                for row in &script.rows[..rows] {
+                let selected: Vec<&Vec<Cell>> = script
+                    .rows
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| script.select.as_ref().is_none_or(|s| s(&values, *index)))
+                    .map(|(_, row)| row)
+                    .collect();
+                let rows = statement
+                    .limit
+                    .unwrap_or(usize::MAX)
+                    .min(script.row_cap.unwrap_or(usize::MAX))
+                    .min(selected.len());
+                for row in &selected[..rows] {
                     let mut packet = vec![0x00];
                     let mut bitmap = vec![0; (row.len() + 7 + 2) / 8];
                     let mut cells: Vec<u8> = Vec::new();
