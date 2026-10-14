@@ -2,11 +2,14 @@
 format: aep.planning-md/3
 id: story:revision-change-keeps-a-recovery-path
 kind: story
-status: draft
+status: active
 title: A bootstrap revision change leaves each connection one working recovery path
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T09:25:50Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-14T09:25:50Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
