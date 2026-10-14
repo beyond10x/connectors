@@ -9,7 +9,7 @@ relations:
 - blocks: story:incident-call-traces
 - serves: vision:independent-contract-adapters
 - blocks: story:parity-slack-message-writes
-revision: 3
+revision: 4
 transitions:
 - {from: "open", to: "cleared", at: "2026-10-14T05:12:41Z", actor: "human:timo", revision: 2}
 ---
@@ -46,7 +46,6 @@ mounted custody, which merges in wave 20261014a.
 |---|---|---|---|---|
 | story:incident-call-lookup (SQL read profile) | conn-u-lookup-sql | impl/incident-call-lookup-sql | 362d99320 | dispatched |
 | story:incident-call-lookup (Loki line profile), story:incident-call-traces | conn-u-loki-profiles | impl/incident-call-loki-profiles | 362d99320 | dispatched |
-
 | story:incident-call-lookup (cross-source join test) | conn-u-call-join | impl/incident-call-join | fedbfd5ca | dispatched |
 | story:parity-slack-message-writes | conn-u-slack-writes | impl/parity-slack-message-writes | fedbfd5ca | dispatched |
 | docs: moving a local install from `slack-credentials` to the catalog provider | conn-u-slack-migration | docs/slack-local-migration | fedbfd5ca | dispatched |
