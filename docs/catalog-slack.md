@@ -41,10 +41,11 @@ cargo run --locked -p connectors-build -- catalog \
 without it the second command is refused with "provider is already indexed".
 `--amendments` applies
 [`slack-web.amendments.json`](../adapters/slack/upstream/slack-web.amendments.json),
-bound to the projection's SHA-256: it records `chat_postMessage` and
-`conversations_open` with an `application/json` request body, the one body the
-engine sends ([cited amendments](local-catalog-provider.md#build-the-bundle)).
-The pinned document lists `application/json` in both operations' `consumes`
+bound to the projection's SHA-256: it records `chat_postMessage`,
+`conversations_open`, `chat_update` and `chat_delete` with an `application/json`
+request body, the one body the engine sends
+([cited amendments](local-catalog-provider.md#build-the-bundle)).
+The pinned document lists `application/json` in all four operations' `consumes`
 beside the form type, but writes their parameters as `formData`, which the
 projection carries only under the form media type.
 The first command writes `slack-web.openapi.json` and its projection record
@@ -61,8 +62,9 @@ run would not reproduce byte for byte.
 ## The shipped selection set
 
 [`adapters/catalog/providers/slack/operations.json`](../adapters/catalog/providers/slack/operations.json)
-exposes ten reads for a bot token, each `effect: read`, and two writes,
-`chat.postMessage` and `conversations.open`, each `effect: write`
+exposes ten reads for a bot token, each `effect: read`, and four writes,
+`chat.postMessage`, `conversations.open`, `chat.update` and `chat.delete`, each
+`effect: write`
 ([Messages](#messages)).
 [`adapters/catalog/providers/slack/user-operations.json`](../adapters/catalog/providers/slack/user-operations.json)
 exposes `search.messages` alone, for a user token
