@@ -88,6 +88,7 @@ management wire payload or a persistent record.
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
 | `setup checkpoints-enable` | local metadata store, under the owner lifetime lock | `SetupCheckpointsEnableInput` → `SetupCheckpointsEnableResult` | no / no |
+| `setup owner-stop` | the running owner of the state directory, through its shutdown request (owner transport) | inputless Context → `SetupOwnerStopResult` | no / no |
 | `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
 | `approvals policy-status` | local policy inspector | `ApprovalPolicyStatusInput` → `ApprovalPolicyResult` | no / no |
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
@@ -127,6 +128,13 @@ consumer launch.
 `approvals clock-check` performs the bounded authenticated exchange specified in
 [the clock binding](./clock.md). Its public observation cannot be
 reused as time evidence; it starts no service and reads no secret or metadata.
+When no observation results it refuses `unavailable` at `stage = observation`, and
+its `Failure` names the cause in `clock_refusal` with that cause's next action:
+`unreachable` with `retry_explicitly`, `unverified` with `check_configuration`, and
+`too_imprecise` with `choose_clock_source` and the signed radius in
+`clock_radius_ms` ([refusals](./clock.md#refusals)). A local timer,
+continuity or calendar refusal names no cause and keeps `check_configuration`. The
+refusal never carries the observation's bounds, the request or the reply.
 
 `approvals policy-set` accepts only `--input-file`; its path is acquired by the
 production handler using the bounded document reader. `prepare` and `issue` use
@@ -307,7 +315,18 @@ the current `connectors-local/2` format, whose adapter entries each select a
 existing `connectors-local/1` file keeps loading unchanged. A
 `connectors-local/3` file is `/2` plus an optional `[consumers]` table of pinned
 consumer launch executables; `[consumers]` in a `/1` or `/2`
-file refuses the configuration, and `setup init` keeps writing `/2`. It records the
+file refuses the configuration, and `setup init` keeps writing `/2`. A
+`connectors-local/4` file is `/3` plus an optional `[custody]` table
+(`connectors.cli.LocalCustodyBinding`) that explicitly selects the custody binding:
+`binding` (closed: `secret_service`, `macos_keychain`, `windows_credential_manager`,
+`mounted_secret`, and one the build supports) and, exactly for `mounted_secret`,
+`directory`, an absolute path with no symbolic link. `mounted_secret` beside
+`secret_service_socket` refuses the configuration, as does `[custody]` in a `/1` to
+`/3` file. Without `[custody]` custody is the platform binding, unchanged. The
+mounted directory is an infrastructure binding of the owner configuration, like
+`secret_service_socket`, not a per-credential locator
+(mounted-secret custody).
+`setup init` never writes `[custody]`. It records the
 local owner policy and OS keyring requirement; it does not write credentials,
 authenticate, install artifacts or start processes. `setup check` checks syntax,
 permissions, configured artifacts and non-interactive keyring availability. A
@@ -327,10 +346,21 @@ Any future remote endpoint or installer is a separately admitted binding.
 Duplicate aliases/instance IDs, unknown keys, relative paths, invalid modes,
 reserved management-name collisions, bad digests and unresolved default selections
 refuse the entire configuration before host launch. TOML contains no credential
-bytes, keyring locators or actionable acquisition continuations. A default adapter
+bytes, keyring locators or actionable acquisition continuations; a `[custody]`
+directory is an infrastructure binding, not a locator. A default adapter
 must name exactly one entry; connection defaults, if used by a future binding,
 must be explicitly recorded and cannot be inferred from last usage. This first
 binding requires an explicit connection for a credentialed operation.
+
+The configuration stage needs an absolute configuration and state path, an
+owner-only file and `owner_uid` equal to the effective user, and no other
+variable: with both `--config` and `--state-dir` no environment variable is read.
+Its `invalid_configuration` refusal names the rule that refused in
+`configuration_rule` (`connectors.cli.ConfigurationRule`), never a path or OS
+text: `config_path_unresolved` (no `--config`, `XDG_CONFIG_HOME` or `HOME`, or an
+inadmissible path), `config_missing` (no file at the resolved path),
+`config_not_private` (the file or a directory above it is not owner-only) or
+`owner_uid_mismatch`.
 
 ### Durable open checkpoints on an existing store
 
@@ -353,8 +383,8 @@ starts no local host or adapter and runs in this order:
    waiting and holds it until it returns, so no owner starts meanwhile. A lock
    another process holds, a running owner for this state directory, refuses
    `lifecycle_conflict` (`stage = admission`, `next_action = stop_owner`) with the
-   store unchanged. The command never signals the owner; the user stops the
-   running `__connectors-owner` process, as for `owner_build_mismatch`.
+   store unchanged. The command never signals the owner; the user stops it with
+   `connectors setup owner-stop`, as for `owner_build_mismatch`.
 3. It opens the store as an admitted mutating open under `metadata.lock`, within
    the usual 30-second wait. As every mutating open does, it first migrates a
    level 1–8 database to level 9 (local metadata).
@@ -533,12 +563,19 @@ through authenticated local session transport. It must satisfy custody
 durable acknowledgement. A transient session cache or a successful method return
 without that durability guarantee is insufficient. Collection lock/absence/write
 failure returns `custody_unavailable`; plaintext TOML, environment variables or
-ordinary local files are never fallback custody. Keyring locations remain private
+ordinary local files are never fallback custody. The one exception is not a fallback:
+the read-only `mounted_secret` binding, used only when the owner configuration
+explicitly selects it (custody §5.2), reads files a platform mounted read-only and
+writes nothing; an unusable platform binding still answers `custody_unavailable`. Keyring locations remain private
 inside the binding. Secret Service's actual durability/ownership behavior remains
 a required backend conformance check before this binding is advertised.
 
 Exactly one protected entry source is selected for connect/repair: hidden terminal,
-protected file or stdin, each explicitly selected by its own source flag. Hidden
+protected file or stdin, each explicitly selected by its own source flag. Under the
+read-only `mounted_secret` binding connect and repair take no source: the owner
+reads the item `<adapter alias>/<profile>` itself, and a source flag is
+`invalid_input` at `arguments`. Under a platform binding a missing source is
+`protected_entry_unavailable` with `next_action = select_protected_source`. Hidden
 terminal requires a trusted controlling TTY; unavailable or conflicting sources
 refuse as a usage/source error and explain safe source selection. No password/token
 argv flag, environment
@@ -661,15 +698,17 @@ never replay a possible write after interruption, timeout or lost response.
 | no safe entry channel (in place of the presentation's `cli_source`) | `protected_entry_unavailable` | 2 |
 | `setup checkpoints-enable` without `--confirm one-way`; nothing changed (`stage = arguments`, `next_action = retry_explicitly`) | `confirmation_required` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
+| a read-only custody binding refused a write it would need (a second connection of a profile, a refresh-rotating profile, an approval-signing key; stage = custody, next_action = check_configuration) | `custody_read_only` | 1 |
+| the read-only binding's item no longer holds the bytes its version pinned (stage = custody, next_action = revalidate_connection) | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
 | store written by a newer binary whose record model differs (its marker names a newer or an unorderable version), a store whose SQL level is above this binary's highest, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
-| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`) | `lifecycle_conflict` | 1 |
+| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
-| running owner is a different executable build (`next_action = stop_owner`) | `owner_build_mismatch` | 1 |
+| running owner is a different executable build (`next_action = stop_owner`: run `connectors setup owner-stop`) | `owner_build_mismatch` | 1 |
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
@@ -678,6 +717,9 @@ never replay a possible write after interruption, timeout or lost response.
 | known revoked connection | `revoked` | 1 |
 | current permission missing | `forbidden` (or shared `not_granted`) | 1 |
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
+| `setup owner-stop`: state directory, owner socket or lock file of another user (`stage = stop`, `next_action = check_configuration`) | `forbidden` | 1 |
+| `setup owner-stop`: the lifetime lock is held and no owner answers within the bound; nothing is signalled (`stage = stop`, `next_action = retry_explicitly`) | `unavailable` | 1 |
+| `setup owner-stop`: the owner accepted the request and still holds the lifetime lock at the bound (`stage = stop`, `next_action = retry_explicitly`) | `timeout` | 1 |
 | user interruption | `interrupted` | 130 |
 
 A configuration whose adapter entry contradicts its format — a
@@ -832,8 +874,34 @@ it as `code = lifecycle_conflict` at `stage = admission`, never with
 when a revalidation can follow the configuration upgrade: its provider
 authority and profile declaration are unchanged, its credential is neither
 known invalid nor expired, and the new provider has not already refused it
-under the configured revision. Otherwise it is `create_connection`, because
-repair refuses a changed binding. A revalidation the new provider refuses (the
+under the configured revision. The connection's identity is the instance,
+adapter, provider authority and the profile's authentication, which is the
+profile declaration apart from its evidence lifetime. A configuration that
+changes only `evidence_lifetime_ms` leaves the identity unchanged, but the
+connection stays bound to the declaration it was admitted under, so the next
+action is `create_connection`, and `connections connect` under the same
+instance id admits the new connection; the old one stays revocable. When the
+provider authority or the profile's authentication changed, the next action is
+`check_configuration`: no command under the same instance id can help, since
+`connections connect` there is refused for the same reason (`lifecycle_conflict`
+at `stage = admission`, `next_action = check_configuration`), and only a new
+instance id admits a new connection. The connections left under the earlier
+instance id stay revocable through the entry, under the same adapter, that
+moved: `connections revoke` reaches a connection whose recorded instance id no
+entry configures any longer, never one another entry still configures.
+Otherwise it is `create_connection`, a saved connection whose profile id the
+configured adapter no longer declares included (revalidate and repair refuse it
+as a read does, never as `unsupported`); connect under a declared profile
+admits the new connection. A
+`connections repair` of a connection saved under another binding is classified
+the same way, never as `identity_mismatch`: repair refuses a changed binding. A
+`connections revalidate`, `connections connect`, `connections repair`, read or
+write whose adapter process still runs an earlier adapter entry stops that
+process and launches the configured one before it captures anything, so no
+command answers `retry_status` for it until `adapters stop`. Only a credential
+validation captured by the earlier process is still refused as
+`lifecycle_conflict`; its `connections connect` starts again with a launch
+that replaces the process. A revalidation the new provider refuses (the
 credential invalid, below scope or another identity) answers `create_connection`
 and records the refusal against the configured revision
 (`Connection.refused_configuration_revision`), so the next read names
@@ -985,7 +1053,13 @@ built-in Administrators group, which correspond to what root may read on Linux
 whatever the mode bits say. Any entry allowing another SID refuses, as group or
 other mode bits do. A file is opened with `FILE_FLAG_OPEN_REPARSE_POINT` and
 refused when it, or any directory on its path, is a reparse point (a symbolic
-link or junction); it must have one link. Files and directories the host
+link or junction); it must have one link. A sidecar of the metadata database
+that SQLite's last close is deleting keeps its name until every handle to it
+closes, and opening it answers access denied meanwhile; one deleted after it
+was opened shows no link on its handle. Such a sidecar is probed again, within
+the lifecycle lock's wait, until its name is gone, and is then absent; one
+still there at the end of the wait refuses, and a present sidecar that is not
+being deleted keeps the full rule. Files and directories the host
 creates get a protected list naming only the current user. Protected stdin
 admits a protected regular file; a pipe on stdin is refused on Windows until a
 producer check is specified for it.

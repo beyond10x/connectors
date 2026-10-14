@@ -645,7 +645,8 @@
     "workflows_stepFailed",
     "workflows_updateStep"
   ],
-  "projector": "swagger2-openapi/1",
+  "projector": "swagger2-openapi/2",
   "source_bytes": 1039581,
-  "source_sha256": "8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471babb68b91936bc3a"
+  "source_sha256": "8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471babb68b91936bc3a",
+  "unprojected_operations": []
 }

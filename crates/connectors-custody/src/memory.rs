@@ -3,8 +3,8 @@
 //! durability: it is what the contract suite runs against on every platform,
 //! never a fallback for a missing platform store.
 use crate::{
-    Backend, CustodyBackend, Failure, Material, Result, Scope, State, Version, admit_material,
-    poll_until,
+    Backend, CustodyBackend, Failure, Material, ReadBackend, Result, Scope, State, Version,
+    admit_material, poll_until,
 };
 use std::{
     collections::HashMap,
@@ -82,7 +82,7 @@ pub struct Memory {
     scope: Scope,
 }
 
-impl Backend for Memory {
+impl ReadBackend for Memory {
     fn kind(&self) -> CustodyBackend {
         self.store.inner.kind
     }
@@ -110,6 +110,15 @@ impl Backend for Memory {
         Ok(())
     }
 
+    fn read(&self, version: Version) -> Result<Material> {
+        self.admit(version)?;
+        let items = self.store.items()?;
+        let bytes = items.get(&version).ok_or(Failure::Missing)?;
+        Ok(Material::from_slice(bytes))
+    }
+}
+
+impl Backend for Memory {
     fn write_new(
         &self,
         version: Version,
@@ -128,13 +137,6 @@ impl Backend for Memory {
         }
         items.insert(version, Zeroizing::new(material.as_bytes().to_vec()));
         Ok(())
-    }
-
-    fn read(&self, version: Version) -> Result<Material> {
-        self.admit(version)?;
-        let items = self.store.items()?;
-        let bytes = items.get(&version).ok_or(Failure::Missing)?;
-        Ok(Material::from_slice(bytes))
     }
 
     fn confirm(

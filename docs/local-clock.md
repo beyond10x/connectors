@@ -36,10 +36,19 @@ later request cannot supply approval clock evidence.
 
 The command makes one UDP request to the configured numeric address, with no DNS,
 automatic retry, server/key discovery or fallback to the machine's wall clock.
-An unavailable source, wrong signature/key, incompatible protocol, excessive
-radius/delay or uncertain local timer produces an operational refusal. Missing or
-invalid configuration produces a configuration refusal. Listing, setup checks and
-existing status commands do not make time requests.
+When no observation results, the command answers an operational `unavailable`
+refusal whose `clock_refusal` names the cause:
+
+| `clock_refusal` | What happened | `next_action` and what to do |
+|---|---|---|
+| `unreachable` | The source did not answer within two seconds, or sending or receiving failed. | `retry_explicitly`: run the check again later; if it persists, check the configured address. |
+| `unverified` | The reply did not verify: it did not parse, or its nonce, protocol version, signatures or Merkle path did not match the configured key and protocol. | `check_configuration`: check the configured public key against the source's published key, and that the source serves Roughtime version `0x8000000c`. |
+| `too_imprecise` | The reply verified, but its signed radius (`clock_radius_ms`), with the network delay and timer-rate error, makes the interval wider than four seconds. | `choose_clock_source`: configure a source with a smaller radius. |
+
+An uncertain local timer, or a check close to UTC midnight, refuses the same way
+without a `clock_refusal`. Missing or invalid configuration produces a
+configuration refusal. Listing, setup checks and existing status commands do not
+make time requests.
 
 Internally, authenticated samples last at most 30 seconds, with network delay,
 timer-rate error and outward rounding included in every interval. They are kept

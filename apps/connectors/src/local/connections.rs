@@ -9,7 +9,8 @@ pub(super) fn execute(
     paths: &Paths,
     alias: &str,
     adapter: &Adapter,
-    socket: Option<&std::path::Path>,
+    selection: &Selection,
+    configured: &std::collections::BTreeSet<String>,
 ) -> Result<Value, HandlerReply> {
     let registry = Registry::with_system_clock(&paths.state);
     let text = |field| {
@@ -49,7 +50,7 @@ pub(super) fn execute(
             if !(1..=500).contains(&limit) {
                 return Err(failure("invalid_input", "arguments", "none", true));
             }
-            let custody = keyring::custody::available_at(socket);
+            let custody = keyring::custody::available_for(selection);
             let page = registry
                 .list(
                     &adapter.instance_id,
@@ -75,7 +76,7 @@ pub(super) fn execute(
             let acquisition = call.input.get("acquisition").and_then(Value::as_str);
             match (reference, acquisition) {
                 (Some(reference), None) => {
-                    let custody = keyring::custody::available_at(socket);
+                    let custody = keyring::custody::available_for(selection);
                     let observed = registry
                         .describe(
                             &adapter.instance_id,
@@ -113,10 +114,13 @@ pub(super) fn execute(
         }
         "connections-revoke" => {
             let reference = text("connection")?;
+            // A connection left under an instance id no entry configures any
+            // longer (the entry moved to a new one) stays revocable here.
             let revision = registry
-                .revoke(
+                .revoke_left_behind(
                     &adapter.instance_id,
                     &adapter.adapter_id,
+                    configured,
                     reference,
                     text("expected_revision")?,
                     connectors_sdk::now_ms(),
@@ -216,6 +220,12 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
             "create_connection",
             false,
         ),
+        AuthenticationChanged => (
+            "lifecycle_conflict",
+            "admission",
+            "check_configuration",
+            false,
+        ),
         Revoked => ("revoked", "admission", "create_connection", false),
         IdentityMismatch => ("identity_mismatch", "admission", "repair_connection", false),
         UpgradeIdentityMismatch => ("identity_mismatch", "admission", "create_connection", false),
@@ -227,6 +237,7 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
         EvidenceExpired => ("not_granted", "admission", "revalidate_connection", false),
         InsufficientScope => ("not_granted", "admission", "repair_connection", false),
         CustodyUnavailable => ("custody_unavailable", "custody", "unlock_keyring", false),
+        CustodyReadOnly => ("custody_read_only", "custody", "check_configuration", false),
     };
     failure(code, stage, action, usage)
 }

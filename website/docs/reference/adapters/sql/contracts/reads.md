@@ -33,7 +33,9 @@ lossless text representation alongside each column's native type name; NULL is
 JSON null. Numeric precision, arrays, timestamps and JSON are preserved as native
 text rather than coerced to JavaScript numbers. Parameters are text or null with
 server-side type resolution. This representation is explicit in the descriptor.
-Report truncation explicitly; no invented resumable cursor for a fresh SQL query.
+Report truncation explicitly; no invented resumable cursor for a fresh SQL query (a
+[read profile](#read-profiles)'s keyset cursor follows a column the operator declared, and
+is a new read after a value, not a resumed one).
 Each request uses a fresh connection and read-only transaction, initialized with
 `search_path = public, pg_catalog`; qualify names in other schemas. Session settings
 are not a substitute for the configured role's schema and function grants.
@@ -41,6 +43,10 @@ No connection pool is claimed in this local profile. A configured CA bundle
 replaces public trust roots for SQL; empty bundles are refused.
 Do not advertise writes, transactions across requests, or dialect portability.
 PostgreSQL SQLSTATE `0A000` (feature not supported) returns `unsupported`, not `unavailable`.
+The statement runs as a derived table that closes on its own line; a syntax error (`42601`)
+answered to that wrapper, after the statement itself prepared, means the statement is not a
+query (`DELETE … RETURNING`, `EXPLAIN`, `SHOW`) and returns `unsupported` (see
+[how a statement that is not a read is refused](#read-profiles)).
 Source facts: https://www.postgresql.org/docs/current/sql-set-transaction.html and
 https://www.postgresql.org/docs/current/runtime-config-client.html.
 Source access: 2026-09-08.
@@ -75,7 +81,9 @@ caller's statement is prepared. A
 statement must return between one and 256 columns, so a statement that returns no
 rows is refused as `unsupported` before execution; it then runs as a derived table
 with positional column aliases and `LIMIT <limit+1>`, so only one result-returning
-statement runs and truncation is reported without draining the result. A table
+statement runs and truncation is reported without draining the result. A statement
+that prepares with columns but cannot be a derived table (`SHOW`, `EXPLAIN`), which the
+server refuses with error 1064 on the wrapper, is `unsupported`, as on PostgreSQL. A table
 write the read-only session refuses (error 1792), including one inside a stored
 function, is `forbidden`. The guarantee is that read-only session plus one
 result-returning statement; it does not prevent the side effects of a routine the
@@ -239,3 +247,131 @@ https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html,
 https://dev.mysql.com/doc/refman/8.4/en/information-schema-key-column-usage-table.html and
 https://dev.mysql.com/doc/refman/8.4/en/information-schema-statistics-table.html, cited, not
 fetched, on 2026-10-09.
+
+## Read profiles
+
+A connection may declare read profiles in its owner-only native file (`read_profiles`, at
+most 32, distinct ids). A read profile is the operator's: one read statement with the
+engine's placeholders (`$1`… on PostgreSQL, `?` on MySQL), the names of its parameters in
+placeholder order, its output columns in statement order, each with a declared type
+(`text`, `integer`, `timestamp` or `phone_number`) and optional masking, the column that
+carries the call identifier and the column the keyset cursor follows. The repository holds
+only this shape and its validation, which the adapter's ESS model
+(`connectors_sql.profiles`, and the profile rules of `connectors_sql.connection.LocalConfiguration`)
+fixes; the composition admits a profile exactly when the model does. Profiles are part of
+the binding: the effective configuration carries them, so a changed profile is a changed
+configuration revision, and a file without profiles (or with an empty list) keeps the
+revision it had before profiles existed.
+
+`profile.read` serves them. It is advertised only by a connection that declares a profile,
+is a declared read (`effect: read`) and needs no mutation profile. The instance descriptor
+publishes each profile's exact input and output as one alternative of the operation's input
+and output schemas, so `operations describe` shows the parameters a caller may pass and the
+typed columns it gets back. The caller names the profile, gives a value (text or `null`) for
+each declared parameter and nothing else, and may pass a cursor and a `limit` of 1 to 1,000.
+An unknown profile, an undeclared or missing parameter, or any other member is
+`invalid_input`; a cursor the checks below do not admit is `stale_cursor`. Both are refused
+before any session is opened. Values are bound as text parameters, never written into a
+statement.
+
+A cursor is not signed, so the adapter cannot tell a cursor it issued from one built to look
+like it. What it checks is shape, context and type, and a cursor that fails any of them is
+`stale_cursor`. Shape: the token is base64url without padding of exactly the object
+`{"profile", "context", "after"}` or `{"profile", "context", "after_base64"}`, in the one
+form the adapter issues for its value (plain when JSON writes the value without an escape,
+otherwise base64url of its UTF-8 bytes), with a value of at most 8,192 bytes. Context:
+`profile` names this profile, and `context` is the digest of the instance's revision (which
+covers the connection's endpoint, database and user and the full definition of every
+profile), the profile's definition and the parameter values, so a cursor issued before any
+change to the profile, on another connection or for other values is stale. Type: the
+ordering column's declared type admits the value, as it must admit a returned one, so an
+`integer` cursor that is not an integer never reaches a cast that would read it as 0. A
+cursor that passes all three but was never issued carries a value of the right type for this
+read: the ordering column is never masked, so it only moves where a read the caller may make
+anyway starts. The longest token the adapter issues (a 64-character id and an 8,192-byte
+value that JSON must escape throughout) is 14,795 characters, inside the 16,384 the
+published schemas admit; an ordering value longer than 8,192 bytes refuses the page as
+`unsupported` rather than issuing a cursor the schemas would refuse.
+
+A page runs the statement through the `query.read` path: the same fresh read-only
+transaction (PostgreSQL) or `READ ONLY` session (MySQL), deadlines and byte bounds, and the
+same refusals of a statement that is not a read (below) before it runs. A statement that
+returns other than its declared number of columns is `unsupported`, also before it runs.
+The statement runs inside the derived table with positional aliases, which closes on its
+own line on both engines (so a statement ending in a `--` comment cannot reach the
+aliases), ordered by one expression `E` of the ordering column and asking for one row past
+the limit; a continuation compares the cursor by the same expression:
+`… \n) AS result(c0,…) [WHERE E(result.c<k>) > E($<n+1>)] ORDER BY E(result.c<k>) LIMIT <limit+1>`
+on PostgreSQL and `… \n) AS result (c0,…) [WHERE E(c<k>) > E(?)] ORDER BY E(c<k>) LIMIT <limit+1>`
+on MySQL, where the cursor's value is bound after the statement's own parameters. `E` is
+chosen by the declared type and the column's native type when the statement is prepared,
+before any row is read (`connectors_sql.profiles.KeysetOrdering`):
+
+| engine | declared type | native column | `E(x)` |
+|---|---|---|---|
+| PostgreSQL | `text`, `phone_number` | any | `x::text COLLATE "C"`: the returned text, by its bytes |
+| PostgreSQL | `integer` | `int2`, `int4`, `int8` | `x` |
+| PostgreSQL | `timestamp` | `timestamp`, `timestamptz` | `x` |
+| MySQL | `text`, `phone_number` | a text string (`CHAR`, `VARCHAR`, `TEXT`, `ENUM`, `SET`) | `CAST(CONVERT(x USING utf8mb4) AS BINARY)` |
+| MySQL | `integer` | a signed or unsigned integer, `YEAR` | `CAST(x AS DECIMAL(65,0))` |
+| MySQL | `timestamp` | `DATETIME`, `TIMESTAMP` | `CAST(x AS DATETIME(6))`, the `Z` of a `TIMESTAMP` cursor dropped (the session is UTC) |
+
+Every other pairing is refused as `unsupported`, naming the profile's column, before the
+page is read. Each admitted pairing orders exactly as the cursor compares, and two returned
+values are equal under `E` exactly when their texts are equal. That is why the rest are
+refused: MySQL writes a binary string, `BIT` and geometry as base64, whose order is not the
+order of their bytes; it writes floating, decimal, JSON, date and time values otherwise than
+its own text conversion; and an integer or timestamp declared over a text column orders as
+text, not as the declared type. ENUM and SET, ordered by their bytes rather than their
+index, are consistent. The text expressions also keep a case- or pad-insensitive collation
+from tying two distinct values.
+
+A server, or a proxy in front of it, may return fewer rows than any `LIMIT` asks for, so
+the adapter never takes a short page for the end. A page that received more than `limit`
+rows returns `limit` of them; every page that received a row carries `next_cursor`, after
+the last row it returns; only a page that received none is `complete` with a null cursor.
+The ordering column must hold distinct values for the rows the statement returns. When a
+page received the row past the limit and that row shares the last returned row's ordering
+value, the page is refused as `unsupported`, naming the ordering column as not unique:
+continuing after that value would drop the row (`connectors_sql.profiles.PageBoundary`). A
+shared value inside a page is not a boundary and is served. On PostgreSQL a row past the
+limit whose cells exceed the row byte bound cannot be compared, and refuses the page as
+`capacity`, as the next page would. The adapter cannot see a row a server cap withheld: when
+a server returns fewer rows than asked and a withheld row shares the last returned value,
+the next page continues after that value and the withheld row is not returned. Uniqueness
+of the ordering column is therefore the operator's obligation; the check above catches it
+only where the adapter received the next row.
+
+A statement that is not a read is refused before it runs, the same way on `query.read` and
+`profile.read`, and the classes match across the engines. A statement that returns no
+columns (an `INSERT`, `UPDATE` or `DELETE` without `RETURNING`, a `SET`, a `CALL`) is
+`unsupported` when it is prepared, on both engines. A statement that prepares with columns
+but cannot be a derived table is refused by the server's syntax check of the wrapper, which
+the adapter answers `unsupported` too: on PostgreSQL that is `DELETE`, `UPDATE` or `INSERT`
+with `RETURNING`, `EXPLAIN` and `SHOW` (SQLSTATE `42601` on the wrapper); on MySQL, which
+has no `RETURNING`, `SHOW` and `EXPLAIN` (error 1064 on the wrapper). A PostgreSQL
+data-modifying `WITH` is refused by the server as not at the top level (`0A000`), also
+`unsupported`. The caller's own statement refused at its own preparation keeps the server's
+class (a syntax error in it is `invalid_input`). A write reached at run time through a
+function the statement calls is refused by the read-only transaction (PostgreSQL `25006`) or
+session (MySQL 1792), and is `forbidden` on both.
+
+Each item carries the declared columns under their declared names, never the database's
+own. Every non-null value is a JSON string: `text` the engine's native text; `integer`
+decimal digits with an optional `-`; `timestamp` the engine's native text, which starts
+`YYYY-MM-DD`, `T` or a space, then `HH:MM:SS`; `phone_number` the number. A value its
+declared type does not admit refuses the page as `unsupported`; it is never coerced. A
+column is masked when the profile says so, and otherwise exactly when it is a
+`phone_number`; a masked value keeps its last four characters and writes `*` for each
+earlier one, and a value of four characters or fewer is all `*`. The call identifier and
+the ordering column are never masked, are not `phone_number` columns, and are never null:
+a null in either refuses the page as `unsupported`. The answer names the profile, its call
+identifier and ordering columns and each column's type and masking, so a workflow joins on
+the call identifier without a model. A page whose answer would exceed the response limit is
+`capacity`; ask for a smaller `limit`.
+
+The scripted wire fixtures of both engines check these rules (`adapters/sql/tests/profiles.rs`,
+`profiles_adversary.rs`, `protocol.rs` and `mysql_local.rs`), against a synthetic call table
+(`tests/mysql/calls.rs`), including the SQL text of each keyset expression;
+`tests/ess_model.rs` holds the executable's admission, masking, pages, page boundaries,
+keyset orderings, issued cursors, cursor admission and refusals to the model. No live database has run a read profile yet.
