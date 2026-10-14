@@ -190,7 +190,7 @@ fn db_error(_: impl Sized) -> HostFailure {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use serde_json::json;
 
@@ -263,7 +263,7 @@ mod tests {
         assert_eq!(floor, 0);
     }
 
-    fn fixture_bootstrap() -> Bootstrap {
+    pub(crate) fn fixture_bootstrap() -> Bootstrap {
         let descriptor = json!({
             "version":"v1alpha1", "instance":"fixture", "adapter":"adapter",
             "revision":"descriptor", "configuration_schema":{"type":"object"},

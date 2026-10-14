@@ -558,6 +558,74 @@ fn adversary_frame(control: &Value) -> Vec<u8> {
     frame
 }
 
+/// Fills the owner's 32 client slots at `socket` and returns the held clients
+/// once the owner itself shows it holds all of them: a probe connection
+/// answered with its `capacity` refusal (transport.rs `handle`). Connecting
+/// only queues a client; the owner counts it when its accept loop takes it,
+/// which under load can be long after the connect returned. A probe the owner
+/// takes into a free slot instead gets no reply; it is held too and the next
+/// probe asks again. The owner takes clients in order, so a refused probe
+/// means every earlier one was taken. The short read timeout only paces the
+/// probes, and the deadline only ends a test whose owner never fills; neither
+/// decides the result. Each held client keeps its slot until the owner's
+/// 10-second greeting deadline from when it was taken.
+#[cfg(unix)]
+fn fill_owner(directory: &sockets::Directory, socket: &str) -> Vec<std::os::unix::net::UnixStream> {
+    use std::io::Read;
+    let mut held: Vec<_> = (0..32).map(|_| directory.connect(socket)).collect();
+    let fail_safe = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    loop {
+        assert!(
+            std::time::Instant::now() < fail_safe,
+            "the owner never refused a client at capacity ({} held)",
+            held.len()
+        );
+        let mut probe = directory.connect(socket);
+        // macOS refuses a socket option with EINVAL once the owner has answered
+        // and closed the probe; its reply is then already readable.
+        tolerate_closed(probe.set_read_timeout(Some(std::time::Duration::from_millis(100))));
+        let mut first = [0u8; 1];
+        match probe.read(&mut first) {
+            Ok(1) => {
+                tolerate_closed(probe.set_read_timeout(None));
+                let mut rest = [0u8; 11];
+                probe.read_exact(&mut rest).unwrap();
+                let mut sizes = [0u8; 12];
+                sizes[0] = first[0];
+                sizes[1..].copy_from_slice(&rest);
+                let size =
+                    |at: usize| u32::from_be_bytes(sizes[at..at + 4].try_into().unwrap()) as usize;
+                let mut control = vec![0; size(0)];
+                probe.read_exact(&mut control).unwrap();
+                let reply: Value = serde_json::from_slice(&control).unwrap();
+                assert_eq!(
+                    (reply["kind"].as_str(), reply["error"]["code"].as_str()),
+                    (Some("failed"), Some("capacity")),
+                    "{reply}"
+                );
+                return held;
+            }
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ) =>
+            {
+                held.push(probe);
+            }
+            other => panic!("the owner closed a probe without its capacity reply: {other:?}"),
+        }
+    }
+}
+
+/// A socket option set on a probe the owner already closed: EINVAL on macOS.
+#[cfg(unix)]
+fn tolerate_closed(result: std::io::Result<()>) {
+    if let Err(error) = result {
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput, "{error}");
+    }
+}
+
 #[cfg(unix)]
 fn adversary_read_control(stream: &mut std::os::unix::net::UnixStream) -> Value {
     use std::io::Read;
@@ -736,7 +804,7 @@ fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
     let _owner = start_owner(started, &root);
     let directory = sockets::Directory::open(&root.path().join("state"));
     // 32 silent clients occupy every slot until the owner's greeting timeout.
-    let held: Vec<_> = (0..32).map(|_| directory.connect("owner.sock")).collect();
+    let held = fill_owner(&directory, "owner.sock");
     let refused = command(&root, &["adapters", "status", "--adapter", "forge"]);
     assert_eq!(refused.status.code(), Some(1));
     let error: Value = serde_json::from_slice(&refused.stderr).unwrap();
@@ -907,13 +975,17 @@ fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
     let _owner = start_owner(binary, &root);
     let _relayed = adversary2_relay(&root, |index, _| index == 0);
     let directory = sockets::Directory::open(&root.path().join("state"));
-    let held: Vec<_> = (0..32).map(|_| directory.connect("real.sock")).collect();
-    std::thread::sleep(std::time::Duration::from_millis(200));
+    let held = fill_owner(&directory, "real.sock");
+    let filled = std::time::Instant::now();
     let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
+    // A slot frees only when a held client reaches the owner's 10-second
+    // greeting deadline; then the probe and the greeting are served and the
+    // status answers `ok:not_running`. The elapsed time says which it was.
     assert_eq!(
         adversary2_code(&output),
         Value::from("capacity"),
-        "{}",
+        "{:?} after the owner was full: {}",
+        filled.elapsed(),
         String::from_utf8_lossy(&output.stderr)
     );
     drop(held);

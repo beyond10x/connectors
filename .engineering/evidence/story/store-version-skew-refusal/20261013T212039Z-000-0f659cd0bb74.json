@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-13T21:20:39Z",
+  "actor": "human:timo",
+  "artifact": "story:store-version-skew-refusal",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "verification",
+    "source": "fixture reproduction on fresh state directories, 0.33.0 built from v0.33.0 against 0.45.0 and 0.49.0; findings in the story",
+    "reference": "story:store-version-skew-refusal#findings"
+  }
+}

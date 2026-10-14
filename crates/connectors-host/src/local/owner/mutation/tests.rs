@@ -81,6 +81,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         code: FailureCode::Owner(Code::ServiceFailure),
                         service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
                         origin: crate::local::owner::Origin::Host,
+                        store_version: None,
                     }),
                     Classification::Unknown => Some(Code::OutcomeUnknown.into()),
                     _ => Some(Code::Forbidden.into()),
@@ -324,6 +325,41 @@ mod replay {
             "retry_status"
         );
         assert_eq!(approval.stage(Classification::NotAttempted), "admission");
+    }
+
+    /// semantics.md §3 on the owner path: the owner's ledger on a store a
+    /// newer binary with another record model wrote is refused as
+    /// `metadata_schema_newer`, and the owner's write failure keeps the
+    /// store's release, the `admission` stage and `upgrade`, as the direct
+    /// path answers; it survives the stored outcome's round trip.
+    #[test]
+    fn an_owner_write_on_a_store_a_newer_binary_wrote_keeps_its_release() {
+        let root = root();
+        Metadata::record_writer_for_tests(root.path(), "999.0.0", &"0".repeat(64)).unwrap();
+        let refused = ledger::Store::new(root.path(), Fixed, ledger::Limits::default())
+            .and_then(|store| store.prepare(&candidate()).map(drop))
+            .unwrap_err();
+        assert_eq!(
+            refused,
+            ledger::Failure::MetadataSchemaNewer(Some(crate::local::Release::new(999, 0, 0)))
+        );
+        let failure = execution::ledger_error(refused);
+        assert_eq!(failure.code, FailureCode::Owner(Code::MetadataSchemaNewer));
+        assert_eq!(failure.stage(Classification::NotAttempted), "admission");
+        assert_eq!(failure.next_action(Classification::NotAttempted), "upgrade");
+        let stored = serde_json::to_value(StoredOutcome::Failure { error: failure }).unwrap();
+        assert_eq!(
+            stored,
+            serde_json::json!({"kind":"failure","error":{"code":"metadata_schema_newer",
+                "store_version":"999.0.0"}})
+        );
+        let StoredOutcome::Failure { error } = serde_json::from_value(stored).unwrap() else {
+            panic!("a failure read back as success");
+        };
+        assert_eq!(
+            serde_json::to_value(&error).unwrap()["store_version"],
+            "999.0.0"
+        );
     }
 
     #[test]

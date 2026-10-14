@@ -109,6 +109,44 @@ bindings exist, but the CLI does not yet run on macOS or Windows.
 {"error":{"code":"failure","data":{"code":"configuration_exists","kind":"operational","next_action":"check_configuration","stage":"configuration"}},"ok":false}
 ```
 
+## Binaries of different versions and one state directory
+
+The metadata store records the newest binary that wrote it and a digest of the record model that
+binary persists. Once a binary has written a state directory, an older binary may not use it:
+binaries of different versions share one state directory only while the oldest of them is at
+least the newest that wrote it. An older binary whose record model differs refuses the store
+before it reads anything, in every command and `setup check` included: exit status 1, failure
+code `metadata_schema_newer` at stage `admission` with `next_action` `upgrade`, and the failure
+names `store_version` (the newest writer's release) and `binary_version` (its own). Retrying does
+not change that answer; upgrading the binary does. A newer release that changed no
+persisted record is admitted. When the newest writer cannot be named, because the store was
+migrated to a level this binary does not know or its recorded version is not one this binary can
+order, the refusal is the same with `store_version` `unrecorded`. Releases up to 0.49.0 cannot read the marker: on a store a newer
+binary wrote they answer `metadata_unavailable` with `next_action` `retry_status` instead, and
+retrying does not help them either.
+
+A consumer pinned to one version keeps its own state directory. `setup init` with the existing
+configuration and a new `--state-dir` initialises an empty store there and leaves the
+configuration unchanged:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/pinned/state" \
+  --output json setup init | jq '{ok, disposition: .result.disposition}'
+```
+
+```json
+{
+  "ok": true,
+  "disposition": "state_initialized"
+}
+```
+
+It then connects in that state directory, passing the same `--state-dir` to `connections connect`
+and to every later command, as the provider guides below show. A connection is recorded in the
+state directory it was made in: connections, list cursors, approvals and cached adapter
+descriptions in another state directory do not carry over, so the pinned consumer connects once
+more there.
+
 ## Next
 
 An adapter entry under `[adapters]` names its executable, the digest of that executable and the

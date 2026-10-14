@@ -60,11 +60,12 @@ fn proof_error(error: approvals::Failure) -> Failure {
         approvals::Failure::Replayed => ApprovalCode::ApprovalReplayed.into(),
         approvals::Failure::Unavailable => Code::Unavailable.into(),
         approvals::Failure::MetadataUnavailable => Code::MetadataUnavailable.into(),
+        approvals::Failure::MetadataSchemaNewer(store) => Error::schema_newer(store).into(),
         approvals::Failure::OutcomeUnknown => Code::OutcomeUnknown.into(),
         approvals::Failure::Capacity => Code::Capacity.into(),
     }
 }
-fn ledger_error(error: ledger::Failure) -> Failure {
+pub(super) fn ledger_error(error: ledger::Failure) -> Failure {
     match error {
         ledger::Failure::InvalidInput => Code::InvalidInput,
         ledger::Failure::Capacity => Code::Capacity,
@@ -73,6 +74,7 @@ fn ledger_error(error: ledger::Failure) -> Failure {
         ledger::Failure::OutcomeUnknown => Code::OutcomeUnknown,
         ledger::Failure::NotFound => Code::NotFound,
         ledger::Failure::MetadataUnavailable => Code::MetadataUnavailable,
+        ledger::Failure::MetadataSchemaNewer(store) => return Error::schema_newer(store).into(),
     }
     .into()
 }

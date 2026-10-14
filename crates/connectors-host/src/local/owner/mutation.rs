@@ -40,6 +40,11 @@ pub struct Failure {
     /// written for the host, so those entries keep their earlier bytes.
     #[serde(default, skip_serializing_if = "Origin::is_host")]
     pub origin: Origin,
+    /// On `metadata_schema_newer` only: the release the store's writer marker
+    /// names, or `unrecorded` (semantics.md §3). Absent on every other failure,
+    /// so those entries keep their earlier bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store_version: Option<String>,
 }
 impl Failure {
     /// The stage a write failure reports. The provider's answer is `dispatch`;
@@ -59,6 +64,10 @@ impl Failure {
     /// have, is never offered a plain retry.
     pub fn next_action(&self, classification: Classification) -> &'static str {
         use connectors_core::ErrorCode as E;
+        // Only a binary at least as new as the store's writer can use it.
+        if self.code == FailureCode::Owner(Code::MetadataSchemaNewer) {
+            return "upgrade";
+        }
         if self.origin != Origin::Provider {
             return "retry_status";
         }
@@ -82,6 +91,7 @@ impl From<Error> for Failure {
             code: FailureCode::Owner(error.code),
             service_code: error.service_code,
             origin: error.origin,
+            store_version: error.store_version,
         }
     }
 }
@@ -96,6 +106,7 @@ impl From<ApprovalCode> for Failure {
             code: FailureCode::Approval(code),
             service_code: None,
             origin: Origin::Host,
+            store_version: None,
         }
     }
 }
@@ -687,6 +698,7 @@ fn observe_as_original(
                 code: FailureCode::Owner(Code::ServiceFailure),
                 service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
                 origin: Origin::Host,
+                store_version: None,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,

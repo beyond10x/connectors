@@ -260,8 +260,7 @@ impl ServiceState {
     /// Internal owner read of one of this host's attempts by its public id.
     pub fn attempt(&self, attempt_id: &str) -> ledger::Result<ledger::Observation> {
         let attempt_id = Uuid::parse_str(attempt_id).map_err(|_| ledger::Failure::InvalidInput)?;
-        let authority =
-            Metadata::authority_at(&self.path).map_err(|_| ledger::Failure::MetadataUnavailable)?;
+        let authority = Metadata::authority_at(&self.path).map_err(ledger_failure)?;
         self.ledger.observe(ledger::AttemptRef {
             authority,
             attempt_id,
@@ -270,8 +269,7 @@ impl ServiceState {
 
     /// The attempts recorded for this host's instance.
     pub fn attempt_count(&self) -> ledger::Result<u32> {
-        let metadata =
-            Metadata::inspect(&self.path).map_err(|_| ledger::Failure::MetadataUnavailable)?;
+        let metadata = Metadata::inspect(&self.path).map_err(ledger_failure)?;
         metadata
             .connection
             .query_row(
@@ -423,6 +421,16 @@ fn record_instance(path: &Path, instance: &str, adapter: &str, revision: &str) -
     metadata.persist()
 }
 
+/// A ledger read's failed open: a store a newer binary with another record
+/// model wrote keeps its name and release (semantics.md §3); any other is
+/// `MetadataUnavailable`.
+fn ledger_failure(failure: Failure) -> ledger::Failure {
+    match failure {
+        Failure::MetadataSchemaNewer(store) => ledger::Failure::MetadataSchemaNewer(store),
+        _ => ledger::Failure::MetadataUnavailable,
+    }
+}
+
 fn now_ms() -> i64 {
     i64::try_from(connectors_sdk::now_ms()).unwrap_or(i64::MAX)
 }
@@ -435,6 +443,26 @@ mod tests {
 
     fn mode(path: &Path, mode: u32) {
         std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    /// semantics.md §3: the HTTP host's attempt reads name a store a newer
+    /// binary with another record model wrote, with its release, as every
+    /// other open does; never `metadata_unavailable`.
+    #[test]
+    fn the_attempt_reads_name_a_store_a_newer_binary_wrote() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        std::fs::create_dir(&path).unwrap();
+        mode(&path, 0o700);
+        let state = ServiceState::open(&path, "leaf", "fixture", "rev-1").unwrap();
+        Metadata::record_writer_for_tests(&path, "999.0.0", &"0".repeat(64)).unwrap();
+        let refused =
+            ledger::Failure::MetadataSchemaNewer(Some(super::super::Release::new(999, 0, 0)));
+        assert_eq!(state.attempt_count().err(), Some(refused));
+        assert_eq!(
+            state.attempt(&Uuid::new_v4().to_string()).err(),
+            Some(refused)
+        );
     }
 
     /// execution_audit.yaml, Final-observation recovery: a full retained set
