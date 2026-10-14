@@ -75,7 +75,7 @@
     {
       "provider": "slack",
       "file_name": "slack.bundle.json",
-      "bundle_sha256": "606e2e2068afdf5f1692eacd739af7384a14cddb95be780b5d55b1d1836ddd24",
+      "bundle_sha256": "282df9c4d3c0e338c049f4ac98e19f3d313a22de10d6e72e48d19ac8395cf8b5",
       "source_sha256": "f010337d9d8aa99ae1dc905cd46f68fecc66e42ce6868379f040b9149789128b",
       "operations": 174,
       "unsupported": 0

@@ -93,6 +93,17 @@ types:
   # failing, leaves the effect possible, as a differing value does. It is for a write that
   # removes what the preflight proved present, such as GitLab's tag delete (204, no body).
   # Absent when unused, so a postflight without it keeps its serialised form.
+  #
+  # `refusals` names the answers a provider gives with a success status when it did not apply the
+  # write: a write that fails `checks` or `any_of`, and whose own answer carries at a refusal's
+  # `pointer` a string equal to one of its `values`, is refused with that refusal's `code`, not
+  # left possible. Read in order; the first that matches decides. It is for a provider that
+  # refuses as `200` with a documented error member, such as Slack's `chat.update` answering
+  # `{"ok": false, "error": "cant_update_message"}` for a message the token did not post. Only
+  # on the write's own answer, so never beside `read` or `absent`, and only beside at least one
+  # check, so an answer that satisfies the checks is never refused. Any other value, or none,
+  # leaves the effect possible, as before. Absent when unused, so a postflight without it keeps
+  # its serialised form; an empty list is the same as an absent one.
   - name: connectors_catalog.guard.Postflight
     kind: struct
     fields:
@@ -100,6 +111,7 @@ types:
       - {name: read, type: "Optional<connectors_catalog.guard.Read>"}
       - {name: any_of, type: "Optional<List<connectors_catalog.guard.Check>>"}
       - {name: absent, type: "Optional<Boolean>"}
+      - {name: refusals, type: "Optional<List<connectors_catalog.guard.Refusal>>"}
     invariants:
       - any: [{not: defined(read)}, {checks.count: {gte: 1}}, defined(absent)]
       - any: [{not: defined(any_of)}, {any_of.count: {lte: 0}}, {any_of.count: {gte: 2}}]
@@ -107,6 +119,30 @@ types:
       - any: [{not: defined(absent)}, defined(read)]
       - any: [{not: defined(absent)}, {checks.count: {lte: 0}}]
       - any: [{not: defined(absent)}, {not: defined(any_of)}, {any_of.count: {lte: 0}}]
+      - any: [{not: defined(refusals)}, {refusals.count: {lte: 0}}, {not: defined(read)}]
+      - any: [{not: defined(refusals)}, {refusals.count: {lte: 0}}, {checks.count: {gte: 1}}]
+
+  # The code a declared refusal answers with, as a provider's own answer: `invalid_input` for the
+  # input it refused, `forbidden` for an act the credential may not perform on that target,
+  # `not_found` for a target that does not exist.
+  - name: connectors_catalog.guard.RefusalCode
+    kind: enum
+    variants: [invalid_input, forbidden, not_found]
+
+  # One declared refusal: the string at the RFC 6901 `pointer` of the write's own answer equal to
+  # one of `values` refuses the write with `code`. The matched value is carried as the provider's
+  # reason. What the engine refuses when the selection loads beyond these invariants (a pointer
+  # without a leading `/`, an empty or repeated value, a value two refusals name, more than
+  # sixteen refusals) is stated in the owner and pinned by the engine's tests.
+  - name: connectors_catalog.guard.Refusal
+    kind: struct
+    fields:
+      - {name: pointer, type: String}
+      - {name: values, type: "List<String>"}
+      - {name: code, type: connectors_catalog.guard.RefusalCode}
+    invariants:
+      - pointer.count >= 1
+      - values.count >= 1
 
   # `preflight` is the first read; `further_preflights` are read after it, in order, each with its
   # own checks, and the first that refuses stops the guard with the write unsent: for a write

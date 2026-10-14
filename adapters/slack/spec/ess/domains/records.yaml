@@ -10,10 +10,12 @@ summary: Slack-owned provider records the parity units read or write — convers
 # (`team.info`) and File (`files.list`, `files.info`, and its content by the
 # download `file.download`). Written through the catalog provider, each under an
 # approval: a Message is posted by `chat.postMessage` (MessagePost in, MessagePosted
-# out) and a direct-message Conversation is opened by `conversations.open`
-# (DirectMessageOpen in, DirectMessageOpened out). The selections of the four read
-# methods whose pinned `token` is required, and of both writes, name it as their
-# `credential`, so the token travels only in the connection's header.
+# out), edited by `chat.update` (MessageEdit, MessageEdited) and deleted by
+# `chat.delete` (MessageDelete, MessageDeleted), and a direct-message Conversation
+# is opened by `conversations.open` (DirectMessageOpen in, DirectMessageOpened out).
+# The selections of the four read methods whose pinned `token` is required, and of
+# every write, name it as their `credential`, so the token travels only in the
+# connection's header.
 # Normative owner: adapters/slack/design.md. Shared ESS includes none of this root
 # and imports none of its types (adapters/README.md:70-74).
 #
@@ -105,14 +107,89 @@ types:
     fields:
       - {name: conversation_id, type: String}
 
-  # The outcome of either write, as the catalog engine classifies it. applied: a 2xx
+  # The closed input of the catalog selection `chat.update` (operationId `chat_update`,
+  # src:11593, `POST /api/chat.update`, scope `chat:write`): the message to edit, by
+  # its MessageRef, and its new text. Wire member `channel` (src:11623, required) is
+  # conversation_id and `ts` (src:11648, required) the message's ts; `text`
+  # (src:11642) is required here although the document leaves it optional beside
+  # `blocks` and `attachments`, which the selection does not admit, so a message's
+  # blocks and attachments are kept as they were. `as_user`, `link_names` and `parse`
+  # are not admitted either; the document says an omitted `link_names` or `parse` is
+  # reset to its default. A bot token edits only the messages it posted.
+  - name: connectors_slack.records.MessageEdit
+    kind: struct
+    fields:
+      - {name: conversation_id, type: String}
+      - {name: ts, type: String}
+      - {name: text, type: String}
+    invariants:
+      - conversation_id.count: {gte: 1}
+      - ts.count: {gte: 1}
+      - text.count: {gte: 1}
+
+  # The applied answer of `chat.update`: its 200 schema (src:11704) requires `ok`,
+  # `channel`, `ts`, `text` and `message` (whose `text` it requires). `channel` and
+  # `ts` are the edited Message's MessageRef, the same pair the edit named, and
+  # `text` its text as Slack stored it.
+  - name: connectors_slack.records.MessageEdited
+    kind: struct
+    fields:
+      - {name: message_ref, type: connectors_slack.records.MessageRef}
+      - {name: text, type: String}
+
+  # The closed input of the catalog selection `chat.delete` (operationId `chat_delete`,
+  # src:10141, `POST /api/chat.delete`, scope `chat:write`): the message to delete, by
+  # its MessageRef. Wire member `channel` (src:10158) is conversation_id and `ts`
+  # (src:10152) the message's ts, sent as the string Slack gives it although the
+  # document types it `number` (usage:155: string timestamps). `as_user` is not
+  # admitted. A bot token deletes only the messages it posted.
+  - name: connectors_slack.records.MessageDelete
+    kind: struct
+    fields:
+      - {name: conversation_id, type: String}
+      - {name: ts, type: String}
+    invariants:
+      - conversation_id.count: {gte: 1}
+      - ts.count: {gte: 1}
+
+  # The applied answer of `chat.delete`: its 200 schema (src:10193) requires `ok`,
+  # `channel` and `ts`, the deleted Message's MessageRef.
+  - name: connectors_slack.records.MessageDeleted
+    kind: struct
+    fields:
+      - {name: message_ref, type: connectors_slack.records.MessageRef}
+
+  # The refusals Slack answers an edit or a delete with, `200` with `ok` false and one
+  # of these in `error`, each from the error enum the pinned document declares for the
+  # method (chat.update src:11719, chat.delete src:10208), and the code each is
+  # refused with. Each means the message was left as it was. not_found:
+  # message_not_found, channel_not_found (both methods). forbidden:
+  # cant_update_message, edit_window_closed (edit), cant_delete_message,
+  # compliance_exports_prevent_deletion (delete): the token did not post the message,
+  # or the workspace does not allow the act. invalid_input: msg_too_long, no_text
+  # (edit). Every other `ok` false answer is unknown, as for send.
+  - name: connectors_slack.records.MessageRefusal
+    kind: enum
+    variants:
+      - message_not_found
+      - channel_not_found
+      - cant_update_message
+      - edit_window_closed
+      - cant_delete_message
+      - compliance_exports_prevent_deletion
+      - msg_too_long
+      - no_text
+
+  # The outcome of a write, as the catalog engine classifies it. applied: a 2xx
   # answer with `ok` true. refused: nothing was sent (no approval, an input outside
   # the closed body, or the token's `auth.test` read before the write answering `ok`
-  # false), or Slack answered a status the engine reads as a definite refusal.
-  # unknown: anything else after the request was sent, a lost connection, a 5xx, and
-  # Slack's own refusal, which it answers `200` with `ok` false: the engine classifies
-  # by status and reads only `ok`, so such an answer is never recorded as applied,
-  # and Slack's `error` string is not carried. Unknown is never retried.
+  # false), Slack answered a status the engine reads as a definite refusal, or, for
+  # an edit or a delete, Slack answered `ok` false with a MessageRefusal, which is
+  # carried as the reason. unknown: anything else after the request was sent, a lost
+  # connection, a 5xx, and every other refusal Slack answers `200` with `ok` false:
+  # the engine classifies by status and reads only `ok` and the declared refusals,
+  # so such an answer is never recorded as applied, and Slack's `error` string is
+  # not carried. Neither refused nor unknown is retried.
   - name: connectors_slack.records.WriteOutcome
     kind: enum
     variants: [applied, refused, unknown]
@@ -178,8 +255,10 @@ entities:
   # `slack.thread` (fx:151-153, parity:210 `conversations.replies`); found by
   # `slack.search` (parity:213 `search.messages`, fluxplane entity `slack.message`
   # fx:170); written by send, edit and delete (parity:211, parity:217, parity:220).
-  # Send is the catalog selection `chat.postMessage` (MessagePost, MessagePosted);
-  # edit and delete are not selected.
+  # Send is the catalog selection `chat.postMessage` (MessagePost, MessagePosted),
+  # edit `chat.update` (MessageEdit, MessageEdited) and delete `chat.delete`
+  # (MessageDelete, MessageDeleted), those two refused by name with a
+  # MessageRefusal.
   - name: connectors_slack.records.Message
     identity:
       name: message_ref
