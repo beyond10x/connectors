@@ -56,10 +56,11 @@ again with `build`; only an owner that accepts the greeting and then closes on
 the unknown request is identified as an earlier build and refused the same way,
 rather than reported unavailable. Any reply, including a refusal, keeps its own
 code. An owner at its client limit answers `capacity` rather than closing
-without a reply. The CLI never signals, stops or replaces that owner: the
-user stops the running `__connectors-owner` process for the state directory, and
+without a reply. No command replaces that owner by itself: the user runs
+`connectors setup owner-stop` ([Stopping an owner](#stopping-an-owner)), and
 the next admitted command starts one from the current build. The private
-shutdown request stays accepted across builds so a lifecycle harness can stop it.
+shutdown request stays accepted across builds so that command, and a lifecycle
+harness, can stop it.
 The actual socket peer must be the configured UID. No credential, source path,
 keyring tuple or continuation is part of ordinary control JSON. A capture admission
 returns only the profile, acquisition reference and original 300-second expiry.
@@ -135,6 +136,37 @@ provider/custody failures preserve any still-valid baseline. No credential is
 written, no new acquisition is created, and business invocation never performs
 implicit revalidation. A lost publication acknowledgement is outcome_unknown;
 connection status observes the resulting baseline and no request is replayed.
+
+## Stopping an owner
+
+`setup owner-stop` (`connectors.cli.SetupOwnerStopResult`) asks the running
+owner of the selected state directory, of any build, to drain and exit. It is
+the command the `stop_owner` next action names. It reads no configuration file,
+starts no owner and creates nothing, and in this order:
+
+1. A state directory that does not exist has no owner: the result is
+   `disposition = no_owner`, exit 0.
+2. A state directory, owner socket or `owner.lock` of another user is refused
+   as `forbidden` (`stage = stop`, `next_action = check_configuration`).
+3. A state directory with no `owner.lock`, or whose lifetime lock it can take
+   (and releases at once), has no owner either: `disposition = no_owner`, exit 0.
+4. Otherwise it greets the owner on its socket as any command does, the
+   configuration path and the store's authority included, and sends the private
+   shutdown request naming the incarnation that greeting returned. The owner
+   stops its recovery and its supervisor, idle children included, answers and
+   exits; the lifetime lock is released at process exit.
+5. It waits for that lock to be free, and answers `disposition = stopped` with
+   that `host_incarnation`.
+
+The command is bounded by 30 seconds. A lock that stays held while
+no owner answers on the socket within the bound is `unavailable`
+(`stage = stop`, `next_action = retry_explicitly`); an owner that accepted the
+request and still holds the lock at the bound is `timeout` (`stage = stop`,
+`next_action = retry_explicitly`). Every other refusal keeps its own code, as
+`readiness_mismatch` for an owner serving another configuration path. The
+command never signals a process: the owner that exits is the one that proved,
+over the owner-only socket of this state directory and with the user's own peer
+credentials, that it serves this store.
 
 ## macOS
 

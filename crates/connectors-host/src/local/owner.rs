@@ -19,7 +19,9 @@ use std::{
 };
 #[cfg(test)]
 pub(crate) use transport::bound_allocator;
-pub use transport::{Capture, Client, WriteClient, enable_checkpoints, serve};
+pub use transport::{
+    Capture, Client, OwnerStop, WriteClient, enable_checkpoints, serve, stop_owner,
+};
 
 const VERSION: &str = "connectors-owner/1";
 pub type Result<T> = std::result::Result<T, Error>;

@@ -16,6 +16,7 @@ mod checkpoints;
 mod connections;
 mod cursor;
 mod operations;
+mod owner_stop;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
@@ -277,7 +278,7 @@ fn host_failure(error: Failure) -> HandlerReply {
     }
 }
 
-/// Every command but `setup init` and `setup checkpoints-enable` loads the configuration somewhere in this
+/// Every command but `setup init`, `setup checkpoints-enable` and `setup owner-stop` loads the configuration somewhere in this
 /// process: in the handler, a protected source, the dynamic validator or an
 /// owner helper. Those later sites keep the owner's payload-free failure, so a
 /// file refused by a rule that can name its entry is refused here first, before
@@ -288,9 +289,13 @@ fn configuration_preflight(
 ) -> Option<connectors_cli_contract::ProcessOutput> {
     use connectors_cli_contract::OutputMode;
     let (callable, context) = session.selected()?;
-    // Neither reads the configuration: `setup init` writes it, and
-    // `setup checkpoints-enable` acts on the state directory alone.
-    if callable == "setup-init" || callable == "setup-checkpoints-enable" {
+    // None reads the configuration: `setup init` writes it, and
+    // `setup checkpoints-enable` and `setup owner-stop` act on the state
+    // directory alone.
+    if matches!(
+        callable,
+        "setup-init" | "setup-checkpoints-enable" | "setup-owner-stop"
+    ) {
         return None;
     }
     let paths = Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()).ok()?;
@@ -349,6 +354,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     .map_err(host_failure)?;
     if call.callable == "setup-checkpoints-enable" {
         return checkpoints::execute(call, &paths);
+    }
+    if call.callable == "setup-owner-stop" {
+        return owner_stop::execute(&paths);
     }
     if call.callable == "setup-init" {
         let initialized = Config::initialize(&paths).map_err(host_failure)?;

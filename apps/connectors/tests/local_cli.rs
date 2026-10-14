@@ -531,6 +531,176 @@ fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
     assert!(owner.0.wait().unwrap().success());
 }
 
+/// story:owner-stop-after-upgrade: an owner another build started is refused
+/// with `stop_owner`; `setup owner-stop` from this build stops it, the owner
+/// exits cleanly, and a fresh owner of this build then serves the next command.
+#[cfg(unix)]
+#[test]
+fn setup_owner_stop_stops_an_owner_another_build_started_and_a_fresh_owner_serves() {
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let status = ["adapters", "status", "--adapter", "forge"];
+    let older = other_build(&root);
+    let mut owner = start_owner(&older, &root);
+    let refused = command(&root, &status);
+    let error: Value = serde_json::from_slice(&refused.stderr).unwrap();
+    assert_eq!(
+        error["error"]["data"]["code"], "owner_build_mismatch",
+        "{error}"
+    );
+    assert_eq!(error["error"]["data"]["next_action"], "stop_owner");
+    let old_host =
+        success(&command_from(&older, &root, &status))["observation"]["host_incarnation"].clone();
+    assert!(old_host.is_string(), "{old_host}");
+
+    let stopped = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+    assert_eq!(stopped["host_incarnation"], old_host, "{stopped}");
+    assert_eq!(
+        stopped["state_path"].as_str().map(std::path::PathBuf::from),
+        Some(state.clone()),
+        "{stopped}"
+    );
+    let exit = owner_exit(&mut owner, std::time::Duration::from_secs(10))
+        .expect("the stopped owner is still running");
+    assert!(
+        exit.success(),
+        "the owner drained and exited cleanly: {exit}"
+    );
+    assert!(!state.join("owner.sock").exists(), "socket left behind");
+
+    // The lifetime lock is free: this build's owner starts and serves.
+    let _fresh = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    let served = success(&command(&root, &status));
+    assert_ne!(
+        served["observation"]["state"], "owner_unavailable",
+        "{served}"
+    );
+    assert!(served["observation"]["host_incarnation"].is_string());
+    assert_ne!(served["observation"]["host_incarnation"], old_host);
+    let again = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(again["disposition"], "stopped", "{again}");
+    assert_eq!(
+        again["host_incarnation"],
+        served["observation"]["host_incarnation"]
+    );
+}
+
+/// No owner runs: a state directory where none ever started, one where an owner
+/// came and went, and one that does not exist each answer `no_owner`, exit 0,
+/// and nothing is started or created.
+#[cfg(unix)]
+#[test]
+fn setup_owner_stop_without_an_owner_answers_no_owner_and_starts_nothing() {
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let stop = |root: &tempfile::TempDir| {
+        let output = command(root, &["setup", "owner-stop"]);
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        success(&output)
+    };
+    let never = stop(&root);
+    assert_eq!(never["disposition"], "no_owner", "{never}");
+    assert!(never.get("host_incarnation").is_none(), "{never}");
+    assert!(
+        !state.join("owner.lock").exists(),
+        "a lock file was created"
+    );
+    assert!(!state.join("owner.sock").exists(), "an owner was started");
+
+    let mut owner = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    shutdown_owner(&root);
+    owner_exit(&mut owner, std::time::Duration::from_secs(10)).expect("owner still running");
+    assert!(state.join("owner.lock").exists());
+    let gone = stop(&root);
+    assert_eq!(gone["disposition"], "no_owner", "{gone}");
+    assert!(!state.join("owner.sock").exists(), "an owner was started");
+
+    let missing = tempfile::tempdir().unwrap();
+    success(&command(&missing, &["setup", "init"]));
+    fs::remove_dir_all(missing.path().join("state")).unwrap();
+    let absent = stop(&missing);
+    assert_eq!(absent["disposition"], "no_owner", "{absent}");
+    assert!(
+        !missing.path().join("state").exists(),
+        "the state directory was created"
+    );
+}
+
+/// A process that holds the lifetime lock but never answers, with no socket or
+/// with a socket nobody serves, is refused by name at the bound and is never
+/// signalled.
+#[cfg(unix)]
+#[test]
+fn setup_owner_stop_refuses_an_owner_that_does_not_answer_and_never_signals_it() {
+    use std::os::{fd::AsRawFd, unix::fs::OpenOptionsExt};
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let lock = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .mode(0o600)
+        .open(state.join("owner.lock"))
+        .unwrap();
+    unsafe extern "C" {
+        fn flock(fd: i32, operation: i32) -> i32;
+    }
+    // SAFETY: a live descriptor owned by `lock`; LOCK_EX | LOCK_NB.
+    assert_eq!(unsafe { flock(lock.as_raw_fd(), 2 | 4) }, 0);
+    // The holder is a process that is not an owner; it keeps the lock through
+    // its inherited descriptor.
+    let mut holder = OwnerProcess(
+        Command::new("/bin/sleep")
+            .arg("120")
+            .stdout(std::process::Stdio::from(lock))
+            .spawn()
+            .unwrap(),
+    );
+    let stop = || {
+        Command::new(env!("CARGO_BIN_EXE_connectors"))
+            .env("CONNECTORS_TEST_OWNER_STOP_MS", "1500")
+            .args(["--output", "json", "--config"])
+            .arg(root.path().join("config/config.toml"))
+            .arg("--state-dir")
+            .arg(&state)
+            .args(["setup", "owner-stop"])
+            .output()
+            .unwrap()
+    };
+    let refused = |output: Output, case: &str| {
+        assert_eq!(output.status.code(), Some(1), "{case}: {output:?}");
+        assert!(output.stdout.is_empty(), "{case}: {output:?}");
+        let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+        let data = &error["error"]["data"];
+        assert_eq!(
+            (&data["code"], &data["stage"], &data["next_action"]),
+            (
+                &Value::from("unavailable"),
+                &Value::from("stop"),
+                &Value::from("retry_explicitly")
+            ),
+            "{case}: {error}"
+        );
+    };
+    refused(stop(), "no socket");
+    let _silent = std::os::unix::net::UnixListener::bind(state.join("owner.sock")).unwrap();
+    fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
+    refused(stop(), "a socket nobody serves");
+    assert!(
+        holder.0.try_wait().unwrap().is_none(),
+        "the lock holder was signalled"
+    );
+}
+
 /// Config with one adapter whose executable is never launched by `adapters status`.
 #[cfg(unix)]
 fn adversary_owner_root() -> tempfile::TempDir {
