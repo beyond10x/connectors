@@ -553,7 +553,7 @@ types:
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
   - name: connectors.cli.NextAction
     kind: enum
-    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, none]
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4]
@@ -631,6 +631,23 @@ types:
       # by tests.
       - {name: store_version, type: "Optional<String>"}
       - {name: binary_version, type: "Optional<String>"}
+      # ESS-LIMIT: clock_refusal appears only on an approval clock's `unavailable`
+      # (`stage = observation`), naming why no observation resulted
+      # (contracts/service/clock.md, "Refusals"); clock_radius_ms, the source's signed
+      # radius in milliseconds, appears exactly when it is too_imprecise. As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence
+      # rules are enforced by the host and pinned by tests.
+      - {name: clock_refusal, type: "Optional<connectors.cli.ClockRefusal>"}
+      - {name: clock_radius_ms, type: "Optional<Integer>"}
+  # Why an approval clock acquisition produced no observation, each with its own
+  # next action: unreachable (no reply within the query timeout, or a send or receive
+  # error; retry_explicitly), unverified (the reply did not parse or verify against the
+  # configured key and protocol version; check_configuration), too_imprecise (a verified
+  # reply whose signed radius, with the measured delay and timer-rate error, is wider
+  # than the clock contract admits; choose_clock_source).
+  - name: connectors.cli.ClockRefusal
+    kind: enum
+    variants: [unreachable, unverified, too_imprecise]
   # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
   # keyring and persistent_custody_qualification under a platform binding; under the
   # explicitly selected mounted_secret binding, mounted_custody (the configured

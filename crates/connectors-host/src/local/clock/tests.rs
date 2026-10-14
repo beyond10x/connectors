@@ -194,6 +194,70 @@ fn oversized_and_unavailable_peers_refuse() {
     assert!(matches!(c.acquire(), Err(Failure::Unavailable)));
 }
 
+/// A source's reply to one request: `None` never answers, `Ok` answers that
+/// fixture's signed reply, `Err` answers these bytes.
+type SourceReply = Option<std::result::Result<fixture::Fixture, Vec<u8>>>;
+
+#[test]
+fn each_refusal_names_its_cause() {
+    // (configured key, the source's reply, the cause the refusal names)
+    let wrong_nonce = fixture::Fixture {
+        nonce_override: Some([3; 32]),
+        ..Default::default()
+    };
+    let cases: [(Option<[u8; 32]>, SourceReply, Cause); 6] = [
+        (None, None, Cause::Unreachable),
+        (None, Some(Err(vec![0; 2048])), Cause::Unverified),
+        (None, Some(Err(vec![0; 64])), Cause::Unverified),
+        (
+            Some([17; 32]),
+            Some(Ok(fixture::Fixture::default())),
+            Cause::Unverified,
+        ),
+        (None, Some(Ok(wrong_nonce)), Cause::Unverified),
+        (
+            None,
+            Some(Ok(fixture::Fixture {
+                radius: 2,
+                ..Default::default()
+            })),
+            Cause::TooImprecise { radius_ms: 2000 },
+        ),
+    ];
+    for (key, reply, cause) in cases {
+        set_test_query_timeout(Duration::from_millis(500));
+        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let mut c = config(socket.local_addr().unwrap());
+        if let Some(key) = key {
+            c.public_key = STANDARD.encode(key);
+        }
+        let server = std::thread::spawn(move || {
+            let mut b = [0; 1024];
+            let (n, a) = socket.recv_from(&mut b).unwrap();
+            match reply {
+                Some(Ok(fixture)) => drop(socket.send_to(&fixture.reply(&b[..n]), a).unwrap()),
+                Some(Err(bytes)) => drop(socket.send_to(&bytes, a).unwrap()),
+                None => {}
+            }
+            socket
+        });
+        let refused = c.acquire_explained().err();
+        drop(server.join().unwrap());
+        assert_eq!(
+            refused,
+            Some(Refused {
+                failure: Failure::Unavailable,
+                cause: Some(cause)
+            }),
+            "{cause:?}"
+        );
+    }
+    set_test_query_timeout(QUERY_TIMEOUT);
+}
+
 #[test]
 #[ignore = "Explicit public Roughtime network interoperability; no physical clock guarantee"]
 fn independent_live_source() {

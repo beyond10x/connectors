@@ -942,6 +942,43 @@
       }
     },
     {
+      "id": "clock-refusal-unreachable-source",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "observation",
+        "next_action": "retry_explicitly",
+        "clock_refusal": "unreachable"
+      }
+    },
+    {
+      "id": "clock-refusal-too-imprecise-names-the-radius",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "observation",
+        "next_action": "choose_clock_source",
+        "clock_refusal": "too_imprecise",
+        "clock_radius_ms": 5000
+      }
+    },
+    {
+      "id": "clock-refusal-is-a-closed-enum",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "observation",
+        "next_action": "check_configuration",
+        "clock_refusal": "signature verification failed"
+      }
+    },
+    {
       "id": "valid-ConnectionStatusInput-36",
       "type": "connectors.cli.ConnectionStatusInput",
       "valid": true,

@@ -166,6 +166,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -341,6 +358,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -549,6 +567,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -724,6 +759,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -888,6 +924,23 @@
                         "kind": "optional",
                         "of": {
                           "kind": "string"
+                        }
+                      },
+                      "clock_radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "clock_refusal": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "unreachable",
+                            "unverified",
+                            "too_imprecise"
+                          ]
                         }
                       },
                       "code": {
@@ -1065,6 +1118,7 @@
                           "retry_explicitly",
                           "stop_owner",
                           "upgrade",
+                          "choose_clock_source",
                           "none"
                         ]
                       },
@@ -1218,6 +1272,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -1395,6 +1466,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -1570,6 +1642,23 @@
                           "kind": "string"
                         }
                       },
+                      "clock_radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "clock_refusal": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "unreachable",
+                            "unverified",
+                            "too_imprecise"
+                          ]
+                        }
+                      },
                       "code": {
                         "kind": "enum",
                         "variants": [
@@ -1745,6 +1834,7 @@
                           "retry_explicitly",
                           "stop_owner",
                           "upgrade",
+                          "choose_clock_source",
                           "none"
                         ]
                       },
@@ -1898,6 +1988,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -2075,6 +2182,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -2247,6 +2355,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -2422,6 +2547,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -2613,6 +2739,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -2788,6 +2931,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -2993,6 +3137,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3168,6 +3329,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -3373,6 +3535,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3548,6 +3727,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -3753,6 +3933,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3928,6 +4125,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -4133,6 +4331,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -4308,6 +4523,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -4513,6 +4729,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -4688,6 +4921,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -4887,6 +5121,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5062,6 +5313,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -5275,6 +5527,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5450,6 +5719,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -5654,6 +5924,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5829,6 +6116,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -6214,6 +6502,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -6389,6 +6694,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -6627,6 +6933,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -6802,6 +7125,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -7028,6 +7352,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7203,6 +7544,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -7376,6 +7718,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7551,6 +7910,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -7779,6 +8139,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7954,6 +8331,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -8195,6 +8573,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -8370,6 +8765,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -8599,6 +8995,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -8774,6 +9187,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -8956,6 +9370,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -9131,6 +9562,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -9312,6 +9744,7 @@
                       "retry_explicitly",
                       "stop_owner",
                       "upgrade",
+                      "choose_clock_source",
                       "none"
                     ]
                   },
@@ -9430,6 +9863,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -9607,6 +10057,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -9808,6 +10259,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -9983,6 +10451,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -10292,6 +10761,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -10467,6 +10953,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -10683,6 +11170,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -10858,6 +11362,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -11033,6 +11538,7 @@
                       "retry_explicitly",
                       "stop_owner",
                       "upgrade",
+                      "choose_clock_source",
                       "none"
                     ]
                   },
@@ -11069,6 +11575,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -11246,6 +11769,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -11426,6 +11950,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -11601,6 +12142,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -11765,6 +12307,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -12264,6 +12823,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
