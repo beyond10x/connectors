@@ -1,20 +1,44 @@
 //! Grafana binding of the profile `grafana-datasources` (`datasource.records/v1alpha1`;
-//! `spec/ess/domains/records.yaml`, `design.md` beside this adapter). The one operation,
-//! `datasources.list`, is one GET of `/api/datasources` through `AuthenticatedHttp`; the
-//! binding is unpaged and retains nothing between calls.
+//! `spec/ess/domains/records.yaml`, `design.md` beside this adapter). `datasources.list`
+//! is one GET of `/api/datasources` through `AuthenticatedHttp`; the binding is unpaged
+//! and retains nothing between calls.
 //!
 //! Each data source is projected onto its uid, name, plugin type, access mode and default
 //! flag. Grafana's numeric ids, the backend `url`, `user`, `database`, basic-auth members,
 //! `jsonData`, `secureJsonFields` and every other member are never read into a result.
+//!
+//! The IRM reads (`irm.*`, `spec/ess/domains/irm.yaml`) live in [`irm`]; they need the
+//! second port the composition builds for a configured `irm_api_url`.
 pub mod auth;
+mod irm;
+
+pub use irm::{
+    ALERT_GROUP_PAGE, ALERT_GROUPS, INCIDENT_PAGE, INCIDENT_READ_POSTS, INCIDENT_REFS, ONCALL_REF,
+};
 
 use async_trait::async_trait;
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_sdk::{Adapter, AuthenticatedHttp, HttpResponse};
 use serde_json::{Value, json};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-const OPERATIONS: [&str; 1] = ["datasources.list"];
+const OPERATIONS: [&str; 5] = [
+    "datasources.list",
+    "irm.alert_groups.list",
+    "irm.alert_group.get",
+    "irm.incidents.list",
+    "irm.incident.get",
+];
+/// The header that names the stack to the IRM API, fixed by the composition.
+pub const STACK_HEADER: &str = "X-Grafana-URL";
+/// The deadline of one incident read sent as a POST.
+pub const READ_POST_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// The value of [`STACK_HEADER`]: the configured stack URL as IRM's documentation writes
+/// it, without the canonical form's final `/`.
+pub fn stack_header_value(base_url: &str) -> String {
+    base_url.strip_suffix('/').unwrap_or(base_url).to_owned()
+}
 /// `GET /api/datasources`, relative to the configured base URL.
 pub const DATASOURCES: [&str; 2] = ["api", "datasources"];
 
@@ -32,7 +56,11 @@ pub const UID_CHARS: usize = 40;
 pub struct Grafana {
     instance: String,
     descriptor: Descriptor,
+    /// The stack (`base_url`): data sources, and the two incident reads sent as a POST.
     http: Arc<dyn AuthenticatedHttp>,
+    /// The IRM API URL, carrying the stack header; absent without `irm_api_url`, and then
+    /// every `irm.*` read is unavailable.
+    irm: Option<Arc<dyn AuthenticatedHttp>>,
     clock: fn() -> u64,
 }
 
@@ -52,18 +80,28 @@ impl Grafana {
             instance: instance.to_owned(),
             descriptor,
             http,
+            irm: None,
             clock: connectors_sdk::now_ms,
         })
     }
 
-    /// A new immutable HTTP capability for one host-admitted use.
+    /// A new immutable HTTP capability for one host-admitted use. It carries no IRM port;
+    /// [`Self::with_irm`] adds the one composed for the same use.
     pub fn with_authenticated_http(&self, http: Arc<dyn AuthenticatedHttp>) -> Self {
         Self {
             instance: self.instance.clone(),
             descriptor: self.descriptor.clone(),
             http,
+            irm: None,
             clock: self.clock,
         }
+    }
+
+    /// The IRM API port, which the composition built on the configured `irm_api_url` with
+    /// [`STACK_HEADER`] fixed. Without it every `irm.*` read is unavailable.
+    pub fn with_irm(mut self, http: Arc<dyn AuthenticatedHttp>) -> Self {
+        self.irm = Some(http);
+        self
     }
 
     /// For tests: a fixed clock in milliseconds since the Unix epoch.
@@ -139,7 +177,7 @@ fn answer(response: HttpResponse) -> Result<Value> {
     connectors_core::read_json::<Value>(&response.body).map_err(|_| malformed())
 }
 
-fn malformed() -> Error {
+pub(crate) fn malformed() -> Error {
     Error::new(ErrorCode::Unavailable, "malformed Grafana answer")
 }
 
@@ -198,6 +236,10 @@ impl Adapter for Grafana {
         connectors_sdk::validate(self.input_schema(operation)?, &input)?;
         match operation {
             "datasources.list" => self.datasources().await,
+            "irm.alert_groups.list" => self.alert_groups(&input).await,
+            "irm.alert_group.get" => self.alert_group(&input).await,
+            "irm.incidents.list" => self.incidents(&input).await,
+            "irm.incident.get" => self.incident(&input).await,
             _ => Err(Error::new(ErrorCode::NotFound, "operation is not provided")),
         }
     }

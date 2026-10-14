@@ -1,0 +1,160 @@
+domain: connectors_grafana.irm
+summary: Grafana Cloud IRM alert groups, incidents and the alert groups an incident references, read over a since window the caller advances; read only.
+
+# Normative owner: adapters/grafana/design.md (IRM reads) and adapters/grafana/README.md.
+# The executable (adapters/grafana/src/lib.rs) answers `irm.alert_groups.list`,
+# `irm.alert_group.get`, `irm.incidents.list` and `irm.incident.get`, and projects every
+# answer onto these records; tests/ess_model.rs checks what it returns, and the windows it
+# admits, against the schemas this model generates.
+#
+# Alert groups are read from the IRM API URL (`GET api/v1/alert_groups/`, with
+# `X-Grafana-URL` naming the stack); incidents from the stack's IRM plugin resource
+# (`POST api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.QueryIncidents` and
+# `…GetIncident`). Both windows are on creation (alert group: start) time; a later state
+# change is re-read by id.
+types:
+  # The since window of one list call: `[since, until]` in UTC. The caller stores `until`
+  # and passes it back as the next run's `since`; a record created exactly at that instant
+  # can appear in both runs, so the caller deduplicates by id.
+  - name: connectors_grafana.irm.Window
+    kind: struct
+    fields:
+      - {name: since, type: Timestamp}
+      - {name: until, type: Timestamp}
+    invariants:
+      - until > since
+
+  # An IRM public-API identifier (alert group, integration, route, team): IRM's upper-case
+  # alphanumeric ids, admitted in either case, 1–64 characters.
+  - name: connectors_grafana.irm.IrmId
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+
+  # An alert group's state as IRM reports it.
+  - name: connectors_grafana.irm.AlertGroupState
+    kind: enum
+    variants: [new, acknowledged, resolved, silenced]
+
+  # The page cursor of `irm.alert_groups.list`: IRM's next page number, in decimal. It is
+  # only meaningful with the window it was returned for.
+  - name: connectors_grafana.irm.AlertGroupCursor
+    kind: newtype
+    of: String
+    alphabet: "0123456789"
+    invariants:
+      - value.count: {gte: 1, lte: 6}
+
+  # One alert group. Only these members are read from IRM's answer: `permalinks`,
+  # `last_alert` (and its `payload`), `dependent_alert_group_ids`, `acknowledged_by`,
+  # `resolved_by` and every other member stay private. An alert group carries no incident
+  # member; the link is read from the incident (`IncidentAlertGroupLink`).
+  - name: connectors_grafana.irm.AlertGroupRecord
+    kind: struct
+    fields:
+      - {name: id, type: connectors_grafana.irm.IrmId}
+      - {name: integration_id, type: connectors_grafana.irm.IrmId}
+      - {name: route_id, type: "Optional<connectors_grafana.irm.IrmId>"}
+      - {name: alert_group_number, type: "Optional<Integer>"}
+      - {name: alerts_count, type: Integer}
+      - {name: state, type: connectors_grafana.irm.AlertGroupState}
+      - {name: title, type: "Optional<String>"}
+      - {name: created_at, type: Timestamp}
+      - {name: acknowledged_at, type: "Optional<Timestamp>"}
+      - {name: resolved_at, type: "Optional<Timestamp>"}
+      - {name: silenced_at, type: "Optional<Timestamp>"}
+      - {name: root_alert_group_id, type: "Optional<connectors_grafana.irm.IrmId>"}
+    invariants:
+      - alerts_count: {gte: 0}
+      - alert_group_number: {gte: 0}
+      - title.count: {gte: 1, lte: 4096}
+
+  # One page of `irm.alert_groups.list`: at most 100 alert groups (IRM's maximum page
+  # size). `complete` is true on the last page, and then there is no cursor.
+  - name: connectors_grafana.irm.AlertGroupPage
+    kind: struct
+    fields:
+      - {name: items, type: "List<connectors_grafana.irm.AlertGroupRecord>"}
+      - {name: complete, type: Boolean}
+      - {name: next_cursor, type: "Optional<connectors_grafana.irm.AlertGroupCursor>"}
+      - {name: window, type: connectors_grafana.irm.Window}
+    invariants:
+      - items.count: {lte: 100}
+
+  # An incident identifier of the IRM incident service, 1–64 characters.
+  - name: connectors_grafana.irm.IncidentId
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+
+  # An incident's status, the values the incident service accepts.
+  - name: connectors_grafana.irm.IncidentStatus
+    kind: enum
+    variants: [active, resolved]
+
+  # The page cursor of `irm.incidents.list`: the incident service's `cursor.nextValue`,
+  # carried unchanged. It is opaque, and only meaningful with the window it was returned
+  # for.
+  - name: connectors_grafana.irm.IncidentCursor
+    kind: newtype
+    of: String
+    alphabet: '!"#$%&''()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~'
+    invariants:
+      - value.count: {gte: 1, lte: 1024}
+
+  # One incident. Only these members are read: labels, users, roles, tasks, the summary,
+  # the overview URL, chat channels and every other member stay private. `severity` and
+  # `closed_time` are absent when the service answers them empty.
+  - name: connectors_grafana.irm.IncidentRecord
+    kind: struct
+    fields:
+      - {name: incident_id, type: connectors_grafana.irm.IncidentId}
+      - {name: title, type: String}
+      - {name: status, type: connectors_grafana.irm.IncidentStatus}
+      - {name: severity, type: "Optional<String>"}
+      - {name: is_drill, type: Boolean}
+      - {name: created_time, type: Timestamp}
+      - {name: modified_time, type: Timestamp}
+      - {name: closed_time, type: "Optional<Timestamp>"}
+    invariants:
+      - title.count: {gte: 1, lte: 4096}
+      - severity.count: {gte: 1, lte: 64}
+
+  # An incident's reference to an alert group: one `refs[]` entry of the incident whose
+  # `key` is `com.grafana.oncall`, its `ref` read as the alert group's id. That this `ref`
+  # is the alert group's id is inferred (README: Limitations), not confirmed against a real
+  # answer. Identical references yield one link.
+  - name: connectors_grafana.irm.IncidentAlertGroupLink
+    kind: struct
+    fields:
+      - {name: incident_id, type: connectors_grafana.irm.IncidentId}
+      - {name: alert_group_id, type: connectors_grafana.irm.IrmId}
+
+  # One page of `irm.incidents.list`: at most 50 incidents and their links (at most 64
+  # alert-group references per incident). `complete` is true when the service reports no
+  # more, and then there is no cursor.
+  - name: connectors_grafana.irm.IncidentPage
+    kind: struct
+    fields:
+      - {name: items, type: "List<connectors_grafana.irm.IncidentRecord>"}
+      - {name: links, type: "List<connectors_grafana.irm.IncidentAlertGroupLink>"}
+      - {name: complete, type: Boolean}
+      - {name: next_cursor, type: "Optional<connectors_grafana.irm.IncidentCursor>"}
+      - {name: window, type: connectors_grafana.irm.Window}
+    invariants:
+      - items.count: {lte: 50}
+      - links.count: {lte: 3200}
+
+# ESS-LIMIT: the adapter refuses more than this model on three points, and never less
+# (tests/ess_model.rs asserts each). A window bound must be written `YYYY-MM-DDTHH:MM:SSZ`
+# (UTC, whole seconds, IRM's `started_at` format): ESS `Timestamp` admits any offset and
+# fraction, and no operator reads a Timestamp's text. An alert-group cursor is a page
+# number from 1, without a leading zero, which an alphabet and a length cannot say. That a
+# link's `incident_id` names an incident of the same page, that `complete` is true exactly
+# when no cursor is returned, and that `next_cursor` is absent rather than null (the wire
+# form is `null`) are relations between members no invariant can read; the binding's tests
+# assert them. `provenance` is the shared records envelope and is not modelled here.

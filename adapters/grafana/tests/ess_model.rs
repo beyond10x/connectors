@@ -1,7 +1,8 @@
 //! The executable's connection surface and the records it returns against the adapter's
-//! own ESS model (`spec/ess/domains/connection.yaml`, `spec/ess/domains/records.yaml`): the
-//! schemas the pinned `ess` generates from it, and their invariants, accept what the
-//! executable accepts, advertises and returns, and refuse what it refuses.
+//! own ESS model (`spec/ess/domains/connection.yaml`, `spec/ess/domains/records.yaml`,
+//! `spec/ess/domains/irm.yaml`): the schemas the pinned `ess` generates from it, and their
+//! invariants, accept what the executable accepts, advertises and returns, and refuse what
+//! it refuses.
 #![cfg(unix)]
 use connectors_grafana::{Grafana, auth};
 use connectors_host::{
@@ -43,6 +44,43 @@ fn literal(text: &str) -> Value {
     serde_json::from_str(text).unwrap_or_else(|_| panic!("unrecognised literal {text}"))
 }
 
+/// An RFC 3339 date-time as seconds (and nanoseconds) since the epoch, so two `Timestamp`
+/// facts compare as instants whatever their offsets.
+fn instant(text: &str) -> (i64, u32) {
+    let number = |range: std::ops::Range<usize>| -> i64 { text[range].parse().unwrap() };
+    let (year, month, day) = (number(0..4), number(5..7), number(8..10));
+    let (hour, minute, second) = (number(11..13), number(14..16), number(17..19));
+    // Days from 1970-01-01 of a proleptic Gregorian date.
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (month + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    let mut rest = &text[19..];
+    let mut nanos = 0;
+    if let Some(fraction) = rest.strip_prefix('.') {
+        let end = fraction
+            .find(|c: char| !c.is_ascii_digit())
+            .unwrap_or(fraction.len());
+        nanos = format!("{:0<9}", &fraction[..end]).parse().unwrap();
+        rest = &fraction[end..];
+    }
+    let offset = match rest {
+        "Z" | "z" => 0,
+        offset => {
+            let sign = if offset.starts_with('-') { -1 } else { 1 };
+            sign * (offset[1..3].parse::<i64>().unwrap() * 3600
+                + offset[4..6].parse::<i64>().unwrap() * 60)
+        }
+    };
+    (
+        days * 86_400 + hour * 3600 + minute * 60 + second - offset,
+        nanos,
+    )
+}
+
 /// Evaluate one `x-ess-invariants` entry of the forms this model uses. An optional field
 /// that is absent satisfies its invariant, as in ESS. Any other form panics, so a new
 /// invariant cannot pass unchecked.
@@ -59,6 +97,16 @@ fn holds(document: &Value, invariant: &str) -> bool {
             v.as_str()
                 .is_some_and(|s| s.starts_with(literal(right).as_str().unwrap()))
         });
+    }
+    // A fact compared with a sibling fact: two `Timestamp`s, as instants (`until > since`).
+    if let Some((left, right)) = invariant.split_once(" > ")
+        && right.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+    {
+        return match (field(document, left), field(document, right)) {
+            (Some(Value::String(l)), Some(Value::String(r))) => instant(l) > instant(r),
+            (None, _) | (_, None) => true,
+            (l, r) => panic!("{invariant} over {l:?} and {r:?}"),
+        };
     }
     for operator in [" == ", " >= ", " <= "] {
         let Some((left, right)) = invariant.split_once(operator) else {
@@ -79,8 +127,8 @@ fn holds(document: &Value, invariant: &str) -> bool {
         };
         return match operator {
             " == " => actual == expected,
-            " >= " => actual.as_u64().unwrap() >= expected.as_u64().unwrap(),
-            _ => actual.as_u64().unwrap() <= expected.as_u64().unwrap(),
+            " >= " => actual.as_f64().unwrap() >= expected.as_f64().unwrap(),
+            _ => actual.as_f64().unwrap() <= expected.as_f64().unwrap(),
         };
     }
     panic!("unrecognised invariant form: {invariant}")
@@ -192,11 +240,21 @@ fn the_executable_refuses_what_the_model_refuses_and_more_only_at_the_recorded_l
     let base = config("https://grafana.example/");
     let mut with_ca = base.clone();
     with_ca["ca_file"] = json!(ca.to_str().unwrap());
+    let mut with_irm = base.clone();
+    with_irm["irm_api_url"] = json!("https://oncall-prod.example/oncall/");
+    let mut longest_irm = base.clone();
+    longest_irm["irm_api_url"] = json!(format!("https://oncall.example/{}/", "a".repeat(488)));
+    assert_eq!(
+        longest_irm["irm_api_url"].as_str().unwrap().chars().count(),
+        512
+    );
     // Grafana served under a sub-path keeps that prefix.
     let admitted = vec![
         base.clone(),
         with_ca,
         config("https://ops.example/grafana/"),
+        with_irm,
+        longest_irm,
     ];
     for document in &admitted {
         conforms(&schema, document).unwrap_or_else(|e| panic!("{document}: {e}"));
@@ -230,6 +288,18 @@ fn the_executable_refuses_what_the_model_refuses_and_more_only_at_the_recorded_l
         document["ca_file"] = ca_file;
         refused.push(document);
     }
+    // `irm_api_url` is absent or an https URL of at most 512 characters, never null.
+    for irm in [
+        json!(null),
+        json!(""),
+        json!("http://oncall.example/"),
+        json!("HTTPS://oncall.example/"),
+        json!(format!("https://oncall.example/{}/", "a".repeat(489))),
+    ] {
+        let mut document = base.clone();
+        document["irm_api_url"] = irm;
+        refused.push(document);
+    }
     for document in &refused {
         assert!(
             conforms(&schema, document).is_err(),
@@ -255,6 +325,17 @@ fn the_executable_refuses_what_the_model_refuses_and_more_only_at_the_recorded_l
         config("https://user@grafana.example/"),
         config("https://grafana.example/?orgId=1"),
     ];
+    // `irm_api_url` not in its canonical form.
+    for irm in [
+        "https://oncall.example",
+        "https://OnCall.example/",
+        "https://user@oncall.example/",
+        "https://oncall.example/?x=1",
+    ] {
+        let mut document = base.clone();
+        document["irm_api_url"] = json!(irm);
+        limit.push(document);
+    }
     // `ca_file` relative, or absent from disk.
     for ca_file in [
         "ca.pem".to_owned(),
@@ -279,7 +360,9 @@ fn the_advertised_profile_and_its_identity_probe_are_the_modelled_ones() {
     let profile_schema = schema(root.path(), "connection.ServiceAccountProfile");
     let entry_schema = schema(root.path(), "connection.ServiceAccountEntry");
     let bootstrap = bootstrap(root.path(), &config("https://grafana.example/")).expect("bootstrap");
-    assert_eq!(bootstrap.profiles.len(), 1);
+    // story:grafana-irm-history-reads: two profiles, in this order, sharing one entry.
+    let ids: Vec<&str> = bootstrap.profiles.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids, [auth::PROFILE_ID, auth::IRM_PROFILE_ID]);
     let profile = serde_json::to_value(&bootstrap.profiles[0]).unwrap();
     assert!(profile.get("acquisition").is_none());
     let modelled = json!({
@@ -300,13 +383,75 @@ fn the_advertised_profile_and_its_identity_probe_are_the_modelled_ones() {
     });
     conforms(&profile_schema, &modelled).unwrap();
     assert_eq!(profile["id"], auth::PROFILE_ID);
-    // Every operation needs exactly this profile and no scope.
+
+    // The IRM profile: the same entry and kind of token, proved by the IRM probe.
+    let irm_schema = schema(root.path(), "connection.IrmServiceAccountProfile");
+    let irm = serde_json::to_value(&bootstrap.profiles[1]).unwrap();
+    assert!(irm.get("acquisition").is_none());
+    assert_eq!(irm["fields"], profile["fields"]);
+    let irm_modelled = json!({
+        "id": irm["id"],
+        "scheme": irm["scheme"],
+        "capability": irm["capability"],
+        "purpose": irm["purpose"],
+        "subject": irm["subject"],
+        "minimum_scopes": irm["minimum_scopes"],
+        "evidence_lifetime_ms": irm["evidence_lifetime_ms"],
+        "entry": "connectors_grafana.connection.ServiceAccountEntry",
+        "identity": {
+            "method": "GET",
+            "path": auth::IRM_PROBE_PATH.join("/"),
+            "query": auth::IRM_PROBE_QUERY
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect::<Vec<_>>()
+                .join("&"),
+            "header": connectors_grafana::STACK_HEADER,
+            "source": "configuration",
+            "kind": auth::IDENTITY_KIND,
+        },
+    });
+    conforms(&irm_schema, &irm_modelled).unwrap();
+    // Neither profile model admits the other's id or probe.
+    let with = |document: &Value, member: &str, value: Value| {
+        let mut document = document.clone();
+        document[member] = value;
+        document
+    };
+    assert!(conforms(&profile_schema, &with(&modelled, "id", irm["id"].clone())).is_err());
     assert!(
-        bootstrap
-            .requirements
-            .iter()
-            .all(|r| r.profile == auth::PROFILE_ID && r.scopes.is_empty())
+        conforms(
+            &irm_schema,
+            &with(&irm_modelled, "id", profile["id"].clone())
+        )
+        .is_err()
     );
+    assert!(
+        conforms(
+            &profile_schema,
+            &with(&modelled, "identity", irm_modelled["identity"].clone())
+        )
+        .is_err()
+    );
+
+    // `datasources.list` needs the data-source profile, every IRM read the IRM profile;
+    // none needs a scope.
+    let required: Vec<(&str, &str)> = bootstrap
+        .requirements
+        .iter()
+        .map(|r| (r.operation.as_str(), r.profile.as_str()))
+        .collect();
+    assert_eq!(
+        required,
+        [
+            ("datasources.list", auth::PROFILE_ID),
+            ("irm.alert_groups.list", auth::IRM_PROFILE_ID),
+            ("irm.alert_group.get", auth::IRM_PROFILE_ID),
+            ("irm.incidents.list", auth::IRM_PROFILE_ID),
+            ("irm.incident.get", auth::IRM_PROFILE_ID),
+        ]
+    );
+    assert!(bootstrap.requirements.iter().all(|r| r.scopes.is_empty()));
 
     // The entry fields are the modelled entry's members, with its bound.
     let entry = &entry_schema["$defs"]["connectors_grafana.connection.ServiceAccountEntry"];
@@ -433,6 +578,295 @@ async fn every_returned_record_and_the_list_are_the_modelled_ones() {
         assert!(
             conforms(&record_schema, &record).is_err(),
             "model admits {record}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// story:grafana-irm-history-reads: the IRM records and windows against `irm.yaml`.
+
+/// The library's answer to one IRM read whose provider answers `answer` once. Both the
+/// stack and the IRM port reach the one fixture server.
+async fn irm_read(
+    operation: &str,
+    input: Value,
+    answer: Vec<u8>,
+) -> connectors_core::Result<Value> {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}/", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        let Ok((mut socket, _)) = listener.accept().await else {
+            return;
+        };
+        let mut head = Vec::new();
+        while !head.ends_with(b"\r\n\r\n") {
+            head.push(socket.read_u8().await.unwrap());
+        }
+        let head = String::from_utf8(head).unwrap();
+        let length: usize = head
+            .lines()
+            .filter_map(|l| l.split_once(':'))
+            .find(|(n, _)| n.eq_ignore_ascii_case("content-length"))
+            .map(|(_, v)| v.trim().parse().unwrap())
+            .unwrap_or(0);
+        let mut body = vec![0; length];
+        socket.read_exact(&mut body).await.unwrap();
+        let status = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            answer.len()
+        );
+        socket.write_all(status.as_bytes()).await.unwrap();
+        socket.write_all(&answer).await.unwrap();
+    });
+    let port = || {
+        ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: base.clone(),
+                credential: None,
+                credential_header: "authorization".into(),
+                bearer: true,
+                allow_plaintext: true,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap()
+    };
+    let stack = port()
+        .with_read_posts(
+            &connectors_grafana::INCIDENT_READ_POSTS,
+            connectors_grafana::READ_POST_TIMEOUT,
+        )
+        .unwrap();
+    let irm = port()
+        .with_fixed_header(
+            connectors_grafana::STACK_HEADER,
+            &connectors_grafana::stack_header_value(&base),
+        )
+        .unwrap();
+    let effective = json!({"format": "connectors-grafana-local/1", "instance": "g",
+        "base_url": base, "ca_digest": null, "irm_api_url": base});
+    Grafana::new("g", &effective, Arc::new(stack))
+        .unwrap()
+        .with_irm(Arc::new(irm))
+        .invoke(operation, input)
+        .await
+}
+
+fn irm_fixture(name: &str) -> Vec<u8> {
+    fs::read(format!(
+        "{}/tests/fixtures/{name}",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap()
+}
+
+fn window() -> Value {
+    json!({"since": "2026-01-01T00:00:00Z", "until": "2026-01-02T00:00:00Z"})
+}
+
+/// A page as the model reads it: the shared envelope's `provenance` is not modelled, and
+/// a null cursor is the model's absent one (ESS-LIMIT in irm.yaml).
+fn modelled_page(out: &Value) -> Value {
+    let mut page = out.clone();
+    let object = page.as_object_mut().unwrap();
+    object.remove("provenance");
+    if object["next_cursor"].is_null() {
+        object.remove("next_cursor");
+    }
+    page
+}
+
+#[tokio::test]
+async fn alert_group_records_carry_only_the_modelled_members() {
+    let root = tempfile::tempdir().unwrap();
+    let record_schema = schema(root.path(), "irm.AlertGroupRecord");
+    let page_schema = schema(root.path(), "irm.AlertGroupPage");
+    // The recorded pages, and the widest page the binding admits: 100 groups at the
+    // model's id and title edges with every optional member present.
+    let edge = |i: usize| {
+        json!({"id": format!("{i:0>64}"), "integration_id": "C".repeat(64),
+            "route_id": "R".repeat(64), "alerts_count": 0, "state": "silenced",
+            "created_at": "2026-01-01T00:00:00.123456789+14:00", "alert_group_number": i,
+            "resolved_at": "2026-01-01T00:00:01Z", "acknowledged_at": "2026-01-01T00:00:02Z",
+            "silenced_at": "2026-01-01T00:00:03Z", "root_alert_group_id": "I1",
+            "title": if i == 0 { "\u{2603}".repeat(4096) } else { "t".to_owned() },
+            "permalinks": {"web": "https://stack.example/"},
+            "last_alert": {"payload": {"message": "fixture-private"}}})
+    };
+    let widest = serde_json::to_vec(&json!({"count": 100, "next": null,
+        "results": (0..100).map(edge).collect::<Vec<_>>()}))
+    .unwrap();
+    for answer in [
+        irm_fixture("alert_groups_page1.json"),
+        irm_fixture("alert_groups_page2.json"),
+        widest,
+    ] {
+        let out = irm_read("irm.alert_groups.list", window(), answer)
+            .await
+            .unwrap();
+        for record in out["items"].as_array().unwrap() {
+            conforms(&record_schema, record).unwrap_or_else(|e| panic!("{record}: {e}"));
+        }
+        conforms(&page_schema, &modelled_page(&out)).unwrap_or_else(|e| panic!("page: {e}"));
+    }
+    // One read by id is the same record.
+    let page: Value = serde_json::from_slice(&irm_fixture("alert_groups_page1.json")).unwrap();
+    let one = irm_read(
+        "irm.alert_group.get",
+        json!({"alert_group_id": "I68T24C13IFW1"}),
+        serde_json::to_vec(&page["results"][0]).unwrap(),
+    )
+    .await
+    .unwrap();
+    conforms(&record_schema, &one["item"]).unwrap();
+    // The members the binding never returns are outside the model, as are the values it
+    // refuses (tests/protocol.rs: alert_group_projection_keeps_the_modelled_members_and_refuses_others_whole).
+    let base = json!({"id": "I1", "integration_id": "C1", "alerts_count": 1,
+        "state": "new", "created_at": "2026-01-01T00:00:00Z"});
+    conforms(&record_schema, &base).unwrap();
+    for (member, value) in [
+        ("permalinks", json!({"web": "https://stack.example/"})),
+        ("last_alert", json!({"payload": {}})),
+        ("dependent_alert_group_ids", json!([])),
+        ("resolved_by", json!("U1")),
+        ("route_id", json!(null)),
+        ("state", json!("firing")),
+        ("id", json!("a/b")),
+        ("id", json!("I".repeat(65))),
+        ("alerts_count", json!(-1)),
+        ("title", json!("")),
+        ("title", json!("t".repeat(4097))),
+    ] {
+        let mut record = base.clone();
+        record[member] = value;
+        assert!(
+            conforms(&record_schema, &record).is_err(),
+            "model admits {record}"
+        );
+    }
+    let mut over = json!({"items": vec![base.clone(); 101], "complete": true,
+        "window": window()});
+    assert!(conforms(&page_schema, &over).is_err());
+    over["items"] = json!(vec![base; 100]);
+    conforms(&page_schema, &over).unwrap();
+}
+
+#[tokio::test]
+async fn incident_records_and_links_are_the_modelled_ones() {
+    let root = tempfile::tempdir().unwrap();
+    let record_schema = schema(root.path(), "irm.IncidentRecord");
+    let link_schema = schema(root.path(), "irm.IncidentAlertGroupLink");
+    let page_schema = schema(root.path(), "irm.IncidentPage");
+    for answer in [
+        irm_fixture("incidents_page1.json"),
+        irm_fixture("incidents_page2.json"),
+    ] {
+        let out = irm_read("irm.incidents.list", window(), answer)
+            .await
+            .unwrap();
+        for record in out["items"].as_array().unwrap() {
+            conforms(&record_schema, record).unwrap_or_else(|e| panic!("{record}: {e}"));
+        }
+        for link in out["links"].as_array().unwrap() {
+            conforms(&link_schema, link).unwrap_or_else(|e| panic!("{link}: {e}"));
+        }
+        conforms(&page_schema, &modelled_page(&out)).unwrap_or_else(|e| panic!("page: {e}"));
+    }
+    let one = irm_read(
+        "irm.incident.get",
+        json!({"incident_id": "incident-101"}),
+        irm_fixture("incident.json"),
+    )
+    .await
+    .unwrap();
+    conforms(&record_schema, &one["item"]).unwrap();
+    let base = json!({"incident_id": "incident-1", "title": "t", "status": "active",
+        "is_drill": false, "created_time": "2026-01-01T00:00:00Z",
+        "modified_time": "2026-01-01T00:00:00Z"});
+    conforms(&record_schema, &base).unwrap();
+    for (member, value) in [
+        ("labels", json!([])),
+        ("summary", json!("s")),
+        ("refs", json!([])),
+        ("severity", json!("")),
+        ("severity", json!("s".repeat(65))),
+        ("closed_time", json!(null)),
+        ("status", json!("investigating")),
+        ("incident_id", json!("a/b")),
+        ("title", json!("")),
+    ] {
+        let mut record = base.clone();
+        record[member] = value;
+        assert!(
+            conforms(&record_schema, &record).is_err(),
+            "model admits {record}"
+        );
+    }
+    for link in [
+        json!({"incident_id": "incident-1", "alert_group_id": "abc/123"}),
+        json!({"incident_id": "incident-1", "alert_group_id": ""}),
+        json!({"incident_id": "incident-1", "alert_group_id": "I1", "url": "https://x.example/"}),
+    ] {
+        assert!(
+            conforms(&link_schema, &link).is_err(),
+            "model admits {link}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn the_window_the_binding_admits_is_inside_the_model() {
+    let root = tempfile::tempdir().unwrap();
+    let window_schema = schema(root.path(), "irm.Window");
+    let page = irm_fixture("alert_groups_page2.json");
+    let at = |since: &str, until: &str| json!({"since": since, "until": until});
+    // Admitted by both.
+    for admitted in [
+        window(),
+        at("2026-01-01T00:00:00Z", "2026-01-01T00:00:01Z"),
+        at("2028-02-29T23:59:59Z", "2028-03-01T00:00:00Z"),
+    ] {
+        conforms(&window_schema, &admitted).unwrap_or_else(|e| panic!("{admitted}: {e}"));
+        irm_read("irm.alert_groups.list", admitted.clone(), page.clone())
+            .await
+            .unwrap_or_else(|e| panic!("{admitted}: {e:?}"));
+    }
+    // Refused by both: an empty or reversed window.
+    for refused in [
+        at("2026-01-02T00:00:00Z", "2026-01-02T00:00:00Z"),
+        at("2026-01-02T00:00:01Z", "2026-01-02T00:00:00Z"),
+        json!({"since": "2026-01-01T00:00:00Z"}),
+    ] {
+        assert!(
+            conforms(&window_schema, &refused).is_err(),
+            "model admits {refused}"
+        );
+        let error = irm_read("irm.alert_groups.list", refused.clone(), page.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.code,
+            connectors_core::ErrorCode::InvalidInput,
+            "{refused}"
+        );
+    }
+    // The ESS-LIMIT, asserted: only the binding refuses an offset or a fraction, which
+    // the model's `Timestamp` admits. Never the other way round.
+    for limit in [
+        at("2026-01-01T00:00:00+01:00", "2026-01-02T00:00:00Z"),
+        at("2026-01-01T00:00:00.5Z", "2026-01-02T00:00:00Z"),
+        at("2026-01-01T00:00:00Z", "2026-01-02T00:00:00-00:00"),
+    ] {
+        conforms(&window_schema, &limit).unwrap_or_else(|e| panic!("{limit}: {e}"));
+        let error = irm_read("irm.alert_groups.list", limit.clone(), page.clone())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.code,
+            connectors_core::ErrorCode::InvalidInput,
+            "{limit}"
         );
     }
 }

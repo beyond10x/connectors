@@ -1,11 +1,11 @@
 domain: connectors_grafana.connection
-summary: The Grafana local connection — its native configuration, the `grafana.service_account` profile and the configured identity probe that proves a service-account token.
+summary: The Grafana local connection — its native configuration, the `grafana.service_account` and `grafana.irm_service_account` profiles and the configured identity probes that prove a service-account token.
 
 # Normative owner: adapters/grafana/design.md (Authentication and configuration) and
 # adapters/grafana/README.md. The executable composition (adapters/grafana/src/local.rs)
 # reads `LocalConfiguration` from its owner-only file and advertises exactly one
-# `ServiceAccountProfile`; tests/ess_model.rs checks both against the schemas this model
-# generates.
+# `ServiceAccountProfile` and one `IrmServiceAccountProfile`; tests/ess_model.rs checks
+# them against the schemas this model generates.
 types:
   # A connection instance id: the host's identifier alphabet, 1–128 characters.
   - name: connectors_grafana.connection.InstanceId
@@ -19,7 +19,13 @@ types:
   # `base_url` is the Grafana HTTPS origin, optionally with the path prefix Grafana is served
   # under (its `root_url` sub-path), written in its canonical form; `ca_file`, when present,
   # is an absolute path to an owner-only PEM bundle that replaces the system roots for this
-  # connection (absent, never null).
+  # connection (absent, never null). `irm_api_url`, when present, is the stack's IRM API URL
+  # (Grafana IRM settings), written like `base_url`; IRM alert groups are read from it, and
+  # without it every `irm.*` operation is unavailable. A configuration without it keeps the
+  # configuration revision it had before the member existed. The CA, when given, applies to
+  # both URLs. The provider authority the stored token is bound to is not modelled here (the
+  # host's binding owns it); the composition derives it from base_url and, when present,
+  # irm_api_url, so a changed IRM URL is a changed authority (adapters/grafana/design.md).
   - name: connectors_grafana.connection.LocalConfiguration
     kind: struct
     fields:
@@ -27,11 +33,14 @@ types:
       - {name: instance, type: connectors_grafana.connection.InstanceId}
       - {name: base_url, type: String}
       - {name: ca_file, type: "Optional<String>"}
+      - {name: irm_api_url, type: "Optional<String>"}
     invariants:
       - format == "connectors-grafana-local/1"
       - base_url.count: {gte: 8, lte: 512}
       - base_url: {starts_with: "https://"}
       - ca_file.count: {gte: 1, lte: 4096}
+      - irm_api_url.count: {gte: 8, lte: 512}
+      - irm_api_url: {starts_with: "https://"}
 
   # A service-account token: 1–8,192 visible ASCII characters (0x21–0x7E), so no space,
   # control or non-ASCII character.
@@ -72,9 +81,9 @@ types:
       - path == "api/datasources"
       - kind == "grafana.connection"
 
-  # The one authentication profile the executable advertises: a static bearer token of a
-  # Grafana service account, entered once through the host's protected entry. Grafana's
-  # role and permissions decide what the token reaches, so `minimum_scopes` is empty, and
+  # The profile `datasources.list` requires: a static bearer token of a Grafana service
+  # account, entered once through the host's protected entry. Grafana's role and
+  # permissions decide what the token reaches, so `minimum_scopes` is empty, and
   # validation evidence lasts 60 seconds.
   - name: connectors_grafana.connection.ServiceAccountProfile
     kind: struct
@@ -98,11 +107,59 @@ types:
       - evidence_lifetime_ms == 60000
       - entry == "connectors_grafana.connection.ServiceAccountEntry"
 
+  # The IRM identity probe: one GET of `path` with `query` relative to `irm_api_url`,
+  # carrying `X-Grafana-URL` (`header`) with the configured stack URL. The window is fixed
+  # and one second long, so the answer is at most one alert group and is not read. 200
+  # admits the token; 401 and 403 refuse it as invalid; 429 and 5xx are unavailable;
+  # anything else is a protocol failure. Without `irm_api_url` the probe is not sent and
+  # the profile is unavailable.
+  - name: connectors_grafana.connection.IrmIdentityProbe
+    kind: struct
+    fields:
+      - {name: method, type: String}
+      - {name: path, type: String}
+      - {name: query, type: String}
+      - {name: header, type: String}
+      - {name: source, type: connectors_grafana.connection.IdentitySource}
+      - {name: kind, type: String}
+    invariants:
+      - method == "GET"
+      - path == "api/v1/alert_groups/"
+      - query == "started_at=2000-01-01T00:00:00_2000-01-01T00:00:01&perpage=1"
+      - header == "X-Grafana-URL"
+      - kind == "grafana.connection"
+
+  # The profile every `irm.*` operation requires: the same kind of service-account token
+  # and entry as `grafana.service_account`, proved against IRM instead of the data-source
+  # read, so a token whose role grants IRM reads and no data-source read connects. A
+  # connection keeps the profile it was made with.
+  - name: connectors_grafana.connection.IrmServiceAccountProfile
+    kind: struct
+    fields:
+      - {name: id, type: String}
+      - {name: scheme, type: String}
+      - {name: capability, type: String}
+      - {name: purpose, type: String}
+      - {name: subject, type: String}
+      - {name: minimum_scopes, type: "List<String>"}
+      - {name: evidence_lifetime_ms, type: Integer}
+      - {name: entry, type: String}
+      - {name: identity, type: connectors_grafana.connection.IrmIdentityProbe}
+    invariants:
+      - id == "grafana.irm_service_account"
+      - scheme == "http_bearer"
+      - capability == "http-bearer"
+      - purpose == "service_account"
+      - subject == "app"
+      - minimum_scopes.count == 0
+      - evidence_lifetime_ms == 60000
+      - entry == "connectors_grafana.connection.ServiceAccountEntry"
+
 # ESS-LIMIT: these are checked by the composition, not expressible as invariants here, and
 # the composition only ever refuses more than the model on them (tests/ess_model.rs asserts
-# each): that `ca_file` names an existing absolute owner-only file; that `base_url` is
-# already its own canonical form (WHATWG URL serialization: lowercase scheme and host, a
-# path ending in `/`, no credentials, query or fragment); and that the subject equals the
-# sibling `instance`. `alphabet:` is carried into the generated schemas as
+# each): that `ca_file` names an existing absolute owner-only file; that `base_url` and
+# `irm_api_url` are already their own canonical form (WHATWG URL serialization: lowercase
+# scheme and host, a path ending in `/`, no credentials, query or fragment); and that the
+# subject equals the sibling `instance`. `alphabet:` is carried into the generated schemas as
 # `x-ess-alphabet`, not as a JSON Schema keyword, so a JSON Schema validator alone does not
 # enforce it.
