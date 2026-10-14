@@ -21,7 +21,7 @@ use std::path::Path;
 /// parameters this pass does not expand, each sent as one value as given: 34
 /// `page` parameters that also accept an offset page number, and one nested
 /// `filter`; no shipped read is among them.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 11] = [
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 12] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
@@ -79,6 +79,13 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 11] = [
         0,
     ),
     (
+        "opsgenie",
+        "../opsgenie/generated/opsgenie.openapi.json",
+        Some("../opsgenie/upstream/swagger.json"),
+        "opsgenie.api-key",
+        OPSGENIE_UNSUPPORTED,
+    ),
+    (
         "runpod",
         "../runpod/upstream/runpod-rest-v1.json",
         None,
@@ -101,10 +108,20 @@ const SOURCES: [(&str, &str, Option<&str>, &str, usize); 11] = [
     ),
 ];
 
+/// Opsgenie's 76 gaps: 71 operations the Swagger projection lists unprojected
+/// (64 writes whose request body has no media type, the attachment upload's
+/// `formData` file, and six policy operations whose `teamId` query parameter
+/// is written with a `schema`), and five array query parameters declared
+/// `explode: false` (`expand` on three schedule and user reads, `keys` and
+/// `tags` on two alert writes), each sent as one value as given. No shipped
+/// read is among them.
+const OPSGENIE_UNSUPPORTED: usize = 76;
+
 /// The cited amendments applied to a provider's pinned source, relative to this
 /// crate. A provider absent here is built from its source as written.
-const AMENDMENTS: [(&str, &str); 3] = [
+const AMENDMENTS: [(&str, &str); 4] = [
     ("gitlab", "../gitlab/upstream/openapi_v3.amendments.json"),
+    ("opsgenie", "../opsgenie/upstream/opsgenie.amendments.json"),
     ("slack", "../slack/upstream/slack-web.amendments.json"),
     (
         "zendesk",

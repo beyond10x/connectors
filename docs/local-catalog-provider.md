@@ -54,16 +54,29 @@ is one of:
   a form media type, such as GitLab's commit create, which the pinned document
   declares `multipart/form-data`. `to` can only be `application/json`, the one
   body the engine sends, so the correction makes the bundle say what the engine
-  already does. The method, path and parameters stay as declared.
+  already does. The method, path and parameters stay as declared;
+- `add_operation`: `{"method": "get", "path": "<path>", "parameters": [...]}`,
+  a read the vendor's reference documents and the pinned document leaves out
+  altogether, such as Opsgenie's
+  `GET /v1/incidents/{identifier}/associated-alert-ids`. `operation_id` names
+  the new operation. Each parameter is written like an added parameter, with
+  `location` `path` or `query`; the path parameters must be exactly the
+  path's `{...}` placeholders, each `required: true`. The operation declares no
+  body and no response, and the engine reads its answer as JSON.
 
 The file must carry the source's SHA-256. An operation that is missing or
 declared twice, an entry with more than one change or none, a citation that is
 not https or a blank reason, a parameter the operation already declares or
 anything other than an optional, unrepeated query parameter, a path correction
 whose `from` is not the operation's current path or whose `to` equals `from` or
-is not derived from it that way, and a media type correction for an operation
+is not derived from it that way, a media type correction for an operation
 that does not declare exactly one request media type, whose `from` is not that
-one or whose `to` is not `application/json` are each refused before any bundle
+one or whose `to` is not `application/json`, and an added operation whose
+method is not `get`, whose `operation_id` the source already declares, whose
+path a GET of the source already has, does not start with `/` or holds a
+parenthesised group, query or fragment, whose path parameters are not exactly
+its placeholders, required and unrepeated, or which declares a header or cookie
+parameter or one parameter twice are each refused before any bundle
 is written, and nothing is applied. The bundle's source record then names the file and its
 SHA-256 (`crates/connectors-catalog/src/amendment.rs`; the format is modelled as
 `connectors_catalog.amendment` in `adapters/catalog/spec/ess`). Zendesk uses it
@@ -71,9 +84,10 @@ for the ticket export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-an
 GitLab for the project search path ([Project code search](#project-code-search))
 and for the JSON bodies of commit create, file update and project create
 ([Pipeline, commit, branch and project writes](#pipeline-commit-branch-and-project-writes)),
-and Slack for the JSON bodies of `chat.postMessage`, `conversations.open`,
+Slack for the JSON bodies of `chat.postMessage`, `conversations.open`,
 `chat.update` and `chat.delete`
-([Slack guide](catalog-slack.md#source-and-bundle)).
+([Slack guide](catalog-slack.md#source-and-bundle)), and Opsgenie to add the
+incident-to-alert link ([Opsgenie guide](catalog-opsgenie.md#source-and-bundle)).
 The GitLab build passes it:
 
 ```sh
@@ -94,8 +108,9 @@ in [the Jira guide](catalog-jira.md), Confluence Cloud in
 [the Confluence guide](catalog-confluence.md), HubSpot CRM in
 [the HubSpot guide](catalog-hubspot.md), Zendesk Support in
 [the Zendesk guide](catalog-zendesk.md), Runpod pods in
-[the Runpod guide](catalog-runpod.md) and Slack conversations and messages in
-[the Slack guide](catalog-slack.md). The GitLab set,
+[the Runpod guide](catalog-runpod.md), Slack conversations and messages in
+[the Slack guide](catalog-slack.md) and Opsgenie alerts and incidents in
+[the Opsgenie guide](catalog-opsgenie.md). The GitLab set,
 [operations.json](../adapters/catalog/providers/gitlab/operations.json), exposes
 every operation the retired native GitLab adapter exposed, so one configuration
 serves the provider from the pinned source alone, plus eleven repository reads
@@ -299,6 +314,10 @@ CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-ca
 sha256sum target/release/connectors-catalog-provider
 ```
 
+Release archives after 0.50.0 carry both binaries for each target
+([install a release binary](../README.md#install-a-release-binary)); with one installed, use its
+`connectors` and `connectors-catalog-provider` wherever this guide names `target/release/…`.
+
 ```json
 {
   "format": "connectors-catalog-local/2",
@@ -328,7 +347,13 @@ The complete configuration used against the sandbox is
   granted scopes, and the scopes the profile requires. The token itself enters
   through the usual protected entry and custody; the file never holds it.
 - `auth.scheme` is `token` when omitted: the protected entry is `{"token":"..."}`
-  and travels in `header`, prefixed `Bearer ` when `bearer` is true. `basic` is
+  and travels in `header`, prefixed `Bearer ` when `bearer` is true. A token
+  profile may instead name another scheme word in `prefix`, 1 to 32 visible
+  ASCII bytes without a space: the token then travels as `<prefix> <token>`,
+  such as Opsgenie's `Authorization: GenieKey <key>`
+  ([Opsgenie guide](catalog-opsgenie.md#authentication)). `prefix` beside
+  `"bearer": true` or under another scheme is refused at load; omitted, existing
+  configuration revisions hold. `basic` is
   HTTP basic for providers whose API tokens are used with an account name: the
   protected entry is `{"account":"...","token":"..."}` and every request carries
   `Authorization: Basic base64(account:token)`. A basic profile must state

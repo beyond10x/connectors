@@ -27,6 +27,7 @@ mod ignored;
 mod metadata_conformance;
 mod metadata_entities;
 mod platform_gated;
+mod release_binaries;
 mod source_hashes;
 mod upstream_redaction;
 
@@ -65,6 +66,9 @@ enum Action {
     },
     /// Check shared ESS ownership and compile shared and adapter semantic models.
     EssBoundary,
+    /// Check that every binary a guide runs as an installed command is one the release
+    /// workflow's `BINARIES` list packages, and that the list names workspace binaries.
+    ReleaseBinaries,
     /// Re-derive every recorded upstream source digest from its archived bytes, and
     /// check every redacted upstream source against its record and its rule.
     SourceHashes,
@@ -125,7 +129,7 @@ enum Action {
         out: PathBuf,
     },
     /// Project a pinned Swagger 2.0 document into OpenAPI 3.1.0 under
-    /// `swagger2-openapi/1`, and write its projection record beside it as
+    /// `swagger2-openapi/2`, and write its projection record beside it as
     /// `<name>.projection.json`. Deterministic; never touches the network.
     Swagger {
         #[arg(long)]
@@ -200,6 +204,9 @@ fn execute(args: Args) -> Result<()> {
     }
     if let Action::Redact { input, output } = &args.command {
         return upstream_redaction::write(input, output);
+    }
+    if let Action::ReleaseBinaries = args.command {
+        return release_binaries::run(&root);
     }
     if let Action::SourceHashes = args.command {
         source_hashes::run(&root)?;
@@ -493,9 +500,10 @@ fn swagger(root: &Path, source: &Path, out: &Path) -> Result<()> {
     let (document, record) =
         write_projection(root, out, &projection.openapi, &projection.record_bytes())?;
     println!(
-        "swagger: {} operations, {} projected; wrote {} and {}",
+        "swagger: {} operations, {} projected, {} unprojected; wrote {} and {}",
         projection.record.operation_count,
         projection.record.operations.len(),
+        projection.record.unprojected_operations.len(),
         document.display(),
         record.display()
     );

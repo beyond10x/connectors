@@ -11,9 +11,11 @@ summary: A `connectors-source-amendments/1` file, the cited corrections the bund
 # reason, a path correction whose `from` is not the operation's path as the source declares it
 # or whose `to` is not `from` with each parenthesised optional segment either removed or kept
 # without its parentheses, and a media type correction whose `from` is not the one request media
-# type the operation declares, or that names an operation declaring none or several. ESS 0.57 has
-# no string-prefix, string-derivation or cross-document constraint to state those by. Nothing is
-# applied when any amendment is refused.
+# type the operation declares, or that names an operation declaring none or several; and an added
+# operation whose `operation_id` the source already declares, whose path another GET of the source
+# already has, whose path parameters are not exactly the placeholders of its path, or which
+# declares a parameter twice. ESS 0.59 has no string-derivation or cross-document constraint to
+# state those by. Nothing is applied when any amendment is refused.
 
 types:
   # The one place an added parameter may travel.
@@ -73,8 +75,56 @@ types:
       - from.count >= 1
       - {to: application/json}
 
-  # One cited amendment: exactly one of `add_parameter`, `correct_path` and `correct_media_type`,
-  # the vendor page that documents it (https) and why the pinned document needs it, in a sentence.
+  # The one method an added operation may have: a read.
+  - name: connectors_catalog.amendment.ReadMethod
+    kind: enum
+    variants: [get]
+
+  # Where a parameter of an added operation travels: its path or its query, never a header, a
+  # cookie or a body.
+  - name: connectors_catalog.amendment.OperationLocation
+    kind: enum
+    variants: [path, query]
+
+  # One parameter of an added operation. A path parameter is required and unrepeated; the
+  # pipeline also refuses one the path template does not name, a placeholder no path parameter
+  # declares and a name declared twice in one location.
+  - name: connectors_catalog.amendment.OperationParameter
+    kind: struct
+    fields:
+      - {name: name, type: String}
+      - {name: location, type: connectors_catalog.amendment.OperationLocation}
+      - {name: required, type: Boolean}
+      - {name: type, type: "Optional<connectors_catalog.amendment.ValueType>"}
+      - {name: repeated, type: "Optional<Boolean>"}
+    invariants:
+      - name.count >= 1
+      - any: [{not: {location: path}}, {required: true}]
+      - any: [{not: {location: path}}, {not: defined(repeated)}, {repeated: false}]
+
+  # A read the vendor's reference documents and its published document leaves out, such as
+  # Opsgenie's `GET /v1/incidents/{identifier}/associated-alert-ids`. The amendment's
+  # `operation_id` names it and must be one the source does not declare; its path must start
+  # with `/`, carry no parenthesised notation, query or fragment, and differ from every path the
+  # source declares for a GET, so it adds a read and never shadows or retargets one. It declares
+  # no request body and no response: the engine reads its 2xx answer as JSON, as it reads any
+  # operation that declares none. The engine still checks, when a selection loads, that the
+  # path lies under the configured base path, like every other operation of the bundle.
+  - name: connectors_catalog.amendment.AddedOperation
+    kind: struct
+    fields:
+      - {name: method, type: connectors_catalog.amendment.ReadMethod}
+      - {name: path, type: String}
+      - {name: parameters, type: "List<connectors_catalog.amendment.OperationParameter>"}
+    invariants:
+      - {path: {starts_with: "/"}}
+      - {not: {path: {contains: "("}}}
+      - {not: {path: {contains: "?"}}}
+      - {not: {path: {contains: "#"}}}
+
+  # One cited amendment: exactly one of `add_parameter`, `correct_path`, `correct_media_type` and
+  # `add_operation`, the vendor page that documents it (https) and why the pinned document needs
+  # it, in a sentence.
   - name: connectors_catalog.amendment.Amendment
     kind: struct
     fields:
@@ -82,16 +132,20 @@ types:
       - {name: add_parameter, type: "Optional<connectors_catalog.amendment.AddedParameter>"}
       - {name: correct_path, type: "Optional<connectors_catalog.amendment.PathCorrection>"}
       - {name: correct_media_type, type: "Optional<connectors_catalog.amendment.MediaTypeCorrection>"}
+      - {name: add_operation, type: "Optional<connectors_catalog.amendment.AddedOperation>"}
       - {name: cite, type: String}
       - {name: reason, type: String}
     invariants:
       - operation_id.count >= 1
       - cite.count >= 1
       - reason.count >= 1
-      - any: [defined(add_parameter), defined(correct_path), defined(correct_media_type)]
+      - any: [defined(add_parameter), defined(correct_path), defined(correct_media_type), defined(add_operation)]
       - any: [{not: defined(add_parameter)}, {not: defined(correct_path)}]
       - any: [{not: defined(add_parameter)}, {not: defined(correct_media_type)}]
       - any: [{not: defined(correct_path)}, {not: defined(correct_media_type)}]
+      - any: [{not: defined(add_operation)}, {not: defined(add_parameter)}]
+      - any: [{not: defined(add_operation)}, {not: defined(correct_path)}]
+      - any: [{not: defined(add_operation)}, {not: defined(correct_media_type)}]
 
   # The file: its format, the SHA-256 of the pinned source it is written against, and at least one
   # amendment.
