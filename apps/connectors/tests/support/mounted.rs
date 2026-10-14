@@ -19,7 +19,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
     io::Write,
-    os::unix::fs::{MetadataExt, PermissionsExt, symlink},
+    os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt, symlink},
     path::{Path, PathBuf},
     process::{Output, Stdio},
 };
@@ -57,7 +57,7 @@ fn profile(id: &str, acquisition: Option<runtime::Acquisition>) -> runtime::Prof
         scheme: "http_bearer".into(),
         capability: "http-bearer".into(),
         minimum_scopes: BTreeSet::new(),
-        evidence_lifetime_ms: 3_600_000,
+        evidence_lifetime_ms: 60_000,
         fields: vec![runtime::EntryField {
             name: "token".into(),
             label: "Token".into(),
@@ -148,7 +148,7 @@ impl runtime::Adapter for Fixture {
             granted_scopes: None,
             credential_expires_at_ms: None,
             collected_at_ms: now,
-            valid_until_ms: now + 3_600_000,
+            valid_until_ms: now + 50_000,
         })
     }
     async fn invoke(
@@ -180,6 +180,13 @@ pub struct Container {
 impl Container {
     /// `test_binary_filter` is the fixture test that serves the adapter.
     pub fn new(adapter_fixture: &str) -> Self {
+        // The child refuses a description outside the protocol's bounds and
+        // closes its channel unanswered, with its stderr discarded: the CLI
+        // then reports only `unavailable` at `readiness`. Hold the description
+        // to the child's own check here, where the failure names itself.
+        bootstrap()
+            .validate_for(runtime::PrivateProtocol::V1)
+            .expect("the fixture adapter's description passes the child's own readiness check");
         let mut jail = Jail::new();
         jail.directory("/srv", 0o755);
         jail.directory("/srv/connectors", 0o700);
@@ -291,6 +298,11 @@ impl Container {
                         .into_encoded_bytes()
                 } else if meta.is_dir() {
                     pending.push(path.clone());
+                    Vec::new()
+                } else if meta.file_type().is_socket() {
+                    // The owner's live socket (`owner.sock`) cannot be
+                    // opened and holds no stored bytes; its mode still
+                    // compares.
                     Vec::new()
                 } else {
                     fs::read(&path).unwrap()
