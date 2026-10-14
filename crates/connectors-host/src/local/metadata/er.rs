@@ -1,7 +1,8 @@
 use super::{
     APPROVAL_KEYS_MIGRATION, APPROVAL_MIGRATION, APPROVAL_POLICY_MIGRATION, AUDIT_MIGRATION,
-    Failure, MIGRATION as BASE_MIGRATION, MUTATION_MIGRATION, REGISTRY_MIGRATION, Release,
-    RUNTIME_MIGRATION, Result, WAIT_BOUND, migration_digest as base_migration_digest, unavailable,
+    Failure, MIGRATION as BASE_MIGRATION, MUTATION_MIGRATION, REGISTRY_MIGRATION,
+    RUNTIME_MIGRATION, Release, Result, WAIT_BOUND, migration_digest as base_migration_digest,
+    unavailable,
 };
 use entity_core::{CoreError, EntityDefinition, EntityInstance, OperationFieldAction, Registry};
 use entity_eventlog::{
@@ -857,8 +858,13 @@ fn writer_action(
         ]),
     };
     let Some(current) = baseline.get(&(WRITER_ENTITY.to_owned(), WRITER_ID.to_owned())) else {
-        return create_action(registry, commands, &next, "connectors.cli.RecordStoreWriter")
-            .map(Some);
+        return create_action(
+            registry,
+            commands,
+            &next,
+            "connectors.cli.RecordStoreWriter",
+        )
+        .map(Some);
     };
     match recorded_writer(baseline)? {
         Some((release, _)) if release < own => {
@@ -898,7 +904,12 @@ pub(super) fn record_writer_for_tests(er: &ErAuthority, version: &str, digest: &
     };
     let key = (WRITER_ENTITY.to_owned(), WRITER_ID.to_owned());
     let action = match er.baseline.get(&key) {
-        None => create_action(&registry, &commands, &next, "connectors.cli.RecordStoreWriter")?,
+        None => create_action(
+            &registry,
+            &commands,
+            &next,
+            "connectors.cli.RecordStoreWriter",
+        )?,
         Some(current) => {
             next.revision = current.revision + 1;
             command_action(
@@ -4677,6 +4688,33 @@ mod tests {
             optional;
         definition["create"]["outcomes"][0]["set"]["newer_field"] =
             json!("$args.input.newer_field");
+        registry_of(&bundle)
+    }
+
+    /// The definitions a newer binary would persist with one entity kind this
+    /// binary does not know: `connectors.cli.FutureRecord`, shaped as the
+    /// writer marker but its own kind.
+    fn future_registry() -> Registry {
+        let mut bundle: Value =
+            serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).unwrap();
+        let definitions = bundle["definitions"].as_array_mut().unwrap();
+        let mut future = definitions
+            .iter()
+            .find(|entry| entry["name"] == WRITER_ENTITY)
+            .unwrap()
+            .clone();
+        future["name"] = json!(FUTURE_ENTITY);
+        let definition = &mut future["definition"];
+        definition["entity"] = json!(FUTURE_ENTITY);
+        definition["operations"] = json!({});
+        definition["create"]["outcomes"][0]["emits"] = json!([]);
+        definitions.push(future);
+        registry_of(&bundle)
+    }
+
+    const FUTURE_ENTITY: &str = "connectors.cli.FutureRecord";
+
+    fn registry_of(bundle: &Value) -> Registry {
         let mut registry = Registry::new();
         for entry in bundle["definitions"].as_array().unwrap() {
             registry
@@ -4685,6 +4723,78 @@ mod tests {
         }
         registry.validate_all().unwrap();
         registry
+    }
+
+    /// A newer binary's handle on the store at `path`, persisting `registry`.
+    fn newer_facade(path: &Path, registry: Registry) -> RecordedProviderFacade {
+        let (logical_scope, tenant, stream_identity): (String, String, String) =
+            Connection::open(path.join("metadata.sqlite3"))
+                .unwrap()
+                .query_row(
+                    "SELECT logical_scope,tenant,stream_identity FROM connectors_er_authority",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .unwrap();
+        RecordedProviderFacade::start_with_read_policy(
+            registry,
+            EventlogRecordedStoreOwner::Sqlite {
+                path: utf8_path(&path.join("metadata.sqlite3")).unwrap(),
+                prefix: PREFIX.into(),
+                authority: Authority {
+                    logical_scope,
+                    tenant,
+                    stream_identity,
+                },
+                limits: LIMITS,
+            },
+            bridge_config(),
+            CapturePolicy::ProviderTracked,
+        )
+        .unwrap()
+    }
+
+    /// A newer binary recorded a record of an entity kind this binary's model
+    /// does not declare, with its marker in the same batch, as every binary
+    /// that has the marker writes. The Entity Runtime replay does not refuse
+    /// the unknown kind, so the marker check runs first: every open, read and
+    /// write alike, is refused as `metadata_schema_newer` naming the newer
+    /// release, never `metadata_unavailable`.
+    #[test]
+    fn a_record_of_an_entity_kind_this_model_does_not_declare_is_a_newer_store() {
+        use crate::local::metadata::Metadata;
+        const OTHER_MODEL: &str =
+            "0000000000000000000000000000000000000000000000000000000000000000";
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        crate::local::filesystem::directory(&path, true, true).unwrap();
+        drop(Metadata::initialize(&path).unwrap());
+        let state = crate::local::runtime::state::State::new(&path);
+        state.suppress("fixture", false).unwrap();
+        Metadata::record_writer_for_tests(&path, "999.0.0", OTHER_MODEL).unwrap();
+        let newer = newer_facade(&path, future_registry());
+        newer
+            .execute_batch(
+                context("newer-binary"),
+                BatchKey::Named(format!("newer-binary-{}", uuid::Uuid::new_v4())),
+                vec![BatchAction::Create(CreateRequest {
+                    subject: Subject::new(FUTURE_ENTITY, "s:future").unwrap(),
+                    definition_version: 1,
+                    fields: json!({"input": {"store": "future", "binary_version": "999.0.0",
+                        "model_digest": OTHER_MODEL}, "bound": {}}),
+                    recording: recording("newer-binary").unwrap(),
+                })],
+                call_wait(),
+            )
+            .unwrap();
+        drop(newer);
+        let refused = Some(Failure::MetadataSchemaNewer(Some(Release {
+            major: 999,
+            minor: 0,
+            patch: 0,
+        })));
+        assert_eq!(Metadata::inspect(&path).err(), refused);
+        assert_eq!(state.suppress("fixture", true).err(), refused);
     }
 
     /// The reproduction's failing write: a newer binary recorded a runtime
@@ -4700,31 +4810,7 @@ mod tests {
         drop(crate::local::metadata::Metadata::initialize(&path).unwrap());
         let state = crate::local::runtime::state::State::new(&path);
         state.suppress("fixture", false).unwrap();
-        let (logical_scope, tenant, stream_identity): (String, String, String) =
-            Connection::open(path.join("metadata.sqlite3"))
-                .unwrap()
-                .query_row(
-                    "SELECT logical_scope,tenant,stream_identity FROM connectors_er_authority",
-                    [],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-                )
-                .unwrap();
-        let newer = RecordedProviderFacade::start_with_read_policy(
-            newer_registry(),
-            EventlogRecordedStoreOwner::Sqlite {
-                path: utf8_path(&path.join("metadata.sqlite3")).unwrap(),
-                prefix: PREFIX.into(),
-                authority: Authority {
-                    logical_scope,
-                    tenant,
-                    stream_identity,
-                },
-                limits: LIMITS,
-            },
-            bridge_config(),
-            CapturePolicy::ProviderTracked,
-        )
-        .unwrap();
+        let newer = newer_facade(&path, newer_registry());
         newer
             .execute_batch(
                 context("newer-binary"),
@@ -4757,11 +4843,17 @@ mod tests {
             ))
         };
         assert_eq!(
-            refused("fields.build_version", "field is not declared in the schema"),
+            refused(
+                "fields.build_version",
+                "field is not declared in the schema"
+            ),
             Failure::MetadataSchemaNewer(None)
         );
         assert_eq!(
-            refused("arguments.input.bogus", "field is not declared in the schema"),
+            refused(
+                "arguments.input.bogus",
+                "field is not declared in the schema"
+            ),
             Failure::MetadataUnavailable
         );
         assert_eq!(
