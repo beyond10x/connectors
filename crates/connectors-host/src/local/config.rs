@@ -125,13 +125,81 @@ impl Rule {
 
 /// The `[custody]` table of a `connectors-local/4` configuration
 /// (`connectors.cli.LocalCustodyBinding`): the binding, and the mounted
-/// directory exactly when the binding is `mounted_secret`.
+/// directory exactly when the binding is `mounted_secret`. Either half-table
+/// (`mounted_secret` without a directory, a platform binding with one) is
+/// refused while decoding, so no value of this type stands for it.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(try_from = "CustodyTable", into = "CustodyTable")]
+pub enum Custody {
+    /// A platform binding, selected explicitly.
+    Platform(PlatformBinding),
+    /// The read-only mounted binding and its directory.
+    Mounted { directory: PathBuf },
+}
+
+/// A platform custody binding: every `connectors.cli.CustodyBackend` except
+/// the read-only `mounted_secret`, which has no platform fallback.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlatformBinding {
+    SecretService,
+    MacosKeychain,
+    WindowsCredentialManager,
+}
+
+impl From<PlatformBinding> for CustodyBinding {
+    fn from(binding: PlatformBinding) -> Self {
+        match binding {
+            PlatformBinding::SecretService => Self::SecretService,
+            PlatformBinding::MacosKeychain => Self::MacosKeychain,
+            PlatformBinding::WindowsCredentialManager => Self::WindowsCredentialManager,
+        }
+    }
+}
+
+/// The `[custody]` table as written.
+#[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct Custody {
-    pub binding: CustodyBinding,
+struct CustodyTable {
+    binding: CustodyBinding,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub directory: Option<PathBuf>,
+    directory: Option<PathBuf>,
+}
+
+impl TryFrom<CustodyTable> for Custody {
+    type Error = &'static str;
+    fn try_from(table: CustodyTable) -> std::result::Result<Self, Self::Error> {
+        match (table.binding, table.directory) {
+            (CustodyBinding::MountedSecret, Some(directory)) => Ok(Self::Mounted { directory }),
+            (CustodyBinding::MountedSecret, None) => {
+                Err("the mounted_secret binding names its directory")
+            }
+            (CustodyBinding::SecretService, None) => {
+                Ok(Self::Platform(PlatformBinding::SecretService))
+            }
+            (CustodyBinding::MacosKeychain, None) => {
+                Ok(Self::Platform(PlatformBinding::MacosKeychain))
+            }
+            (CustodyBinding::WindowsCredentialManager, None) => {
+                Ok(Self::Platform(PlatformBinding::WindowsCredentialManager))
+            }
+            (_, Some(_)) => Err("only the mounted_secret binding names a directory"),
+        }
+    }
+}
+
+impl From<Custody> for CustodyTable {
+    fn from(custody: Custody) -> Self {
+        match custody {
+            Custody::Platform(binding) => Self {
+                binding: binding.into(),
+                directory: None,
+            },
+            Custody::Mounted { directory } => Self {
+                binding: CustodyBinding::MountedSecret,
+                directory: Some(directory),
+            },
+        }
+    }
 }
 
 /// `connectors.cli.CustodyBackend`, as a configuration names it.
@@ -369,13 +437,10 @@ impl Config {
     /// the platform binding, exactly as before `connectors-local/4`.
     pub fn selection(&self) -> Selection {
         match &self.custody {
-            Some(Custody {
-                binding: CustodyBinding::MountedSecret,
-                directory: Some(directory),
-            }) => Selection::Mounted {
+            Some(Custody::Mounted { directory }) => Selection::Mounted {
                 directory: directory.clone(),
             },
-            _ => Selection::Platform {
+            None | Some(Custody::Platform(_)) => Selection::Platform {
                 secret_service_socket: self.secret_service_socket.clone(),
             },
         }
@@ -386,20 +451,20 @@ impl Config {
     /// directory is named exactly for `mounted_secret`, which never sits beside
     /// a Secret Service socket.
     fn check_custody(&self, custody: &Custody) -> std::result::Result<(), Refusal> {
-        let mounted = custody.binding == CustodyBinding::MountedSecret;
-        let supported = if mounted {
-            cfg!(target_os = "linux")
-        } else {
-            connectors_custody::PLATFORM == Some(custody.binding.backend())
+        let (supported, directory) = match custody {
+            Custody::Mounted { directory } => (
+                cfg!(target_os = "linux") && self.secret_service_socket.is_none(),
+                Some(directory),
+            ),
+            Custody::Platform(binding) => (
+                connectors_custody::PLATFORM == Some(CustodyBinding::from(*binding).backend()),
+                None,
+            ),
         };
-        if self.format != "connectors-local/4"
-            || !supported
-            || mounted != custody.directory.is_some()
-            || (mounted && self.secret_service_socket.is_some())
-        {
+        if self.format != "connectors-local/4" || !supported {
             return Err(Failure::InvalidConfiguration.into());
         }
-        if let Some(directory) = &custody.directory {
+        if let Some(directory) = directory {
             fs::validate_path(directory)?;
         }
         Ok(())
@@ -863,5 +928,30 @@ mod consumer_tests {
                 instance_id: "fixture-instance".into(),
             })
         );
+    }
+}
+
+#[cfg(test)]
+mod custody_tests {
+    //! story:mounted-secret-custody: a `[custody]` table names the mounted
+    //! directory exactly for `mounted_secret`. Neither half-table decodes, so
+    //! no configuration can carry a mounted binding without its directory and
+    //! fall back to the platform binding.
+    use super::*;
+
+    #[test]
+    fn a_mounted_binding_without_its_directory_does_not_decode() {
+        assert!(toml::from_str::<Custody>("binding = 'mounted_secret'").is_err());
+        assert!(
+            toml::from_str::<Custody>("binding = 'secret_service'\ndirectory = '/srv/custody'")
+                .is_err()
+        );
+        let mounted: Custody =
+            toml::from_str("binding = 'mounted_secret'\ndirectory = '/srv/custody'").unwrap();
+        let platform: Custody = toml::from_str("binding = 'secret_service'").unwrap();
+        for custody in [mounted, platform] {
+            let text = toml::to_string(&custody).unwrap();
+            assert_eq!(toml::from_str::<Custody>(&text).unwrap(), custody, "{text}");
+        }
     }
 }

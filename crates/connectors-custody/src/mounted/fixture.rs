@@ -154,8 +154,39 @@ impl Jail {
         command
     }
 
-    /// Why a jailed child failed to start, naming the kernel prerequisite.
+    /// Run `command`, a jailed command, to completion and collect its output.
+    ///
+    /// A binary just copied in by [`Jail::install`] can be briefly busy: while
+    /// one thread's copy holds it open for writing, a child another thread
+    /// forks inherits that descriptor until its own exec, and executing the
+    /// copy meanwhile fails with `ETXTBSY`. That window closes when the other
+    /// child execs or exits, so a busy binary is retried within a bound; any
+    /// other failure, or a binary busy past the bound, panics naming its cause.
+    pub fn output(command: &mut Command) -> std::process::Output {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            match command.output() {
+                Ok(output) => return output,
+                Err(error)
+                    if error.raw_os_error() == Some(libc::ETXTBSY)
+                        && std::time::Instant::now() < deadline =>
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(error) => panic!("{}", Self::spawn_error(&error)),
+            }
+        }
+    }
+
+    /// Why a jailed child failed to start: a busy binary as itself, anything
+    /// else naming the kernel prerequisite.
     pub fn spawn_error(error: &std::io::Error) -> String {
+        if error.raw_os_error() == Some(libc::ETXTBSY) {
+            return format!(
+                "the jailed binary stayed busy (ETXTBSY) past the retry bound ({error}): \
+                 a concurrent writer still holds the copy open"
+            );
+        }
         format!(
             "a jailed child could not enter its user and mount namespaces ({error}): \
              these tests need unprivileged user namespaces with capabilities \

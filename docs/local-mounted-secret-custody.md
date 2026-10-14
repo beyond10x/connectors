@@ -49,7 +49,8 @@ An item is named by public, owner-configured coordinates only: `<adapter alias>/
 such as `tavily/tavily.api-key`. Both are selectors (`[A-Za-z0-9._-]{1,128}`, never `.` or
 `..`). The item holds the credential document the profile's protected file source accepts,
 at most 64 KiB. One item backs one connection: a second `connections connect` for the same
-alias and profile is `custody_read_only` while the first is not revoked.
+alias and profile is `custody_read_only` while the first is not revoked, also when two
+connects run at once: the rule is checked in the commit that publishes the connection.
 
 Two layouts are admitted, and the binding tells them apart by the presence of `..data`:
 
@@ -63,7 +64,9 @@ Two layouts are admitted, and the binding tells them apart by the presence of `.
 ## Checks
 
 Every open is `openat` from an already admitted descriptor with `O_NOFOLLOW`, and every
-check runs on the opened descriptor:
+check runs on the opened descriptor. The item itself is first opened with `O_PATH`, which
+reads nothing, so whatever stands at its name (a device node or a FIFO included) is never
+opened for reading before checks 5 and 6 admit it:
 
 1. Every directory above `directory` is owned by root or the effective user and is not
    group- or other-writable.
@@ -83,7 +86,10 @@ check runs on the opened descriptor:
    pod with `fsGroup`, as `0440 root:<fsGroup>`.
 6. The item's filesystem is mounted read-only (`ST_RDONLY`): a writable filesystem is
    refused even when every mode bit is right.
-7. The item is read once from the checked descriptor and bounded before use.
+7. Only then is that same inode opened for reading, through its `/proc/self/fd` entry
+   rather than by name again, and refused unless it is the inode the checks ran on. It is
+   read once and bounded before use. The binding therefore needs `/proc` mounted, as it is
+   in every container.
 
 A missing directory, an item that fails a check or a mount that is not read-only answers
 `custody_unavailable`. Nothing retries against another binding. Failures carry neither the
@@ -95,7 +101,8 @@ Custody versions are immutable, but a mounted item can be replaced underneath Co
 The binding therefore pins every version it publishes: an HMAC-SHA-256 of the validated
 bytes under a random 32-byte key, both kept owner-only in `custody-mounted/` in the state
 directory. A pin is not the credential; a leaked metadata store alone does not allow
-offline guessing of a weak password.
+offline guessing of a weak password, but a copy of the whole state directory, key and pins
+together, does (see the threat model).
 
 A read re-reads the item and returns its bytes only while they match the pin. Otherwise
 the read is refused with `custody_unavailable` and `next_action = revalidate_connection`,
@@ -112,7 +119,8 @@ provider and publishes it as a new version.
 | `connections revalidate` | Re-reads the item; changed bytes are validated and published as a new version, unchanged bytes refresh the evidence as before. |
 | `connections revoke` | Metadata only, as on every binding. The mounted item is untouched; delete or rotate the Secret as well. |
 | An OAuth-acquired (refresh-rotating) profile | `custody_read_only` at `custody`, before any provider exchange. |
-| `approvals key-init`, `key-rotate`, `key-recover` | `custody_read_only`: approval-signing seeds are not mounted. |
+| `approvals key-init`, `key-rotate`, `key-recover`, `key-retire` | `custody_read_only`: approval-signing seeds are not mounted. |
+| Signing an approval | `custody_read_only` before any custody is opened; the platform keyring is never reached in its place. |
 | A write, confirm or delete of a version | Not compiled: the binding implements only the read capability. |
 
 `custody_read_only` (exit 1, `stage = custody`, `next_action = check_configuration`) is
@@ -133,6 +141,8 @@ The adversary is anyone other than the configured owner user, plus a careless op
 | Who else on the host can read | Any process of the same user that can reach the unlocked collection; root. | Root on the node; whoever can read the Secret through the Kubernetes API or exec into the pod; with group read, every process in the pod holding the `fsGroup`. Not other users on the node. |
 | Same-user process | Can call the Secret Service for the same items. | Can read the file directly. The same promise boundary. |
 | Tampering or substitution | Item attributes are scoped and verified; the writer refuses an existing version. | Read-only mount, no write bits, root or owner ownership, and `..data` resolved only to a root- or owner-owned sibling. A substituted item is caught by the pin: until a revalidation re-pins it, reads of the old version are refused. |
+| Writes to the item | Connectors writes the version it stores. | None, ever: the binding has no write, confirm or delete, and opens the item only to read it. |
+| A copy of the state directory | Holds metadata only; the material is in the keyring. | The pin key and the pin records share the owner-only `custody-mounted/` subdirectory of the state directory. A copy of the whole state directory therefore holds both, which permits offline guessing of a weak mounted credential against its pins. Keep the state directory owner-only, as Connectors requires, and out of backups and images; a metadata store copied without `custody-mounted/` permits no such guessing. |
 | Symbolic links | Every storage component is admitted without symbolic links. | `O_NOFOLLOW` everywhere; the single admitted indirection is `..data` to one `..`-prefixed sibling. |
 | Rotation | Connectors writes a new immutable version. | The platform replaces the item; Connectors re-pins on `revalidate` and never follows silently. |
 | Revocation | The version is retired; its material is retained for in-flight reads. | Connectors stops using the item. The operator must also delete or rotate the Secret. |

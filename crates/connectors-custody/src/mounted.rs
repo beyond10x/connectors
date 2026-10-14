@@ -735,8 +735,11 @@ fn read_item(directory: &Path, item: &Item, identity: &Identity) -> Result<Mater
         libc::O_RDONLY | libc::O_DIRECTORY,
     )?;
     trusted_directory(&alias, identity)?;
-    let file = open_at(&alias, OsStr::new(&item.profile), libc::O_RDONLY)?;
-    let stat = file.metadata().map_err(|_| Failure::Unavailable)?;
+    // Check 5 runs on a descriptor that cannot read: whatever stands at the
+    // item's name, a device node or a FIFO included, is not opened for reading
+    // until that exact inode is admitted.
+    let held = open_at(&alias, OsStr::new(&item.profile), libc::O_PATH)?;
+    let stat = held.metadata().map_err(|_| Failure::Unavailable)?;
     admits(
         &ItemStat {
             regular: stat.is_file(),
@@ -748,14 +751,42 @@ fn read_item(directory: &Path, item: &Item, identity: &Identity) -> Result<Mater
         },
         identity,
     )?;
-    if !read_only(&file) {
+    if !read_only(&held) {
         return Err(Failure::Unavailable);
     }
+    let file = reopen_for_reading(&held, &stat)?;
     let bytes = bounded(file, MAX_BYTES)?;
     if bytes.is_empty() {
         return Err(Failure::Unavailable);
     }
     Ok(Material::from_slice(&bytes))
+}
+
+/// Open the inode `held` (an `O_PATH` descriptor already admitted) for
+/// reading, through its `/proc/self/fd` entry rather than by name again, so
+/// nothing swapped in at the name since is opened. The reopened descriptor
+/// must be the same inode the checks ran on.
+fn reopen_for_reading(held: &File, admitted: &std::fs::Metadata) -> Result<File> {
+    let path = CString::new(format!("/proc/self/fd/{}", held.as_raw_fd()))
+        .map_err(|_| Failure::Unavailable)?;
+    // SAFETY: path is NUL-terminated and live; ownership of a new descriptor
+    // passes to File.
+    let fd = unsafe {
+        libc::open(
+            path.as_ptr(),
+            libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOCTTY | libc::O_NONBLOCK,
+        )
+    };
+    if fd < 0 {
+        return Err(Failure::Unavailable);
+    }
+    // SAFETY: open returned a new, owned descriptor.
+    let file = unsafe { File::from_raw_fd(fd) };
+    let reopened = file.metadata().map_err(|_| Failure::Unavailable)?;
+    if (reopened.dev(), reopened.ino()) != (admitted.dev(), admitted.ino()) || !reopened.is_file() {
+        return Err(Failure::Unavailable);
+    }
+    Ok(file)
 }
 
 /// An owner-only regular file with one link, owned by the effective user.
