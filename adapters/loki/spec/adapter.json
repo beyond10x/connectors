@@ -77,6 +77,10 @@
         "type": "string",
         "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
       },
+      "matched_key": {
+        "type": "string",
+        "pattern": "^([A-Za-z][A-Za-z0-9_]{0,127}|_|_[A-Za-z0-9][A-Za-z0-9_]{0,126})$"
+      },
       "profile_name": {
         "type": "string",
         "pattern": "^[a-z0-9_.-]{1,64}$"
@@ -277,9 +281,7 @@
                     "type": "object",
                     "properties": {
                       "key": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 128
+                        "$ref": "#/$defs/matched_key"
                       },
                       "format": {
                         "$ref": "#/$defs/line_format"
@@ -782,7 +784,7 @@
     },
     {
       "id": "logs.profile_lines",
-      "description": "Read the lines a configured line profile selects in a window and answer one typed record per line: the profile's declared fields, masked as declared (phone numbers by default), and its call identifier. The caller names the profile and may match exact values of the fields it declares filterable; it passes no LogQL. One GET /loki/api/v1/query_range, oldest first; unpaged, at most limit lines.",
+      "description": "Read the lines a configured line profile selects in a window and answer one typed record per line: the profile's declared fields, masked as declared (phone numbers by default), and its call identifier. The caller names the profile and may match exact values of the fields it declares filterable, each an exact filter on the parsed field, never a substring; it passes no LogQL. One GET /loki/api/v1/query_range, oldest first; unpaged, at most limit lines.",
       "contract": "datasource.logs/v1alpha1",
       "profile": "loki-line-profile",
       "input_schema": {
@@ -870,14 +872,10 @@
             "properties": {
               "unreadable": {
                 "type": "integer"
-              },
-              "unmatched": {
-                "type": "integer"
               }
             },
             "required": [
-              "unreadable",
-              "unmatched"
+              "unreadable"
             ],
             "additionalProperties": false
           },
@@ -1069,9 +1067,6 @@
               "additionalProperties": false
             }
           },
-          "excluded": {
-            "type": "integer"
-          },
           "selection": {
             "type": "object",
             "properties": {
@@ -1165,7 +1160,6 @@
           "profile",
           "call_id",
           "lines",
-          "excluded",
           "selection",
           "order",
           "complete",

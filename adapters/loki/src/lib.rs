@@ -822,19 +822,18 @@ impl Loki {
             .await?;
         let observation = observe(&result, start, end, false, limit)?;
         let mut records = Vec::new();
-        let (mut unreadable, mut unmatched) = (0_usize, 0_usize);
+        let mut unreadable = 0_usize;
         let (mut bytes, mut response_dropped) = (0_usize, 0_usize);
         for occurrence in &observation.occurrences {
+            // A line not holding every matched value exactly is not the caller's
+            // to know about: dropped, counted nowhere (§12.2).
             let record = match profile.read(occurrence.line, &matches) {
-                Err(()) => {
+                profile::Read::Unreadable => {
                     unreadable += 1;
                     continue;
                 }
-                Ok(None) => {
-                    unmatched += 1;
-                    continue;
-                }
-                Ok(Some(record)) => record,
+                profile::Read::Unmatched => continue,
+                profile::Read::Record(record) => record,
             };
             if response_dropped > 0 {
                 response_dropped += 1;
@@ -857,7 +856,7 @@ impl Loki {
         Ok(json!({
             "profile": profile.name,
             "records": records,
-            "skipped": {"unreadable": unreadable, "unmatched": unmatched},
+            "skipped": {"unreadable": unreadable},
             "selection": {
                 "kind": "loki-profile",
                 "start_unix_ns": start.to_string(),
@@ -902,11 +901,11 @@ impl Loki {
             sources.push(source);
         }
         let mut lines = Vec::new();
-        let mut excluded = 0_usize;
         let (mut bytes, mut response_dropped, mut clipped) = (0_usize, 0_usize, false);
         for occurrence in &observation.occurrences {
+            // A line that is not this call's on the adapter's own reading is
+            // dropped and counted nowhere: no answer tells of another call (§12.3).
             if !profile.carries(occurrence.line, &call_id) {
-                excluded += 1;
                 continue;
             }
             if response_dropped > 0 {
@@ -934,7 +933,6 @@ impl Loki {
             "profile": profile.name,
             "call_id": call_id,
             "lines": lines,
-            "excluded": excluded,
             "selection": {
                 "kind": "loki-call-trace",
                 "start_unix_ns": start.to_string(),
