@@ -129,7 +129,10 @@ statement does not take is `invalid_input`. The statement then runs as a derived
 table, `SELECT * FROM (<query>) AS result (c0,…) LIMIT <limit+1>`, so the server
 sends at most one row past the limit and only one result-returning statement
 runs. The derived table closes on a line of its own, so a trailing `--` or `#`
-comment in the statement cannot reach the aliases or the limit.
+comment in the statement cannot reach the aliases or the limit. A statement that
+prepares with columns but cannot be a derived table (`SHOW`, `EXPLAIN`) is refused
+by the server's syntax check of the wrapper, which the adapter answers
+`unsupported`, as it does a statement that returns no columns.
 
 What this guarantees is a read-only session plus one result-returning
 statement. A write to a table, including one inside a stored function, is
@@ -262,12 +265,19 @@ columns, masking and keyset cursor. The statement uses `?` placeholders, bound i
 ```
 
 Values are written by the `mysql-native-text` rules above, so a `timestamp` column reads
-`2026-01-02T09:00:00` for a `DATETIME` and `2026-01-02T09:00:00Z` for a `TIMESTAMP`. MySQL
-compares a text parameter with a number as a double, so the adapter compares an `integer`
-cursor as `CAST(? AS DECIMAL(65,0))` and a `timestamp` cursor as `CAST(? AS DATETIME(6))`
-(dropping the `Z`; the session is UTC). Add `"profile.read"` to `operations` in the adapter
-entry. The paging is checked on the scripted fixture with a server that returns fewer rows
-than the limit asks for (`adapters/sql/tests/profiles.rs`).
+`2026-01-02T09:00:00` for a `DATETIME` and `2026-01-02T09:00:00Z` for a `TIMESTAMP`. A page
+orders by one expression of the ordering column and compares the cursor by the same one:
+an `integer` column as `CAST(… AS DECIMAL(65,0))` (MySQL would compare a text parameter
+with a number as a double), a `timestamp` column as `CAST(… AS DATETIME(6))` (dropping the
+`Z`; the session is UTC) and a `text` or `phone_number` column by its UTF-8 bytes,
+`CAST(CONVERT(… USING utf8mb4) AS BINARY)`, so no collation ties two distinct values. An
+`integer` ordering needs an integer or `YEAR` column, a `timestamp` ordering a `DATETIME` or
+`TIMESTAMP` column, and a `text` ordering a text string (`CHAR`, `VARCHAR`, `TEXT`, `ENUM`,
+`SET`); a binary string (written as base64, which orders otherwise than its bytes) or any
+other column is refused as `unsupported`, by the profile's column name, before a row is
+read. Add `"profile.read"` to `operations` in the adapter entry. The paging is checked on
+the scripted fixture with a server that returns fewer rows than the limit asks for
+(`adapters/sql/tests/profiles.rs`).
 
 ## Limitations
 

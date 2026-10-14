@@ -479,9 +479,18 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
         .unwrap_or(args.query.trim());
     let original = conn.prep(query).await.map_err(classify)?;
     column_bounds(original.columns().len())?;
-    if let Some(keyset) = &args.keyset {
-        keyset.columns(original.columns().len())?;
-    }
+    let expression = match &args.keyset {
+        None => None,
+        Some(keyset) => {
+            keyset.columns(original.columns().len())?;
+            let column = &original.columns()[keyset.column];
+            Some(keyset.expression(
+                crate::profile::mysql_keyset(keyset.kind, Family::of(column)),
+                &native_type(column),
+                crate::Engine::Mysql,
+            )?)
+        }
+    };
     if original.num_params() as usize != args.parameters.len() {
         return Err(Error::invalid("parameter count does not match query"));
     }
@@ -503,38 +512,41 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
     // cannot collide, and the server sends at most one row past the limit.
     // The derived table closes on its own line, so a trailing `--` or `#`
     // comment in the caller's statement cannot reach the aliases or LIMIT.
-    // A keyset page orders by its column and continues after the cursor, bound
-    // after the statement's own parameters. MySQL would compare a text parameter
-    // with a number as a double, so an integer cursor is cast to an exact
-    // decimal, and a timestamp cursor to a DATETIME: the session is UTC, so the
-    // `Z` a TIMESTAMP is written with is dropped before the cast.
+    // A keyset page orders by one expression of its column and continues after
+    // the cursor compared by that same expression, the cursor bound after the
+    // statement's own parameters: an integer as an exact decimal (MySQL would
+    // compare text with a number as a double), a timestamp as a DATETIME(6) (the
+    // session is UTC, so the `Z` a TIMESTAMP is written with is dropped), and
+    // text by its UTF-8 bytes, so no collation ties or reorders two values.
     let mut parameters = args.parameters;
-    let order = match &args.keyset {
-        None => String::new(),
-        Some(keyset) => {
+    let order = match (&args.keyset, expression) {
+        (Some(keyset), Some(expression)) => {
+            let column = expression.over(&format!("c{}", keyset.column));
             let mut clause = String::new();
             if let Some(after) = &keyset.after {
-                let (placeholder, value) = match keyset.kind {
-                    crate::ColumnType::Integer => ("CAST(? AS DECIMAL(65,0))", after.as_str()),
-                    crate::ColumnType::Timestamp => (
-                        "CAST(? AS DATETIME(6))",
-                        after.strip_suffix('Z').unwrap_or(after),
-                    ),
-                    crate::ColumnType::Text | crate::ColumnType::PhoneNumber => {
-                        ("?", after.as_str())
+                let value = match expression {
+                    crate::profile::KeysetExpression::Datetime6 => {
+                        after.strip_suffix('Z').unwrap_or(after)
                     }
+                    _ => after.as_str(),
                 };
                 parameters.push(Some(value.to_owned()));
-                clause = format!(" WHERE c{} > {placeholder}", keyset.column);
+                clause = format!(" WHERE {column} > {}", expression.over("?"));
             }
-            format!("{clause} ORDER BY c{}", keyset.column)
+            format!("{clause} ORDER BY {column}")
         }
+        _ => String::new(),
     };
     let wrapped = format!(
         "SELECT * FROM ({query}\n) AS result ({aliases}){order} LIMIT {}",
         u32::from(args.limit) + 1
     );
-    let statement = conn.prep(&wrapped).await.map_err(classify)?;
+    // The statement prepared on its own, so a syntax error now (1064) is the
+    // wrapper's: the statement is not a query (`SHOW`, `EXPLAIN`).
+    let statement = conn.prep(&wrapped).await.map_err(|error| match &error {
+        mysql_async::Error::Server(server) if server.code == 1064 => super::not_a_query(),
+        _ => classify(error),
+    })?;
     let parameters = if parameters.is_empty() {
         Params::Empty
     } else {
@@ -558,6 +570,17 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
     while let Some(row) = result.next().await.map_err(classify)? {
         if rows.len() == args.limit as usize {
             truncated = true;
+            // A keyset page compares the row past the limit with the last one.
+            if let Some(keyset) = &args.keyset {
+                let types = row.columns();
+                let next = row
+                    .unwrap()
+                    .into_iter()
+                    .zip(types.iter())
+                    .map(|(value, column)| cell(value, column))
+                    .collect::<Result<Vec<_>>>()?;
+                keyset.boundary(rows.last(), &next)?;
+            }
             break;
         }
         let types = row.columns();

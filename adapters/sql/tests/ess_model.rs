@@ -1363,3 +1363,282 @@ async fn every_refusal_comes_before_a_session_as_the_model_fixes() {
     let wrong = json!({"outcome":"stale_cursor","session_opened":true});
     assert!(conforms(&model, &wrong).is_err());
 }
+
+#[test]
+fn each_keyset_ordering_is_the_one_the_model_fixes() {
+    use connectors_sql::profile::{
+        ColumnType, PostgresqlOrderingType, mysql_keyset, postgresql_keyset,
+    };
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "profiles.KeysetOrdering");
+    let mut admitted = 0;
+    for kind in ColumnType::ALL {
+        let mut documents = Vec::new();
+        for native in PostgresqlOrderingType::ALL {
+            let expression = postgresql_keyset(kind, native);
+            documents.push((
+                json!({"engine": "postgresql", "column_type": kind.name(),
+                    "postgresql_type": native.name()}),
+                expression.map(|e| e.name()),
+            ));
+        }
+        for family in Family::ALL {
+            let expression = mysql_keyset(kind, family);
+            documents.push((
+                json!({"engine": "mysql", "column_type": kind.name(),
+                    "mysql_family": family.name()}),
+                expression.map(|e| e.name()),
+            ));
+        }
+        for (mut document, expression) in documents {
+            document["admitted"] = json!(expression.is_some());
+            if let Some(expression) = expression {
+                admitted += 1;
+                document["expression"] = json!(expression);
+            }
+            conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
+            // The other verdict, and every other expression, is refused.
+            let mut flipped = document.clone();
+            flipped["admitted"] = json!(expression.is_none());
+            if expression.is_none() {
+                flipped["expression"] = json!("native");
+            } else {
+                flipped.as_object_mut().unwrap().remove("expression");
+            }
+            assert!(conforms(&model, &flipped).is_err(), "{flipped}");
+            if let Some(expression) = expression {
+                for other in [
+                    "native",
+                    "c_collated_text",
+                    "exact_decimal",
+                    "datetime6",
+                    "utf8mb4_bytes",
+                ]
+                .into_iter()
+                .filter(|o| *o != expression)
+                {
+                    let mut wrong = document.clone();
+                    wrong["expression"] = json!(other);
+                    assert!(conforms(&model, &wrong).is_err(), "{wrong}");
+                }
+            }
+        }
+    }
+    // PostgreSQL: 6 text + 6 phone_number + 3 integer + 2 timestamp; MySQL: 1 + 1 + 3 + 2.
+    assert_eq!(admitted, 6 + 6 + 3 + 2 + 1 + 1 + 3 + 2);
+}
+
+fn decode_token(token: &str) -> Value {
+    use base64::Engine as _;
+    serde_json::from_slice(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(token)
+            .unwrap(),
+    )
+    .unwrap()
+}
+fn encode_token(cursor: &Value) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(cursor).unwrap())
+}
+
+#[tokio::test]
+async fn every_issued_cursor_is_one_the_model_admits() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "profiles.Cursor");
+    // A plain value (the call table's row key) and values JSON must escape.
+    let server = fixture::start(calls::script(None)).await;
+    let token = profile_sql(server.port)
+        .invoke("profile.read", calls::input(None, 2))
+        .await
+        .unwrap()["next_cursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut cursors = vec![decode_token(&token)];
+    for key in ["\"".repeat(8192), "\u{1}".repeat(8192), "x".repeat(8192)] {
+        let server = fixture::start(fixture::Script {
+            columns: vec![fixture::col(
+                "k",
+                fixture::VAR_STRING,
+                0,
+                fixture::UTF8MB4,
+                0,
+            )],
+            rows: vec![vec![fixture::text(&key)]],
+            params: 0,
+            ..fixture::Script::default()
+        })
+        .await;
+        let profile = json!({"id": "keys", "statement": "SELECT k FROM fixture_keys",
+            "parameters": [], "columns": [{"name": "key", "type": "text"}],
+            "call_identifier": "key", "ordering": "key"});
+        let token = sql(Engine::Mysql, server.port)
+            .with_read_profiles(vec![serde_json::from_value(profile).unwrap()])
+            .unwrap()
+            .invoke("profile.read", json!({"profile": "keys", "limit": 1}))
+            .await
+            .unwrap()["next_cursor"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(token.len() <= 16384);
+        cursors.push(decode_token(&token));
+    }
+    assert_eq!(cursors[0]["after"], "12");
+    assert!(cursors[1].get("after_base64").is_some(), "{}", cursors[1]);
+    assert!(cursors[3].get("after").is_some());
+    for cursor in &cursors {
+        conforms(&model, cursor).unwrap_or_else(|e| panic!("{cursor}: {e}"));
+    }
+    let mut both = cursors[0].clone();
+    both["after_base64"] = json!("MTI");
+    let mut neither = cursors[0].clone();
+    neither.as_object_mut().unwrap().remove("after");
+    let mut long = cursors[0].clone();
+    long["after"] = json!("1".repeat(8193));
+    let mut context = cursors[0].clone();
+    context["context"] = json!("abc");
+    for wrong in [both, neither, long, context] {
+        assert!(conforms(&model, &wrong).is_err(), "{wrong}");
+    }
+}
+
+#[tokio::test]
+async fn each_cursor_admission_is_the_one_the_model_fixes() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "profiles.CursorAdmission");
+    let server = fixture::start(calls::script(None)).await;
+    let sql = profile_sql(server.port);
+    let token = sql
+        .invoke("profile.read", calls::input(None, 2))
+        .await
+        .unwrap()["next_cursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let issued = decode_token(&token);
+    let with = |key: &str, value: Value| {
+        let mut cursor = issued.clone();
+        cursor[key] = value;
+        encode_token(&cursor)
+    };
+    let mut other_values = calls::input(None, 2);
+    other_values["parameters"]["from"] = json!("2026-01-01T00:00:00");
+    // (token, input, decodes, same_profile, same_context, value_admitted)
+    let cases = [
+        (token.clone(), calls::input(None, 2), true, true, true, true),
+        (
+            "AAAA".to_owned(),
+            calls::input(None, 2),
+            false,
+            false,
+            false,
+            false,
+        ),
+        (
+            with("after", json!(7)),
+            calls::input(None, 2),
+            false,
+            true,
+            true,
+            false,
+        ),
+        (
+            with("profile", json!("other")),
+            calls::input(None, 2),
+            true,
+            false,
+            false,
+            true,
+        ),
+        (token.clone(), other_values, true, true, false, true),
+        (
+            with("after", json!("x12")),
+            calls::input(None, 2),
+            true,
+            true,
+            true,
+            false,
+        ),
+        (
+            with("context", json!("0".repeat(64))),
+            calls::input(None, 2),
+            true,
+            true,
+            false,
+            true,
+        ),
+    ];
+    for (token, mut input, decodes, same_profile, same_context, value_admitted) in cases {
+        input["cursor"] = json!(token);
+        let before = server.log.lock().unwrap().sessions;
+        let answer = sql.invoke("profile.read", input.clone()).await;
+        assert_eq!(
+            server.log.lock().unwrap().sessions > before,
+            answer.is_ok(),
+            "{input}"
+        );
+        let document = json!({
+            "decodes": decodes, "same_profile": same_profile, "same_context": same_context,
+            "value_admitted": value_admitted,
+            "outcome": match &answer {
+                Ok(_) => "read",
+                Err(e) if e.code == ErrorCode::StaleCursor => "stale_cursor",
+                Err(e) => panic!("{input}: {e:?}"),
+            },
+        });
+        conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
+    }
+}
+
+#[tokio::test]
+async fn every_page_boundary_is_one_the_model_admits() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "profiles.PageBoundary");
+    // Row keys 11, 12, 12, 14…: the boundary after the first, the second and the third row.
+    let mut rows = calls::ROWS;
+    rows[2].row_key = rows[1].row_key;
+    for (limit, past, shares) in [
+        (1, true, false),
+        (2, true, true),
+        (3, true, false),
+        (100, false, false),
+    ] {
+        let server = fixture::start(fixture::Script {
+            rows: rows
+                .iter()
+                .map(|r| {
+                    let mut cells = calls::script(None).rows[0].clone();
+                    cells[0] = fixture::int8(r.row_key);
+                    cells
+                })
+                .collect(),
+            select: None,
+            ..calls::script(None)
+        })
+        .await;
+        let answer = profile_sql(server.port)
+            .invoke("profile.read", calls::input(None, limit))
+            .await;
+        let document = json!({
+            "received_past_limit": past,
+            "past_limit_row_bounded": true,
+            "shares_ordering_value": shares,
+            "outcome": match &answer {
+                Ok(_) => "page",
+                Err(e) if e.code == ErrorCode::Unsupported => "unsupported",
+                Err(e) => panic!("{limit}: {e:?}"),
+            },
+        });
+        conforms(&model, &document).unwrap_or_else(|e| panic!("{limit}: {document}: {e}"));
+    }
+    for wrong in [
+        json!({"received_past_limit":true,"past_limit_row_bounded":true,"shares_ordering_value":true,"outcome":"page"}),
+        json!({"received_past_limit":true,"past_limit_row_bounded":false,"shares_ordering_value":false,"outcome":"page"}),
+        json!({"received_past_limit":false,"past_limit_row_bounded":true,"shares_ordering_value":true,"outcome":"unsupported"}),
+        json!({"received_past_limit":true,"past_limit_row_bounded":true,"shares_ordering_value":false,"outcome":"unsupported"}),
+    ] {
+        assert!(conforms(&model, &wrong).is_err(), "{wrong}");
+    }
+}
