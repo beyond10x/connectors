@@ -249,7 +249,9 @@ pub(super) fn schema_newer(store: Option<String>) -> HandlerReply {
 
 fn host_failure(error: Failure) -> HandlerReply {
     match error {
-        Failure::MetadataSchemaNewer(store) => schema_newer(store.map(|release| release.to_string())),
+        Failure::MetadataSchemaNewer(store) => {
+            schema_newer(store.map(|release| release.to_string()))
+        }
         Failure::InvalidConfiguration => failure(
             "invalid_configuration",
             "configuration",
