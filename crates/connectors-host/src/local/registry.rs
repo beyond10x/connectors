@@ -71,6 +71,13 @@ pub enum Failure {
     /// instance under an unchanged provider authority and profile declaration:
     /// a revalidation follows the upgrade. Public code `lifecycle_conflict`.
     UpgradeRequired,
+    /// The configured binding changes the provider authority, or the
+    /// authentication of a profile, that the instance's connections were
+    /// admitted under (`StaticProfile::same_authentication`): no revalidation,
+    /// repair or connect under this instance id can follow it, a new instance
+    /// id can. Public code `lifecycle_conflict`, `next_action =
+    /// check_configuration`.
+    AuthenticationChanged,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 
@@ -92,7 +99,7 @@ pub enum Subject {
 /// admits only credential-bearing static_entry flows, including the
 /// OAuth-acquired non-rotating variant whose entry a CLI obtained by consent
 /// before submitting it; never a coordinator OAuth flow or host-owned refresh.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StaticProfile {
     pub id: String,
@@ -101,6 +108,58 @@ pub struct StaticProfile {
     pub subject: Subject,
     pub minimum_scopes: BTreeSet<String>,
     pub evidence_lifetime_ms: u64,
+    /// The complete declaration a configured profile was selected from, as its
+    /// adapter digests it into `revision` (`runtime::Profile::registry_profile`).
+    /// Never recorded and never compared: it only proves a lifetime-only
+    /// difference (`same_authentication`). `None` on a recorded profile.
+    #[serde(skip)]
+    pub declaration: Option<serde_json::Value>,
+}
+impl PartialEq for StaticProfile {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.revision == other.revision
+            && self.purpose == other.purpose
+            && self.subject == other.subject
+            && self.minimum_scopes == other.minimum_scopes
+            && self.evidence_lifetime_ms == other.evidence_lifetime_ms
+    }
+}
+impl Eq for StaticProfile {}
+impl StaticProfile {
+    /// Whether `configured` declares the authentication this admitted profile
+    /// does (connectors.auth_bindings.LocalStaticProfile): equal, or differing
+    /// only in the evidence lifetime, which bounds how long validation evidence
+    /// stays current and is not the connection's identity. The revision
+    /// digests the lifetime too, so a lifetime-only difference is proved from
+    /// the configured declaration: under its own lifetime it digests to the
+    /// configured revision, under the admitted one to the admitted revision.
+    /// A difference it cannot prove is another authentication.
+    pub fn same_authentication(&self, configured: &StaticProfile) -> bool {
+        if self == configured {
+            return true;
+        }
+        if self.id != configured.id
+            || self.purpose != configured.purpose
+            || self.subject != configured.subject
+            || self.minimum_scopes != configured.minimum_scopes
+            || self.evidence_lifetime_ms == configured.evidence_lifetime_ms
+        {
+            return false;
+        }
+        let Some(declaration) = configured.declaration.as_ref() else {
+            return false;
+        };
+        let digest = |lifetime: u64| {
+            let mut declaration = declaration.clone();
+            let fields = declaration.as_object_mut()?;
+            fields.insert("revision".into(), serde_json::json!(""));
+            fields.insert("evidence_lifetime_ms".into(), serde_json::json!(lifetime));
+            Some(connectors_core::digest(&declaration))
+        };
+        digest(configured.evidence_lifetime_ms).as_deref() == Some(configured.revision.as_str())
+            && digest(self.evidence_lifetime_ms).as_deref() == Some(self.revision.as_str())
+    }
 }
 
 /// Supplied by the trusted configuration/bootstrap owner, not caller assertions.
@@ -129,6 +188,7 @@ pub(super) fn fixture_binding(instance: &str) -> Binding {
             subject: Subject::User,
             minimum_scopes: BTreeSet::new(),
             evidence_lifetime_ms: 60_000,
+            declaration: None,
         },
     }
 }

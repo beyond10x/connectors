@@ -70,6 +70,17 @@ types:
       - {name: evidence_lifetime_ms, type: Integer}
     # Exact durable subset admitted by the production static-entry owner. It
     # cannot be inflated into a complete authored ProfileDeclaration on import.
+    # Its authentication is every field but evidence_lifetime_ms: the lifetime
+    # bounds how long validation evidence stays current, not what credential is
+    # accepted or whose identity it proves. revision digests the declaration,
+    # lifetime included, so two declarations differing only in their lifetime
+    # differ in revision; the owner proves that difference from the configured
+    # declaration (its digest under the admitted lifetime is the admitted
+    # revision) and treats them as one authentication. Any other difference, or
+    # one it cannot prove, is another authentication. A Connection stays bound to
+    # the AuthProfile record it was admitted under (its Acquisitions name the
+    # same record), so a lifetime-only change is followed by a new Connection
+    # under the same instance id, not by moving the existing one.
 
 entities:
   - name: connectors.auth_bindings.AuthProfile
@@ -168,8 +179,13 @@ entities:
     # removes it.
     # A connection begun under another revision of its instance is refused when
     # the instance holds a connection, revoked ones included, under another
-    # provider authority or another declaration of the same profile: those
-    # still need a new instance id.
+    # provider authority or another authentication of the same profile
+    # (LocalStaticProfile): those still need a new instance id, so that refusal,
+    # and a revalidation or repair of a connection whose own authority or
+    # authentication changed, names the configuration, never a retry. A
+    # revision change that leaves both unchanged is followed by revalidation
+    # when the profile declaration is equal, and by a new connection under the
+    # same instance id when only its evidence lifetime changed.
     # Fixed mediated route and parent are present together only for a via binding;
     # parent identity is this field, not duplicated route authority. Historical
     # observation coordinates impose no live observation FK or retention pin.

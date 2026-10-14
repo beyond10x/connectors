@@ -852,8 +852,34 @@ it as `code = lifecycle_conflict` at `stage = admission`, never with
 when a revalidation can follow the configuration upgrade: its provider
 authority and profile declaration are unchanged, its credential is neither
 known invalid nor expired, and the new provider has not already refused it
-under the configured revision. Otherwise it is `create_connection`, because
-repair refuses a changed binding. A revalidation the new provider refuses (the
+under the configured revision. The connection's identity is the instance,
+adapter, provider authority and the profile's authentication, which is the
+profile declaration apart from its evidence lifetime. A configuration that
+changes only `evidence_lifetime_ms` leaves the identity unchanged, but the
+connection stays bound to the declaration it was admitted under, so the next
+action is `create_connection`, and `connections connect` under the same
+instance id admits the new connection; the old one stays revocable. When the
+provider authority or the profile's authentication changed, the next action is
+`check_configuration`: no command under the same instance id can help, since
+`connections connect` there is refused for the same reason (`lifecycle_conflict`
+at `stage = admission`, `next_action = check_configuration`), and only a new
+instance id admits a new connection. The connections left under the earlier
+instance id stay revocable through the entry, under the same adapter, that
+moved: `connections revoke` reaches a connection whose recorded instance id no
+entry configures any longer, never one another entry still configures.
+Otherwise it is `create_connection`, a saved connection whose profile id the
+configured adapter no longer declares included (revalidate and repair refuse it
+as a read does, never as `unsupported`); connect under a declared profile
+admits the new connection. A
+`connections repair` of a connection saved under another binding is classified
+the same way, never as `identity_mismatch`: repair refuses a changed binding. A
+`connections revalidate`, `connections connect`, `connections repair`, read or
+write whose adapter process still runs an earlier adapter entry stops that
+process and launches the configured one before it captures anything, so no
+command answers `retry_status` for it until `adapters stop`. Only a credential
+validation captured by the earlier process is still refused as
+`lifecycle_conflict`; its `connections connect` starts again with a launch
+that replaces the process. A revalidation the new provider refuses (the
 credential invalid, below scope or another identity) answers `create_connection`
 and records the refusal against the configured revision
 (`Connection.refused_configuration_revision`), so the next read names

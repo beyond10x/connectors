@@ -34,6 +34,7 @@ fn binding(instance: &str) -> Binding {
             subject: Subject::User,
             minimum_scopes: BTreeSet::from(["read".to_owned()]),
             evidence_lifetime_ms: 60_000,
+            declaration: None,
         },
     }
 }
