@@ -814,7 +814,13 @@ pub(crate) fn sidecar_at(parent: &File, child: &OsStr) -> Result<Sidecar> {
         READ_CONTROL | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
     ) {
         Ok(file) if retiring(&file)? => Ok(Sidecar::Retiring),
-        Ok(file) => check_private_file(&file).map(|()| Sidecar::Private),
+        // A deletion between the probe above and this check leaves the handle
+        // with no link, which the private check refuses: ask the handle again.
+        Ok(file) => match check_private_file(&file) {
+            Ok(()) => Ok(Sidecar::Private),
+            Err(_) if retiring(&file)? => Ok(Sidecar::Retiring),
+            Err(failure) => Err(failure),
+        },
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Sidecar::Absent),
         Err(error)
             if error.raw_os_error() == Some(ERROR_ACCESS_DENIED as i32)
