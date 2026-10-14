@@ -100,7 +100,8 @@ only when:
   the same scheme, capability, purpose, subject, entry fields, minimum scopes and
   evidence lifetime. The registry keeps only the declaration's revision, which
   digests all of these, so any revision change refuses, a minimum-scope change
-  included; and
+  included. A connection stays bound to the declaration record it was saved
+  under, which its acquisitions name too, so it never moves to another one; and
 - the validated external identity equals the connection's recorded identity.
 
 Publication advances the public revision, because the binding changed
@@ -110,9 +111,26 @@ version, records new baseline evidence and a new private fence, and moves the
 instance to the configured revision in the same metadata commit. Reads are then
 admitted under the new binding and refused under the old one.
 
-Any other binding difference refuses before provider work as `lifecycle_conflict`
-with `next_action = create_connection`: neither revalidation nor repair can move
-the connection, a new connection under a new instance id can. A different
+A changed provider authority or profile authentication refuses before provider
+work as `lifecycle_conflict` with `next_action = check_configuration`, from
+revalidate, repair, a read and a new connect under the same instance id alike:
+only a new instance id helps. The connections left under the earlier instance
+id stay revocable through the moved entry: `connections revoke` reaches a
+connection of the entry's adapter whose instance id no entry configures any
+longer. The profile's authentication is the declaration
+apart from its evidence lifetime: a revision that differs is the same
+authentication only when the configured declaration, given the admitted
+lifetime, digests to the admitted revision, as every shipped adapter computes
+it. Any other binding difference, a lifetime-only change included, refuses as
+`lifecycle_conflict` with `next_action = create_connection`, and a new
+connection under the same instance id is admitted. A saved connection whose
+profile id the configured adapter no longer declares is such a difference too,
+never `unsupported`. A repair of a
+connection whose binding differs answers the same refusal a read does, never
+`identity_mismatch`. A revalidation, connect, repair, read or write whose
+adapter process still runs an earlier adapter entry stops it and starts the
+configured one first; only a credential validation captured by the earlier
+process keeps refusing. A different
 validated identity refuses as `identity_mismatch`, also with `next_action =
 create_connection`, because repair refuses the changed binding; outside an
 upgrade it keeps `repair_connection`. A credential the new provider refuses
@@ -132,7 +150,8 @@ the instance's current revision, or under the configured revision when the two
 differ. A connection published under the configured revision moves the instance
 to it in the same metadata commit, as an upgrading revalidation does; a
 connection begun under an older revision never moves the instance back. Changing
-the provider authority or the profile declaration still needs a new instance id.
+the provider authority or the profile's authentication still needs a new instance id;
+a changed evidence lifetime alone does not.
 
 A refused upgrade (a credential the new provider refuses, or another identity)
 is recorded on the connection, so reads, approval targets and launches answer

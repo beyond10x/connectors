@@ -10,6 +10,7 @@ pub(super) fn execute(
     alias: &str,
     adapter: &Adapter,
     socket: Option<&std::path::Path>,
+    configured: &std::collections::BTreeSet<String>,
 ) -> Result<Value, HandlerReply> {
     let registry = Registry::with_system_clock(&paths.state);
     let text = |field| {
@@ -113,10 +114,13 @@ pub(super) fn execute(
         }
         "connections-revoke" => {
             let reference = text("connection")?;
+            // A connection left under an instance id no entry configures any
+            // longer (the entry moved to a new one) stays revocable here.
             let revision = registry
-                .revoke(
+                .revoke_left_behind(
                     &adapter.instance_id,
                     &adapter.adapter_id,
+                    configured,
                     reference,
                     text("expected_revision")?,
                     connectors_sdk::now_ms(),
@@ -214,6 +218,12 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
             "lifecycle_conflict",
             "admission",
             "create_connection",
+            false,
+        ),
+        AuthenticationChanged => (
+            "lifecycle_conflict",
+            "admission",
+            "check_configuration",
             false,
         ),
         Revoked => ("revoked", "admission", "create_connection", false),

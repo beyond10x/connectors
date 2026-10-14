@@ -50,7 +50,17 @@ impl Registry {
                 return Err(Failure::Conflict);
             }
             if row.binding != *binding {
-                return Err(Failure::IdentityMismatch);
+                // Repair keeps the binding, so it cannot move a connection
+                // saved under another one. Name the step that can, as a read
+                // does: revalidation, a new connection, or a new instance id.
+                let usable = || {
+                    Ok(row.material.is_some()
+                        && matches!(
+                            super::observation::readiness(tx, &row, now, true)?,
+                            State::Ready | State::Pending
+                        ))
+                };
+                return Err(super::revalidation::changed(&row, binding, usable)?);
             }
             create_acquisition(tx, authority, row.reference, row.fence, now)
         })
@@ -256,9 +266,44 @@ impl Registry {
         expected_revision: &str,
         now: u64,
     ) -> Result<String> {
+        self.revoke_admitted(adapter_id, reference, expected_revision, now, |recorded| {
+            recorded == instance
+        })
+    }
+
+    /// Revoke through the adapter entry of `instance` a connection of that
+    /// entry's adapter recorded under `instance`, or under an instance id no
+    /// entry configures any longer (`configured`, every configured instance
+    /// id): a changed provider authority or profile authentication moves the
+    /// entry to a new instance id, and the connections left under the earlier
+    /// one stay revocable. A connection of an instance another entry still
+    /// configures is that entry's, and stays `NotFound` here.
+    pub fn revoke_left_behind(
+        &self,
+        instance: &str,
+        adapter_id: &str,
+        configured: &BTreeSet<String>,
+        reference: &str,
+        expected_revision: &str,
+        now: u64,
+    ) -> Result<String> {
+        self.revoke_admitted(adapter_id, reference, expected_revision, now, |recorded| {
+            recorded == instance || !configured.contains(recorded)
+        })
+    }
+
+    fn revoke_admitted(
+        &self,
+        adapter_id: &str,
+        reference: &str,
+        expected_revision: &str,
+        now: u64,
+        admits: impl Fn(&str) -> bool,
+    ) -> Result<String> {
         self.transaction(now, false, |tx, _, now| {
             let row = Self::connection(tx, reference)?;
-            if !row.public || row.binding.instance_id!=instance || row.binding.adapter_id!=adapter_id { return Err(Failure::NotFound); }
+            if !row.public || !admits(&row.binding.instance_id) || row.binding.adapter_id!=adapter_id { return Err(Failure::NotFound); }
+            let instance = row.binding.instance_id.as_str();
             if row.state=="revoked" { return Ok(row.revision); }
             if row.revision!=expected_revision { return Err(Failure::Conflict); }
             let revision = new_id();
@@ -290,9 +335,7 @@ fn authentication_changed(tx: &Transaction<'_>, binding: &Binding) -> Result<boo
         .map_err(db)?;
     for text in stored {
         let (admitted, _) = decode_stored(&text)?;
-        if admitted.provider_authority != binding.provider_authority
-            || (admitted.profile.id == binding.profile.id && admitted.profile != binding.profile)
-        {
+        if super::revalidation::identity_changed(&admitted, binding) {
             return Ok(true);
         }
     }
@@ -319,12 +362,14 @@ fn register(tx: &Transaction<'_>, binding: &Binding) -> Result<Option<String>> {
         // after an upgrading revalidation. Refusing it here left an instance
         // whose connections never followed an upgrade (the new provider
         // refused the credential) admitting no connection at all.
-        // The provider authority and the profile declaration still bind the
-        // instance id: a new revision that changes either for a profile the
-        // instance already holds needs a new instance id.
+        // The provider authority and the profile's authentication still bind
+        // the instance id: a new revision that changes either for a profile the
+        // instance already holds needs a new instance id. A declaration that
+        // differs only in its evidence lifetime is the same authentication
+        // (`StaticProfile::same_authentication`): that connection is admitted.
         Some((_, revision)) if revision != binding.configuration_revision => {
             if authentication_changed(tx, binding)? {
-                return Err(Failure::Conflict);
+                return Err(Failure::AuthenticationChanged);
             }
             Some(revision)
         }

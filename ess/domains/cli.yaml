@@ -239,6 +239,22 @@ types:
       - {name: name, type: String}
       - {name: label, type: String}
       - {name: max_bytes, type: Integer}
+  # A connection's identity is its instance, adapter, provider authority and this
+  # profile's authentication: every field but evidence_lifetime_ms
+  # (connectors.auth_bindings.LocalStaticProfile). A configuration revision that
+  # leaves the identity unchanged is upgraded by `connections revalidate` when the
+  # profile is unchanged; when only evidence_lifetime_ms changed, revalidate, repair
+  # and a read name create_connection, which connect under the same instance id
+  # admits; a saved connection whose profile id the configured adapter no longer
+  # declares is refused the same way, never as `unsupported`. Revalidate, connect,
+  # repair, a read and a write first replace an adapter process still running an
+  # earlier adapter entry. One that changes the identity refuses revalidate,
+  # repair, a read and connect under the same instance id with
+  # `lifecycle_conflict` and next_action check_configuration: only a new instance
+  # id helps, and `connections revoke` through the moved entry still reaches the
+  # connections left under an instance id no entry configures any longer.
+  # ESS-LIMIT: no construct relates two revisions' values field by field, so the
+  # host enforces the classification and tests pin it.
   - name: connectors.cli.PrivateStaticProfile
     kind: struct
     fields:

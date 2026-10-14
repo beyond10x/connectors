@@ -243,17 +243,27 @@ fn a_changed_authority_or_profile_refuses_the_upgrade_and_publishes_nothing() {
         let (reference, revision, _) = connected(&registry, "one");
         let mut target = upgraded();
         change(&mut target);
+        // story:revision-change-keeps-a-recovery-path: a changed identity
+        // names a new instance id, as connect under this one refuses it too.
+        // Another profile id is no change of this profile's authentication.
+        // A lifetime change no declaration proves stays another authentication.
+        let refused = if name == "profile id" {
+            Failure::BindingChanged
+        } else {
+            Failure::AuthenticationChanged
+        };
         let before = recorded(root.path(), &reference);
         assert_eq!(
             registry.admit_revalidation(&target, &reference, &revision, LATER),
-            Err(Failure::BindingChanged),
+            Err(refused),
             "{name}"
         );
-        assert!(
-            matches!(
-                registry.capture_revalidation(&target, &reference, &revision, LATER, LATER + 1000),
-                Err(Failure::BindingChanged)
-            ),
+        assert_eq!(
+            registry
+                .capture_revalidation(&target, &reference, &revision, LATER, LATER + 1000)
+                .map(|_| ())
+                .err(),
+            Some(refused),
             "{name}"
         );
         assert_eq!(recorded(root.path(), &reference), before, "{name}");
@@ -296,7 +306,7 @@ fn a_new_connection_that_changes_authority_or_profile_needs_a_new_instance_id() 
         change(&mut target);
         assert_eq!(
             registry.begin(&target, LATER).err(),
-            Some(Failure::Conflict),
+            Some(Failure::AuthenticationChanged),
             "begun: {name}"
         );
 
@@ -313,7 +323,7 @@ fn a_new_connection_that_changes_authority_or_profile_needs_a_new_instance_id() 
             .unwrap();
         assert_eq!(
             registry.begin(&target, LATER + 1).err(),
-            Some(Failure::Conflict),
+            Some(Failure::AuthenticationChanged),
             "revoked: {name}"
         );
     }
@@ -518,15 +528,15 @@ fn a_stale_connection_names_the_step_that_clears_it() {
     changed.profile.revision = "profile-2".into();
     assert_eq!(
         registry.admit_read(&changed, &reference, &none, LATER),
-        Err(Failure::BindingChanged)
+        Err(Failure::AuthenticationChanged)
     );
     assert!(matches!(
         registry.capture_read(&changed, &reference, &none, LATER, LATER + 1000),
-        Err(Failure::BindingChanged)
+        Err(Failure::AuthenticationChanged)
     ));
     assert_eq!(
         registry.approval_target(&changed, &reference, &none),
-        Err(Failure::BindingChanged)
+        Err(Failure::AuthenticationChanged)
     );
 }
 
@@ -823,5 +833,237 @@ fn adversary_an_approval_for_a_stale_expired_connection_does_not_name_revalidati
         approval != Err(Failure::UpgradeRequired) || revalidation.is_ok(),
         "approval names revalidation ({approval:?}), revalidation refuses \
          ({revalidation:?}), repair refuses ({repair:?})"
+    );
+}
+
+/// story:revision-change-keeps-a-recovery-path: the profile `profile.id` an
+/// adapter declares, digested into its revision as every shipped adapter does
+/// (`adapters/catalog/src/local.rs`), with this evidence lifetime and these
+/// minimum scopes.
+fn declared(lifetime: u64, scopes: &[&str], label: &str) -> StaticProfile {
+    let mut profile = crate::local::runtime::Profile {
+        id: "fixture-token".into(),
+        revision: String::new(),
+        purpose: Purpose::DelegatedUser,
+        subject: Subject::User,
+        scheme: "http_bearer".into(),
+        capability: "http-bearer".into(),
+        minimum_scopes: scopes.iter().map(|scope| (*scope).to_owned()).collect(),
+        evidence_lifetime_ms: lifetime,
+        fields: vec![crate::local::runtime::EntryField {
+            name: "token".into(),
+            label: label.into(),
+            max_bytes: 1024,
+        }],
+        acquisition: None,
+    };
+    profile.revision = connectors_core::digest(&serde_json::to_value(&profile).unwrap());
+    profile.registry_profile()
+}
+
+fn declared_binding(configuration: &str, profile: StaticProfile) -> Binding {
+    Binding {
+        configuration_revision: configuration.into(),
+        profile,
+        ..binding()
+    }
+}
+
+/// A connection published under `admitted`; its reference and public revision.
+fn connected_under(registry: &Registry, admitted: &Binding) -> (String, String) {
+    let acquisition = registry.begin(admitted, NOW).unwrap();
+    let claim = registry.consume(acquisition, NOW).unwrap();
+    let candidate = registry
+        .prepare(&claim, validated("one", NOW), 12, NOW)
+        .unwrap();
+    let reference = publish_fixture(registry, candidate, NOW);
+    let revision = observe(registry, "config-1", &reference, NOW).revision;
+    (reference, revision)
+}
+
+/// The observed defect: raising the adapter's evidence lifetime moves its
+/// profile revision, and the connection was refused by revalidate
+/// (`BindingChanged`, `create_connection`), connect (`Conflict`,
+/// `retry_status`) and repair (`IdentityMismatch`, `repair_connection`), so no
+/// next action led anywhere. The lifetime is not the connection's identity,
+/// but a connection stays bound to the declaration record it was admitted
+/// under, so it is not upgraded in place: revalidate, a read and a repair name
+/// a new connection, connect under the same instance id admits it and moves
+/// the instance, and the old connection stays revocable.
+#[test]
+fn an_evidence_lifetime_change_is_followed_by_a_new_connection() {
+    let admitted = declared_binding("config-1", declared(60_000, &["read"], "Token"));
+    let configured = declared_binding("config-2", declared(300_000, &["read"], "Token"));
+    assert_ne!(admitted.profile.revision, configured.profile.revision);
+    assert!(admitted.profile.same_authentication(&configured.profile));
+    let none = BTreeSet::new();
+
+    let (root, registry) = fixture();
+    let (reference, revision) = connected_under(&registry, &admitted);
+    assert_eq!(
+        registry.admit_read(&configured, &reference, &none, LATER),
+        Err(Failure::BindingChanged)
+    );
+    assert_eq!(
+        registry.admit_revalidation(&configured, &reference, &revision, LATER),
+        Err(Failure::BindingChanged)
+    );
+    assert_eq!(
+        registry
+            .begin_repair(&configured, &reference, &revision, LATER)
+            .map(|_| ()),
+        Err(Failure::BindingChanged)
+    );
+
+    let acquisition = registry.begin(&configured, LATER).unwrap();
+    let claim = registry.consume(acquisition, LATER).unwrap();
+    let candidate = registry
+        .prepare(&claim, validated("one", LATER), 12, LATER)
+        .unwrap();
+    let fresh = publish_fixture(&registry, candidate, LATER);
+    let observed = observe(&registry, "config-2", &fresh, LATER);
+    assert_eq!(observed.state, State::Ready);
+    assert!(!observed.stale);
+    registry
+        .admit_read(&configured, &fresh, &none, LATER)
+        .unwrap();
+    assert_eq!(recorded(root.path(), &fresh).instance_revision, "config-2");
+    registry
+        .revoke(
+            "fixture-instance",
+            "fixture-adapter",
+            &reference,
+            &revision,
+            LATER + 1,
+        )
+        .unwrap();
+    // The lifetime alone is not proved by a declaration-less profile.
+    let mut unproved = configured.profile.clone();
+    unproved.declaration = None;
+    assert!(!admitted.profile.same_authentication(&unproved));
+}
+
+/// A change to the connection's identity, the provider authority or the
+/// profile's authentication (here its minimum scopes, or an entry field with
+/// the lifetime changed beside it), refuses every command under the same
+/// instance id by one name, `AuthenticationChanged`: only a new instance id
+/// helps, so none of them names another command that refuses again.
+#[test]
+fn an_identity_change_names_a_new_instance_id_on_every_command() {
+    let admitted = declared_binding("config-1", declared(60_000, &["read"], "Token"));
+    let changes: [(&str, Binding); 3] = [
+        ("provider authority", {
+            let mut configured = declared_binding("config-2", declared(60_000, &["read"], "Token"));
+            configured.provider_authority.push_str("/other");
+            configured
+        }),
+        (
+            "minimum scopes",
+            declared_binding("config-2", declared(60_000, &["read", "write"], "Token")),
+        ),
+        (
+            "entry field beside the lifetime",
+            declared_binding("config-2", declared(300_000, &["read"], "Other token")),
+        ),
+    ];
+    let none = BTreeSet::new();
+    for (name, configured) in changes {
+        let (root, registry) = fixture();
+        let (reference, revision) = connected_under(&registry, &admitted);
+        let before = recorded(root.path(), &reference);
+        assert_eq!(
+            registry.admit_read(&configured, &reference, &none, LATER),
+            Err(Failure::AuthenticationChanged),
+            "read: {name}"
+        );
+        assert_eq!(
+            registry.admit_revalidation(&configured, &reference, &revision, LATER),
+            Err(Failure::AuthenticationChanged),
+            "revalidate: {name}"
+        );
+        assert_eq!(
+            registry
+                .begin_repair(&configured, &reference, &revision, LATER)
+                .map(|_| ()),
+            Err(Failure::AuthenticationChanged),
+            "repair: {name}"
+        );
+        assert_eq!(
+            registry.begin(&configured, LATER).err(),
+            Some(Failure::AuthenticationChanged),
+            "connect: {name}"
+        );
+        assert_eq!(recorded(root.path(), &reference), before, "{name}");
+    }
+}
+
+/// story:revision-change-keeps-a-recovery-path: a changed provider authority
+/// or profile authentication moves the adapter entry to a new instance id, and
+/// the connection left under the earlier one stays revocable through that
+/// entry while no entry configures the earlier id; one another entry still
+/// configures, or one of another adapter, is not this entry's to revoke.
+#[test]
+fn a_connection_left_under_an_unconfigured_instance_id_stays_revocable() {
+    let (root, registry) = fixture();
+    let (reference, revision) = connected_under(&registry, &binding());
+    let moved = "fixture-instance-2";
+    let both = BTreeSet::from(["fixture-instance".to_owned(), moved.to_owned()]);
+    let only_moved = BTreeSet::from([moved.to_owned()]);
+    assert_eq!(
+        registry.revoke(moved, "fixture-adapter", &reference, &revision, LATER),
+        Err(Failure::NotFound)
+    );
+    assert_eq!(
+        registry.revoke_left_behind(
+            moved,
+            "fixture-adapter",
+            &both,
+            &reference,
+            &revision,
+            LATER
+        ),
+        Err(Failure::NotFound)
+    );
+    assert_eq!(
+        registry.revoke_left_behind(
+            moved,
+            "other-adapter",
+            &only_moved,
+            &reference,
+            &revision,
+            LATER
+        ),
+        Err(Failure::NotFound)
+    );
+    let before = recorded(root.path(), &reference);
+    assert!(before.material.is_some());
+    let revoked = registry
+        .revoke_left_behind(
+            moved,
+            "fixture-adapter",
+            &only_moved,
+            &reference,
+            &revision,
+            LATER,
+        )
+        .unwrap();
+    let after = recorded(root.path(), &reference);
+    assert_eq!(after.revision, revoked);
+    assert_eq!(after.material, None);
+    assert_eq!(
+        observe(&registry, "config-1", &reference, LATER + 1).state,
+        State::Revoked
+    );
+    // Repeating it answers the revocation already recorded.
+    assert_eq!(
+        registry.revoke_left_behind(
+            moved,
+            "fixture-adapter",
+            &only_moved,
+            &reference,
+            &revision,
+            LATER + 2
+        ),
+        Ok(revoked)
     );
 }

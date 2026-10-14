@@ -39,9 +39,11 @@ fn approval_target_is_passive_but_requires_exact_retained_admission() {
     );
     let mut changed = binding();
     changed.provider_authority.push_str("/other");
+    // A changed provider authority is a changed connection identity: only a
+    // new instance id helps (story:revision-change-keeps-a-recovery-path).
     assert_eq!(
         passive.approval_target(&changed, &reference, &BTreeSet::new()),
-        Err(Failure::BindingChanged)
+        Err(Failure::AuthenticationChanged)
     );
     assert_eq!(
         passive.approval_target(&binding(), &reference, &BTreeSet::from(["write".into()])),
@@ -837,6 +839,7 @@ pub(super) fn binding() -> Binding {
             subject: Subject::User,
             minimum_scopes: BTreeSet::from(["read".to_owned()]),
             evidence_lifetime_ms: 60_000,
+            declaration: None,
         },
     }
 }
