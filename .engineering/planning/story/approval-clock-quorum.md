@@ -91,7 +91,7 @@ scope:
   path: website/docs/reference/contracts/model/domains/connectors-mutations.md
 - confidence: inferred
   path: website/docs/status.md
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T18:07:38Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-14T18:07:38Z", actor: "human:timo", revision: 7}
@@ -126,10 +126,9 @@ Host, `crates/connectors-host/src/local/clock/tests.rs`:
 - `quorum_below_quorum_names_each_source`
 - `quorum_split_refuses`
 - `quorum_combined_width_over_cap_refuses`
-- `quorum_source_over_cap_is_not_counted`
+- `quorum_wide_source_counts_and_only_the_answer_is_capped`
 - `quorum_width_cap_boundary`
 - `quorum_shared_deadline`
-- `roughtime_1_recorded_reply_verifies`
 - `quorum_version_mismatch_is_unverified`
 - `quorum_configuration_refusals`
 - `quorum_counted_set_is_fixed`
@@ -209,3 +208,21 @@ reporting, any change to the proof profile's `nbf`/`exp` offsets.
 - The width cap is re-checked separately in `approvals/proof.rs:94` and `mutations.rs:469`;
   leaving either at 4,000 ms is the regression this story must not ship.
 - The base now carries `0ec7ccd1a` (the clock refusal causes): this branch merged wave 20261014c.
+
+## Decided 2026-10-14: a wide source counts; only the answer is capped
+
+The live check of 2026-10-14 found Cloudflare and roughtime.se unreachable, int08h verified with
+a 5,000 ms radius (over the per-source cap) and time.txryan.com verified with a 3,000 ms radius:
+one counted source, `below_quorum`. Decided: a verified source counts toward the quorum whatever
+its own radius; the combined answer's width stays capped at 8,000 ms. The guarantee (if `quorum`
+counted intervals contain true time, the answer does) needs no per-source bound. A verified
+source is never `too_imprecise` on its own; `too_imprecise` names only an answer over the cap.
+`quorum_source_over_cap_is_not_counted` becomes
+`quorum_wide_source_counts_and_only_the_answer_is_capped`. Until a third source answers, the
+configured two reachable sources at quorum 2 tolerate no outage and no lying source; the release
+note says so.
+
+`roughtime-1` is removed from the model and the host: no source answers it and no reply can be
+recorded, and a wire version ships only with its verifier and a recorded fixture.
+`roughtime_1_recorded_reply_verifies` is dropped. Every configured source uses
+`roughtime-0x8000000c`.

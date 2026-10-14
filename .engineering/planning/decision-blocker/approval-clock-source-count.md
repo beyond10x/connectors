@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:approval-clock-source-count
 kind: decision-blocker
-status: open
+status: cleared
 title: Does a verified clock source wider than the cap count toward the quorum?
 relations:
 - blocks: story:approval-clock-quorum
-revision: 1
+revision: 4
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-14T20:34:43Z", actor: "human:timo", revision: 4}
 ---
 ## Question
 The approval clock quorum's live check on 2026-10-14 (`independent_live_quorum`, run explicitly):
@@ -27,3 +29,10 @@ profile (`docs/design/approval-clock-quorum.md`, "Width cap"), and a 5 s radius 
   3 s or less answers. Slack writes stay blocked.
 - **C: quorum 1 over the reachable sources.** That is the single-source trust the decision
   replaced.
+
+## Decided (2026-10-14)
+
+Option A. A verified source counts toward the quorum whatever its own radius; the combined answer
+stays capped at 8,000 ms. The design's "Width cap" section and the clock model say so first.
+Until a third source answers, the clock tolerates no outage and no lying source, and the release
+note states it. `roughtime-1` is removed: no source answers it and no reply can be recorded.
