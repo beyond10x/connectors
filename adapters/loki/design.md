@@ -1,6 +1,6 @@
 # loki adapter design
 
-**Status:** native executable `connectors-loki` (2026-10-08). It serves `logs.query_range`, `logs.query_metric` and `logs.labels` (`contracts/logs/v1alpha1/semantics.md` §11.3) through the local host under the profile `loki.bearer` (§11.4); see [README.md](README.md). The other profiles below remain proposals.
+**Status:** native executable `connectors-loki` (2026-10-08). It serves `logs.query_range`, `logs.query_metric` and `logs.labels` (`contracts/logs/v1alpha1/semantics.md` §11.3), and since 2026-10-14 the configured-profile reads `logs.profile_lines` and `logs.call_trace` (§12, `src/profile.rs`), through the local host under the profile `loki.bearer` (§11.4); see [README.md](README.md). The other profiles below remain proposals.
 
 ## Scope and dependencies
 

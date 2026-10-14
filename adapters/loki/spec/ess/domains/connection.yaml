@@ -26,7 +26,11 @@ types:
   # The owner-only native file named by `--local-config`. No credential is a member.
   # `base_url` is an HTTPS origin, optionally with a path prefix, written in its canonical
   # form; `ca_file`, when present, is an absolute path to an owner-only PEM bundle that
-  # replaces the system roots for this connection (absent, never null).
+  # replaces the system roots for this connection (absent, never null). `line_profiles` and
+  # `trace_profiles` are the operator's configured profiles (semantics.md §12), absent when
+  # none is configured; each profile name is distinct within its list, and every profile's
+  # selector carries every equality of the configured scope, so no profile reads a stream
+  # the scope does not admit.
   - name: connectors_loki.connection.LocalConfiguration
     kind: struct
     fields:
@@ -35,11 +39,41 @@ types:
       - {name: base_url, type: String}
       - {name: ca_file, type: "Optional<String>"}
       - {name: query_scope, type: connectors_loki.connection.QueryScope}
+      - {name: line_profiles, type: "Optional<List<connectors_loki.reads.LineProfile>>"}
+      - {name: trace_profiles, type: "Optional<List<connectors_loki.reads.TraceProfile>>"}
     invariants:
       - format == "connectors-loki-local/1"
       - base_url.count: {gte: 8, lte: 512}
       - base_url: {starts_with: "https://"}
       - ca_file.count: {gte: 1, lte: 4096}
+      - line_profiles.count: {gte: 1, lte: 16}
+      - trace_profiles.count: {gte: 1, lte: 16}
+      - distinct: {in: line_profiles, as: p, by: p.name}
+      - distinct: {in: trace_profiles, as: p, by: p.name}
+      - forall:
+          in: line_profiles
+          as: p
+          that:
+            forall:
+              in: query_scope.required_equalities
+              as: e
+              that:
+                exists:
+                  in: p.selector
+                  as: m
+                  that: {all: [m.label == e.label, m.operator == equal, m.value == e.value]}
+      - forall:
+          in: trace_profiles
+          as: p
+          that:
+            forall:
+              in: query_scope.required_equalities
+              as: e
+              that:
+                exists:
+                  in: p.selector
+                  as: m
+                  that: {all: [m.label == e.label, m.operator == equal, m.value == e.value]}
 
   # A bearer token: 1–8,192 visible ASCII characters (0x21–0x7E), so no space, control
   # or non-ASCII character.

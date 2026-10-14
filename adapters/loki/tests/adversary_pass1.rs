@@ -56,78 +56,14 @@ fn schema(out: &Path, name: &str) -> Value {
     serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
 }
 
-fn field<'a>(document: &'a Value, path: &str) -> Option<&'a Value> {
-    path.split('.')
-        .try_fold(document, |value, key| value.get(key))
-}
+#[path = "support/invariants.rs"]
+mod invariants;
 
-/// The invariant forms this model uses; anything else panics.
-fn holds(document: &Value, invariant: &str) -> bool {
-    let invariant = invariant.trim();
-    if let Some(inner) = invariant
-        .strip_prefix('(')
-        .and_then(|s| s.strip_suffix(')'))
-    {
-        return inner.split(" and ").all(|part| holds(document, part));
-    }
-    if let Some((left, right)) = invariant.split_once(" starts_with ") {
-        let prefix: String = serde_json::from_str(right).unwrap();
-        return field(document, left)
-            .is_none_or(|v| v.as_str().is_some_and(|s| s.starts_with(&prefix)));
-    }
-    for operator in [" == ", " >= ", " <= "] {
-        let Some((left, right)) = invariant.split_once(operator) else {
-            continue;
-        };
-        let expected: Value = serde_json::from_str(right).unwrap();
-        let actual = match left.strip_suffix(".count") {
-            Some(name) => match field(document, name) {
-                None => return true,
-                Some(Value::String(s)) => json!(s.chars().count()),
-                Some(Value::Array(a)) => json!(a.len()),
-                Some(other) => panic!("count of {other}"),
-            },
-            None => match field(document, left) {
-                None => return true,
-                Some(value) => value.clone(),
-            },
-        };
-        return match operator {
-            " == " => actual == expected,
-            " >= " => actual.as_u64().unwrap() >= expected.as_u64().unwrap(),
-            _ => actual.as_u64().unwrap() <= expected.as_u64().unwrap(),
-        };
-    }
-    panic!("unrecognised invariant form: {invariant}")
-}
-
+/// The invariant forms the model renders, in the shared evaluator; anything else
+/// panics. An alphabet is part of the model (ESS lowers it to `x-ess-alphabet`,
+/// not to a JSON Schema `pattern`).
 fn check(schema: &Value, name: &str, document: &Value) -> bool {
-    let definition = &schema["$defs"][name];
-    // ESS 0.56.0 lowers a newtype's `alphabet:` to the `x-ess-alphabet`
-    // annotation, not to a JSON Schema `pattern`; it is part of the model.
-    let within_alphabet = match (definition["x-ess-alphabet"].as_str(), document.as_str()) {
-        (Some(alphabet), Some(text)) => text.chars().all(|c| alphabet.contains(c)),
-        (Some(_), None) => false,
-        (None, _) => true,
-    };
-    within_alphabet
-        && definition["x-ess-invariants"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .all(|i| holds(document, i.as_str().unwrap()))
-        && definition["properties"]
-            .as_object()
-            .into_iter()
-            .flatten()
-            .all(
-                |(key, property)| match (property["$ref"].as_str(), document.get(key)) {
-                    (Some(reference), Some(value)) => {
-                        check(schema, reference.trim_start_matches("#/$defs/"), value)
-                    }
-                    _ => true,
-                },
-            )
+    invariants::check(schema, name, document).is_ok()
 }
 
 fn model_admits(schema: &Value, document: &Value) -> bool {
