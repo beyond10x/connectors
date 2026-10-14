@@ -262,14 +262,14 @@ impl Container {
     /// Run the CLI in the jail with an empty environment and only the two
     /// path globals.
     pub fn run(&self, args: &[&str]) -> Output {
-        self.jail
-            .command("/bin-test/connectors", Map::Own)
-            .args(["--output", "json", "--config", CONFIG, "--state-dir", STATE])
-            .args(args)
-            .env_clear()
-            .stdin(Stdio::null())
-            .output()
-            .unwrap_or_else(|error| panic!("{}", Jail::spawn_error(&error)))
+        Jail::output(
+            self.jail
+                .command("/bin-test/connectors", Map::Own)
+                .args(["--output", "json", "--config", CONFIG, "--state-dir", STATE])
+                .args(args)
+                .env_clear()
+                .stdin(Stdio::null()),
+        )
     }
 
     /// The digests the adapter child recorded in one of its logs.

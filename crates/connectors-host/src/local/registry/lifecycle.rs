@@ -153,6 +153,20 @@ impl Registry {
     /// This single metadata commit couples generation, custody, evidence, the
     /// private fence and the acquisition result. Repair preserves public revision.
     pub fn publish(&self, stored: StoredCandidate, now: u64) -> Result<String> {
+        self.publish_with(stored, now, false)
+    }
+
+    /// `exclusive` is the read-only binding's rule that one item backs one
+    /// connection, held inside the publishing commit: two connects that both
+    /// passed the early check publish at most one connection of the profile,
+    /// and the other is refused as `CustodyReadOnly`. A repair republishes its
+    /// own connection and is not counted.
+    pub(super) fn publish_with(
+        &self,
+        stored: StoredCandidate,
+        now: u64,
+        exclusive: bool,
+    ) -> Result<String> {
         let prepared = stored.prepared;
         self.transaction(now, false, |tx, _, now| {
             let acquired = completing(tx, &prepared.acquisition, &prepared.owner, now)?;
@@ -160,6 +174,11 @@ impl Registry {
             live(&row)?;
             if acquired.candidate.as_deref()!=Some(&prepared.version_id) || acquired.generation!=prepared.generation
                 || row.fence!=acquired.fence || row.binding!=prepared.binding { return Err(Failure::Conflict); }
+            if exclusive {
+                let held: i64 = tx.query_row("SELECT count(*) FROM registry_connections WHERE instance_id=?1 AND profile_key=?2 AND public=1 AND state!='revoked' AND connection_ref!=?3",
+                    params![row.binding.instance_id,profile_key(&row.binding)?,row.reference], |r| r.get(0)).map_err(db)?;
+                if held > 0 { return Err(Failure::CustodyReadOnly); }
+            }
             if row.identity.as_ref().is_some_and(|old| old!=&prepared.baseline.identity) { return Err(Failure::IdentityMismatch); }
             let consumed = acquired.consumed.ok_or(Failure::MetadataUnavailable)?;
             prepared.baseline.validate(&row.binding, consumed, now)?;
@@ -241,7 +260,7 @@ impl Registry {
                 })
             })?;
         let stored = self.acknowledge(prepared, receipt, clock())?;
-        self.publish(stored, clock())
+        self.publish_with(stored, clock(), true)
     }
 
     /// Whether the binding's instance holds a published, unrevoked connection

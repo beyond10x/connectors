@@ -363,3 +363,30 @@ fn configuration_refusal_names_rule() {
         "no path: {text}"
     );
 }
+
+/// Security review, story:mounted-secret-custody: one mounted item backs one
+/// connection, also when two `connections connect` for the same alias and
+/// profile run at once. The owner's `holds_profile` check reads only
+/// published connections, outside the transaction that publishes, so two
+/// connects that both pass it before either publishes would each publish a
+/// connection over the same item.
+#[test]
+fn mounted_concurrent_connects_publish_one_connection() {
+    let container = container("connectors-local/4", &Container::mounted());
+    // Start the owner first, so both connects race on the profile check and
+    // not on owner startup.
+    success(&container.run(&["connections", "list", "--adapter", ALIAS]));
+    let outputs = std::thread::scope(|scope| {
+        let first = scope.spawn(|| container.connect(PROFILE));
+        let second = scope.spawn(|| container.connect(PROFILE));
+        [first.join().unwrap(), second.join().unwrap()]
+    });
+    let succeeded = outputs.iter().filter(|o| o.status.success()).count();
+    let listed = success(&container.run(&["connections", "list", "--adapter", ALIAS]));
+    let connections = listed["connections"].as_array().unwrap().len();
+    assert!(
+        succeeded <= 1 && connections <= 1,
+        "one item backs one connection: {succeeded} connects succeeded, \
+         {connections} connections listed: {listed}"
+    );
+}

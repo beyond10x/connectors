@@ -38,15 +38,14 @@ fn in_child() -> bool {
 /// with its output unless it passes.
 fn run_in(jail: &Jail, name: &str, map: Map) {
     jail.install(&std::env::current_exe().unwrap(), "/bin-test/custody");
-    let output = jail
-        .command("/bin-test/custody", map)
-        .args(["--exact", name, "--nocapture", "--test-threads=1"])
-        .env_clear()
-        .env(CHILD, "1")
-        .env("TMPDIR", "/work")
-        .stdin(Stdio::null())
-        .output()
-        .unwrap_or_else(|error| panic!("{}", Jail::spawn_error(&error)));
+    let output = Jail::output(
+        jail.command("/bin-test/custody", map)
+            .args(["--exact", name, "--nocapture", "--test-threads=1"])
+            .env_clear()
+            .env(CHILD, "1")
+            .env("TMPDIR", "/work")
+            .stdin(Stdio::null()),
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(
         output.status.success() && stdout.contains("1 passed"),
@@ -458,4 +457,149 @@ fn items_are_selectors_and_redacted() {
     assert_eq!(format!("{:?}", super::Pin([7; 32])), "Pin(redacted)");
     let material = Material::from_slice(SECRET);
     assert_eq!(format!("{material:?}"), "Material(redacted)");
+}
+
+/// Security review, story:mounted-secret-custody: the checks
+/// `refuses_each_check` does not reach, each with everything else valid.
+/// Check 1, a group- or other-writable directory above the configured one;
+/// check 3, a world-writable `..data` sibling and a `..data` naming a second
+/// link; and Q3, a pin key or pin directory that is not owner-only.
+#[test]
+fn refuses_the_unmeasured_checks() {
+    if !in_child() {
+        let mut jail = jail();
+        projected(&jail.path(SOURCE), &[("ok", "profile", SECRET, 0o400)]);
+        // Check 1: the configured directory below an open directory.
+        jail.directory("/srv/open", 0o777);
+        let below = jail.directory("/srv/open/custody", 0o755);
+        projected(&below, &[("ok", "profile", SECRET, 0o400)]);
+        jail.read_only("/srv/open/custody", "/srv/open/custody");
+        // Check 3: the `..data` sibling writable by others.
+        let wide = jail.directory("/srv/wide", 0o755);
+        projected(&wide, &[("ok", "profile", SECRET, 0o400)]);
+        fs::set_permissions(wide.join(STAMP), fs::Permissions::from_mode(0o777)).unwrap();
+        jail.read_only("/srv/wide", "/srv/wide");
+        // Check 3: `..data` names a second link, which names the sibling.
+        let chained = jail.directory("/srv/chained", 0o755);
+        write(&chained.join(STAMP).join("ok/profile"), SECRET, 0o400);
+        symlink(STAMP, chained.join("..link")).unwrap();
+        symlink("..link", chained.join("..data")).unwrap();
+        jail.read_only("/srv/chained", "/srv/chained");
+        return run_in(
+            &jail,
+            "mounted::tests::refuses_the_unmeasured_checks",
+            Map::Own,
+        );
+    }
+    // Check 1.
+    assert_eq!(inspect(Path::new("/srv/open/custody")), State::Unavailable);
+    assert_eq!(
+        MountedSecret::open(scope(), Path::new("/srv/open/custody"), Path::new(PINS)).unwrap_err(),
+        Failure::Unavailable,
+        "an open ancestor"
+    );
+    // Check 3.
+    for name in ["/srv/wide", "/srv/chained"] {
+        let binding = MountedSecret::open(scope(), Path::new(name), Path::new(PINS)).unwrap();
+        let failure = binding.read_item(&item("ok", "profile")).unwrap_err();
+        assert_eq!(failure, Failure::Unavailable, "{name}");
+        redacted(failure, &binding, &[SECRET]);
+    }
+    // Q3: the pin key is owner-only, and so is its directory.
+    let binding = open();
+    assert!(binding.read_item(&item("ok", "profile")).is_ok());
+    let key = Path::new(PINS).join("pin.key");
+    fs::set_permissions(&key, fs::Permissions::from_mode(0o640)).unwrap();
+    assert_eq!(
+        binding.read_item(&item("ok", "profile")).unwrap_err(),
+        Failure::Unavailable,
+        "a pin key others can read"
+    );
+    fs::set_permissions(&key, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::set_permissions(PINS, fs::Permissions::from_mode(0o750)).unwrap();
+    assert_eq!(
+        MountedSecret::open(scope(), Path::new(CUSTODY), Path::new(PINS)).unwrap_err(),
+        Failure::Unavailable,
+        "a pin directory others can enter"
+    );
+}
+
+/// Check 5 runs on a descriptor that cannot read (`O_PATH`), and the item is
+/// opened for reading only once it is admitted: a refused item is never
+/// opened at all, so a device node or FIFO put in an item's place is never
+/// opened for read. Opens are observed with inotify, which reports
+/// `IN_OPEN` for every open that can read and none for `O_PATH`.
+#[test]
+fn an_item_is_opened_for_reading_only_after_its_checks() {
+    if !in_child() {
+        let jail = jail();
+        projected(
+            &jail.path(SOURCE),
+            &[
+                ("ok", "profile", SECRET, 0o400),
+                ("wide", "profile", SECRET, 0o644),
+            ],
+        );
+        return run_in(
+            &jail,
+            "mounted::tests::an_item_is_opened_for_reading_only_after_its_checks",
+            Map::Own,
+        );
+    }
+    // SAFETY: plain system calls on owned descriptors and NUL-terminated paths.
+    let (inotify, ok, wide) = unsafe {
+        let inotify = libc::inotify_init1(libc::IN_NONBLOCK | libc::IN_CLOEXEC);
+        assert!(inotify >= 0);
+        let watch = |path: &std::ffi::CStr| {
+            let wd = libc::inotify_add_watch(inotify, path.as_ptr(), libc::IN_OPEN);
+            assert!(wd >= 0, "watch {path:?}");
+            wd
+        };
+        (
+            inotify,
+            watch(c"/srv/custody/..data/ok/profile"),
+            watch(c"/srv/custody/..data/wide/profile"),
+        )
+    };
+    let binding = open();
+    assert_eq!(
+        binding.read_item(&item("wide", "profile")).unwrap_err(),
+        Failure::Unavailable
+    );
+    assert_eq!(
+        binding
+            .read_item(&item("ok", "profile"))
+            .unwrap()
+            .material()
+            .as_bytes(),
+        SECRET
+    );
+    let mut opens = std::collections::BTreeMap::<i32, usize>::new();
+    let mut buffer = [0u8; 4096];
+    loop {
+        // SAFETY: buffer is writable for its length; inotify is owned.
+        let count = unsafe { libc::read(inotify, buffer.as_mut_ptr().cast(), buffer.len()) };
+        if count <= 0 {
+            break;
+        }
+        let mut offset = 0;
+        while offset < count as usize {
+            // SAFETY: the kernel wrote whole events; read_unaligned copies one header.
+            let event = unsafe {
+                std::ptr::read_unaligned(buffer[offset..].as_ptr().cast::<libc::inotify_event>())
+            };
+            if event.mask & libc::IN_OPEN != 0 {
+                *opens.entry(event.wd).or_default() += 1;
+            }
+            offset += std::mem::size_of::<libc::inotify_event>() + event.len as usize;
+        }
+    }
+    // SAFETY: inotify is owned and closed once.
+    unsafe { libc::close(inotify) };
+    assert_eq!(opens.get(&wide), None, "the refused item was opened");
+    assert_eq!(
+        opens.get(&ok),
+        Some(&1),
+        "the admitted item, opened once to read"
+    );
 }

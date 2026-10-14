@@ -394,6 +394,10 @@ impl Store {
             .view)
     }
     pub fn retire(&self, revision: Uuid, key: Uuid) -> Result<View> {
+        // Retirement deletes from custody, which a read-only binding never does.
+        if self.read_only {
+            return Err(Failure::CustodyReadOnly);
+        }
         let _lease = Lease::acquire(&self.path, true)?;
         let record = self.prepare_retirement(revision, key)?;
         if record.view.key(key)?.state == State::Deleted {
@@ -488,6 +492,7 @@ impl Store {
             lease,
             version,
             socket: self.socket.clone(),
+            read_only: self.read_only,
             key: approvals::ConfiguredApprovalKey {
                 issuer: record.view.issuer.clone(),
                 audience: record.view.audience.clone(),
@@ -625,6 +630,8 @@ pub struct KeyUse {
     key: approvals::ConfiguredApprovalKey,
     version: custody::Version,
     socket: Option<PathBuf>,
+    /// Under a read-only selection the signer is never opened.
+    read_only: bool,
 }
 impl KeyUse {
     pub fn key(&self) -> Result<&approvals::ConfiguredApprovalKey> {
@@ -636,6 +643,11 @@ impl KeyUse {
         use_signer: impl FnOnce(&approvals::Signer) -> Result<T>,
     ) -> Result<T> {
         self.lease.check()?;
+        // A read-only binding holds no signing key: never open the platform
+        // custody in its place.
+        if self.read_only {
+            return Err(Failure::CustodyReadOnly);
+        }
         let custody = custody::Store::open_at(self.version.scope(), self.socket.as_deref())
             .map_err(secret_error)?;
         let seed = custody.read(self.version).map_err(secret_error)?;
