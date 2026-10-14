@@ -1,18 +1,30 @@
-//! Native protected entry and identity probe of the profile `grafana.service_account`
-//! (`spec/ess/domains/connection.yaml`; `design.md` beside this adapter). The host owns
-//! acquisition, custody, publication, clocks and the authenticated capability; this
-//! module owns only the entry's shape and the check.
+//! Native protected entry and identity probes of the profiles `grafana.service_account`
+//! and `grafana.irm_service_account` (`spec/ess/domains/connection.yaml`; `design.md`
+//! beside this adapter). The host owns acquisition, custody, publication, clocks and the
+//! authenticated capability; this module owns only the entry's shape and the checks.
 //!
-//! The check is `GET /api/datasources`, the declared `datasources.list` verification: a
-//! 200 proves the service-account token reaches the data-source read. Its body is not
-//! used and the identity is the configured connection: two tokens Grafana accepts are the
-//! same identity, and a repair cannot detect a token of another organization.
+//! The data-source check is `GET /api/datasources`, the declared `datasources.list`
+//! verification: a 200 proves the service-account token reaches the data-source read. The
+//! IRM check is one GET of `api/v1/alert_groups/` over a fixed one-second window on the
+//! IRM API URL: a 200 proves the token reaches the IRM read. Neither body is used and the
+//! identity is the configured connection: two tokens Grafana accepts are the same
+//! identity, and a repair cannot detect a token of another organization.
 use connectors_core::ErrorCode;
 use connectors_sdk::{AuthenticatedHttp, Secret};
 use serde::{Deserialize, Deserializer};
 use zeroize::Zeroizing;
 
 pub const PROFILE_ID: &str = "grafana.service_account";
+/// The profile every `irm.*` read requires: the same entry, proved against IRM.
+pub const IRM_PROFILE_ID: &str = "grafana.irm_service_account";
+/// The IRM identity probe, relative to the configured IRM API URL.
+pub const IRM_PROBE_PATH: [&str; 4] = crate::ALERT_GROUPS;
+/// The probe's fixed, one-second window and one-record page: its answer is at most one
+/// alert group, and it is not read.
+pub const IRM_PROBE_QUERY: [(&str, &str); 2] = [
+    ("started_at", "2000-01-01T00:00:00_2000-01-01T00:00:01"),
+    ("perpage", "1"),
+];
 /// The identity kind recorded beside the configured `instance` subject.
 pub const IDENTITY_KIND: &str = "grafana.connection";
 /// The identity probe, relative to the configured base URL.
@@ -76,8 +88,30 @@ pub async fn validate(
     http: &dyn AuthenticatedHttp,
     clock: impl Fn() -> u64,
 ) -> Result<Validation, Failure> {
+    probe(http, &PROBE_PATH, &[], clock).await
+}
+
+/// `GET api/v1/alert_groups/` with the fixed window on the IRM port, which carries the
+/// stack header. Its statuses are read as [`validate`] reads its own.
+pub async fn validate_irm(
+    http: &dyn AuthenticatedHttp,
+    clock: impl Fn() -> u64,
+) -> Result<Validation, Failure> {
+    let query: Vec<(&str, String)> = IRM_PROBE_QUERY
+        .iter()
+        .map(|(k, v)| (*k, (*v).to_owned()))
+        .collect();
+    probe(http, &IRM_PROBE_PATH, &query, clock).await
+}
+
+async fn probe(
+    http: &dyn AuthenticatedHttp,
+    path: &[&str],
+    query: &[(&str, String)],
+    clock: impl Fn() -> u64,
+) -> Result<Validation, Failure> {
     let collected_at_ms = clock();
-    let response = http.get(&PROBE_PATH, &[]).await.map_err(|e| match e.code {
+    let response = http.get(path, query).await.map_err(|e| match e.code {
         ErrorCode::Timeout => Failure::Deadline,
         _ => Failure::Unavailable,
     })?;

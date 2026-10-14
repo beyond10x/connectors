@@ -1,0 +1,37 @@
+{
+  "incident": {
+    "incidentID": "incident-101",
+    "refs": [
+      {
+        "key": "com.grafana.oncall",
+        "ref": "I68T24C13IFW1",
+        "url": "https://stack.example/a/grafana-irm-app/alert-groups/I68T24C13IFW1"
+      },
+      {
+        "key": "com.grafana.oncall",
+        "ref": "I68T24C13IFW1",
+        "url": "https://stack.example/a/grafana-irm-app/alert-groups/I68T24C13IFW1"
+      }
+    ],
+    "severity": "minor",
+    "labels": [],
+    "isDrill": false,
+    "incidentType": "internal",
+    "createdTime": "2026-01-01T12:40:00Z",
+    "modifiedTime": "2026-01-03T09:00:00Z",
+    "createdByUser": {
+      "name": "Fixture Person",
+      "photoURL": "",
+      "userID": "user-fixture-1"
+    },
+    "closedTime": "2026-01-03T09:00:00Z",
+    "durationSeconds": 159600,
+    "status": "resolved",
+    "title": "Memory pressure on the fixture cluster",
+    "overviewURL": "/a/grafana-irm-app/incidents/incident-101/title",
+    "summary": "fixture-private-summary",
+    "incidentStart": "2026-01-01T12:35:00Z",
+    "incidentEnd": "2026-01-03T09:00:00Z",
+    "incidentChannels": []
+  }
+}

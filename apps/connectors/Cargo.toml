@@ -20,6 +20,7 @@ tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
+connectors-custody = { workspace = true, features = ["test-support"] }
 async-trait.workspace = true
 hex.workspace = true
 libc = "0.2"

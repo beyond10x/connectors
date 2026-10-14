@@ -1,0 +1,526 @@
+{
+  "excluded_media_types": [],
+  "ignored_keys": [
+    "/definitions/AddTeamMemberPayload/properties/user/description",
+    "/definitions/CreateEscalationPayload/properties/ownerTeam/description",
+    "/definitions/CreateEscalationPayload/properties/repeat/description",
+    "/definitions/CreateForwardingRulePayload/properties/fromUser/description",
+    "/definitions/CreateForwardingRulePayload/properties/toUser/description",
+    "/definitions/CreateMaintenancePayload/properties/time/description",
+    "/definitions/CreateNotificationRulePayload/properties/timeRestriction/description",
+    "/definitions/CreateNotificationRuleStepPayload/properties/contact/description",
+    "/definitions/CreateNotificationRuleStepPayload/properties/sendAfter/description",
+    "/definitions/CreateScheduleOverridePayload/properties/user/description",
+    "/definitions/CreateSchedulePayload/properties/ownerTeam/description",
+    "/definitions/CreateScheduleRotationPayload/properties/timeRestriction/description",
+    "/definitions/CreateUserPayload/properties/role/description",
+    "/definitions/CreateUserPayload/properties/userAddress/description",
+    "/definitions/DeprecatedAlertPolicy/properties/filter/description",
+    "/definitions/DeprecatedAlertPolicy/properties/timeRestrictions/description",
+    "/definitions/DeprecatedAutoCloseAlertPolicy/allOf/1/properties/duration/description",
+    "/definitions/DeprecatedAutoRestartNotificationsAlertPolicy/allOf/1/properties/duration/description",
+    "/definitions/DeprecatedNotificationDeduplicationAlertPolicy/allOf/1/properties/duration/description",
+    "/definitions/DeprecatedNotificationDelayAlertPolicy/allOf/1/properties/duration/description",
+    "/definitions/Maintenance/properties/time/description",
+    "/definitions/MaintenanceMeta/properties/time/description",
+    "/definitions/NotificationPolicy/allOf/1/properties/autoCloseAction/description",
+    "/definitions/NotificationPolicy/allOf/1/properties/autoRestartAction/description",
+    "/definitions/NotificationPolicy/allOf/1/properties/deduplicationAction/description",
+    "/definitions/NotificationPolicy/allOf/1/properties/delayAction/description",
+    "/definitions/Policy/properties/filter/description",
+    "/definitions/Policy/properties/timeRestrictions/description",
+    "/definitions/UpdateEscalationPayload/properties/ownerTeam/description",
+    "/definitions/UpdateEscalationPayload/properties/repeat/description",
+    "/definitions/UpdateForwardingRulePayload/properties/fromUser/description",
+    "/definitions/UpdateForwardingRulePayload/properties/toUser/description",
+    "/definitions/UpdateMaintenancePayload/properties/time/description",
+    "/definitions/UpdateNotificationRulePayload/properties/repeat/description",
+    "/definitions/UpdateNotificationRulePayload/properties/timeRestriction/description",
+    "/definitions/UpdateNotificationRuleStepPayload/properties/contact/description",
+    "/definitions/UpdateNotificationRuleStepPayload/properties/sendAfter/description",
+    "/definitions/UpdateScheduleOverridePayload/properties/user/description",
+    "/definitions/UpdateSchedulePayload/properties/ownerTeam/description",
+    "/definitions/UpdateScheduleRotationPayload/properties/timeRestriction/description",
+    "/definitions/UpdateUserPayload/properties/role/description",
+    "/definitions/UpdateUserPayload/properties/userAddress/description",
+    "/definitions/User/properties/role/description",
+    "/definitions/User/properties/userAddress/description",
+    "/parameters/DeprecatedAlertPolicy",
+    "/parameters/DeprecatedAlertPolicyMeta",
+    "/parameters/DeprecatedAutoCloseAlertPolicy",
+    "/parameters/DeprecatedAutoRestartNotificationsAlertPolicy",
+    "/parameters/DeprecatedChangeAlertPolicyOrderPayload",
+    "/parameters/DeprecatedCreateAlertPolicyResponse",
+    "/parameters/DeprecatedGetAlertPolicyResponse",
+    "/parameters/DeprecatedListAlertPoliciesResponse",
+    "/parameters/DeprecatedModifyAlertPolicy",
+    "/parameters/DeprecatedNotificationDeduplicationAlertPolicy",
+    "/parameters/DeprecatedNotificationDelayAlertPolicy",
+    "/parameters/DeprecatedNotificationRenotifyAlertPolicy",
+    "/parameters/DeprecatedNotificationSuppressAlertPolicy",
+    "/securityDefinitions"
+  ],
+  "info_version": "2.0.0",
+  "operation_count": 170,
+  "operations": [
+    "ListIncidents",
+    "cancelMaintenance",
+    "countAlerts",
+    "deleteAlert",
+    "deleteAlertPolicy",
+    "deleteContact",
+    "deleteCustomUserRole",
+    "deleteEscalation",
+    "deleteForwardingRule",
+    "deleteHeartbeat",
+    "deleteIncident",
+    "deleteIntegration",
+    "deleteMaintenance",
+    "deleteNotificationRule",
+    "deleteNotificationRuleStep",
+    "deleteSavedSearch",
+    "deleteSchedule",
+    "deleteScheduleOverride",
+    "deleteScheduleRotation",
+    "deleteTeam",
+    "deleteTeamMember",
+    "deleteTeamRole",
+    "deleteTeamRoutingRule",
+    "deleteUser",
+    "disableAlertPolicy",
+    "disableContact",
+    "disableHeartbeat",
+    "disableIntegration",
+    "disableNotificationRule",
+    "disableNotificationRuleStep",
+    "enableAlertPolicy",
+    "enableContact",
+    "enableHeartbeat",
+    "enableIntegration",
+    "enableNotificationRule",
+    "enableNotificationRuleStep",
+    "exportOnCallUser",
+    "exportSchedule",
+    "getAlert",
+    "getAlertPolicy",
+    "getAttachment",
+    "getContact",
+    "getCustomUserRole",
+    "getEscalation",
+    "getForwardingRule",
+    "getHeartbeat",
+    "getIncident",
+    "getIncidentRequestStatus",
+    "getInfo",
+    "getIntegration",
+    "getMaintenance",
+    "getNextOnCalls",
+    "getNotificationRule",
+    "getNotificationRuleStep",
+    "getOnCalls",
+    "getRequestStatus",
+    "getSavedSearch",
+    "getSchedule",
+    "getScheduleOverride",
+    "getScheduleRotation",
+    "getScheduleTimeline",
+    "getTeam",
+    "getTeamRole",
+    "getTeamRoutingRule",
+    "getUser",
+    "listAlertPolicies",
+    "listAlerts",
+    "listAttachments",
+    "listContacts",
+    "listCustomUserRoles",
+    "listEscalations",
+    "listForwardingRules",
+    "listHeartBeats",
+    "listIntegrationActions",
+    "listIntegrations",
+    "listLogs",
+    "listMaintenance",
+    "listNotes",
+    "listNotificationRuleSteps",
+    "listNotificationRules",
+    "listOnCalls",
+    "listRecipients",
+    "listSavedSearches",
+    "listScheduleOverride",
+    "listScheduleRotations",
+    "listSchedules",
+    "listTeamLogs",
+    "listTeamRoles",
+    "listTeamRoutingRules",
+    "listTeams",
+    "listUserEscalations",
+    "listUserForwardingRules",
+    "listUserSchedules",
+    "listUserTeams",
+    "listUsers",
+    "ping",
+    "removeAttachment",
+    "removeDetails",
+    "removeTags"
+  ],
+  "projector": "swagger2-openapi/2",
+  "source_bytes": 659535,
+  "source_sha256": "60901e17d0d4ba28b8d13d3d78f6a5d329b93008c3c1710dfe6a0b6c786ef071",
+  "unprojected_operations": [
+    {
+      "operation_id": "acknowledgeAlert",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1acknowledge/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "addAttachment",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1attachments/post",
+      "reason": "formData parameter of type file"
+    },
+    {
+      "operation_id": "addDetails",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1details/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "addNote",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1notes/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "addResponder",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1responders/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "addTags",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1tags/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "addTeam",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1teams/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "addTeamMember",
+      "pointer": "/paths/~1v2~1teams~1{identifier}~1members/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "assignAlert",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1assign/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "authenticateIntegration",
+      "pointer": "/paths/~1v2~1integrations~1authenticate/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "changeAlertPolicyOrder",
+      "pointer": "/paths/~1v1~1policies~1{policyId}~1change-order/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "changeNotificationRuleOrder",
+      "pointer": "/paths/~1v2~1users~1{identifier}~1notification-rules~1{ruleId}~1change-order/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "changePolicyOrder",
+      "pointer": "/paths/~1v2~1policies~1{policyId}~1change-order/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "changeTeamRoutingRuleOrder",
+      "pointer": "/paths/~1v2~1teams~1{identifier}~1routing-rules~1{id}~1change-order/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "closeAlert",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1close/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "closeIncident",
+      "pointer": "/paths/~1v1~1incidents~1{identifier}~1close/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createAlert",
+      "pointer": "/paths/~1v2~1alerts/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createAlertPolicy",
+      "pointer": "/paths/~1v1~1policies/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createContact",
+      "pointer": "/paths/~1v2~1users~1{identifier}~1contacts/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createCustomUserRole",
+      "pointer": "/paths/~1v2~1roles/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createEscalation",
+      "pointer": "/paths/~1v2~1escalations/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createForwardingRule",
+      "pointer": "/paths/~1v2~1forwarding-rules/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createHeartbeat",
+      "pointer": "/paths/~1v2~1heartbeats/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createIncident",
+      "pointer": "/paths/~1v1~1incidents~1create/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createIntegration",
+      "pointer": "/paths/~1v2~1integrations/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createIntegrationAction",
+      "pointer": "/paths/~1v2~1integrations~1{id}~1actions/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createMaintenance",
+      "pointer": "/paths/~1v1~1maintenance/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createNotificationRule",
+      "pointer": "/paths/~1v2~1users~1{identifier}~1notification-rules/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createNotificationRuleStep",
+      "pointer": "/paths/~1v2~1users~1{identifier}~1notification-rules~1{ruleId}~1steps/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createPolicy",
+      "pointer": "/paths/~1v2~1policies/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createSavedSearches",
+      "pointer": "/paths/~1v2~1alerts~1saved-searches/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createSchedule",
+      "pointer": "/paths/~1v2~1schedules/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createScheduleOverride",
+      "pointer": "/paths/~1v2~1schedules~1{identifier}~1overrides/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createScheduleRotation",
+      "pointer": "/paths/~1v2~1schedules~1{identifier}~1rotations/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createTeam",
+      "pointer": "/paths/~1v2~1teams/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createTeamRole",
+      "pointer": "/paths/~1v2~1teams~1{identifier}~1roles/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createTeamRoutingRule",
+      "pointer": "/paths/~1v2~1teams~1{identifier}~1routing-rules/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "createUser",
+      "pointer": "/paths/~1v2~1users/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "deletePolicy",
+      "pointer": "/paths/~1v2~1policies~1{policyId}/delete",
+      "reason": "non-body parameter written with a schema"
+    },
+    {
+      "operation_id": "disablePolicy",
+      "pointer": "/paths/~1v2~1policies~1{policyId}~1disable/post",
+      "reason": "non-body parameter written with a schema"
+    },
+    {
+      "operation_id": "enablePolicy",
+      "pointer": "/paths/~1v2~1policies~1{policyId}~1enable/post",
+      "reason": "non-body parameter written with a schema"
+    },
+    {
+      "operation_id": "escalateAlert",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1escalate/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "executeCustomAlertAction",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1actions~1{actionName}/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "getPolicy",
+      "pointer": "/paths/~1v2~1policies~1{policyId}/get",
+      "reason": "non-body parameter written with a schema"
+    },
+    {
+      "operation_id": "listAlertPolicies",
+      "pointer": "/paths/~1v2~1policies~1alert/get",
+      "reason": "non-body parameter written with a schema"
+    },
+    {
+      "operation_id": "listNotificationPolicies",
+      "pointer": "/paths/~1v2~1policies~1notification/get",
+      "reason": "non-body parameter written with a schema"
+    },
+    {
+      "operation_id": "snoozeAlert",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1snooze/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "unAcknowledgeAlert",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1unacknowledge/post",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateAlertDescription",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1description/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateAlertMessage",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1message/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateAlertPolicy",
+      "pointer": "/paths/~1v1~1policies~1{policyId}/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateAlertPriority",
+      "pointer": "/paths/~1v2~1alerts~1{identifier}~1priority/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateContact",
+      "pointer": "/paths/~1v2~1users~1{identifier}~1contacts~1{contactId}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateCustomUserRole",
+      "pointer": "/paths/~1v2~1roles~1{identifier}/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateEscalation",
+      "pointer": "/paths/~1v2~1escalations~1{identifier}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateForwardingRule",
+      "pointer": "/paths/~1v2~1forwarding-rules~1{identifier}/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateHeartbeat",
+      "pointer": "/paths/~1v2~1heartbeats~1{name}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateIntegration",
+      "pointer": "/paths/~1v2~1integrations~1{id}/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateIntegrationActions",
+      "pointer": "/paths/~1v2~1integrations~1{id}~1actions/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateMaintenance",
+      "pointer": "/paths/~1v1~1maintenance~1{id}/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateNotificationRule",
+      "pointer": "/paths/~1v2~1users~1{identifier}~1notification-rules~1{ruleId}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateNotificationRuleStep",
+      "pointer": "/paths/~1v2~1users~1{identifier}~1notification-rules~1{ruleId}~1steps~1{id}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updatePolicy",
+      "pointer": "/paths/~1v2~1policies~1{policyId}/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateSavedSearch",
+      "pointer": "/paths/~1v2~1alerts~1saved-searches~1{identifier}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateSchedule",
+      "pointer": "/paths/~1v2~1schedules~1{identifier}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateScheduleOverride",
+      "pointer": "/paths/~1v2~1schedules~1{identifier}~1overrides~1{alias}/put",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateScheduleRotation",
+      "pointer": "/paths/~1v2~1schedules~1{identifier}~1rotations~1{id}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateTeam",
+      "pointer": "/paths/~1v2~1teams~1{identifier}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateTeamRole",
+      "pointer": "/paths/~1v2~1teams~1{identifier}~1roles~1{teamRoleIdentifier}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateTeamRoutingRule",
+      "pointer": "/paths/~1v2~1teams~1{identifier}~1routing-rules~1{id}/patch",
+      "reason": "request body without a media type"
+    },
+    {
+      "operation_id": "updateUser",
+      "pointer": "/paths/~1v2~1users~1{identifier}/patch",
+      "reason": "request body without a media type"
+    }
+  ]
+}

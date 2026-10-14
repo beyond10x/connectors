@@ -750,27 +750,13 @@ fn worker(
                         job.deadline,
                     )?;
                     let version = captured.version();
-                    let material = custody::Store::open_at(
-                        version.scope(),
-                        config.secret_service_socket.as_deref(),
-                    )
-                    .and_then(|store| store.read(version));
-                    let material = match material {
-                        Ok(value) => value,
-                        Err(error) => {
-                            if matches!(error, custody::Failure::Missing) {
-                                registry
-                                    .missing_revalidation(captured, connectors_sdk::now_ms())?;
-                            } else {
-                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
-                            }
-                            return Err(Code::CustodyUnavailable.into());
-                        }
-                    };
+                    let selection = config.selection();
+                    let read = custody::Store::open_for(version.scope(), &selection, &paths.state)
+                        .and_then(|store| store.read(version));
                     let check = || -> Result<()> {
                         let (latest_config, latest) = selected(&paths, &job.alias)?;
                         if latest.selection() != current.selection()
-                            || latest_config.secret_service_socket != config.secret_service_socket
+                            || latest_config.selection() != config.selection()
                         {
                             return Err(Code::LifecycleConflict.into());
                         }
@@ -781,6 +767,75 @@ fn worker(
                             return Err(Code::Unavailable.into());
                         }
                         Ok(())
+                    };
+                    let material = match read {
+                        Ok(value) => value,
+                        // The mounted item's bytes are no longer the pinned
+                        // ones: re-read it, validate the new bytes with the
+                        // provider and publish them as a new version, without
+                        // re-entry. The old bytes' version is retired.
+                        #[cfg(target_os = "linux")]
+                        Err(custody::Failure::Missing) if selection.read_only() => {
+                            registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+                            let acquired = registry.begin_repair(
+                                &binding,
+                                &connection,
+                                &revision,
+                                connectors_sdk::now_ms(),
+                            )?;
+                            let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
+                            let published = super::publish_mounted(
+                                &paths,
+                                &selection,
+                                &registry,
+                                &claim,
+                                &job.alias,
+                                &profile,
+                                |secret| {
+                                    control
+                                        .lock()
+                                        .map_err(|_| Code::Unavailable)?
+                                        .check(job.epoch)
+                                        .and_then(|_| check())?;
+                                    Ok(active
+                                        .validate(&profile, &secret, job.deadline)?
+                                        .into_registry())
+                                },
+                                || {
+                                    control
+                                        .lock()
+                                        .map_err(|_| Code::Unavailable)?
+                                        .check(job.epoch)
+                                        .and_then(|_| check())
+                                },
+                            );
+                            if let Err(error) = published {
+                                if error.code != Code::OutcomeUnknown {
+                                    registry.fail(&claim, connectors_sdk::now_ms())?;
+                                }
+                                return Err(error);
+                            }
+                            let observed = registry.describe(
+                                &current.instance_id,
+                                &current.adapter_id,
+                                &current.configuration_revision,
+                                &connection,
+                                connectors_sdk::now_ms(),
+                                true,
+                            )?;
+                            return Ok(Output::Value(
+                                json!({"connection":connection_value(&job.alias,observed)}),
+                            ));
+                        }
+                        Err(error) => {
+                            if super::read_invalidates(&selection, error) {
+                                registry
+                                    .missing_revalidation(captured, connectors_sdk::now_ms())?;
+                            } else {
+                                registry.cancel_revalidation(captured, connectors_sdk::now_ms())?;
+                            }
+                            return Err(Code::CustodyUnavailable.into());
+                        }
                     };
                     let guard = control.lock().map_err(|_| Code::Unavailable)?;
                     if let Err(error) = guard.check(job.epoch).and_then(|_| check()) {
@@ -889,15 +944,14 @@ fn worker(
                         job.deadline,
                     )?;
                     let version = captured.version();
-                    let material = custody::Store::open_at(
-                        version.scope(),
-                        config.secret_service_socket.as_deref(),
-                    )
-                    .and_then(|store| store.read(version));
+                    let selection = config.selection();
+                    let material =
+                        custody::Store::open_for(version.scope(), &selection, &paths.state)
+                            .and_then(|store| store.read(version));
                     let material = match material {
                         Ok(value) => value,
                         Err(e) => {
-                            if matches!(e, custody::Failure::Missing) {
+                            if super::read_invalidates(&selection, e) {
                                 registry.invalidate_read(
                                     &captured,
                                     registry::InvalidCredential::Missing,
@@ -905,7 +959,7 @@ fn worker(
                                 )?;
                             }
                             registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                            return Err(Code::CustodyUnavailable.into());
+                            return Err(super::read_error(&selection, e));
                         }
                     };
                     let partition = captured.partition().to_owned();
@@ -913,7 +967,7 @@ fn worker(
                     let checked: Result<()> = (|| {
                         let (latest_config, latest) = selected(&paths, &job.alias)?;
                         if latest.selection() != current.selection()
-                            || latest_config.secret_service_socket != config.secret_service_socket
+                            || latest_config.selection() != config.selection()
                         {
                             return Err(Code::LifecycleConflict.into());
                         }

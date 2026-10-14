@@ -2,14 +2,104 @@
 format: aep.planning-md/3
 id: story:mounted-secret-custody
 kind: story
-status: proposed
+status: active
 title: Read-only mounted-secret custody, explicitly selected, for headless and container hosts
 relations:
 - serves: vision:independent-contract-adapters
 - depends_on: story:platform-credential-custody
-revision: 3
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: inferred
+  path: apps/connectors-cli-contract
+- confidence: cited
+  path: apps/connectors/spec/cli.yaml
+- confidence: cited
+  path: apps/connectors/src/local.rs
+- confidence: cited
+  path: apps/connectors/src/local/connections.rs
+- confidence: cited
+  path: apps/connectors/tests/container_env_i.rs
+- confidence: cited
+  path: apps/connectors/tests/mounted_custody.rs
+- confidence: cited
+  path: contracts/auth/custody/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/fixtures
+- confidence: inferred
+  path: contracts/cli/v1alpha1/fixtures/values.json
+- confidence: cited
+  path: contracts/cli/v1alpha1/scenarios.md
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-build/src/ignored.rs
+- confidence: cited
+  path: crates/connectors-custody/Cargo.toml
+- confidence: cited
+  path: crates/connectors-custody/src/contract.rs
+- confidence: inferred
+  path: crates/connectors-custody/src/keychain.rs
+- confidence: cited
+  path: crates/connectors-custody/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-custody/src/memory.rs
+- confidence: cited
+  path: crates/connectors-custody/src/mounted.rs
+- confidence: inferred
+  path: crates/connectors-custody/src/secret_service/mod.rs
+- confidence: inferred
+  path: crates/connectors-custody/src/tests.rs
+- confidence: cited
+  path: crates/connectors-docs/src/status.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/approval_keys.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/config.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/filesystem.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/keyring.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/keyring/custody.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/metadata/er.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/supervisor.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/transport.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/registry/lifecycle.rs
+- confidence: cited
+  path: crates/connectors-spec/toolchain.json
+- confidence: cited
+  path: docs/local-container.md
+- confidence: cited
+  path: docs/local-mounted-secret-custody.md
+- confidence: cited
+  path: docs/local-secret-service.md
+- confidence: cited
+  path: ess/components.yaml
+- confidence: cited
+  path: ess/domains/auth_bindings.yaml
+- confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: inferred
+  path: website/data/status.json
+- confidence: inferred
+  path: website/docs/concepts/local-runtime.md
+- confidence: inferred
+  path: website/docs/guides/set-up-the-local-cli.md
+- confidence: inferred
+  path: website/docs/reference
+- confidence: inferred
+  path: website/docs/status.md
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-13T20:03:47Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-14T02:55:05Z", actor: "human:timo", revision: 6}
 ---
 ## Problem
 

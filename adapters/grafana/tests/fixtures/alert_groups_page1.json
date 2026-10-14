@@ -1,0 +1,60 @@
+{
+  "count": 3,
+  "next": "https://oncall.example/api/v1/alert_groups/?page=2&perpage=2&started_at=2026-01-01T00%3A00%3A00_2026-01-02T00%3A00%3A00",
+  "previous": null,
+  "results": [
+    {
+      "id": "I68T24C13IFW1",
+      "integration_id": "CFRPV98RPR1U8",
+      "route_id": "RIYGUJXCPFHXY",
+      "alerts_count": 3,
+      "state": "resolved",
+      "created_at": "2026-01-01T12:37:01.430444Z",
+      "alert_group_number": 42,
+      "resolved_at": "2026-01-01T13:37:01.429805Z",
+      "acknowledged_at": null,
+      "acknowledged_by": null,
+      "resolved_by": "UFIXTUREUSER1",
+      "title": "Memory above 90% threshold",
+      "permalinks": {
+        "slack": "https://fixture-workspace.slack.example/archives/C000/p000",
+        "telegram": "https://t.example/c/0000/0000"
+      },
+      "silenced_at": null,
+      "root_alert_group_id": null,
+      "dependent_alert_group_ids": ["I7XKBQYJYFW3M"],
+      "last_alert": {
+        "id": "AA74DN7T4JQB6",
+        "alert_group_id": "I68T24C13IFW1",
+        "created_at": "2026-01-01T12:37:01Z",
+        "payload": {
+          "state": "alerting",
+          "title": "[Alerting] fixture-private-payload-title",
+          "message": "fixture-private-payload-message"
+        }
+      }
+    },
+    {
+      "id": "I7XKBQYJYFW3M",
+      "integration_id": "CFRPV98RPR1U8",
+      "route_id": null,
+      "alerts_count": 1,
+      "state": "new",
+      "created_at": "2026-01-01T18:00:00Z",
+      "alert_group_number": 43,
+      "resolved_at": null,
+      "acknowledged_at": null,
+      "acknowledged_by": null,
+      "resolved_by": null,
+      "title": null,
+      "permalinks": {},
+      "silenced_at": null,
+      "root_alert_group_id": "I68T24C13IFW1",
+      "dependent_alert_group_ids": [],
+      "last_alert": null
+    }
+  ],
+  "current_page_number": 1,
+  "page_size": 2,
+  "total_pages": 2
+}

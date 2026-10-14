@@ -250,6 +250,14 @@ Sources:
   [Waves](#waves) falls from 577 to 445: U08 keeps `slack.message.edit` and
   `slack.message.delete` open (30 calls). No mapped call of
   [Used but not declared](#used-but-not-declared) lands on this operation.
+- **Opsgenie reads, 2026-10-14 (unreleased).** `opsgenie.alert.list` and `opsgenie.alert.get`
+  moved from missing to covered when the catalog provider gained Opsgenie with `alerts.list` and
+  `alert.get`, beside `incidents.list`, `incident.get` and `incident.alert_ids`, all reads
+  ([Opsgenie guide](catalog-opsgenie.md)), verified against a fixture, not a live Opsgenie.
+  Both have 0 calls, so the `opsgenie` row reads 2 / 0 covered and 6 / 0 missing, the plugin
+  moves from missing to covered, the summary and total rows move by 2 operations and no call,
+  and [Not planned until used](#not-planned-until-used) falls from 177 to 175. The writes, on-call,
+  schedules and `opsgenie.test` stay missing.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -276,9 +284,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 104 | 5,919 | 89 | 5,919 |
+| covered | 106 | 5,919 | 89 | 5,919 |
 | partial | 7 | 5 | 1 | 5 |
-| missing | 190 | 432 | 19 | 432 |
+| missing | 188 | 432 | 19 | 432 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -311,22 +319,22 @@ Per plugin (operations / calls):
 | git | 6 | 0 | 0 | 0 / 0 | 0 / 0 | 6 / 0 |
 | ollama | 7 | 0 | 0 | 0 / 0 | 0 / 0 | 7 / 0 |
 | openai | 3 | 0 | 0 | 0 / 0 | 0 / 0 | 3 / 0 |
-| opsgenie | 8 | 0 | 0 | 0 / 0 | 0 / 0 | 8 / 0 |
+| opsgenie | 8 | 0 | 0 | 2 / 0 | 0 / 0 | 6 / 0 |
 | sleep | 1 | 0 | 0 | 0 / 0 | 0 / 0 | 1 / 0 |
 | system | 1 | 0 | 0 | 0 / 0 | 0 / 0 | 1 / 0 |
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **104 / 5,919** | **7 / 5** | **190 / 432** |
+| **total** | **301** | **109** | **6,356** | **106 / 5,919** | **7 / 5** | **188 / 432** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
 
 | verdict | plugins | count |
 |---|---|---:|
-| covered | gitlab, jira, confluence, grafana, kubernetes, loki, prometheus, slack, sql, tavily | 10 |
+| covered | gitlab, jira, confluence, grafana, kubernetes, loki, opsgenie, prometheus, slack, sql, tavily | 11 |
 | partial only | websearch | 1 |
-| missing | homer, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, opsgenie, sleep, system, vision | 13 |
+| missing | homer, alertmanager, asterisk, aws, docker, duckduckgo, git, ollama, openai, sleep, system, vision | 12 |
 | no operations declared | clock | 1 |
 
 ## Verdict rules
@@ -886,18 +894,18 @@ Source: fluxplane inventory §2 openai. Connectors has no OpenAI provider.
 
 ## opsgenie
 
-Source: fluxplane inventory §2 opsgenie. Connectors has no Opsgenie provider.
+Source: fluxplane inventory §2 opsgenie. Operations are cited in `adapters/catalog/providers/opsgenie/operations.json`; the catalog provider serves Opsgenie read only ([Opsgenie guide](catalog-opsgenie.md)), with no write.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `opsgenie.alert.ack` | 0 | 0 | - | — | missing | No provider. |
-| `opsgenie.alert.close` | 0 | 0 | - | — | missing | No provider. |
-| `opsgenie.alert.get` | 0 | 0 | - | — | missing | No provider. |
-| `opsgenie.alert.list` | 0 | 0 | - | — | missing | No provider. |
-| `opsgenie.alert.note` | 0 | 0 | - | — | missing | No provider. |
-| `opsgenie.oncall` | 0 | 0 | - | — | missing | No provider. |
-| `opsgenie.schedule.list` | 0 | 0 | - | — | missing | No provider. |
-| `opsgenie.test` | 0 | 0 | - | — | missing | No provider. |
+| `opsgenie.alert.ack` | 0 | 0 | - | — | missing | No write is selected. |
+| `opsgenie.alert.close` | 0 | 0 | - | — | missing | No write is selected. |
+| `opsgenie.alert.get` | 0 | 0 | - | `alert.get` (:11) | covered | — |
+| `opsgenie.alert.list` | 0 | 0 | - | `alerts.list` (:5) | covered | Lists by a search query over a creation window, oldest first; a saved search is not offered. |
+| `opsgenie.alert.note` | 0 | 0 | - | — | missing | No write is selected. |
+| `opsgenie.oncall` | 0 | 0 | - | — | missing | Not selected. |
+| `opsgenie.schedule.list` | 0 | 0 | - | — | missing | Not selected. |
+| `opsgenie.test` | 0 | 0 | - | — | missing | Not selected. |
 
 ## sleep
 
@@ -1147,8 +1155,8 @@ the sum of its units' open calls in [Gap units](#gap-units); a wave with 0 open 
 
 ## Not planned until used
 
-177 operations with 0 calls are partial or missing: 171 missing and 6 partial. They belong to
-no unit until a session uses them. The other 15 operations with 0 calls are already covered.
+175 operations with 0 calls are partial or missing: 169 missing and 6 partial. They belong to
+no unit until a session uses them. The other 17 operations with 0 calls are already covered.
 
 | plugin | count | operations |
 |---|---:|---|
@@ -1169,7 +1177,7 @@ no unit until a session uses them. The other 15 operations with 0 calls are alre
 | git | 6 | all |
 | ollama | 7 | all |
 | openai | 3 | all |
-| opsgenie | 8 | all |
+| opsgenie | 6 | `alert.ack`, `alert.close`, `alert.note`, `oncall`, `schedule.list`, `test` |
 | sleep | 1 | all |
 | system | 1 | all |
 | vision | 2 | all |

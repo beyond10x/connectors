@@ -1,0 +1,18 @@
+[
+  {
+    "file": "swagger.json",
+    "url": "https://raw.githubusercontent.com/opsgenie/opsgenie-oas/71c55343d03076e5544c484ed32b37c3fbc54037/swagger.json",
+    "commit": "71c55343d03076e5544c484ed32b37c3fbc54037",
+    "git_blob": "ca0c91ad0d9f3153f8288a6d70965fe6c9fc7086",
+    "sha256": "60901e17d0d4ba28b8d13d3d78f6a5d329b93008c3c1710dfe6a0b6c786ef071",
+    "bytes": 659535
+  },
+  {
+    "file": "LICENSE",
+    "url": "https://raw.githubusercontent.com/opsgenie/opsgenie-oas/71c55343d03076e5544c484ed32b37c3fbc54037/LICENSE",
+    "commit": "71c55343d03076e5544c484ed32b37c3fbc54037",
+    "git_blob": "8dada3edaf50dbc082c9a125058f25def75e625a",
+    "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+    "bytes": 11357
+  }
+]

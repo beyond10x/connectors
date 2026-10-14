@@ -24,8 +24,8 @@ use std::{
 };
 use windows_sys::Win32::{
     Foundation::{
-        CloseHandle, ERROR_ALREADY_EXISTS, ERROR_FILE_EXISTS, GENERIC_ALL, GENERIC_WRITE, HANDLE,
-        INVALID_HANDLE_VALUE, LocalFree,
+        CloseHandle, ERROR_ACCESS_DENIED, ERROR_ALREADY_EXISTS, ERROR_DELETE_PENDING,
+        ERROR_FILE_EXISTS, GENERIC_ALL, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE, LocalFree,
     },
     Security::{
         ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, ACL_REVISION, AddAccessAllowedAceEx,
@@ -43,8 +43,9 @@ use windows_sys::Win32::{
         FILE_ALL_ACCESS, FILE_APPEND_DATA, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
         FILE_ATTRIBUTE_REPARSE_POINT, FILE_DELETE_CHILD, FILE_FLAG_BACKUP_SEMANTICS,
         FILE_FLAG_OPEN_REPARSE_POINT, FILE_LIST_DIRECTORY, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE,
-        FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_WRITE_ATTRIBUTES, FILE_WRITE_DATA, FILE_WRITE_EA,
-        GetFileInformationByHandle, GetFinalPathNameByHandleW, GetVolumeInformationByHandleW,
+        FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_STANDARD_INFO, FILE_WRITE_ATTRIBUTES,
+        FILE_WRITE_DATA, FILE_WRITE_EA, FileStandardInfo, GetFileInformationByHandle,
+        GetFileInformationByHandleEx, GetFinalPathNameByHandleW, GetVolumeInformationByHandleW,
         MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH, MoveFileExW, READ_CONTROL, SYNCHRONIZE,
         WRITE_DAC, WRITE_OWNER,
     },
@@ -786,6 +787,68 @@ pub fn private_file_metadata_if_present_at(parent: &File, child: &OsStr) -> Resu
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(_) => Err(Failure::InvalidConfiguration),
     }
+}
+
+/// What one probe of a metadata-database sidecar found at its name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Sidecar {
+    Absent,
+    /// A file passing `check_private_file`.
+    Private,
+    /// A file being deleted. Under delete-on-close semantics its name stays
+    /// until every handle to it closes, and opening it answers access denied
+    /// meanwhile; a handle opened just before a deletion sees the file marked
+    /// for deletion, or with no link left once the name is gone.
+    Retiring,
+}
+
+/// `private_file_metadata_if_present_at` for a SQLite sidecar, which SQLite's
+/// last close may be deleting while it is probed. Access denied on the open
+/// is reported as `Retiring`, since that is how a file pending deletion
+/// answers; a caller that keeps seeing it refuses. A present file that is not
+/// retiring is checked in full.
+pub(crate) fn sidecar_at(parent: &File, child: &OsStr) -> Result<Sidecar> {
+    match open_child(
+        parent,
+        child,
+        READ_CONTROL | FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+    ) {
+        Ok(file) if retiring(&file)? => Ok(Sidecar::Retiring),
+        // A deletion between the probe above and this check leaves the handle
+        // with no link, which the private check refuses: ask the handle again.
+        Ok(file) => match check_private_file(&file) {
+            Ok(()) => Ok(Sidecar::Private),
+            Err(_) if retiring(&file)? => Ok(Sidecar::Retiring),
+            Err(failure) => Err(failure),
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Sidecar::Absent),
+        Err(error)
+            if error.raw_os_error() == Some(ERROR_ACCESS_DENIED as i32)
+                || error.raw_os_error() == Some(ERROR_DELETE_PENDING as i32) =>
+        {
+            Ok(Sidecar::Retiring)
+        }
+        Err(_) => Err(Failure::InvalidConfiguration),
+    }
+}
+
+/// Whether an opened file is marked for deletion or has lost its last link.
+fn retiring(file: &File) -> Result<bool> {
+    // SAFETY: zero is a valid FILE_STANDARD_INFO.
+    let mut info: FILE_STANDARD_INFO = unsafe { std::mem::zeroed() };
+    // SAFETY: a live handle and a writable structure of the size passed.
+    let ok = unsafe {
+        GetFileInformationByHandleEx(
+            file.as_raw_handle() as HANDLE,
+            FileStandardInfo,
+            (&raw mut info).cast(),
+            std::mem::size_of::<FILE_STANDARD_INFO>() as u32,
+        )
+    };
+    if ok == 0 {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok(info.DeletePending || info.NumberOfLinks == 0)
 }
 
 /// Inspect a held directory without following or creating the destination. A

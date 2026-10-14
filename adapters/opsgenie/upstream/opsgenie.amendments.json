@@ -1,0 +1,23 @@
+{
+  "format": "connectors-source-amendments/1",
+  "source_sha256": "a8f262c9fc54882e35309168804d1f2c69167a244361508721289a661e322950",
+  "amendments": [
+    {
+      "operation_id": "getAssociatedAlertIds",
+      "add_operation": {
+        "method": "get",
+        "path": "/v1/incidents/{identifier}/associated-alert-ids",
+        "parameters": [
+          {"name": "identifier", "location": "path", "required": true, "type": "string"},
+          {"name": "identifierType", "location": "query", "required": false, "type": "string"},
+          {"name": "offset", "location": "query", "required": false, "type": "integer"},
+          {"name": "direction", "location": "query", "required": false, "type": "string"},
+          {"name": "limit", "location": "query", "required": false, "type": "integer"},
+          {"name": "order", "location": "query", "required": false, "type": "string"}
+        ]
+      },
+      "cite": "https://docs.opsgenie.com/docs/incident-api#get-associated-alerts",
+      "reason": "Opsgenie's incident API reference documents Get Associated Alerts, GET /v1/incidents/:identifier/associated-alert-ids with identifierType, offset, direction, limit and order, answering the ids of the alerts linked to the incident; the pinned document, last changed on 2021-02-19, declares no path containing associated."
+    }
+  ]
+}

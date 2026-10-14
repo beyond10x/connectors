@@ -2,12 +2,56 @@
 format: aep.planning-md/3
 id: story:catalog-opsgenie-history-reads
 kind: story
-status: draft
+status: active
 title: Opsgenie alerts, incidents and their links over a since window, read only
 relations:
 - decomposes: epic:incident-collection-workflow
 - serves: vision:independent-contract-adapters
-revision: 2
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: inferred
+  path: adapters/README.md
+- confidence: cited
+  path: adapters/catalog
+- confidence: cited
+  path: adapters/catalog/generated/bundles
+- confidence: cited
+  path: adapters/catalog/providers/opsgenie/operations.json
+- confidence: cited
+  path: adapters/catalog/spec/ess/domains/amendment.yaml
+- confidence: cited
+  path: adapters/catalog/spec/ess/domains/identity.yaml
+- confidence: cited
+  path: adapters/catalog/src/local.rs
+- confidence: cited
+  path: adapters/catalog/tests/opsgenie.rs
+- confidence: cited
+  path: adapters/opsgenie
+- confidence: cited
+  path: contracts/auth/capability/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-catalog/src/amendment.rs
+- confidence: inferred
+  path: crates/connectors-catalog/src/inventory.rs
+- confidence: inferred
+  path: crates/connectors-catalog/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-docs/src/status.rs
+- confidence: cited
+  path: docs/catalog-opsgenie.md
+- confidence: cited
+  path: docs/fluxplane-plugin-parity.md
+- confidence: cited
+  path: docs/local-catalog-provider.md
+- confidence: inferred
+  path: website/data/status.json
+- confidence: inferred
+  path: website/docs/status.md
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T02:55:05Z", actor: "human:timo", revision: 5}
+- {from: "proposed", to: "active", at: "2026-10-14T02:55:06Z", actor: "human:timo", revision: 6}
 ---
 
 ## Placement: a new story, and a narrowed `story:parity-opsgenie-alerts`
@@ -152,7 +196,7 @@ In `adapters/catalog/tests/opsgenie.rs` unless named otherwise:
   `order` other than `asc`, `limit` 0 or 101, `offset` 19900 are each refused before any request.
 - `alerts_list_sends_the_since_query_with_geniekey_and_returns_the_recorded_body`: the stand-in
   provider sees `Authorization: GenieKey <fixture key>` and
-  `query=createdAt%20%3E%3D%201760000000000&sort=createdAt&order=asc&offset=0&limit=100`; the
+  `query=createdAt+%3E%3D+1760000000000&sort=createdAt&order=asc&offset=0&limit=100`; the
   body comes back byte-identical.
 - `a_window_walks_two_pages_and_resumes_from_the_last_created_at`: page 1 full, page 2 short;
   the next window's `query` carries the last `createdAt` in epoch ms.

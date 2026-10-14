@@ -489,7 +489,6 @@ fn protected_source_conflicts_and_parser_errors_never_capture_or_echo_values() {
             "/private/fictional-sentinel",
             "--unknown",
         ],
-        vec![],
     ] {
         let mut handler = Recorder::new(fixture("ConnectionConnectResult"));
         let mut sources = InputSources::default();
@@ -513,6 +512,40 @@ fn protected_source_conflicts_and_parser_errors_never_capture_or_echo_values() {
         assert!(!output.stderr.contains("fictional-sentinel"));
         assert!(!output.stderr.contains("/private/"));
     }
+}
+
+/// A connect with no protected source is the read-only binding's form: the
+/// contract reads no source and hands the handler no credential document,
+/// and the runtime decides by the selected binding (a platform binding answers
+/// `protected_entry_unavailable`).
+#[test]
+fn a_connect_without_a_protected_source_reads_none_and_passes_no_document() {
+    let mut handler = Recorder::new(fixture("ConnectionConnectResult"));
+    let mut sources = InputSources::default();
+    let output = run(
+        &[
+            "connections",
+            "connect",
+            "--adapter",
+            "forge",
+            "--profile",
+            "static",
+            "--output",
+            "json",
+        ],
+        &mut sources,
+        &mut handler,
+        None,
+    );
+    assert_eq!(output.exit_code, 0, "{output:?}");
+    assert!(sources.calls.is_empty());
+    assert_eq!(handler.calls, 1);
+    let (callable, input, _) = handler.last.unwrap();
+    assert_eq!(callable, "connections-connect");
+    assert!(
+        input.get("credential_document").is_none_or(Value::is_null),
+        "{input}"
+    );
 }
 
 #[derive(Default)]

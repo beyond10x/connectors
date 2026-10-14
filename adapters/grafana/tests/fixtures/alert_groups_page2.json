@@ -1,0 +1,38 @@
+{
+  "count": 3,
+  "next": null,
+  "previous": "https://oncall.example/api/v1/alert_groups/?page=1&perpage=2&started_at=2026-01-01T00%3A00%3A00_2026-01-02T00%3A00%3A00",
+  "results": [
+    {
+      "id": "I9LPV30QXJ5KM",
+      "integration_id": "C0FIXTUREINT2",
+      "route_id": "R0FIXTUREROUT",
+      "alerts_count": 12,
+      "state": "acknowledged",
+      "created_at": "2026-01-01T23:59:59Z",
+      "alert_group_number": 44,
+      "resolved_at": null,
+      "acknowledged_at": "2026-01-02T00:05:00Z",
+      "acknowledged_by": "UFIXTUREUSER2",
+      "resolved_by": null,
+      "title": "Disk latency",
+      "permalinks": {
+        "web": "https://stack.example/a/grafana-irm-app/alert-groups/I9LPV30QXJ5KM"
+      },
+      "silenced_at": "2026-01-02T00:06:00Z",
+      "root_alert_group_id": null,
+      "dependent_alert_group_ids": [],
+      "last_alert": {
+        "id": "AB000000000001",
+        "alert_group_id": "I9LPV30QXJ5KM",
+        "created_at": "2026-01-01T23:59:59Z",
+        "payload": {
+          "message": "fixture-private-payload-message"
+        }
+      }
+    }
+  ],
+  "current_page_number": 2,
+  "page_size": 2,
+  "total_pages": 2
+}
