@@ -97,6 +97,25 @@
         "observation": {
           "configuration_sha256": "9075017ceec92b29c7ec5d5b4e98364d39dd767ed602dadd2aca6797e5496df9",
           "lower_unix_ms": 1789077509997,
+          "upper_unix_ms": 1789077512071,
+          "sources": [
+            {"index": 0, "address": "192.0.2.10:2002", "result": "agreed", "radius_ms": 1000},
+            {"index": 1, "address": "192.0.2.11:2002", "result": "outlier", "radius_ms": 1000},
+            {"index": 2, "address": "192.0.2.12:2002", "result": "agreed", "radius_ms": 1000},
+            {"index": 3, "address": "192.0.2.13:2002", "result": "unreachable"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "approval-clock-check-observation-names-each-source",
+      "type": "connectors.cli.ApprovalClockCheckResult",
+      "valid": false,
+      "value": {
+        "adapter": "forge",
+        "observation": {
+          "configuration_sha256": "9075017ceec92b29c7ec5d5b4e98364d39dd767ed602dadd2aca6797e5496df9",
+          "lower_unix_ms": 1789077509997,
           "upper_unix_ms": 1789077512071
         }
       }
@@ -942,19 +961,7 @@
       }
     },
     {
-      "id": "clock-refusal-unreachable-source",
-      "type": "connectors.cli.Failure",
-      "valid": true,
-      "value": {
-        "kind": "operational",
-        "code": "unavailable",
-        "stage": "observation",
-        "next_action": "retry_explicitly",
-        "clock_refusal": "unreachable"
-      }
-    },
-    {
-      "id": "clock-refusal-too-imprecise-names-the-radius",
+      "id": "clock-refusal-below-quorum-names-each-source",
       "type": "connectors.cli.Failure",
       "valid": true,
       "value": {
@@ -962,8 +969,28 @@
         "code": "unavailable",
         "stage": "observation",
         "next_action": "choose_clock_source",
-        "clock_refusal": "too_imprecise",
-        "clock_radius_ms": 5000
+        "clock_refusal": "below_quorum",
+        "clock_sources": [
+          {"index": 0, "address": "192.0.2.10:2002", "result": "verified", "radius_ms": 1000},
+          {"index": 1, "address": "192.0.2.11:2002", "result": "unreachable"},
+          {"index": 2, "address": "192.0.2.12:2002", "result": "too_imprecise", "radius_ms": 5000}
+        ]
+      }
+    },
+    {
+      "id": "clock-refusal-split-names-each-source",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "observation",
+        "next_action": "choose_clock_source",
+        "clock_refusal": "split",
+        "clock_sources": [
+          {"index": 0, "address": "192.0.2.10:2002", "result": "verified", "radius_ms": 1000},
+          {"index": 1, "address": "192.0.2.11:2002", "result": "verified", "radius_ms": 1000}
+        ]
       }
     },
     {
@@ -975,7 +1002,47 @@
         "code": "unavailable",
         "stage": "observation",
         "next_action": "check_configuration",
-        "clock_refusal": "signature verification failed"
+        "clock_refusal": "unreachable"
+      }
+    },
+    {
+      "id": "clock-source-result-is-a-closed-enum",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "observation",
+        "next_action": "retry_explicitly",
+        "clock_refusal": "below_quorum",
+        "clock_sources": [
+          {"index": 0, "address": "192.0.2.10:2002", "result": "signature verification failed"}
+        ]
+      }
+    },
+    {
+      "id": "clock-refusal-has-no-single-source-radius",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "observation",
+        "next_action": "choose_clock_source",
+        "clock_refusal": "too_imprecise",
+        "clock_radius_ms": 5000
+      }
+    },
+    {
+      "id": "clock-retired-format-names-its-rule",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "usage",
+        "code": "invalid_configuration",
+        "stage": "configuration",
+        "next_action": "check_configuration",
+        "configuration_rule": "approval_clock_format_retired"
       }
     },
     {
