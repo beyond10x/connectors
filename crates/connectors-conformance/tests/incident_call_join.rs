@@ -299,7 +299,9 @@ async fn every_leg_of_a_transferred_call_is_typed_by_joining_the_call_table_and_
         assert_eq!(record["call_id"], call);
         assert!(record["fields"].get("leg_type").is_none(), "{record}");
     }
-    assert_eq!(cdr["skipped"], json!({"unreadable": 1, "unmatched": 2}));
+    // The heartbeat line and the lines of call-0002 and call-00010 do not hold the
+    // matched call identifier exactly: dropped and counted nowhere (logs §12.2).
+    assert_eq!(cdr["skipped"], json!({"unreadable": 0}));
 
     let legs = join(call, &rows, row_key, records);
     let leg = |started_at: &str, leg_type: &str, direction: &str, caller: &str, callee: &str| Leg {
