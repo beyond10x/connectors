@@ -126,7 +126,8 @@ impl Error {
     #[must_use]
     pub fn schema_newer(store: Option<super::Release>) -> Self {
         let mut error = Self::from(Code::MetadataSchemaNewer);
-        error.store_version = Some(store.map_or_else(|| "unrecorded".to_owned(), |release| release.to_string()));
+        error.store_version =
+            Some(store.map_or_else(|| "unrecorded".to_owned(), |release| release.to_string()));
         error
     }
 }
