@@ -165,7 +165,29 @@
 
 ### Changed
 
-- `approvals clock-check` names why the configured clock source gave no observation. The
+- The approval clock answers from a quorum of Roughtime sources instead of one trusted source.
+  `[approval_clock]` takes `format = "roughtime-quorum/1"`, a `quorum` (2 to 8) and two to
+  eight `[[approval_clock.sources]]`, each with a numeric `address`, its `public_key` and the
+  one wire `version` it speaks (`roughtime-1` or `roughtime-0x8000000c`; no negotiation). No
+  two sources share an address or a key. All sources are asked in parallel under one shared
+  two-second deadline, with no retries; the answer is the hull of the instants at least
+  `quorum` verified sources' intervals contain, so one lying source among honest ones cannot
+  move it off true time and one unreachable source does not stop it while a quorum remains.
+  The width cap moves from 4,000 ms to 8,000 ms for the clock, the approval proof and the
+  mutation ledger alike (the delegation contract's "at most eight seconds"). The observation
+  adds `sources`, one line per source (`agreed`, `outlier`, `unreachable`, `unverified`,
+  `too_imprecise`, with the signed `radius_ms` when the reply verified). A refusal's
+  `clock_refusal` is now the combined `below_quorum`, `split` or `too_imprecise`, and
+  `clock_sources` replaces `clock_radius_ms` with every source's line.
+  **Migration:** the single-source `roughtime-clock/1` table is retired. It still parses, so a
+  configuration that carries it loads and every command that does not use the clock keeps
+  working, but `clock-check`, approval issuance and approved writes refuse it as
+  `invalid_configuration` with `configuration_rule` `approval_clock_format_retired`. Rewrite
+  it as `roughtime-quorum/1` with at least two sources (`docs/local-clock.md`); the new table
+  has a new configuration digest. The live check is now `independent_live_quorum`.
+- (Superseded before release by the quorum above: `clock_refusal` now names the combined
+  refusal, each source's cause is its `clock_sources` line, and `clock_radius_ms` is gone.)
+  `approvals clock-check` names why the configured clock source gave no observation. The
   refusal stays `unavailable` at stage `observation`, and its `Failure` adds `clock_refusal`:
   `unreachable` (no reply within the two-second deadline, or a send or receive error;
   `next_action` `retry_explicitly`), `unverified` (the reply did not parse or did not verify

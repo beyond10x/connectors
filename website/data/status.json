@@ -74,7 +74,7 @@
     },
     {
       "area": "Local runtime",
-      "detail": "approvals clock-check names why no observation resulted: an unreachable source, a reply that does not verify against the configured key, or a source whose signed radius is too wide for approvals, each with its own next action.",
+      "detail": "approvals clock-check names why the quorum formed no answer (below quorum, split or too imprecise) with its next action, and each source's result: unreachable, unverified, too imprecise or verified.",
       "href": "/docs/concepts/local-runtime",
       "label": "Approval clock refusals",
       "status": "shipped"
@@ -109,7 +109,7 @@
     },
     {
       "area": "Local runtime",
-      "detail": "approvals clock-check verifies one configured Roughtime source without starting the owner or reading metadata.",
+      "detail": "approvals clock-check answers from a quorum of two to eight configured Roughtime sources, naming each source's result, without starting the owner or reading metadata.",
       "href": "/docs/concepts/local-runtime",
       "label": "Approval clock check",
       "status": "shipped"
