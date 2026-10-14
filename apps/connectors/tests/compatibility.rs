@@ -97,6 +97,8 @@ fn legacy_describe_is_complete_and_invoke_prints_raw_result_once() {
                 }
                 Err(error) => panic!("fixture accept: {error}"),
             };
+            // Windows hands an accepted socket the listener's non-blocking mode.
+            stream.set_nonblocking(false).unwrap();
             stream
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
