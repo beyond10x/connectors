@@ -139,6 +139,89 @@ fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
     fixture.join().unwrap();
 }
 
+/// `approvals clock-check` against a local fixture source configured with `key`.
+/// `reply` answers the one request (`None`: the source never answers); the
+/// command's refusal `Failure` is returned.
+fn clock_refusal(key: [u8; 32], reply: Option<clock_fixture::Fixture>) -> Value {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use std::{net::UdpSocket, time::Duration};
+    let root = tempfile::tempdir().unwrap();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let original = fs::read_to_string(&config_path).unwrap();
+    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let address = socket.local_addr().unwrap();
+    fs::write(
+        &config_path,
+        format!(
+            "{original}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{address}'\npublic_key='{}'\nmax_rate_error_ppm=10000\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            STANDARD.encode(key),
+            "a".repeat(64)
+        ),
+    )
+    .unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+    let source = std::thread::spawn(move || {
+        let mut b = [0; 1024];
+        let (n, caller) = socket.recv_from(&mut b).unwrap();
+        assert_eq!(n, 1024);
+        if let Some(fixture) = reply {
+            socket.send_to(&fixture.reply(&b[..n]), caller).unwrap();
+        }
+        // Held open until the request is answered or abandoned, so the
+        // silent source refuses nothing: the client's deadline expires.
+        socket
+    });
+    let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
+    drop(source.join().unwrap());
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(refused.stdout.is_empty());
+    let error = String::from_utf8(refused.stderr).unwrap();
+    // Never the observation's bounds, nor packet contents.
+    for leaked in ["lower_unix_ms", "upper_unix_ms", "ROUGHTIM", "midpoint"] {
+        assert!(!error.contains(leaked), "{leaked}: {error}");
+    }
+    let envelope: Value = serde_json::from_str(&error).unwrap();
+    let failure = envelope["error"]["data"].clone();
+    assert_eq!(failure["kind"], "operational", "{error}");
+    assert_eq!(failure["code"], "unavailable", "{error}");
+    assert_eq!(failure["stage"], "observation", "{error}");
+    failure
+}
+
+#[test]
+fn clock_check_names_an_unreachable_source() {
+    let failure = clock_refusal(clock_fixture::root_key(), None);
+    assert_eq!(failure["clock_refusal"], "unreachable", "{failure}");
+    assert_eq!(failure["next_action"], "retry_explicitly", "{failure}");
+    assert!(failure.get("clock_radius_ms").is_none(), "{failure}");
+}
+
+#[test]
+fn clock_check_names_a_reply_that_does_not_verify_against_the_configured_key() {
+    let failure = clock_refusal([17; 32], Some(clock_fixture::Fixture::default()));
+    assert_eq!(failure["clock_refusal"], "unverified", "{failure}");
+    assert_eq!(failure["next_action"], "check_configuration", "{failure}");
+    assert!(failure.get("clock_radius_ms").is_none(), "{failure}");
+}
+
+#[test]
+fn clock_check_names_a_verified_source_too_imprecise_for_the_width() {
+    // A 5 s signed radius is a 10 s interval: wider than the contract's 4,000 ms.
+    let failure = clock_refusal(
+        clock_fixture::root_key(),
+        Some(clock_fixture::Fixture {
+            radius: 5,
+            ..Default::default()
+        }),
+    );
+    assert_eq!(failure["clock_refusal"], "too_imprecise", "{failure}");
+    assert_eq!(failure["next_action"], "choose_clock_source", "{failure}");
+    assert_eq!(failure["clock_radius_ms"], 5000, "{failure}");
+}
+
 #[test]
 fn production_parser_initializes_and_inspects_across_processes() {
     let root = tempfile::tempdir().unwrap();

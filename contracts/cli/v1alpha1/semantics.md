@@ -112,6 +112,13 @@ Admission order, delivery, process rules and the same-user boundary are in
 `approvals clock-check` performs the bounded authenticated exchange specified in
 [the clock binding](../../service/clock.md). Its public observation cannot be
 reused as time evidence; it starts no service and reads no secret or metadata.
+When no observation results it refuses `unavailable` at `stage = observation`, and
+its `Failure` names the cause in `clock_refusal` with that cause's next action:
+`unreachable` with `retry_explicitly`, `unverified` with `check_configuration`, and
+`too_imprecise` with `choose_clock_source` and the signed radius in
+`clock_radius_ms` ([refusals](../../service/clock.md#refusals)). A local timer,
+continuity or calendar refusal names no cause and keeps `check_configuration`. The
+refusal never carries the observation's bounds, the request or the reply.
 
 `approvals policy-set` accepts only `--input-file`; its path is acquired by the
 production handler using the bounded document reader. `prepare` and `issue` use
