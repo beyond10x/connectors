@@ -1,0 +1,27 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "opsgenie",
+  "operations": [
+    {"id": "alerts.list", "operation_id": "listAlerts", "effect": "read",
+     "description": "List the alerts a search query matches, oldest first, one page per call; a window sends query createdAt >= <epoch ms>, sort createdAt and order asc, advances offset by limit while paging.next is present, and starts the next window at the last createdAt read",
+     "bounds": {"sort": {"values": ["createdAt"]}, "order": {"values": ["asc"]},
+                "offset": {"minimum": 0, "maximum": 19899}, "limit": {"minimum": 1, "maximum": 100}},
+     "required": ["sort", "order"],
+     "withhold": ["searchIdentifier", "searchIdentifierType"]},
+    {"id": "alert.get", "operation_id": "getAlert", "effect": "read",
+     "description": "Read one alert by identifier, an alert id unless identifierType says alias or tiny",
+     "bounds": {"identifierType": {"values": ["id", "alias", "tiny"]}}},
+    {"id": "incidents.list", "operation_id": "ListIncidents", "effect": "read",
+     "description": "List the incidents a search query matches, oldest first, one page per call; a window sends query createdAt >= <epoch ms>, sort createdAt and order asc, advances offset by limit while paging.next is present, and starts the next window at the last createdAt read",
+     "bounds": {"sort": {"values": ["createdAt"]}, "order": {"values": ["asc"]},
+                "offset": {"minimum": 0, "maximum": 19899}, "limit": {"minimum": 1, "maximum": 100}},
+     "required": ["sort", "order"]},
+    {"id": "incident.get", "operation_id": "getIncident", "effect": "read",
+     "description": "Read one incident by identifier, an incident id unless identifierType says tiny",
+     "bounds": {"identifierType": {"values": ["id", "tiny"]}}},
+    {"id": "incident.alert_ids", "operation_id": "getAssociatedAlertIds", "effect": "read",
+     "description": "List the ids of the alerts associated with one incident, at most limit per call; a page with fewer ids than limit is the last",
+     "bounds": {"identifierType": {"values": ["id", "tiny"]}, "limit": {"minimum": 1, "maximum": 25},
+                "order": {"values": ["asc", "desc"]}}}
+  ]
+}

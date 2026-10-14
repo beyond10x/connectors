@@ -17,8 +17,8 @@
 //! the part numbers except after external tampering; a delete still sweeps
 //! every possible part number, so it reclaims any remainder.
 use crate::{
-    Backend, CustodyBackend, Failure, MAX_BYTES, Material, Result, Scope, State, Version,
-    admit_material,
+    Backend, CustodyBackend, Failure, MAX_BYTES, Material, ReadBackend, Result, Scope, State,
+    Version, admit_material,
 };
 use sha2::{Digest, Sha256};
 use std::time::Instant;
@@ -194,7 +194,7 @@ impl<E: Entries> Parted<E> {
     }
 }
 
-impl<E: Entries> Backend for Parted<E> {
+impl<E: Entries> ReadBackend for Parted<E> {
     fn kind(&self) -> CustodyBackend {
         CustodyBackend::WindowsCredentialManager
     }
@@ -217,6 +217,13 @@ impl<E: Entries> Backend for Parted<E> {
         Ok(())
     }
 
+    fn read(&self, version: Version) -> Result<Material> {
+        self.admit(version)?;
+        self.read_parts(version)
+    }
+}
+
+impl<E: Entries> Backend for Parted<E> {
     fn write_new(
         &self,
         version: Version,
@@ -250,11 +257,6 @@ impl<E: Entries> Backend for Parted<E> {
             Ok(retained) if retained.ct_eq(material.as_bytes()) => Ok(()),
             _ => Err(Failure::OutcomeUnknown),
         }
-    }
-
-    fn read(&self, version: Version) -> Result<Material> {
-        self.admit(version)?;
-        self.read_parts(version)
     }
 
     fn confirm(

@@ -1,6 +1,6 @@
 [package]
 name = "connectors-custody"
-description = "Credential custody of the local host: the backend trait, an in-memory reference and one platform binding each for the Secret Service, the macOS login keychain and the Windows Credential Manager."
+description = "Credential custody of the local host: the read and write backend traits, an in-memory reference, one platform binding each for the Secret Service, the macOS login keychain and the Windows Credential Manager, and the explicitly selected read-only mounted-secret binding on Linux."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -21,6 +21,7 @@ tempfile = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 hex.workspace = true
+hmac.workspace = true
 libc = "0.2"
 zbus = "=5.19.0"
 

@@ -223,6 +223,41 @@ fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &s
     fs::write(&config_path, config).unwrap();
 }
 
+/// Only the read-only `mounted_secret` binding takes `connections connect`
+/// without a protected source; a platform binding refuses it by name, before
+/// any owner starts, metadata opens or a credential is read.
+#[test]
+fn a_platform_binding_refuses_a_connect_with_no_protected_source() {
+    let root = tempfile::tempdir().unwrap();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\n",
+    );
+    let output = command(
+        &root,
+        &[
+            "connections",
+            "connect",
+            "--adapter",
+            "forge",
+            "--profile",
+            "token",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(
+        error["error"]["data"]["code"], "protected_entry_unavailable",
+        "{error}"
+    );
+    assert_eq!(
+        error["error"]["data"]["next_action"],
+        "select_protected_source"
+    );
+}
+
 #[test]
 fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_entry() {
     for (format, private_protocol) in [

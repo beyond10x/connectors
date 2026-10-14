@@ -898,6 +898,32 @@ pub(super) fn publish_fixture(
     registry.publish(stored, now).unwrap()
 }
 
+/// The read-only binding's rule, one item backs one connection, is held in
+/// the publishing commit: two connects of one profile that were both begun
+/// and acknowledged before either published yield one connection, and the
+/// second is refused as `CustodyReadOnly`. The platform path is unchanged.
+#[test]
+fn exclusive_publication_admits_one_connection_per_profile() {
+    let (_root, registry) = fixture();
+    let (_, first) = prepared(&registry, "one", NOW);
+    let (_, second) = prepared(&registry, "one", NOW);
+    let receipt = custody::WrittenVersion::fixture(first.version());
+    let first = registry.acknowledge(first, receipt, NOW).unwrap();
+    let receipt = custody::WrittenVersion::fixture(second.version());
+    let second = registry.acknowledge(second, receipt, NOW).unwrap();
+    registry.publish_with(first, NOW, true).unwrap();
+    assert_eq!(
+        registry.publish_with(second, NOW, true),
+        Err(Failure::CustodyReadOnly)
+    );
+
+    let (_root, registry) = fixture();
+    let (_, first) = prepared(&registry, "one", NOW);
+    let (_, second) = prepared(&registry, "one", NOW);
+    publish_fixture(&registry, first, NOW);
+    publish_fixture(&registry, second, NOW);
+}
+
 #[test]
 fn publication_preserves_unobserved_scope_and_credential_expiry() {
     let (root, registry) = fixture();

@@ -10,6 +10,7 @@ relations:
 - blocks: story:catalog-opsgenie-history-reads
 - blocks: story:aep-pin-0713
 - serves: vision:independent-contract-adapters
+- blocks: story:windows-sidecar-retirement-admission
 revision: 2
 transitions:
 - {from: "open", to: "cleared", at: "2026-10-14T02:55:04Z", actor: "human:timo", revision: 2}

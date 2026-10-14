@@ -46,9 +46,11 @@ login keychain on macOS and the Credential Manager on Windows
 The macOS and Windows bindings have a CI job that runs the custody contract suite against their
 real stores. The CLI and its local host also build and run on macOS: a CI job runs their lint and
 test suites on `macos-latest`, and the guarantees macOS holds only in a weaker form are listed in
-the [CLI semantics](contracts/cli/v1alpha1/semantics.md#macos-platform-guarantees). They do not
-yet run on Windows. A release page carries Linux and macOS binaries besides the source
-archives ([install a release binary](#install-a-release-binary)). See the [catalog provider guide](docs/local-catalog-provider.md),
+the [CLI semantics](contracts/cli/v1alpha1/semantics.md#macos-platform-guarantees). Since 0.49.0
+they also build and run on Windows, where a CI job runs them on `windows-latest`
+([Windows platform guarantees](contracts/cli/v1alpha1/semantics.md#windows-platform-guarantees));
+there is no Windows release binary, so build it from the release tag's source. A release page
+carries Linux and macOS binaries besides the source archives ([install a release binary](#install-a-release-binary)). See the [catalog provider guide](docs/local-catalog-provider.md),
 the [Kubernetes CLI guide](docs/local-kubernetes-cli.md) and the
 [runtime binding](docs/local-runtime-foundation.md).
 
@@ -131,6 +133,7 @@ The current services provide:
 | Grafana | `datasources.list` | Grafana HTTP API, one `GET /api/datasources`; service-account token from keyring custody, proved with that same GET; records carry uid, name, type, access and default flag only. A Loki data source is read through Grafana as a Loki connection on its proxy path; see [the Grafana guide](adapters/grafana/README.md) |
 | Runpod (catalog provider) | `pod.create`, `pods.list`, `pod.terminate` | Runpod REST API v1 from the pinned OpenAPI source; API key as `Authorization: Bearer` from keyring custody; both writes are unguarded required-approval mutations, a create without a definite answer is `unknown`; verified against a local fixture only, see [the Runpod guide](docs/catalog-runpod.md) |
 | Slack (catalog provider) | `conversations.list`, `conversations.history`, `conversations.replies`; `users.list`, `team.info`, `emoji.list`, `auth.test`; `files.list`, `files.info`, `file.download`; and `search.messages` on a second connection with a user token | Slack Web API from the pinned Swagger 2.0 document projected to OpenAPI; bot token as `Authorization: Bearer` from keyring custody, and a user token under `slack.user` for search; the document's `token` parameter is never sent; reads only, one page per call; `file.download` reads a file's `url_private` as base64 with its media type, length and SHA-256, at most 2 MiB, only on a connection whose `hosts` admits `https://files.slack.com` with the credential; a Slack error is returned as `200` with `"ok": false`; verified against a local fixture only, see [the Slack guide](docs/catalog-slack.md) |
+| Opsgenie (catalog provider) | `alerts.list`, `alert.get`, `incidents.list`, `incident.get`, `incident.alert_ids` | Opsgenie REST API from the pinned Swagger 2.0 document projected to OpenAPI, with the incident-to-alert link added by a cited amendment; API integration key as `Authorization: GenieKey <key>` (`auth.prefix`) from keyring custody, proved with `GET /v2/alerts`; reads only, one page per call over a `createdAt` window the caller advances; verified against a local fixture only, see [the Opsgenie guide](docs/catalog-opsgenie.md) |
 
 Kubernetes and SQL also run as separate Rust services, with a generic CLI and one-hop
 federation; those services advertise no writes. Writes run only through the local CLI under

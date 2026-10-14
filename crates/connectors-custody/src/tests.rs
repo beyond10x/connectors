@@ -1,6 +1,6 @@
 use crate::{
-    Backend, CustodyBackend, Failure, MAX_BYTES, Material, Result, SIGNING_SEED_BYTES, Scope,
-    State, Version, contract,
+    Backend, CustodyBackend, Failure, MAX_BYTES, Material, ReadBackend, Result, SIGNING_SEED_BYTES,
+    Scope, State, Version, contract,
     memory::MemoryStore,
     parts::{Header, MAX_PARTS, PART_BYTES, Parted, fake::FakeEntries, header_name, part_name},
 };
@@ -358,6 +358,45 @@ fn header_encodes_length_parts_and_digest_and_refuses_anything_else() {
 fn memory_answers_the_custody_contract() {
     let store = MemoryStore::new(CustodyBackend::SecretService);
     contract::run(&|scope| store.open(scope));
+}
+
+/// The read half of the contract against the reference, whose own write
+/// places the bytes: the same checks `mounted_secret` answers.
+#[test]
+fn memory_answers_the_read_only_custody_contract() {
+    struct Writes(MemoryStore);
+    impl contract::Placement for Writes {
+        type Binding = crate::memory::Memory;
+        fn open(&self, scope: Scope) -> Result<Self::Binding> {
+            self.0.open(scope)
+        }
+        fn place(&self, binding: &Self::Binding, version: Version, material: &[u8]) {
+            binding
+                .write_new(version, &Material::from_slice(material), until(), || Ok(()))
+                .unwrap();
+        }
+    }
+    contract::run_read_only(&Writes(MemoryStore::new(CustodyBackend::SecretService)));
+}
+
+/// Only the read-only binding refuses writes; every platform binding writes.
+#[test]
+fn only_the_mounted_binding_is_read_only() {
+    for (kind, name, writable) in [
+        (CustodyBackend::SecretService, "secret_service", true),
+        (CustodyBackend::MacosKeychain, "macos_keychain", true),
+        (
+            CustodyBackend::WindowsCredentialManager,
+            "windows_credential_manager",
+            true,
+        ),
+        (CustodyBackend::MountedSecret, "mounted_secret", false),
+    ] {
+        assert_eq!(kind.as_str(), name);
+        assert_eq!(kind.writable(), writable, "{name}");
+        assert_eq!(kind.max_bytes(), MAX_BYTES);
+    }
+    assert_eq!(Failure::ReadOnly.to_string(), "custody binding read-only");
 }
 
 #[test]

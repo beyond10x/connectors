@@ -20,7 +20,7 @@ The pinned source is
 SHA-256 `8b92da26a3c5b11d20042a9f36d81f1fa6fc9382c5ddc471babb68b91936bc3a`:
 `slackapi/slack-api-specs` at commit `bc08db49`, Swagger `2.0`, `info.version`
 `1.7.0`, 174 operations. It is projected under the rule table of
-`crates/connectors-catalog/src/swagger.rs` (`swagger2-openapi/1`), and the
+`crates/connectors-catalog/src/swagger.rs` (`swagger2-openapi/2`), and the
 bundle is compiled from the projection with the derivation recorded:
 
 ```sh

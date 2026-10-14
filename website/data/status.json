@@ -67,6 +67,13 @@
     },
     {
       "area": "Local runtime",
+      "detail": "An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation.",
+      "href": "/docs/guides/set-up-the-local-cli",
+      "label": "Mounted-secret custody",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
       "detail": "approvals policy-set, prepare and issue bind a write's whole input to a protected proof before the host dispatches it once.",
       "href": "/docs/concepts/local-runtime",
       "label": "Approved writes",
@@ -228,6 +235,13 @@
     },
     {
       "area": "Catalog provider",
+      "detail": "alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Opsgenie alerts and incidents",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
       "detail": "Listing and locating precompiled bundles with provenance is specified; directly configured adapters need no index.",
       "href": "/docs/reference/contracts/catalog",
       "label": "Catalog index service",
@@ -308,6 +322,13 @@
       "detail": "datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (since 0.39.0).",
       "href": "/docs/reference/adapters/grafana",
       "label": "Grafana data sources",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "irm.alert_groups.list, irm.alert_group.get, irm.incidents.list and irm.incident.get over a since window, with incident-to-alert-group links (inferred), through a saved IRM service-account connection; read only.",
+      "href": "/docs/reference/adapters/grafana",
+      "label": "Grafana IRM alert groups and incidents",
       "status": "shipped"
     },
     {
