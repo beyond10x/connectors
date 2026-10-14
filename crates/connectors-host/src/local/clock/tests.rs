@@ -420,6 +420,8 @@ fn quorum_below_quorum_names_each_source() {
     let good = answering(7, T, 1);
     let silent = Server::silent();
     let wrong_key = answering(8, T, 1);
+    // A 5 s radius, an interval wider than the cap: it still counts, so the
+    // quorum is 3 for two verified sources to fall short of it.
     let wide = answering(10, T, 5);
     let mut sources = vec![
         source(&good, 7),
@@ -427,7 +429,7 @@ fn quorum_below_quorum_names_each_source() {
         source(&wrong_key, 9),
         source(&wide, 10),
     ];
-    let refused = quorum(2, sources.clone())
+    let refused = quorum(3, sources.clone())
         .acquire_explained()
         .err()
         .unwrap();
@@ -439,7 +441,7 @@ fn quorum_below_quorum_names_each_source() {
             SourceResult::Verified,
             SourceResult::Unreachable,
             SourceResult::Unverified,
-            SourceResult::TooImprecise
+            SourceResult::Verified
         ]
     );
     assert_eq!(
@@ -456,16 +458,24 @@ fn quorum_below_quorum_names_each_source() {
             (i, sources[i].address.as_str())
         );
     }
-    // Next action by precedence: an unverified source first, then a too
-    // imprecise one, else a retry.
+    // Next action: an unverified source names check_configuration, else a
+    // retry; a wide verified source never names choose_clock_source.
     assert_eq!(refused.next_action(), NextAction::CheckConfiguration);
     sources.remove(2);
-    let refused = quorum(2, sources.clone())
+    let refused = quorum(3, sources.clone())
         .acquire_explained()
         .err()
         .unwrap();
     assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
-    assert_eq!(refused.next_action(), NextAction::ChooseClockSource);
+    assert_eq!(
+        results(&refused.sources),
+        [
+            SourceResult::Verified,
+            SourceResult::Unreachable,
+            SourceResult::Verified
+        ]
+    );
+    assert_eq!(refused.next_action(), NextAction::RetryExplicitly);
     sources.remove(2);
     let refused = quorum(2, sources).acquire_explained().err().unwrap();
     assert_eq!(
@@ -511,20 +521,38 @@ fn quorum_combined_width_over_cap_refuses() {
 }
 
 #[test]
-fn quorum_source_over_cap_is_not_counted() {
-    let (wide, a, b) = (answering(7, T, 4), answering(8, T, 1), answering(9, T, 1));
-    let config = quorum(2, vec![source(&wide, 7), source(&a, 8), source(&b, 9)]);
+fn quorum_wide_source_counts_and_only_the_answer_is_capped() {
+    // The live pair of 2026-10-14: a 5 s signed radius (an interval of about
+    // 10 s, wider than the 8,000 ms cap) and a 3 s one. The wide source counts,
+    // and their intersection, about 6 s, is the answer.
+    let (wide, narrow) = (answering(7, T, 5), answering(8, T, 3));
+    let config = quorum(2, vec![source(&wide, 7), source(&narrow, 8)]);
     let view = config.acquire().unwrap().observe().unwrap();
-    assert!(view.upper_unix_ms - view.lower_unix_ms <= 4000, "{view:?}");
+    let width = view.upper_unix_ms - view.lower_unix_ms;
+    assert!((6000..=8000).contains(&width), "{view:?}");
+    assert!(view.lower_unix_ms <= (T * 1000) as i64 && view.upper_unix_ms >= (T * 1000) as i64);
     assert_eq!(
         results(&view.sources),
-        [
-            SourceResult::TooImprecise,
-            SourceResult::Agreed,
-            SourceResult::Agreed
-        ]
+        [SourceResult::Agreed, SourceResult::Agreed]
     );
-    assert_eq!(view.sources[0].radius_ms, Some(4000));
+    assert_eq!(
+        view.sources.iter().map(|s| s.radius_ms).collect::<Vec<_>>(),
+        [Some(5000), Some(3000)]
+    );
+    // Only the answer is capped: two wide sources count, and their combined
+    // answer, about 10 s, refuses too_imprecise with both lines verified.
+    let (a, b) = (answering(9, T, 5), answering(10, T, 5));
+    let refused = quorum(2, vec![source(&a, 9), source(&b, 10)])
+        .acquire_explained()
+        .err()
+        .unwrap();
+    assert_eq!(refused.failure, Failure::Unavailable);
+    assert_eq!(refused.refusal, Some(Refusal::TooImprecise));
+    assert_eq!(
+        results(&refused.sources),
+        [SourceResult::Verified, SourceResult::Verified]
+    );
+    assert_eq!(refused.next_action(), NextAction::ChooseClockSource);
 }
 
 #[test]
@@ -607,8 +635,9 @@ fn quorum_shared_deadline() {
 
 #[test]
 fn quorum_version_mismatch_is_unverified() {
-    // Each source is asked at its configured version only, and the reply must
-    // sign exactly that VER and list it in VERS.
+    // Each source is asked at its configured version only, the draft version
+    // 0x8000000c, and the reply must sign exactly that VER and list it in VERS.
+    const OTHER: u32 = 0x8000000b;
     let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let recorder = |fixture: fixture::Fixture| {
         let seen = seen.clone();
@@ -618,35 +647,29 @@ fn quorum_version_mismatch_is_unverified() {
             Some(fixture.reply(request))
         }))
     };
-    let at_one = |seed| fixture::Fixture {
-        seed,
-        version: 1,
-        versions: vec![1],
-        ..Default::default()
-    };
     let signed_other_ver = recorder(fixture::Fixture {
         seed: 7,
-        versions: vec![1, 0x8000000c],
+        version: OTHER,
+        versions: vec![OTHER, 0x8000000c],
         ..Default::default()
     });
     let vers_without_it = recorder(fixture::Fixture {
         seed: 8,
-        version: 1,
-        versions: vec![0x8000000c],
+        versions: vec![OTHER],
         ..Default::default()
     });
-    let (good_1, good_2) = (recorder(at_one(9)), recorder(at_one(10)));
-    let at = |server: &Server, seed| Source {
-        version: RoughtimeVersion::Roughtime1,
-        ..source(server, seed)
+    let at_draft = |seed| fixture::Fixture {
+        seed,
+        ..Default::default()
     };
+    let (good_1, good_2) = (recorder(at_draft(9)), recorder(at_draft(10)));
     let refused = quorum(
         3,
         vec![
-            at(&signed_other_ver, 7),
-            at(&vers_without_it, 8),
-            at(&good_1, 9),
-            at(&good_2, 10),
+            source(&signed_other_ver, 7),
+            source(&vers_without_it, 8),
+            source(&good_1, 9),
+            source(&good_2, 10),
         ],
     )
     .acquire_explained()
@@ -662,6 +685,7 @@ fn quorum_version_mismatch_is_unverified() {
             SourceResult::Verified
         ]
     );
+    assert_eq!(refused.next_action(), NextAction::CheckConfiguration);
     for server in [&signed_other_ver, &vers_without_it, &good_1, &good_2] {
         assert_eq!(
             server.requests.load(Ordering::SeqCst),
@@ -669,15 +693,10 @@ fn quorum_version_mismatch_is_unverified() {
             "no second request"
         );
     }
-    assert_eq!(*seen.lock().unwrap(), vec![1u32.to_le_bytes().to_vec(); 4]);
-    // The same draft-version reply verifies when the source is configured at it.
-    let draft = answering(11, T, 1);
-    let view = quorum(2, vec![source(&draft, 11), at(&good_1, 9)])
-        .acquire()
-        .unwrap()
-        .observe()
-        .unwrap();
-    assert_eq!(results(&view.sources), [SourceResult::Agreed; 2]);
+    assert_eq!(
+        *seen.lock().unwrap(),
+        vec![0x8000000cu32.to_le_bytes().to_vec(); 4]
+    );
 }
 
 #[test]
@@ -721,14 +740,21 @@ fn quorum_configuration_refusals() {
     // A source names its version: no default, no other spelling.
     let table = |version: &str| {
         format!(
-            "format='roughtime-quorum/1'\nquorum=2\nmax_rate_error_ppm=100\n[[sources]]\naddress='127.0.0.1:2002'\npublic_key='{}'\n{version}[[sources]]\naddress='127.0.0.1:2003'\npublic_key='{}'\nversion='roughtime-1'\n",
+            "format='roughtime-quorum/1'\nquorum=2\nmax_rate_error_ppm=100\n[[sources]]\naddress='127.0.0.1:2002'\npublic_key='{}'\n{version}[[sources]]\naddress='127.0.0.1:2003'\npublic_key='{}'\nversion='roughtime-0x8000000c'\n",
             STANDARD.encode(fixture::key(7)),
             STANDARD.encode(fixture::key(8)),
         )
     };
     let parsed: ApprovalClock = toml::from_str(&table("version='roughtime-0x8000000c'\n")).unwrap();
     parsed.validate().unwrap();
-    for version in ["", "version='roughtime-0x8000000b'\n", "version=1\n"] {
+    // roughtime-1 (RFC 10049's 0x00000001) has no verifier and no recorded
+    // reply, so it is refused as an unknown version.
+    for version in [
+        "",
+        "version='roughtime-1'\n",
+        "version='roughtime-0x8000000b'\n",
+        "version=1\n",
+    ] {
         assert!(
             toml::from_str::<ApprovalClock>(&table(version)).is_err(),
             "{version:?}"
@@ -862,7 +888,7 @@ fn independent_live_quorum() {
             source(
                 "162.159.200.123:2003",
                 "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg=",
-                RoughtimeVersion::Roughtime1,
+                RoughtimeVersion::Draft0x8000000c,
             ),
             source(
                 "51.81.57.55:2002",
@@ -872,7 +898,7 @@ fn independent_live_quorum() {
             source(
                 "192.36.143.134:2002",
                 "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=",
-                RoughtimeVersion::Roughtime1,
+                RoughtimeVersion::Draft0x8000000c,
             ),
             source(
                 "148.113.255.71:2002",

@@ -227,7 +227,8 @@ fn clock_check_below_quorum_refusal() {
     let silent = clock_fixture::Server::silent();
     // Signed with seed 8, configured with seed 12's key.
     let wrong_key = clock_source(8, CLOCK_T, 1);
-    // A 5 s signed radius is a 10 s interval: wider than the 8,000 ms cap.
+    // A 5 s signed radius is a 10 s interval, wider than the 8,000 ms cap: it
+    // still counts, since only the combined answer is capped.
     let wide = clock_source(9, CLOCK_T, 5);
     let (g, s, w, i) = (
         (good.address.as_str(), 7),
@@ -235,24 +236,29 @@ fn clock_check_below_quorum_refusal() {
         (wrong_key.address.as_str(), 12),
         (wide.address.as_str(), 9),
     );
-    for (sources, results, action) in [
+    // Every verified source counts, whatever its radius, so a row's quorum is
+    // set above its verified count; the wide line is verified with its radius.
+    for (sources, quorum, results, action) in [
         (
             vec![g, s, w, i],
-            vec!["verified", "unreachable", "unverified", "too_imprecise"],
+            3,
+            vec!["verified", "unreachable", "unverified", "verified"],
             "check_configuration",
         ),
         (
             vec![g, s, i],
-            vec!["verified", "unreachable", "too_imprecise"],
-            "choose_clock_source",
+            3,
+            vec!["verified", "unreachable", "verified"],
+            "retry_explicitly",
         ),
         (
             vec![g, s],
+            2,
             vec!["verified", "unreachable"],
             "retry_explicitly",
         ),
     ] {
-        let root = clock_root(&clock_fixture::quorum_toml(2, 10_000, &sources));
+        let root = clock_root(&clock_fixture::quorum_toml(quorum, 10_000, &sources));
         let failure = clock_unavailable(&root);
         assert_eq!(failure["clock_refusal"], "below_quorum", "{failure}");
         assert_eq!(failure["next_action"], action, "{failure}");
@@ -262,8 +268,8 @@ fn clock_check_below_quorum_refusal() {
             assert_eq!(line["index"], index, "{failure}");
             assert_eq!(line["address"], sources[index].0, "{failure}");
             let radius = match line["result"].as_str().unwrap() {
+                "verified" if sources[index] == i => Some(5000),
                 "verified" => Some(1000),
-                "too_imprecise" => Some(5000),
                 _ => None,
             };
             assert_eq!(line["radius_ms"].as_i64(), radius, "{failure}");

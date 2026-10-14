@@ -74,7 +74,7 @@
     },
     {
       "area": "Local runtime",
-      "detail": "approvals clock-check names why the quorum formed no answer (below quorum, split or too imprecise) with its next action, and each source's result: unreachable, unverified, too imprecise or verified.",
+      "detail": "approvals clock-check names why the quorum formed no answer (below quorum, split or too imprecise) with its next action, and each source's result: unreachable, unverified or verified at any radius; only the combined answer is capped.",
       "href": "/docs/concepts/local-runtime",
       "label": "Approval clock refusals",
       "status": "shipped"
