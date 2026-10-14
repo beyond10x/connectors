@@ -203,16 +203,16 @@ fn the_corrected_semantics_citations_land_on_their_rules() {
     let semantics = read("contracts/cli/v1alpha1/semantics.md");
     let lines: Vec<&str> = semantics.lines().collect();
     let spec = read("ess/domains/cli.yaml");
-    assert!(spec.contains("semantics.md:452"));
-    assert!(spec.contains("semantics.md:456"));
-    assert!(
-        lines[451].contains("500 maximum list items per page"),
-        "{}",
-        lines[451]
-    );
-    assert!(
-        lines[455].contains("stale cursors refuse"),
-        "{}",
-        lines[455]
-    );
+    let cite = regex::Regex::new(r"cli/v1alpha1/semantics\.md:(\d+)\b").unwrap();
+    let cited: Vec<&str> = cite
+        .captures_iter(&spec)
+        .map(|c| lines[c[1].parse::<usize>().unwrap() - 1])
+        .collect();
+    for rule in ["500 maximum list items per page", "stale cursors refuse"] {
+        assert!(
+            cited.iter().any(|line| line.contains(rule)),
+            "no semantics.md citation in cli.yaml lands on `{rule}`; cited lines:\n{}",
+            cited.join("\n")
+        );
+    }
 }
