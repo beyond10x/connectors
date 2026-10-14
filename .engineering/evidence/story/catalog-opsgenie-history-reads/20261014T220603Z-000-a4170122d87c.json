@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-14T22:06:03Z",
+  "actor": "human:timo",
+  "artifact": "story:catalog-opsgenie-history-reads",
+  "kind": "story",
+  "revision": 7,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/pull/170 CI on head 7371f097d, all checks green (repository gate run 38640417261; host and CLI macOS 38640417017, Windows 38640417080)",
+    "reference": "7371f097d06595a4a02e348f3a4e98c180397755"
+  }
+}
