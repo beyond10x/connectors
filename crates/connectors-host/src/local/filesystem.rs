@@ -17,7 +17,7 @@ use std::{ffi::OsStr, fs::File, io::Read, path::Path};
 #[cfg(windows)]
 pub(crate) mod windows;
 #[cfg(windows)]
-pub(crate) use windows::require_absent;
+pub(crate) use windows::{Sidecar, require_absent, sidecar_at};
 #[cfg(windows)]
 pub use windows::{
     check_private_file, directory, private_file_at, private_file_metadata_if_present_at, uid,

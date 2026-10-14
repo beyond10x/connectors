@@ -970,7 +970,13 @@ built-in Administrators group, which correspond to what root may read on Linux
 whatever the mode bits say. Any entry allowing another SID refuses, as group or
 other mode bits do. A file is opened with `FILE_FLAG_OPEN_REPARSE_POINT` and
 refused when it, or any directory on its path, is a reparse point (a symbolic
-link or junction); it must have one link. Files and directories the host
+link or junction); it must have one link. A sidecar of the metadata database
+that SQLite's last close is deleting keeps its name until every handle to it
+closes, and opening it answers access denied meanwhile; one deleted after it
+was opened shows no link on its handle. Such a sidecar is probed again, within
+the lifecycle lock's wait, until its name is gone, and is then absent; one
+still there at the end of the wait refuses, and a present sidecar that is not
+being deleted keeps the full rule. Files and directories the host
 creates get a protected list naming only the current user. Protected stdin
 admits a protected regular file; a pipe on stdin is refused on Windows until a
 producer check is specified for it.
