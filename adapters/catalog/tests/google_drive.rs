@@ -200,6 +200,7 @@ fn shipped_drive_selections_are_the_six_reads_and_three_writes() {
                 read: None,
                 any_of: vec![],
                 absent: None,
+                refusals: vec![],
             },
         })
     );

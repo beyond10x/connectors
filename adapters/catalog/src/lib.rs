@@ -107,6 +107,44 @@ pub struct Postflight {
         deserialize_with = "present_flag"
     )]
     pub absent: Option<bool>,
+    /// The answers a provider gives with a success status when it did not
+    /// apply the write: a 2xx own answer that fails `checks` or `any_of` and
+    /// carries at a refusal's pointer one of its values is refused with its
+    /// code, the first match deciding. Only without `read`, beside at least
+    /// one check. Omitted when empty, so a guard without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refusals: Vec<Refusal>,
+}
+
+/// The code a declared refusal answers with, as the provider's own answer
+/// (`connectors_catalog.guard.RefusalCode`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RefusalCode {
+    InvalidInput,
+    Forbidden,
+    NotFound,
+}
+
+impl RefusalCode {
+    fn code(self) -> ErrorCode {
+        match self {
+            Self::InvalidInput => ErrorCode::InvalidInput,
+            Self::Forbidden => ErrorCode::Forbidden,
+            Self::NotFound => ErrorCode::NotFound,
+        }
+    }
+}
+
+/// One declared refusal (`connectors_catalog.guard.Refusal`): the string at
+/// `pointer` in the write's own answer equal to one of `values` refuses the
+/// write with `code`, the matched value carried as the provider's reason.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Refusal {
+    pub pointer: String,
+    pub values: Vec<String>,
+    pub code: RefusalCode,
 }
 
 /// How a 2xx body is read. The bundle's declared media types decide by default;
@@ -686,6 +724,8 @@ pub struct Prepared {
     reread: Option<Request>,
     /// Whether the read after the write must answer 404 (`postflight.absent`).
     absent: bool,
+    /// The postflight's declared refusals, read from the write's own answer.
+    refusals: Vec<Refusal>,
     resource: String,
     instance: String,
     source_revision: String,
@@ -1040,6 +1080,30 @@ impl Engine {
                         "guard of `{}` declares an any_of of one comparison",
                         selection.id
                     )));
+                }
+                // A refusal reads the write's own answer, and only one that
+                // fails a check: never beside a read after the write, never
+                // without a check. Each value names one refusal alone.
+                let refusals = &guard.postflight.refusals;
+                if !refusals.is_empty() {
+                    let mut named = BTreeSet::new();
+                    if guard.postflight.read.is_some()
+                        || guard.postflight.checks.is_empty()
+                        || refusals.len() > 16
+                        || refusals.iter().any(|refusal| {
+                            !refusal.pointer.starts_with('/')
+                                || refusal.values.is_empty()
+                                || refusal
+                                    .values
+                                    .iter()
+                                    .any(|value| value.is_empty() || !named.insert(value))
+                        })
+                    {
+                        return Err(refuse(format!(
+                            "guard of `{}` declares refusals other than up to sixteen on its own answer beside a check, each with a pointer and distinct non-empty values",
+                            selection.id
+                        )));
+                    }
                 }
                 for preflight in &guard.further_preflights {
                     reads.push(probe_operation(&preflight.operation_id)?);
@@ -1691,6 +1755,12 @@ impl Engine {
                 .guard
                 .as_ref()
                 .is_some_and(|guard| guard.postflight.absent == Some(true)),
+            refusals: exposed
+                .selection
+                .guard
+                .as_ref()
+                .map(|guard| guard.postflight.refusals.clone())
+                .unwrap_or_default(),
             resource: exposed.operation.path.clone(),
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
@@ -1714,6 +1784,20 @@ impl Prepared {
                 .alternatives
                 .iter()
                 .any(|(pointer, expected)| expected.holds(observed.pointer(pointer)))
+    }
+
+    /// The first declared refusal whose pointer holds, as a string, one of its
+    /// values in the write's own answer: refused with its code, as the
+    /// provider's answer, the matched value its reason.
+    fn declared_refusal(&self, answer: &Value) -> Option<Error> {
+        self.refusals.iter().find_map(|refusal| {
+            let value = answer.pointer(&refusal.pointer)?.as_str()?;
+            refusal.values.iter().any(|v| v == value).then(|| {
+                Error::new(refusal.code.code(), "provider refused the write")
+                    .answered()
+                    .with_upstream_reason(connectors_core::reason::admit(value))
+            })
+        })
     }
 
     /// Send once and classify. Only documented definite refusals are refused;
@@ -1783,6 +1867,16 @@ impl Prepared {
         // possible. It is never reported as refused, and no corrective request
         // is issued. The comparison is best effort, not detection.
         let Some((segments, query)) = &self.reread else {
+            // An answer that fails the checks and names a declared refusal is
+            // the provider's definite refusal, not uncertainty.
+            let holds = self
+                .postflight
+                .iter()
+                .all(|(pointer, expected)| expected.holds(body.pointer(pointer)))
+                && self.accepts_one(&body);
+            if !holds && let Some(refusal) = self.declared_refusal(&body) {
+                return WriteOutcome::Refused(refusal);
+            }
             for (pointer, expected) in &self.postflight {
                 if !expected.holds(body.pointer(pointer)) {
                     return WriteOutcome::Unknown(Error::new(

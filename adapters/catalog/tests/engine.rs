@@ -147,6 +147,7 @@ fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Chec
             read: None,
             any_of: vec![],
             absent: None,
+            refusals: vec![],
         },
     }
 }
@@ -171,6 +172,7 @@ fn selections() -> Vec<Selection> {
                     read: None,
                     any_of: vec![],
                     absent: None,
+                    refusals: vec![],
                 },
             }),
             ..select("merge_request.create", "createMergeRequest", Effect::Write)
@@ -2452,4 +2454,175 @@ async fn a_write_answered_429_is_sent_once_and_not_retried() {
         // Only the preflight read went through the read port.
         assert_eq!(http.calls.lock().unwrap().len(), 1, "{header:?}");
     }
+}
+
+/// The merge request create guarded as `selections()` guards it, with
+/// `postflight.refusals` as given: what a provider answers with a success
+/// status when it did not apply the write.
+fn refusing(refusals: Value) -> std::result::Result<Engine, connectors_core::Error> {
+    let selection: Selection = serde_json::from_value(json!({
+        "id": "merge_request.create", "operation_id": "createMergeRequest", "effect": "write",
+        "guard": {
+            "preflight": {"operation_id": "getBranch",
+                          "values": {"id": "id", "branch": "body.source_branch"},
+                          "checks": [{"pointer": "/commit/id", "expect": {"input": "sha"}}]},
+            "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}],
+                           "refusals": refusals}}}))
+    .unwrap_or_else(|error| panic!("the selection does not read: {error}"));
+    Engine::new(&bundle(), "/api/v4", &[selection])
+}
+
+/// story:parity-slack-message-writes: a success-status answer that fails the
+/// postflight checks and carries a declared refusal value is refused with that
+/// refusal's code, as the provider's own answer, with the matched value as its
+/// reason and the write sent once. Any other value, a non-string one, none, or
+/// an answer that satisfies the checks keeps the outcome it had: unknown, or
+/// applied.
+#[tokio::test]
+async fn a_declared_refusal_in_a_success_answer_refuses_the_write_with_its_code() {
+    /// The outcome class it keeps (`applied`, `unknown`), or the refusal it
+    /// becomes: its code and reason.
+    type Expected = std::result::Result<&'static str, (ErrorCode, &'static str)>;
+    let engine = refusing(json!([
+        {"pointer": "/error", "values": ["cant_update_message", "edit_window_closed"],
+         "code": "forbidden"},
+        {"pointer": "/error", "values": ["message_not_found"], "code": "not_found"},
+        {"pointer": "/error", "values": ["no_text"], "code": "invalid_input"}
+    ]))
+    .unwrap();
+    let cases: [(HttpResponse, Expected); 9] = [
+        (
+            response(200, json!({"ok": false, "error": "cant_update_message"})),
+            Err((ErrorCode::Forbidden, "cant_update_message")),
+        ),
+        (
+            response(200, json!({"ok": false, "error": "edit_window_closed"})),
+            Err((ErrorCode::Forbidden, "edit_window_closed")),
+        ),
+        (
+            response(200, json!({"ok": false, "error": "message_not_found"})),
+            Err((ErrorCode::NotFound, "message_not_found")),
+        ),
+        (
+            response(200, json!({"ok": false, "error": "no_text"})),
+            Err((ErrorCode::InvalidInput, "no_text")),
+        ),
+        (
+            response(200, json!({"ok": false, "error": "not_in_channel"})),
+            Ok("unknown"),
+        ),
+        (
+            response(200, json!({"ok": false, "error": 7})),
+            Ok("unknown"),
+        ),
+        (response(200, json!({"ok": false})), Ok("unknown")),
+        // The checks hold, so a refusal value beside them is not read.
+        (
+            response(200, json!({"ok": true, "error": "cant_update_message"})),
+            Ok("applied"),
+        ),
+        // A status the engine does not read as a refusal stays unknown.
+        (
+            response(500, json!({"ok": false, "error": "cant_update_message"})),
+            Ok("unknown"),
+        ),
+    ];
+    for (reply, expected) in cases {
+        let http = reads(vec![response(200, json!({"commit": {"id": SHA}}))]);
+        let prepared = engine
+            .prepare(
+                http.as_ref(),
+                "fixture",
+                "merge_request.create",
+                create_input(),
+            )
+            .await
+            .unwrap();
+        let sent: Sent = Arc::new(Mutex::new(Vec::new()));
+        let outcome = prepared
+            .execute(Box::new(Send {
+                sent: sent.clone(),
+                response: Some(reply),
+            }))
+            .await;
+        assert_eq!(sent.lock().unwrap().len(), 1, "{expected:?}");
+        match (outcome, expected) {
+            (WriteOutcome::Refused(error), Err((code, reason))) => {
+                assert_eq!(error.code, code, "{reason}");
+                assert!(error.upstream_answer, "{reason}");
+                assert_eq!(error.upstream_reason.as_deref(), Some(reason));
+                assert!(!error.message.contains(reason), "{}", error.message);
+            }
+            (outcome, Ok(expected)) => assert_eq!(classify(outcome), expected),
+            (outcome, expected) => panic!("expected {expected:?}, got {}", classify(outcome)),
+        }
+    }
+}
+
+/// Refusals are held to the write's own answer, beside at least one check, with
+/// non-empty, distinct values each refusal alone names, `/` pointers and at
+/// most sixteen of them; anything else is refused when the selection loads.
+/// An empty list is the same as none, and a postflight without refusals keeps
+/// its serialised form.
+#[test]
+fn a_declared_refusal_is_refused_at_load_unless_well_formed() {
+    let one = |values: Value| json!({"pointer": "/error", "values": values, "code": "forbidden"});
+    assert!(refusing(json!([one(json!(["cant_update_message"]))])).is_ok());
+    assert!(refusing(json!([])).is_ok());
+    let many: Vec<Value> = (0..17).map(|n| one(json!([format!("e{n}")]))).collect();
+    for (name, refusals) in [
+        ("no values", json!([one(json!([]))])),
+        ("an empty value", json!([one(json!([""]))])),
+        ("a repeated value", json!([one(json!(["a", "a"]))])),
+        (
+            "a value two refusals name",
+            json!([one(json!(["a"])), one(json!(["a"]))]),
+        ),
+        (
+            "a pointer without a slash",
+            json!([{"pointer": "error", "values": ["a"], "code": "forbidden"}]),
+        ),
+        ("seventeen refusals", Value::Array(many)),
+    ] {
+        assert!(refusing(refusals).is_err(), "{name} loaded");
+    }
+    // Beside a read after the write, or with no check, there is no answer of
+    // the write's own to read them from, or no check they could follow.
+    let with = |postflight: Value| {
+        let selection: Selection = serde_json::from_value(json!({
+            "id": "merge_request.create", "operation_id": "createMergeRequest", "effect": "write",
+            "guard": {
+                "preflight": {"operation_id": "getBranch",
+                              "values": {"id": "id", "branch": "body.source_branch"},
+                              "checks": [{"pointer": "/commit/id", "expect": {"input": "sha"}}]},
+                "postflight": postflight}}))
+        .unwrap();
+        Engine::new(&bundle(), "/api/v4", &[selection])
+    };
+    let refusals = json!([one(json!(["a"]))]);
+    assert!(
+        with(
+            json!({"checks": [{"pointer": "/sha", "expect": {"input": "sha"}}],
+                    "read": {"operation_id": "getMergeRequest",
+                             "values": {"id": "id", "merge_request_iid": "body.source_branch"}},
+                    "refusals": refusals})
+        )
+        .is_err(),
+        "refusals beside a read loaded"
+    );
+    assert!(
+        with(json!({"checks": [], "refusals": refusals})).is_err(),
+        "refusals without a check loaded"
+    );
+    let unused = mr_guard(
+        &[("id", "id")],
+        vec![],
+        vec![literal_check("/state", "merged")],
+    );
+    assert!(
+        serde_json::to_value(&unused.postflight)
+            .unwrap()
+            .get("refusals")
+            .is_none()
+    );
 }
