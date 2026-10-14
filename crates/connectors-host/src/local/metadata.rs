@@ -1265,14 +1265,41 @@ fn unavailable(_: rusqlite::Error) -> Failure {
 /// Eventlog's SQLite handle is not under the lifecycle lock, so its last close
 /// may retire a sidecar at any point here. One `fstatat` per sidecar decides
 /// present-and-private or absent; a present sidecar is never admitted weaker.
+#[cfg(unix)]
 fn admit_sidecars(dir: &std::fs::File) -> Result<()> {
-    for suffix in ["-wal", "-shm", "-journal"] {
+    for suffix in SIDECARS {
         let name = format!("{NAME}{suffix}");
         fs::private_file_metadata_if_present_at(dir, OsStr::new(&name))
             .map_err(|_| Failure::MetadataUnavailable)?;
     }
     Ok(())
 }
+
+/// Windows has no `fstatat`: a sidecar is opened, then checked on its handle.
+/// A sidecar being deleted keeps its name until every handle to it closes and
+/// answers access denied meanwhile, and one deleted after the open shows no
+/// link on the handle. Either is probed again until its name is gone, within
+/// the lifecycle lock's bound, and refused if it is still there at the bound.
+/// A present sidecar that is not retiring is never admitted weaker.
+#[cfg(windows)]
+fn admit_sidecars(dir: &std::fs::File) -> Result<()> {
+    let deadline = Instant::now() + lifecycle_lock_wait();
+    for suffix in SIDECARS {
+        let name = format!("{NAME}{suffix}");
+        loop {
+            match fs::sidecar_at(dir, OsStr::new(&name)) {
+                Ok(fs::Sidecar::Absent | fs::Sidecar::Private) => break,
+                Ok(fs::Sidecar::Retiring) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                Ok(fs::Sidecar::Retiring) | Err(_) => return Err(Failure::MetadataUnavailable),
+            }
+        }
+    }
+    Ok(())
+}
+
+const SIDECARS: [&str; 3] = ["-wal", "-shm", "-journal"];
 
 // Protect physical SQLite admission, initial WAL installation, migration and
 // the physical connection's close. Established ER observations close that
@@ -1684,6 +1711,137 @@ mod tests {
             admit_sidecars(&directory),
             Err(Failure::MetadataUnavailable)
         );
+    }
+
+    /// A Windows sidecar marked delete-on-close while a handle is open (here
+    /// the test's own; in production an idle Eventlog handle closing in the
+    /// pool) and a holder sharing delete. Its name stays until that handle
+    /// closes, and opening it answers access denied meanwhile.
+    #[cfg(windows)]
+    fn pending_deletion(path: &Path) -> std::fs::File {
+        use std::os::windows::{fs::OpenOptionsExt, io::AsRawHandle};
+        use windows_sys::Win32::Foundation::GENERIC_READ;
+        use windows_sys::Win32::Storage::FileSystem::{
+            DELETE, FILE_DISPOSITION_INFO, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            FileDispositionInfo, SetFileInformationByHandle,
+        };
+        let holder = std::fs::OpenOptions::new()
+            .access_mode(DELETE | GENERIC_READ)
+            .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+            .open(path)
+            .unwrap();
+        let disposition = FILE_DISPOSITION_INFO { DeleteFile: true };
+        // SAFETY: a live handle opened with DELETE and a structure of the size
+        // passed. This information class is delete-on-close, never POSIX.
+        let marked = unsafe {
+            SetFileInformationByHandle(
+                holder.as_raw_handle() as _,
+                FileDispositionInfo,
+                (&raw const disposition).cast(),
+                std::mem::size_of::<FILE_DISPOSITION_INFO>() as u32,
+            )
+        };
+        assert_ne!(marked, 0, "{}", std::io::Error::last_os_error());
+        let code = std::fs::File::open(path).unwrap_err().raw_os_error();
+        assert!(
+            matches!(code, Some(5 | 303)),
+            "a file pending deletion answers access denied or delete pending, not {code:?}"
+        );
+        holder
+    }
+
+    /// Windows: a sidecar SQLite's last close is deleting is waited for until
+    /// its name is gone, within the lifecycle lock's bound; it is then absent,
+    /// not unavailable.
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_sidecar_pending_deletion_is_waited_for_until_it_is_gone() {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        let directory = fs::directory(&state, true, true).unwrap();
+        let name = format!("{NAME}-wal");
+        fs::publish_new(&directory, OsStr::new(&name), &[]).unwrap();
+        let holder = pending_deletion(&state.join(&name));
+        set_lifecycle_lock_wait(Duration::from_secs(20));
+        let closing = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(200));
+            drop(holder);
+        });
+        let admitted = admit_sidecars(&directory);
+        closing.join().unwrap();
+        assert_eq!(admitted, Ok(()), "a retiring sidecar was refused");
+        assert!(!state.join(&name).exists());
+    }
+
+    /// Windows: a sidecar that stays pending deletion past the bound is still
+    /// refused, and a present sidecar is never admitted weaker for the wait.
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_sidecar_still_pending_deletion_at_the_bound_is_refused() {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        let directory = fs::directory(&state, true, true).unwrap();
+        let name = format!("{NAME}-shm");
+        fs::publish_new(&directory, OsStr::new(&name), &[]).unwrap();
+        let holder = pending_deletion(&state.join(&name));
+        set_lifecycle_lock_wait(Duration::from_millis(100));
+        let started = Instant::now();
+        assert_eq!(
+            admit_sidecars(&directory),
+            Err(Failure::MetadataUnavailable)
+        );
+        assert!(started.elapsed() >= Duration::from_millis(100));
+        drop(holder);
+        assert_eq!(admit_sidecars(&directory), Ok(()));
+
+        fs::publish_new(&directory, OsStr::new(&name), &[]).unwrap();
+        assert_eq!(admit_sidecars(&directory), Ok(()));
+        fs::windows::grant_everyone_read(&state.join(&name));
+        assert_eq!(
+            admit_sidecars(&directory),
+            Err(Failure::MetadataUnavailable)
+        );
+    }
+
+    /// Windows counterpart of the Unix retirement race: a sidecar created and
+    /// deleted concurrently, by whichever deletion semantics `remove_file` has
+    /// here, is never refused while it retires.
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_sidecar_retired_during_admission_is_absent_not_unavailable() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        let directory = fs::directory(&state, true, true).unwrap();
+        let retiring_directory = fs::directory(&state, false, true).unwrap();
+        let name = format!("{NAME}-journal");
+        let sidecar = state.join(&name);
+        let stop = Arc::new(AtomicBool::new(false));
+        let retiring = {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                let mut retired = 0_u32;
+                while !stop.load(Ordering::SeqCst) {
+                    // Under delete-on-close the name lingers while admission
+                    // holds its probe handle, so a publication may meet it.
+                    if fs::publish_new(&retiring_directory, OsStr::new(&name), &[]).is_ok() {
+                        std::fs::remove_file(&sidecar).unwrap();
+                        retired += 1;
+                    }
+                }
+                retired
+            })
+        };
+        let refused = (0..5_000)
+            .filter(|_| admit_sidecars(&directory).is_err())
+            .count();
+        stop.store(true, Ordering::SeqCst);
+        let retired = retiring.join().unwrap();
+        assert!(retired > 0, "the race never ran");
+        assert_eq!(refused, 0, "a concurrently retired sidecar was refused");
     }
 
     #[test]
