@@ -65,7 +65,7 @@ fn proof_error(error: approvals::Failure) -> Failure {
         approvals::Failure::Capacity => Code::Capacity.into(),
     }
 }
-fn ledger_error(error: ledger::Failure) -> Failure {
+pub(super) fn ledger_error(error: ledger::Failure) -> Failure {
     match error {
         ledger::Failure::InvalidInput => Code::InvalidInput,
         ledger::Failure::Capacity => Code::Capacity,

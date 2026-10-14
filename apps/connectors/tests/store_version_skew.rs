@@ -102,11 +102,7 @@ fn assert_schema_newer(output: &Output, store_version: &str) {
     assert_eq!(data["stage"], "admission", "{value}");
     assert_eq!(data["next_action"], "upgrade", "{value}");
     assert_eq!(data["store_version"], store_version, "{value}");
-    assert_eq!(
-        data["binary_version"],
-        env!("CARGO_PKG_VERSION"),
-        "{value}"
-    );
+    assert_eq!(data["binary_version"], env!("CARGO_PKG_VERSION"), "{value}");
 }
 
 #[test]
@@ -141,7 +137,10 @@ fn the_same_model_under_a_newer_release_is_admitted_and_keeps_its_marker() {
     let root = configured();
     let model = Metadata::model_digest().unwrap();
     Metadata::record_writer_for_tests(&state(&root), NEWER, model).unwrap();
-    let listed = success(&command(&root, &["connections", "list", "--adapter", "forge"]));
+    let listed = success(&command(
+        &root,
+        &["connections", "list", "--adapter", "forge"],
+    ));
     assert_eq!(listed["connections"], Value::Array(Vec::new()), "{listed}");
     let checked = success(&command(&root, &["setup", "check"]));
     assert!(
@@ -167,6 +166,12 @@ fn a_store_without_a_marker_is_admitted_and_marked_by_its_first_write() {
     Metadata::unmarked_store_for_tests(&unmarked).unwrap();
     assert_eq!(Metadata::writer_for_tests(&unmarked).unwrap(), None);
     success(&command_in(&root, &unmarked, &["setup", "check"]));
+    assert_eq!(
+        Metadata::writer_for_tests(&unmarked).unwrap(),
+        None,
+        "a check writes nothing"
+    );
+    // A list writes: it records the registry clock it observed at.
     success(&command_in(
         &root,
         &unmarked,
