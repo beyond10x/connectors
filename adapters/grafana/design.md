@@ -97,6 +97,13 @@ port with one fixed `X-Grafana-URL` (`ScopedHttp::with_fixed_header`, the one-he
 [receiver-owned headers](../../contracts/auth/capability/v1alpha1/http-headers.md)). The
 header's value is `base_url` without its final `/`; no input reaches it.
 
+The provider authority the host binds the stored token to names every destination of that
+token: `base_url` alone, or `base_url`, one space and `irm_api_url` when the IRM API URL is
+configured. A changed `irm_api_url` is thus a changed authority, which needs a new instance id
+(`docs/local-connection-registry.md`, configuration upgrades), so an upgrading revalidation can
+never carry the token to another IRM host. A configuration without `irm_api_url` keeps the
+authority and revision it had before the member existed.
+
 Decisions taken inside the read-only scope: a service-account token plus the fixed header
 (not a legacy OnCall API key); a second profile `grafana.irm_service_account` whose probe is
 `GET api/v1/alert_groups/?started_at=2000-01-01T00:00:00_2000-01-01T00:00:01&perpage=1`, so the

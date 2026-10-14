@@ -12,12 +12,18 @@ nonsecret header on a native port, `ScopedHttp::with_fixed_header`
 - The composition names the header and its value once, when it builds the port; the business
   adapter holds only `AuthenticatedHttp` and can neither add, change nor remove it. No caller
   input, provider response or adapter-built request reaches the value.
-- It cannot take the credential header's name (in any case), or that of a routing, framing,
-  content, upgrade or cookie header (`host`, `content-length`, `content-type`,
-  `transfer-encoding`, `connection`, `upgrade`, `accept`, `sec-websocket-*`, `cookie`,
-  `authorization`, `proxy-authorization` and their kin); its value is 1–1,024 bytes of visible
-  ASCII and spaces. A second fixed header on the same port is refused. Each refusal is
-  `invalid_input` at composition, before any request.
+- It cannot take the port's credential header name, or any name in these classes, each
+  compared case-insensitively; a trailing `*` is every name with that prefix:
+  - credential and cookie: `authorization`, `proxy-authorization`, `cookie`;
+  - routing and forwarding: `host`, `forwarded`, `x-forwarded-*`, `x-real-ip`;
+  - method override: `x-http-method-override`, `x-http-method`, `x-method-override`;
+  - framing and negotiation: `transfer-encoding`, `connection`, `proxy-connection`,
+    `keep-alive`, `te`, `trailer`, `expect`, `accept`, `accept-encoding`;
+  - content: `content-*`;
+  - upgrade: `upgrade`, `sec-websocket-*`.
+
+  Its value is 1–1,024 bytes of visible ASCII and spaces. A second fixed header on the same
+  port is refused. Each refusal is `invalid_input` at composition, before any request.
 - Every request of the port carries it once, beside the credential: reads, reads sent as a
   POST, the probe capability and writes derived from the port. The credential-free form
   exchange (`post_form`) carries neither.

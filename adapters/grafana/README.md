@@ -39,7 +39,11 @@ in `/`, at most 512 characters. A Grafana served under a sub-path (`root_url` wi
 with a private CA; it applies to `irm_api_url` too. `irm_api_url`, optional, is the stack's IRM
 API URL as IRM's settings show it, written like `base_url` (HTTPS, canonical, ending in `/`).
 Without it the IRM reads are unavailable, and a configuration without it keeps the
-`configuration_revision` it had before the member existed. The token is never part of this
+`configuration_revision` and the provider authority it had before the member existed. The
+provider authority, which the stored token is bound to, is `base_url`, or, with `irm_api_url`,
+`base_url` and `irm_api_url` separated by one space: the token goes to both. Adding, removing or
+changing `irm_api_url` is therefore a changed authority and needs a new instance id; it is not
+an upgrade of the saved connection. The token is never part of this
 file, of the TOML below, of executable arguments or of the environment.
 
 Inspect the native bootstrap and hash the built executable:

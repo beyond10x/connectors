@@ -69,6 +69,48 @@ const READ_POST_DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
 /// The longest value of a header composition fixes on a port (`with_fixed_header`).
 pub const FIXED_HEADER_VALUE_LIMIT: usize = 1024;
 
+/// The header names a composition-fixed header can never take, by class, as
+/// `contracts/auth/capability/v1alpha1/http-headers.md` lists them. `name` is the
+/// lower-case form `HeaderName` normalises every spelling to.
+fn refused_fixed_header_name(name: &str) -> bool {
+    const PREFIXES: [&str; 3] = [
+        // content: every `content-*` header describes the body the transport frames
+        "content-",
+        // upgrade
+        "sec-websocket-",
+        // forwarding: the origin or authority an intermediary routes to
+        "x-forwarded-",
+    ];
+    PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+        || matches!(
+            name,
+            // credential
+            "authorization"
+                | "proxy-authorization"
+                | "cookie"
+                // routing and forwarding
+                | "host"
+                | "forwarded"
+                | "x-real-ip"
+                // method override: retargets a read as another verb
+                | "x-http-method-override"
+                | "x-http-method"
+                | "x-method-override"
+                // framing and negotiation
+                | "accept"
+                | "accept-encoding"
+                | "transfer-encoding"
+                | "connection"
+                | "proxy-connection"
+                | "keep-alive"
+                | "te"
+                | "trailer"
+                | "expect"
+                // upgrade
+                | "upgrade"
+        )
+}
+
 impl ScopedHttp {
     pub fn from_config(config: &HttpConfig) -> Result<Self> {
         Self::new(
@@ -297,8 +339,9 @@ impl ScopedHttp {
     /// Trusted composition only. Fixes, once, one nonsecret header every request of this
     /// port carries beside the credential, such as a provider's tenancy header whose value
     /// the admitted configuration derives (`contracts/auth/capability/v1alpha1/http-headers.md`).
-    /// It cannot take the credential header's place, a routing, framing, content or
-    /// upgrade header's, or a cookie's; its value is visible ASCII and spaces, at most
+    /// It cannot take the credential header's place, or a credential, cookie, routing,
+    /// forwarding, method-override, framing, content (`content-*`) or upgrade header's
+    /// (`refused_fixed_header_name`); its value is visible ASCII and spaces, at most
     /// [`FIXED_HEADER_VALUE_LIMIT`] bytes. A port has at most one. A business adapter
     /// holding only `AuthenticatedHttp` can neither add nor change it.
     ///
@@ -314,31 +357,9 @@ impl ScopedHttp {
         }
         let name = reqwest::header::HeaderName::from_bytes(name.as_bytes())
             .map_err(|_| Error::invalid("invalid fixed header name"))?;
-        if name == self.header
-            || name.as_str().starts_with("sec-websocket-")
-            || matches!(
-                name.as_str(),
-                "authorization"
-                    | "proxy-authorization"
-                    | "cookie"
-                    | "host"
-                    | "content-length"
-                    | "content-type"
-                    | "content-encoding"
-                    | "accept"
-                    | "accept-encoding"
-                    | "transfer-encoding"
-                    | "connection"
-                    | "proxy-connection"
-                    | "keep-alive"
-                    | "te"
-                    | "trailer"
-                    | "upgrade"
-                    | "expect"
-            )
-        {
+        if name == self.header || refused_fixed_header_name(name.as_str()) {
             return Err(Error::invalid(
-                "a fixed header cannot replace credential, routing, framing or content headers",
+                "a fixed header cannot take a credential, routing, forwarding, method-override, framing, content or upgrade header",
             ));
         }
         if value.is_empty()
