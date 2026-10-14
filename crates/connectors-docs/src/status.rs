@@ -144,10 +144,38 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Local runtime",
+        "Stopping an owner after an upgrade",
+        "setup owner-stop asks the state directory's running owner, of any build, to drain and exit within 30 seconds, answers no_owner when none runs, and never signals a process.",
+        "apps/connectors/tests/local_cli.rs::setup_owner_stop_stops_an_owner_another_build_started_and_a_fresh_owner_serves",
+        "/docs/guides/set-up-the-local-cli#after-an-upgrade",
+    ),
+    shipped(
+        "Local runtime",
+        "Configuration upgrades",
+        "After a configuration change each saved connection has one working path: revalidate, a new connection under the same instance id after an evidence lifetime change, or a new instance id after a changed provider authority or profile.",
+        "crates/connectors-host/src/local/registry/upgrade_tests.rs::an_identity_change_names_a_new_instance_id_on_every_command",
+        "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
+        "Approval clock refusals",
+        "approvals clock-check names why no observation resulted: an unreachable source, a reply that does not verify against the configured key, or a source whose signed radius is too wide for approvals, each with its own next action.",
+        "apps/connectors/tests/local_cli.rs::clock_check_names_a_verified_source_too_imprecise_for_the_width",
+        "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
         "Saved connections",
         "connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown.",
         "apps/connectors/tests/failed_connect.rs::a_revalidation_reply_that_never_arrives_is_outcome_unknown",
         "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
+        "Mounted-secret custody",
+        "An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation.",
+        "apps/connectors/tests/container_env_i.rs::env_i_mounted_custody_round_trip",
+        "/docs/guides/set-up-the-local-cli",
     ),
     shipped(
         "Local runtime",
@@ -310,6 +338,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "adapters/catalog/tests/slack.rs::the_download_reads_url_private_with_the_token_on_an_admitted_host",
         "/docs/reference/adapters/catalog",
     ),
+    shipped(
+        "Catalog provider",
+        "Opsgenie alerts and incidents",
+        "alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only.",
+        "adapters/catalog/tests/opsgenie.rs::shipped_opsgenie_selections_are_exactly_the_five_reads",
+        "/docs/reference/adapters/catalog",
+    ),
     decided(
         "Catalog provider",
         "Catalog index service",
@@ -416,6 +451,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Native adapters",
+        "Grafana IRM alert groups and incidents",
+        "irm.alert_groups.list, irm.alert_group.get, irm.incidents.list and irm.incident.get over a since window, with incident-to-alert-group links (inferred), through a saved IRM service-account connection; read only.",
+        "adapters/grafana/tests/local_runtime.rs::a_saved_irm_connection_reads_alert_groups_and_incidents_through_the_private_runtime",
+        "/docs/reference/adapters/grafana",
+    ),
+    shipped(
+        "Native adapters",
         "Prometheus PromQL reads",
         "series.query, series.query_range and rules.list through a saved bearer connection, directly or through Grafana's data-source proxy.",
         "adapters/prometheus/tests/local_runtime.rs::each_read_answers_through_the_private_runtime_from_the_recorded_answers",
@@ -451,10 +493,17 @@ pub const CAPABILITIES: &[Capability] = &[
         "MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime.",
         "/docs/reference/adapters",
     ),
+    shipped(
+        "Distribution",
+        "Release binaries",
+        "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors and connectors-catalog-provider, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
+        "crates/connectors-build/src/release_binaries.rs::the_release_workflow_packages_the_cli_and_the_catalog_provider",
+        "/docs/getting-started",
+    ),
     planned(
         "Distribution",
-        "Binary and package distribution",
-        "Every release is a source release for Linux x86_64; build it from the checkout.",
+        "Package distribution",
+        "No package manager, container registry or Windows binary carries a release.",
         "/docs/getting-started",
     ),
 ];
@@ -576,7 +625,7 @@ fn page_for(root: &Path, capabilities: &[Capability]) -> Result<String> {
         3,
     );
     out.push_str(&format!(
-        "# Status\n\nAs of {AS_OF}: {} capabilities are shipped, {} are decided and {} are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.\n",
+        "# Status\n\nAs of {AS_OF}: {} capabilities are shipped, {} are decided and {} are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.\n",
         count("shipped"),
         count("decided"),
         count("planned"),

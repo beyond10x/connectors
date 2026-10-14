@@ -175,6 +175,11 @@ impl Session {
             selection.context.config.as_deref(),
             selection.context.state_dir.as_deref(),
         )?;
+        // The read-only binding takes no protected source: the owner reads
+        // the configured item itself.
+        if Config::load(&paths.config)?.selection().read_only() {
+            return Err(Code::InvalidInput.into());
+        }
         let text = |key| selection.selectors.get(key).and_then(Value::as_str);
         let alias = text("adapter").ok_or(Code::InvalidInput)?;
         owner::admit_capture(
@@ -214,6 +219,42 @@ impl Session {
         self.captured = Some((capture, secret));
         Ok(MARKER.into())
     }
+    /// `connections connect` or `repair` with no protected source. Under the
+    /// read-only `mounted_secret` binding the owner reads the item
+    /// `<adapter alias>/<profile>` itself and no bytes pass through this
+    /// process; under a platform binding a source is required.
+    pub fn complete_without_source(&mut self, call: &Invocation<'_>) -> owner::Result<Value> {
+        self.signals()?;
+        let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
+        if call.callable != selection.callable || call.context != selection.context {
+            return Err(Code::InvalidInput.into());
+        }
+        let paths = Paths::resolve(
+            call.context.config.as_deref(),
+            call.context.state_dir.as_deref(),
+        )?;
+        if !Config::load(&paths.config)?.selection().read_only() {
+            return Err(Code::ProtectedEntryUnavailable.into());
+        }
+        let text = |key| call.input.get(key).and_then(Value::as_str);
+        let alias = text("adapter").ok_or(Code::InvalidInput)?;
+        owner::admit_capture(
+            &paths,
+            alias,
+            text("profile"),
+            text("connection"),
+            text("expected_revision"),
+        )?;
+        owner::Client::connect(&paths, true)?
+            .begin(
+                alias,
+                text("profile").map(str::to_owned),
+                text("connection").map(str::to_owned),
+                text("expected_revision").map(str::to_owned),
+            )?
+            .complete_mounted()
+    }
+
     pub fn complete(&mut self, call: &Invocation<'_>) -> owner::Result<Value> {
         let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
         if call.callable != selection.callable

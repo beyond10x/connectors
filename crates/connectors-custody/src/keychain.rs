@@ -10,8 +10,8 @@
 //! The keychain is injectable ([`Keychain::with_keychain`]) so a test can
 //! create, lock and delete its own temporary keychain.
 use crate::{
-    Backend, CustodyBackend, Failure, MAX_BYTES, Material, Result, Scope, State, Version,
-    admit_material,
+    Backend, CustodyBackend, Failure, MAX_BYTES, Material, ReadBackend, Result, Scope, State,
+    Version, admit_material,
 };
 use core_foundation::{
     array::{CFArray, CFArrayRef},
@@ -359,7 +359,7 @@ fn status(keychain: &SecKeychain) -> State {
     }
 }
 
-impl Backend for Keychain {
+impl ReadBackend for Keychain {
     fn kind(&self) -> CustodyBackend {
         CustodyBackend::MacosKeychain
     }
@@ -382,6 +382,20 @@ impl Backend for Keychain {
         Ok(())
     }
 
+    fn read(&self, version: Version) -> Result<Material> {
+        let _quiet = NoInteraction::enter()?;
+        self.admit(version)?;
+        let (password, _item) = self.find(version)?.ok_or(Failure::Missing)?;
+        let material = Material::from_slice(&password);
+        drop(password);
+        if material.is_empty() || material.len() > MAX_BYTES {
+            return Err(Failure::Unavailable);
+        }
+        Ok(material)
+    }
+}
+
+impl Backend for Keychain {
     fn write_new(
         &self,
         version: Version,
@@ -408,18 +422,6 @@ impl Backend for Keychain {
             return Err(Failure::OutcomeUnknown);
         }
         Ok(())
-    }
-
-    fn read(&self, version: Version) -> Result<Material> {
-        let _quiet = NoInteraction::enter()?;
-        self.admit(version)?;
-        let (password, _item) = self.find(version)?.ok_or(Failure::Missing)?;
-        let material = Material::from_slice(&password);
-        drop(password);
-        if material.is_empty() || material.len() > MAX_BYTES {
-            return Err(Failure::Unavailable);
-        }
-        Ok(material)
     }
 
     fn confirm(

@@ -19,7 +19,9 @@ use std::{
 };
 #[cfg(test)]
 pub(crate) use transport::bound_allocator;
-pub use transport::{Capture, Client, WriteClient, enable_checkpoints, serve};
+pub use transport::{
+    Capture, Client, OwnerStop, WriteClient, enable_checkpoints, serve, stop_owner,
+};
 
 const VERSION: &str = "connectors-owner/1";
 pub type Result<T> = std::result::Result<T, Error>;
@@ -34,6 +36,9 @@ pub enum Code {
     /// recorded revision moved under it; the store itself is readable.
     RevisionConflict,
     CustodyUnavailable,
+    /// The selected custody binding is read-only (`mounted_secret`): it writes,
+    /// rotates and deletes nothing, so the command cannot proceed under it.
+    CustodyReadOnly,
     OutcomeUnknown,
     Forbidden,
     NotFound,
@@ -96,6 +101,11 @@ pub struct Error {
     /// new connection helps (`registry::Failure::BindingChanged`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reconnect: bool,
+    /// The connection's provider authority or profile authentication changed
+    /// under the configuration: no command under this instance id helps, a new
+    /// instance id does (`registry::Failure::AuthenticationChanged`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reconfigure: bool,
     /// A `not_granted` read whose connection's validation evidence expired
     /// while its credential is intact; a revalidation helps, not a repair
     /// (`registry::Failure::EvidenceExpired`).
@@ -116,6 +126,7 @@ impl From<Code> for Error {
             retry_after_seconds: None,
             origin: Origin::Host,
             reconnect: false,
+            reconfigure: false,
             revalidate: false,
             store_version: None,
         }
@@ -160,7 +171,7 @@ impl From<registry::Failure> for Error {
             F::ConcurrentRevision => Code::RevisionConflict,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
-            F::Conflict | F::UpgradeRequired => Code::LifecycleConflict,
+            F::Conflict | F::UpgradeRequired | F::AuthenticationChanged => Code::LifecycleConflict,
             F::Revoked => Code::Revoked,
             F::IdentityMismatch | F::UpgradeIdentityMismatch => Code::IdentityMismatch,
             F::Expired => Code::Timeout,
@@ -169,8 +180,11 @@ impl From<registry::Failure> for Error {
             F::Capacity => Code::Capacity,
             F::NotReady | F::EvidenceExpired | F::InsufficientScope => Code::NotGranted,
             F::CustodyUnavailable => Code::CustodyUnavailable,
+            F::CustodyReadOnly => Code::CustodyReadOnly,
         });
         error.reconnect = reconnect;
+        // Only a new instance id helps: connect refuses it under this one too.
+        error.reconfigure = e == F::AuthenticationChanged;
         // Revalidation helps: it recollects expired evidence, and it follows a
         // configuration upgrade of the connection's instance.
         error.revalidate = matches!(e, F::EvidenceExpired | F::UpgradeRequired);
@@ -233,6 +247,7 @@ impl From<runtime::Failure> for Error {
             retry_after_seconds: None,
             origin,
             reconnect: false,
+            reconfigure: false,
             revalidate: false,
             store_version: None,
         }
@@ -359,7 +374,7 @@ pub fn admit_capture(
     }
     // Metadata must exist before any private owner startup or protected input.
     super::metadata::Metadata::inspect(&paths.state)?;
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     Ok(profile)
@@ -420,7 +435,7 @@ pub fn admit_revalidation(
     if !adapter.permissions.profiles.contains(&profile) {
         return Err(Code::Forbidden.into());
     }
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     // Nothing is cached for a configuration until the adapter is launched
@@ -428,7 +443,7 @@ pub fn admit_revalidation(
     // connection was admitted under; the owner's capture compares it with the
     // launched provider's binding before any material is read.
     let binding = match cached(paths, alias) {
-        Ok(bootstrap) => bootstrap.binding(&profile)?,
+        Ok(bootstrap) => saved_binding(&bootstrap, &profile)?,
         Err(Error {
             code: Code::DescriptionUnavailable,
             ..
@@ -442,6 +457,20 @@ pub fn admit_revalidation(
         connectors_sdk::now_ms(),
     )?;
     Ok(profile)
+}
+/// The configured binding of a saved connection's profile. A profile the
+/// configured adapter no longer declares (its `auth.profile` id changed) is a
+/// changed binding, refused as a read refuses one (`create_connection`): a new
+/// connection under a declared profile follows it, and no command answers
+/// `unsupported` with nothing to do next.
+pub(crate) fn saved_binding(
+    bootstrap: &runtime::Bootstrap,
+    profile: &str,
+) -> Result<registry::Binding> {
+    bootstrap.binding(profile).map_err(|failure| match failure {
+        runtime::Failure::Unsupported => registry::Failure::BindingChanged.into(),
+        other => other.into(),
+    })
 }
 /// Validate the original text carrier, including duplicate-key and depth checks.
 pub fn validate_document(schema: &Value, document: &[u8], limit: usize) -> Result<()> {
@@ -476,7 +505,7 @@ pub fn admit_invoke(paths: &Paths, alias: &str, call: &Value, document: &[u8]) -
         &requirement.scopes,
         connectors_sdk::now_ms(),
     )?;
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     Ok(())
@@ -537,13 +566,65 @@ pub fn admit_launch(
             connectors_sdk::now_ms(),
         )
         .map_err(launch_failure)?;
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     Ok(LaunchAdmission {
         consumer: entry,
         binding,
     })
+}
+/// Whether a failed custody read proves the version's bytes gone for good, so
+/// the version is invalidated. Under the read-only binding `Missing` means the
+/// mounted item changed or went away underneath: a revalidation re-pins it, so
+/// it never invalidates.
+pub(crate) fn read_invalidates(
+    selection: &super::config::Selection,
+    failure: custody::Failure,
+) -> bool {
+    failure == custody::Failure::Missing && !selection.read_only()
+}
+/// The owner's answer to a failed custody read: `custody_unavailable`, naming
+/// a revalidation when the read-only binding's pinned bytes are no longer the
+/// item's. The changed bytes are never used.
+pub(crate) fn read_error(selection: &super::config::Selection, failure: custody::Failure) -> Error {
+    let mut error: Error = Code::CustodyUnavailable.into();
+    error.revalidate = failure == custody::Failure::Missing && selection.read_only();
+    error
+}
+/// The read-only binding's connect, repair and re-pin, after the claim is
+/// consumed: the owner reads the item `<alias>/<profile>` once under every
+/// check, the provider validates exactly those bytes, and the binding pins
+/// them to the prepared version, which is published. Nothing is written to the
+/// mounted directory; a missing or refused item is `custody_unavailable`.
+#[cfg(target_os = "linux")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn publish_mounted(
+    paths: &Paths,
+    selection: &super::config::Selection,
+    registry: &registry::Registry,
+    claim: &registry::Claim,
+    alias: &str,
+    profile: &str,
+    validate: impl FnOnce(connectors_sdk::Secret) -> Result<registry::ValidatedBaseline>,
+    recheck: impl FnOnce() -> Result<()>,
+) -> Result<String> {
+    let item = custody::Item::new(alias, profile).map_err(|_| Code::InvalidInput)?;
+    let reading = custody::read_mounted(selection, &paths.state, &item)
+        .map_err(|_| Code::CustodyUnavailable)?;
+    let baseline = validate(connectors_sdk::Secret(
+        reading.material().as_bytes().to_vec(),
+    ))?;
+    recheck()?;
+    let prepared = registry.prepare(
+        claim,
+        baseline,
+        reading.material().len(),
+        connectors_sdk::now_ms(),
+    )?;
+    let store = custody::Store::open_for(prepared.version().scope(), selection, &paths.state)
+        .map_err(|_| Code::CustodyUnavailable)?;
+    Ok(registry.pin_and_publish(prepared, &item, &reading, &store, connectors_sdk::now_ms)?)
 }
 /// Evidence that is not current is readiness, `unavailable`, as the
 /// connection's own observation reports it; never a grant refusal.
@@ -733,5 +814,18 @@ mod cached_tests {
             answered.map(|b| b.instance).map_err(|e| e.code),
             Ok("owned".into())
         );
+    }
+
+    /// story:revision-change-keeps-a-recovery-path: a saved connection whose
+    /// profile the configured adapter no longer declares (its `auth.profile`
+    /// id changed) is a changed binding that a new connection follows, never
+    /// `unsupported` with no next action.
+    #[test]
+    fn a_profile_the_configuration_no_longer_declares_names_a_new_connection() {
+        let error = saved_binding(&bootstrap("fixture-instance"), "gitlab.pat").unwrap_err();
+        assert_eq!(error.code, Code::LifecycleConflict);
+        assert!(error.reconnect);
+        assert!(!error.reconfigure);
+        assert!(!error.revalidate);
     }
 }

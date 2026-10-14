@@ -4,6 +4,15 @@
 
 ### Added
 
+- Release archives carry the catalog provider: each `connectors-<version>-<target>.tar.gz` holds
+  `connectors` and `connectors-catalog-provider`, both built, checked against the tag's version,
+  signed and notarized on macOS where the signing secrets are set, and covered by `SHA256SUMS`
+  through their archive. Archives of 0.50.0 and earlier hold `connectors` alone; the other
+  adapters are still built from the checkout. `connectors-catalog-provider --version` prints the
+  package version.
+- The repository gate runs `connectors-build release-binaries`, which refuses a guide that runs an
+  installed binary the release workflow's `BINARIES` list leaves out.
+
 - SQL read profiles (`profile.read`), on PostgreSQL and MySQL. A connection's native file may
   declare up to 32 `read_profiles`: an operator-written read statement, the names of its
   parameters, its output columns with a type (`text`, `integer`, `timestamp` or
@@ -75,9 +84,100 @@
   (`invalid_input`, `forbidden` or `not_found`), as the provider's own answer, with the matched
   value as its reason. Only on the write's own answer and beside at least one check; any other
   answer is classified as before.
+- Grafana Cloud IRM reads in the native `grafana` adapter, read only:
+  `irm.alert_groups.list` and `irm.incidents.list` over a since window (`since`, `until`, both
+  `YYYY-MM-DDTHH:MM:SSZ`, UTC) with a page cursor of the same window, and
+  `irm.alert_group.get` and `irm.incident.get` to re-read one record's state by id. Each
+  incident answer carries `links`, the alert groups the incident references through its
+  `com.grafana.oncall` references; that such a reference names the alert group's id is
+  inferred and not yet confirmed against a real stack. They need the new optional
+  `irm_api_url` in the native configuration and a connection under the new profile
+  `grafana.irm_service_account`, whose probe is one alert-group read over a fixed one-second
+  window. A configuration without `irm_api_url` keeps its configuration revision, and the IRM
+  reads are unavailable on it; existing `grafana.service_account` connections are unchanged.
+- `ScopedHttp::with_fixed_header`: trusted composition may fix one nonsecret header on a
+  native port, refused for credential, routing, framing, content, upgrade and cookie names
+  (the implemented slice of the auth capability's receiver-owned headers). A read may name a
+  collection path ending in `/` with one final empty segment.
+- The catalog provider reads Opsgenie: `alerts.list` and `incidents.list` over a creation window
+  the caller advances (`query` `createdAt >= <epoch ms>`, `sort` held to `createdAt` and `order`
+  to `asc`, `offset` bounded to 19,899 under Opsgenie's 20K cap, `limit` 1..100), `alert.get`,
+  `incident.get`, and `incident.alert_ids`, the alert ids linked to an incident. All five are
+  reads with no approval. The caller holds the cursor: the last `createdAt` it read, sent back as
+  the next window's lower bound; delivery is at least once. The source is the Apache-2.0
+  `opsgenie/opsgenie-oas` Swagger document at `71c55343` (SHA-256 `60901e17`), vendored with its
+  `LICENSE`. Verified against a local fixture only; Opsgenie ends service on 2027-04-05
+  (`docs/catalog-opsgenie.md`).
+- A token profile's optional `auth.prefix` sends the token as `<prefix> <token>`, such as
+  `Authorization: GenieKey <key>`. It is 1 to 32 visible ASCII bytes, belongs to the `token`
+  scheme only and is refused beside `bearer: true`. A configuration without it keeps its
+  revision. Modelled in `connectors_catalog.identity.Profile`.
+- A fourth cited amendment kind, `add_operation`, adds a GET the vendor's reference documents and
+  its pinned document leaves out: a new `operationId`, a path no GET of the source has, path
+  parameters exactly its placeholders and otherwise query parameters only. Modelled in
+  `connectors_catalog.amendment.AddedOperation`.
+- The Swagger 2.0 projection moves to `swagger2-openapi/2`. It reads the document's shared
+  `parameters` and `responses` through `$ref` and inlines them, projects response headers, `csv`
+  and `multi` array query parameters, operation `x-*` extensions, `discriminator`, `nullable` and
+  a property's described `$ref`, and lists a shared entry no operation references. An operation
+  with no exact projection for its own reason (a request body no `consumes` gives a media type, a
+  `formData` file, a `schema` on a non-body parameter) is no longer a refusal of the document: it
+  is left out, listed in the projection record's new `unprojected_operations` with its pointer and
+  reason, and counted unsupported in the bundle. `operationId` must be unique among the projected
+  operations. Every document version 1 accepted projects to the same bytes; Slack's projection
+  record names the new version and its bundle was rebuilt.
+- Read-only mounted-secret custody for headless and container hosts. A `connectors-local/4`
+  owner configuration can select it with a `[custody]` table (`binding = "mounted_secret"`,
+  `directory = "<absolute path>"`; Linux only): credentials are read from a read-only mounted
+  directory, such as a Kubernetes Secret volume in its projected `..data` layout or a read-only
+  bind mount, as items `<adapter alias>/<profile>`. It is never a fallback: without `[custody]`
+  custody is the platform binding exactly as before, and an unusable platform store still answers
+  `custody_unavailable`. Every item is opened without following symbolic links (only `..data` to
+  one `..`-prefixed sibling is resolved) and admitted only as a regular, singly linked file of at
+  most 64 KiB, with no write or other bits, owned by the effective user or root, on a read-only
+  mount; group read is admitted only on a root-owned item whose group the process holds, which
+  is how Kubernetes presents a Secret to a non-root pod with `fsGroup`. `setup check` reports
+  `custody_backend = "mounted_secret"` and a `mounted_custody` prerequisite.
+- Under that binding `connections connect` and `repair` take no protected source: the owner reads
+  the item itself and the provider validates those bytes. Each version pins its bytes with an
+  HMAC-SHA-256 under a key kept owner-only in the state directory; once the platform replaces an
+  item, a read is refused with `custody_unavailable` and `next_action = revalidate_connection`,
+  the new bytes are never sent, and `connections revalidate` publishes them as a new version.
+- A new failure code, `custody_read_only` (exit 1, `stage = custody`,
+  `next_action = check_configuration`): a write the read-only binding cannot make, a second
+  connection of the same profile, an OAuth-acquired (refresh-rotating) profile or an
+  approval-signing key, refused before any provider exchange.
+- `invalid_configuration` at stage `configuration` names the rule that refused in
+  `configuration_rule`: `config_path_unresolved`, `config_missing`, `config_not_private` or
+  `owner_uid_mismatch`, never a path.
+- `docs/local-mounted-secret-custody.md` describes the binding and its threat model beside the
+  Secret Service's; `docs/local-container.md` the container setup, with a CronJob example.
+
+- `setup owner-stop` stops the owner an older binary started, the step the `stop_owner` next
+  action of `owner_build_mismatch` and `lifecycle_conflict` asks for. It sends the owner's own
+  shutdown request over the state directory's socket, after a greeting that names the store's
+  authority and the incarnation that answered, and waits up to 30 seconds for the owner to
+  exit: `disposition` `stopped` with that `host_incarnation`. A state directory where no owner
+  runs answers `no_owner`, exit 0, and nothing is started or created. A held lifetime lock with
+  no owner answering is `unavailable`, an owner still running at the bound is `timeout`, and a
+  state directory, socket or lock file of another user is `forbidden`, each at stage `stop`; no
+  process is ever signalled. The CLI guide's new "After an upgrade" section shows it.
 
 ### Changed
 
+- `approvals clock-check` names why the configured clock source gave no observation. The
+  refusal stays `unavailable` at stage `observation`, and its `Failure` adds `clock_refusal`:
+  `unreachable` (no reply within the two-second deadline, or a send or receive error;
+  `next_action` `retry_explicitly`), `unverified` (the reply did not parse or did not verify
+  against the configured key and protocol version; `check_configuration`) or `too_imprecise`
+  (a verified reply whose signed radius, with the network delay and timer-rate error, is wider
+  than the 4,000 ms the clock contract admits; the new next action `choose_clock_source`, with
+  the signed radius in `clock_radius_ms`). Before, all three answered `check_configuration`
+  with no cause. A local timer or UTC-midnight refusal is unchanged and names no cause. The
+  width, the deadline, the protocol version and the trusted-source model do not change, and
+  the approval paths that acquire the clock (`approvals issue`, a business write and its
+  recovery) still answer `unavailable` without a cause. `docs/local-clock.md` lists the three
+  refusals and what to do about each.
 - SQL: a statement that prepares with columns but cannot run as a derived table is refused as
   `unsupported` on both engines, as a statement that returns no columns already was. On
   PostgreSQL that is `INSERT`, `UPDATE` or `DELETE` with `RETURNING`, `EXPLAIN` and `SHOW`,
@@ -86,11 +186,43 @@
   in the statement itself stays `invalid_input`. The live PostgreSQL case that pins this was
   updated, not re-run.
 
+- `connections connect` and `repair` no longer require a protected source flag in the parser.
+  Under a platform binding a connect without one is refused with `protected_entry_unavailable`
+  and `next_action = select_protected_source`; under the mounted binding a source flag is
+  `invalid_input`.
+- The custody backend trait splits into a read capability (`ReadBackend`) and a write capability
+  (`Backend: ReadBackend`); the mounted binding implements only the first.
+
 ### Fixed
 
+- A configuration change that moves an adapter's bootstrap revision no longer strands its
+  connections. The evidence lifetime is no longer part of a connection's identity: after
+  raising `auth.evidence_lifetime_ms` (which every shipped adapter digests into the profile
+  revision), revalidate still answers `lifecycle_conflict` / `create_connection`, and
+  `connections connect` under the same instance id now answers `ready`, where it answered
+  `lifecycle_conflict` / `retry_status` and repair `identity_mismatch`; the old connection stays
+  revocable. A saved connection is not moved to the new lifetime in place: it stays bound to the
+  profile record it was saved under. A change to the identity itself (the provider
+  authority or any other field of the profile) is refused by revalidate, repair, reads and
+  connect alike with `lifecycle_conflict` and `next_action: check_configuration`, since only a
+  new instance id helps; connect answered `retry_status` there before. A repair of a connection
+  saved under another binding answers what a read does instead of `identity_mismatch`. A
+  revalidate, connect, repair or read that finds the adapter process of an earlier adapter entry
+  still running stops it and starts the configured one, where every command answered
+  `retry_status` until `adapters stop`; credential validation and writes keep refusing.
+  Compatibility: a caller that matched `retry_status` from connect, or `create_connection` from
+  revalidate, after a changed provider authority or profile now receives `check_configuration`.
 - SQL on PostgreSQL: a `query.read` statement ending in a `--` comment ran into the derived
   table's closing parenthesis and was refused; the derived table now closes on its own line,
   as it already did on MySQL.
+
+### Limitations
+
+- A retired version of the mounted binding stays retired: its own terminal state (`Released`,
+  nothing deleted) needs a metadata store migration and is not recorded yet. No version of any
+  binding is reclaimed today.
+- The `fsGroup` group-read delivery is exercised against root-owned files in an unprivileged
+  test jail; a run against a real Secret volume in a cluster is not part of the gate.
 
 ## 0.50.0 — 2026-10-14
 

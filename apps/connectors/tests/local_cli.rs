@@ -139,6 +139,89 @@ fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
     fixture.join().unwrap();
 }
 
+/// `approvals clock-check` against a local fixture source configured with `key`.
+/// `reply` answers the one request (`None`: the source never answers); the
+/// command's refusal `Failure` is returned.
+fn clock_refusal(key: [u8; 32], reply: Option<clock_fixture::Fixture>) -> Value {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    use std::{net::UdpSocket, time::Duration};
+    let root = tempfile::tempdir().unwrap();
+    success(&command(&root, &["setup", "init"]));
+    let config_path = root.path().join("config/config.toml");
+    let original = fs::read_to_string(&config_path).unwrap();
+    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let address = socket.local_addr().unwrap();
+    fs::write(
+        &config_path,
+        format!(
+            "{original}\n[approval_clock]\nformat='roughtime-clock/1'\naddress='{address}'\npublic_key='{}'\nmax_rate_error_ppm=10000\n[adapters.forge]\ninstance_id='forge-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.forge.executable]\npath='{NOT_INSTALLED}/connectors-catalog-provider'\nsha256='{}'\nargs=[]\n",
+            STANDARD.encode(key),
+            "a".repeat(64)
+        ),
+    )
+    .unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(10)))
+        .unwrap();
+    let source = std::thread::spawn(move || {
+        let mut b = [0; 1024];
+        let (n, caller) = socket.recv_from(&mut b).unwrap();
+        assert_eq!(n, 1024);
+        if let Some(fixture) = reply {
+            socket.send_to(&fixture.reply(&b[..n]), caller).unwrap();
+        }
+        // Held open until the request is answered or abandoned, so the
+        // silent source refuses nothing: the client's deadline expires.
+        socket
+    });
+    let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
+    drop(source.join().unwrap());
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(refused.stdout.is_empty());
+    let error = String::from_utf8(refused.stderr).unwrap();
+    // Never the observation's bounds, nor packet contents.
+    for leaked in ["lower_unix_ms", "upper_unix_ms", "ROUGHTIM", "midpoint"] {
+        assert!(!error.contains(leaked), "{leaked}: {error}");
+    }
+    let envelope: Value = serde_json::from_str(&error).unwrap();
+    let failure = envelope["error"]["data"].clone();
+    assert_eq!(failure["kind"], "operational", "{error}");
+    assert_eq!(failure["code"], "unavailable", "{error}");
+    assert_eq!(failure["stage"], "observation", "{error}");
+    failure
+}
+
+#[test]
+fn clock_check_names_an_unreachable_source() {
+    let failure = clock_refusal(clock_fixture::root_key(), None);
+    assert_eq!(failure["clock_refusal"], "unreachable", "{failure}");
+    assert_eq!(failure["next_action"], "retry_explicitly", "{failure}");
+    assert!(failure.get("clock_radius_ms").is_none(), "{failure}");
+}
+
+#[test]
+fn clock_check_names_a_reply_that_does_not_verify_against_the_configured_key() {
+    let failure = clock_refusal([17; 32], Some(clock_fixture::Fixture::default()));
+    assert_eq!(failure["clock_refusal"], "unverified", "{failure}");
+    assert_eq!(failure["next_action"], "check_configuration", "{failure}");
+    assert!(failure.get("clock_radius_ms").is_none(), "{failure}");
+}
+
+#[test]
+fn clock_check_names_a_verified_source_too_imprecise_for_the_width() {
+    // A 5 s signed radius is a 10 s interval: wider than the contract's 4,000 ms.
+    let failure = clock_refusal(
+        clock_fixture::root_key(),
+        Some(clock_fixture::Fixture {
+            radius: 5,
+            ..Default::default()
+        }),
+    );
+    assert_eq!(failure["clock_refusal"], "too_imprecise", "{failure}");
+    assert_eq!(failure["next_action"], "choose_clock_source", "{failure}");
+    assert_eq!(failure["clock_radius_ms"], 5000, "{failure}");
+}
+
 #[test]
 fn production_parser_initializes_and_inspects_across_processes() {
     let root = tempfile::tempdir().unwrap();
@@ -221,6 +304,41 @@ fn configured_entry(root: &tempfile::TempDir, format: &str, private_protocol: &s
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
+}
+
+/// Only the read-only `mounted_secret` binding takes `connections connect`
+/// without a protected source; a platform binding refuses it by name, before
+/// any owner starts, metadata opens or a credential is read.
+#[test]
+fn a_platform_binding_refuses_a_connect_with_no_protected_source() {
+    let root = tempfile::tempdir().unwrap();
+    configured_entry(
+        &root,
+        "connectors-local/2",
+        "private_protocol='connectors-private/2'\n",
+    );
+    let output = command(
+        &root,
+        &[
+            "connections",
+            "connect",
+            "--adapter",
+            "forge",
+            "--profile",
+            "token",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(output.stdout.is_empty());
+    let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(
+        error["error"]["data"]["code"], "protected_entry_unavailable",
+        "{error}"
+    );
+    assert_eq!(
+        error["error"]["data"]["next_action"],
+        "select_protected_source"
+    );
 }
 
 #[test]
@@ -529,6 +647,176 @@ fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
     let host = client.host_incarnation.clone();
     client.shutdown(&host).unwrap();
     assert!(owner.0.wait().unwrap().success());
+}
+
+/// story:owner-stop-after-upgrade: an owner another build started is refused
+/// with `stop_owner`; `setup owner-stop` from this build stops it, the owner
+/// exits cleanly, and a fresh owner of this build then serves the next command.
+#[cfg(unix)]
+#[test]
+fn setup_owner_stop_stops_an_owner_another_build_started_and_a_fresh_owner_serves() {
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let status = ["adapters", "status", "--adapter", "forge"];
+    let older = other_build(&root);
+    let mut owner = start_owner(&older, &root);
+    let refused = command(&root, &status);
+    let error: Value = serde_json::from_slice(&refused.stderr).unwrap();
+    assert_eq!(
+        error["error"]["data"]["code"], "owner_build_mismatch",
+        "{error}"
+    );
+    assert_eq!(error["error"]["data"]["next_action"], "stop_owner");
+    let old_host =
+        success(&command_from(&older, &root, &status))["observation"]["host_incarnation"].clone();
+    assert!(old_host.is_string(), "{old_host}");
+
+    let stopped = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(stopped["disposition"], "stopped", "{stopped}");
+    assert_eq!(stopped["host_incarnation"], old_host, "{stopped}");
+    assert_eq!(
+        stopped["state_path"].as_str().map(std::path::PathBuf::from),
+        Some(state.clone()),
+        "{stopped}"
+    );
+    let exit = owner_exit(&mut owner, std::time::Duration::from_secs(10))
+        .expect("the stopped owner is still running");
+    assert!(
+        exit.success(),
+        "the owner drained and exited cleanly: {exit}"
+    );
+    assert!(!state.join("owner.sock").exists(), "socket left behind");
+
+    // The lifetime lock is free: this build's owner starts and serves.
+    let _fresh = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    let served = success(&command(&root, &status));
+    assert_ne!(
+        served["observation"]["state"], "owner_unavailable",
+        "{served}"
+    );
+    assert!(served["observation"]["host_incarnation"].is_string());
+    assert_ne!(served["observation"]["host_incarnation"], old_host);
+    let again = success(&command(&root, &["setup", "owner-stop"]));
+    assert_eq!(again["disposition"], "stopped", "{again}");
+    assert_eq!(
+        again["host_incarnation"],
+        served["observation"]["host_incarnation"]
+    );
+}
+
+/// No owner runs: a state directory where none ever started, one where an owner
+/// came and went, and one that does not exist each answer `no_owner`, exit 0,
+/// and nothing is started or created.
+#[cfg(unix)]
+#[test]
+fn setup_owner_stop_without_an_owner_answers_no_owner_and_starts_nothing() {
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let stop = |root: &tempfile::TempDir| {
+        let output = command(root, &["setup", "owner-stop"]);
+        assert_eq!(output.status.code(), Some(0), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        success(&output)
+    };
+    let never = stop(&root);
+    assert_eq!(never["disposition"], "no_owner", "{never}");
+    assert!(never.get("host_incarnation").is_none(), "{never}");
+    assert!(
+        !state.join("owner.lock").exists(),
+        "a lock file was created"
+    );
+    assert!(!state.join("owner.sock").exists(), "an owner was started");
+
+    let mut owner = start_owner(
+        std::path::Path::new(env!("CARGO_BIN_EXE_connectors")),
+        &root,
+    );
+    shutdown_owner(&root);
+    owner_exit(&mut owner, std::time::Duration::from_secs(10)).expect("owner still running");
+    assert!(state.join("owner.lock").exists());
+    let gone = stop(&root);
+    assert_eq!(gone["disposition"], "no_owner", "{gone}");
+    assert!(!state.join("owner.sock").exists(), "an owner was started");
+
+    let missing = tempfile::tempdir().unwrap();
+    success(&command(&missing, &["setup", "init"]));
+    fs::remove_dir_all(missing.path().join("state")).unwrap();
+    let absent = stop(&missing);
+    assert_eq!(absent["disposition"], "no_owner", "{absent}");
+    assert!(
+        !missing.path().join("state").exists(),
+        "the state directory was created"
+    );
+}
+
+/// A process that holds the lifetime lock but never answers, with no socket or
+/// with a socket nobody serves, is refused by name at the bound and is never
+/// signalled.
+#[cfg(unix)]
+#[test]
+fn setup_owner_stop_refuses_an_owner_that_does_not_answer_and_never_signals_it() {
+    use std::os::{fd::AsRawFd, unix::fs::OpenOptionsExt};
+    let root = adversary_owner_root();
+    let state = root.path().join("state");
+    let lock = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .mode(0o600)
+        .open(state.join("owner.lock"))
+        .unwrap();
+    unsafe extern "C" {
+        fn flock(fd: i32, operation: i32) -> i32;
+    }
+    // SAFETY: a live descriptor owned by `lock`; LOCK_EX | LOCK_NB.
+    assert_eq!(unsafe { flock(lock.as_raw_fd(), 2 | 4) }, 0);
+    // The holder is a process that is not an owner; it keeps the lock through
+    // its inherited descriptor.
+    let mut holder = OwnerProcess(
+        Command::new("/bin/sleep")
+            .arg("120")
+            .stdout(std::process::Stdio::from(lock))
+            .spawn()
+            .unwrap(),
+    );
+    let stop = || {
+        Command::new(env!("CARGO_BIN_EXE_connectors"))
+            .env("CONNECTORS_TEST_OWNER_STOP_MS", "1500")
+            .args(["--output", "json", "--config"])
+            .arg(root.path().join("config/config.toml"))
+            .arg("--state-dir")
+            .arg(&state)
+            .args(["setup", "owner-stop"])
+            .output()
+            .unwrap()
+    };
+    let refused = |output: Output, case: &str| {
+        assert_eq!(output.status.code(), Some(1), "{case}: {output:?}");
+        assert!(output.stdout.is_empty(), "{case}: {output:?}");
+        let error: Value = serde_json::from_slice(&output.stderr).unwrap();
+        let data = &error["error"]["data"];
+        assert_eq!(
+            (&data["code"], &data["stage"], &data["next_action"]),
+            (
+                &Value::from("unavailable"),
+                &Value::from("stop"),
+                &Value::from("retry_explicitly")
+            ),
+            "{case}: {error}"
+        );
+    };
+    refused(stop(), "no socket");
+    let _silent = sockets::bind(&state, "owner.sock");
+    fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
+    refused(stop(), "a socket nobody serves");
+    assert!(
+        holder.0.try_wait().unwrap().is_none(),
+        "the lock holder was signalled"
+    );
 }
 
 /// Config with one adapter whose executable is never launched by `adapters status`.

@@ -141,10 +141,31 @@ types:
       - {name: operations, type: "List<String>"}
   # secret_service_socket selects the Secret Service bus on Linux only; the macOS and
   # Windows backends take no binding and refuse one.
+  # binding and directory are the `[custody]` table of a `connectors-local/4`
+  # configuration (contracts/cli/v1alpha1/semantics.md §3). Absent, custody is the
+  # platform binding. binding names one the build supports; mounted_secret, Linux
+  # only, is the explicit read-only binding over a mounted directory
+  # (contracts/auth/custody/v1alpha1/semantics.md §5.2). directory is an
+  # infrastructure binding of the owner configuration, like secret_service_socket,
+  # never a per-credential locator; no request selects a binding, directory or item.
   - name: connectors.cli.LocalCustodyBinding
     kind: struct
     fields:
       - {name: secret_service_socket, type: "Optional<String>"}
+      - {name: binding, type: "Optional<connectors.cli.CustodyBackend>"}
+      - {name: directory, type: "Optional<String>"}
+    invariants:
+      # directory is defined exactly when the binding is mounted_secret.
+      - any:
+          - {binding: mounted_secret}
+          - {directory: {exists: false}}
+      - any:
+          - not: {binding: mounted_secret}
+          - {directory: {exists: true}}
+      # The Secret Service bus is never named beside the mounted binding.
+      - any:
+          - not: {binding: mounted_secret}
+          - {secret_service_socket: {exists: false}}
   # Lowercase hex SHA-256 of an executable, as owner/transport.rs writes it (hex::encode)
   # in own_build.
   - name: connectors.cli.BuildDigest
@@ -239,6 +260,22 @@ types:
       - {name: name, type: String}
       - {name: label, type: String}
       - {name: max_bytes, type: Integer}
+  # A connection's identity is its instance, adapter, provider authority and this
+  # profile's authentication: every field but evidence_lifetime_ms
+  # (connectors.auth_bindings.LocalStaticProfile). A configuration revision that
+  # leaves the identity unchanged is upgraded by `connections revalidate` when the
+  # profile is unchanged; when only evidence_lifetime_ms changed, revalidate, repair
+  # and a read name create_connection, which connect under the same instance id
+  # admits; a saved connection whose profile id the configured adapter no longer
+  # declares is refused the same way, never as `unsupported`. Revalidate, connect,
+  # repair, a read and a write first replace an adapter process still running an
+  # earlier adapter entry. One that changes the identity refuses revalidate,
+  # repair, a read and connect under the same instance id with
+  # `lifecycle_conflict` and next_action check_configuration: only a new instance
+  # id helps, and `connections revoke` through the moved entry still reaches the
+  # connections left under an instance id no entry configures any longer.
+  # ESS-LIMIT: no construct relates two revisions' values field by field, so the
+  # host enforces the classification and tests pin it.
   - name: connectors.cli.PrivateStaticProfile
     kind: struct
     fields:
@@ -301,11 +338,14 @@ types:
     variants: [linux, macos, windows]
   # The protected store custody uses, fixed by the platform the binary was built for:
   # the freedesktop Secret Service on Linux, the login keychain on macOS, the
-  # Credential Manager on Windows (contracts/auth/custody/v1alpha1/semantics.md §5.1).
-  # There is no plain-text variant.
+  # Credential Manager on Windows (contracts/auth/custody/v1alpha1/semantics.md §5.1),
+  # or mounted_secret, the read-only binding over a mounted directory that only an
+  # explicit `[custody]` selection in the owner configuration chooses (§5.2).
+  # There is no fallback variant: mounted_secret is explicit and read-only, and
+  # nothing selects it when the platform binding is unusable.
   - name: connectors.cli.CustodyBackend
     kind: enum
-    variants: [secret_service, macos_keychain, windows_credential_manager]
+    variants: [secret_service, macos_keychain, windows_credential_manager, mounted_secret]
   # The operating-system guarantees the local host builds on, each fixed by the
   # platform the binary was built for (contracts/cli/v1alpha1/semantics.md §7,
   # "macOS platform guarantees" and "Windows platform guarantees"):
@@ -507,16 +547,24 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
   - name: connectors.cli.NextAction
     kind: enum
-    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, none]
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
-    variants: [connectors-local/1, connectors-local/2, connectors-local/3]
+    variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4]
+  # Which rule of the configuration stage refused (contracts/cli/v1alpha1/semantics.md
+  # §3): no absolute configuration path resolves (config_path_unresolved), no file is
+  # at the resolved path (config_missing), the file or a directory above it is not
+  # owner-only (config_not_private), or owner_uid is not the effective user
+  # (owner_uid_mismatch). It names the rule only, never a path or OS text.
+  - name: connectors.cli.ConfigurationRule
+    kind: enum
+    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created, state_initialized]
@@ -566,6 +614,10 @@ types:
       # ESS 0.52 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
       # so both rules are enforced by the host and pinned by tests, not declared here.
       - {name: instance_id, type: "Optional<String>"}
+      # ESS-LIMIT: configuration_rule appears only on invalid_configuration at stage
+      # configuration. As for instance_id above, ESS declares no invariant on a CLI type,
+      # so the presence rule is enforced by the host and pinned by tests.
+      - {name: configuration_rule, type: "Optional<connectors.cli.ConfigurationRule>"}
       # ESS-LIMIT: store_version and binary_version appear together, only on
       # metadata_schema_newer (contracts/cli/v1alpha1/semantics.md). binary_version is
       # the refusing binary's release version; store_version is the release version the
@@ -579,6 +631,28 @@ types:
       # by tests.
       - {name: store_version, type: "Optional<String>"}
       - {name: binary_version, type: "Optional<String>"}
+      # ESS-LIMIT: clock_refusal appears only on an approval clock's `unavailable`
+      # (`stage = observation`), naming why no observation resulted
+      # (contracts/service/clock.md, "Refusals"); clock_radius_ms, the source's signed
+      # radius in milliseconds, appears exactly when it is too_imprecise. As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence
+      # rules are enforced by the host and pinned by tests.
+      - {name: clock_refusal, type: "Optional<connectors.cli.ClockRefusal>"}
+      - {name: clock_radius_ms, type: "Optional<Integer>"}
+  # Why an approval clock acquisition produced no observation, each with its own
+  # next action: unreachable (no reply within the query timeout, or a send or receive
+  # error; retry_explicitly), unverified (the reply did not parse or verify against the
+  # configured key and protocol version; check_configuration), too_imprecise (a verified
+  # reply whose signed radius, with the measured delay and timer-rate error, is wider
+  # than the clock contract admits; choose_clock_source).
+  - name: connectors.cli.ClockRefusal
+    kind: enum
+    variants: [unreachable, unverified, too_imprecise]
+  # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
+  # keyring and persistent_custody_qualification under a platform binding; under the
+  # explicitly selected mounted_secret binding, mounted_custody (the configured
+  # directory and its items pass the binding's checks) takes the place of keyring and
+  # persistent_custody_qualification (contracts/auth/custody/v1alpha1/semantics.md §5.2).
   - name: connectors.cli.Prerequisite
     kind: struct
     fields:
@@ -729,6 +803,23 @@ types:
       # store carrying checkpoints. As for Failure.instance_id, ESS declares no
       # invariant on a CLI type, so the host pins the value and tests hold it.
       - {name: newest_incompatible_release, type: "String"}
+  # `setup owner-stop` (contracts/cli/v1alpha1/owner.md, "Stopping an owner"), the
+  # command the stop_owner next action names: asks the running owner of the state
+  # directory, of any build, to drain and exit through its private shutdown request
+  # and waits a bounded time for its lifetime lock. No process is ever signalled.
+  # no_owner is a success: no owner ran, and nothing was started or created.
+  - name: connectors.cli.OwnerStopDisposition
+    kind: enum
+    variants: [stopped, no_owner]
+  # host_incarnation is the incarnation that greeted and exited, present exactly
+  # when stopped; that cross-field requirement is a runtime obligation, as for
+  # AcquisitionObservation.
+  - name: connectors.cli.SetupOwnerStopResult
+    kind: struct
+    fields:
+      - {name: disposition, type: "connectors.cli.OwnerStopDisposition"}
+      - {name: state_path, type: "String"}
+      - {name: host_incarnation, type: "Optional<String>"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:
@@ -811,12 +902,16 @@ types:
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
   # EPHEMERAL LOCAL ACTION ONLY: protected source fills credential_document; never persist/log/serialize into public management, results or recording evidence.
+  # Under the read-only mounted_secret binding connect and repair take no protected source: the
+  # owner reads the item <adapter alias>/<profile> itself, and a source is invalid_input
+  # at arguments. Under a platform binding a missing source is protected_entry_unavailable
+  # (contracts/cli/v1alpha1/semantics.md §2).
   - name: connectors.cli.ConnectionConnectInput
     kind: struct
     fields:
       - {name: adapter, type: "String"}
       - {name: profile, type: "String"}
-      - {name: credential_document, type: "String"}
+      - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionConnectResult
     kind: struct
     fields:
@@ -829,7 +924,7 @@ types:
       - {name: adapter, type: "String"}
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
-      - {name: credential_document, type: "String"}
+      - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionRepairResult
     kind: struct
     fields:
@@ -1088,7 +1183,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:504, docs/local-connection-registry.md:105-106;
+    # contracts/cli/v1alpha1/semantics.md:534, docs/local-connection-registry.md:184-185;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1105,8 +1200,8 @@ entities:
     # connection or dispatch authority and is retained after logical expiry.
     # ESS-LIMIT: a cursor is stale when its registry_epoch differs from the
     # ServiceConfiguration's, which publication, revoke and known invalidity advance
-    # (docs/local-connection-registry.md:107-108); the 300 s expiry and the 10,000
-    # live-cursor cap (:104) are host rules. The guard over the related
+    # (docs/local-connection-registry.md:186-187); the 300 s expiry and the 10,000
+    # live-cursor cap (:183) are host rules. The guard over the related
     # configuration's field is `when_related:`, added in ESS 0.41 at source format
     # ess/18; this specification is ess/15, which refuses it
     # (unsupported_format_version), and the ESS 0.52 Entity Runtime lowering
@@ -1248,7 +1343,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:508) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:538) and the host
     # removal path (er.rs:4327-4329) only expires Active cursors. The error name is
     # the decision; no source names one.
 

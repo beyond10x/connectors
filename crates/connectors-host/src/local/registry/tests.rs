@@ -39,9 +39,11 @@ fn approval_target_is_passive_but_requires_exact_retained_admission() {
     );
     let mut changed = binding();
     changed.provider_authority.push_str("/other");
+    // A changed provider authority is a changed connection identity: only a
+    // new instance id helps (story:revision-change-keeps-a-recovery-path).
     assert_eq!(
         passive.approval_target(&changed, &reference, &BTreeSet::new()),
-        Err(Failure::BindingChanged)
+        Err(Failure::AuthenticationChanged)
     );
     assert_eq!(
         passive.approval_target(&binding(), &reference, &BTreeSet::from(["write".into()])),
@@ -837,6 +839,7 @@ pub(super) fn binding() -> Binding {
             subject: Subject::User,
             minimum_scopes: BTreeSet::from(["read".to_owned()]),
             evidence_lifetime_ms: 60_000,
+            declaration: None,
         },
     }
 }
@@ -896,6 +899,32 @@ pub(super) fn publish_fixture(
     let receipt = custody::WrittenVersion::fixture(prepared.version());
     let stored = registry.acknowledge(prepared, receipt, now).unwrap();
     registry.publish(stored, now).unwrap()
+}
+
+/// The read-only binding's rule, one item backs one connection, is held in
+/// the publishing commit: two connects of one profile that were both begun
+/// and acknowledged before either published yield one connection, and the
+/// second is refused as `CustodyReadOnly`. The platform path is unchanged.
+#[test]
+fn exclusive_publication_admits_one_connection_per_profile() {
+    let (_root, registry) = fixture();
+    let (_, first) = prepared(&registry, "one", NOW);
+    let (_, second) = prepared(&registry, "one", NOW);
+    let receipt = custody::WrittenVersion::fixture(first.version());
+    let first = registry.acknowledge(first, receipt, NOW).unwrap();
+    let receipt = custody::WrittenVersion::fixture(second.version());
+    let second = registry.acknowledge(second, receipt, NOW).unwrap();
+    registry.publish_with(first, NOW, true).unwrap();
+    assert_eq!(
+        registry.publish_with(second, NOW, true),
+        Err(Failure::CustodyReadOnly)
+    );
+
+    let (_root, registry) = fixture();
+    let (_, first) = prepared(&registry, "one", NOW);
+    let (_, second) = prepared(&registry, "one", NOW);
+    publish_fixture(&registry, first, NOW);
+    publish_fixture(&registry, second, NOW);
 }
 
 #[test]

@@ -505,6 +505,7 @@ fn publish(
             subject: registry::Subject::User,
             minimum_scopes: BTreeSet::new(),
             evidence_lifetime_ms: 60_000,
+            declaration: None,
         },
     };
     let clock = connectors_sdk::now_ms;

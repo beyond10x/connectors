@@ -136,13 +136,23 @@ fn lost(error: Error) -> Error {
     }
 }
 impl Capture {
-    pub fn complete(mut self, secret: &Secret) -> Result<Value> {
+    pub fn complete(self, secret: &Secret) -> Result<Value> {
+        self.finish(Some(secret))
+    }
+
+    /// Complete under the read-only binding: no bytes travel, the owner reads
+    /// the configured item itself.
+    pub fn complete_mounted(self) -> Result<Value> {
+        self.finish(None)
+    }
+
+    fn finish(mut self, secret: Option<&Secret>) -> Result<Value> {
         let answer = (|| {
             crate::local::protected::cancellation()?;
             channel::write(
                 &mut self.client.stream,
                 &Request::Complete,
-                Some(secret),
+                secret,
                 &[],
                 until(self.expires_at_ms)?,
             )?;
@@ -809,6 +819,102 @@ pub fn enable_checkpoints(paths: &Paths) -> Result<super::super::metadata::Check
     let enabled = Metadata::enable_checkpoints(&paths.state)?;
     drop(lock);
     Ok(enabled)
+}
+
+/// What `setup owner-stop` found for the state directory.
+#[derive(Debug, PartialEq, Eq)]
+pub enum OwnerStop {
+    /// The owner greeted as this incarnation, accepted the shutdown request and
+    /// released the lifetime lock.
+    Stopped { host_incarnation: String },
+    /// No owner held the lifetime lock: none ran for the state directory.
+    NoOwner,
+}
+
+/// `setup owner-stop` (contracts/cli/v1alpha1/owner.md, "Stopping an owner"):
+/// asks the running owner of `paths.state`, of any build, to drain and exit,
+/// and waits until `bound` for it to release the lifetime lock. The request is
+/// the private shutdown request, sent on the owner's own socket after a
+/// greeting that names this state directory's authority and the exact
+/// incarnation that answered; no process is ever signalled. A socket, state
+/// directory or lock file of another user is `Forbidden`; an owner that holds
+/// the lock but does not answer is `Unavailable`; one that has not exited by
+/// `bound` is `Timeout`. Nothing is started.
+pub fn stop_owner(paths: &Paths, bound: Duration) -> Result<OwnerStop> {
+    let deadline = Instant::now() + bound;
+    // No owner can run for a directory that does not exist.
+    match std::fs::symlink_metadata(&paths.state) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(OwnerStop::NoOwner);
+        }
+        #[cfg(unix)]
+        Ok(info) if info.uid() != fs::uid() => return Err(Code::Forbidden.into()),
+        _ => {}
+    }
+    let directory = fs::directory(&paths.state, false, true)?;
+    let name = std::ffi::OsStr::new("owner.lock");
+    // The socket and the lock file an owner of another user would hold.
+    #[cfg(unix)]
+    for path in [socket_path(&directory), paths.state.join(name)] {
+        if let Ok(info) = std::fs::symlink_metadata(&path)
+            && info.uid() != fs::uid()
+        {
+            return Err(Code::Forbidden.into());
+        }
+    }
+    // An owner always runs holding this file; without it none ever started, and
+    // none is created here.
+    if !fs::private_file_metadata_if_present_at(&directory, name)? {
+        return Ok(OwnerStop::NoOwner);
+    }
+    // Taken on a fresh open and released by closing it: free means no owner
+    // runs.
+    let free = || -> Result<bool> {
+        let lock = fs::private_file_at(&directory, name)?;
+        match try_lock(&lock) {
+            Ok(()) => Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(false),
+            Err(_) => Err(Error::from(Code::Unavailable)),
+        }
+    };
+    if free()? {
+        return Ok(OwnerStop::NoOwner);
+    }
+    // The lock is held: an owner runs or is starting. Greet it, retrying while
+    // a starting owner is not listening yet.
+    let client = loop {
+        match Client::connect_version(paths, false, VERSION, deadline) {
+            Ok(client) => break client,
+            Err(error) if error.code == Code::Unavailable => {
+                // It retired or exited by itself meanwhile.
+                if free()? {
+                    return Ok(OwnerStop::NoOwner);
+                }
+                if Instant::now() >= deadline {
+                    return Err(error);
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(error) if error.code == Code::Timeout => return Err(Code::Unavailable.into()),
+            Err(error) => return Err(error),
+        }
+    };
+    let host_incarnation = client.host_incarnation.clone();
+    match client.shutdown(&host_incarnation) {
+        Ok(()) => {}
+        // A lost reply, or an owner already shutting down: its exit decides.
+        Err(error) if matches!(error.code, Code::Unavailable | Code::Timeout) => {}
+        Err(error) => return Err(error),
+    }
+    loop {
+        if free()? {
+            return Ok(OwnerStop::Stopped { host_incarnation });
+        }
+        if Instant::now() >= deadline {
+            return Err(Code::Timeout.into());
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
 }
 
 /// The owner lifetime lock, taken now or not at all: `flock(LOCK_EX |
@@ -1597,7 +1703,7 @@ fn action(
             if !adapter.permissions.profiles.contains(&profile) {
                 return Err(Code::Forbidden.into());
             }
-            if !custody::available_at(config.secret_service_socket.as_deref()) {
+            if !custody::available_for(&config.selection()) {
                 return Err(Code::CustodyUnavailable.into());
             }
             let Output::Bootstrap(bootstrap, capture_epoch) = owner.pool.run(
@@ -1612,7 +1718,7 @@ fn action(
             // Startup is not authority: repeat the preflight before admitting
             // protected entry, and keep the originally selected custody binding.
             let (latest, _) = selected(&owner.paths, &alias)?;
-            if latest.secret_service_socket != config.secret_service_socket {
+            if latest.selection() != config.selection() {
                 return Err(Code::LifecycleConflict.into());
             }
             admit_capture(
@@ -1626,7 +1732,25 @@ fn action(
                 connection.as_deref(),
                 expected_revision.as_deref(),
             )?;
-            let binding = bootstrap.binding(&profile)?;
+            // A repair keeps the saved connection's profile, which the
+            // configuration may no longer declare; a connect names its own.
+            let binding = if connection.is_some() {
+                saved_binding(&bootstrap, &profile)?
+            } else {
+                bootstrap.binding(&profile)?
+            };
+            let selection = config.selection();
+            if selection.read_only() {
+                // A read-only binding cannot hold what an OAuth-acquired,
+                // refresh-rotating profile writes, and one mounted item backs
+                // one connection: both refused before any provider exchange.
+                if bootstrap.profile(&profile)?.acquisition.is_some()
+                    || (connection.is_none()
+                        && registry.holds_profile(&binding, connectors_sdk::now_ms())?)
+                {
+                    return Err(Code::CustodyReadOnly.into());
+                }
+            }
             let now = connectors_sdk::now_ms();
             let acquired = match connection {
                 Some(reference) => registry.begin_repair(
@@ -1652,7 +1776,11 @@ fn action(
                     super::until(expiry)?,
                 )?;
                 let frame = channel::read::<Request>(stream, super::until(expiry)?, true, 0)?;
-                if !matches!(frame.control, Request::Complete) || frame.secret.0.is_empty() {
+                // Under the read-only binding the owner reads the item itself:
+                // the caller completes with no bytes, and any bytes are refused.
+                if !matches!(frame.control, Request::Complete)
+                    || frame.secret.0.is_empty() != selection.read_only()
+                {
                     return Err(Code::InvalidInput.into());
                 }
                 let (_, current) = selected(&owner.paths, &alias)?;
@@ -1667,6 +1795,54 @@ fn action(
             let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
             let result = (|| {
                 let secret = result?;
+                #[cfg(target_os = "linux")]
+                if selection.read_only() {
+                    let connection = super::publish_mounted(
+                        &owner.paths,
+                        &selection,
+                        &registry,
+                        &claim,
+                        &alias,
+                        &profile,
+                        |secret| {
+                            let Output::Baseline(baseline) = owner.pool.run(
+                                &alias,
+                                &adapter,
+                                Task::Validate {
+                                    profile: profile.clone(),
+                                    secret,
+                                    capture_epoch,
+                                },
+                                expiry.min(connectors_sdk::now_ms() + 30_000),
+                            )?
+                            else {
+                                return Err(Code::Unavailable.into());
+                            };
+                            Ok(baseline.into_registry())
+                        },
+                        || {
+                            let (latest, current) = selected(&owner.paths, &alias)?;
+                            if current.selection() != adapter.selection()
+                                || latest.selection() != selection
+                            {
+                                return Err(Code::LifecycleConflict.into());
+                            }
+                            if !current.permissions.profiles.contains(&profile) {
+                                return Err(Code::Forbidden.into());
+                            }
+                            Ok(())
+                        },
+                    )?;
+                    let description = registry.describe(
+                        &adapter.instance_id,
+                        &adapter.adapter_id,
+                        &adapter.configuration_revision,
+                        &connection,
+                        connectors_sdk::now_ms(),
+                        true,
+                    )?;
+                    return Ok(json!({"connection":connection_value(&alias,description)}));
+                }
                 let Output::Baseline(baseline) = owner.pool.run(
                     &alias,
                     &adapter,
@@ -1682,7 +1858,7 @@ fn action(
                 };
                 let (latest, current) = selected(&owner.paths, &alias)?;
                 if current.selection() != adapter.selection()
-                    || latest.secret_service_socket != config.secret_service_socket
+                    || latest.selection() != config.selection()
                 {
                     return Err(Code::LifecycleConflict.into());
                 }
@@ -1695,9 +1871,10 @@ fn action(
                     secret.0.len(),
                     connectors_sdk::now_ms(),
                 )?;
-                let store = custody::Store::open_at(
+                let store = custody::Store::open_for(
                     prepared.version().scope(),
-                    config.secret_service_socket.as_deref(),
+                    &selection,
+                    &owner.paths.state,
                 )
                 .map_err(|_| Code::CustodyUnavailable)?;
                 let connection = registry.store_and_publish(
@@ -1830,28 +2007,28 @@ fn launch(
         )
         .map_err(launch_failure)?;
     let version = captured.version();
-    let material =
-        match custody::Store::open_at(version.scope(), config.secret_service_socket.as_deref())
-            .and_then(|store| store.read(version))
-        {
-            Ok(material) => material,
-            Err(error) => {
-                if matches!(error, custody::Failure::Missing) {
-                    registry.invalidate_read(
-                        &captured,
-                        registry::InvalidCredential::Missing,
-                        connectors_sdk::now_ms(),
-                    )?;
-                }
-                registry.cancel_read(captured, connectors_sdk::now_ms())?;
-                return Err(Code::CustodyUnavailable.into());
+    let selection = config.selection();
+    let material = match custody::Store::open_for(version.scope(), &selection, &owner.paths.state)
+        .and_then(|store| store.read(version))
+    {
+        Ok(material) => material,
+        Err(error) => {
+            if super::read_invalidates(&selection, error) {
+                registry.invalidate_read(
+                    &captured,
+                    registry::InvalidCredential::Missing,
+                    connectors_sdk::now_ms(),
+                )?;
             }
-        };
+            registry.cancel_read(captured, connectors_sdk::now_ms())?;
+            return Err(super::read_error(&selection, error));
+        }
+    };
     let checked: Result<()> = (|| {
         let (latest_config, latest) = selected(&owner.paths, alias)?;
         let binding = &admitted.binding;
         if latest_config.consumers.get(consumer) != Some(&admitted.consumer)
-            || latest_config.secret_service_socket != config.secret_service_socket
+            || latest_config.selection() != config.selection()
             || latest.instance_id != binding.instance_id
             || latest.adapter_id != binding.adapter_id
             || latest.configuration_revision != binding.configuration_revision

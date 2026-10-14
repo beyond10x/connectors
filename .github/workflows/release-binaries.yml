@@ -1,5 +1,8 @@
-# Attaches pre-built `connectors` binaries for Linux and macOS to the GitHub Release of every
-# `v<version>` tag, with a SHA256SUMS file. No Windows binary is built.
+# Attaches pre-built `connectors` and `connectors-catalog-provider` binaries for Linux and macOS
+# to the GitHub Release of every `v<version>` tag, with a SHA256SUMS file. No Windows binary is
+# built. The build job's `BINARIES` is the one list of packaged binaries; every step builds,
+# checks, signs and packages each of them, and the repository gate (`connectors-build
+# release-binaries`) refuses a guide that runs an installed binary this list leaves out.
 #
 # The release page itself is created by the bot after the tag push (AGENTS.md, "Cutting a
 # release", step 7). This workflow never creates or edits a release page or its notes: its
@@ -100,6 +103,8 @@ jobs:
     env:
       TARGET: ${{ matrix.target }}
       VERSION: ${{ needs.provenance.outputs.version }}
+      # Each name is both a workspace package and the binary it builds.
+      BINARIES: connectors connectors-catalog-provider
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -111,14 +116,20 @@ jobs:
           rustup toolchain install 1.98.1 --profile minimal --target "$TARGET"
           rustup default 1.98.1
           rustc --version
-      - name: Build the release binary
-        shell: bash
-        run: cargo build --locked --release -p connectors --target "$TARGET"
-      - name: The binary names the version
+      - name: Build the release binaries
         shell: bash
         run: |
           set -euo pipefail
-          test "$("target/${TARGET}/release/connectors" --version)" = "connectors ${VERSION}"
+          packages=()
+          for binary in $BINARIES; do packages+=(-p "$binary"); done
+          cargo build --locked --release "${packages[@]}" --target "$TARGET"
+      - name: Each binary names the version
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in $BINARIES; do
+            test "$("target/${TARGET}/release/${binary}" --version)" = "${binary} ${VERSION}"
+          done
 
       - name: Signing secrets
         id: secrets
@@ -153,7 +164,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          binary="target/${TARGET}/release/connectors"
           keychain="$RUNNER_TEMP/signing.keychain-db"
           keychain_password=$(uuidgen)
           printf '%s' "$MACOS_SIGNING_CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/signing.p12"
@@ -165,9 +175,12 @@ jobs:
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           identity=$(security find-identity -v -p codesigning "$keychain" | awk -v team="($APPLE_TEAM_ID)" 'index($0, team) {print $2; exit}')
           test -n "$identity"
-          codesign --force --options runtime --timestamp --sign "$identity" "$binary"
-          codesign --verify --strict --verbose=2 "$binary"
-          codesign --display --verbose=2 "$binary" 2>&1 | grep -F "TeamIdentifier=$APPLE_TEAM_ID"
+          for binary in $BINARIES; do
+            path="target/${TARGET}/release/${binary}"
+            codesign --force --options runtime --timestamp --sign "$identity" "$path"
+            codesign --verify --strict --verbose=2 "$path"
+            codesign --display --verbose=2 "$path" 2>&1 | grep -F "TeamIdentifier=$APPLE_TEAM_ID"
+          done
           rm -f "$RUNNER_TEMP/signing.p12"
       - name: Notarize
         if: ${{ runner.os == 'macOS' && steps.secrets.outputs.sign == 'true' && steps.secrets.outputs.notarize == 'true' }}
@@ -179,7 +192,11 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/api-key.p8"
-          ditto -c -k "target/${TARGET}/release/connectors" "$RUNNER_TEMP/connectors.zip"
+          mkdir "$RUNNER_TEMP/notarize"
+          for binary in $BINARIES; do
+            cp "target/${TARGET}/release/${binary}" "$RUNNER_TEMP/notarize/"
+          done
+          ditto -c -k --keepParent "$RUNNER_TEMP/notarize" "$RUNNER_TEMP/connectors.zip"
           xcrun notarytool submit "$RUNNER_TEMP/connectors.zip" --key "$RUNNER_TEMP/api-key.p8" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --wait
           rm -f "$RUNNER_TEMP/api-key.p8"
 
@@ -190,11 +207,16 @@ jobs:
           name="connectors-${VERSION}-${TARGET}"
           mkdir -p "dist/${name}"
           cp README.md CHANGELOG.md "dist/${name}/"
-          cp "target/${TARGET}/release/connectors" "dist/${name}/"
+          for binary in $BINARIES; do
+            cp "target/${TARGET}/release/${binary}" "dist/${name}/"
+          done
           tar -C dist -czf "dist/${name}.tar.gz" "${name}"
           rm -r "dist/${name}"
           test -s "dist/${name}.tar.gz"
-          tar -tzf "dist/${name}.tar.gz"
+          tar -tzf "dist/${name}.tar.gz" | tee "$RUNNER_TEMP/contents"
+          for binary in $BINARIES; do
+            grep -Fxq "${name}/${binary}" "$RUNNER_TEMP/contents"
+          done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.target }}
