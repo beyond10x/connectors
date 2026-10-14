@@ -36,6 +36,9 @@ const FLOOR_RECORD_MS: i64 = 60_000;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Failure {
     MetadataUnavailable,
+    /// The store was written by a newer binary with another record model
+    /// (`super::Failure::MetadataSchemaNewer`); public code `metadata_schema_newer`.
+    MetadataSchemaNewer(Option<super::Release>),
     ConcurrentRevision,
     OutcomeUnknown,
     NotFound,
@@ -650,6 +653,7 @@ enum Observation {
 
 fn host_failure(error: super::Failure) -> Failure {
     match error {
+        super::Failure::MetadataSchemaNewer(store) => Failure::MetadataSchemaNewer(store),
         super::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
         super::Failure::ConcurrentRevision => Failure::ConcurrentRevision,
         _ => Failure::MetadataUnavailable,

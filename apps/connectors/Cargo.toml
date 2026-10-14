@@ -27,3 +27,4 @@ rusqlite = { version = "=0.40.2", features = ["bundled"] }
 sha2.workspace = true
 ring = "=0.17.14"
 tempfile.workspace = true
+connectors-host = { workspace = true, features = ["test-support"] }

@@ -233,6 +233,7 @@ fn project(
                 code: FailureCode::Owner(Code::ServiceFailure),
                 service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
                 origin: owner::Origin::Host,
+                store_version: None,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,
@@ -248,6 +249,17 @@ fn project(
         let mut data = json!({"kind":"operational","code":error.code,"stage":error.stage(classification),"next_action":error.next_action(classification)});
         if let Some(code) = &error.service_code {
             data["service_code"] = json!(code);
+        }
+        // The owner's `metadata_schema_newer` names both versions, as the
+        // direct path does (semantics.md §3).
+        if error.code == FailureCode::Owner(Code::MetadataSchemaNewer) {
+            data["store_version"] = json!(
+                error
+                    .store_version
+                    .clone()
+                    .unwrap_or_else(|| "unrecorded".to_owned())
+            );
+            data["binary_version"] = json!(connectors_host::local::Release::current().to_string());
         }
         data
     };
@@ -462,5 +474,54 @@ mod json_value_tests {
             assert_eq!(answer["result"], json!({"id": 7}), "{answer}");
             assert_eq!(answer["mutation"]["replayed"], replayed);
         }
+    }
+
+    /// semantics.md §3 on the owner path: a write the owner refused because a
+    /// newer binary with another record model wrote the store answers the
+    /// failure fields the direct path does: both versions, `admission`, `upgrade`.
+    #[test]
+    fn an_owner_write_on_a_newer_store_answers_both_versions_and_upgrade() {
+        let root = tempfile::tempdir().unwrap();
+        let (context, _) = configured(root.path());
+        let target = target();
+        let call = Invocation {
+            callable: "operations-invoke",
+            target: &target,
+            context,
+            input: json!({"adapter":"forge","connection":"connection","operation":WRITE,
+                          "revision":"desc-1","input":"{}"}),
+        };
+        let delivery: owner::mutation::Delivery = serde_json::from_value(json!({
+            "request_id": "00000000-0000-4000-8000-000000000001",
+            "result": null,
+            "error": {"code":"metadata_schema_newer","store_version":"999.0.0"},
+            "mutation": {"classification":"not_attempted","attempt":null,
+                         "original_request_id":null,"replayed":false,"cause":null},
+            "source_audit": {"instance":"forge-local","audit_ref":null,
+                             "audit_status":"unavailable"}
+        }))
+        .unwrap();
+        let HandlerReply::Error { code, data } = project(&call, &bootstrap(), delivery).unwrap()
+        else {
+            panic!("a refused write is not a failure");
+        };
+        assert_eq!(code, "failure");
+        let HandlerReply::Error { data: direct, .. } =
+            super::super::schema_newer(Some("999.0.0".into()))
+        else {
+            panic!("the direct refusal is not a failure");
+        };
+        for field in [
+            "kind",
+            "code",
+            "stage",
+            "next_action",
+            "store_version",
+            "binary_version",
+        ] {
+            assert_eq!(data[field], direct[field], "{field}: {data}");
+        }
+        assert_eq!(data["next_action"], "upgrade", "{data}");
+        assert_eq!(data["binary_version"], env!("CARGO_PKG_VERSION"), "{data}");
     }
 }

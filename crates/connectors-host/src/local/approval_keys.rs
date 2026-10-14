@@ -33,6 +33,9 @@ pub enum Failure {
     BindingChanged,
     NotFound,
     MetadataUnavailable,
+    /// The store was written by a newer binary with another record model
+    /// (`super::Failure::MetadataSchemaNewer`); public code `metadata_schema_newer`.
+    MetadataSchemaNewer(Option<super::Release>),
     /// The metadata store changed under the write; nothing was written.
     RevisionConflict,
     CustodyUnavailable,
@@ -45,6 +48,7 @@ impl From<super::Failure> for Failure {
         match value {
             super::Failure::OutcomeUnknown => Self::OutcomeUnknown,
             super::Failure::ConcurrentRevision => Self::RevisionConflict,
+            super::Failure::MetadataSchemaNewer(store) => Self::MetadataSchemaNewer(store),
             _ => Self::MetadataUnavailable,
         }
     }

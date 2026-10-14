@@ -548,8 +548,8 @@ fn mr1_restart_and_every_open_path_yield_identical_views() {
     );
     assert_eq!(
         entities(&first).len(),
-        17,
-        "fixture must record every table-backed entity: {:?}",
+        18,
+        "fixture must record every table-backed entity and the writer marker: {:?}",
         entities(&first)
     );
     // Owner open paths, each dropped without a change.
@@ -644,11 +644,16 @@ fn mr2_fresh_and_migrated_installations_record_the_same_subjects() {
     let strip = |view: &View| -> View {
         normalized(view)
             .into_iter()
-            // Provider bookkeeping and the authority envelope differ by design.
+            // Provider bookkeeping and the authority envelope differ by design,
+            // and so does the writer marker: an adopting open writes no batch, so
+            // the migrated store is marked by its next write (semantics.md §3).
             .filter(|(table, _)| {
                 !matches!(
                     table.as_str(),
-                    "sql:local_authority" | "sql:schema_migrations" | "sql:connectors_er_authority"
+                    "sql:local_authority"
+                        | "sql:schema_migrations"
+                        | "sql:connectors_er_authority"
+                        | "er:connectors.cli.StoreWriter"
                 )
             })
             .collect()
