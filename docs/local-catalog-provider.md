@@ -795,17 +795,30 @@ parameter. After upgrading:
 2. Run `connections revalidate` on each connection of an instance that was
    already connected. It moves the connection to the new configuration revision
    with the credential already in custody, and asks for no credential, when the
-   provider host and the profile are unchanged and the provider still answers
-   the same identity. Until then the connection reports `pending` and reads
-   refuse with `lifecycle_conflict` and `next_action = revalidate_connection`.
-   When the provider host or the profile changed, revalidate refuses with
-   `lifecycle_conflict` and `next_action = create_connection`; when the provider
-   answers another identity, or refuses the credential, with its own code and
-   the same `next_action`. The credential is not invalidated; the refusal is
-   recorded, and reads then name `create_connection` too. Connect again: under
-   the same `instance` id a new connection is admitted under the configured
-   revision and moves the instance to it when it publishes; a changed provider
-   host or profile still needs a new `instance` id. See [Configuration
+   provider host and the `auth` profile are unchanged and the provider still
+   answers the same identity. No owner restart is needed: when the adapter
+   process of the earlier entry still runs, revalidate stops it and starts the
+   configured one. Until then the connection reports `pending` and reads, and
+   `connections repair`, refuse with `lifecycle_conflict` and `next_action =
+   revalidate_connection`. A change to `evidence_lifetime_ms` alone keeps the
+   connection's identity, but the saved connection stays bound to the profile it
+   was saved under: revalidate, repair and reads answer `lifecycle_conflict` with
+   `next_action = create_connection`, and `connections connect` under the same
+   `instance` id answers `ready` with the new lifetime; revoke the old
+   connection with `connections revoke`. When the provider host or any other `auth` field of
+   the profile changed, revalidate, repair, reads and `connections connect` all
+   refuse with `lifecycle_conflict` and `next_action = check_configuration`:
+   only a new `instance` id helps. Give the instance a new id in the native
+   configuration and the adapter entry, copy the new revision, and connect;
+   then revoke the old connection through the same adapter alias with
+   `connections revoke`, which still reaches it. A changed `auth.profile` id
+   is answered like a lifetime change: connect with the new `--profile`. When
+   the provider answers another identity, or refuses the credential, revalidate
+   answers its own code and `next_action = create_connection`. The credential is
+   not invalidated; the refusal is recorded, and reads then name
+   `create_connection` too. Connect again: under the same `instance` id a new
+   connection is admitted under the configured revision and moves the instance
+   to it when it publishes. See [Configuration
    upgrades](local-connection-registry.md#configuration-upgrades).
 3. Issue every write approval policy bound to the instance again.
 
@@ -871,7 +884,10 @@ Connect runs the declared identity and scope reads and refuses a token below
 connection reports `pending`, and `operations invoke` of a read refuses with
 `not_granted` at `admission` and `next_action: revalidate_connection` until
 `connections revalidate --adapter forge --connection CONNECTION --expected-revision REVISION`
-renews it with no credential re-entry. The invoke does not revalidate on its own.
+renews it with no credential re-entry. `operations invoke` never revalidates on
+its own, and validation evidence lasts 60 s by default, so a caller that invokes
+more than a minute after its last connect or revalidation runs `connections
+revalidate` right before the invoke.
 A credential the provider refused or one below an operation's scopes still
 answers `next_action: repair_connection`. `connections repair` replaces an invalid
 credential and refuses a changed identity; `connections revoke` is terminal local

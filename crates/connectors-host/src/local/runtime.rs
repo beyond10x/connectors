@@ -494,6 +494,9 @@ impl Profile {
             subject: self.subject,
             minimum_scopes: self.minimum_scopes.clone(),
             evidence_lifetime_ms: self.evidence_lifetime_ms,
+            // What the adapter digested into `revision`, so a lifetime-only
+            // change can be proved (`StaticProfile::same_authentication`).
+            declaration: serde_json::to_value(self).ok(),
         }
     }
 }

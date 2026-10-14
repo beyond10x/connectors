@@ -200,7 +200,11 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     // refuses a changed binding, so only a new connection helps.
     // Only the connection's validation evidence expired, its credential is
     // intact: a revalidation recollects it, a repair would ask for re-entry.
-    let action = if error.reconnect {
+    // The connection's identity changed under the configuration: no command
+    // under this instance id helps, a new instance id does.
+    let action = if error.reconfigure {
+        "check_configuration"
+    } else if error.reconnect {
         "create_connection"
     } else if error.revalidate {
         "revalidate_connection"
@@ -488,7 +492,18 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             | "connections-revoke"
             | "connections-revalidate"
     ) {
-        return connections::execute(call, &paths, alias, adapter, &config.selection());
+        return connections::execute(
+            call,
+            &paths,
+            alias,
+            adapter,
+            &config.selection(),
+            &config
+                .adapters
+                .values()
+                .map(|entry| entry.instance_id.clone())
+                .collect(),
+        );
     }
     match call.callable {
         "adapters-describe" => {
@@ -837,6 +852,12 @@ mod tests {
         for (failure, action) in [
             (registry::Failure::UpgradeRequired, "revalidate_connection"),
             (registry::Failure::BindingChanged, "create_connection"),
+            // story:revision-change-keeps-a-recovery-path: a changed provider
+            // authority or profile authentication needs a new instance id.
+            (
+                registry::Failure::AuthenticationChanged,
+                "check_configuration",
+            ),
         ] {
             let error = owner::Error::from(failure);
             assert_eq!(error.code, owner::Code::LifecycleConflict, "{failure:?}");
