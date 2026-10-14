@@ -2,9 +2,99 @@
 format: aep.planning-md/3
 id: story:approval-clock-quorum
 kind: story
-status: draft
+status: active
 title: The approval clock answers from a quorum of Roughtime sources
-revision: 2
+relations:
+- serves: vision:independent-contract-adapters
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/background_recovery.rs
+- confidence: cited
+  path: adapters/catalog/tests/local_runtime/guarded_merge.rs
+- confidence: cited
+  path: apps/connectors-cli-contract
+- confidence: cited
+  path: apps/connectors/src/local.rs
+- confidence: cited
+  path: apps/connectors/tests/local_cli.rs
+- confidence: cited
+  path: contracts/cli/v1alpha1/fixtures/values.json
+- confidence: cited
+  path: contracts/cli/v1alpha1/semantics.md
+- confidence: cited
+  path: contracts/service/clock.md
+- confidence: cited
+  path: contracts/service/delegation.md
+- confidence: cited
+  path: crates/connectors-build/src/ignored.rs
+- confidence: cited
+  path: crates/connectors-docs/src/status.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/approvals/proof.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/approvals/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/clock.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/clock/protocol.rs
+- confidence: inferred
+  path: crates/connectors-host/src/local/clock/protocol_tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/clock/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/config.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/mutations.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/approval_issuance.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/approval_issuance/tests.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/maintenance.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/mutation/execution.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/mutation/recovery.rs
+- confidence: cited
+  path: crates/connectors-host/src/local/owner/mutation/tests.rs
+- confidence: cited
+  path: crates/connectors-host/tests/fixtures/clock/README.md
+- confidence: cited
+  path: crates/connectors-host/tests/fixtures/clock/server.rs
+- confidence: cited
+  path: docs/catalog-slack.md
+- confidence: cited
+  path: docs/local-approval-binding.md
+- confidence: cited
+  path: docs/local-clock.md
+- confidence: cited
+  path: docs/local-mutation-ledger.md
+- confidence: cited
+  path: ess/domains/cli.yaml
+- confidence: cited
+  path: ess/domains/clock.yaml
+- confidence: cited
+  path: ess/domains/mutations.yaml
+- confidence: cited
+  path: website/docs/concepts/local-runtime.md
+- confidence: inferred
+  path: website/docs/reference/contracts/cli.md
+- confidence: inferred
+  path: website/docs/reference/contracts/clock.md
+- confidence: inferred
+  path: website/docs/reference/contracts/model/domains/connectors-cli.md
+- confidence: cited
+  path: website/docs/reference/contracts/model/domains/connectors-clock.md
+- confidence: inferred
+  path: website/docs/reference/contracts/model/domains/connectors-mutations.md
+- confidence: inferred
+  path: website/docs/status.md
+revision: 7
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T18:07:38Z", actor: "human:timo", revision: 6}
+- {from: "proposed", to: "active", at: "2026-10-14T18:07:38Z", actor: "human:timo", revision: 7}
 ---
 # Story: the approval clock answers from a quorum of Roughtime sources
 
@@ -104,3 +194,18 @@ seconds, ±4 s), `contracts/cli/v1alpha1/semantics.md`, `docs/local-clock.md`,
 
 Out of scope: a second Roughtime wire version, server-list discovery, malfeasance
 reporting, any change to the proof profile's `nbf`/`exp` offsets.
+
+## Scope corrections (2026-10-14, scoped on wave 20261014c)
+
+- `crates/connectors-build/src/ignored.rs` names `local::clock::tests::independent_live_source`;
+  the rename to `independent_live_quorum` lands there too, or the ignored-test inventory fails.
+- `website/docs/concepts/local-runtime.md` (hand-written) shows a `roughtime-clock/1`
+  `[approval_clock]` table; it moves to the new shape.
+- `src/local/clock/protocol_tests.rs` reads `protocol::VERSION`; it follows the per-source version.
+- Only `owner/approval_issuance/tests.rs` constructs `clock::Configuration`;
+  `approvals/tests.rs` and `owner/mutation/tests.rs` are only the homes of the two
+  `*_admits_8000_ms` tests.
+- The clock status items are `crates/connectors-docs/src/status.rs:161-163` and `:196-198`, not `:169`.
+- The width cap is re-checked separately in `approvals/proof.rs:94` and `mutations.rs:469`;
+  leaving either at 4,000 ms is the regression this story must not ship.
+- The base now carries `0ec7ccd1a` (the clock refusal causes): this branch merged wave 20261014c.
