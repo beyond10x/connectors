@@ -4804,22 +4804,43 @@ mod tests {
     /// never `metadata_unavailable`.
     #[test]
     fn a_record_field_this_model_does_not_declare_is_a_newer_store_unrecorded() {
-        let root = tempfile::tempdir().unwrap();
-        let path = root.path().join("state");
-        crate::local::filesystem::directory(&path, true, true).unwrap();
-        drop(crate::local::metadata::Metadata::initialize(&path).unwrap());
-        let state = crate::local::runtime::state::State::new(&path);
-        state.suppress("fixture", false).unwrap();
+        use crate::local::{metadata::Metadata, runtime::state};
+        let fresh = || {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("state");
+            crate::local::filesystem::directory(&path, true, true).unwrap();
+            drop(Metadata::initialize(&path).unwrap());
+            (root, path)
+        };
+        // The record as this binary remembers it, every field present.
+        let (_scratch, scratch) = fresh();
+        state::State::new(&scratch)
+            .remember("selection", &state::tests::fixture_bootstrap())
+            .unwrap();
+        let key = (
+            "connectors.cli.LocalRuntimeRecord".to_owned(),
+            "s:fixture".to_owned(),
+        );
+        let mut input = Metadata::update(&scratch, false)
+            .unwrap()
+            .er
+            .as_ref()
+            .unwrap()
+            .baseline[&key]
+            .fields
+            .clone();
+        input.insert("newer_field".into(), json!("written by a newer binary"));
+        // A newer binary recorded the same record with one more field.
+        let (_root, path) = fresh();
         let newer = newer_facade(&path, newer_registry());
         newer
             .execute_batch(
                 context("newer-binary"),
                 BatchKey::Named(format!("newer-binary-{}", uuid::Uuid::new_v4())),
                 vec![BatchAction::Create(CreateRequest {
-                    subject: Subject::new("connectors.cli.LocalRuntimeRecord", "s:newer").unwrap(),
+                    subject: Subject::new(&key.0, &key.1).unwrap(),
                     definition_version: 1,
-                    fields: json!({"input": {"instance_id": "newer", "suppressed": false,
-                        "newer_field": "written by a newer binary"}, "bound": {}}),
+                    fields: json!({"input": input, "bound": {}}),
                     recording: recording("newer-binary").unwrap(),
                 })],
                 call_wait(),
@@ -4827,7 +4848,7 @@ mod tests {
             .unwrap();
         drop(newer);
         assert_eq!(
-            state.suppress("newer", true),
+            state::State::new(&path).suppress("fixture", true),
             Err(Failure::MetadataSchemaNewer(None)),
             "a record a newer model wrote is not an unavailable store"
         );
