@@ -30,6 +30,11 @@ types:
   # owner-only PEM bundle that replaces the public roots for this connection. The bounds of
   # `host`, `database` and `user` count characters (Unicode scalar values), not bytes, and
   # the executable counts them the same way.
+  # `read_profiles`, when present, holds at most 32 read profiles with distinct ids
+  # (`connectors_sql.profiles.ReadProfile`). Each names its call identifier and its ordering
+  # column among its own columns, and neither of those is a `phone_number` or masked. A file
+  # without `read_profiles` (or with an empty list) serves no `profile.read` and keeps its
+  # configuration revision.
   - name: connectors_sql.connection.LocalConfiguration
     kind: struct
     fields:
@@ -42,6 +47,7 @@ types:
       - {name: user, type: String}
       - {name: allow_plaintext, type: "Optional<Boolean>"}
       - {name: ca_file, type: "Optional<connectors_sql.connection.CaFile>"}
+      - {name: read_profiles, type: "Optional<List<connectors_sql.profiles.ReadProfile>>"}
     invariants:
       - format == "connectors-sql-local/1"
       - host.count: {gte: 1, lte: 512}
@@ -50,6 +56,12 @@ types:
       - port <= 65535
       - database.count: {gte: 1, lte: 512}
       - user.count: {gte: 1, lte: 512}
+      - read_profiles.count <= 32
+      - distinct: {in: read_profiles, as: p, by: p.id}
+      - forall: {in: read_profiles, as: p, that: {exists: {in: p.columns, as: c, that: c.name == p.call_identifier}}}
+      - forall: {in: read_profiles, as: p, that: {exists: {in: p.columns, as: c, that: c.name == p.ordering}}}
+      - forall: {in: read_profiles, as: p, that: {forall: {in: p.columns, as: c, that: {any: [c.name != p.call_identifier, {all: [c.type != phone_number, {any: ["not defined(c.masked)", c.masked == false]}]}]}}}}
+      - forall: {in: read_profiles, as: p, that: {forall: {in: p.columns, as: c, that: {any: [c.name != p.ordering, {all: [c.type != phone_number, {any: ["not defined(c.masked)", c.masked == false]}]}]}}}}
 
   # The path of an owner-only PEM bundle, 1–4,096 characters. The file may name it, write
   # `null` for none, or omit it; `null` and absence mean the same thing.

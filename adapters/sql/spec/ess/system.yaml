@@ -1,6 +1,7 @@
-format: ess/14
+format: ess/22
 system: connectors_sql
 version: v1
 domains:
   - connectors_sql.connection
   - connectors_sql.reads
+  - connectors_sql.profiles

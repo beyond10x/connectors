@@ -4,6 +4,8 @@
 //! the profile each engine advertises, and fix the read binding and the MySQL
 //! cell rules the library implements.
 #![cfg(unix)]
+#[path = "mysql/calls.rs"]
+mod calls;
 #[path = "mysql/fixture.rs"]
 mod fixture;
 
@@ -50,30 +52,119 @@ fn literal(text: &str) -> Value {
     serde_json::from_str(text).unwrap_or_else(|_| Value::String(text.to_owned()))
 }
 
+/// The parts of `text` separated by `separator` outside parentheses and quotes.
+fn split_top<'a>(text: &'a str, separator: &str) -> Vec<&'a str> {
+    let (mut parts, mut depth, mut quoted, mut start) = (Vec::new(), 0usize, false, 0);
+    let bytes = text.as_bytes();
+    let mut index = 0;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'"' => quoted = !quoted,
+            b'(' if !quoted => depth += 1,
+            b')' if !quoted => depth -= 1,
+            _ if !quoted && depth == 0 && text[index..].starts_with(separator) => {
+                parts.push(&text[start..index]);
+                index += separator.len();
+                start = index;
+                continue;
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    parts.push(&text[start..]);
+    parts
+}
+
+/// The text inside `prefix(` … `)` when that closing parenthesis ends `text`.
+fn enclosed<'a>(text: &'a str, prefix: &str) -> Option<&'a str> {
+    let inner = text.strip_prefix(prefix)?.strip_prefix('(')?;
+    let mut depth = 1usize;
+    for (index, c) in inner.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return (index == inner.len() - 1).then(|| &inner[..index]);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// The document with `name` bound to `value`, so a path through the binder resolves.
+fn bind(document: &Value, name: &str, value: &Value) -> Value {
+    let mut bound = document.clone();
+    bound
+        .as_object_mut()
+        .expect("a quantifier ranges inside a struct")
+        .insert(name.to_owned(), value.clone());
+    bound
+}
+
 /// Evaluate one rendered `x-ess-invariants` entry of the forms this model uses.
 /// An optional field that is absent satisfies its invariant, as in ESS. Any
 /// other form panics, so a new invariant cannot pass unchecked.
 fn holds(document: &Value, invariant: &str) -> bool {
     let invariant = invariant.trim();
-    if let Some(inner) = invariant
-        .strip_prefix("not (")
-        .and_then(|s| s.strip_suffix(')'))
-    {
+    // `forall v in path: body`, `exists v in path: body`, `distinct v in path [by v.member]`.
+    // An absent (optional) list satisfies all three.
+    for quantifier in ["forall ", "exists ", "distinct "] {
+        let Some(rest) = invariant.strip_prefix(quantifier) else {
+            continue;
+        };
+        let (name, rest) = rest.split_once(" in ").unwrap();
+        if quantifier == "distinct " {
+            let (path, member) = match rest.split_once(" by ") {
+                Some((path, member)) => (path, Some(member)),
+                None => (rest, None),
+            };
+            let Some(Value::Array(items)) = field(document, path) else {
+                return true;
+            };
+            let keys: Vec<Value> = items
+                .iter()
+                .map(|item| match member {
+                    Some(member) => field(&bind(document, name, item), member)
+                        .cloned()
+                        .unwrap_or(Value::Null),
+                    None => item.clone(),
+                })
+                .collect();
+            return keys
+                .iter()
+                .enumerate()
+                .all(|(index, key)| !keys[..index].contains(key));
+        }
+        let (path, body) = rest.split_once(": ").unwrap();
+        let Some(Value::Array(items)) = field(document, path) else {
+            return true;
+        };
+        let mut each = items
+            .iter()
+            .map(|item| holds(&bind(document, name, item), body));
+        return if quantifier == "forall " {
+            each.all(|held| held)
+        } else {
+            each.any(|held| held)
+        };
+    }
+    if let Some(inner) = enclosed(invariant, "not ") {
         return !holds(document, inner);
     }
-    if let Some(inner) = invariant
-        .strip_prefix('(')
-        .and_then(|s| s.strip_suffix(')'))
-    {
-        if inner.contains(" or ") {
-            return inner.split(" or ").any(|part| holds(document, part));
+    if let Some(inner) = enclosed(invariant, "") {
+        let any = split_top(inner, " or ");
+        if any.len() > 1 {
+            return any.into_iter().any(|part| holds(document, part));
         }
-        return inner.split(" and ").all(|part| holds(document, part));
+        return split_top(inner, " and ")
+            .into_iter()
+            .all(|part| holds(document, part));
     }
-    if let Some(path) = invariant
-        .strip_prefix("defined(")
-        .and_then(|s| s.strip_suffix(')'))
-    {
+    if let Some(path) = enclosed(invariant, "defined") {
         return field(document, path).is_some_and(|v| !v.is_null());
     }
     if let Some((left, right)) = invariant.split_once(" starts_with ") {
@@ -104,18 +195,26 @@ fn holds(document: &Value, invariant: &str) -> bool {
             } else {
                 literal(right)
             };
-        let actual = match left.strip_suffix(".count") {
-            Some(name) => match field(document, name) {
-                // An optional member that is absent or null holds, as in ESS.
-                None | Some(Value::Null) => return true,
-                Some(Value::String(s)) => json!(s.chars().count()),
-                Some(Value::Array(a)) => json!(a.len()),
-                Some(other) => panic!("count of {other}"),
-            },
-            None => match field(document, left) {
-                None => return true,
-                Some(value) => value.clone(),
-            },
+        let measured = |name: &str, measure: fn(&Value) -> Value| match field(document, name) {
+            // An optional member that is absent or null holds, as in ESS.
+            None | Some(Value::Null) => None,
+            Some(value) => Some(measure(value)),
+        };
+        let actual = if let Some(name) = left.strip_suffix(".count") {
+            measured(name, |value| match value {
+                Value::String(s) => json!(s.chars().count()),
+                Value::Array(a) => json!(a.len()),
+                other => panic!("count of {other}"),
+            })
+        } else if let Some(name) = left.strip_suffix(".utf8_bytes") {
+            measured(name, |value| {
+                json!(value.as_str().expect("utf8_bytes of text").len())
+            })
+        } else {
+            field(document, left).cloned()
+        };
+        let Some(actual) = actual else {
+            return true;
         };
         return match operator {
             " == " => actual == expected,
@@ -170,8 +269,23 @@ fn check(schema: &Value, name: &str, document: &Value) -> Result<(), String> {
         }
     }
     for (key, property) in definition["properties"].as_object().into_iter().flatten() {
-        if let (Some(reference), Some(value)) = (property["$ref"].as_str(), document.get(key)) {
-            check(schema, reference.trim_start_matches("#/$defs/"), value)?;
+        let reference = |property: &Value| {
+            property["$ref"]
+                .as_str()
+                .map(|r| r.trim_start_matches("#/$defs/").to_owned())
+        };
+        match (
+            document.get(key),
+            reference(property),
+            reference(&property["items"]),
+        ) {
+            (Some(value), Some(reference), _) => check(schema, &reference, value)?,
+            (Some(Value::Array(items)), None, Some(reference)) => {
+                for item in items {
+                    check(schema, &reference, item)?;
+                }
+            }
+            _ => {}
         }
     }
     Ok(())
@@ -877,4 +991,375 @@ async fn catalogue_rows_are_the_model_row_types() {
         let model = schema(out.path(), row_type);
         assert!(conforms(&model, &wrong).is_err(), "{row_type} {wrong}");
     }
+}
+
+/// The fixture's profile with one change applied: `(pointer, value)`, `ABSENT` removes it.
+fn profile_with(changes: &[(&str, Value)]) -> Value {
+    let mut profile = calls::profile();
+    for (pointer, value) in changes {
+        if value == ABSENT {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            let parent = profile.pointer_mut(parent).unwrap();
+            match parent {
+                Value::Object(map) => {
+                    map.remove(key);
+                }
+                Value::Array(items) => {
+                    items.remove(key.parse().unwrap());
+                }
+                _ => panic!("{pointer}"),
+            }
+        } else {
+            let (parent, key) = pointer.rsplit_once('/').unwrap();
+            match profile.pointer_mut(parent).unwrap() {
+                Value::Object(map) => {
+                    map.insert(key.to_owned(), value.clone());
+                }
+                Value::Array(items) => items[key.parse::<usize>().unwrap()] = value.clone(),
+                _ => panic!("{pointer}"),
+            }
+        }
+    }
+    profile
+}
+
+/// `count` distinct text columns, the first of which is the call identifier and ordering.
+fn wide_profile(count: usize) -> Value {
+    let columns: Vec<Value> = (0..count)
+        .map(|i| json!({"name": format!("c{i}"), "type": "text"}))
+        .collect();
+    json!({"id":"wide","statement":"SELECT 1","parameters":[],"columns":columns,
+        "call_identifier":"c0","ordering":"c0"})
+}
+
+#[test]
+fn the_model_admits_exactly_the_read_profiles_the_executable_admits() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "connection.LocalConfiguration");
+    let root = tempfile::tempdir().unwrap();
+    let directory = root.path().join("private");
+    connectors_host::local::filesystem::directory(&directory, true, true).unwrap();
+    let mut second = calls::profile();
+    second["id"] = json!("legs-by-call");
+    let parameters = |n: usize| Value::Array((0..n).map(|i| json!(format!("p{i}"))).collect());
+    let cases: Vec<(Value, bool)> = vec![
+        (json!([calls::profile()]), true),
+        (json!([calls::profile(), second]), true),
+        (json!([]), true),
+        (Value::Null, false),
+        (json!([calls::profile(), calls::profile()]), false),
+        (
+            Value::Array(
+                (0..32)
+                    .map(|i| {
+                        let mut p = calls::profile();
+                        p["id"] = json!(format!("p{i}"));
+                        p
+                    })
+                    .collect(),
+            ),
+            true,
+        ),
+        (
+            Value::Array(
+                (0..33)
+                    .map(|i| {
+                        let mut p = calls::profile();
+                        p["id"] = json!(format!("p{i}"));
+                        p
+                    })
+                    .collect(),
+            ),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/call_identifier", json!("absent"))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/ordering", json!("absent"))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/ordering", json!("caller"))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/call_identifier", json!("callee"))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[
+                ("/columns/3/masked", json!(false)),
+                ("/ordering", json!("caller"))
+            ])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/1/masked", json!(true))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/1/masked", json!(false))])]),
+            true,
+        ),
+        (
+            json!([profile_with(&[("/columns/0/masked", json!(true))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/3/masked", json!(false))])]),
+            true,
+        ),
+        (
+            json!([profile_with(&[("/columns/3/masked", Value::Null)])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/call_identifier", json!("row_key"))])]),
+            true,
+        ),
+        (
+            json!([profile_with(&[("/columns/2/name", json!("call_id"))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[(
+                "/parameters",
+                json!(["number", "number", "to"])
+            )])]),
+            false,
+        ),
+        (json!([profile_with(&[("/parameters", json!([]))])]), true),
+        (
+            json!([profile_with(&[("/parameters", parameters(63))])]),
+            true,
+        ),
+        (
+            json!([profile_with(&[("/parameters", parameters(64))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/2/name", json!("Direction"))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/2/name", json!("d".repeat(64)))])]),
+            true,
+        ),
+        (
+            json!([profile_with(&[("/columns/2/name", json!("d".repeat(65)))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/2/name", json!(""))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/parameters/0", json!("num-ber"))])]),
+            false,
+        ),
+        (json!([profile_with(&[("/id", json!("Calls"))])]), false),
+        (
+            json!([profile_with(&[("/id", json!("c".repeat(65)))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/2/type", json!("number"))])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/columns/2/limit", json!(5))])]),
+            false,
+        ),
+        (json!([profile_with(&[("/limit", json!(5))])]), false),
+        (json!([profile_with(&[("/columns", json!([]))])]), false),
+        (
+            json!([profile_with(&[("/parameters", ABSENT.into())])]),
+            false,
+        ),
+        (
+            json!([profile_with(&[("/ordering", ABSENT.into())])]),
+            false,
+        ),
+        (json!([profile_with(&[("/statement", json!(""))])]), false),
+        (
+            json!([profile_with(&[("/statement", json!("s".repeat(8192)))])]),
+            true,
+        ),
+        (
+            json!([profile_with(&[("/statement", json!("s".repeat(8193)))])]),
+            false,
+        ),
+        // The byte bound: 4,096 two-byte characters are 8,192 bytes, one more is over.
+        (
+            json!([profile_with(&[(
+                "/statement",
+                json!("\u{e9}".repeat(4096))
+            )])]),
+            true,
+        ),
+        (
+            json!([profile_with(&[(
+                "/statement",
+                json!("\u{e9}".repeat(4097))
+            )])]),
+            false,
+        ),
+        (json!([wide_profile(256)]), true),
+        (json!([wide_profile(257)]), false),
+    ];
+    for (profiles, admitted) in cases {
+        let document = configuration(json!({ "read_profiles": profiles }));
+        let verdict = conforms(&model, &document);
+        assert_eq!(
+            verdict.is_ok(),
+            admitted,
+            "model on {profiles}: {verdict:?}"
+        );
+        assert_eq!(
+            bootstrap(&directory, &document).is_some(),
+            admitted,
+            "executable on {profiles}"
+        );
+    }
+}
+
+#[test]
+fn each_columns_masking_is_the_one_the_model_fixes() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "profiles.ColumnMasking");
+    for kind in ["text", "integer", "timestamp", "phone_number"] {
+        for masked in [None, Some(true), Some(false)] {
+            let mut column = json!({"name": "c", "type": kind});
+            if let Some(masked) = masked {
+                column["masked"] = json!(masked);
+            }
+            let column: connectors_sql::ProfileColumn = serde_json::from_value(column).unwrap();
+            let effective = column.effective_masked();
+            let mut document = json!({"type": kind, "effective": effective});
+            if let Some(masked) = masked {
+                document["masked"] = json!(masked);
+            }
+            conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
+            document["effective"] = json!(!effective);
+            assert!(conforms(&model, &document).is_err(), "{document}");
+        }
+    }
+}
+
+fn profile_sql(port: u16) -> Sql {
+    sql(Engine::Mysql, port)
+        .with_read_profiles(vec![serde_json::from_value(calls::profile()).unwrap()])
+        .unwrap()
+}
+
+#[tokio::test]
+async fn every_page_is_one_the_model_admits() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "profiles.PageScope");
+    let expected = calls::expected();
+    for (cap, limit) in [
+        (None, 2),
+        (None, 5),
+        (None, 7),
+        (None, 100),
+        (Some(3), 5),
+        (Some(3), 3),
+        (Some(1), 2),
+    ] {
+        let server = fixture::start(calls::script(cap)).await;
+        let sql = profile_sql(server.port);
+        let mut cursor: Option<String> = None;
+        let mut after = i64::MIN;
+        loop {
+            let page = sql
+                .invoke("profile.read", calls::input(cursor.as_deref(), limit))
+                .await
+                .unwrap();
+            // What the server sent: one row past the limit at most, never past its cap.
+            let remaining = expected.iter().filter(|r| r.row_key > after).count();
+            let received = remaining
+                .min(usize::from(limit) + 1)
+                .min(cap.unwrap_or(usize::MAX));
+            let items = page["items"].as_array().unwrap();
+            let document = json!({"page": {
+                "limit": limit,
+                "rows_received": received,
+                "rows_returned": items.len(),
+                "next_cursor": !page["next_cursor"].is_null(),
+            }});
+            conforms(&model, &document)
+                .unwrap_or_else(|e| panic!("{cap:?} {limit}: {document}: {e}"));
+            if page["complete"] == true {
+                break;
+            }
+            after = items.last().unwrap()["row_key"]
+                .as_str()
+                .unwrap()
+                .parse()
+                .unwrap();
+            cursor = page["next_cursor"].as_str().map(str::to_owned);
+        }
+    }
+    // The model refuses the pages a read must never answer: a short page that ends the
+    // read, a received row without a cursor, more than the limit, and a cursor after
+    // nothing.
+    for wrong in [
+        json!({"limit":5,"rows_received":3,"rows_returned":3,"next_cursor":false}),
+        json!({"limit":5,"rows_received":6,"rows_returned":5,"next_cursor":false}),
+        json!({"limit":5,"rows_received":6,"rows_returned":6,"next_cursor":true}),
+        json!({"limit":5,"rows_received":6,"rows_returned":4,"next_cursor":true}),
+        json!({"limit":5,"rows_received":3,"rows_returned":2,"next_cursor":true}),
+        json!({"limit":5,"rows_received":0,"rows_returned":0,"next_cursor":true}),
+    ] {
+        let document = json!({ "page": wrong });
+        assert!(conforms(&model, &document).is_err(), "{document}");
+    }
+}
+
+#[tokio::test]
+async fn every_refusal_comes_before_a_session_as_the_model_fixes() {
+    let out = tempfile::tempdir().unwrap();
+    let model = schema(out.path(), "profiles.ProfileReadCall");
+    let server = fixture::start(calls::script(None)).await;
+    let sql = profile_sql(server.port);
+    let issued = sql
+        .invoke("profile.read", calls::input(None, 1))
+        .await
+        .unwrap()["next_cursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut undeclared = calls::input(None, 5);
+    undeclared["parameters"]["extra"] = json!("x");
+    let mut unknown = calls::input(None, 5);
+    unknown["profile"] = json!("absent");
+    let mut foreign = calls::input(Some(&issued), 5);
+    foreign["parameters"]["to"] = json!("2026-01-04T00:00:00");
+    for (input, outcome) in [
+        (calls::input(None, 5), "read"),
+        (calls::input(Some(&issued), 5), "read"),
+        (undeclared, "invalid_input"),
+        (unknown, "invalid_input"),
+        (foreign, "stale_cursor"),
+        (calls::input(Some("AAAA"), 5), "stale_cursor"),
+    ] {
+        let before = server.log.lock().unwrap().sessions;
+        let answer = sql.invoke("profile.read", input.clone()).await;
+        let after = server.log.lock().unwrap().sessions;
+        let document = json!({
+            "outcome": match &answer {
+                Ok(_) => "read",
+                Err(e) if e.code == ErrorCode::InvalidInput => "invalid_input",
+                Err(e) if e.code == ErrorCode::StaleCursor => "stale_cursor",
+                Err(e) => panic!("{input}: {e:?}"),
+            },
+            "session_opened": after > before,
+        });
+        assert_eq!(document["outcome"], outcome, "{input}");
+        conforms(&model, &document).unwrap_or_else(|e| panic!("{document}: {e}"));
+    }
+    let wrong = json!({"outcome":"stale_cursor","session_opened":true});
+    assert!(conforms(&model, &wrong).is_err());
 }
