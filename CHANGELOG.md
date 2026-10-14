@@ -21,6 +21,12 @@
   with `--state-dir`. Releases up to 0.49.0 cannot read the marker and keep answering such a store
   with `metadata_unavailable`.
 
+### Fixed
+
+- OAuth consent: a request that reaches the loopback listener after the redirect decided the
+  flow, but before the flow returns, is answered `400` instead of being closed unanswered. The
+  listener's drain now polls once more after it is told to stop.
+
 ## 0.49.0 — 2026-10-13
 
 ### Added

@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0490-windows-host
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.49.0: the CLI on Windows'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-13T15:32:14Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-13T20:14:31Z", actor: "human:timo", revision: 3, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

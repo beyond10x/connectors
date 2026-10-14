@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-13T19:30:07Z",
+  "actor": "human:timo",
+  "artifact": "story:host-runs-on-windows",
+  "kind": "story",
+  "revision": 6,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "https://github.com/beyond10x/connectors/actions/runs/38451737047 (Windows host: host and CLI on windows-latest, success on 956d2dd42)",
+    "reference": "https://github.com/beyond10x/connectors/actions/runs/38451737047"
+  }
+}
