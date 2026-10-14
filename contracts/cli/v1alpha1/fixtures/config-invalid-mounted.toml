@@ -1,0 +1,10 @@
+# Fictional invalid example: each defect alone refuses the configuration.
+# `[custody]` belongs to connectors-local/4, and the mounted binding never sits
+# beside a Secret Service socket.
+format = "connectors-local/3"
+owner_uid = 10001
+secret_service_socket = "/run/user/10001/bus"
+
+[custody]
+binding = "mounted_secret"
+directory = "/run/connectors/custody"

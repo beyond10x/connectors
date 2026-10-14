@@ -129,7 +129,7 @@ enum Action {
         out: PathBuf,
     },
     /// Project a pinned Swagger 2.0 document into OpenAPI 3.1.0 under
-    /// `swagger2-openapi/1`, and write its projection record beside it as
+    /// `swagger2-openapi/2`, and write its projection record beside it as
     /// `<name>.projection.json`. Deterministic; never touches the network.
     Swagger {
         #[arg(long)]
@@ -500,9 +500,10 @@ fn swagger(root: &Path, source: &Path, out: &Path) -> Result<()> {
     let (document, record) =
         write_projection(root, out, &projection.openapi, &projection.record_bytes())?;
     println!(
-        "swagger: {} operations, {} projected; wrote {} and {}",
+        "swagger: {} operations, {} projected, {} unprojected; wrote {} and {}",
         projection.record.operation_count,
         projection.record.operations.len(),
+        projection.record.unprojected_operations.len(),
         document.display(),
         record.display()
     );
