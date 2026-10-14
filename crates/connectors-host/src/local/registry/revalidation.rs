@@ -222,8 +222,7 @@ impl Registry {
         reference: &str,
         revision: &str,
     ) -> Result<Binding> {
-        let mut metadata =
-            Metadata::inspect(&self.path).map_err(|_| Failure::MetadataUnavailable)?;
+        let mut metadata = Metadata::inspect(&self.path).map_err(super::host_failure)?;
         let tx = metadata.connection.transaction().map_err(db)?;
         let row = Self::connection(&tx, reference)?;
         observation::visible(&row, instance, adapter)?;

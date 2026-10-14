@@ -189,8 +189,12 @@ fn description(alias: &str, connection: &ObservedConnection) -> Value {
 }
 pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
     use registry::Failure::*;
+    if let MetadataSchemaNewer(store) = error {
+        return schema_newer(store.map(|release| release.to_string()));
+    }
     let (code, stage, action, usage) = match error {
         MetadataUnavailable => ("metadata_unavailable", "observation", "retry_status", false),
+        MetadataSchemaNewer(_) => ("metadata_schema_newer", "admission", "upgrade", false),
         ConcurrentRevision => (
             "revision_conflict",
             "publication",

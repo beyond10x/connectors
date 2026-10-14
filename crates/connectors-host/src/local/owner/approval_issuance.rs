@@ -510,6 +510,7 @@ pub(super) fn policy_error(failure: approval_policy::Failure) -> Error {
         NotFound => Code::NotFound,
         NotAdmitted => Code::Forbidden,
         MetadataUnavailable => Code::MetadataUnavailable,
+        MetadataSchemaNewer(store) => return Error::schema_newer(store),
         RevisionConflict => Code::RevisionConflict,
         OutcomeUnknown => Code::OutcomeUnknown,
         Capacity => Code::Capacity,
@@ -529,6 +530,7 @@ pub(super) fn key_error(failure: approval_keys::Failure) -> Error {
         MetadataUnavailable => Code::MetadataUnavailable,
         RevisionConflict => Code::RevisionConflict,
         CustodyUnavailable => Code::CustodyUnavailable,
+        MetadataSchemaNewer(store) => return Error::schema_newer(store),
         OutcomeUnknown => Code::OutcomeUnknown,
         Capacity => Code::Capacity,
     }
@@ -544,6 +546,7 @@ fn proof_error(error: approvals::Failure) -> Error {
         Refused | Replayed => Code::Forbidden,
         Unavailable => Code::Unavailable,
         MetadataUnavailable => Code::MetadataUnavailable,
+        MetadataSchemaNewer(store) => return Error::schema_newer(store),
         OutcomeUnknown => Code::OutcomeUnknown,
         Capacity => Code::Capacity,
     }

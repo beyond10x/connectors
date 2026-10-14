@@ -81,11 +81,15 @@ pub(super) fn execute(
     Ok(result)
 }
 pub(super) fn error(failure: Failure) -> Error {
+    if let Failure::MetadataSchemaNewer(store) = failure {
+        return Error::schema_newer(store);
+    }
     let mut error: Error = match failure {
         Failure::InvalidInput => Code::InvalidInput,
         Failure::Conflict | Failure::BindingChanged => Code::LifecycleConflict,
         Failure::NotFound => Code::NotFound,
         Failure::MetadataUnavailable => Code::MetadataUnavailable,
+        Failure::MetadataSchemaNewer(_) => Code::MetadataSchemaNewer,
         Failure::RevisionConflict => Code::RevisionConflict,
         Failure::CustodyUnavailable => Code::CustodyUnavailable,
         Failure::OutcomeUnknown => Code::OutcomeUnknown,

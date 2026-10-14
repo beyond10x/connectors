@@ -507,13 +507,13 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
   - name: connectors.cli.NextAction
     kind: enum
-    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, none]
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3]
@@ -566,6 +566,19 @@ types:
       # ESS 0.52 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
       # so both rules are enforced by the host and pinned by tests, not declared here.
       - {name: instance_id, type: "Optional<String>"}
+      # ESS-LIMIT: store_version and binary_version appear together, only on
+      # metadata_schema_newer (contracts/cli/v1alpha1/semantics.md). binary_version is
+      # the refusing binary's release version; store_version is the release version the
+      # store's StoreWriter marker names, or `unrecorded` when no marker names a newer
+      # writer this binary can order: the Entity Runtime refused a record field this
+      # binary's schema does not declare, the marker's version cannot be ordered, or
+      # the store's level is above this binary's highest (its marker is then not read
+      # through a schema this binary does not know). As for instance_id above, ESS
+      # declares no invariant on a CLI type, so
+      # the presence rule and the `unrecorded` value are enforced by the host and pinned
+      # by tests.
+      - {name: store_version, type: "Optional<String>"}
+      - {name: binary_version, type: "Optional<String>"}
   - name: connectors.cli.Prerequisite
     kind: struct
     fields:
@@ -1029,6 +1042,42 @@ entities:
     # remembers records that build's; a suppression change keeps it. Remembering a
     # bootstrap always records one.
 
+  - name: connectors.cli.StoreWriter
+    identity: {name: store, type: String}
+    fields:
+      - {name: binary_version, type: String}
+      - {name: model_digest, type: String}
+    lifecycle:
+      initial: Recorded
+      states: [Recorded]
+      terminal: [Recorded]
+      transitions:
+        - {name: raise, from: [Recorded], to: Recorded}
+    # The metadata store's writer marker: the newest binary that wrote the store
+    # (its release version) and the digest of the record model it persists. One per
+    # store, identity `store`. A binary records it in the batch of its first write
+    # when it is absent, and raises it in the batch of its first write when its own
+    # release version is newer; it never lowers it, and an equal version keeps it.
+    # Before any command reads the store's records it compares the marker with its
+    # own: a different model digest under a newer version refuses
+    # metadata_schema_newer; the same digest under a newer version is admitted. A
+    # binary_version this binary cannot order under a different model digest refuses
+    # metadata_schema_newer with store_version `unrecorded`; under the same digest
+    # it is admitted and kept, since it is never known to be lower.
+    # The model digest is SHA-256 over the persisted record shapes of the Entity
+    # Runtime definitions: per entity its name, identity field, lifecycle states,
+    # field schema (names, types, required-ness, bounds, enumerations) and the
+    # assertions of its invariants, without invariant names or messages, which
+    # the generator chooses. A release that changes only generated text keeps it.
+    # ESS-LIMIT: binary_version is a SemVer 2.0.0 version and "newer" is SemVer
+    # precedence (a pre-release orders below its release; build metadata is
+    # ignored; a pre-release longer than 40 bytes is not ordered), and "never
+    # lowered" compares the input with the current field. ESS has no version type,
+    # no version order, no string pattern and no guard comparing a command input
+    # with a subject field, so the host enforces all three and tests pin them; the
+    # field stays a String. Every store written before the marker existed has none
+    # and is admitted; it gets one on its next write.
+
   - name: connectors.cli.ConnectionListCursor
     identity: {name: cursor_id, type: Uuid}
     fields:
@@ -1039,7 +1088,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:452, docs/local-connection-registry.md:105-106;
+    # contracts/cli/v1alpha1/semantics.md:504, docs/local-connection-registry.md:105-106;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1125,6 +1174,40 @@ commands:
           bootstrap: input.bootstrap
           observed_at: input.observed_at
           build_version: input.build_version
+  - name: connectors.cli.RecordStoreWriter
+    input:
+      - {name: store, type: String}
+      - {name: binary_version, type: String}
+      - {name: model_digest, type: String}
+    outcomes:
+      - name: recorded
+        creates: connectors.cli.StoreWriter
+        instance: store
+        emits: [connectors.cli.StoreWriterRecorded]
+        payload:
+          connectors.cli.StoreWriterRecorded:
+            store: input.store
+            binary_version: input.binary_version
+        sets:
+          binary_version: input.binary_version
+          model_digest: input.model_digest
+  - name: connectors.cli.RaiseStoreWriter
+    input:
+      - {name: store, type: String}
+      - {name: binary_version, type: String}
+      - {name: model_digest, type: String}
+    outcomes:
+      - name: raised
+        moves: connectors.cli.StoreWriter.raise
+        instance: store
+        emits: [connectors.cli.StoreWriterRaised]
+        payload:
+          connectors.cli.StoreWriterRaised:
+            store: input.store
+            binary_version: input.binary_version
+        sets:
+          binary_version: input.binary_version
+          model_digest: input.model_digest
   - name: connectors.cli.RecordConnectionListCursor
     input:
       - {name: cursor_id, type: Uuid}
@@ -1165,8 +1248,8 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:456) and the host
-    # removal path (er.rs:4081-4083) only expires Active cursors. The error name is
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:508) and the host
+    # removal path (er.rs:4327-4329) only expires Active cursors. The error name is
     # the decision; no source names one.
 
 events:
@@ -1178,6 +1261,14 @@ events:
       - {name: suppressed, type: Boolean}
   - name: connectors.cli.LocalRuntimeBootstrapRemembered
     fields: [{name: instance_id, type: String}]
+  - name: connectors.cli.StoreWriterRecorded
+    fields:
+      - {name: store, type: String}
+      - {name: binary_version, type: String}
+  - name: connectors.cli.StoreWriterRaised
+    fields:
+      - {name: store, type: String}
+      - {name: binary_version, type: String}
   - name: connectors.cli.ConnectionListCursorRecorded
     fields: [{name: cursor_id, type: Uuid}]
   - name: connectors.cli.ConnectionListCursorExpired
@@ -1209,6 +1300,8 @@ actors:
     may:
       - connectors.cli.ExpireConnectionListCursor
       - connectors.cli.RecordConnectionListCursor
+      - connectors.cli.RaiseStoreWriter
       - connectors.cli.RecordLocalRuntime
+      - connectors.cli.RecordStoreWriter
       - connectors.cli.RememberLocalRuntimeBootstrap
       - connectors.cli.SetLocalRuntimeSuppression

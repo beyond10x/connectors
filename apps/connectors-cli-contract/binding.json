@@ -160,6 +160,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -193,7 +199,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -319,6 +326,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -419,6 +427,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -515,6 +529,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -548,7 +568,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -674,6 +695,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -774,6 +796,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -828,6 +856,12 @@
                           "kind": "string"
                         }
                       },
+                      "binary_version": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "code": {
                         "kind": "enum",
                         "variants": [
@@ -861,7 +895,8 @@
                           "approval_replayed",
                           "idempotency_conflict",
                           "owner_build_mismatch",
-                          "confirmation_required"
+                          "confirmation_required",
+                          "metadata_schema_newer"
                         ]
                       },
                       "configuration_format": {
@@ -987,6 +1022,7 @@
                           "request_permission",
                           "retry_explicitly",
                           "stop_owner",
+                          "upgrade",
                           "none"
                         ]
                       },
@@ -1087,6 +1123,12 @@
                           "observation",
                           "stop"
                         ]
+                      },
+                      "store_version": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
                       }
                     }
                   }
@@ -1130,6 +1172,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -1163,7 +1211,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -1289,6 +1338,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -1389,6 +1439,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -1452,6 +1508,12 @@
                           "kind": "string"
                         }
                       },
+                      "binary_version": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
                       "code": {
                         "kind": "enum",
                         "variants": [
@@ -1485,7 +1547,8 @@
                           "approval_replayed",
                           "idempotency_conflict",
                           "owner_build_mismatch",
-                          "confirmation_required"
+                          "confirmation_required",
+                          "metadata_schema_newer"
                         ]
                       },
                       "configuration_format": {
@@ -1611,6 +1674,7 @@
                           "request_permission",
                           "retry_explicitly",
                           "stop_owner",
+                          "upgrade",
                           "none"
                         ]
                       },
@@ -1711,6 +1775,12 @@
                           "observation",
                           "stop"
                         ]
+                      },
+                      "store_version": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "string"
+                        }
                       }
                     }
                   }
@@ -1754,6 +1824,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -1787,7 +1863,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -1913,6 +1990,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -2013,6 +2091,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -2073,6 +2157,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -2106,7 +2196,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -2232,6 +2323,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -2332,6 +2424,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -2411,6 +2509,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -2444,7 +2548,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -2570,6 +2675,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -2670,6 +2776,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -2763,6 +2875,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -2796,7 +2914,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -2922,6 +3041,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -3022,6 +3142,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -3115,6 +3241,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3148,7 +3280,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -3274,6 +3407,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -3374,6 +3508,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -3467,6 +3607,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3500,7 +3646,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -3626,6 +3773,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -3726,6 +3874,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -3819,6 +3973,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3852,7 +4012,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -3978,6 +4139,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -4078,6 +4240,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -4171,6 +4339,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -4204,7 +4378,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -4330,6 +4505,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -4430,6 +4606,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -4517,6 +4699,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -4550,7 +4738,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -4676,6 +4865,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -4776,6 +4966,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -4877,6 +5073,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -4910,7 +5112,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -5036,6 +5239,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -5136,6 +5340,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -5228,6 +5438,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5261,7 +5477,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -5387,6 +5604,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -5487,6 +5705,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -5760,6 +5984,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5793,7 +6023,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -5919,6 +6150,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -6019,6 +6251,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -6142,6 +6380,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -6175,7 +6419,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -6301,6 +6546,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -6401,6 +6647,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -6515,6 +6767,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -6548,7 +6806,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -6674,6 +6933,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -6774,6 +7034,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -6835,6 +7101,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -6868,7 +7140,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -6994,6 +7267,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -7094,6 +7368,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -7210,6 +7490,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7243,7 +7529,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -7369,6 +7656,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -7469,6 +7757,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -7595,6 +7889,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7628,7 +7928,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -7754,6 +8055,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -7854,6 +8156,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -7971,6 +8279,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -8004,7 +8318,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -8130,6 +8445,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -8230,6 +8546,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -8300,6 +8622,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -8333,7 +8661,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -8459,6 +8788,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -8559,6 +8889,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -8633,6 +8969,7 @@
                       "request_permission",
                       "retry_explicitly",
                       "stop_owner",
+                      "upgrade",
                       "none"
                     ]
                   },
@@ -8747,6 +9084,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -8780,7 +9123,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -8906,6 +9250,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -9006,6 +9351,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -9095,6 +9446,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -9128,7 +9485,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -9254,6 +9612,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -9354,6 +9713,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -9551,6 +9916,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -9584,7 +9955,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -9710,6 +10082,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -9810,6 +10183,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -9914,6 +10293,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -9947,7 +10332,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -10073,6 +10459,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -10173,6 +10560,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -10240,6 +10633,7 @@
                       "request_permission",
                       "retry_explicitly",
                       "stop_owner",
+                      "upgrade",
                       "none"
                     ]
                   },
@@ -10267,6 +10661,12 @@
             "kind": "struct",
             "fields": {
               "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "binary_version": {
                 "kind": "optional",
                 "of": {
                   "kind": "string"
@@ -10305,7 +10705,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -10431,6 +10832,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -10531,6 +10933,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -10599,6 +11007,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -10632,7 +11046,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -10758,6 +11173,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -10858,6 +11274,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
@@ -10912,6 +11334,12 @@
                   "kind": "string"
                 }
               },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -10945,7 +11373,8 @@
                   "approval_replayed",
                   "idempotency_conflict",
                   "owner_build_mismatch",
-                  "confirmation_required"
+                  "confirmation_required",
+                  "metadata_schema_newer"
                 ]
               },
               "configuration_format": {
@@ -11071,6 +11500,7 @@
                   "request_permission",
                   "retry_explicitly",
                   "stop_owner",
+                  "upgrade",
                   "none"
                 ]
               },
@@ -11171,6 +11601,12 @@
                   "observation",
                   "stop"
                 ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
               }
             }
           }
