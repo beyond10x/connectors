@@ -53,7 +53,7 @@ version = "roughtime-1"
 [[approval_clock.sources]]   # int08h, roughtime.int08h.com
 address = "51.81.57.55:2002"
 public_key = "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE="
-version = "roughtime-1"
+version = "roughtime-0x8000000c"
 
 [[approval_clock.sources]]   # Netnod, roughtime.se
 address = "192.36.143.134:2002"
@@ -63,18 +63,33 @@ version = "roughtime-1"
 [[approval_clock.sources]]   # time.txryan.com
 address = "148.113.255.71:2002"
 public_key = "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="
-version = "roughtime-1"
+version = "roughtime-0x8000000c"
 ```
 
 The addresses are numeric because the host does no DNS; they are the names'
 IPv4 answers on 2026-10-14 and are rechecked, with the keys, before use. The keys and
 addresses are this document's and the live test's (`independent_live_quorum`); the
-host ships no default source. On 2026-10-14 none of the four answered a request at
-`roughtime-0x8000000c` with a reply the current client verifies, roughtime.se
-included, which did on 2026-09-10: the ecosystem lists all four as "IETF-Roughtime",
-and Roughtime is now RFC 10049, version 1. Which version each source answers is
-settled by the live probe before the implementation starts, and the table's
-`version` follows it.
+host ships no default source.
+
+Probe of 2026-10-14 (one request per source and version, 3 s timeout, from the
+client's own request and verifier):
+
+| Source | At `0x8000000c` | With VER `0x00000001` |
+|---|---|---|
+| Cloudflare | no reply | no reply |
+| int08h | 420-byte reply, verifies | no reply |
+| Netnod roughtime.se | no reply (it answered on 2026-09-10) | no reply |
+| time.txryan.com | 460-byte reply, verifies | no reply |
+
+So int08h and time.txryan.com speak `roughtime-0x8000000c` today and are configured
+with it. The single-source check refused both although their replies verify; the
+4,000 ms width is the likely cause (not yet isolated), which
+the 8,000 ms cap answers. Cloudflare and roughtime.se are configured at `roughtime-1`,
+RFC 10049's version, which the ecosystem list's "IETF-Roughtime" names; whether
+either answers a full version-1 request (not only a patched VER) is the first thing
+the implementation's `roughtime-1` verifier checks live. Until a third source
+answers, the quorum is two of two reachable sources: an answer, but no tolerance of
+a liar (see Threat model).
 
 - **How many.** Two to eight sources (`connectors.clock.Configuration`), `quorum` two
   to eight and at most the number of sources. Three sources with quorum two is the
@@ -96,9 +111,10 @@ settled by the live probe before the implementation starts, and the table's
   `clock/protocol.rs:151-165` does today for the fixed `0x8000000c`
   (`protocol.rs:14`). There is no negotiation and no downgrade. Two versions are
   admitted: `roughtime-1`, RFC 10049's version `0x00000001` (IANA Roughtime Version
-  Registry), which the ecosystem list says the sources above speak, and
+  Registry), for Cloudflare and roughtime.se, and
   `roughtime-0x8000000c`, the
-  draft-19 test version the client verifies today. A version ships only together
+  draft-19 test version the client verifies today, which int08h and time.txryan.com
+  answer. A version ships only together
   with its verifier and an independent signed fixture: for `roughtime-1`, a reply
   recorded from one of the sources above. A further version is added as an enum
   variant the same way. The field is required with no default, so the digest always
