@@ -6,7 +6,7 @@ status: draft
 title: A bootstrap revision change leaves each connection one working recovery path
 relations:
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Outcome
 
@@ -46,3 +46,11 @@ the old one revocable). The three refusals above get next actions that lead to t
   an earlier refusal.
 - docs/local-catalog-provider.md states that `invoke` does not revalidate, that evidence lasts
   60 s by default, and that a caller revalidates right before invoke.
+
+## Also observed
+
+On 2026-10-14, a guide run against a scratch state directory: after an adapter entry is edited
+(the revision moved, or only `private_protocol` changed), the adapter process still running the
+old entry makes `connections revalidate` answer `lifecycle_conflict` with `next_action:
+retry_status`, which no retry satisfies until `adapters stop` stops that process. The next action
+names `adapters stop` (with what to pass), or revalidation stops the stale adapter process itself.
