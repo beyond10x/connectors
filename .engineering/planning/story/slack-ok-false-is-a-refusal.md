@@ -2,12 +2,16 @@
 format: aep.planning-md/3
 id: story:slack-ok-false-is-a-refusal
 kind: story
-status: draft
+status: active
 title: A Slack ok:false answer is a typed refusal, never an empty read
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+- depends_on: story:slack-user-token-history-reads
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T23:35:16Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-14T23:35:16Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
@@ -34,3 +38,7 @@ signals failure in its body.
 
 - Recorded fixtures for each mapped error answer their refusal and a non-zero exit.
 - No Slack read answers success on a body with `ok: false`.
+
+## Scope
+
+Primary: adapters/catalog/src/lib.rs (read_body :2026, Selection :397, RefusalCode), feed.rs, providers/slack/{operations,user-operations}.json, catalog spec selection.yaml/guard.yaml, contracts/catalog semantics.md, tests/slack.rs, docs local-catalog-provider.md, catalog-slack.md. Not cli.yaml, not host. Collides with slack-user-token (user-operations.json, tests/slack.rs) → same unit or sequenced.
