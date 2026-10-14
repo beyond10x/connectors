@@ -1,0 +1,136 @@
+domain: connectors_sql.profiles
+summary: Configured read profiles — an operator-authored parameterised read with declared typed columns, per-column masking, one call identifier and a keyset cursor over a declared ordering column, served by `profile.read`.
+
+# Normative owner: adapters/sql/contracts/reads/v1alpha1/semantics.md, section "Read profiles",
+# and docs/local-postgres-cli.md / docs/local-mysql-cli.md. The repository holds the profile's
+# shape and validation only: every statement, column name and masking choice is the
+# operator's, written in the owner-only native file (`read_profiles` of
+# `connectors_sql.connection.LocalConfiguration`). The executable composition
+# (adapters/sql/src/local.rs) admits a profile exactly when this model does, and the library
+# (adapters/sql/src/profile.rs) serves `profile.read`; tests/ess_model.rs checks both against
+# the schemas this model generates, and tests/profiles.rs checks the reads on the wire.
+types:
+  # A profile's id, which the caller names as `profile`: lower-case letters, digits, `_`, `.`
+  # and `-`, 1–64 characters.
+  - name: connectors_sql.profiles.ProfileId
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyz0123456789_.-"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+
+  # The name of a declared parameter or output column: lower-case letters, digits and `_`,
+  # 1–64 characters. Output records use these names, never the database's own column names.
+  - name: connectors_sql.profiles.FieldName
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyz0123456789_"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+
+  # The declared type of an output column. Every non-null value is a JSON string:
+  # - text: the engine's native text, unchanged.
+  # - integer: decimal digits with an optional leading `-`, never a JSON number.
+  # - timestamp: the engine's native text, which starts `YYYY-MM-DD`, then `T` or a space,
+  #   then `HH:MM:SS`.
+  # - phone_number: an end-user number, masked unless the profile says otherwise.
+  # A value the declared type does not admit refuses the read (`unsupported`); it is never
+  # coerced.
+  - name: connectors_sql.profiles.ColumnType
+    kind: enum
+    variants: [text, integer, timestamp, phone_number]
+
+  # One output column, in the statement's column order: the statement returns exactly as
+  # many columns as the profile declares, and the n-th is written under the n-th name.
+  - name: connectors_sql.profiles.ProfileColumn
+    kind: struct
+    fields:
+      - {name: name, type: connectors_sql.profiles.FieldName}
+      - {name: type, type: connectors_sql.profiles.ColumnType}
+      - {name: masked, type: "Optional<Boolean>"}
+
+  # Whether a column is masked: `masked` when the profile says, otherwise exactly the
+  # `phone_number` columns. A masked value keeps its last four characters and writes `*` for
+  # each earlier one; a value of four characters or fewer is all `*`.
+  - name: connectors_sql.profiles.ColumnMasking
+    kind: struct
+    fields:
+      - {name: type, type: connectors_sql.profiles.ColumnType}
+      - {name: masked, type: "Optional<Boolean>"}
+      - {name: effective, type: Boolean}
+    invariants:
+      - any: ["defined(masked)", type != phone_number, effective == true]
+      - any: ["defined(masked)", type == phone_number, effective == false]
+      - any: ["not defined(masked)", masked == false, effective == true]
+      - any: ["not defined(masked)", masked == true, effective == false]
+
+  # One read profile. `statement` is the operator's single read statement, with the engine's
+  # placeholders (`$1`… on PostgreSQL, `?` on MySQL); `parameters` names them in placeholder
+  # order, and the caller supplies a value (text or null) for each by name and nothing else.
+  # Values are bound, never written into the statement. `call_identifier` names the output
+  # column that carries the join key; `ordering` names the column the keyset cursor follows,
+  # which must hold distinct values for the rows the statement returns. The two may be the
+  # same column. Both are unmasked and neither is a `phone_number` (see LocalConfiguration).
+  - name: connectors_sql.profiles.ReadProfile
+    kind: struct
+    fields:
+      - {name: id, type: connectors_sql.profiles.ProfileId}
+      - {name: statement, type: String}
+      - {name: parameters, type: "List<connectors_sql.profiles.FieldName>"}
+      - {name: columns, type: "List<connectors_sql.profiles.ProfileColumn>"}
+      - {name: call_identifier, type: connectors_sql.profiles.FieldName}
+      - {name: ordering, type: connectors_sql.profiles.FieldName}
+    invariants:
+      - statement.count >= 1
+      - statement.utf8_bytes <= 8192
+      - parameters.count <= 63
+      - columns.count: {gte: 1, lte: 256}
+      - distinct: {in: columns, as: c, by: c.name}
+      - distinct: {in: parameters, as: p}
+
+  # One page of `profile.read`. The adapter asks for `limit + 1` rows after the cursor in
+  # `ordering` order, but a server (or a proxy in front of it) may return fewer rows than
+  # any LIMIT asks for, so a short page does not prove the end. A page that received more
+  # than `limit` rows returns `limit` of them; any page that received a row carries a
+  # `next_cursor` after the last row it returns; only a page that received none ends the
+  # read.
+  - name: connectors_sql.profiles.Page
+    kind: struct
+    fields:
+      - {name: limit, type: Integer}
+      - {name: rows_received, type: Integer}
+      - {name: rows_returned, type: Integer}
+      - {name: next_cursor, type: Boolean}
+
+  - name: connectors_sql.profiles.PageScope
+    kind: struct
+    fields:
+      - {name: page, type: connectors_sql.profiles.Page}
+    invariants:
+      - page.rows_returned <= page.limit
+      - any: [page.rows_received == 0, page.next_cursor == true]
+      - any: [page.rows_received != 0, page.next_cursor == false]
+      - any: [page.rows_received <= page.limit, page.rows_returned == page.limit]
+      - any: [{not: page.rows_received <= page.limit}, page.rows_returned == page.rows_received]
+
+  # `read` answered a page; `invalid_input` refused an input the instance's published input
+  # schema does not admit (an unknown profile, an undeclared or missing parameter); and
+  # `stale_cursor` refused a cursor issued for another profile or other parameter values, or
+  # not issued by this adapter. Both refusals come before any session is opened.
+  - name: connectors_sql.profiles.ProfileReadOutcome
+    kind: enum
+    variants: [read, invalid_input, stale_cursor]
+
+  - name: connectors_sql.profiles.ProfileReadCall
+    kind: struct
+    fields:
+      - {name: outcome, type: connectors_sql.profiles.ProfileReadOutcome}
+      - {name: session_opened, type: Boolean}
+    invariants:
+      - any: [outcome == read, session_opened == false]
+
+# ESS-LIMIT: these are checked by the executable, not expressible here, and the executable
+# only ever refuses more than the model on them: that the statement prepares to exactly as
+# many columns and parameters as the profile declares (known only to the server), and the
+# masking function itself (which characters a masked value keeps), which tests/profiles.rs
+# checks value by value.

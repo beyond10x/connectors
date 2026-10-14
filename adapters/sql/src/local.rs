@@ -13,7 +13,7 @@ use connectors_host::local::{
     runtime::{Baseline, Bootstrap, Effect, EntryField, Failure, Profile, Requirement, Result},
 };
 use connectors_sdk::{Adapter as _, Credential, Secret};
-use connectors_sql::{Config, Sql, auth};
+use connectors_sql::{Config, ReadProfile, Sql, auth};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
@@ -36,6 +36,10 @@ struct Configuration {
     #[serde(default)]
     allow_plaintext: bool,
     ca_file: Option<PathBuf>,
+    /// The operator's read profiles (`connectors_sql.profiles.ReadProfile`). Absent and
+    /// empty mean none; `null` is refused, as the model refuses it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    read_profiles: Vec<ReadProfile>,
 }
 
 pub struct Local {
@@ -43,6 +47,7 @@ pub struct Local {
     config: Config,
     instance: String,
     effective: Value,
+    profiles: Vec<ReadProfile>,
 }
 impl Local {
     pub fn load(path: &Path) -> Result<Self> {
@@ -85,6 +90,13 @@ impl Local {
         if !config.engine.is_postgresql() {
             effective["engine"] = json!(config.engine.name());
         }
+        // Profiles are part of the binding, so a changed profile is a changed
+        // revision; a file without profiles keeps the revision it had before them.
+        connectors_sql::profile::validate_profiles(&config.read_profiles)
+            .map_err(|_| Failure::InvalidConfiguration)?;
+        if !config.read_profiles.is_empty() {
+            effective["read_profiles"] = json!(config.read_profiles);
+        }
         let configuration_revision = connectors_core::digest(&effective);
         // The provider authority is the exact database endpoint, so a changed
         // engine, host, port or database is a changed binding rather than a new
@@ -112,6 +124,7 @@ impl Local {
             effective.clone(),
             Arc::new(Absent),
         )
+        .and_then(|adapter| adapter.with_read_profiles(config.read_profiles.clone()))
         .map_err(Failure::from_service)?;
         // A password establishes a session; it does not sign a request and
         // carries no scope grant, so the profile declares no required scopes.
@@ -155,7 +168,7 @@ impl Local {
                     // none can express a write.
                     effect: match o.id.as_str() {
                         "schema.list" | "query.read" | "database.list" | "table.list"
-                        | "table.describe" | "index.list" => Effect::Read,
+                        | "table.describe" | "index.list" | "profile.read" => Effect::Read,
                         _ => Effect::Unknown,
                     },
                 })
@@ -167,6 +180,7 @@ impl Local {
             config: native,
             instance: config.instance,
             effective,
+            profiles: config.read_profiles,
         })
     }
     pub fn description(&self) -> &Bootstrap {
@@ -183,6 +197,7 @@ impl Local {
             self.effective.clone(),
             Arc::new(Fixed(password)),
         )
+        .and_then(|adapter| adapter.with_read_profiles(self.profiles.clone()))
         .map_err(Failure::from_service)
     }
 }
@@ -243,8 +258,9 @@ impl connectors_host::local::runtime::Adapter for Local {
         document: Secret,
         input: Value,
     ) -> Result<Value> {
-        // No cursor state exists for either operation, so the connection
-        // partition selects nothing and is deliberately unused.
+        // No operation keeps cursor state (a profile cursor carries its own
+        // position), so the connection partition selects nothing and is
+        // deliberately unused.
         self.bound(document)?
             .invoke(operation, input)
             .await

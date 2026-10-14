@@ -55,6 +55,12 @@ struct Scenario {
     columns: Vec<(&'static str, i32)>,
     /// Every statement text the client prepared, in order.
     prepared: Arc<std::sync::Mutex<Vec<String>>>,
+    /// The read profiles the adapter is built with.
+    read_profiles: Vec<connectors_sql::ReadProfile>,
+    /// What the wrapped statement carries after its derived table.
+    suffix: String,
+    /// The parameters the wrapped statement takes, when not those of the original.
+    wrapped_parameters: Option<usize>,
 }
 impl Default for Scenario {
     fn default() -> Self {
@@ -68,6 +74,9 @@ impl Default for Scenario {
             ignore_cancel: false,
             columns: vec![("answer", 23), ("nullable", 25)],
             prepared: Arc::default(),
+            read_profiles: vec![],
+            suffix: String::new(),
+            wrapped_parameters: None,
         }
     }
 }
@@ -169,7 +178,9 @@ async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
     let sql = adapter(
         listener.local_addr().unwrap().port(),
         Arc::new(AtomicUsize::new(0)),
-    );
+    )
+    .with_read_profiles(scenario.read_profiles.clone())
+    .unwrap();
     let task = tokio::spawn(async move {
         let (mut stream, _) = listener.accept().await.unwrap();
         let len = stream.read_i32().await.unwrap();
@@ -240,8 +251,9 @@ async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                             .join(",");
                         assert!(query.contains(&format!("ARRAY[{casts}]")));
                         assert!(query.ends_with(&format!(
-                            "FROM ({original}) AS result({})",
-                            aliases.join(",")
+                            "FROM ({original}) AS result({}){}",
+                            aliases.join(","),
+                            scenario.suffix
                         )));
                     }
                     if let Some(code) = scenario.query_error {
@@ -252,8 +264,12 @@ async fn fixture(mut scenario: Scenario) -> (Sql, tokio::task::JoinHandle<()>) {
                     }
                 }
                 b'D' if !failed => {
-                    let mut params = (scenario.parameters as i16).to_be_bytes().to_vec();
-                    for _ in 0..scenario.parameters {
+                    let count = match scenario.wrapped_parameters {
+                        Some(count) if prepares > 1 => count,
+                        _ => scenario.parameters,
+                    };
+                    let mut params = (count as i16).to_be_bytes().to_vec();
+                    for _ in 0..count {
                         params.extend(25_i32.to_be_bytes());
                     }
                     send(&mut stream, b't', &params).await;
@@ -1045,4 +1061,68 @@ async fn postgresql_catalogue_statements_hide_what_the_role_cannot_see() {
         index.contains("pg_catalog.strpos(COALESCE(i.indexprs::pg_catalog.text, '') || COALESCE(i.indpred::pg_catalog.text, ''), ':varattno 0 ') > 0"),
         "{index}"
     );
+}
+
+/// A synthetic read profile over a fictional table: a number in, the rows it appears on.
+fn number_profile() -> connectors_sql::ReadProfile {
+    serde_json::from_value(json!({
+        "id": "rows-by-number",
+        "statement": "SELECT id, from_number FROM fixture_calls WHERE from_number = $1",
+        "parameters": ["number"],
+        "columns": [
+            {"name": "row_key", "type": "integer"},
+            {"name": "caller", "type": "phone_number"}
+        ],
+        "call_identifier": "row_key",
+        "ordering": "row_key"
+    }))
+    .unwrap()
+}
+
+#[tokio::test]
+async fn postgresql_profile_read_orders_by_the_keyset_column_and_binds_the_cursor_last() {
+    let number = "+99900000101";
+    let first = catalogue(
+        Scenario {
+            rows: vec![
+                row(&[Some("7"), Some(number)]),
+                row(&[Some("9"), Some(number)]),
+            ],
+            parameters: 1,
+            bound_values: vec![Some(number.into())],
+            columns: vec![("id", INT8), ("from_number", TEXT)],
+            read_profiles: vec![number_profile()],
+            suffix: " ORDER BY result.c0 LIMIT 6".into(),
+            ..Scenario::default()
+        },
+        "profile.read",
+        json!({"profile":"rows-by-number","parameters":{"number":number},"limit":5}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        first["items"],
+        json!([{"row_key":"7","caller":"********0101"},{"row_key":"9","caller":"********0101"}])
+    );
+    assert_eq!(first["complete"], false);
+    let cursor = first["next_cursor"].as_str().unwrap();
+    let last = catalogue(
+        Scenario {
+            rows: vec![],
+            parameters: 1,
+            wrapped_parameters: Some(2),
+            bound_values: vec![Some(number.into()), Some("9".into())],
+            columns: vec![("id", INT8), ("from_number", TEXT)],
+            read_profiles: vec![number_profile()],
+            suffix: " WHERE result.c0 > $2 ORDER BY result.c0 LIMIT 6".into(),
+            ..Scenario::default()
+        },
+        "profile.read",
+        json!({"profile":"rows-by-number","parameters":{"number":number},"cursor":cursor,"limit":5}),
+    )
+    .await
+    .unwrap();
+    assert_eq!(last["items"], json!([]));
+    assert_eq!(last["complete"], true);
+    assert_eq!(last["next_cursor"], Value::Null);
 }

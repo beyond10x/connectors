@@ -18,7 +18,9 @@ lossless text representation alongside each column's native type name; NULL is
 JSON null. Numeric precision, arrays, timestamps and JSON are preserved as native
 text rather than coerced to JavaScript numbers. Parameters are text or null with
 server-side type resolution. This representation is explicit in the descriptor.
-Report truncation explicitly; no invented resumable cursor for a fresh SQL query.
+Report truncation explicitly; no invented resumable cursor for a fresh SQL query (a
+[read profile](#read-profiles)'s keyset cursor follows a column the operator declared, and
+is a new read after a value, not a resumed one).
 Each request uses a fresh connection and read-only transaction, initialized with
 `search_path = public, pg_catalog`; qualify names in other schemas. Session settings
 are not a substitute for the configured role's schema and function grants.
@@ -224,3 +226,72 @@ https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html,
 https://dev.mysql.com/doc/refman/8.4/en/information-schema-key-column-usage-table.html and
 https://dev.mysql.com/doc/refman/8.4/en/information-schema-statistics-table.html, cited, not
 fetched, on 2026-10-09.
+
+## Read profiles
+
+A connection may declare read profiles in its owner-only native file (`read_profiles`, at
+most 32, distinct ids). A read profile is the operator's: one read statement with the
+engine's placeholders (`$1`… on PostgreSQL, `?` on MySQL), the names of its parameters in
+placeholder order, its output columns in statement order, each with a declared type
+(`text`, `integer`, `timestamp` or `phone_number`) and optional masking, the column that
+carries the call identifier and the column the keyset cursor follows. The repository holds
+only this shape and its validation, which the adapter's ESS model
+(`connectors_sql.profiles`, and the profile rules of `connectors_sql.connection.LocalConfiguration`)
+fixes; the composition admits a profile exactly when the model does. Profiles are part of
+the binding: the effective configuration carries them, so a changed profile is a changed
+configuration revision, and a file without profiles (or with an empty list) keeps the
+revision it had before profiles existed.
+
+`profile.read` serves them. It is advertised only by a connection that declares a profile,
+is a declared read (`effect: read`) and needs no mutation profile. The instance descriptor
+publishes each profile's exact input and output as one alternative of the operation's input
+and output schemas, so `operations describe` shows the parameters a caller may pass and the
+typed columns it gets back. The caller names the profile, gives a value (text or `null`) for
+each declared parameter and nothing else, and may pass a cursor and a `limit` of 1 to 1,000.
+An unknown profile, an undeclared or missing parameter, or any other member is
+`invalid_input`; a cursor issued for another profile or other parameter values, or not
+issued by this adapter, is `stale_cursor`. Both are refused before any session is opened.
+Values are bound as text parameters, never written into a statement.
+
+A page runs the statement through the `query.read` path: the same fresh read-only
+transaction (PostgreSQL) or `READ ONLY` session (MySQL), deadlines and byte bounds, and the
+same refusal of a statement that returns no columns (any write) before it runs. A statement
+that returns other than its declared number of columns is `unsupported`, also before it
+runs. The statement runs inside the derived table with positional aliases, ordered by the
+ordering column and asking for one row past the limit:
+`… AS result(c0,…) [WHERE result.c<k> > $<n+1>] ORDER BY result.c<k> LIMIT <limit+1>` on
+PostgreSQL and `… AS result (c0,…) [WHERE c<k> > ?] ORDER BY c<k> LIMIT <limit+1>` on MySQL,
+where the cursor's value is bound after the statement's own parameters. On MySQL an
+`integer` cursor is compared as `CAST(? AS DECIMAL(65,0))`, so no 64-bit value loses digits
+to a floating comparison, and a `timestamp` cursor as `CAST(? AS DATETIME(6))` with the `Z`
+of a `TIMESTAMP` dropped (the session is UTC); PostgreSQL infers the parameter's type from
+the column.
+
+A server, or a proxy in front of it, may return fewer rows than any `LIMIT` asks for, so
+the adapter never takes a short page for the end. A page that received more than `limit`
+rows returns `limit` of them; every page that received a row carries `next_cursor`, after
+the last row it returns; only a page that received none is `complete` with a null cursor.
+The ordering column must hold distinct values for the rows the statement returns: rows
+that share an ordering value across a page boundary are skipped. The cursor is the
+profile, a digest of the parameter values and the last ordering value, not signed: the
+ordering column is never masked, so the value is one the caller already read, and a forged
+value only moves where a read the caller may make anyway starts.
+
+Each item carries the declared columns under their declared names, never the database's
+own. Every non-null value is a JSON string: `text` the engine's native text; `integer`
+decimal digits with an optional `-`; `timestamp` the engine's native text, which starts
+`YYYY-MM-DD`, `T` or a space, then `HH:MM:SS`; `phone_number` the number. A value its
+declared type does not admit refuses the page as `unsupported`; it is never coerced. A
+column is masked when the profile says so, and otherwise exactly when it is a
+`phone_number`; a masked value keeps its last four characters and writes `*` for each
+earlier one, and a value of four characters or fewer is all `*`. The call identifier and
+the ordering column are never masked, are not `phone_number` columns, and are never null:
+a null in either refuses the page as `unsupported`. The answer names the profile, its call
+identifier and ordering columns and each column's type and masking, so a workflow joins on
+the call identifier without a model. A page whose answer would exceed the response limit is
+`capacity`; ask for a smaller `limit`.
+
+The scripted wire fixtures of both engines check these rules (`adapters/sql/tests/profiles.rs`,
+`protocol.rs` and `mysql_local.rs`), against a synthetic call table (`tests/mysql/calls.rs`);
+`tests/ess_model.rs` holds the executable's admission, masking, pages and refusals to the
+model. No live database has run a read profile yet.

@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use bytes::BytesMut;
 use connectors_contracts::{Column, QueryResult};
-use connectors_core::{Descriptor, Error, ErrorCode, Result};
+use connectors_core::{Descriptor, Error, ErrorCode, Operation, Result};
 use connectors_sdk::{Adapter, Credential, decode, encode, instance_descriptor, provenance};
 use rustls::pki_types::{CertificateDer, pem::PemObject};
 use serde::{Deserialize, Serialize};
@@ -10,6 +10,8 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 
 pub mod auth;
 pub mod mysql;
+pub mod profile;
+pub use profile::{ColumnType, ProfileColumn, ReadProfile, mask};
 use tokio::{sync::oneshot, time::Instant};
 use tokio_postgres::{
     CancelToken, Client, NoTls,
@@ -190,6 +192,10 @@ pub struct Sql {
     config: Config,
     password: Arc<dyn Credential>,
     descriptor: Descriptor,
+    /// The connection's read profiles; `profile.read` is advertised only when there is one.
+    profiles: Arc<Vec<ReadProfile>>,
+    /// The generated `profile.read` declaration each instance specializes.
+    profile_template: Operation,
 }
 
 impl Sql {
@@ -212,11 +218,6 @@ impl Sql {
             instance,
             &effective_configuration,
         )?;
-        // The operations are the same on both engines; the profile names how a
-        // cell is written, which is the engine's own.
-        for operation in &mut descriptor.operations {
-            operation.profile = config.engine.result_profile().into();
-        }
         connectors_sdk::verify_handlers(
             &descriptor,
             &[
@@ -226,13 +227,67 @@ impl Sql {
                 "table.list",
                 "table.describe",
                 "index.list",
+                profile::OPERATION,
             ],
         )?;
+        // `profile.read` serves the connection's read profiles; with none it is not
+        // advertised at all (`with_read_profiles` adds it).
+        let position = descriptor
+            .operations
+            .iter()
+            .position(|o| o.id == profile::OPERATION)
+            .ok_or_else(Error::internal)?;
+        let profile_template = descriptor.operations.remove(position);
+        // The operations are the same on both engines; the profile names how a
+        // cell is written, which is the engine's own.
+        for operation in &mut descriptor.operations {
+            operation.profile = config.engine.result_profile().into();
+        }
         Ok(Self {
             descriptor,
             config,
             password,
+            profiles: Arc::default(),
+            profile_template,
         })
+    }
+
+    /// The connection's read profiles, each validated as the adapter's ESS model
+    /// (`connectors_sql.profiles`) fixes. With at least one, the descriptor advertises
+    /// `profile.read` with each profile's exact input and output, and its revision covers
+    /// the profiles; with none, the descriptor is unchanged.
+    pub fn with_read_profiles(mut self, profiles: Vec<ReadProfile>) -> Result<Self> {
+        profile::validate_profiles(&profiles)?;
+        self.descriptor
+            .operations
+            .retain(|o| o.id != profile::OPERATION);
+        if !profiles.is_empty() {
+            self.descriptor
+                .operations
+                .push(profile::specialize(&self.profile_template, &profiles));
+            self.descriptor.revision = connectors_core::digest(&serde_json::json!({
+                "revision": self.descriptor.revision,
+                "read_profiles": profiles,
+            }));
+        }
+        self.profiles = Arc::new(profiles);
+        Ok(self)
+    }
+
+    async fn profile_read(&self, input: Value) -> Result<Value> {
+        let input: profile::Input = decode(input)?;
+        let (profile, prepared) = profile::prepare(&self.profiles, &input)?;
+        let result = self
+            .query(Query {
+                query: prepared.statement,
+                parameters: prepared.parameters,
+                limit: input.limit,
+                catalogue: false,
+                keyset: Some(prepared.keyset),
+            })
+            .await?;
+        let rows = result["rows"].as_array().ok_or_else(Error::internal)?;
+        profile::page(profile, &input, rows, result["provenance"].clone())
     }
     async fn connect(&self) -> Result<(Client, ConnectionTask)> {
         let mut config = tokio_postgres::Config::new();
@@ -371,6 +426,9 @@ impl Sql {
             .unwrap_or(args.query.trim());
         let original = transaction.prepare(query).await.map_err(database_error)?;
         column_bounds(original.columns().len())?;
+        if let Some(keyset) = &args.keyset {
+            keyset.columns(original.columns().len())?;
+        }
         if original.params().len() != args.parameters.len() {
             return Err(Error::invalid("parameter count does not match query"));
         }
@@ -395,10 +453,29 @@ impl Sql {
             .map(|c| format!("COALESCE(octet_length(result.{c}::text),0)::bigint"))
             .collect::<Vec<_>>()
             .join("+");
+        // A keyset page orders by its column and continues after the cursor, which is
+        // bound after the statement's own parameters; the server infers its type from
+        // the column it is compared with.
+        let mut parameters = args.parameters;
+        let keyset = match &args.keyset {
+            None => String::new(),
+            Some(keyset) => {
+                let mut clause = String::new();
+                if let Some(after) = &keyset.after {
+                    parameters.push(Some(after.clone()));
+                    clause = format!(" WHERE result.c{} > ${}", keyset.column, parameters.len());
+                }
+                format!(
+                    "{clause} ORDER BY result.c{} LIMIT {}",
+                    keyset.column,
+                    u32::from(args.limit) + 1
+                )
+            }
+        };
         // Prepared single-statement subquery plus server-generated positional aliases.
         // PostgreSQL's text representation is explicit in the native-text profile.
         let wrapped = format!(
-            "SELECT CASE WHEN ({size}) > {} THEN NULL::text[] ELSE ARRAY[{casts}] END FROM ({query}) AS result({})",
+            "SELECT CASE WHEN ({size}) > {} THEN NULL::text[] ELSE ARRAY[{casts}] END FROM ({query}) AS result({}){keyset}",
             connectors_core::RESPONSE_LIMIT,
             aliases.join(",")
         );
@@ -406,8 +483,7 @@ impl Sql {
             .prepare(&wrapped)
             .await
             .map_err(database_error)?;
-        let values = args
-            .parameters
+        let values = parameters
             .into_iter()
             .map(TextParameter)
             .collect::<Vec<_>>();
@@ -533,6 +609,30 @@ struct Query {
     /// set cannot represent (error 3988) names no table.
     #[serde(skip)]
     catalogue: bool,
+    /// Set by the adapter for `profile.read`, never by the caller.
+    #[serde(skip)]
+    keyset: Option<Keyset>,
+}
+
+/// A keyset page over one output column: the rows ordered by it, after the
+/// cursor's value when there is one, one row past the limit at most. The
+/// statement must return exactly `columns` columns, checked before it runs.
+pub(crate) struct Keyset {
+    pub column: usize,
+    pub kind: ColumnType,
+    pub after: Option<String>,
+    pub columns: usize,
+}
+impl Keyset {
+    fn columns(&self, returned: usize) -> Result<()> {
+        if returned != self.columns {
+            return Err(Error::new(
+                ErrorCode::Unsupported,
+                "profile statement does not return its declared columns",
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// A table the read cannot find: it does not exist, the configured role or
@@ -580,6 +680,7 @@ impl Adapter for Sql {
         connectors_sdk::validate(&self.descriptor.operation(operation)?.input_schema, &input)?;
         let engine = self.config.engine;
         let query = match (operation, Catalogue::of(operation)) {
+            (profile::OPERATION, _) => return self.profile_read(input).await,
             ("query.read", _) => decode(input)?,
             ("schema.list", _) => {
                 let args: Scope = decode(input)?;
@@ -592,6 +693,7 @@ impl Adapter for Sql {
                     parameters: vec![Some(self.scoped_schema(args.schema)?)],
                     limit: args.limit,
                     catalogue: false,
+                    keyset: None,
                 }
             }
             (_, Some(read)) => {
@@ -618,6 +720,7 @@ impl Adapter for Sql {
                         parameters,
                         limit: args.limit,
                         catalogue: true,
+                        keyset: None,
                     })
                     .await?;
                 // Every table has at least one column, so a description with
