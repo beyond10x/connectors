@@ -135,6 +135,15 @@ impl Local {
             effective["irm_api_url"] = json!(irm);
         }
         let configuration_revision = connectors_core::digest(&effective);
+        // The provider authority names every destination the stored token is sent to: the
+        // stack URL, and the IRM API URL when one is configured. Both are canonical URLs,
+        // which hold no space, so the pair is unambiguous. A changed IRM URL is therefore a
+        // changed authority (a new instance id), never an upgrading revalidation; a
+        // configuration without it keeps the authority it had before the member existed.
+        let provider_authority = match &irm_api_url {
+            None => base.clone(),
+            Some(irm) => format!("{base} {irm}"),
+        };
         let mut stack = port(&base, ca.as_deref())?;
         let irm = match &irm_api_url {
             None => None,
@@ -167,7 +176,7 @@ impl Local {
             adapter: "grafana".into(),
             protocol: connectors_core::WIRE_VERSION.into(),
             configuration_revision,
-            provider_authority: base,
+            provider_authority,
             descriptor: serde_json::to_string(&descriptor).map_err(|_| Failure::Protocol)?,
             profiles: vec![profile(auth::PROFILE_ID)?, profile(auth::IRM_PROFILE_ID)?],
             requirements: descriptor

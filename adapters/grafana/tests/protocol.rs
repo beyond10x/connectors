@@ -1069,3 +1069,54 @@ fn an_existing_configuration_without_irm_api_url_keeps_its_revision() {
         profile(&after, "grafana.service_account")
     );
 }
+
+/// story:grafana-irm-history-reads, security review: a since-window cursor the caller
+/// passes back can neither add a query parameter nor a path segment. An alert-group
+/// cursor shaped as a query or path fragment is refused with no I/O; an incident cursor
+/// that admits such characters travels only inside the JSON body, never in the target.
+#[tokio::test]
+async fn a_returned_cursor_cannot_inject_a_query_parameter_or_path_segment() {
+    let (stack, stack_seen) = server("/", vec![]).await;
+    let (irm, irm_seen) = server("/oncall/", vec![]).await;
+    let g = irm_grafana(&stack, &irm);
+    for cursor in [
+        "2&perpage=1000",
+        "2&page=3",
+        "2/../x",
+        "2/",
+        "2?x=1",
+        "2#x",
+        "%32",
+        "+2",
+        " 2",
+        "2\n",
+        "\u{ff12}",
+        "1000000",
+        "02",
+        "",
+    ] {
+        let mut input = window();
+        input["cursor"] = json!(cursor);
+        let error = g.invoke("irm.alert_groups.list", input).await.unwrap_err();
+        assert_eq!(error.code, ErrorCode::InvalidInput, "{cursor:?}");
+    }
+    assert!(irm_seen.lock().unwrap().is_empty());
+    assert!(stack_seen.lock().unwrap().is_empty());
+
+    let cursor = "x&page=9/../?y=1#z%2F\"}";
+    let (stack, seen) = server("/", vec![(200, fixture("incidents_page2.json"))]).await;
+    let (irm, irm_seen) = server("/oncall/", vec![]).await;
+    let g = irm_grafana(&stack, &irm);
+    let mut input = window();
+    input["cursor"] = json!(cursor);
+    g.invoke("irm.incidents.list", input).await.unwrap();
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        seen[0].path,
+        "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.QueryIncidents"
+    );
+    assert_eq!(seen[0].query, "");
+    assert_eq!(seen[0].json()["cursor"]["nextValue"], cursor);
+    assert!(irm_seen.lock().unwrap().is_empty());
+}

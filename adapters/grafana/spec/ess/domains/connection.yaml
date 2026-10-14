@@ -23,7 +23,9 @@ types:
   # (Grafana IRM settings), written like `base_url`; IRM alert groups are read from it, and
   # without it every `irm.*` operation is unavailable. A configuration without it keeps the
   # configuration revision it had before the member existed. The CA, when given, applies to
-  # both URLs.
+  # both URLs. The provider authority the stored token is bound to is not modelled here (the
+  # host's binding owns it); the composition derives it from base_url and, when present,
+  # irm_api_url, so a changed IRM URL is a changed authority (adapters/grafana/design.md).
   - name: connectors_grafana.connection.LocalConfiguration
     kind: struct
     fields:
