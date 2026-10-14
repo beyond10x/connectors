@@ -48,7 +48,7 @@ max_rate_error_ppm = 10000
 [[approval_clock.sources]]   # Cloudflare, roughtime.cloudflare.com
 address = "162.159.200.123:2003"
 public_key = "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg="
-version = "roughtime-1"
+version = "roughtime-0x8000000c"
 
 [[approval_clock.sources]]   # int08h, roughtime.int08h.com
 address = "51.81.57.55:2002"
@@ -58,7 +58,7 @@ version = "roughtime-0x8000000c"
 [[approval_clock.sources]]   # Netnod, roughtime.se
 address = "192.36.143.134:2002"
 public_key = "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI="
-version = "roughtime-1"
+version = "roughtime-0x8000000c"
 
 [[approval_clock.sources]]   # time.txryan.com
 address = "148.113.255.71:2002"
@@ -81,15 +81,16 @@ client's own request and verifier):
 | Netnod roughtime.se | no reply (it answered on 2026-09-10) | no reply |
 | time.txryan.com | 460-byte reply, verifies | no reply |
 
-So int08h and time.txryan.com speak `roughtime-0x8000000c` today and are configured
-with it. The single-source check refused both although their replies verify; the
-4,000 ms width is the likely cause (not yet isolated), which
-the 8,000 ms cap answers. Cloudflare and roughtime.se are configured at `roughtime-1`,
-RFC 10049's version, which the ecosystem list's "IETF-Roughtime" names; whether
-either answers a full version-1 request (not only a patched VER) is the first thing
-the implementation's `roughtime-1` verifier checks live. Until a third source
-answers, the quorum is two of two reachable sources: an answer, but no tolerance of
-a liar (see Threat model).
+So int08h and time.txryan.com speak `roughtime-0x8000000c` today. Every source is
+configured at `roughtime-0x8000000c`, the one version the client verifies.
+Cloudflare and roughtime.se stay listed but were unreachable at that version on
+2026-10-14, and neither answered VER `0x00000001` either, so no reply at RFC
+10049's version could be recorded and that version is not offered (see
+"Version"). The live check of 2026-10-14 verified int08h with a 5,000 ms signed
+radius and time.txryan.com with a 3,000 ms one: both count (see "Width cap"), and
+their combined answer is within the cap. With those two sources reachable the
+quorum is two of two: an answer, but it tolerates no outage and no lying source
+until a third source answers (see Threat model).
 
 - **How many.** Two to eight sources (`connectors.clock.Configuration`), `quorum` two
   to eight and at most the number of sources. Three sources with quorum two is the
@@ -109,16 +110,15 @@ a liar (see Threat model).
   (`connectors.clock.RoughtimeVersion`). The request carries it as VER; a reply
   verifies only if its signed VER equals it and its VERS lists it, as
   `clock/protocol.rs:151-165` does today for the fixed `0x8000000c`
-  (`protocol.rs:14`). There is no negotiation and no downgrade. Two versions are
-  admitted: `roughtime-1`, RFC 10049's version `0x00000001` (IANA Roughtime Version
-  Registry), for Cloudflare and roughtime.se, and
-  `roughtime-0x8000000c`, the
-  draft-19 test version the client verifies today, which int08h and time.txryan.com
-  answer. A version ships only together
-  with its verifier and an independent signed fixture: for `roughtime-1`, a reply
-  recorded from one of the sources above. A further version is added as an enum
-  variant the same way. The field is required with no default, so the digest always
-  names the version.
+  (`protocol.rs:14`). There is no negotiation and no downgrade. One version is
+  admitted: `roughtime-0x8000000c`, the draft-19 test version the client verifies,
+  which int08h and time.txryan.com answer. A version ships only together with its
+  verifier and a recorded signed fixture. RFC 10049's version `0x00000001` has
+  neither: no source answered it on 2026-10-14, so no reply could be recorded, and a
+  configuration naming `roughtime-1` is refused as an unknown version. A further
+  version is added as an enum variant once a source answers it and its reply is
+  recorded. The field is required with no default, so the digest always names the
+  version.
 - **No discovery.** No DNS, no server list, no default key, no fallback to the
   system clock, unchanged from `clock.md:13-14`.
 
@@ -153,10 +153,10 @@ u_i = M_i + A_i + 3 ms + elapsed_upper(N - S_i)
 
 exactly today's interval (`clock.md:107-109`, `clock.rs:226-241`), per source.
 
-1. **Count.** At acquisition, a source is *counted* when its reply verified and its
-   own interval, rounded outward to milliseconds, is at most 8,000 ms wide. A
-   verified source wider than that is `too_imprecise` and not counted. The counted
-   set is fixed at acquisition; later readings never add or drop a source.
+1. **Count.** At acquisition, a source is *counted* when its reply verified,
+   whatever its own radius or interval width. No source is `too_imprecise` on its
+   own: only the combined answer is capped (step 5). The counted set is fixed at
+   acquisition; later readings never add or drop a source.
 2. **Below quorum.** Fewer than `quorum` counted sources refuses `below_quorum`.
 3. **Coverage.** For an instant x, c(x) is the number of counted sources with
    l_i <= x <= u_i (closed intervals). The answer is the hull of the instants that
@@ -183,7 +183,10 @@ exactly today's interval (`clock.md:107-109`, `clock.rs:226-241`), per source.
 
 **Why it holds.** Every interval is convex. If at least `quorum` counted intervals
 contain true UTC t, then c(t) >= quorum, so L <= t <= U: the answer contains t. That
-is the whole guarantee, and it needs no assumption about the other intervals.
+is the whole guarantee, and it needs no assumption about the other intervals, nor
+any bound on a counted interval's width: a wide honest interval still contains t,
+and a wide lying one can only widen the answer, which the cap of step 5 refuses.
+So a source counts at any width.
 
 **Why not the alternatives.**
 - *Intersection of the counted intervals* excludes t as soon as one lying interval
@@ -208,6 +211,12 @@ is the whole guarantee, and it needs no assumption about the other intervals.
 
 ## Width cap: 8,000 ms
 
+The cap bounds the combined answer, never a single source. A verified source counts
+toward the quorum at any width (Quorum rule, step 1): the guarantee needs no
+per-source bound, and the answer, the hull of the quorum-covered instants, is
+usually much narrower than its widest counted source. With quorum two of two it is
+the intersection of the two intervals, at most as wide as the narrower.
+
 A source's interval at acquisition is about `2A + 6 ms + (d + 2 ms) q/(q - p)` for
 round trip d, and it grows by about `2p/q` of the elapsed time over the 30 s
 validity (600 ms at 10,000 ppm). Roughtime draft 19 signs RADI in whole seconds
@@ -219,9 +228,14 @@ validity (600 ms at 10,000 ppm). Roughtime draft 19 signs RADI in whole seconds
 | 2 s | 6,028 ms | 6,628 ms | always refused | admitted for the whole 30 s |
 | 3 s | 8,028 ms | 8,628 ms | always refused | admitted at acquisition if d <= ~1,950 ms |
 
-Today a source with a 2 s radius can never be used, and one with a 1 s radius only
-on a fast path; a quorum needs several sources and cannot pick only the most precise
-one. 8,000 ms admits radius-2 sources for the whole validity window.
+The table is the width of an answer formed from such sources alone. Under the
+single-source check a source with a 2 s radius could never be used, and one with a
+1 s radius only on a fast path; a quorum needs several sources and cannot pick only
+the most precise one. 8,000 ms admits answers from radius-2 sources for the whole
+validity window. The live check of 2026-10-14 is the case the per-source bound got
+wrong: int08h signed a 5 s radius (an interval of about 10 s, over the cap) and
+time.txryan.com a 3 s one; capping each source counted only one and refused
+`below_quorum`, while their intersection is about 6 s wide and is admitted.
 
 The ceiling is the delegation profile. The issuer sets `iat = floor(midpoint)` and
 `nbf = iat - 5` (`delegation.md:145`, `proof.rs:213-217`), and its own interval must
@@ -262,15 +276,17 @@ reply verified):
 | `verified` | counted; no answer formed (a refusal) |
 | `unreachable` | no verified reply by the shared deadline, or a send or receive error (single-source meaning unchanged) |
 | `unverified` | a reply that does not parse or verify against this source's key and version (unchanged) |
-| `too_imprecise` | verified, but its own interval is over 8,000 ms; not counted (unchanged, per source) |
+
+There is no per-source `too_imprecise`: the single-source cause becomes the combined
+refusal below, because a verified source counts at any width.
 
 Combined, as the CLI `unavailable` refusal at `stage = observation`:
 
 | Refusal | When | `next_action` |
 |---|---|---|
-| `below_quorum` | fewer than `quorum` counted sources | `check_configuration` if any source is `unverified`; else `choose_clock_source` if any is `too_imprecise`; else `retry_explicitly` |
+| `below_quorum` | fewer than `quorum` verified (counted) sources | `check_configuration` if any source is `unverified`; else `retry_explicitly` |
 | `split` | no instant lies in `quorum` counted intervals | `choose_clock_source`: a source is wrong; find it from the per-source lines and retire its key |
-| `too_imprecise` | the answer is wider than 8,000 ms | `choose_clock_source`: select more precise sources |
+| `too_imprecise` | the combined answer is wider than 8,000 ms; the only `too_imprecise`, never a single source | `choose_clock_source`: select more precise sources |
 
 In the CLI `Failure`, `clock_refusal` carries the combined refusal and a new
 `clock_sources` carries the per-source lines; the single `clock_radius_ms` moves into
@@ -311,7 +327,7 @@ truth. Within that:
 
 | Event | Effect |
 |---|---|
-| One lying source (valid signature, false time), the others honest and reachable, `quorum <= sources - 1` | Cannot move the answer off true time. It can widen the answer up to the cap, causing `too_imprecise` (denial of service), and shows as `outlier` when its interval is disjoint. A liar whose interval overlaps the answer is undetectable and harmless. |
+| One lying source (valid signature, false time), the others honest and reachable, `quorum <= sources - 1` | Cannot move the answer off true time, at any width: it counts like every verified source, and the guarantee needs no per-source bound. Signing a wide radius or a false time can only widen the answer, past the cap at worst, causing `too_imprecise` (denial of service); it shows as `outlier` when its interval is disjoint. A liar whose interval overlaps the answer is undetectable and harmless. With the two sources reachable on 2026-10-14 (int08h radius 5 s, time.txryan.com radius 3 s) the quorum is two of two, so this row does not apply: no outage and no lying source is tolerated until a third source answers. |
 | One unreachable source | Availability only: an answer while `quorum` others are counted, else `below_quorum`. |
 | One lying and one unreachable source | Safe only if `quorum` honest sources remain counted (four sources, quorum two). With three sources and quorum two, the liar and the remaining honest source form the quorum and a liar overlapping it can set a false answer. |
 | `quorum` or more colluding liars | A false answer. Out of scope: the sources' independence is a deployment assertion. |
@@ -332,22 +348,23 @@ Host (`crates/connectors-host/src/local/clock/tests.rs`, fixtures from
   contains the fixture time; the liar is `outlier`.
 - `quorum_overlapping_liar_cannot_exclude_truth`: three sources, liar overlaps both
   honest intervals without containing t; answer contains t.
-- `quorum_below_quorum_names_each_source`: one counted of quorum two; each other line
-  `unreachable`, `unverified` or `too_imprecise`; next action by precedence.
+- `quorum_below_quorum_names_each_source`: fewer counted than the quorum; each other
+  line `unreachable` or `unverified`, a wide source `verified`; next action by
+  precedence.
 - `quorum_split_refuses`: no instant covered twice; `split`, `choose_clock_source`.
 - `quorum_combined_width_over_cap_refuses`: the last example row; `too_imprecise`.
-- `quorum_source_over_cap_is_not_counted`: a radius-4 s source is `too_imprecise`
-  with `radius_ms = 4000`; the others still answer.
+- `quorum_wide_source_counts_and_only_the_answer_is_capped`: a radius-5 s source
+  (wider than 8,000 ms) and a radius-3 s source answer at quorum two, both `agreed`;
+  two radius-5 s sources form an answer over 8,000 ms, refused `too_imprecise` with
+  both lines `verified`.
 - `quorum_width_cap_boundary`: answers of exactly 8,000 ms admitted, 8,001 ms refused.
 - `quorum_shared_deadline`: one source silent, total acquisition under 2,000 ms plus
   verification; that source `unreachable`.
-- `roughtime_1_recorded_reply_verifies`: a reply recorded from a source of "Sources"
-  at `roughtime-1` verifies against its key; the same bytes at `roughtime-0x8000000c`
-  are `unverified`.
 - `quorum_version_mismatch_is_unverified`: a reply signed with another VER, or VERS
   without the configured version, is `unverified`; no second request is sent.
 - `quorum_configuration_refusals`: one source; nine sources; quorum 1; quorum above the
-  source count; duplicate address; duplicate key; missing `version`.
+  source count; duplicate address; duplicate key; missing `version`; an unknown
+  version, `roughtime-1` included.
 - `quorum_counted_set_is_fixed`: a later `Clock::now` past one source's 30 s window
   refuses; it never drops that source and answers from the rest.
 - `legacy_single_source_format_refuses_only_the_clock`: a `roughtime-clock/1` table

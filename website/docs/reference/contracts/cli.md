@@ -132,9 +132,9 @@ The observation carries one `sources` line per configured source. When the quoru
 forms no answer it refuses `unavailable` at `stage = observation`, and its `Failure`
 names the combined refusal in `clock_refusal` and each source's line in
 `clock_sources` ([refusals](./clock.md#refusals)): `below_quorum` with
-`check_configuration` if a source is `unverified`, else `choose_clock_source` if one
-is `too_imprecise`, else `retry_explicitly`; `split` and `too_imprecise` with
-`choose_clock_source`. A local timer, continuity or calendar refusal carries neither
+`check_configuration` if a source is `unverified`, else `retry_explicitly`; `split`
+and `too_imprecise` (the combined answer over 8,000 ms; a verified source counts at
+any width and is never `too_imprecise` on its own) with `choose_clock_source`. A local timer, continuity or calendar refusal carries neither
 field and keeps `check_configuration`. The refusal never carries the observation's
 bounds, a source's own interval, the request or the reply. A retired
 `roughtime-clock/1` table refuses `invalid_configuration` at

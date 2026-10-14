@@ -968,12 +968,28 @@
         "kind": "operational",
         "code": "unavailable",
         "stage": "observation",
-        "next_action": "choose_clock_source",
+        "next_action": "retry_explicitly",
         "clock_refusal": "below_quorum",
         "clock_sources": [
           {"index": 0, "address": "192.0.2.10:2002", "result": "verified", "radius_ms": 1000},
           {"index": 1, "address": "192.0.2.11:2002", "result": "unreachable"},
-          {"index": 2, "address": "192.0.2.12:2002", "result": "too_imprecise", "radius_ms": 5000}
+          {"index": 2, "address": "192.0.2.12:2002", "result": "verified", "radius_ms": 5000}
+        ]
+      }
+    },
+    {
+      "id": "clock-source-is-never-too-imprecise",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "observation",
+        "next_action": "choose_clock_source",
+        "clock_refusal": "too_imprecise",
+        "clock_sources": [
+          {"index": 0, "address": "192.0.2.10:2002", "result": "too_imprecise", "radius_ms": 5000},
+          {"index": 1, "address": "192.0.2.11:2002", "result": "verified", "radius_ms": 5000}
         ]
       }
     },

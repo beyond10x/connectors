@@ -51,24 +51,29 @@ types:
     # host checks (crates/connectors-host/src/local/clock.rs, Configuration::resolved).
   - name: connectors.clock.RoughtimeVersion
     kind: enum
-    # The wire VER values a source may be configured to speak. roughtime-1 is
-    # RFC 10049's version 0x00000001 (IANA Roughtime Version Registry), the version
-    # the ecosystem list names for two of the sources in docs/design/approval-clock-quorum.md;
-    # roughtime-0x8000000c is the draft-19 test version that
-    # crates/connectors-host/src/local/clock/protocol.rs verifies today. Each variant
-    # ships only together with its verifier and an independent signed fixture.
-    variants: [roughtime-1, roughtime-0x8000000c]
+    # The wire VER values a source may be configured to speak. roughtime-0x8000000c
+    # is the draft-19 test version that
+    # crates/connectors-host/src/local/clock/protocol.rs verifies. A variant ships
+    # only together with its verifier and a recorded signed fixture; RFC 10049's
+    # version 0x00000001 has neither (no source answered it on 2026-10-14,
+    # docs/design/approval-clock-quorum.md "Sources"), so it is not a variant and a
+    # configuration naming it is refused as an unknown version.
+    variants: [roughtime-0x8000000c]
   - name: connectors.clock.SourceResult
     kind: enum
     # What one configured source contributed to an acquisition
     # (docs/design/approval-clock-quorum.md, "Refusals"):
-    #   agreed        verified within the cap, and its interval meets the answer;
-    #   outlier       verified within the cap, and its interval is disjoint from the answer;
-    #   verified      verified within the cap, and no answer was formed (a refusal);
+    #   agreed        verified, and its interval meets the answer;
+    #   outlier       verified, and its interval is disjoint from the answer;
+    #   verified      verified, and no answer was formed (a refusal);
     #   unreachable   no reply within the shared deadline, or a send or receive error;
-    #   unverified    a reply that does not parse or verify against the source's key and version;
-    #   too_imprecise verified, but its own interval is wider than the cap; not counted.
-    variants: [agreed, outlier, verified, unreachable, unverified, too_imprecise]
+    #   unverified    a reply that does not parse or verify against the source's key and version.
+    # A verified source counts toward the quorum whatever its own radius or
+    # interval width: if `quorum` counted intervals contain true time the answer
+    # does, so the guarantee needs no per-source bound. Only the combined answer is
+    # capped (connectors.clock.Refusal too_imprecise); no source is too imprecise
+    # on its own.
+    variants: [agreed, outlier, verified, unreachable, unverified]
   - name: connectors.clock.SourceReport
     kind: struct
     fields:
@@ -79,7 +84,7 @@ types:
     # One line per configured source, in configuration order, on an observation
     # and on a quorum refusal. radius_ms is the source's signed radius in
     # milliseconds, present exactly when the reply verified (agreed, outlier,
-    # verified, too_imprecise). Never the reply bytes, the nonce or the source's
+    # verified). Never the reply bytes, the nonce or the source's
     # own interval.
     # ESS-LIMIT: index is 0..7 and radius_ms is present exactly for the verified
     # results. The range is writable as an invariant, but this type is reached from
@@ -91,13 +96,14 @@ types:
     kind: enum
     # Why a quorum acquisition formed no answer, each with its own next action
     # (docs/design/approval-clock-quorum.md, "Refusals"):
-    #   below_quorum  fewer than `quorum` sources verified within the cap;
-    #                 next action from the excluded sources: check_configuration
-    #                 if any is unverified, else choose_clock_source if any is
-    #                 too_imprecise, else retry_explicitly;
+    #   below_quorum  fewer than `quorum` sources verified; next action
+    #                 check_configuration if any source is unverified, else
+    #                 retry_explicitly;
     #   split         no instant lies in the intervals of `quorum` counted sources;
     #                 choose_clock_source (a source is wrong; retire its key);
-    #   too_imprecise the combined answer is wider than the cap; choose_clock_source.
+    #   too_imprecise the combined answer is wider than the 8,000 ms cap;
+    #                 choose_clock_source. Only the answer is capped: a single
+    #                 source is never too_imprecise.
     # A local timer, continuity, overflow or UTC-midnight refusal names none.
     variants: [below_quorum, split, too_imprecise]
   - name: connectors.clock.Observation
