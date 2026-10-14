@@ -168,17 +168,25 @@
 - The approval clock answers from a quorum of Roughtime sources instead of one trusted source.
   `[approval_clock]` takes `format = "roughtime-quorum/1"`, a `quorum` (2 to 8) and two to
   eight `[[approval_clock.sources]]`, each with a numeric `address`, its `public_key` and the
-  one wire `version` it speaks (`roughtime-1` or `roughtime-0x8000000c`; no negotiation). No
+  one wire `version` it speaks (only `roughtime-0x8000000c`; no negotiation; any other
+  version, `roughtime-1` included, is refused as unknown, since no source answered RFC
+  10049's version and no reply at it could be recorded). No
   two sources share an address or a key. All sources are asked in parallel under one shared
   two-second deadline, with no retries; the answer is the hull of the instants at least
   `quorum` verified sources' intervals contain, so one lying source among honest ones cannot
   move it off true time and one unreachable source does not stop it while a quorum remains.
-  The width cap moves from 4,000 ms to 8,000 ms for the clock, the approval proof and the
+  A verified source counts at any radius; only the combined answer is capped. The width cap
+  moves from 4,000 ms to 8,000 ms for the clock answer, the approval proof and the
   mutation ledger alike (the delegation contract's "at most eight seconds"). The observation
-  adds `sources`, one line per source (`agreed`, `outlier`, `unreachable`, `unverified`,
-  `too_imprecise`, with the signed `radius_ms` when the reply verified). A refusal's
-  `clock_refusal` is now the combined `below_quorum`, `split` or `too_imprecise`, and
+  adds `sources`, one line per source (`agreed`, `outlier`, `unreachable` or `unverified`,
+  with the signed `radius_ms` when the reply verified). A refusal's
+  `clock_refusal` is now the combined `below_quorum`, `split` or `too_imprecise` (the answer
+  over 8,000 ms; never a single source), and
   `clock_sources` replaces `clock_radius_ms` with every source's line.
+  **Limitation:** of the four public sources in `docs/local-clock.md`, only int08h (signed
+  radius 5 s) and time.txryan.com (3 s) answered on 2026-10-14; Cloudflare and roughtime.se
+  were unreachable at `roughtime-0x8000000c`. That configuration is a quorum of two of two:
+  it answers, but tolerates no outage and no lying source until a third source answers.
   **Migration:** the single-source `roughtime-clock/1` table is retired. It still parses, so a
   configuration that carries it loads and every command that does not use the clock keeps
   working, but `clock-check`, approval issuance and approved writes refuse it as

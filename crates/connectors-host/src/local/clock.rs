@@ -85,11 +85,12 @@ type Result<T> = std::result::Result<T, Failure>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Refusal {
-    /// Fewer than `quorum` sources verified within the width cap.
+    /// Fewer than `quorum` sources verified.
     BelowQuorum,
     /// No instant lies in the intervals of `quorum` counted sources.
     Split,
-    /// The combined answer is wider than the cap.
+    /// The combined answer is wider than the cap. Only the answer is capped:
+    /// a verified source counts whatever its own radius.
     TooImprecise,
 }
 
@@ -107,8 +108,6 @@ pub enum SourceResult {
     Unreachable,
     /// A reply that does not parse or verify against this source's key and version.
     Unverified,
-    /// Verified, but its own interval is over the cap; not counted.
-    TooImprecise,
 }
 
 /// One line per configured source, in configuration order
@@ -171,17 +170,13 @@ impl Refused {
         }
     }
     /// `below_quorum` names `check_configuration` if any source is unverified,
-    /// else `choose_clock_source` if any is too imprecise, else
-    /// `retry_explicitly`; `split` and `too_imprecise` name
+    /// else `retry_explicitly`; `split` and `too_imprecise` name
     /// `choose_clock_source`; any other refusal `check_configuration`.
     pub fn next_action(&self) -> NextAction {
         let any = |result| self.sources.iter().any(|s| s.result == result);
         match self.refusal {
             Some(Refusal::BelowQuorum) if any(SourceResult::Unverified) => {
                 NextAction::CheckConfiguration
-            }
-            Some(Refusal::BelowQuorum) if any(SourceResult::TooImprecise) => {
-                NextAction::ChooseClockSource
             }
             Some(Refusal::BelowQuorum) => NextAction::RetryExplicitly,
             Some(Refusal::Split | Refusal::TooImprecise) => NextAction::ChooseClockSource,
@@ -193,9 +188,6 @@ impl Refused {
 /// The one wire version a source speaks (`connectors.clock.RoughtimeVersion`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RoughtimeVersion {
-    /// RFC 10049's version 0x00000001.
-    #[serde(rename = "roughtime-1")]
-    Roughtime1,
     /// The draft-19 test version 0x8000000c.
     #[serde(rename = "roughtime-0x8000000c")]
     Draft0x8000000c,
@@ -203,7 +195,6 @@ pub enum RoughtimeVersion {
 impl RoughtimeVersion {
     fn wire(self) -> u32 {
         match self {
-            Self::Roughtime1 => 0x0000_0001,
             Self::Draft0x8000000c => 0x8000_000c,
         }
     }
@@ -351,12 +342,8 @@ impl Configuration {
         let mut counted = Vec::with_capacity(replies.len());
         for source in replies {
             source.started.continuous_with(now)?;
-            let (_, lower, upper) = bounds_ns(&source, now, self.max_rate_error_ppm)?;
-            if upper.div_ceil(NS_PER_MS) - lower / NS_PER_MS > max_width_ms() {
-                reports[source.index].result = SourceResult::TooImprecise;
-            } else {
-                counted.push(source);
-            }
+            bounds_ns(&source, now, self.max_rate_error_ppm)?;
+            counted.push(source);
         }
         if counted.len() < quorum {
             return Err(Refused::quorum(Refusal::BelowQuorum, reports));

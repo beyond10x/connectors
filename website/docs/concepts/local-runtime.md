@@ -81,6 +81,12 @@ public_key = "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="
 version = "roughtime-0x8000000c"
 ```
 
+These two were the only sources that answered on 2026-10-14, so this is a quorum of two of two:
+it answers, but tolerates no outage and no lying source until a third source answers. A verified
+source counts at any radius (int08h signed 5 s, time.txryan.com 3 s); only the combined answer
+is capped at eight seconds. `roughtime-0x8000000c` is the one admitted version; any other is
+refused as unknown.
+
 The single-source `roughtime-clock/1` table is retired: it still loads, but every use of the
 clock refuses it with `configuration_rule` `approval_clock_format_retired` until it is rewritten
 in this shape.

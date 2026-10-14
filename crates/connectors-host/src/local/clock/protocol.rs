@@ -1,5 +1,5 @@
-//! Roughtime at one configured wire version per source (`roughtime-1`, RFC 10049
-//! version 0x00000001, or the draft-19 test version 0x8000000c), with ring
+//! Roughtime at one configured wire version per source (the draft-19 test
+//! version 0x8000000c, the only one with a verifier and a recorded reply), with ring
 //! cryptography and bounded framing. There is no negotiation or downgrade.
 //! Verify original signed byte strings, never a reconstructed projection.
 use super::{Failure, Result};

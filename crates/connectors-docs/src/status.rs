@@ -159,7 +159,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Local runtime",
         "Approval clock refusals",
-        "approvals clock-check names why the quorum formed no answer (below quorum, split or too imprecise) with its next action, and each source's result: unreachable, unverified, too imprecise or verified.",
+        "approvals clock-check names why the quorum formed no answer (below quorum, split or too imprecise) with its next action, and each source's result: unreachable, unverified or verified at any radius; only the combined answer is capped.",
         "apps/connectors/tests/local_cli.rs::clock_check_below_quorum_refusal",
         "/docs/concepts/local-runtime",
     ),
