@@ -15,7 +15,8 @@ it does not identify an installed executable.
 and the Eventlog-backed runtime roots on installed Rust 1.91.0. The Rust gate runs
 formatting, descriptor drift, offline builds/tests/Clippy, library dependency
 boundaries, the [shared ESS provider boundary](../adapters/README.md),
-independent adapter-model compilation, the website examples model synthesis
+independent adapter-model compilation, the release-binaries check of the guides
+(`connectors-build release-binaries`, below), the website examples model synthesis
 (`connectors-build examples` without its WASM build), the drift check of the documentation
 site's generated pages (`connectors-docs generate --check`) and AEP validation. It uses a task-owned temporary directory under
 `.local/tmp`. The owner tests bind and connect Unix sockets inside it through a descriptor
@@ -152,6 +153,23 @@ depend on shared contracts/SDK and their protocol dependencies, with no host,
 client, or sibling adapter dependency. The generic client and federation host have
 no adapter dependencies. A new provider supplies an `Adapter` implementation and
 configuration; it requires no provider switch in the shared client or host.
+
+## Release binaries
+
+[`release-binaries.yml`](../.github/workflows/release-binaries.yml) packages the binaries its
+build job's `BINARIES` lists, `connectors` and `connectors-catalog-provider`; its `cargo build`
+and `Package` steps iterate that list. `connectors-build release-binaries`, which the gate runs,
+reads the list and refuses a guide that runs an installed binary outside it. The guides are
+`README.md`, the Markdown files directly under `docs/` and the authored pages under
+`website/docs/`. A guide runs an installed binary where, in a fenced `sh`, `shell`, `bash`, `zsh`
+or `console` block, a workspace binary's bare name starts a command, or a path into an extracted
+archive (`connectors-$version-$target/<name>`) names it; `target/release/<name>` is a source
+build and is not one. Every listed name must be a workspace binary. To ship another binary, add
+it to `BINARIES`, then document it.
+
+```sh
+cargo run --locked -p connectors-build -- release-binaries
+```
 
 ## Ignored tests
 

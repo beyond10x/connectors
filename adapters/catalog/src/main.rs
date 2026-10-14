@@ -5,6 +5,7 @@ use std::path::PathBuf;
 mod local;
 
 #[derive(Parser)]
+#[command(version)]
 struct Args {
     /// Owner-only nonsecret configuration for the private host binding.
     #[arg(long)]
