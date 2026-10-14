@@ -299,7 +299,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Slack messages",
-        "chat.postMessage posts a message, a thread reply included, and conversations.open opens a direct message to post to, each under approval after the token's auth.test read; a dispatch without a definite answer, or Slack's 200 with ok false, is unknown and never sent again; verified against a local fixture only.",
+        "chat.postMessage posts a message, a thread reply included, conversations.open opens a direct message to post to, and chat.update and chat.delete edit and delete a message the bot posted, each under approval after the token's auth.test read; an edit or delete Slack refuses by name (cant_update_message, cant_delete_message, message_not_found) is refused, and a dispatch without a definite answer, or any other 200 with ok false, is unknown; none is sent again; verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::an_approved_post_sends_one_json_body_and_returns_channel_and_ts",
         "/docs/reference/adapters/catalog",
     ),
@@ -374,6 +374,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Native adapters",
+        "SQL read profiles",
+        "profile.read runs a read the operator declares in the native file by name, on either engine: declared parameters only, bound; typed columns with numbers masked by default; one call identifier; keyset pages that never take a short page for the end and refuse, rather than skip, a non-unique ordering value at a page boundary; cursors checked for shape, type and context; verified against scripted wire fixtures, not a live database.",
+        "adapters/sql/tests/mysql_local.rs::read_profiles_are_served_through_the_private_runtime_as_a_declared_read",
+        "/docs/reference/adapters/sql",
+    ),
+    shipped(
+        "Native adapters",
         "Tavily web search",
         "websearch.search, websearch.fetch and websearch.crawl through the shared websearch family; the key is checked without spending a search.",
         "adapters/tavily/tests/protocol.rs::the_key_is_validated_by_usage_without_a_search",
@@ -385,6 +392,20 @@ pub const CAPABILITIES: &[Capability] = &[
         "logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0).",
         "adapters/loki/tests/local_runtime.rs::each_read_answers_through_the_private_runtime_from_the_recorded_answers",
         "/docs/reference/adapters/loki",
+    ),
+    shipped(
+        "Native adapters",
+        "Loki line and trace profiles",
+        "logs.profile_lines (one typed, masked record per line of a configured line profile) and logs.call_trace (one call's lines from every source, by its identifier) through a saved bearer connection.",
+        "adapters/loki/tests/local_runtime.rs::configured_profiles_answer_through_the_private_runtime",
+        "/docs/reference/adapters/loki",
+    ),
+    shipped(
+        "Native adapters",
+        "A call by its number, every leg typed",
+        "A configured SQL read profile over the call table and a configured Loki line profile over the CDR lines, joined by a workflow on the call identifier each declares, answer every leg of a transferred call with its type, numbers masked, across a page boundary of the SQL read.",
+        "crates/connectors-conformance/tests/incident_call_join.rs::every_leg_of_a_transferred_call_is_typed_by_joining_the_call_table_and_the_cdr_lines",
+        "/docs/reference/adapters/sql",
     ),
     shipped(
         "Native adapters",
