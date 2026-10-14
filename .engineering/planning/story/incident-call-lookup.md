@@ -7,7 +7,7 @@ title: Look up a call by its number, one typed line per leg
 relations:
 - decomposes: epic:incident-collection-workflow
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 2
 ---
 ## Outcome
 
@@ -29,11 +29,14 @@ What the join must handle, as an existing operator tool found:
 - the SQL read returns at most 100 rows whatever the query's `LIMIT` says, so the operation pages;
 - end-user numbers are masked by default and stay masked in the typed output.
 
-## Open before design
+## Decided before design
 
-- Whether the join runs inside one composite operation or as two reads a workflow joins; Connectors
-  has no composite operation today.
-- Which configured Loki and SQL connections it binds to, read from the host's configuration.
+- Two typed reads, joined by the calling workflow; no composite operation. Each read is callable
+  through `operations describe/invoke` without a mutation profile and returns typed output that
+  carries the join key (the call identifier), so a deterministic workflow step joins them without a
+  model. A composite operation would be a new runtime noun and stays out until two consumers need it.
+- Each read binds to a configured connection the caller names by connection id (one Loki, one SQL);
+  nothing is discovered from the host configuration implicitly.
 
 ## Acceptance
 
