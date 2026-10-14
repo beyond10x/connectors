@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The metadata store records its newest writer: the release version of the newest binary that
+  wrote it and a digest of the record model that binary persists (`connectors.cli.StoreWriter`).
+  A binary older than the marker whose record model differs refuses the store before it reads a
+  record, in every command and `setup check` included, with `metadata_schema_newer` (exit 1,
+  `next_action = upgrade`) naming `store_version` and `binary_version`; it no longer answers
+  `metadata_unavailable` with `retry_status`, which retrying never changed. A write the Entity
+  Runtime refuses because a record carries a field the binary's model does not declare is
+  `metadata_schema_newer` with `store_version = "unrecorded"`, as is a store migrated to a level the
+  binary does not know or whose marker names a version it cannot order. Release versions order by
+  SemVer precedence, pre-releases included, and the model digest covers the persisted record
+  shapes only, not generated invariant names or messages. A newer release whose record model is
+  unchanged is admitted, and a store written before the marker gets one on its next write. The
+  CLI guide states the rule for sharing a state directory: binaries of different versions share
+  one only while the oldest is at least the newest that wrote it; a pinned consumer keeps its own
+  with `--state-dir`. Releases up to 0.49.0 cannot read the marker and keep answering such a store
+  with `metadata_unavailable`.
+
 ## 0.49.0 — 2026-10-13
 
 ### Added

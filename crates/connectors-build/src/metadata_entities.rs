@@ -28,6 +28,7 @@ const DEFINITIONS: &[&str] = &[
     "connectors.clock.LocalClockFloor",
     "connectors.cli.ConnectionListCursor",
     "connectors.cli.LocalRuntimeRecord",
+    "connectors.cli.StoreWriter",
     "connectors.credentials.CredentialGeneration",
     "connectors.declarations.AdapterSpecification",
     "connectors.declarations.OperationDeclaration",

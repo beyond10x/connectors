@@ -15,6 +15,9 @@ use uuid::Uuid;
 pub enum Failure {
     InvalidInput,
     MetadataUnavailable,
+    /// The store was written by a newer binary with another record model
+    /// (`super::Failure::MetadataSchemaNewer`); public code `metadata_schema_newer`.
+    MetadataSchemaNewer(Option<super::Release>),
     OutcomeUnknown,
     NotFound,
     Conflict,
@@ -410,6 +413,7 @@ fn db(_: rusqlite::Error) -> Failure {
 fn host_error(value: super::Failure) -> Failure {
     match value {
         super::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
+        super::Failure::MetadataSchemaNewer(store) => Failure::MetadataSchemaNewer(store),
         _ => Failure::MetadataUnavailable,
     }
 }

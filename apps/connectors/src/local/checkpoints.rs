@@ -34,6 +34,7 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
                 owner::Code::OutcomeUnknown => {
                     failure("outcome_unknown", "publication", "retry_explicitly", false)
                 }
+                owner::Code::MetadataSchemaNewer => super::schema_newer(error.store_version),
                 _ => failure("metadata_unavailable", "observation", "retry_status", false),
             });
         }

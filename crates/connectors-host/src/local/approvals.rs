@@ -15,6 +15,9 @@ pub enum Failure {
     Refused,
     Unavailable,
     MetadataUnavailable,
+    /// The store was written by a newer binary with another record model
+    /// (`super::Failure::MetadataSchemaNewer`); public code `metadata_schema_newer`.
+    MetadataSchemaNewer(Option<super::Release>),
     OutcomeUnknown,
     Replayed,
     Capacity,

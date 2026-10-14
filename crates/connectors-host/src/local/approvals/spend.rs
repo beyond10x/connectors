@@ -70,6 +70,9 @@ impl<C: Clock> Store<C> {
                 crate::local::mutations::Failure::MetadataUnavailable => {
                     Failure::MetadataUnavailable
                 }
+                crate::local::mutations::Failure::MetadataSchemaNewer(store) => {
+                    Failure::MetadataSchemaNewer(store)
+                }
                 crate::local::mutations::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
                 _ => Failure::Refused,
             })?;
@@ -170,6 +173,7 @@ fn db(_: rusqlite::Error) -> Failure {
 fn host_error(value: crate::local::Failure) -> Failure {
     match value {
         crate::local::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
+        crate::local::Failure::MetadataSchemaNewer(store) => Failure::MetadataSchemaNewer(store),
         _ => Failure::MetadataUnavailable,
     }
 }
