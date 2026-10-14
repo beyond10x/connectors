@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-10: 50 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-10: 53 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -28,6 +28,9 @@ As of 2026-10-10: 50 capabilities are shipped, 3 are decided and 5 are planned. 
 |---|---|---|
 | [Setup and metadata store](./guides/set-up-the-local-cli.md) | ● shipped | setup init creates a private configuration and an Entity Runtime metadata store over Eventlog SQLite, with durable open checkpoints (since 0.33.0). |
 | [Supervised adapters](./concepts/local-runtime.md) | ● shipped | A local owner starts the configured adapter executables, refuses a changed executable or configuration before provider work, and stops exact incarnations. |
+| [Stopping an owner after an upgrade](./guides/set-up-the-local-cli.md#after-an-upgrade) | ● shipped | setup owner-stop asks the state directory's running owner, of any build, to drain and exit within 30 seconds, answers no_owner when none runs, and never signals a process. |
+| [Configuration upgrades](./concepts/local-runtime.md) | ● shipped | After a configuration change each saved connection has one working path: revalidate, a new connection under the same instance id after an evidence lifetime change, or a new instance id after a changed provider authority or profile. |
+| [Approval clock refusals](./concepts/local-runtime.md) | ● shipped | approvals clock-check names why no observation resulted: an unreachable source, a reply that does not verify against the configured key, or a source whose signed radius is too wide for approvals, each with its own next action. |
 | [Saved connections](./concepts/local-runtime.md) | ● shipped | connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown. |
 | [Mounted-secret custody](./guides/set-up-the-local-cli.md) | ● shipped | An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation. |
 | [Approved writes](./concepts/local-runtime.md) | ● shipped | approvals policy-set, prepare and issue bind a write's whole input to a protected proof before the host dispatches it once. |

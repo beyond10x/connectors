@@ -1,7 +1,7 @@
 {
   "format": "ess-cli-plan/1",
   "binary": "connectors",
-  "about": "Local integration access through explicitly configured adapters",
+  "about": "Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started",
   "globals": {
     "config": "config",
     "state": "state-dir",
@@ -164,6 +164,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -341,6 +358,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -549,6 +567,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -724,6 +759,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -888,6 +924,23 @@
                         "kind": "optional",
                         "of": {
                           "kind": "string"
+                        }
+                      },
+                      "clock_radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "clock_refusal": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "unreachable",
+                            "unverified",
+                            "too_imprecise"
+                          ]
                         }
                       },
                       "code": {
@@ -1065,6 +1118,7 @@
                           "retry_explicitly",
                           "stop_owner",
                           "upgrade",
+                          "choose_clock_source",
                           "none"
                         ]
                       },
@@ -1218,6 +1272,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -1395,6 +1466,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -1570,6 +1642,23 @@
                           "kind": "string"
                         }
                       },
+                      "clock_radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "clock_refusal": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "unreachable",
+                            "unverified",
+                            "too_imprecise"
+                          ]
+                        }
+                      },
                       "code": {
                         "kind": "enum",
                         "variants": [
@@ -1745,6 +1834,7 @@
                           "retry_explicitly",
                           "stop_owner",
                           "upgrade",
+                          "choose_clock_source",
                           "none"
                         ]
                       },
@@ -1898,6 +1988,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -2075,6 +2182,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -2247,6 +2355,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -2422,6 +2547,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -2613,6 +2739,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -2788,6 +2931,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -2993,6 +3137,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3168,6 +3329,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -3373,6 +3535,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3548,6 +3727,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -3753,6 +3933,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -3928,6 +4125,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -4133,6 +4331,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -4308,6 +4523,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -4513,6 +4729,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -4688,6 +4921,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -4887,6 +5121,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5062,6 +5313,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -5275,6 +5527,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5450,6 +5719,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -5654,6 +5924,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -5829,6 +6116,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -6214,6 +6502,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -6389,6 +6694,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -6627,6 +6933,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -6802,6 +7125,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -7028,6 +7352,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7203,6 +7544,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -7376,6 +7718,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7551,6 +7910,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -7779,6 +8139,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -7954,6 +8331,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -8195,6 +8573,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -8370,6 +8765,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -8599,6 +8995,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -8774,6 +9187,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -8956,6 +9370,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -9131,6 +9562,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -9312,6 +9744,7 @@
                       "retry_explicitly",
                       "stop_owner",
                       "upgrade",
+                      "choose_clock_source",
                       "none"
                     ]
                   },
@@ -9430,6 +9863,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -9607,6 +10057,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -9808,6 +10259,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -9983,6 +10451,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -10292,6 +10761,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -10467,6 +10953,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -10683,6 +11170,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -10858,6 +11362,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -11033,6 +11538,7 @@
                       "retry_explicitly",
                       "stop_owner",
                       "upgrade",
+                      "choose_clock_source",
                       "none"
                     ]
                   },
@@ -11069,6 +11575,23 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
                 }
               },
               "code": {
@@ -11246,6 +11769,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -11426,6 +11950,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -11601,6 +12142,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -11767,6 +12309,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -11942,6 +12501,361 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
+                  "none"
+                ]
+              },
+              "request_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "source_audit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "audit_ref": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "audit_status": {
+                      "kind": "enum",
+                      "variants": [
+                        "complete",
+                        "incomplete",
+                        "unavailable",
+                        "not_required"
+                      ]
+                    },
+                    "instance": {
+                      "kind": "string"
+                    }
+                  }
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "setup-owner-stop": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "setup-owner-stop"
+      },
+      "input": null,
+      "result": {
+        "type_ref": "connectors.cli.SetupOwnerStopResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "disposition": {
+              "kind": "enum",
+              "variants": [
+                "stopped",
+                "no_owner"
+              ]
+            },
+            "host_incarnation": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "state_path": {
+              "kind": "string"
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "custody_read_only",
+                  "metadata_unavailable",
+                  "revision_conflict",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure",
+                  "approval_required",
+                  "approval_refused",
+                  "approval_replayed",
+                  "idempotency_conflict",
+                  "owner_build_mismatch",
+                  "confirmation_required",
+                  "metadata_schema_newer"
+                ]
+              },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2",
+                    "connectors-local/3",
+                    "connectors-local/4"
+                  ]
+                }
+              },
+              "configuration_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "config_path_unresolved",
+                    "config_missing",
+                    "config_not_private",
+                    "owner_uid_mismatch"
+                  ]
+                }
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "mutation": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "attempt": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "id": {
+                            "kind": "string"
+                          },
+                          "instance": {
+                            "kind": "string"
+                          }
+                        }
+                      }
+                    },
+                    "cause": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "code": {
+                            "kind": "enum",
+                            "variants": [
+                              "invalid_input",
+                              "unsupported",
+                              "unauthorized",
+                              "forbidden",
+                              "not_found",
+                              "stale_description",
+                              "stale_cursor",
+                              "rate_limited",
+                              "unavailable",
+                              "capacity",
+                              "timeout",
+                              "upstream_protocol",
+                              "internal"
+                            ]
+                          },
+                          "stage": {
+                            "kind": "enum",
+                            "variants": [
+                              "preflight",
+                              "attempt_store",
+                              "approval",
+                              "dispatch",
+                              "response",
+                              "observation",
+                              "audit"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "classification": {
+                      "kind": "enum",
+                      "variants": [
+                        "not_attempted",
+                        "refused",
+                        "applied",
+                        "unknown"
+                      ]
+                    },
+                    "original_request_id": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "replayed": {
+                      "kind": "boolean"
+                    }
+                  }
+                }
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "revalidate_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "stop_owner",
+                  "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -12956,6 +13870,16 @@
       "callable": "setup-init",
       "about": "Create private local configuration without starting services",
       "arguments": []
+    },
+    {
+      "path": [
+        "setup",
+        "owner-stop"
+      ],
+      "aliases": [],
+      "callable": "setup-owner-stop",
+      "about": "Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner",
+      "arguments": []
     }
   ],
   "obligations": [
@@ -12988,6 +13912,7 @@
     "handler:operations-list: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-check: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract",
-    "handler:setup-init: implement the owner-qualified callable and its declared result/error contract"
+    "handler:setup-init: implement the owner-qualified callable and its declared result/error contract",
+    "handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract"
   ]
 }

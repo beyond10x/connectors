@@ -2,7 +2,7 @@
 # Generated package is a contract fixture; production handlers remain separate.
 format: ess-cli/1
 binary: connectors
-about: Local integration access through explicitly configured adapters
+about: Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
 globals: {config: config, state: state-dir, output: output}
 callables:
   approval-policy-status:
@@ -74,6 +74,11 @@ callables:
     target: {kind: local, owner: connectors.cli, action: setup-checkpoints-enable}
     input: connectors.cli.SetupCheckpointsEnableInput
     result: connectors.cli.SetupCheckpointsEnableResult
+    errors: {failure: connectors.cli.Failure}
+  setup-owner-stop:
+    target: {kind: local, owner: connectors.cli, action: setup-owner-stop}
+    input: null
+    result: connectors.cli.SetupOwnerStopResult
     errors: {failure: connectors.cli.Failure}
   adapters-list:
     target: {kind: local, owner: connectors.cli, action: adapters-list}
@@ -293,6 +298,11 @@ commands:
     arguments:
       - field: confirm
         source: {kind: option, long: confirm}
+  - path: [setup, owner-stop]
+    aliases: []
+    callable: setup-owner-stop
+    about: Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner
+    arguments: []
   - path: [adapters, list]
     aliases: []
     callable: adapters-list

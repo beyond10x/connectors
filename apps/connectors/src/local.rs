@@ -16,6 +16,7 @@ mod checkpoints;
 mod connections;
 mod cursor;
 mod operations;
+mod owner_stop;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
@@ -199,7 +200,11 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     // refuses a changed binding, so only a new connection helps.
     // Only the connection's validation evidence expired, its credential is
     // intact: a revalidation recollects it, a repair would ask for re-entry.
-    let action = if error.reconnect {
+    // The connection's identity changed under the configuration: no command
+    // under this instance id helps, a new instance id does.
+    let action = if error.reconfigure {
+        "check_configuration"
+    } else if error.reconnect {
         "create_connection"
     } else if error.revalidate {
         "revalidate_connection"
@@ -247,6 +252,27 @@ fn failure(code: &str, stage: &str, next_action: &str, usage: bool) -> HandlerRe
     }
 }
 
+/// An approval clock that yielded no observation: `unavailable`, naming the
+/// source's cause and its next action (contracts/service/clock.md, "Refusals").
+/// Never the observation's bounds, the request or the reply.
+fn clock_failure(refused: connectors_host::local::clock::Refused) -> HandlerReply {
+    use connectors_host::local::clock::Cause;
+    let (cause, action) = match refused.cause {
+        Some(Cause::Unreachable) => (Some("unreachable"), "retry_explicitly"),
+        Some(Cause::Unverified) => (Some("unverified"), "check_configuration"),
+        Some(Cause::TooImprecise { .. }) => (Some("too_imprecise"), "choose_clock_source"),
+        None => (None, "check_configuration"),
+    };
+    let mut reply = failure("unavailable", "observation", action, false);
+    if let (Some(cause), HandlerReply::Error { data, .. }) = (cause, &mut reply) {
+        data["clock_refusal"] = json!(cause);
+        if let Some(Cause::TooImprecise { radius_ms }) = refused.cause {
+            data["clock_radius_ms"] = json!(radius_ms);
+        }
+    }
+    reply
+}
+
 /// `metadata_schema_newer` (semantics.md §3): a newer binary with another record
 /// model wrote the store; only a binary at least as new can use it. `store` is
 /// the release its writer marker names, `None` for `unrecorded`.
@@ -289,7 +315,7 @@ fn host_failure(error: Failure) -> HandlerReply {
     }
 }
 
-/// Every command but `setup init` and `setup checkpoints-enable` loads the configuration somewhere in this
+/// Every command but `setup init`, `setup checkpoints-enable` and `setup owner-stop` loads the configuration somewhere in this
 /// process: in the handler, a protected source, the dynamic validator or an
 /// owner helper. Those later sites keep the owner's payload-free failure, so a
 /// file refused by a rule that can name its entry is refused here first, before
@@ -300,9 +326,13 @@ fn configuration_preflight(
 ) -> Option<connectors_cli_contract::ProcessOutput> {
     use connectors_cli_contract::OutputMode;
     let (callable, context) = session.selected()?;
-    // Neither reads the configuration: `setup init` writes it, and
-    // `setup checkpoints-enable` acts on the state directory alone.
-    if callable == "setup-init" || callable == "setup-checkpoints-enable" {
+    // None reads the configuration: `setup init` writes it, and
+    // `setup checkpoints-enable` and `setup owner-stop` act on the state
+    // directory alone.
+    if matches!(
+        callable,
+        "setup-init" | "setup-checkpoints-enable" | "setup-owner-stop"
+    ) {
         return None;
     }
     let refusal = match Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()) {
@@ -371,6 +401,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     let paths = resolved(call)?;
     if call.callable == "setup-checkpoints-enable" {
         return checkpoints::execute(call, &paths);
+    }
+    if call.callable == "setup-owner-stop" {
+        return owner_stop::execute(&paths);
     }
     if call.callable == "setup-init" {
         let initialized = Config::initialize(&paths).map_err(host_failure)?;
@@ -463,9 +496,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             )
         })?;
         let observation = selected
-            .acquire()
-            .and_then(|clock| clock.observe())
-            .map_err(|_| failure("unavailable", "observation", "check_configuration", false))?;
+            .acquire_explained()
+            .and_then(|clock| clock.observe().map_err(Into::into))
+            .map_err(clock_failure)?;
         return Ok(json!({"adapter":alias,"observation":observation}));
     }
     if call.callable.starts_with("approval-keys-") {
@@ -480,7 +513,18 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             | "connections-revoke"
             | "connections-revalidate"
     ) {
-        return connections::execute(call, &paths, alias, adapter, &config.selection());
+        return connections::execute(
+            call,
+            &paths,
+            alias,
+            adapter,
+            &config.selection(),
+            &config
+                .adapters
+                .values()
+                .map(|entry| entry.instance_id.clone())
+                .collect(),
+        );
     }
     match call.callable {
         "adapters-describe" => {
@@ -829,6 +873,12 @@ mod tests {
         for (failure, action) in [
             (registry::Failure::UpgradeRequired, "revalidate_connection"),
             (registry::Failure::BindingChanged, "create_connection"),
+            // story:revision-change-keeps-a-recovery-path: a changed provider
+            // authority or profile authentication needs a new instance id.
+            (
+                registry::Failure::AuthenticationChanged,
+                "check_configuration",
+            ),
         ] {
             let error = owner::Error::from(failure);
             assert_eq!(error.code, owner::Code::LifecycleConflict, "{failure:?}");

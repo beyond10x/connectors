@@ -144,6 +144,27 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Local runtime",
+        "Stopping an owner after an upgrade",
+        "setup owner-stop asks the state directory's running owner, of any build, to drain and exit within 30 seconds, answers no_owner when none runs, and never signals a process.",
+        "apps/connectors/tests/local_cli.rs::setup_owner_stop_stops_an_owner_another_build_started_and_a_fresh_owner_serves",
+        "/docs/guides/set-up-the-local-cli#after-an-upgrade",
+    ),
+    shipped(
+        "Local runtime",
+        "Configuration upgrades",
+        "After a configuration change each saved connection has one working path: revalidate, a new connection under the same instance id after an evidence lifetime change, or a new instance id after a changed provider authority or profile.",
+        "crates/connectors-host/src/local/registry/upgrade_tests.rs::an_identity_change_names_a_new_instance_id_on_every_command",
+        "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
+        "Approval clock refusals",
+        "approvals clock-check names why no observation resulted: an unreachable source, a reply that does not verify against the configured key, or a source whose signed radius is too wide for approvals, each with its own next action.",
+        "apps/connectors/tests/local_cli.rs::clock_check_names_a_verified_source_too_imprecise_for_the_width",
+        "/docs/concepts/local-runtime",
+    ),
+    shipped(
+        "Local runtime",
         "Saved connections",
         "connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown.",
         "apps/connectors/tests/failed_connect.rs::a_revalidation_reply_that_never_arrives_is_outcome_unknown",

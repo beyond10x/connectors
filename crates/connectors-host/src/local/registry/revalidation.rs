@@ -54,7 +54,11 @@ fn admitted(
     }
     let upgrade = row.binding != *binding;
     if upgrade && !upgradable(&row.binding, binding) {
-        return Err(Failure::BindingChanged);
+        return Err(if identity_changed(&row.binding, binding) {
+            Failure::AuthenticationChanged
+        } else {
+            Failure::BindingChanged
+        });
     }
     if row.material.is_none() {
         return Err(Failure::NotReady);
@@ -72,12 +76,17 @@ fn admitted(
 /// unchanged, the new provider has not already refused it under the configured
 /// revision, and revalidation admits the credential (`usable`, asked last:
 /// material that is neither known invalid nor expired, as `admitted` requires).
-/// Anything else needs a new connection: repair refuses a changed binding.
+/// Anything else needs a new connection: repair refuses a changed binding;
+/// one under a new instance id when the connection's identity changed, since
+/// connect refuses it under this one (`AuthenticationChanged`).
 pub(super) fn changed(
     row: &ConnectionRow,
     configured: &Binding,
     usable: impl FnOnce() -> Result<bool>,
 ) -> Result<Failure> {
+    if identity_changed(&row.binding, configured) {
+        return Ok(Failure::AuthenticationChanged);
+    }
     if upgradable(&row.binding, configured)
         && row.kept.refused.as_deref() != Some(configured.configuration_revision.as_str())
         && usable()?
@@ -90,13 +99,27 @@ pub(super) fn changed(
 
 /// The profile declaration's revision digests its scheme, capability, entry
 /// fields, scopes and evidence lifetime, so an equal declaration is unchanged
-/// authentication. Only the configuration revision may differ.
+/// authentication. Only the configuration revision may differ. A connection
+/// stays bound to the declaration record it was admitted under (the metadata
+/// store projects its acquisitions' profile from it), so even a lifetime-only
+/// change is not followed in place: a new connection under the same instance
+/// id follows it (`identity_changed` is false, connect admits it).
 fn upgradable(admitted: &Binding, configured: &Binding) -> bool {
     admitted.instance_id == configured.instance_id
         && admitted.adapter_id == configured.adapter_id
         && admitted.provider_authority == configured.provider_authority
         && admitted.profile == configured.profile
         && admitted.configuration_revision != configured.configuration_revision
+}
+
+/// Whether the configured binding changes the provider authority, or the
+/// authentication of the same profile id, a connection was admitted under.
+/// Connect then refuses every connection under this instance id
+/// (`lifecycle::authentication_changed`), so only a new instance id helps.
+pub(super) fn identity_changed(admitted: &Binding, configured: &Binding) -> bool {
+    admitted.provider_authority != configured.provider_authority
+        || (admitted.profile.id == configured.profile.id
+            && !admitted.profile.same_authentication(&configured.profile))
 }
 
 fn current(
