@@ -151,6 +151,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Local runtime",
+        "Mounted-secret custody",
+        "An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation.",
+        "apps/connectors/tests/container_env_i.rs::env_i_mounted_custody_round_trip",
+        "/docs/guides/set-up-the-local-cli",
+    ),
+    shipped(
+        "Local runtime",
         "Approved writes",
         "approvals policy-set, prepare and issue bind a write's whole input to a protected proof before the host dispatches it once.",
         "crates/connectors-host/src/local/approvals/tests.rs::issuer_audience_time_key_and_clock_refusals_are_current",

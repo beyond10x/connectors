@@ -54,6 +54,11 @@ jobs:
           echo "$PWD/aep-$version-x86_64-unknown-linux-gnu" >> "$GITHUB_PATH"
       - name: Fetch locked dependencies
         run: cargo fetch --locked
+      - name: Permit unprivileged user namespaces
+        run: |
+          if sysctl -n kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
       - name: Run the repository gate
         run: cargo run --locked -p connectors-build -- gate
       - name: Report disk use
