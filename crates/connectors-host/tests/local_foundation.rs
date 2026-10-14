@@ -200,7 +200,24 @@ fn unavailable_or_unrecognized_metadata_is_never_reinitialized() {
     assert!(!paths.state.exists());
     Config::initialize(&paths).unwrap();
     let db = rusqlite::Connection::open(paths.state.join("metadata.sqlite3")).unwrap();
+    // A level above this binary's highest is a store a newer binary migrated
+    // (semantics.md §3): refused by name, and still never reinitialized.
     db.pragma_update(None, "user_version", 99).unwrap();
+    assert_eq!(
+        Metadata::initialize(&paths.state).err(),
+        Some(Failure::MetadataSchemaNewer(None))
+    );
+    assert_eq!(
+        Metadata::inspect(&paths.state).err(),
+        Some(Failure::MetadataSchemaNewer(None))
+    );
+    assert_eq!(
+        db.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))
+            .unwrap(),
+        99
+    );
+    // The same level in a database that is not this project's is unrecognized.
+    db.pragma_update(None, "application_id", 0x1234).unwrap();
     assert!(matches!(
         Metadata::initialize(&paths.state),
         Err(Failure::MetadataUnavailable)
