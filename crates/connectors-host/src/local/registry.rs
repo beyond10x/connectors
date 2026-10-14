@@ -57,6 +57,8 @@ pub enum Failure {
     EvidenceExpired,
     InsufficientScope,
     CustodyUnavailable,
+    /// The selected custody binding is read-only: public code `custody_read_only`.
+    CustodyReadOnly,
     /// The connection's binding differs from the configured one in more than
     /// its configuration revision: neither revalidation nor repair can move it,
     /// a new connection can. Public code `lifecycle_conflict`.

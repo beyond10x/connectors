@@ -3,7 +3,7 @@ use connectors_cli_contract::{
 };
 use connectors_host::local::{
     Failure,
-    config::{Config, Paths, Refusal},
+    config::{Config, Paths, Refusal, Rule, Selection},
     keyring,
     metadata::Metadata,
     owner,
@@ -73,7 +73,17 @@ struct LocalHandler(session::Shared);
 impl Handler for LocalHandler {
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
         let result = if matches!(call.callable, "connections-connect" | "connections-repair") {
-            self.0.borrow_mut().complete(call).map_err(owner_failure)
+            let mut session = self.0.borrow_mut();
+            if call
+                .input
+                .get("credential_document")
+                .is_none_or(Value::is_null)
+            {
+                session.complete_without_source(call)
+            } else {
+                session.complete(call)
+            }
+            .map_err(owner_failure)
         } else if matches!(
             call.callable,
             "approval-policy-status"
@@ -165,6 +175,8 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
         // Not committed, so the same command is safe to run again.
         RevisionConflict => ("publication", "retry_explicitly", false),
         CustodyUnavailable => ("custody", "unlock_keyring", false),
+        // The selected binding is read-only: only another configuration helps.
+        CustodyReadOnly => ("custody", "check_configuration", false),
         OutcomeUnknown => ("publication", "retry_status", false),
         Forbidden => ("admission", "request_permission", false),
         NotFound => ("admission", "check_configuration", false),
@@ -293,10 +305,12 @@ fn configuration_preflight(
     if callable == "setup-init" || callable == "setup-checkpoints-enable" {
         return None;
     }
-    let paths = Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()).ok()?;
-    let refusal = match Config::read(&paths.config) {
-        Err(refusal @ Refusal::PrivateProtocolMismatch { .. }) => refusal,
-        _ => return None,
+    let refusal = match Paths::resolve(context.config.as_deref(), context.state_dir.as_deref()) {
+        Err(_) => Refusal::Rule(Rule::ConfigPathUnresolved),
+        Ok(paths) => match Config::read(&paths.config) {
+            Err(refusal @ (Refusal::PrivateProtocolMismatch { .. } | Refusal::Rule(_))) => refusal,
+            _ => return None,
+        },
     };
     let HandlerReply::UsageError { code, data } = configuration_refusal(refusal) else {
         return None;
@@ -327,26 +341,34 @@ fn configuration_preflight(
 
 fn configuration_refusal(refusal: Refusal) -> HandlerReply {
     let mut reply = host_failure(refusal.failure());
-    if let (
-        Refusal::PrivateProtocolMismatch {
-            format,
-            instance_id,
-        },
-        HandlerReply::UsageError { data, .. },
-    ) = (refusal, &mut reply)
-    {
-        data["configuration_format"] = json!(format);
-        data["instance_id"] = json!(instance_id);
+    if let HandlerReply::UsageError { data, .. } = &mut reply {
+        match refusal {
+            Refusal::PrivateProtocolMismatch {
+                format,
+                instance_id,
+            } => {
+                data["configuration_format"] = json!(format);
+                data["instance_id"] = json!(instance_id);
+            }
+            Refusal::Rule(rule) => data["configuration_rule"] = json!(rule.as_str()),
+            Refusal::Failure(_) => {}
+        }
     }
     reply
 }
 
-fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
-    let paths = Paths::resolve(
+/// The selected paths, or the configuration stage's refusal naming
+/// `config_path_unresolved`.
+fn resolved(call: &Invocation<'_>) -> Result<Paths, HandlerReply> {
+    Paths::resolve(
         call.context.config.as_deref(),
         call.context.state_dir.as_deref(),
     )
-    .map_err(host_failure)?;
+    .map_err(|_| configuration_refusal(Refusal::Rule(Rule::ConfigPathUnresolved)))
+}
+
+fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
+    let paths = resolved(call)?;
     if call.callable == "setup-checkpoints-enable" {
         return checkpoints::execute(call, &paths);
     }
@@ -359,6 +381,7 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     let config = Config::read(&paths.config).map_err(configuration_refusal)?;
     let summary = |alias: &str, adapter: &connectors_host::local::config::Adapter| json!({"adapter":alias,"instance_id":adapter.instance_id,"adapter_id":adapter.adapter_id,"startup":adapter.startup,"restart":adapter.restart});
     if call.callable == "setup-check" {
+        let selection = config.selection();
         let state = keyring::inspect_at(config.secret_service_socket.as_deref());
         let mut checks =
             vec![json!({"name":"configuration", "state":"ready", "next_action":"none"})];
@@ -372,16 +395,27 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             let ready = adapter.executable.check().is_ok();
             checks.push(json!({"name":format!("artifact:{alias}"), "state":if ready {"ready"} else {"failed"}, "next_action":if ready {"none"} else {"check_configuration"}}));
         }
-        checks.push(json!({"name":"keyring", "state": if state == keyring::State::Available {"ready"} else {"failed"}, "next_action":if state == keyring::State::Available {"none"} else {"unlock_keyring"}}));
-        // Availability alone is weaker than the qualified implementation and
-        // storage binding with durable-write, restart and retirement evidence.
-        let qualified = state == keyring::State::Available
-            && keyring::custody::available_at(config.secret_service_socket.as_deref());
-        checks.push(json!({"name":"persistent_custody_qualification", "state":if qualified {"ready"} else {"failed"}, "next_action":"none"}));
+        match &selection {
+            Selection::Platform { .. } => {
+                checks.push(json!({"name":"keyring", "state": if state == keyring::State::Available {"ready"} else {"failed"}, "next_action":if state == keyring::State::Available {"none"} else {"unlock_keyring"}}));
+                // Availability alone is weaker than the qualified implementation and
+                // storage binding with durable-write, restart and retirement evidence.
+                let qualified = state == keyring::State::Available
+                    && keyring::custody::available_for(&selection);
+                checks.push(json!({"name":"persistent_custody_qualification", "state":if qualified {"ready"} else {"failed"}, "next_action":"none"}));
+            }
+            // The explicitly selected read-only directory takes the platform
+            // store's place; that store is not consulted for custody.
+            Selection::Mounted { directory } => {
+                let ready = keyring::inspect_mounted(directory) == keyring::State::Available;
+                checks.push(json!({"name":"mounted_custody", "state":if ready {"ready"} else {"failed"}, "next_action":if ready {"none"} else {"check_configuration"}}));
+            }
+        }
         // `os` is the build target's (`linux`, `macos`, `windows`, the model's
-        // variants), and `custody_backend` the binding fixed with it.
+        // variants), and `custody_backend` the selected binding: the platform's,
+        // fixed with the build, or the explicitly selected mounted directory.
         return Ok(
-            json!({"config_path":paths.config,"state_path":paths.state,"os":std::env::consts::OS, "keyring":match state {keyring::State::Available => "available",keyring::State::Locked => "locked",keyring::State::Unavailable => "unavailable"},"custody_backend":keyring::PLATFORM.map(keyring::CustodyBackend::as_str),"prerequisites":checks}),
+            json!({"config_path":paths.config,"state_path":paths.state,"os":std::env::consts::OS, "keyring":match state {keyring::State::Available => "available",keyring::State::Locked => "locked",keyring::State::Unavailable => "unavailable"},"custody_backend":selection.backend().map(keyring::CustodyBackend::as_str),"prerequisites":checks}),
         );
     }
     if call.callable == "adapters-list" {
@@ -446,13 +480,7 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
             | "connections-revoke"
             | "connections-revalidate"
     ) {
-        return connections::execute(
-            call,
-            &paths,
-            alias,
-            adapter,
-            config.secret_service_socket.as_deref(),
-        );
+        return connections::execute(call, &paths, alias, adapter, &config.selection());
     }
     match call.callable {
         "adapters-describe" => {

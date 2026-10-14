@@ -65,6 +65,14 @@
       "unsupported": 0
     },
     {
+      "provider": "opsgenie",
+      "file_name": "opsgenie.bundle.json",
+      "bundle_sha256": "2583af617c9dea416b254107723e497d2b5e4362edbdfde66acfe8e712fab3e0",
+      "source_sha256": "a8f262c9fc54882e35309168804d1f2c69167a244361508721289a661e322950",
+      "operations": 100,
+      "unsupported": 76
+    },
+    {
       "provider": "runpod",
       "file_name": "runpod.bundle.json",
       "bundle_sha256": "5e0cf3e695f3b7693db03ae627d5f6aa11c1091e91d0ee82e944c364aa93ab83",
@@ -75,7 +83,7 @@
     {
       "provider": "slack",
       "file_name": "slack.bundle.json",
-      "bundle_sha256": "606e2e2068afdf5f1692eacd739af7384a14cddb95be780b5d55b1d1836ddd24",
+      "bundle_sha256": "3d925079c18e7078a900bccaef01badb4ba6d8396fb6b8ca2795496fd2be2005",
       "source_sha256": "f010337d9d8aa99ae1dc905cd46f68fecc66e42ce6868379f040b9149789128b",
       "operations": 174,
       "unsupported": 0

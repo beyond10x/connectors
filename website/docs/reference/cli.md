@@ -277,7 +277,7 @@ connectors approvals prepare [OPTIONS] --adapter <field:adapter> --connection <f
 Begin admitted local protected credential acquisition
 
 ```text
-connectors connections connect [OPTIONS] --adapter <field:adapter> --profile <field:profile> <--credential-file <source:credential_document:file>|--credential-stdin|--credential-prompt>
+connectors connections connect [OPTIONS] --adapter <field:adapter> --profile <field:profile>
 ```
 
 | Argument | Required | Default | Values | Meaning |
@@ -335,7 +335,7 @@ connectors connections list [OPTIONS] --adapter <field:adapter>
 Repair the exact connection without changing its identity
 
 ```text
-connectors connections repair [OPTIONS] --adapter <field:adapter> --connection <field:connection> --expected-revision <field:expected_revision> <--credential-file <source:credential_document:file>|--credential-stdin|--credential-prompt>
+connectors connections repair [OPTIONS] --adapter <field:adapter> --connection <field:connection> --expected-revision <field:expected_revision>
 ```
 
 | Argument | Required | Default | Values | Meaning |

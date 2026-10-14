@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-10: 43 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-10: 46 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
@@ -29,6 +29,7 @@ As of 2026-10-10: 43 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Setup and metadata store](./guides/set-up-the-local-cli.md) | ● shipped | setup init creates a private configuration and an Entity Runtime metadata store over Eventlog SQLite, with durable open checkpoints (since 0.33.0). |
 | [Supervised adapters](./concepts/local-runtime.md) | ● shipped | A local owner starts the configured adapter executables, refuses a changed executable or configuration before provider work, and stops exact incarnations. |
 | [Saved connections](./concepts/local-runtime.md) | ● shipped | connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown. |
+| [Mounted-secret custody](./guides/set-up-the-local-cli.md) | ● shipped | An owner configuration can explicitly select read-only mounted-secret custody (mounted_secret, Linux): connect, list and a credentialed invoke run under an empty environment in a container, reading a Kubernetes-style Secret volume and writing nothing; rotation needs a revalidation. |
 | [Approved writes](./concepts/local-runtime.md) | ● shipped | approvals policy-set, prepare and issue bind a write's whole input to a protected proof before the host dispatches it once. |
 | [Approval-signing keys](./concepts/local-runtime.md) | ● shipped | Approval-signing keys are initialized, rotated, recovered, revoked and retired through the CLI; status reads never touch custody. |
 | [Approval clock check](./concepts/local-runtime.md) | ● shipped | approvals clock-check verifies one configured Roughtime source without starting the owner or reading metadata. |
@@ -57,6 +58,7 @@ As of 2026-10-10: 43 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Slack conversations](./reference/adapters/catalog/index.md) | ● shipped | conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only. |
 | [Slack messages](./reference/adapters/catalog/index.md) | ● shipped | chat.postMessage posts a message, a thread reply included, and conversations.open opens a direct message to post to, each under approval after the token's auth.test read; a dispatch without a definite answer, or Slack's 200 with ok false, is unknown and never sent again; verified against a local fixture only. |
 | [Slack files](./reference/adapters/catalog/index.md) | ● shipped | files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only. |
+| [Opsgenie alerts and incidents](./reference/adapters/catalog/index.md) | ● shipped | alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only. |
 | [Catalog index service](./reference/contracts/catalog.md) | ◐ decided | Listing and locating precompiled bundles with provenance is specified; directly configured adapters need no index. |
 
 ## Native adapters
@@ -74,6 +76,7 @@ As of 2026-10-10: 43 capabilities are shipped, 3 are decided and 5 are planned. 
 | [Tavily web search](./reference/adapters/tavily/index.md) | ● shipped | websearch.search, websearch.fetch and websearch.crawl through the shared websearch family; the key is checked without spending a search. |
 | [Loki LogQL reads](./reference/adapters/loki/index.md) | ● shipped | logs.query_range, logs.query_metric and logs.labels through a saved bearer connection (since 0.38.0). |
 | [Grafana data sources](./reference/adapters/grafana/index.md) | ● shipped | datasources.list through a saved service-account connection, and Loki reads through Grafana's data-source proxy (since 0.39.0). |
+| [Grafana IRM alert groups and incidents](./reference/adapters/grafana/index.md) | ● shipped | irm.alert_groups.list, irm.alert_group.get, irm.incidents.list and irm.incident.get over a since window, with incident-to-alert-group links (inferred), through a saved IRM service-account connection; read only. |
 | [Prometheus PromQL reads](./reference/adapters/prometheus/index.md) | ● shipped | series.query, series.query_range and rules.list through a saved bearer connection, directly or through Grafana's data-source proxy. |
 | [Kubernetes permission checks](./reference/adapters/kubernetes/index.md) | ○ planned | Per-operation SelfSubjectAccessReview checks and the remaining Kubernetes and Helm workflows. |
 | [Loki tenants and other authentication](./reference/adapters/loki/index.md) | ○ planned | An X-Scope-OrgID tenant header and profiles other than a bearer token; today a Loki without authentication cannot be connected. |

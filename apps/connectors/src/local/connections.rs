@@ -9,7 +9,7 @@ pub(super) fn execute(
     paths: &Paths,
     alias: &str,
     adapter: &Adapter,
-    socket: Option<&std::path::Path>,
+    selection: &Selection,
 ) -> Result<Value, HandlerReply> {
     let registry = Registry::with_system_clock(&paths.state);
     let text = |field| {
@@ -49,7 +49,7 @@ pub(super) fn execute(
             if !(1..=500).contains(&limit) {
                 return Err(failure("invalid_input", "arguments", "none", true));
             }
-            let custody = keyring::custody::available_at(socket);
+            let custody = keyring::custody::available_for(selection);
             let page = registry
                 .list(
                     &adapter.instance_id,
@@ -75,7 +75,7 @@ pub(super) fn execute(
             let acquisition = call.input.get("acquisition").and_then(Value::as_str);
             match (reference, acquisition) {
                 (Some(reference), None) => {
-                    let custody = keyring::custody::available_at(socket);
+                    let custody = keyring::custody::available_for(selection);
                     let observed = registry
                         .describe(
                             &adapter.instance_id,
@@ -227,6 +227,7 @@ pub(super) fn registry_failure(error: registry::Failure) -> HandlerReply {
         EvidenceExpired => ("not_granted", "admission", "revalidate_connection", false),
         InsufficientScope => ("not_granted", "admission", "repair_connection", false),
         CustodyUnavailable => ("custody_unavailable", "custody", "unlock_keyring", false),
+        CustodyReadOnly => ("custody_read_only", "custody", "check_configuration", false),
     };
     failure(code, stage, action, usage)
 }

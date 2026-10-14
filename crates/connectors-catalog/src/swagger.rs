@@ -18,20 +18,32 @@
 //! | `host`, `basePath`, `schemes` | one `servers[].url` per scheme, `<scheme>://<host><basePath>`: `host` and `schemes` required (without them the server is wherever the document was fetched from, which a pinned document does not record); `host` is `<host>[:<digits>]`; schemes `http` and `https` only; `basePath` `/` or a path starting with `/` and without a final `/` |
 //! | `externalDocs` {`description`, `url` required}, `tags` [{`name` required, `description`, `externalDocs`}] | as written, on the document and on each operation |
 //! | `consumes`, `produces` | the media types of each request body and response schema; an operation's own list replaces the document's |
+//! | a `body` or `formData` parameter where the `consumes` in effect (the operation's own, else the document's) is absent or empty | the operation not projected (no media type is assumed), listed with its pointer and the reason "request body without a media type"; a derived bundle counts it unsupported; a path whose every operation is unprojected is left out |
+//! | a `formData` parameter of `type: file` (an upload) | the operation not projected (its OpenAPI 3 binary encoding has no exact row), listed with its pointer and the reason "formData parameter of type file", counted unsupported and its path left out as above; the rest of the operation is still read, so a refusal in it stands; `file` in any other location refused |
+//! | a `query`, `header`, `path` or `formData` parameter carrying `schema` (Swagger 2.0 defines it for `body` only, so the parameter declares no type) | the operation not projected, listed with its pointer and the reason "non-body parameter written with a schema", counted unsupported and its path left out as above; the parameter's other keys still read |
 //! | an operation's own `consumes` with no body or form parameter, or `produces` with no response schema | ignored, listed |
 //! | `securityDefinitions` | ignored, listed; it declares the schemes and scopes `security` may name |
 //! | `security`, on the document or an operation | `x-swagger-security`, as written; each scheme declared, each scope declared by its scheme |
 //! | `paths` | `paths`; each key starts with `/`; only `get`, `put`, `post`, `delete`, `options`, `head`, `patch` |
-//! | `operationId`, `summary`, `description`, `deprecated` | as written; `operationId` unique |
+//! | `operationId`, `summary`, `description`, `deprecated` | as written; `operationId` unique among the projected operations (an unprojected operation is not written, so its id collides with none; the record tells two such designations apart by pointer) |
+//! | an operation's `x-*` keys | as written |
+//! | `parameters` (the document's) | each entry a parameter, read only where a `$ref` names it; an entry no operation references is not projected, listed |
+//! | parameter `$ref` `#/parameters/<name>` | the declared parameter, inlined and read by the parameter rows; an undeclared name refused; any sibling refused |
 //! | parameter `in` `query`, `header`, `path` | a parameter with `name`, `in`, `description` and `required` as written, and `schema` holding `type` (`string`, `number`, `integer`, `boolean`), `format`, `enum`, `default`, `pattern`, `minimum`, `maximum`, `minLength`, `maxLength`; a path parameter is `required: true` and named by the path template, and every template name has one; header `Accept`, `Content-Type` and `Authorization` refused (OpenAPI 3 ignores them) |
+//! | query parameter `type: array` with `items` (one of the four scalar types, with the scalar schema keys) and `collectionFormat` `csv` (the default) or `multi` | `style: form` with `explode: false` for `csv` and `explode: true` for `multi`; `schema` `{type: array, items}`; any other `collectionFormat`, an array outside the query, or `items` or `collectionFormat` on a scalar refused |
 //! | parameter `in` `formData` | a property of one `requestBody` object schema, its `description` on the property, `required` collected; content under each form media type (`application/x-www-form-urlencoded`, `multipart/form-data`) the operation consumes; any other consumed media type excluded and listed; none of the two refused; `requestBody.required` when a property is |
 //! | parameter `in` `body` | `requestBody` with `description`, `required: true` when written so, and `schema` under each consumed media type; one per operation, never beside `formData` |
 //! | `responses` | each `default` or three-digit status, `description` required; `schema` under each produced media type |
+//! | `responses` (the document's), response `$ref` `#/responses/<name>` | the declared response, inlined and read by the response rows; an undeclared name refused; any sibling refused; an entry no operation references is not projected, listed |
+//! | response `headers` | `headers`, each with `description` as written and `schema` holding `type` (one of the four scalar types, required) and the scalar schema keys; `Content-Type` refused (OpenAPI 3 ignores it) |
 //! | `definitions` | `components.schemas`; names of letters, digits, `.`, `-`, `_` |
 //! | schema `$ref` `#/definitions/<name>` | `#/components/schemas/<name>`; an undeclared name refused; any sibling refused (Swagger 2.0 ignores it, OpenAPI 3.1 applies it) |
+//! | a property written as `$ref` and a string `description`, nothing else | the reference alone; the `description` (which Swagger 2.0 ignores and which constrains nothing) not projected, listed |
 //! | schema `type` | a name or a list of names of `array`, `boolean`, `integer`, `null`, `number`, `object`, `string` |
 //! | schema `items` | an object as `items`; a list as `prefixItems` (draft 4 tuple form, extra items unconstrained in both) |
 //! | schema `properties`, `additionalProperties`, `allOf` | kept, each subschema projected |
+//! | schema `discriminator` (a property name) | `discriminator` `{propertyName}` |
+//! | schema `nullable` (not Swagger 2.0; written beside one `type` name) | `true` adds `null` to `type`; `false` adds nothing |
 //! | schema `title`, `description`, `default`, `enum`, `format`, `pattern`, `minLength`, `maxLength`, `minimum`, `maximum`, `multipleOf`, `minItems`, `maxItems`, `uniqueItems`, `minProperties`, `maxProperties`, `readOnly`, `example`, `required`, `x-*` | kept as written |
 //! | any key or value not in this table | refused, naming the JSON pointer |
 
@@ -44,16 +56,36 @@ use std::collections::{BTreeMap, BTreeSet};
 
 /// The input format a derivation names.
 pub const FORMAT: &str = "swagger/2.0";
-/// This projector, versioned: a change to any row is a new version.
-pub const PROJECTOR: &str = "swagger2-openapi/1";
+/// This projector, versioned: a change to any row is a new version. Version 2
+/// added the rows for the document's shared parameters and responses, response
+/// headers, array query parameters, operation extensions, `discriminator`,
+/// `nullable` and a property's described `$ref`; it lists an operation whose
+/// request body has no media type, that uploads a `formData` file or that
+/// writes a `schema` on a non-body parameter instead of refusing the document,
+/// and holds `operationId` unique among the projected operations only. Each
+/// admits only a construct version 1 refused, so a document version 1 accepted
+/// projects to the same bytes; its record names the new version and carries
+/// the (empty) list of unprojected operations.
+pub const PROJECTOR: &str = "swagger2-openapi/2";
 /// The OpenAPI version every projection declares.
 pub const OPENAPI: &str = "3.1.0";
 /// Why a consumed media type beside `formData` parameters is excluded.
 pub const FORM_ONLY: &str = "formData parameters are defined only for \
      application/x-www-form-urlencoded and multipart/form-data";
+/// Why an operation is not projected: it has a `body` or `formData` parameter
+/// and the `consumes` in effect, the operation's own or else the document's, is
+/// absent or empty.
+pub const NO_MEDIA_TYPE: &str = "request body without a media type";
+/// Why an operation is not projected: it has a `formData` parameter of
+/// `type: file`, an upload whose OpenAPI 3 encoding has no exact row here.
+pub const FILE_FORM_PARAMETER: &str = "formData parameter of type file";
+/// Why an operation is not projected: a `query`, `header`, `path` or
+/// `formData` parameter of it carries a `schema`, which Swagger 2.0 defines for
+/// `body` only, so the parameter's type is not declared.
+pub const SCHEMA_ON_NON_BODY: &str = "non-body parameter written with a schema";
 
 const FORM_TYPES: [&str; 2] = ["application/x-www-form-urlencoded", "multipart/form-data"];
-const DOCUMENT_KEYS: [&str; 13] = [
+const DOCUMENT_KEYS: [&str; 15] = [
     "swagger",
     "info",
     "host",
@@ -63,6 +95,8 @@ const DOCUMENT_KEYS: [&str; 13] = [
     "produces",
     "paths",
     "definitions",
+    "parameters",
+    "responses",
     "securityDefinitions",
     "security",
     "tags",
@@ -91,11 +125,27 @@ const OPERATION_KEYS: [&str; 11] = [
     "security",
 ];
 /// The keys of a `query`, `header`, `path` or `formData` parameter.
-const PARAMETER_KEYS: [&str; 13] = [
+const PARAMETER_KEYS: [&str; 15] = [
     "name",
     "in",
     "description",
     "required",
+    "type",
+    "format",
+    "enum",
+    "default",
+    "pattern",
+    "minimum",
+    "maximum",
+    "minLength",
+    "maxLength",
+    "items",
+    "collectionFormat",
+];
+/// The keys of a response header: a description and one scalar type with its
+/// schema keys.
+const HEADER_KEYS: [&str; 10] = [
+    "description",
     "type",
     "format",
     "enum",
@@ -120,7 +170,7 @@ const PARAMETER_SCHEMA_KEYS: [&str; 9] = [
 ];
 const PARAMETER_TYPES: [&str; 4] = ["string", "number", "integer", "boolean"];
 const BODY_KEYS: [&str; 5] = ["name", "in", "description", "required", "schema"];
-const RESPONSE_KEYS: [&str; 2] = ["description", "schema"];
+const RESPONSE_KEYS: [&str; 3] = ["description", "schema", "headers"];
 /// Header parameters OpenAPI 3 says are ignored.
 const IGNORED_HEADERS: [&str; 3] = ["accept", "content-type", "authorization"];
 const SCHEMA_TYPES: [&str; 7] = [
@@ -225,6 +275,17 @@ pub struct ExcludedMediaType {
     pub reason: String,
 }
 
+/// An operation the projection read and did not project, with why.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnprojectedOperation {
+    /// The operation's `operationId`, or `<METHOD> <path>` without one.
+    pub operation_id: String,
+    /// The operation's JSON pointer in the Swagger document.
+    pub pointer: String,
+    pub reason: String,
+}
+
 /// What one projection did, beside the document it wrote.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -239,6 +300,8 @@ pub struct ProjectionRecord {
     pub operation_count: usize,
     /// Projected operations by `operationId`, or `<METHOD> <path>` without one, sorted.
     pub operations: Vec<String>,
+    /// Operations read and not projected, by pointer, sorted by designation.
+    pub unprojected_operations: Vec<UnprojectedOperation>,
     pub excluded_media_types: Vec<ExcludedMediaType>,
     /// JSON pointers of keys read but not carried into the output, sorted.
     pub ignored_keys: Vec<String>,
@@ -523,7 +586,23 @@ fn schema_type(value: &Value, pointer: &str) -> Result<()> {
     }
 }
 
-fn schema(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Value> {
+/// A property written as exactly a `$ref` and a string `description`, as the
+/// reference alone; `None` for any other property. Swagger 2.0 ignores a
+/// sibling of `$ref`, and a description constrains nothing, so the reference
+/// alone is the property's exact projection.
+fn described_reference(property: &Value) -> Option<Value> {
+    let map = property.as_object()?;
+    let reference = map.get("$ref")?;
+    (map.len() == 2 && map.get("description").is_some_and(Value::is_string))
+        .then(|| json!({"$ref": reference}))
+}
+
+fn schema(
+    value: &Value,
+    pointer: &str,
+    names: &BTreeSet<String>,
+    ignored: &mut BTreeSet<String>,
+) -> Result<Value> {
     let map = object(value, pointer)?;
     if let Some(reference) = map.get("$ref") {
         let at = child(pointer, "$ref");
@@ -549,6 +628,7 @@ fn schema(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Valu
         return Ok(json!({"$ref": format!("#/components/schemas/{name}")}));
     }
     let mut out = Map::new();
+    let mut nullable = false;
     for (key, item) in map {
         let here = child(pointer, key);
         match key.as_str() {
@@ -556,17 +636,43 @@ fn schema(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Valu
                 schema_type(item, &here)?;
                 out.insert(key.clone(), item.clone());
             }
+            "discriminator" => {
+                let Value::String(property) = item else {
+                    return invalid(&here, "expected a string: the name of the property");
+                };
+                out.insert(key.clone(), json!({"propertyName": property}));
+            }
+            "nullable" => {
+                let Value::Bool(flag) = item else {
+                    return invalid(&here, "expected a boolean");
+                };
+                if !map.get("type").is_some_and(Value::is_string) {
+                    return invalid(
+                        &here,
+                        "`nullable` beside no single `type` name has no exact projection",
+                    );
+                }
+                nullable = *flag;
+            }
             "properties" => {
                 let mut properties = Map::new();
                 for (name, property) in object(item, &here)? {
-                    properties.insert(name.clone(), schema(property, &child(&here, name), names)?);
+                    let at = child(&here, name);
+                    let projected = match described_reference(property) {
+                        Some(reference) => {
+                            ignored.insert(child(&at, "description"));
+                            schema(&reference, &at, names, ignored)?
+                        }
+                        None => schema(property, &at, names, ignored)?,
+                    };
+                    properties.insert(name.clone(), projected);
                 }
                 out.insert(key.clone(), Value::Object(properties));
             }
             "additionalProperties" => {
                 let projected = match item {
                     Value::Bool(_) => item.clone(),
-                    _ => schema(item, &here, names)?,
+                    _ => schema(item, &here, names, ignored)?,
                 };
                 out.insert(key.clone(), projected);
             }
@@ -574,12 +680,17 @@ fn schema(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Valu
                 Value::Array(items) => {
                     let mut projected = Vec::new();
                     for (index, element) in items.iter().enumerate() {
-                        projected.push(schema(element, &child(&here, &index.to_string()), names)?);
+                        projected.push(schema(
+                            element,
+                            &child(&here, &index.to_string()),
+                            names,
+                            ignored,
+                        )?);
                     }
                     out.insert("prefixItems".into(), Value::Array(projected));
                 }
                 _ => {
-                    out.insert(key.clone(), schema(item, &here, names)?);
+                    out.insert(key.clone(), schema(item, &here, names, ignored)?);
                 }
             },
             "allOf" => {
@@ -589,7 +700,12 @@ fn schema(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Valu
                 }
                 let mut projected = Vec::new();
                 for (index, member) in members.iter().enumerate() {
-                    projected.push(schema(member, &child(&here, &index.to_string()), names)?);
+                    projected.push(schema(
+                        member,
+                        &child(&here, &index.to_string()),
+                        names,
+                        ignored,
+                    )?);
                 }
                 out.insert(key.clone(), Value::Array(projected));
             }
@@ -601,6 +717,12 @@ fn schema(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Valu
                 out.insert(key.clone(), item.clone());
             }
             _ => return refuse(&here, Reason::UnknownKey),
+        }
+    }
+    if nullable && let Some(Value::String(name)) = out.get("type") {
+        let name = name.clone();
+        if name != "null" {
+            out.insert("type".into(), json!([name, "null"]));
         }
     }
     Ok(Value::Object(out))
@@ -647,20 +769,122 @@ struct Parameters {
     form_required: Vec<String>,
     /// The body's schema, description and `required`.
     body: Option<(Value, Option<String>, bool)>,
+    /// A `formData` parameter of `type: file` is declared.
+    file: bool,
+    /// A non-body parameter is written with a `schema`.
+    schema_on_non_body: bool,
 }
 
-fn parameters(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<Parameters> {
+/// The document-level object `$ref` `reference` names under `prefix`
+/// (`#/parameters/` or `#/responses/`), with its JSON pointer, recorded as
+/// referenced; `None` when `value` is not a reference. A sibling of `$ref`, a
+/// reference outside `prefix` and an undeclared name are refused.
+fn reference<'a>(
+    value: &Value,
+    pointer: &str,
+    prefix: &str,
+    declared: &'a Map<String, Value>,
+    referenced: &mut BTreeSet<String>,
+) -> Result<Option<(&'a Value, String)>> {
+    let map = object(value, pointer)?;
+    let Some(reference) = map.get("$ref") else {
+        return Ok(None);
+    };
+    let at = child(pointer, "$ref");
+    if let Some(sibling) = map.keys().find(|key| *key != "$ref") {
+        return invalid(
+            &child(pointer, sibling),
+            "a sibling of `$ref`: Swagger 2.0 ignores it, so it has no exact projection",
+        );
+    }
+    let Value::String(reference) = reference else {
+        return invalid(&at, "expected a string");
+    };
+    let Some(name) = reference.strip_prefix(prefix) else {
+        return invalid(&at, format!("`$ref` `{reference}` is not `{prefix}<name>`"));
+    };
+    let Some(target) = declared.get(name) else {
+        return refuse(&at, Reason::UnresolvedRef(name.to_owned()));
+    };
+    referenced.insert(name.to_owned());
+    let root = prefix.trim_start_matches('#').trim_end_matches('/');
+    Ok(Some((target, child(root, name))))
+}
+
+/// An array query parameter's `items` and `collectionFormat`: its schema's
+/// `items`, and whether it is exploded.
+fn array_parameter(map: &Map<String, Value>, here: &str, location: &str) -> Result<(Value, bool)> {
+    if location != "query" {
+        return invalid(
+            &child(here, "type"),
+            format!(
+                "an array parameter in `{location}` has no exact projection: only a query parameter is sent as an array"
+            ),
+        );
+    }
+    let at = child(here, "items");
+    let Some(items) = map.get("items") else {
+        return invalid(
+            &at,
+            "required, and absent: an array parameter names its items",
+        );
+    };
+    let items_map = object(items, &at)?;
+    only(items_map, &at, &PARAMETER_SCHEMA_KEYS)?;
+    let kind = required_string(items_map, "type", &at)?;
+    if !PARAMETER_TYPES.contains(&kind) {
+        return invalid(
+            &child(&at, "type"),
+            format!("array items of type `{kind}` have no exact projection under {PROJECTOR}"),
+        );
+    }
+    let explode = match string(map, "collectionFormat", here)? {
+        None | Some("csv") => false,
+        Some("multi") => true,
+        Some(other) => {
+            return invalid(
+                &child(here, "collectionFormat"),
+                format!("collectionFormat `{other}` has no exact projection: only csv and multi"),
+            );
+        }
+    };
+    Ok((items.clone(), explode))
+}
+
+fn parameters(
+    value: &Value,
+    pointer: &str,
+    context: &Context<'_>,
+    collected: &mut Collected,
+) -> Result<Parameters> {
+    let names = context.names;
     let mut out = Parameters::default();
     let mut seen = BTreeSet::new();
     for (index, parameter) in array(value, pointer)?.iter().enumerate() {
-        let here = child(pointer, &index.to_string());
+        let written = child(pointer, &index.to_string());
+        let (parameter, here) = match reference(
+            parameter,
+            &written,
+            "#/parameters/",
+            context.parameters,
+            &mut collected.parameters,
+        )? {
+            Some(declared) => declared,
+            None => (parameter, written),
+        };
         let map = object(parameter, &here)?;
         let location = string(map, "in", &here)?;
+        // A non-body parameter written with a `schema` declares no type; its
+        // other keys are still read, and its operation is listed.
+        let schema_on_non_body = location != Some("body") && map.contains_key("schema");
+        let with_schema: Vec<&str> = PARAMETER_KEYS.iter().copied().chain(["schema"]).collect();
         only(
             map,
             &here,
             if location == Some("body") {
                 &BODY_KEYS
+            } else if schema_on_non_body {
+                &with_schema
             } else {
                 &PARAMETER_KEYS
             },
@@ -683,7 +907,7 @@ fn parameters(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<
                 return invalid(&child(&here, "schema"), "required, and absent");
             };
             out.body = Some((
-                schema(body, &child(&here, "schema"), names)?,
+                schema(body, &child(&here, "schema"), names, &mut collected.ignored)?,
                 description.map(str::to_owned),
                 required == Some(true),
             ));
@@ -697,18 +921,53 @@ fn parameters(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<
                 ),
             );
         }
-        let kind = required_string(map, "type", &here)?;
-        if !PARAMETER_TYPES.contains(&kind) {
-            return invalid(
-                &child(&here, "type"),
-                format!("parameter type `{kind}` has no exact projection under {PROJECTOR}"),
-            );
+        if schema_on_non_body {
+            out.schema_on_non_body = true;
+            continue;
         }
+        let kind = required_string(map, "type", &here)?;
+        if location == "formData" && kind == "file" {
+            // An upload: its operation is listed, not projected.
+            if let Some(key) = ["items", "collectionFormat"]
+                .into_iter()
+                .find(|key| map.contains_key(*key))
+            {
+                return invalid(
+                    &child(&here, key),
+                    format!("`{key}` belongs to an array parameter, and this one is `{kind}`"),
+                );
+            }
+            out.file = true;
+            continue;
+        }
+        let array = if kind == "array" {
+            Some(array_parameter(map, &here, location)?)
+        } else {
+            if !PARAMETER_TYPES.contains(&kind) {
+                return invalid(
+                    &child(&here, "type"),
+                    format!("parameter type `{kind}` has no exact projection under {PROJECTOR}"),
+                );
+            }
+            if let Some(key) = ["items", "collectionFormat"]
+                .into_iter()
+                .find(|key| map.contains_key(*key))
+            {
+                return invalid(
+                    &child(&here, key),
+                    format!("`{key}` belongs to an array parameter, and this one is `{kind}`"),
+                );
+            }
+            None
+        };
         let mut parameter_schema = Map::new();
         for key in PARAMETER_SCHEMA_KEYS {
             if let Some(item) = map.get(key) {
                 parameter_schema.insert(key.to_owned(), item.clone());
             }
+        }
+        if let Some((items, _)) = &array {
+            parameter_schema.insert("items".into(), items.clone());
         }
         if location == "formData" {
             if let Some(description) = description {
@@ -747,10 +1006,14 @@ fn parameters(value: &Value, pointer: &str, names: &BTreeSet<String>) -> Result<
         if let Some(required) = required {
             projected.insert("required".into(), json!(required));
         }
+        if let Some((_, explode)) = array {
+            projected.insert("style".into(), json!("form"));
+            projected.insert("explode".into(), json!(explode));
+        }
         projected.insert("schema".into(), Value::Object(parameter_schema));
         out.parameters.push(Value::Object(projected));
     }
-    if out.body.is_some() && !out.form.is_empty() {
+    if out.body.is_some() && (out.file || !out.form.is_empty()) {
         return invalid(pointer, "a body parameter beside formData parameters");
     }
     Ok(out)
@@ -762,6 +1025,10 @@ struct Context<'a> {
     schemes: &'a BTreeMap<String, BTreeSet<String>>,
     consumes: Option<&'a [String]>,
     produces: Option<&'a [String]>,
+    /// The document's `parameters`, read where a `$ref` names one.
+    parameters: &'a Map<String, Value>,
+    /// The document's `responses`, read where a `$ref` names one.
+    responses: &'a Map<String, Value>,
 }
 
 /// What projecting the operations collected beside the paths.
@@ -769,8 +1036,50 @@ struct Context<'a> {
 struct Collected {
     ids: BTreeMap<String, String>,
     operations: Vec<String>,
+    unprojected: Vec<UnprojectedOperation>,
     excluded_media_types: Vec<ExcludedMediaType>,
     ignored: BTreeSet<String>,
+    /// The document parameters and responses some operation references.
+    parameters: BTreeSet<String>,
+    responses: BTreeSet<String>,
+}
+
+/// A response's `headers`, as OpenAPI 3.1 headers.
+fn headers(value: &Value, pointer: &str) -> Result<Value> {
+    let mut out = Map::new();
+    for (name, header) in object(value, pointer)? {
+        let here = child(pointer, name);
+        if name.eq_ignore_ascii_case("content-type") {
+            return invalid(
+                &here,
+                format!(
+                    "response header `{name}` is ignored by OpenAPI 3, so it has no exact projection"
+                ),
+            );
+        }
+        let map = object(header, &here)?;
+        only(map, &here, &HEADER_KEYS)?;
+        let kind = required_string(map, "type", &here)?;
+        if !PARAMETER_TYPES.contains(&kind) {
+            return invalid(
+                &child(&here, "type"),
+                format!("header type `{kind}` has no exact projection under {PROJECTOR}"),
+            );
+        }
+        let mut header_schema = Map::new();
+        for key in PARAMETER_SCHEMA_KEYS {
+            if let Some(item) = map.get(key) {
+                header_schema.insert(key.to_owned(), item.clone());
+            }
+        }
+        let mut projected = Map::new();
+        if let Some(description) = string(map, "description", &here)? {
+            projected.insert("description".into(), json!(description));
+        }
+        projected.insert("schema".into(), Value::Object(header_schema));
+        out.insert(name.clone(), Value::Object(projected));
+    }
+    Ok(Value::Object(out))
 }
 
 fn media_types(map: &Map<String, Value>, key: &str, pointer: &str) -> Result<Option<Vec<String>>> {
@@ -787,23 +1096,19 @@ fn operation(
     template_names: &[String],
     context: &Context<'_>,
     collected: &mut Collected,
-) -> Result<Value> {
+) -> Result<Option<Value>> {
     let map = object(value, pointer)?;
-    only(map, pointer, &OPERATION_KEYS)?;
+    if let Some(key) = map
+        .keys()
+        .find(|key| !OPERATION_KEYS.contains(&key.as_str()) && !key.starts_with("x-"))
+    {
+        return refuse(&child(pointer, key), Reason::UnknownKey);
+    }
     let id = string(map, "operationId", pointer)?;
     let designation = id.map_or_else(
         || format!("{} {path}", method.to_ascii_uppercase()),
         str::to_owned,
     );
-    if let Some(id) = id
-        && let Some(first) = collected.ids.insert(id.to_owned(), pointer.to_owned())
-    {
-        return invalid(
-            &child(pointer, "operationId"),
-            format!("operationId `{id}` is already used at `{first}`"),
-        );
-    }
-
     let mut out = Map::new();
     for key in ["operationId", "summary", "description"] {
         if let Some(text) = string(map, key, pointer)? {
@@ -823,6 +1128,9 @@ fn operation(
         strings(tags, &child(pointer, "tags"))?;
         out.insert("tags".into(), tags.clone());
     }
+    for (key, item) in map.iter().filter(|(key, _)| key.starts_with("x-")) {
+        out.insert(key.clone(), item.clone());
+    }
     if let Some(requirements) = map.get("security") {
         out.insert(
             "x-swagger-security".into(),
@@ -831,7 +1139,7 @@ fn operation(
     }
 
     let declared = match map.get("parameters") {
-        Some(value) => parameters(value, &child(pointer, "parameters"), context.names)?,
+        Some(value) => parameters(value, &child(pointer, "parameters"), context, collected)?,
         None => Parameters::default(),
     };
     for (name, at) in &declared.path {
@@ -857,15 +1165,30 @@ fn operation(
     }
 
     let own_consumes = media_types(map, "consumes", pointer)?;
-    let consumes = own_consumes.as_deref().or(context.consumes);
+    // An operation's own list replaces the document's, so an empty own list
+    // declares no media type, as an absent one on both does.
+    let consumes = own_consumes
+        .as_deref()
+        .or(context.consumes)
+        .filter(|types| !types.is_empty());
     let consumes_at = child(pointer, "consumes");
-    if let Some((body, description, required)) = declared.body {
-        let Some(types) = consumes.filter(|types| !types.is_empty()) else {
-            return invalid(
-                &consumes_at,
-                "required, and absent: a body parameter needs a media type",
-            );
-        };
+    // A request body whose media type nothing declares has no exact
+    // projection, and none is assumed: the operation is read through, so any
+    // refusal later in it still stands, and then listed rather than projected.
+    // An upload (`formData` of `type: file`) has no exact projection either.
+    let has_body = declared.body.is_some() || !declared.form.is_empty() || declared.file;
+    let unprojected_reason = if has_body && consumes.is_none() {
+        Some(NO_MEDIA_TYPE)
+    } else if declared.file {
+        Some(FILE_FORM_PARAMETER)
+    } else if declared.schema_on_non_body {
+        Some(SCHEMA_ON_NON_BODY)
+    } else {
+        None
+    };
+    let unprojected = unprojected_reason.is_some();
+    let types = consumes.unwrap_or_default();
+    if let Some((body, description, required)) = declared.body.filter(|_| !unprojected) {
         let mut request = Map::new();
         if let Some(description) = description {
             request.insert("description".into(), json!(description));
@@ -879,8 +1202,7 @@ fn operation(
             .collect();
         request.insert("content".into(), Value::Object(content));
         out.insert("requestBody".into(), Value::Object(request));
-    } else if !declared.form.is_empty() {
-        let types = consumes.unwrap_or_default();
+    } else if !declared.form.is_empty() && !unprojected {
         let (form, other): (Vec<&String>, Vec<&String>) = types
             .iter()
             .partition(|media| FORM_TYPES.contains(&media.as_str()));
@@ -915,7 +1237,7 @@ fn operation(
             .collect();
         request.insert("content".into(), Value::Object(content));
         out.insert("requestBody".into(), Value::Object(request));
-    } else if own_consumes.is_some() {
+    } else if !has_body && own_consumes.is_some() {
         collected.ignored.insert(consumes_at);
     }
 
@@ -933,21 +1255,37 @@ fn operation(
     let mut projected = Map::new();
     let mut produced = false;
     for (status, response) in responses {
-        let here = child(&responses_at, status);
+        let written = child(&responses_at, status);
         let is_status = status.len() == 3
             && status.bytes().all(|b| b.is_ascii_digit())
             && (b'1'..=b'5').contains(&status.as_bytes()[0]);
         if status != "default" && !is_status {
             return invalid(
-                &here,
+                &written,
                 format!("response key `{status}` is not `default` or a three-digit status"),
             );
         }
+        let (response, here) = match reference(
+            response,
+            &written,
+            "#/responses/",
+            context.responses,
+            &mut collected.responses,
+        )? {
+            Some(declared) => declared,
+            None => (response, written),
+        };
         let response_map = object(response, &here)?;
         only(response_map, &here, &RESPONSE_KEYS)?;
         let description = required_string(response_map, "description", &here)?;
         let mut out_response = Map::new();
         out_response.insert("description".into(), json!(description));
+        if let Some(declared) = response_map.get("headers") {
+            out_response.insert(
+                "headers".into(),
+                headers(declared, &child(&here, "headers"))?,
+            );
+        }
         if let Some(body) = response_map.get("schema") {
             let Some(types) = produces.filter(|types| !types.is_empty()) else {
                 return invalid(
@@ -955,7 +1293,12 @@ fn operation(
                     "required, and absent: a response schema needs a media type",
                 );
             };
-            let body = schema(body, &child(&here, "schema"), context.names)?;
+            let body = schema(
+                body,
+                &child(&here, "schema"),
+                context.names,
+                &mut collected.ignored,
+            )?;
             produced = true;
             let content: Map<String, Value> = types
                 .iter()
@@ -968,9 +1311,26 @@ fn operation(
     if !produced && own_produces.is_some() {
         collected.ignored.insert(produces_at);
     }
+    if let Some(reason) = unprojected_reason {
+        collected.unprojected.push(UnprojectedOperation {
+            operation_id: designation,
+            pointer: pointer.to_owned(),
+            reason: reason.to_owned(),
+        });
+        return Ok(None);
+    }
+    // Unique among the operations written; an unprojected one is not written.
+    if let Some(id) = id
+        && let Some(first) = collected.ids.insert(id.to_owned(), pointer.to_owned())
+    {
+        return invalid(
+            &child(pointer, "operationId"),
+            format!("operationId `{id}` is already used at `{first}`"),
+        );
+    }
     out.insert("responses".into(), Value::Object(projected));
     collected.operations.push(designation);
-    Ok(Value::Object(out))
+    Ok(Some(Value::Object(out)))
 }
 
 /// Project the Swagger 2.0 document in `bytes`.
@@ -1013,21 +1373,36 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
         }
         names.insert(name.clone());
     }
+    let mut collected = Collected::default();
     let mut components = Map::new();
     for (name, value) in definitions {
         components.insert(
             name.clone(),
-            schema(value, &child("/definitions", name), &names)?,
+            schema(
+                value,
+                &child("/definitions", name),
+                &names,
+                &mut collected.ignored,
+            )?,
         );
     }
 
+    let shared_parameters = match document.get("parameters") {
+        Some(declared) => object(declared, "/parameters")?,
+        None => &none,
+    };
+    let shared_responses = match document.get("responses") {
+        Some(declared) => object(declared, "/responses")?,
+        None => &none,
+    };
     let context = Context {
         names: &names,
         schemes: &schemes,
         consumes: consumes.as_deref(),
         produces: produces.as_deref(),
+        parameters: shared_parameters,
+        responses: shared_responses,
     };
-    let mut collected = Collected::default();
     if document.contains_key("securityDefinitions") {
         collected.ignored.insert("/securityDefinitions".to_owned());
     }
@@ -1047,20 +1422,33 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
         let mut projected = Map::new();
         for (method, value) in item_map {
             operation_count += 1;
-            projected.insert(
-                method.clone(),
-                operation(
-                    value,
-                    &child(&here, method),
-                    method,
-                    path,
-                    &template_names,
-                    &context,
-                    &mut collected,
-                )?,
-            );
+            if let Some(operation) = operation(
+                value,
+                &child(&here, method),
+                method,
+                path,
+                &template_names,
+                &context,
+                &mut collected,
+            )? {
+                projected.insert(method.clone(), operation);
+            }
         }
-        projected_paths.insert(path.clone(), Value::Object(projected));
+        // A path whose every operation is unprojected is left out with them;
+        // one that declares no operation is kept as written.
+        if !projected.is_empty() || item_map.is_empty() {
+            projected_paths.insert(path.clone(), Value::Object(projected));
+        }
+    }
+    // A shared parameter or response no operation references is read by no
+    // row; it is listed rather than dropped.
+    for (root, declared, referenced) in [
+        ("/parameters", shared_parameters, &collected.parameters),
+        ("/responses", shared_responses, &collected.responses),
+    ] {
+        for name in declared.keys().filter(|name| !referenced.contains(*name)) {
+            collected.ignored.insert(child(root, name));
+        }
     }
 
     let mut openapi = Map::new();
@@ -1086,6 +1474,9 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
 
     let mut operations = collected.operations;
     operations.sort();
+    let mut unprojected_operations = collected.unprojected;
+    unprojected_operations
+        .sort_by(|a, b| (&a.operation_id, &a.pointer).cmp(&(&b.operation_id, &b.pointer)));
     let record = ProjectionRecord {
         projector: PROJECTOR.to_owned(),
         source_sha256: hex::encode(Sha256::digest(bytes)),
@@ -1093,6 +1484,7 @@ pub fn project(bytes: &[u8]) -> std::result::Result<Projection, Refusal> {
         info_version,
         operation_count,
         operations,
+        unprojected_operations,
         excluded_media_types: collected.excluded_media_types,
         ignored_keys: collected.ignored.into_iter().collect(),
     };
