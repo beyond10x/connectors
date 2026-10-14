@@ -71,7 +71,8 @@ for the ticket export's `per_page` ([Zendesk guide](catalog-zendesk.md#source-an
 GitLab for the project search path ([Project code search](#project-code-search))
 and for the JSON bodies of commit create, file update and project create
 ([Pipeline, commit, branch and project writes](#pipeline-commit-branch-and-project-writes)),
-and Slack for the JSON bodies of `chat.postMessage` and `conversations.open`
+and Slack for the JSON bodies of `chat.postMessage`, `conversations.open`,
+`chat.update` and `chat.delete`
 ([Slack guide](catalog-slack.md#source-and-bundle)).
 The GitLab build passes it:
 
@@ -691,13 +692,30 @@ The complete configuration used against the sandbox is
     GitLab's tag delete (`204`). The target still found, or a read that fails
     otherwise, leaves the outcome uncertain. The write's own status and body
     are what the operation returns.
+  - `postflight.refusals` is optional: a list of
+    `{"pointer", "values", "code"}`, `code` one of `invalid_input`, `forbidden`
+    and `not_found`. It names the answers a provider gives with a `2xx` status
+    when it did not apply the write. A write answered `2xx` that fails the
+    postflight's checks or `any_of`, and whose own answer carries at a
+    refusal's `pointer` a string equal to one of its `values`, is refused with
+    that `code`, as the provider's own answer, with the matched value as its
+    reason; it is never sent again. Refusals are read in order and the first
+    that matches decides. Any other value, a value that is not a string, or
+    none leaves the outcome uncertain, as before, and an answer that satisfies
+    the checks is applied whatever the pointer holds. It is for a provider that
+    refuses as `200` with a documented error member: Slack's `chat.update`
+    answers `{"ok": false, "error": "cant_update_message"}` for a message the
+    token did not post ([Slack guide](catalog-slack.md#messages)). Name only
+    values the provider documents as leaving the target unchanged.
   - Every read binds every value, and every check resolves its input, before
     the first request; a missing one is refused as `invalid_input` with nothing
     sent. A read that is not a GET under the base path, more than sixteen checks
     in all, a further preflight without checks, more than three of them, a
     postflight read without checks and without `absent`, an `absent` that is
-    not `true`, lacks a read or sits beside a check, and an `any_of` of one
-    check are refused
+    not `true`, lacks a read or sits beside a check, an `any_of` of one
+    check, and `refusals` beside a postflight read or without a check, with an
+    empty, repeated or empty-string value, a value two refusals name, a pointer
+    without a leading `/`, or more than sixteen of them are refused
     when the selection loads, as is a credential parameter bound by any read's
     `values`. The format is modelled as `connectors_catalog.guard.Guard` in
     `adapters/catalog/spec/ess`, and every shipped guard is checked against it.
@@ -860,7 +878,8 @@ Prepare, issue and invoke a write with that file exactly as
 [the guarded merge guide](local-gitlab-merge.md) describes. A read that the
 provider refuses is an error with a safe code; a write is classified
 `not_attempted` when the guard refuses in preflight, `refused` on a documented
-definite refusal (400, 401, 403, 404, 405, 409, 410, 412, 415, 422), `applied` on
+definite refusal (400, 401, 403, 404, 405, 409, 410, 412, 415, 422) or on a 2xx
+answer carrying a refusal the guard declares (`postflight.refusals`), `applied` on
 a 2xx whose postflight holds, and `unknown` for everything else.
 
 ## What the sandbox showed
