@@ -479,6 +479,9 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
         .unwrap_or(args.query.trim());
     let original = conn.prep(query).await.map_err(classify)?;
     column_bounds(original.columns().len())?;
+    if let Some(keyset) = &args.keyset {
+        keyset.columns(original.columns().len())?;
+    }
     if original.num_params() as usize != args.parameters.len() {
         return Err(Error::invalid("parameter count does not match query"));
     }
@@ -500,16 +503,43 @@ async fn read(conn: &mut Conn, args: Query, instance: &str, database: &str) -> R
     // cannot collide, and the server sends at most one row past the limit.
     // The derived table closes on its own line, so a trailing `--` or `#`
     // comment in the caller's statement cannot reach the aliases or LIMIT.
+    // A keyset page orders by its column and continues after the cursor, bound
+    // after the statement's own parameters. MySQL would compare a text parameter
+    // with a number as a double, so an integer cursor is cast to an exact
+    // decimal, and a timestamp cursor to a DATETIME: the session is UTC, so the
+    // `Z` a TIMESTAMP is written with is dropped before the cast.
+    let mut parameters = args.parameters;
+    let order = match &args.keyset {
+        None => String::new(),
+        Some(keyset) => {
+            let mut clause = String::new();
+            if let Some(after) = &keyset.after {
+                let (placeholder, value) = match keyset.kind {
+                    crate::ColumnType::Integer => ("CAST(? AS DECIMAL(65,0))", after.as_str()),
+                    crate::ColumnType::Timestamp => (
+                        "CAST(? AS DATETIME(6))",
+                        after.strip_suffix('Z').unwrap_or(after),
+                    ),
+                    crate::ColumnType::Text | crate::ColumnType::PhoneNumber => {
+                        ("?", after.as_str())
+                    }
+                };
+                parameters.push(Some(value.to_owned()));
+                clause = format!(" WHERE c{} > {placeholder}", keyset.column);
+            }
+            format!("{clause} ORDER BY c{}", keyset.column)
+        }
+    };
     let wrapped = format!(
-        "SELECT * FROM ({query}\n) AS result ({aliases}) LIMIT {}",
+        "SELECT * FROM ({query}\n) AS result ({aliases}){order} LIMIT {}",
         u32::from(args.limit) + 1
     );
     let statement = conn.prep(&wrapped).await.map_err(classify)?;
-    let parameters = if args.parameters.is_empty() {
+    let parameters = if parameters.is_empty() {
         Params::Empty
     } else {
         Params::Positional(
-            args.parameters
+            parameters
                 .into_iter()
                 .map(|p| {
                     p.map(|text| Cell::Bytes(text.into_bytes()))
