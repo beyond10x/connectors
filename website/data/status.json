@@ -60,6 +60,27 @@
     },
     {
       "area": "Local runtime",
+      "detail": "setup owner-stop asks the state directory's running owner, of any build, to drain and exit within 30 seconds, answers no_owner when none runs, and never signals a process.",
+      "href": "/docs/guides/set-up-the-local-cli#after-an-upgrade",
+      "label": "Stopping an owner after an upgrade",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "After a configuration change each saved connection has one working path: revalidate, a new connection under the same instance id after an evidence lifetime change, or a new instance id after a changed provider authority or profile.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Configuration upgrades",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
+      "detail": "approvals clock-check names why no observation resulted: an unreachable source, a reply that does not verify against the configured key, or a source whose signed radius is too wide for approvals, each with its own next action.",
+      "href": "/docs/concepts/local-runtime",
+      "label": "Approval clock refusals",
+      "status": "shipped"
+    },
+    {
+      "area": "Local runtime",
       "detail": "connections connect validates a credential and keeps it in Secret Service custody; revalidate, repair and revoke manage it, and an unanswered revalidation is outcome_unknown.",
       "href": "/docs/concepts/local-runtime",
       "label": "Saved connections",
