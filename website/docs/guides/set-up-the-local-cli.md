@@ -158,6 +158,45 @@ state directory it was made in: connections, list cursors, approvals and cached 
 descriptions in another state directory do not carry over, so the pinned consumer connects once
 more there.
 
+## After an upgrade
+
+The owner is the background `connectors` process that serves a state directory. An owner the
+previous binary started keeps running after an upgrade, and every command that needs it is
+refused with `next_action` `stop_owner`, here `adapters status` for a configured adapter entry
+`forge`:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  --output json adapters status --adapter forge
+```
+
+```json
+{"error":{"code":"failure","data":{"code":"owner_build_mismatch","kind":"operational","next_action":"stop_owner","stage":"readiness"}},"ok":false}
+```
+
+`setup owner-stop` asks that owner, whatever binary started it, to drain and exit, and waits up
+to 30 seconds for it:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  --output json setup owner-stop | jq '{ok, disposition: .result.disposition}'
+```
+
+```json
+{
+  "ok": true,
+  "disposition": "stopped"
+}
+```
+
+The result also names the `host_incarnation` that exited. The next command that needs an owner
+starts one from the current binary. With no owner running, the same command answers
+`"disposition": "no_owner"` and exits 0, and it never starts an owner. It sends the owner's own
+shutdown request over the state directory's socket and never signals a process. An owner that holds
+the state directory but does not answer within the 30 seconds is refused as `unavailable`; one
+that is still running at the bound is refused as `timeout`; and a state directory, socket or lock
+file of another user is refused as `forbidden`, each at stage `stop`.
+
 ## Next
 
 An adapter entry under `[adapters]` names its executable, the digest of that executable and the
