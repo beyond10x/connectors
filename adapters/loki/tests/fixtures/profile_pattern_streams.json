@@ -1,0 +1,1 @@
+{"status":"success","data":{"resultType":"streams","result":[{"stream":{"env":"fixture","service":"edge-proxy","stream_kind":"cdr"},"values":[["1788822090000000000","fx-cdr inbound +15550100001 -> +15550100002 at 1788822000250 id=fx-leg-0001"],["1788822092000000000","fx-cdr garbled"]]}]}}
