@@ -569,9 +569,12 @@ types:
       # ESS-LIMIT: store_version and binary_version appear together, only on
       # metadata_schema_newer (contracts/cli/v1alpha1/semantics.md). binary_version is
       # the refusing binary's release version; store_version is the release version the
-      # store's StoreWriter marker names, or `unrecorded` when the Entity Runtime refused
-      # a record field this binary's schema does not declare and no newer marker names
-      # the writer. As for instance_id above, ESS declares no invariant on a CLI type, so
+      # store's StoreWriter marker names, or `unrecorded` when no marker names a newer
+      # writer this binary can order: the Entity Runtime refused a record field this
+      # binary's schema does not declare, the marker's version cannot be ordered, or
+      # the store's level is above this binary's highest (its marker is then not read
+      # through a schema this binary does not know). As for instance_id above, ESS
+      # declares no invariant on a CLI type, so
       # the presence rule and the `unrecorded` value are enforced by the host and pinned
       # by tests.
       - {name: store_version, type: "Optional<String>"}
@@ -1051,19 +1054,29 @@ entities:
       transitions:
         - {name: raise, from: [Recorded], to: Recorded}
     # The metadata store's writer marker: the newest binary that wrote the store
-    # (its release version) and the digest of the record model it persists (the
-    # Entity Runtime definitions the store's records are checked against). One per
+    # (its release version) and the digest of the record model it persists. One per
     # store, identity `store`. A binary records it in the batch of its first write
     # when it is absent, and raises it in the batch of its first write when its own
     # release version is newer; it never lowers it, and an equal version keeps it.
     # Before any command reads the store's records it compares the marker with its
     # own: a different model digest under a newer version refuses
-    # metadata_schema_newer; the same digest under a newer version is admitted.
-    # ESS-LIMIT: "newer" is the numeric order of the major.minor.patch release
-    # version and "never lowered" compares the input with the current field; ESS has
-    # no version order and no guard comparing a command input with a subject field,
-    # so the host enforces both and tests pin them. Every store written before the
-    # marker existed has none and is admitted; it gets one on its next write.
+    # metadata_schema_newer; the same digest under a newer version is admitted. A
+    # binary_version this binary cannot order under a different model digest refuses
+    # metadata_schema_newer with store_version `unrecorded`; under the same digest
+    # it is admitted and kept, since it is never known to be lower.
+    # The model digest is SHA-256 over the persisted record shapes of the Entity
+    # Runtime definitions: per entity its name, identity field, lifecycle states,
+    # field schema (names, types, required-ness, bounds, enumerations) and the
+    # assertions of its invariants, without invariant names or messages, which
+    # the generator chooses. A release that changes only generated text keeps it.
+    # ESS-LIMIT: binary_version is a SemVer 2.0.0 version and "newer" is SemVer
+    # precedence (a pre-release orders below its release; build metadata is
+    # ignored; a pre-release longer than 40 bytes is not ordered), and "never
+    # lowered" compares the input with the current field. ESS has no version type,
+    # no version order, no string pattern and no guard comparing a command input
+    # with a subject field, so the host enforces all three and tests pin them; the
+    # field stays a String. Every store written before the marker existed has none
+    # and is admitted; it gets one on its next write.
 
   - name: connectors.cli.ConnectionListCursor
     identity: {name: cursor_id, type: Uuid}

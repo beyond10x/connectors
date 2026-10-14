@@ -403,11 +403,18 @@ unapplied, with its failure unchanged.
 
 The metadata store records its newest writer in one `StoreWriter` record
 (identity `store`): the release version of the newest binary that wrote it and
-the digest of the record model that binary persists, a SHA-256 over the Entity
-Runtime definitions the store's records are checked against. Two releases that
-persist the same record shapes have the same digest. A binary records the marker
-in the batch of its first write when the store has none, and raises it in the
-batch of its first write when its own release version is newer; an equal or
+the digest of the record model that binary persists. The digest is a SHA-256
+over the persisted record shapes of the Entity Runtime definitions the store's
+records are checked against: for each entity its name, identity field,
+lifecycle states, field schema (names, types, required-ness, bounds and
+enumerations) and the assertions of its invariants. Invariant names and
+messages, which the generator chooses, are not part of it, so two releases that
+persist the same record shapes have the same digest even when the generator
+that lowered them changed. A release version is a SemVer 2.0.0 version, ordered
+by SemVer precedence: a pre-release orders below its release, and build
+metadata is ignored. A binary records the marker in the batch of its first
+write when the store has none, and raises it in the batch of its first write
+when its own release version is newer; an equal or
 older binary leaves it as it is, so the marker is never lowered. A store written
 before the marker existed has none, is admitted, and gets one on its next write.
 
@@ -418,13 +425,22 @@ version is newer than the binary's, the command refuses `metadata_schema_newer`
 (`kind = operational`, exit 1, `stage = admission`, `next_action = upgrade`),
 and the `Failure` names `store_version` (the marker's version) and
 `binary_version` (its own); it reads and writes nothing. The same digest under a
-newer version, a release that changed no persisted record, is admitted. A command
-an owner of its own build answers reports the owner's refusal the same way.
+newer version, a release that changed no persisted record, is admitted. A marker
+whose version this binary cannot order (not a SemVer version, or a pre-release
+longer than 40 bytes) under a different digest is refused the same way with
+`store_version = "unrecorded"`; under the same digest it is admitted and kept,
+since it is never known to be lower. A store whose SQL level (`user_version`) is
+above the highest this binary knows was migrated by a newer binary and is
+refused the same way with `store_version = "unrecorded"`, before any record is
+replayed: its marker is not read through a schema this binary does not know. A
+store that fails integrity verification is not a newer store and stays
+`metadata_unavailable`. A command an owner of its own build answers reports the
+owner's refusal the same way.
 Independently of the marker, a write the Entity Runtime refuses because a record
 carries a field this binary's model does not declare is `metadata_schema_newer`
 too, with `store_version = "unrecorded"` unless a newer marker names the writer;
 it is never `metadata_unavailable` or `retry_status`, because running the same
-binary again cannot change the record. Neither refusal changes the store.
+binary again cannot change the record. None of these refusals changes the store.
 
 So once a binary has written a state directory, an older binary may not use it:
 binaries of different versions share one state directory only while the oldest
@@ -646,7 +662,7 @@ never replay a possible write after interruption, timeout or lost response.
 | `setup checkpoints-enable` without `--confirm one-way`; nothing changed (`stage = arguments`, `next_action = retry_explicitly`) | `confirmation_required` | 2 |
 | keyring unavailable or durable storage not acknowledged | `custody_unavailable` | 1 |
 | metadata authority unavailable | `metadata_unavailable` | 1 |
-| store written by a newer binary whose record model differs, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
+| store written by a newer binary whose record model differs (its marker names a newer or an unorderable version), a store whose SQL level is above this binary's highest, or a store record carrying a field this binary's model does not declare; nothing read or written (`stage = admission`, `next_action = upgrade`, `store_version` and `binary_version` named) | `metadata_schema_newer` | 1 |
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
