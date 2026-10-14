@@ -1,17 +1,27 @@
-//! Loki binding of the profiles `logql-range`, `logql-metric` and `loki-labels`
-//! (`contracts/logs/v1alpha1/semantics.md` beside this adapter, §§3–5 and 11).
-//! Every operation is one GET through `AuthenticatedHttp`; the binding is
-//! unpaged and retains nothing between calls (§11.3).
+//! Loki binding of the profiles `logql-range`, `logql-metric`, `loki-labels`,
+//! `loki-line-profile` and `loki-call-trace` (`contracts/logs/v1alpha1/semantics.md`
+//! beside this adapter, §§3–5, 11 and 12). Every operation is one GET through
+//! `AuthenticatedHttp`; the binding is unpaged and retains nothing between calls
+//! (§11.3).
 pub mod auth;
+pub mod profile;
 
 use async_trait::async_trait;
 use connectors_core::{Descriptor, Error, ErrorCode, Result};
 use connectors_sdk::{Adapter, AuthenticatedHttp, HttpResponse};
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
-const OPERATIONS: [&str; 3] = ["logs.query_range", "logs.query_metric", "logs.labels"];
+const OPERATIONS: [&str; 5] = [
+    "logs.query_range",
+    "logs.query_metric",
+    "logs.labels",
+    "logs.profile_lines",
+    "logs.call_trace",
+];
+/// The longest line a trace answers (§12.2), as `logs.query_range`'s default.
+pub const TRACE_LINE_BYTES: usize = 8192;
 const QUERY_RANGE: [&str; 4] = ["loki", "api", "v1", "query_range"];
 const QUERY: [&str; 4] = ["loki", "api", "v1", "query"];
 
@@ -37,12 +47,14 @@ pub struct Loki {
     descriptor: Descriptor,
     http: Arc<dyn AuthenticatedHttp>,
     clock: fn() -> u64,
+    profiles: Arc<profile::Profiles>,
 }
 
 impl Loki {
     /// `effective_configuration` must admit the explicit empty
     /// `query_scope.required_equalities`; no LogQL parser exists to enforce a
     /// nonempty one (§11.3), so the descriptor's configuration schema refuses it.
+    /// Its `line_profiles` and `trace_profiles` are admitted here (§12.1).
     pub fn new(
         instance: &str,
         effective_configuration: &Value,
@@ -54,11 +66,13 @@ impl Loki {
             effective_configuration,
         )?;
         connectors_sdk::verify_handlers(&descriptor, &OPERATIONS)?;
+        let profiles = profile::from_configuration(effective_configuration)?;
         Ok(Self {
             instance: instance.to_owned(),
             descriptor,
             http,
             clock: connectors_sdk::now_ms,
+            profiles: Arc::new(profiles),
         })
     }
 
@@ -69,6 +83,7 @@ impl Loki {
             descriptor: self.descriptor.clone(),
             http,
             clock: self.clock,
+            profiles: self.profiles.clone(),
         }
     }
 
@@ -282,12 +297,183 @@ struct Labels {
     query: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProfileLines {
+    profile: String,
+    start_unix_ns: String,
+    end_unix_ns: String,
+    limit: Option<usize>,
+    #[serde(rename = "match")]
+    matches: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CallTrace {
+    profile: String,
+    call_id: String,
+    start_unix_ns: String,
+    end_unix_ns: String,
+    limit: Option<usize>,
+}
+
 /// One retained occurrence: timestamp, then its private (group, entry) coordinates.
 struct Occurrence<'a> {
     timestamp: u64,
     group: usize,
     entry: usize,
     line: &'a str,
+}
+
+/// A fully validated `streams` answer (§4.3): the retained groups' labels, their
+/// occurrences sorted in the requested direction, the provider's entry count, the
+/// entries of omitted groups and the number of groups.
+struct Observation<'a> {
+    stream_labels: Vec<Value>,
+    occurrences: Vec<Occurrence<'a>>,
+    total: usize,
+    omitted_entries: usize,
+    groups: usize,
+}
+
+/// Validate the whole answer before anything is retained (§4.3).
+fn observe(
+    result: &Value,
+    start: u64,
+    end: u64,
+    backward: bool,
+    limit: usize,
+) -> Result<Observation<'_>> {
+    let groups = result.as_array().ok_or_else(malformed)?;
+    let mut stream_labels = Vec::with_capacity(groups.len().min(STREAM_GROUPS));
+    let mut occurrences = Vec::new();
+    let mut total = 0_usize;
+    let mut omitted_entries = 0_usize;
+    for (group, value) in groups.iter().enumerate() {
+        let object = value.as_object().ok_or_else(malformed)?;
+        if object.len() != 2 {
+            return Err(malformed());
+        }
+        let stream = labels(object.get("stream").ok_or_else(malformed)?)?;
+        let values = object
+            .get("values")
+            .and_then(Value::as_array)
+            .ok_or_else(malformed)?;
+        let mut previous: Option<u64> = None;
+        for (entry, tuple) in values.iter().enumerate() {
+            let Some([Value::String(timestamp), Value::String(line)]) =
+                tuple.as_array().map(Vec::as_slice)
+            else {
+                return Err(malformed());
+            };
+            let timestamp = canonical_ns(timestamp).ok_or_else(malformed)?;
+            if timestamp < start || timestamp >= end {
+                return Err(malformed());
+            }
+            if let Some(previous) = previous
+                && (if backward {
+                    timestamp > previous
+                } else {
+                    timestamp < previous
+                })
+            {
+                return Err(malformed());
+            }
+            previous = Some(timestamp);
+            total += 1;
+            if group < STREAM_GROUPS {
+                occurrences.push(Occurrence {
+                    timestamp,
+                    group,
+                    entry,
+                    line,
+                });
+            } else {
+                omitted_entries += 1;
+            }
+        }
+        if group < STREAM_GROUPS {
+            stream_labels.push(stream);
+        }
+    }
+    if total > limit {
+        return Err(malformed());
+    }
+    if backward {
+        occurrences.sort_by(|a, b| {
+            b.timestamp
+                .cmp(&a.timestamp)
+                .then((a.group, a.entry).cmp(&(b.group, b.entry)))
+        });
+    } else {
+        occurrences.sort_by_key(|o| (o.timestamp, o.group, o.entry));
+    }
+    Ok(Observation {
+        stream_labels,
+        occurrences,
+        total,
+        omitted_entries,
+        groups: groups.len(),
+    })
+}
+
+impl Observation<'_> {
+    /// The §5 truncation of a profile read, given the occurrences the response
+    /// bound left out and whether a line was clipped: (complete, truncation).
+    fn truncation(&self, limit: usize, response_dropped: usize, clipped: bool) -> (bool, Value) {
+        let provider_limit = self.total == limit;
+        let mut causes = Vec::new();
+        if provider_limit {
+            causes.push("provider_limit");
+        }
+        if self.groups > STREAM_GROUPS {
+            causes.push("stream_limit");
+        }
+        if response_dropped > 0 {
+            causes.push("response_bytes");
+        }
+        let complete = causes.is_empty();
+        if clipped {
+            causes.push("line_bytes");
+        }
+        let (occurrences, groups) = if provider_limit {
+            (Value::Null, Value::Null)
+        } else {
+            (
+                json!(self.omitted_entries + response_dropped),
+                json!(self.groups.saturating_sub(STREAM_GROUPS)),
+            )
+        };
+        (
+            complete,
+            json!({"causes": causes, "occurrences_dropped": occurrences,
+                   "stream_groups_dropped": groups}),
+        )
+    }
+}
+
+/// A profile read's window: both ends given, start before end, at most a day.
+fn profile_window(start: &str, end: &str) -> Result<(u64, u64)> {
+    let (start, end) = (input_ns(start)?, input_ns(end)?);
+    window(start, end)?;
+    Ok((start, end))
+}
+
+fn profile_limit(limit: Option<usize>) -> Result<usize> {
+    let limit = limit.unwrap_or(1000);
+    if !(1..=1000).contains(&limit) {
+        return Err(Error::invalid("limit out of range"));
+    }
+    Ok(limit)
+}
+
+/// The size an element adds to a serialized answer.
+fn serialized(value: &Value) -> Result<usize> {
+    Ok(serde_json::to_vec(value)
+        .map_err(|_| Error::internal())?
+        .len()
+        + 1)
 }
 
 impl Loki {
@@ -331,71 +517,13 @@ impl Loki {
             }
             _ => return Err(malformed()),
         }
-        let groups = result.as_array().ok_or_else(malformed)?;
-        // Validate the whole answer before anything is retained (§4.3).
-        let mut stream_labels = Vec::with_capacity(groups.len().min(STREAM_GROUPS));
-        let mut occurrences = Vec::new();
-        let mut total = 0_usize;
-        let mut omitted_entries = 0_usize;
-        for (group, value) in groups.iter().enumerate() {
-            let object = value.as_object().ok_or_else(malformed)?;
-            if object.len() != 2 {
-                return Err(malformed());
-            }
-            let stream = labels(object.get("stream").ok_or_else(malformed)?)?;
-            let values = object
-                .get("values")
-                .and_then(Value::as_array)
-                .ok_or_else(malformed)?;
-            let mut previous: Option<u64> = None;
-            for (entry, tuple) in values.iter().enumerate() {
-                let Some([Value::String(timestamp), Value::String(line)]) =
-                    tuple.as_array().map(Vec::as_slice)
-                else {
-                    return Err(malformed());
-                };
-                let timestamp = canonical_ns(timestamp).ok_or_else(malformed)?;
-                if timestamp < start || timestamp >= end {
-                    return Err(malformed());
-                }
-                if let Some(previous) = previous
-                    && (if backward {
-                        timestamp > previous
-                    } else {
-                        timestamp < previous
-                    })
-                {
-                    return Err(malformed());
-                }
-                previous = Some(timestamp);
-                total += 1;
-                if group < STREAM_GROUPS {
-                    occurrences.push(Occurrence {
-                        timestamp,
-                        group,
-                        entry,
-                        line,
-                    });
-                } else {
-                    omitted_entries += 1;
-                }
-            }
-            if group < STREAM_GROUPS {
-                stream_labels.push(stream);
-            }
-        }
-        if total > limit {
-            return Err(malformed());
-        }
-        if backward {
-            occurrences.sort_by(|a, b| {
-                b.timestamp
-                    .cmp(&a.timestamp)
-                    .then((a.group, a.entry).cmp(&(b.group, b.entry)))
-            });
-        } else {
-            occurrences.sort_by_key(|o| (o.timestamp, o.group, o.entry));
-        }
+        let Observation {
+            stream_labels,
+            occurrences,
+            total,
+            omitted_entries,
+            groups,
+        } = observe(&result, start, end, backward, limit)?;
         let mut lines = Vec::with_capacity(occurrences.len());
         let mut bytes = 0_usize;
         let mut clipped = false;
@@ -427,7 +555,7 @@ impl Loki {
             lines.push(value);
         }
         let provider_limit = total == limit;
-        let stream_limit = groups.len() > STREAM_GROUPS;
+        let stream_limit = groups > STREAM_GROUPS;
         let mut causes = Vec::new();
         if provider_limit {
             causes.push("provider_limit");
@@ -448,7 +576,7 @@ impl Loki {
         } else {
             (
                 json!(omitted_entries + response_dropped),
-                json!(groups.len().saturating_sub(STREAM_GROUPS)),
+                json!(groups.saturating_sub(STREAM_GROUPS)),
             )
         };
         Ok(json!({
@@ -644,6 +772,181 @@ impl Loki {
         answer.insert("provenance".into(), self.provenance("loki-labels"));
         Ok(Value::Object(answer))
     }
+
+    /// One forward log GET of a composed profile query; its `streams` result.
+    async fn profile_streams(
+        &self,
+        query: String,
+        start: u64,
+        end: u64,
+        limit: usize,
+    ) -> Result<Value> {
+        let data = self
+            .get(
+                &QUERY_RANGE,
+                &[
+                    ("query", query),
+                    ("start", start.to_string()),
+                    ("end", end.to_string()),
+                    ("direction", "forward".into()),
+                    ("limit", limit.to_string()),
+                ],
+            )
+            .await?;
+        let (kind, result) = query_data(data)?;
+        // A composed selector query answers streams; anything else is not Loki's
+        // answer to it.
+        if kind != "streams" {
+            return Err(malformed());
+        }
+        Ok(result)
+    }
+
+    fn range_provenance(&self) -> Value {
+        json!({
+            "instance": self.instance,
+            "resource": "loki:query_range",
+            "observed_at_unix_ms": (self.clock)(),
+            "source_revision": null,
+        })
+    }
+
+    /// `loki-line-profile` (§12.1): one typed, masked record per selected line.
+    async fn profile_lines(&self, input: ProfileLines) -> Result<Value> {
+        let profile = self.profiles.line(&input.profile)?;
+        let (start, end) = profile_window(&input.start_unix_ns, &input.end_unix_ns)?;
+        let limit = profile_limit(input.limit)?;
+        let matches = profile.matches(&input.matches.unwrap_or_default())?;
+        let result = self
+            .profile_streams(profile.query(&matches), start, end, limit)
+            .await?;
+        let observation = observe(&result, start, end, false, limit)?;
+        let mut records = Vec::new();
+        let (mut unreadable, mut unmatched) = (0_usize, 0_usize);
+        let (mut bytes, mut response_dropped) = (0_usize, 0_usize);
+        for occurrence in &observation.occurrences {
+            let record = match profile.read(occurrence.line, &matches) {
+                Err(()) => {
+                    unreadable += 1;
+                    continue;
+                }
+                Ok(None) => {
+                    unmatched += 1;
+                    continue;
+                }
+                Ok(Some(record)) => record,
+            };
+            if response_dropped > 0 {
+                response_dropped += 1;
+                continue;
+            }
+            let value = json!({
+                "timestamp_unix_ns": occurrence.timestamp.to_string(),
+                "call_id": record.call_id,
+                "fields": record.fields,
+            });
+            let size = serialized(&value)?;
+            if bytes + size > RESULT_BYTES - ENVELOPE_RESERVE {
+                response_dropped = 1;
+                continue;
+            }
+            bytes += size;
+            records.push(value);
+        }
+        let (complete, truncation) = observation.truncation(limit, response_dropped, false);
+        Ok(json!({
+            "profile": profile.name,
+            "records": records,
+            "skipped": {"unreadable": unreadable, "unmatched": unmatched},
+            "selection": {
+                "kind": "loki-profile",
+                "start_unix_ns": start.to_string(),
+                "end_unix_ns": end.to_string(),
+                "direction": "forward",
+            },
+            "order": "timestamp-forward",
+            "complete": complete,
+            "truncation": truncation,
+            "provenance": self.range_provenance(),
+        }))
+    }
+
+    /// `loki-call-trace` (§12.2): one call's lines from every source, oldest first.
+    async fn call_trace(&self, input: CallTrace) -> Result<Value> {
+        let profile = self.profiles.trace(&input.profile)?;
+        let (start, end) = profile_window(&input.start_unix_ns, &input.end_unix_ns)?;
+        let limit = profile_limit(input.limit)?;
+        let call_id = input.call_id;
+        if call_id.is_empty() || call_id.chars().count() > 512 {
+            return Err(Error::invalid("invalid call identifier"));
+        }
+        let result = self
+            .profile_streams(profile.query(&call_id), start, end, limit)
+            .await?;
+        let observation = observe(&result, start, end, false, limit)?;
+        // Every retained stream names its source, and a label-carried identifier is
+        // exactly this call's: a stream of another call is not Loki's answer to the
+        // composed equality, and is refused rather than mixed in.
+        let mut sources = Vec::with_capacity(observation.stream_labels.len());
+        for stream in &observation.stream_labels {
+            let source = stream
+                .get(profile.source_label())
+                .and_then(Value::as_str)
+                .filter(|s| !s.is_empty())
+                .ok_or_else(malformed)?;
+            if let Some(label) = profile.call_label()
+                && stream.get(label).and_then(Value::as_str) != Some(call_id.as_str())
+            {
+                return Err(malformed());
+            }
+            sources.push(source);
+        }
+        let mut lines = Vec::new();
+        let mut excluded = 0_usize;
+        let (mut bytes, mut response_dropped, mut clipped) = (0_usize, 0_usize, false);
+        for occurrence in &observation.occurrences {
+            if !profile.carries(occurrence.line, &call_id) {
+                excluded += 1;
+                continue;
+            }
+            if response_dropped > 0 {
+                response_dropped += 1;
+                continue;
+            }
+            let (line, line_truncated) = clip(occurrence.line, TRACE_LINE_BYTES);
+            let value = json!({
+                "timestamp_unix_ns": occurrence.timestamp.to_string(),
+                "source": sources[occurrence.group],
+                "line": line,
+                "line_truncated": line_truncated,
+            });
+            let size = serialized(&value)?;
+            if bytes + size > RESULT_BYTES - ENVELOPE_RESERVE {
+                response_dropped = 1;
+                continue;
+            }
+            bytes += size;
+            clipped |= line_truncated;
+            lines.push(value);
+        }
+        let (complete, truncation) = observation.truncation(limit, response_dropped, clipped);
+        Ok(json!({
+            "profile": profile.name,
+            "call_id": call_id,
+            "lines": lines,
+            "excluded": excluded,
+            "selection": {
+                "kind": "loki-call-trace",
+                "start_unix_ns": start.to_string(),
+                "end_unix_ns": end.to_string(),
+                "direction": "forward",
+            },
+            "order": "timestamp-forward",
+            "complete": complete,
+            "truncation": truncation,
+            "provenance": self.range_provenance(),
+        }))
+    }
 }
 
 #[async_trait]
@@ -657,6 +960,8 @@ impl Adapter for Loki {
             "logs.query_range" => self.query_range(decode(input)?).await,
             "logs.query_metric" => self.query_metric(decode(input)?).await,
             "logs.labels" => self.labels(decode(input)?).await,
+            "logs.profile_lines" => self.profile_lines(decode(input)?).await,
+            "logs.call_trace" => self.call_trace(decode(input)?).await,
             _ => Err(Error::new(ErrorCode::NotFound, "operation is not provided")),
         }
     }

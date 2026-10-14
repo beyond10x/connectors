@@ -349,3 +349,134 @@ schemas and invariants that model generates.
 - **Not served.** `loki.anonymous`: the local host admits only profiles with at least one
   entry field and a bearer, basic, mTLS or session scheme, and this binding does not widen
   that. `loki.basic` and `loki.via_parent` are not implemented.
+
+## 12. Configured line and trace profiles
+
+**Recorded:** 2026-10-14. Two reads whose LogQL the operator writes once, in the connection's
+configuration, as a named profile; the caller names the profile and passes only the values
+its operation declares. The profiles are typed in the
+[Loki-owned model](../../../spec/ess/domains/reads.yaml) (`LineProfile`, `TraceProfile`,
+`ProfileLinesSelection`, `CallTraceSelection`, `ProfileRecord`, `TraceLine`) and carried by
+`connectors_loki.connection.LocalConfiguration`; the operations are declared in
+[the adapter specification](../../../spec/adapter.json).
+
+| Operation | Contract | Profile | Native request |
+|---|---|---|---|
+| `logs.profile_lines` | `datasource.logs/v1alpha1` | `loki-line-profile` | `GET loki/api/v1/query_range`, forward |
+| `logs.call_trace` | `datasource.logs/v1alpha1` | `loki-call-trace` | `GET loki/api/v1/query_range`, forward |
+
+Both are reads under the bearer connection of §11.4 and follow §11.3: one GET, no retry,
+unpaged, at most `limit` (1–1,000, default 1,000) provider entries over a window the caller
+states with both `start_unix_ns` and `end_unix_ns` (§4.3 timestamps, start before end, at
+most 24 hours), the provider answer validated whole as §4.3 requires, at most 500 stream
+groups retained and the emitted answer bounded to 4 MiB. Truncation causes and dropped totals
+follow §5; `complete` is false exactly when `provider_limit`, `stream_limit` or
+`response_bytes` applies. Errors are §11's. A profile name the configuration does not hold is
+NotFound before dispatch; any other input the operation does not declare is InvalidInput
+before dispatch.
+
+### 12.1 Why a profile is not the injected filter §4.2 forbids
+
+§4.2 governs caller-authored LogQL. There the caller's query bytes are the request, so the
+adapter forwards them unchanged and may not inject a filter or substitute a fixed query: the
+caller would no longer get what it asked for, and scope could only be proven by parsing what
+it wrote. A profile read takes no caller LogQL at all. The adapter composes the whole query
+itself from structured parts of operator-authored configuration — label matchers with a
+declared operator, a declared format and declared field keys — and places the caller's one
+value, a call identifier or a matched field value, only inside a LogQL string literal in a
+fixed position. There are no caller bytes to preserve, and no parser is needed to know what
+the query selects: the adapter built its syntax tree and renders it.
+
+A string literal is double-quoted with `"`, `\`, newline, carriage return and tab written as
+`\"`, `\\`, `\n`, `\r` and `\t` and every other control character as `\uXXXX`, so no caller
+text can end the literal or add a matcher, a line filter or a pipeline stage. A matcher value
+in the configuration is rendered the same way.
+
+### 12.2 `loki-line-profile`
+
+A line profile names a stream selector (1–16 matchers, at least one a nonempty equality), a
+format and 1–64 typed fields, one of which is the call identifier. The format is `logfmt`
+(`key=value`, `key="quoted"` with the escapes of §12.1, or a bare `key`) or a pattern of
+literal text and `<name>` captures (`<_>` discards), matched from the line's start, each
+capture ending at the next literal's first occurrence and the last running to the line's end.
+A field reads one key and has a type: `string`; `integer` (a signed 64-bit decimal);
+`phone_number` (text); or `unix_seconds` (decimal seconds, at most nine fractional digits),
+`unix_millis` or `unix_nanos`, each answered as canonical decimal nanoseconds. A field may be
+`optional` (null when its key is absent) and `filterable`.
+
+Masking is per field: `none` answers the value, `redact` answers `"<redacted>"`, and
+`last_four` replaces every character but the last four with `*` (a value of four characters
+or fewer is all `*`). A `phone_number` field without a declared mask is `last_four`; every
+other field without one is `none`. Only text is masked. The call identifier is the join key a
+workflow reads, so it is unmasked, required `string` text. A record carries no raw line, so
+no unmasked value reaches the answer.
+
+Input `{profile, start_unix_ns, end_unix_ns, limit?, match?}`. `match` maps up to 16 fields
+the profile declares `filterable` to an exact value (1–512 characters): each adds a line
+filter `|= "<value as the format spells it>"` that narrows the provider read, and a record is
+answered only when every matched field's text equals its value exactly, compared before
+masking. Matches combine with AND.
+
+Result:
+
+```json
+{ "profile": "fixture-cdr", "records": [ { "timestamp_unix_ns": "1788822090000000000", "call_id": "fx-leg-0001", "fields": { "direction": "inbound", "caller": "********0001", "call_id": "fx-leg-0001" } } ], "skipped": { "unreadable": 1, "unmatched": 0 }, "selection": { "kind": "loki-profile", "start_unix_ns": "…", "end_unix_ns": "…", "direction": "forward" }, "order": "timestamp-forward", "complete": true, "truncation": { "causes": [], "occurrences_dropped": 0, "stream_groups_dropped": 0 }, "provenance": { "instance": "…", "resource": "loki:query_range", "observed_at_unix_ms": 0, "source_revision": null } }
+```
+
+Records are in timestamp order, ties in provider order. A selected line the profile cannot
+read — the format does not match, a required key is absent, a value is not its type or is over
+4 KiB — is counted under `skipped.unreadable`; a line that reads but does not hold every
+matched value is counted under `skipped.unmatched`. Neither is an omitted occurrence: the
+provider answered it.
+
+### 12.3 `loki-call-trace`
+
+A trace profile names a stream selector (as §12.2), where the call identifier is carried —
+a stream label, or a key of the line read with a declared format — and the label that names
+each line's source. Input is `{profile, call_id, start_unix_ns, end_unix_ns, limit?}` and
+nothing else; `call_id` is 1–512 characters of any text. The composed query is the profile's
+matchers, then `<source_label>=~".+"`, then for a label-carried identifier
+`<label>="<call_id>"`; for a line-carried identifier it is followed by
+`|= "<call_id as the format spells it>"`.
+
+The answer is the call's lines, oldest first with ties in provider order, each with its
+source, its text clipped to 8 KiB (`line_truncated`, cause `line_bytes`) and its timestamp:
+
+```json
+{ "profile": "fixture-by-label", "call_id": "fx-leg-0001", "lines": [ { "timestamp_unix_ns": "1788822000100000000", "source": "edge-proxy", "line": "INVITE received", "line_truncated": false } ], "excluded": 0, "selection": { "kind": "loki-call-trace", "start_unix_ns": "…", "end_unix_ns": "…", "direction": "forward" }, "order": "timestamp-forward", "complete": true, "truncation": { "causes": [], "occurrences_dropped": 0, "stream_groups_dropped": 0 }, "provenance": { "instance": "…", "resource": "loki:query_range", "observed_at_unix_ms": 0, "source_revision": null } }
+```
+
+No line of another call is answered. A retained stream without a nonempty source label, or a
+label-carried answer whose stream names another call identifier, is not Loki's answer to the
+composed equality and is Unavailable, never mixed in. For a line-carried identifier the line
+filter only narrows: a line is answered only when it reads in the declared format and its key
+is exactly the identifier, and every other selected line — another call whose identifier
+contains this one, a line naming it elsewhere, a line the format cannot read — is counted
+under `excluded`. One invocation reads one connection; merging the traces of several
+connections is the workflow's time-ordered join.
+
+### 12.4 A profile never weakens the configured scope
+
+Every equality of `query_scope.required_equalities` must appear among each profile's matchers
+as an exact `=` with the same label and value; a profile without one is refused at
+configuration, before any read. The adapter only adds to what a profile selects: matchers of
+a selector all hold of every stream it selects, so the source-label matcher, the call
+equality and every line filter narrow and never widen. A trace profile's call label may not
+appear in its selector or be its source label, so the composed equality is the only matcher on
+it. The configuration still admits only the empty scope (§11.3), because the native reads of
+§11 cannot enforce a nonempty one; the profile rule is enforced and tested
+(`tests/profiles.rs`, `a_profile_cannot_widen_the_configured_stream_scope`) so that it already
+holds when a scope is admitted.
+
+### 12.5 Configuration
+
+`line_profiles` and `trace_profiles` are optional members of the configuration file of §11.4:
+absent, or a list of 1–16 profiles with distinct names (`[a-z0-9_.-]`, 1–64 characters);
+never `null`. Field names are distinct within a profile (`[a-z0-9_]`, 1–64 characters); label
+names are Loki's (`[A-Za-z_][A-Za-z0-9_]*`, at most 128 bytes). A pattern needs at least one
+named capture, no two adjacent captures and no capture named twice, and a pattern profile's
+keys are its captures. A configured profile is part of the effective configuration and so of
+its revision: changing one refuses a recorded launch, as a changed CA does. A configuration
+without profiles keeps the revision it had before profiles existed. The repository holds the
+profile shape, its validation and synthetic fixtures only; the selectors, keys, formats and
+masking of a real deployment are the operator's, in that deployment's configuration.
