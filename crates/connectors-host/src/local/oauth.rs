@@ -428,13 +428,19 @@ impl Drain {
     fn start(mut loopback: Loopback) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let stopped = stop.clone();
+        // The stop flag is read before each poll, so the poll after it is set
+        // still answers a request that arrived before the flow dropped this.
         let thread = std::thread::spawn(move || {
-            while !stopped.load(Ordering::SeqCst) {
+            loop {
+                let stopping = stopped.load(Ordering::SeqCst);
                 let Ok(complete) = loopback.poll() else {
                     return;
                 };
                 for (stream, _) in complete {
                     answer(stream, Answer::Refused);
+                }
+                if stopping {
+                    return;
                 }
                 std::thread::sleep(POLL);
             }
@@ -1067,6 +1073,22 @@ mod tests {
         let answers = record.answers();
         assert!(answers[0].starts_with("HTTP/1.1 200 "), "{:?}", answers[0]);
         assert!(answers[1].starts_with("HTTP/1.1 400 "), "{:?}", answers[1]);
+    }
+
+    #[test]
+    fn a_request_queued_before_the_flow_returns_is_answered() {
+        // The flow drops its drain as soon as the exchange returns, which can be
+        // before the drain thread first polls; a request already queued then is
+        // still answered 400, not closed unanswered.
+        for _ in 0..20 {
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let mut late = get(port, "/?state=late&code=other");
+            drop(Drain::start(Loopback::new(listener)));
+            let answer = read_answer(&mut late);
+            assert!(answer.starts_with("HTTP/1.1 400 "), "{answer:?}");
+        }
     }
 
     #[test]
