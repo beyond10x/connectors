@@ -13,8 +13,9 @@ The optional `approval_clock` table in local configuration selects format
 `roughtime-quorum/1`, a `quorum`, `max_rate_error_ppm` in 1..10,000 and two to
 eight `[[approval_clock.sources]]`. Each source names one numeric UDP `address`,
 an exact canonical base64 Ed25519 `public_key` and the one wire `version` it
-speaks: `roughtime-1` (RFC 10049's version `0x00000001`) or
-`roughtime-0x8000000c` (the draft-19 test version). `quorum` is two to eight and at
+speaks. The one admitted version is `roughtime-0x8000000c` (the draft-19 test
+version); a version ships only with its verifier and a recorded signed reply, so
+any other value, `roughtime-1` included, is refused as an unknown version. `quorum` is two to eight and at
 most the number of sources. No two sources share an address or a key: two entries
 for one key are one operator counted twice. There is no ambient server, DNS/key
 discovery, default key or fallback to SystemTime. The configured owner admits the
@@ -35,7 +36,7 @@ max_rate_error_ppm = 10000
 [[approval_clock.sources]]
 address = "192.0.2.10:2002"
 public_key = "<44-character base64 Ed25519 root key>"
-version = "roughtime-1"
+version = "roughtime-0x8000000c"
 
 [[approval_clock.sources]]
 address = "198.51.100.20:2002"
@@ -149,15 +150,16 @@ outward. With source i's signed midpoint M_i and radius A_i, its interval is
 The complete request/response delay is therefore included; no symmetric-delay
 assumption or best-case network subtraction is permitted.
 
-A source is counted when its reply verified and its own interval at acquisition,
-rounded outward to milliseconds, is at most 8,000 ms wide; a verified source wider
-than that is `too_imprecise` and not counted. Fewer than `quorum` counted sources
+A source is counted when its reply verified, whatever its own radius or interval
+width; no single source is too imprecise, and only the combined answer is capped.
+Fewer than `quorum` counted sources
 refuses `below_quorum`. The answer is the hull of the instants that at least
 `quorum` counted intervals contain (closed intervals), rounded outward to Unix
 milliseconds: its lower bound is the earliest such instant, its upper bound the
 latest. If no instant lies in `quorum` counted intervals the acquisition refuses
 `split`. Every interval is convex, so if at least `quorum` counted intervals contain
-true UTC the answer does too, whatever the other intervals are.
+true UTC the answer does too, whatever the other intervals are; the guarantee needs
+no per-source width bound, and a wide or lying interval can only widen the answer.
 
 Each counted source's conservative elapsed upper bound from S_i must remain at most
 30,000 ms. Every answer must be within 0..9007199254740991 Unix ms, ordered and at
@@ -199,7 +201,6 @@ in configuration order (`connectors.clock.SourceReport`): its zero-based `index`
 | `verified` | counted; no answer formed (a refusal) |
 | `unreachable` | no verified reply by the shared deadline, or a send or receive error |
 | `unverified` | a reply that does not parse, carries another nonce or version, or fails either signature, the delegation interval or the Merkle path |
-| `too_imprecise` | verified, but its own interval is wider than 8,000 ms; not counted |
 
 An acquisition that forms no answer names one combined refusal
 (`connectors.clock.Refusal`), each with its own next action. None changes a bound
@@ -208,9 +209,9 @@ configured.
 
 | Refusal | When | Next action |
 |---|---|---|
-| `below_quorum` | fewer than `quorum` counted sources | `check_configuration` if any source is `unverified`; else `choose_clock_source` if any is `too_imprecise`; else `retry_explicitly` |
+| `below_quorum` | fewer than `quorum` counted sources | `check_configuration` if any source is `unverified`; else `retry_explicitly` |
 | `split` | no instant lies in `quorum` counted intervals | `choose_clock_source`: a source is wrong; find it from the per-source lines and retire its key |
-| `too_imprecise` | the answer is wider than 8,000 ms | `choose_clock_source`: select more precise sources |
+| `too_imprecise` | the combined answer is wider than 8,000 ms (never a single source) | `choose_clock_source`: select more precise sources |
 
 An `outlier` on a successful observation is not a refusal: the answer still holds
 under the quorum, and the line names the key to examine. A local timer, continuity,
