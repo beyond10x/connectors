@@ -697,11 +697,15 @@ dependencies = [
  "connectors-client",
  "connectors-core",
  "connectors-host",
+ "connectors-loki",
  "connectors-sdk",
+ "connectors-sql",
  "jsonschema",
  "serde_json",
+ "sha2 0.11.0",
  "tempfile",
  "tokio",
+ "tokio-rustls",
 ]
 
 [[package]]

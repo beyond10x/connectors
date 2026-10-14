@@ -21,3 +21,9 @@ axum.workspace = true
 tempfile.workspace = true
 connectors_cli_contract.workspace = true
 jsonschema.workspace = true
+# Composition, not a library edge: the incident call join pairs two concrete adapters in a
+# test, which no adapter library may do (adapters/README.md).
+connectors-loki = { path = "../../adapters/loki", default-features = false }
+connectors-sql = { path = "../../adapters/sql", default-features = false }
+sha2.workspace = true
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
