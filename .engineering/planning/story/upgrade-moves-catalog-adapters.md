@@ -8,7 +8,8 @@ relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - informed_by: story:owner-stop-after-upgrade
-revision: 1
+- depends_on: story:connection-lease-holds-unattended
+revision: 2
 ---
 ## Outcome
 
@@ -41,3 +42,7 @@ story:connection-follows-configuration-upgrade's rules.
 - A CLI test: an entry pinned to an older provider build is reported by `setup check` with the move
   command; after the move, `operations list --adapter <alias>` lists the new release's selection.
 - The upgrade guide names the steps, run in the tree and pasted from that run.
+
+## Scope
+
+Primary: ess/domains/cli.yaml (SetupCheckResult, Prerequisite, NextAction), apps/connectors/src/local.rs setup-check, apps/connectors/spec/cli.yaml, connectors-host local/config.rs (first rewriter of existing config), owner.rs, adapters/catalog main.rs/local.rs (provider version), contracts/cli semantics.md, generated CLI contract, docs. Collides with owner-stop (wave c, A) and any cli.yaml unit; sequence after wave c merges. Open: provider version mechanism, permissions.operations rewrite, configuration_revision handoff to connection-follows-configuration-upgrade.
