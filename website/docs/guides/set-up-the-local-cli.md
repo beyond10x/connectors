@@ -119,7 +119,9 @@ before it reads anything, in every command and `setup check` included: exit stat
 code `metadata_schema_newer` at stage `admission` with `next_action` `upgrade`, and the failure
 names `store_version` (the newest writer's release) and `binary_version` (its own). Retrying does
 not change that answer; upgrading the binary does. A newer release that changed no
-persisted record is admitted. Releases up to 0.49.0 cannot read the marker: on a store a newer
+persisted record is admitted. When the newest writer cannot be named, because the store was
+migrated to a level this binary does not know or its recorded version is not one this binary can
+order, the refusal is the same with `store_version` `unrecorded`. Releases up to 0.49.0 cannot read the marker: on a store a newer
 binary wrote they answer `metadata_unavailable` with `next_action` `retry_status` instead, and
 retrying does not help them either.
 

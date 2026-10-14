@@ -789,50 +789,92 @@ fn writer_key(key: &(String, String)) -> bool {
 }
 
 /// The digest of the record model this binary persists: SHA-256 over the
-/// canonical JSON of the Entity Runtime definitions its records are checked
-/// against (the bundle's `definitions`, without its source or synthesis
-/// digests). Two builds whose persisted records have the same shapes lower the
-/// same definitions, so they have the same digest even when the ESS source
-/// around them, its comments or the tool that generated it changed.
+/// record shapes of the Entity Runtime definitions its records are checked
+/// against ([`definitions_digest`]). Two builds whose persisted records have the
+/// same shapes have the same digest even when the ESS source around them, its
+/// comments, or the generated invariant names and messages changed.
 pub(super) fn model_digest() -> Result<&'static str> {
     static DIGEST: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
     DIGEST
         .get_or_init(|| {
-            let bundle: Value =
-                serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).ok()?;
-            let definitions = serde_json::to_vec(bundle.get("definitions")?).ok()?;
-            Some(hex::encode(Sha256::digest(definitions)))
+            definitions_digest(
+                &serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).ok()?,
+            )
         })
         .as_deref()
         .ok_or(Failure::MetadataUnavailable)
 }
 
-/// The release and model digest the store's writer marker names, if it has one.
-fn recorded_writer(baseline: &Baseline) -> Result<Option<(Release, String)>> {
+/// SHA-256 over the persisted record shapes of `bundle`'s definitions: per
+/// entity, by name, its identity field, lifecycle, field schema and the set of
+/// its invariants' assertions. Invariant names (positional, `entity_0000`) and
+/// messages are the generator's text, and operations say how this binary
+/// writes, not what a record is; none of them is covered.
+fn definitions_digest(bundle: &Value) -> Option<String> {
+    let mut shapes = BTreeMap::new();
+    for entry in bundle.get("definitions")?.as_array()? {
+        let definition = entry.get("definition")?;
+        let mut assertions = definition
+            .get("invariants")?
+            .as_array()?
+            .iter()
+            .map(|invariant| serde_json::to_string(invariant.get("assert")?).ok())
+            .collect::<Option<Vec<_>>>()?;
+        assertions.sort_unstable();
+        assertions.dedup();
+        let shape = json!({
+            "identity": definition.get("identity")?,
+            "lifecycle": definition.get("lifecycle")?,
+            "schema": definition.get("schema")?,
+            "assertions": assertions,
+        });
+        if shapes
+            .insert(entry.get("name")?.as_str()?.to_owned(), shape)
+            .is_some()
+        {
+            return None;
+        }
+    }
+    // serde_json's map is ordered by key here (no `preserve_order`), so the
+    // encoding is canonical whatever order the generator wrote.
+    let encoded = serde_json::to_vec(&shapes).ok()?;
+    Some(hex::encode(Sha256::digest(encoded)))
+}
+
+/// The store's writer marker, if it has one: its release, `None` when its
+/// `binary_version` is not a version this binary can order (an edited store,
+/// or a newer release's version form), and its model digest.
+fn recorded_writer(baseline: &Baseline) -> Result<Option<(Option<Release>, String)>> {
     let Some(row) = baseline.get(&(WRITER_ENTITY.to_owned(), WRITER_ID.to_owned())) else {
         return Ok(None);
     };
-    let release = row
+    // Both fields are declared required strings: a record without them did
+    // not pass this or any binary's Entity Runtime, so it is not a newer store.
+    let version = row
         .fields
         .get("binary_version")
         .and_then(Value::as_str)
-        .and_then(Release::parse)
         .ok_or(Failure::MetadataUnavailable)?;
     let digest = row
         .fields
         .get("model_digest")
         .and_then(Value::as_str)
         .ok_or(Failure::MetadataUnavailable)?;
-    Ok(Some((release, digest.to_owned())))
+    Ok(Some((Release::parse(version), digest.to_owned())))
 }
 
 /// Refuses a store whose marker names a newer release with another model
-/// digest, before any record of it is read. The same digest under a newer
-/// release, an older or equal release and a store without a marker are admitted.
+/// digest, before any record of it is read, naming that release; a marker
+/// whose release this binary cannot order under another digest is refused
+/// unnamed. The same digest under any release, an older or equal release and
+/// a store without a marker are admitted.
 pub(super) fn admit_writer(er: &ErAuthority) -> Result<()> {
     match recorded_writer(&er.baseline)? {
-        Some((release, digest)) if release > Release::current() && digest != model_digest()? => {
-            Err(Failure::MetadataSchemaNewer(Some(release)))
+        Some((release, digest))
+            if release.is_none_or(|release| release > Release::current())
+                && digest != model_digest()? =>
+        {
+            Err(Failure::MetadataSchemaNewer(release))
         }
         _ => Ok(()),
     }
@@ -867,7 +909,7 @@ fn writer_action(
         .map(Some);
     };
     match recorded_writer(baseline)? {
-        Some((release, _)) if release < own => {
+        Some((Some(release), _)) if release < own => {
             next.revision = current.revision + 1;
             command_action(
                 registry,
@@ -935,7 +977,20 @@ pub(super) fn record_writer_for_tests(er: &ErAuthority, version: &str, digest: &
 
 #[cfg(any(test, feature = "test-support"))]
 pub(super) fn writer_for_tests(er: &ErAuthority) -> Result<Option<(String, String)>> {
-    Ok(recorded_writer(&er.baseline)?.map(|(release, digest)| (release.to_string(), digest)))
+    let Some(row) = er
+        .baseline
+        .get(&(WRITER_ENTITY.to_owned(), WRITER_ID.to_owned()))
+    else {
+        return Ok(None);
+    };
+    let field = |name: &str| {
+        row.fields
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or(Failure::MetadataUnavailable)
+    };
+    Ok(Some((field("binary_version")?, field("model_digest")?)))
 }
 
 /// A refused write names the marker's newer release when it has one.
@@ -945,7 +1000,7 @@ fn named_writer(baseline: &Baseline, failure: Failure) -> Failure {
             recorded_writer(baseline)
                 .ok()
                 .flatten()
-                .map(|(release, _)| release)
+                .and_then(|(release, _)| release)
                 .filter(|release| *release > Release::current()),
         ),
         other => other,
@@ -4788,11 +4843,7 @@ mod tests {
             )
             .unwrap();
         drop(newer);
-        let refused = Some(Failure::MetadataSchemaNewer(Some(Release {
-            major: 999,
-            minor: 0,
-            patch: 0,
-        })));
+        let refused = Some(Failure::MetadataSchemaNewer(Some(Release::new(999, 0, 0))));
         assert_eq!(Metadata::inspect(&path).err(), refused);
         assert_eq!(state.suppress("fixture", true).err(), refused);
     }
@@ -4852,6 +4903,110 @@ mod tests {
             Err(Failure::MetadataSchemaNewer(None)),
             "a record a newer model wrote is not an unavailable store"
         );
+    }
+
+    /// The model digest covers the persisted record shapes, not the text the
+    /// generator chose: an invariant's message or positional name, or its
+    /// operations, change no record and keep the digest; a field's type, its
+    /// required-ness, a lifecycle state or an invariant's assertion change it.
+    #[test]
+    fn the_model_digest_covers_record_shapes_not_generated_text() {
+        let bundle: Value =
+            serde_json::from_slice(include_bytes!("entity-runtime-definitions.json")).unwrap();
+        let own = definitions_digest(&bundle).unwrap();
+        assert_eq!(own, model_digest().unwrap());
+        let changed = |edit: &dyn Fn(&mut Value)| {
+            let mut bundle = bundle.clone();
+            edit(&mut bundle);
+            definitions_digest(&bundle).unwrap()
+        };
+        for (what, edit, same) in [
+            (
+                "an invariant message",
+                &(|bundle: &mut Value| {
+                    bundle_invariant(bundle)["message"] = json!("reworded by a newer generator");
+                }) as &dyn Fn(&mut Value),
+                true,
+            ),
+            (
+                "an invariant name",
+                &|bundle: &mut Value| {
+                    bundle_invariant(bundle)["name"] = json!("entity_9999");
+                },
+                true,
+            ),
+            (
+                "an operation's emitted payload",
+                &|bundle: &mut Value| {
+                    writer_definition(bundle)["operations"]["connectors.cli.RaiseStoreWriter"]["outcomes"]
+                        [0]["emits"] = json!([]);
+                },
+                true,
+            ),
+            (
+                "a field type",
+                &|bundle: &mut Value| {
+                    writer_definition(bundle)["schema"]["fields"]["model_digest"]["type"] =
+                        json!("integer");
+                },
+                false,
+            ),
+            (
+                "a field's required-ness",
+                &|bundle: &mut Value| {
+                    writer_definition(bundle)["schema"]["fields"]["model_digest"]["required"] =
+                        json!(false);
+                },
+                false,
+            ),
+            (
+                "a new field",
+                &|bundle: &mut Value| {
+                    let field =
+                        writer_definition(bundle)["schema"]["fields"]["model_digest"].clone();
+                    writer_definition(bundle)["schema"]["fields"]["newer_field"] = field;
+                },
+                false,
+            ),
+            (
+                "a lifecycle state",
+                &|bundle: &mut Value| {
+                    writer_definition(bundle)["lifecycle"]["states"] =
+                        json!(["Recorded", "Retired"]);
+                },
+                false,
+            ),
+            (
+                "an invariant assertion",
+                &|bundle: &mut Value| {
+                    bundle_invariant(bundle)["assert"] = json!({"exists": "$fields.newer_field"});
+                },
+                false,
+            ),
+        ] {
+            assert_eq!(changed(edit) == own, same, "{what}");
+        }
+    }
+
+    /// The store writer marker's definition.
+    fn writer_definition(bundle: &mut Value) -> &mut Value {
+        bundle["definitions"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|entry| entry["name"] == WRITER_ENTITY)
+            .map(|entry| &mut entry["definition"])
+            .unwrap()
+    }
+    /// The first invariant of the first entity that has one.
+    fn bundle_invariant(bundle: &mut Value) -> &mut Value {
+        &mut bundle["definitions"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .map(|entry| &mut entry["definition"]["invariants"])
+            .find(|invariants| invariants.as_array().is_some_and(|list| !list.is_empty()))
+            .unwrap()[0]
     }
 
     #[test]

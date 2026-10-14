@@ -341,11 +341,7 @@ mod replay {
             .unwrap_err();
         assert_eq!(
             refused,
-            ledger::Failure::MetadataSchemaNewer(Some(crate::local::Release {
-                major: 999,
-                minor: 0,
-                patch: 0,
-            }))
+            ledger::Failure::MetadataSchemaNewer(Some(crate::local::Release::new(999, 0, 0)))
         );
         let failure = execution::ledger_error(refused);
         assert_eq!(failure.code, FailureCode::Owner(Code::MetadataSchemaNewer));
