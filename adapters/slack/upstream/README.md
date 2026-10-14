@@ -18,7 +18,7 @@ The document is pinned as published. Gitleaks 8.30.0 reports no finding in it,
 and it carries no e-mail address.
 
 The catalog does not read Swagger 2.0 directly: `crates/connectors-catalog`
-projects it to OpenAPI 3.1.0 under `swagger2-openapi/1` (rule table in
+projects it to OpenAPI 3.1.0 under `swagger2-openapi/2` (rule table in
 `src/swagger.rs`), and `crates/connectors-catalog/tests/swagger.rs` asserts the
 digest above, that the projection ingests all 174 operations with none
 unsupported, and that `conversations.list`, `conversations.history` and

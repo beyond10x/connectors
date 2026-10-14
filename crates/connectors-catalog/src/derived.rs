@@ -5,6 +5,7 @@
 //! document, never its file name, so a pinned source cannot be projected by the
 //! wrong projector because of what it is called.
 
+use crate::inventory::Unsupported;
 use crate::{Derivation, SOURCE_LIMIT, discovery, swagger};
 
 /// A projected source, from whichever format it was projected.
@@ -74,6 +75,25 @@ impl Projection {
         match self {
             Self::Discovery(projection) => projection.record_bytes(),
             Self::Swagger(projection) => projection.record_bytes(),
+        }
+    }
+
+    /// The operations the source document declares and the projection left
+    /// out, each an unsupported operation of the bundle built from it: a
+    /// Swagger operation the projection lists unprojected, with its reason. A
+    /// Discovery projection names none here; its record lists its exclusions.
+    pub fn gaps(&self) -> Vec<Unsupported> {
+        match self {
+            Self::Discovery(_) => Vec::new(),
+            Self::Swagger(projection) => projection
+                .record
+                .unprojected_operations
+                .iter()
+                .map(|operation| Unsupported {
+                    designation: operation.operation_id.clone(),
+                    reason: operation.reason.clone(),
+                })
+                .collect(),
         }
     }
 
