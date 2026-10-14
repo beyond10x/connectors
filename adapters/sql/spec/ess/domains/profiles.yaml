@@ -1,0 +1,274 @@
+domain: connectors_sql.profiles
+summary: Configured read profiles — an operator-authored parameterised read with declared typed columns, per-column masking, one call identifier and a keyset cursor over a declared ordering column, served by `profile.read`.
+
+# Normative owner: adapters/sql/contracts/reads/v1alpha1/semantics.md, section "Read profiles",
+# and docs/local-postgres-cli.md / docs/local-mysql-cli.md. The repository holds the profile's
+# shape and validation only: every statement, column name and masking choice is the
+# operator's, written in the owner-only native file (`read_profiles` of
+# `connectors_sql.connection.LocalConfiguration`). The executable composition
+# (adapters/sql/src/local.rs) admits a profile exactly when this model does, and the library
+# (adapters/sql/src/profile.rs) serves `profile.read`; tests/ess_model.rs checks both against
+# the schemas this model generates, and tests/profiles.rs checks the reads on the wire.
+types:
+  # A profile's id, which the caller names as `profile`: lower-case letters, digits, `_`, `.`
+  # and `-`, 1–64 characters.
+  - name: connectors_sql.profiles.ProfileId
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyz0123456789_.-"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+
+  # The name of a declared parameter or output column: lower-case letters, digits and `_`,
+  # 1–64 characters. Output records use these names, never the database's own column names.
+  - name: connectors_sql.profiles.FieldName
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyz0123456789_"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+
+  # The declared type of an output column. Every non-null value is a JSON string:
+  # - text: the engine's native text, unchanged.
+  # - integer: decimal digits with an optional leading `-`, never a JSON number.
+  # - timestamp: the engine's native text, which starts `YYYY-MM-DD`, then `T` or a space,
+  #   then `HH:MM:SS`.
+  # - phone_number: an end-user number, masked unless the profile says otherwise.
+  # A value the declared type does not admit refuses the read (`unsupported`); it is never
+  # coerced.
+  - name: connectors_sql.profiles.ColumnType
+    kind: enum
+    variants: [text, integer, timestamp, phone_number]
+
+  # One output column, in the statement's column order: the statement returns exactly as
+  # many columns as the profile declares, and the n-th is written under the n-th name.
+  - name: connectors_sql.profiles.ProfileColumn
+    kind: struct
+    fields:
+      - {name: name, type: connectors_sql.profiles.FieldName}
+      - {name: type, type: connectors_sql.profiles.ColumnType}
+      - {name: masked, type: "Optional<Boolean>"}
+
+  # Whether a column is masked: `masked` when the profile says, otherwise exactly the
+  # `phone_number` columns. A masked value keeps its last four characters and writes `*` for
+  # each earlier one; a value of four characters or fewer is all `*`.
+  - name: connectors_sql.profiles.ColumnMasking
+    kind: struct
+    fields:
+      - {name: type, type: connectors_sql.profiles.ColumnType}
+      - {name: masked, type: "Optional<Boolean>"}
+      - {name: effective, type: Boolean}
+    invariants:
+      - any: ["defined(masked)", type != phone_number, effective == true]
+      - any: ["defined(masked)", type == phone_number, effective == false]
+      - any: ["not defined(masked)", masked == false, effective == true]
+      - any: ["not defined(masked)", masked == true, effective == false]
+
+  # One read profile. `statement` is the operator's single read statement, with the engine's
+  # placeholders (`$1`… on PostgreSQL, `?` on MySQL); `parameters` names them in placeholder
+  # order, and the caller supplies a value (text or null) for each by name and nothing else.
+  # Values are bound, never written into the statement. `call_identifier` names the output
+  # column that carries the join key; `ordering` names the column the keyset cursor follows,
+  # which must hold distinct values for the rows the statement returns (the operator's
+  # obligation: a page whose row past the limit shares the last returned value is refused,
+  # see PageBoundary, but a row a server cap withheld is not seen). The two may be the
+  # same column. Both are unmasked and neither is a `phone_number` (see LocalConfiguration).
+  - name: connectors_sql.profiles.ReadProfile
+    kind: struct
+    fields:
+      - {name: id, type: connectors_sql.profiles.ProfileId}
+      - {name: statement, type: String}
+      - {name: parameters, type: "List<connectors_sql.profiles.FieldName>"}
+      - {name: columns, type: "List<connectors_sql.profiles.ProfileColumn>"}
+      - {name: call_identifier, type: connectors_sql.profiles.FieldName}
+      - {name: ordering, type: connectors_sql.profiles.FieldName}
+    invariants:
+      - statement.count >= 1
+      - statement.utf8_bytes <= 8192
+      - parameters.count <= 63
+      - columns.count: {gte: 1, lte: 256}
+      - distinct: {in: columns, as: c, by: c.name}
+      - distinct: {in: parameters, as: p}
+
+  # One page of `profile.read`. The adapter asks for `limit + 1` rows after the cursor in
+  # `ordering` order, but a server (or a proxy in front of it) may return fewer rows than
+  # any LIMIT asks for, so a short page does not prove the end. A page that received more
+  # than `limit` rows returns `limit` of them; any page that received a row carries a
+  # `next_cursor` after the last row it returns; only a page that received none ends the
+  # read.
+  - name: connectors_sql.profiles.Page
+    kind: struct
+    fields:
+      - {name: limit, type: Integer}
+      - {name: rows_received, type: Integer}
+      - {name: rows_returned, type: Integer}
+      - {name: next_cursor, type: Boolean}
+
+  - name: connectors_sql.profiles.PageScope
+    kind: struct
+    fields:
+      - {name: page, type: connectors_sql.profiles.Page}
+    invariants:
+      - page.rows_returned <= page.limit
+      - any: [page.rows_received == 0, page.next_cursor == true]
+      - any: [page.rows_received != 0, page.next_cursor == false]
+      - any: [page.rows_received <= page.limit, page.rows_returned == page.limit]
+      - any: [{not: page.rows_received <= page.limit}, page.rows_returned == page.rows_received]
+
+  # The row past the limit. When a page received it, the adapter compares its ordering value
+  # with the last returned row's: the keyset continues strictly after that value, so a shared
+  # value would drop the rows that hold it. Such a page is refused (`unsupported`, naming the
+  # ordering column as not unique), never answered. On PostgreSQL a row past the limit whose
+  # cells exceed the row byte bound cannot be compared and refuses the page as `capacity`,
+  # as the next page would; MySQL reads it whole (`past_limit_row_bounded` is always true).
+  - name: connectors_sql.profiles.PageOutcome
+    kind: enum
+    variants: [page, unsupported, capacity]
+
+  - name: connectors_sql.profiles.PageBoundary
+    kind: struct
+    fields:
+      - {name: received_past_limit, type: Boolean}
+      - {name: past_limit_row_bounded, type: Boolean}
+      - {name: shares_ordering_value, type: Boolean}
+      - {name: outcome, type: connectors_sql.profiles.PageOutcome}
+    invariants:
+      - any: [received_past_limit == true, past_limit_row_bounded == true]
+      - any: [received_past_limit == true, shares_ordering_value == false]
+      - any: [past_limit_row_bounded == true, outcome == capacity]
+      - any: [past_limit_row_bounded == false, shares_ordering_value == false, outcome == unsupported]
+      - any: [past_limit_row_bounded == false, shares_ordering_value == true, outcome == page]
+
+  # A PostgreSQL ordering column's native type, as the keyset distinguishes it; every other
+  # type is `other`.
+  - name: connectors_sql.profiles.PostgresqlOrderingType
+    kind: enum
+    variants: [int2, int4, int8, timestamp, timestamptz, other]
+
+  # The one expression a keyset page both orders by and compares the cursor with, so the
+  # order the page is read in and the `>` that continues it cannot disagree:
+  # - native: the column itself (PostgreSQL; the cursor is bound with the column's type).
+  # - c_collated_text: the text the page returns, `::text COLLATE "C"` (PostgreSQL), so
+  #   order and equality are those of the returned bytes, whatever the column's collation.
+  # - exact_decimal: `CAST(… AS DECIMAL(65,0))` (MySQL), so no 64-bit value loses digits.
+  # - datetime6: `CAST(… AS DATETIME(6))` (MySQL; the `Z` of a TIMESTAMP cursor is dropped,
+  #   the session being UTC).
+  # - utf8mb4_bytes: `CAST(CONVERT(… USING utf8mb4) AS BINARY)` (MySQL), the bytes the page
+  #   returns, so a case- or pad-insensitive collation cannot tie two distinct values.
+  - name: connectors_sql.profiles.KeysetExpression
+    kind: enum
+    variants: [native, c_collated_text, exact_decimal, datetime6, utf8mb4_bytes]
+
+  # Whether the keyset can follow an ordering column of this declared type and native type,
+  # and by which expression. A column is admitted exactly when equal returned texts are equal
+  # under the expression and distinct ones are not, so the boundary check (PageBoundary) and
+  # the continuation agree. Admission is decided when the statement is prepared, before any
+  # row is read (the native type is known only to the server); a column it refuses is
+  # `unsupported`, naming the profile's column. MySQL writes binary strings, BIT and geometry
+  # as base64, so the server's order of their bytes is not the order of the text a cursor
+  # carries; they, and every other family whose server-side text differs from the page's
+  # (floating, decimal, JSON, date, time), are refused as `text`, and `integer` and
+  # `timestamp` admit only their own families. ENUM and SET are text strings: ordered by
+  # their bytes, not their index, they are admitted.
+  - name: connectors_sql.profiles.KeysetOrdering
+    kind: struct
+    fields:
+      - {name: engine, type: connectors_sql.connection.Engine}
+      - {name: column_type, type: connectors_sql.profiles.ColumnType}
+      - {name: mysql_family, type: "Optional<connectors_sql.reads.MysqlTypeFamily>"}
+      - {name: postgresql_type, type: "Optional<connectors_sql.profiles.PostgresqlOrderingType>"}
+      - {name: admitted, type: Boolean}
+      - {name: expression, type: "Optional<connectors_sql.profiles.KeysetExpression>"}
+    invariants:
+      - any: [engine != mysql, "defined(mysql_family)"]
+      - any: [engine != postgresql, "defined(postgresql_type)"]
+      - any: [admitted == true, "not defined(expression)"]
+      - any: [admitted == false, "defined(expression)"]
+      # PostgreSQL
+      - any: [engine != postgresql, column_type != integer, postgresql_type == int2, postgresql_type == int4, postgresql_type == int8, admitted == false]
+      - any: [engine != postgresql, column_type != integer, {all: [postgresql_type != int2, postgresql_type != int4, postgresql_type != int8]}, admitted == true]
+      - any: [engine != postgresql, column_type != timestamp, postgresql_type == timestamp, postgresql_type == timestamptz, admitted == false]
+      - any: [engine != postgresql, column_type != timestamp, {all: [postgresql_type != timestamp, postgresql_type != timestamptz]}, admitted == true]
+      - any: [engine != postgresql, column_type == integer, column_type == timestamp, admitted == true]
+      - any: [engine != postgresql, column_type == text, column_type == phone_number, admitted == false, expression == native]
+      - any: [engine != postgresql, column_type == integer, column_type == timestamp, expression == c_collated_text]
+      # MySQL
+      - any: [engine != mysql, column_type != integer, mysql_family == signed_integer, mysql_family == unsigned_integer, mysql_family == year, admitted == false]
+      - any: [engine != mysql, column_type != integer, {all: [mysql_family != signed_integer, mysql_family != unsigned_integer, mysql_family != year]}, admitted == true]
+      - any: [engine != mysql, column_type != integer, admitted == false, expression == exact_decimal]
+      - any: [engine != mysql, column_type != timestamp, mysql_family == datetime, mysql_family == timestamp, admitted == false]
+      - any: [engine != mysql, column_type != timestamp, {all: [mysql_family != datetime, mysql_family != timestamp]}, admitted == true]
+      - any: [engine != mysql, column_type != timestamp, admitted == false, expression == datetime6]
+      - any: [engine != mysql, column_type == integer, column_type == timestamp, mysql_family == text_string, admitted == false]
+      - any: [engine != mysql, column_type == integer, column_type == timestamp, mysql_family != text_string, admitted == true]
+      - any: [engine != mysql, column_type == integer, column_type == timestamp, admitted == false, expression == utf8mb4_bytes]
+
+  # What a cursor token decodes to: the token is this object as JSON, base64url without
+  # padding. `context` is a SHA-256 digest (64 hexadecimal characters) of the instance's
+  # revision (which covers the connection's endpoint, database, user and every profile), the
+  # profile's full definition and the parameter values. The ordering value of the last
+  # returned row is carried as `after` when JSON writes it without escaping, otherwise as
+  # `after_base64` (standard base64url of its UTF-8 bytes, no padding): exactly one of the
+  # two, and never the other form for the same value. The value is at most 8,192 bytes, so
+  # the worst token (a 64-character id and 8,192 bytes that each need escaping) is 14,795
+  # characters, inside the 16,384 the published schemas admit; a longer ordering value
+  # refuses the page as `unsupported`.
+  - name: connectors_sql.profiles.Cursor
+    kind: struct
+    fields:
+      - {name: profile, type: connectors_sql.profiles.ProfileId}
+      - {name: context, type: String}
+      - {name: after, type: "Optional<String>"}
+      - {name: after_base64, type: "Optional<String>"}
+    invariants:
+      - context.count == 64
+      - any: ["defined(after)", "defined(after_base64)"]
+      - any: ["not defined(after)", "not defined(after_base64)"]
+      - after.utf8_bytes <= 8192
+      - after_base64.count <= 10923
+
+  # How a caller's cursor is admitted, before any session. Cursors are not signed: what is
+  # checked is their shape (`decodes`: base64url of exactly a Cursor, in its canonical form,
+  # with a value of at most 8,192 bytes), their context (`same_profile` and `same_context`:
+  # issued for this profile, its current definition, this connection and these parameter
+  # values) and their type (`value_admitted`: the declared type of the ordering column admits
+  # the value, as it admits a returned one). Any failure is `stale_cursor`. A cursor that
+  # passes all of them but was never issued (a value forged within the declared type) only
+  # moves where a read the caller may make anyway starts: the ordering column is never
+  # masked, so the value is one the caller could have read.
+  - name: connectors_sql.profiles.CursorAdmission
+    kind: struct
+    fields:
+      - {name: decodes, type: Boolean}
+      - {name: same_profile, type: Boolean}
+      - {name: same_context, type: Boolean}
+      - {name: value_admitted, type: Boolean}
+      - {name: outcome, type: connectors_sql.profiles.ProfileReadOutcome}
+    invariants:
+      - any: [decodes == false, same_profile == false, same_context == false, value_admitted == false, outcome == read]
+      - any: [{all: [decodes == true, same_profile == true, same_context == true, value_admitted == true]}, outcome == stale_cursor]
+
+  # `read` answered a page; `invalid_input` refused an input the instance's published input
+  # schema does not admit (an unknown profile, an undeclared or missing parameter); and
+  # `stale_cursor` refused a cursor CursorAdmission does not admit. Both refusals come
+  # before any session is opened.
+  - name: connectors_sql.profiles.ProfileReadOutcome
+    kind: enum
+    variants: [read, invalid_input, stale_cursor]
+
+  - name: connectors_sql.profiles.ProfileReadCall
+    kind: struct
+    fields:
+      - {name: outcome, type: connectors_sql.profiles.ProfileReadOutcome}
+      - {name: session_opened, type: Boolean}
+    invariants:
+      - any: [outcome == read, session_opened == false]
+
+# ESS-LIMIT: these are checked by the executable, not expressible here, and the executable
+# only ever refuses more than the model on them: that the statement prepares to exactly as
+# many columns and parameters as the profile declares (known only to the server), and the
+# masking function itself (which characters a masked value keeps), which tests/profiles.rs
+# checks value by value; the digest behind a cursor's `context` and the token's base64
+# wrapping, which tests/profiles.rs and tests/profiles_adversary.rs check on issued and
+# forged tokens; and the SQL text each KeysetExpression writes, which the scripted servers
+# check statement by statement.

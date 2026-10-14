@@ -2,7 +2,8 @@
 
 The SQL adapter serves MySQL as well as PostgreSQL, chosen per connection by the
 `engine` member of its native file. A MySQL connection has the same reads —
-`schema.list`, `query.read` and the four [catalogue reads](#catalogue-reads) — the same
+`schema.list`, `query.read`, the four [catalogue reads](#catalogue-reads) and
+[`profile.read`](#read-profiles) — the same
 input bounds and the same output shape as a PostgreSQL one; what differs is the wire
 protocol, the profile id and how a value is written. Everything this guide does not
 repeat — setup, the TOML entry, credential prompts and files, consumer launch — is as in
@@ -128,7 +129,10 @@ statement does not take is `invalid_input`. The statement then runs as a derived
 table, `SELECT * FROM (<query>) AS result (c0,…) LIMIT <limit+1>`, so the server
 sends at most one row past the limit and only one result-returning statement
 runs. The derived table closes on a line of its own, so a trailing `--` or `#`
-comment in the statement cannot reach the aliases or the limit.
+comment in the statement cannot reach the aliases or the limit. A statement that
+prepares with columns but cannot be a derived table (`SHOW`, `EXPLAIN`) is refused
+by the server's syntax check of the wrapper, which the adapter answers
+`unsupported`, as it does a statement that returns no columns.
 
 What this guarantees is a read-only session plus one result-returning
 statement. A write to a table, including one inside a stored function, is
@@ -236,6 +240,44 @@ target/release/connectors --output json operations invoke --adapter incidents --
   character the `utf8mb3` metadata cannot represent (such as an emoji) makes the server answer
   error 3988, which these reads report as `not_found`; `query.read` still reports that error
   as `unavailable`.
+
+## Read profiles
+
+[Read profiles](local-postgres-cli.md#read-profiles) work on MySQL as on PostgreSQL: the
+same `read_profiles` member of the native file, the same `profile.read` operation, typed
+columns, masking and keyset cursor. The statement uses `?` placeholders, bound in the order
+`parameters` names them:
+
+```json
+{
+  "id": "calls-by-number",
+  "statement": "SELECT id, call_ref, from_number, started FROM calls WHERE ? IN (from_number, to_number) AND started >= ? AND started < ?",
+  "parameters": ["number", "from", "to"],
+  "columns": [
+    {"name": "row_key", "type": "integer"},
+    {"name": "call_id", "type": "text"},
+    {"name": "caller", "type": "phone_number"},
+    {"name": "started_at", "type": "timestamp"}
+  ],
+  "call_identifier": "call_id",
+  "ordering": "row_key"
+}
+```
+
+Values are written by the `mysql-native-text` rules above, so a `timestamp` column reads
+`2026-01-02T09:00:00` for a `DATETIME` and `2026-01-02T09:00:00Z` for a `TIMESTAMP`. A page
+orders by one expression of the ordering column and compares the cursor by the same one:
+an `integer` column as `CAST(… AS DECIMAL(65,0))` (MySQL would compare a text parameter
+with a number as a double), a `timestamp` column as `CAST(… AS DATETIME(6))` (dropping the
+`Z`; the session is UTC) and a `text` or `phone_number` column by its UTF-8 bytes,
+`CAST(CONVERT(… USING utf8mb4) AS BINARY)`, so no collation ties two distinct values. An
+`integer` ordering needs an integer or `YEAR` column, a `timestamp` ordering a `DATETIME` or
+`TIMESTAMP` column, and a `text` ordering a text string (`CHAR`, `VARCHAR`, `TEXT`, `ENUM`,
+`SET`); a binary string (written as base64, which orders otherwise than its bytes) or any
+other column is refused as `unsupported`, by the profile's column name, before a row is
+read. Add `"profile.read"` to `operations` in the adapter entry. The paging is checked on
+the scripted fixture with a server that returns fewer rows than the limit asks for
+(`adapters/sql/tests/profiles.rs`).
 
 ## Limitations
 

@@ -213,11 +213,93 @@ Add the operations you grant to `operations` in the adapter entry. These reads a
 against a scripted PostgreSQL wire fixture; their visibility rules were also run against a
 disposable PostgreSQL 17 server on 2026-10-09.
 
+## Read profiles
+
+A read profile is a read you write once in the native file and callers then run by name,
+passing values for its parameters and nothing else: no statement text reaches the adapter
+from a caller. `profile.read` serves it, with typed output columns, numbers masked by
+default and a keyset cursor, so a workflow can page through it and join its rows on a call
+identifier without a model. The statement, its columns and its masking stay in your file;
+the repository holds only the shape below. Add `read_profiles` to the native file:
+
+```json
+{
+  "format": "connectors-sql-local/1",
+  "instance": "postgres-local",
+  "host": "db.example",
+  "port": 5432,
+  "database": "incidents",
+  "user": "reader",
+  "read_profiles": [
+    {
+      "id": "calls-by-number",
+      "statement": "SELECT id, call_ref, from_number, started FROM calls WHERE $1 IN (from_number, to_number) AND started >= $2::timestamptz AND started < $3::timestamptz",
+      "parameters": ["number", "from", "to"],
+      "columns": [
+        {"name": "row_key", "type": "integer"},
+        {"name": "call_id", "type": "text"},
+        {"name": "caller", "type": "phone_number"},
+        {"name": "started_at", "type": "timestamp"}
+      ],
+      "call_identifier": "call_id",
+      "ordering": "row_key"
+    }
+  ]
+}
+```
+
+- `id` is lower-case letters, digits, `_`, `.` and `-`; parameter and column names are
+  lower-case letters, digits and `_`, 1–64 characters, distinct within the profile. A file
+  holds at most 32 profiles with distinct ids.
+- `statement` is one read statement of at most 8,192 bytes. `parameters` names its
+  placeholders in order (`$1`, `$2`, …; at most 63). The statement must return exactly the
+  declared `columns`, in order; the n-th column is written under the n-th name.
+- `type` is `text`, `integer` (decimal text), `timestamp` (the engine's text, starting
+  `YYYY-MM-DD HH:MM:SS`) or `phone_number`. A value its type does not admit refuses the
+  read as `unsupported`.
+- A `phone_number` column is masked unless it says `"masked": false`; any column may say
+  `"masked": true`. A masked value keeps its last four characters: `+99900000101` is written
+  `********0101`.
+- `call_identifier` names the column the answer offers as the join key, and `ordering` the
+  column pages follow. Neither may be a `phone_number` or masked, and neither may be null in
+  a row. The ordering column must hold distinct values for the rows the statement returns.
+  A page whose row past the limit shares the last returned value is refused as
+  `unsupported`, naming the column as not unique, rather than skipping a row; a row a server
+  cap withheld cannot be seen, so a unique column is still yours to choose. On PostgreSQL a
+  `text` or `phone_number` ordering pages by the returned text's bytes (`COLLATE "C"`), an
+  `integer` ordering needs an `int2`, `int4` or `int8` column and a `timestamp` ordering a
+  `timestamp` or `timestamptz` column; any other is refused by name before a row is read.
+
+A file the model refuses fails `--print-local-bootstrap`. Profiles are part of the
+configuration revision, so re-copy `configuration_revision` after changing one, and add
+`"profile.read"` to `operations` in the adapter entry. `operations describe` then shows each
+profile's own parameters and typed columns:
+
+```sh
+target/release/connectors --output json operations describe --adapter warehouse --operation profile.read
+target/release/connectors --output json operations invoke --adapter warehouse --connection CONNECTION --operation profile.read --schema SCHEMA --revision REVISION --input-json '{"profile":"calls-by-number","parameters":{"number":"+99900000101","from":"2026-01-02T00:00:00Z","to":"2026-01-03T00:00:00Z"},"limit":100}'
+```
+
+An answer names the profile, its `call_identifier` and `ordering` columns and each column's
+type and masking, and carries `items`, one object per row. A server, or a proxy in front of
+it, may return fewer rows than any limit asks for, so a short page does not end the read:
+pass `next_cursor` back as `cursor` with the same profile and parameters until a page comes
+back with no items, `complete: true` and a null cursor. A cursor is not signed: it is
+checked for its shape, its type (the ordering column's declared type must admit its value)
+and its context, so a cursor issued for another profile or other values, on another
+connection, or before any change to the profile is `stale_cursor`; an undeclared or missing
+parameter is `invalid_input`. Each
+page runs in its own read-only transaction, like `query.read`, so pages are not one
+snapshot. The full rules are in the
+[SQL reads contract](../adapters/sql/contracts/reads/v1alpha1/semantics.md#read-profiles).
+
 ## Limitations
 
 MySQL is served by the same adapter; see [the MySQL guide](local-mysql-cli.md). No write,
 DDL, transaction control, cursor, stored procedure or connection pooling is
-exposed. `schema.list`, `query.read` and the four catalogue reads are the whole surface.
+exposed. `schema.list`, `query.read`, the four catalogue reads and `profile.read` are the
+whole surface. Read profiles are checked against scripted wire fixtures only; no live
+database has run one yet.
 
 The [retained real-provider restart evidence](evidence/provider-restarts-20261002/README.md)
 covers a disposable PostgreSQL server and saved-credential reuse. Wire-protocol
@@ -262,8 +344,9 @@ schema and terminates only a correlated test backend. Explicit selection with
 missing prerequisites fails; an ignored case in the ordinary package run is
 unexecuted evidence, not a passing provider case.
 
-Write refusal checks distinguish columnless statements and unsupported PostgreSQL
-features (`unsupported`, including SQLSTATE `0A000`), rejected read-subquery syntax
-or multiple statements (`invalid_input`), and the mandatory
+Write refusal checks distinguish columnless statements, statements that return rows
+but cannot be a derived table (`INSERT … RETURNING`, refused by the server's syntax
+check of the wrapper) and unsupported PostgreSQL features (all `unsupported`,
+including SQLSTATE `0A000`), multiple statements (`invalid_input`), and the mandatory
 read-only transaction. They also compare independently observed fixture contents;
 an arbitrary transport failure is not accepted as write protection.

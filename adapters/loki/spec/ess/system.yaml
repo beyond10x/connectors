@@ -1,4 +1,4 @@
-format: ess/14
+format: ess/24
 system: connectors_loki
 version: v1
 domains:

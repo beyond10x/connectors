@@ -174,9 +174,12 @@ Each release page carries `connectors-<version>-<target>.tar.gz` for
 `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin` and
 `aarch64-apple-darwin`, and a `SHA256SUMS` file; releases cut before
 [`release-binaries.yml`](.github/workflows/release-binaries.yml) existed carry source archives
-only. There is no Windows binary. Each archive holds a directory with the `connectors` binary,
-`README.md` and `CHANGELOG.md`. The Linux binaries are built on Ubuntu 24.04 and need its glibc
-or a newer one.
+only. There is no Windows binary. Each archive holds a directory with two binaries,
+`connectors` and `connectors-catalog-provider` (the executable the
+[catalog provider guide](docs/local-catalog-provider.md) binds to the CLI), and `README.md` and
+`CHANGELOG.md`; archives of 0.50.0 and earlier hold `connectors` alone. The other adapters
+(Kubernetes, SQL, Tavily and the rest) are built from source, as their guides show. The Linux
+binaries are built on Ubuntu 24.04 and need its glibc or a newer one.
 
 On Linux, with the version and target you want:
 
@@ -190,7 +193,9 @@ grep " connectors-$version-$target.tar.gz\$" SHA256SUMS | sha256sum -c -
 tar -xzf "connectors-$version-$target.tar.gz"
 mkdir -p ~/.local/bin
 install -m 0755 "connectors-$version-$target/connectors" ~/.local/bin/connectors
+install -m 0755 "connectors-$version-$target/connectors-catalog-provider" ~/.local/bin/connectors-catalog-provider
 connectors --version
+connectors-catalog-provider --version
 ```
 
 On macOS, use `target=aarch64-apple-darwin` (Apple silicon) or `x86_64-apple-darwin` (Intel),
@@ -200,7 +205,7 @@ one downloaded through a browser carries Gatekeeper's quarantine attribute and i
 you remove it, from the extracted directory:
 
 ```sh
-xattr -d com.apple.quarantine connectors
+xattr -d com.apple.quarantine connectors connectors-catalog-provider
 ```
 
 An unsigned binary also cannot read login keychain items that an earlier build of `connectors`

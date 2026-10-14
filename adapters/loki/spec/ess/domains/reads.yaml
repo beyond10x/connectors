@@ -1,5 +1,5 @@
 domain: connectors_loki.reads
-summary: Loki-owned LogQL range, metric and label selections and mandatory selector equalities.
+summary: Loki-owned LogQL range, metric and label selections, mandatory selector equalities, and the configured line and trace profiles.
 
 # Normative owner: adapters/loki/contracts/logs/v1alpha1/semantics.md §§3–4.
 types:
@@ -83,3 +83,258 @@ types:
     invariants:
       - label.count: {gte: 1, lte: 128}
       - query.count: {gte: 1, lte: 16384}
+
+  # ---------------------------------------------------------------------------------------
+  # Configured line and trace profiles (semantics.md §12). An operator writes them in the
+  # owner-only configuration file; the caller names one and passes only the values its
+  # operation declares. The adapter composes the LogQL itself from these structured parts,
+  # so no caller text is LogQL and no parser is needed to know what the query selects.
+
+  # A Loki label name: `[A-Za-z_][A-Za-z0-9_]*`, 1–128 bytes.
+  - name: connectors_loki.reads.LabelName
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
+    invariants:
+      - value.count: {gte: 1, lte: 128}
+      - not: {value: {starts_with: "0"}}
+      - not: {value: {starts_with: "1"}}
+      - not: {value: {starts_with: "2"}}
+      - not: {value: {starts_with: "3"}}
+      - not: {value: {starts_with: "4"}}
+      - not: {value: {starts_with: "5"}}
+      - not: {value: {starts_with: "6"}}
+      - not: {value: {starts_with: "7"}}
+      - not: {value: {starts_with: "8"}}
+      - not: {value: {starts_with: "9"}}
+
+  # A profile's name, as the caller selects it, and a declared field's output name.
+  - name: connectors_loki.reads.ProfileName
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyz0123456789_.-"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+  - name: connectors_loki.reads.FieldName
+    kind: newtype
+    of: String
+    alphabet: "abcdefghijklmnopqrstuvwxyz0123456789_"
+    invariants:
+      - value.count: {gte: 1, lte: 64}
+
+  # One stream matcher, rendered `label<op>"value"` with the value escaped as a LogQL
+  # string literal: `=`, `!=`, `=~`, `!~`.
+  - name: connectors_loki.reads.MatchOperator
+    kind: enum
+    variants: [equal, not_equal, matches, not_matches]
+  - name: connectors_loki.reads.LabelMatcher
+    kind: struct
+    fields:
+      - {name: label, type: connectors_loki.reads.LabelName}
+      - {name: operator, type: connectors_loki.reads.MatchOperator}
+      - {name: value, type: String}
+    invariants:
+      - value.count: {lte: 1024}
+
+  # How a selected line is read into named values: logfmt `key=value` pairs, or a pattern of
+  # literal text and `<name>` captures (`<_>` captures and discards), matched from the line's
+  # start, each capture ending at the next literal and the last running to the line's end.
+  - name: connectors_loki.reads.LinePattern
+    kind: struct
+    fields:
+      - {name: pattern, type: String}
+    invariants:
+      - pattern.count: {gte: 3, lte: 1024}
+      - pattern: {contains: "<"}
+  - name: connectors_loki.reads.LineFormat
+    kind: union
+    tag: kind
+    variants:
+      logfmt:
+      pattern: connectors_loki.reads.LinePattern
+
+  # A declared field's type. `phone_number` is text masked by default; the three timestamp
+  # types read decimal seconds (up to nine fractional digits), milliseconds or nanoseconds and
+  # answer canonical decimal nanoseconds.
+  - name: connectors_loki.reads.FieldType
+    kind: enum
+    variants: [string, integer, phone_number, unix_seconds, unix_millis, unix_nanos]
+  # `none` answers the value; `redact` answers a fixed `"<redacted>"`; `last_four` replaces
+  # every character but the last four with `*`. A `phone_number` field without `mask` is
+  # `last_four`; every other field without `mask` is `none`.
+  - name: connectors_loki.reads.FieldMask
+    kind: enum
+    variants: [none, redact, last_four]
+
+  - name: connectors_loki.reads.ProfileField
+    kind: struct
+    fields:
+      - {name: name, type: connectors_loki.reads.FieldName}
+      - {name: key, type: String}
+      - {name: type, type: connectors_loki.reads.FieldType}
+      - {name: mask, type: "Optional<connectors_loki.reads.FieldMask>"}
+      - {name: optional, type: "Optional<Boolean>"}
+      - {name: filterable, type: "Optional<Boolean>"}
+    invariants:
+      - key.count: {gte: 1, lte: 128}
+      # Only text is masked: a masked integer or timestamp would no longer be one.
+      - any:
+          - not defined(mask)
+          - mask == none
+          - type == string
+          - type == phone_number
+
+  # A line profile: the stream selector, how a line reads, its typed fields and which field
+  # is the call identifier, the key a workflow joins on. That field is unmasked text and
+  # always present.
+  - name: connectors_loki.reads.LineProfile
+    kind: struct
+    fields:
+      - {name: name, type: connectors_loki.reads.ProfileName}
+      - {name: selector, type: "List<connectors_loki.reads.LabelMatcher>"}
+      - {name: format, type: connectors_loki.reads.LineFormat}
+      - {name: fields, type: "List<connectors_loki.reads.ProfileField>"}
+      - {name: call_identifier, type: connectors_loki.reads.FieldName}
+    invariants:
+      - selector.count: {gte: 1, lte: 16}
+      - fields.count: {gte: 1, lte: 64}
+      - distinct: {in: fields, as: f, by: f.name}
+      - exists:
+          in: selector
+          as: m
+          that: {all: [m.operator == equal, m.value.count >= 1]}
+      - exists:
+          in: fields
+          as: f
+          that:
+            all:
+              - f.name == call_identifier
+              - f.type == string
+              - any: [not defined(f.mask), f.mask == none]
+              - any: [not defined(f.optional), f.optional == false]
+      # A stream label of a matched key's name shadows the parsed value in the label filter.
+      - not:
+          exists:
+            in: fields
+            as: f
+            that:
+              all:
+                - f.filterable == true
+                - exists: {in: selector, as: m, that: m.label == f.key}
+
+  # Where a trace profile finds the call identifier: a stream label, or a field of the line
+  # read with a declared format.
+  - name: connectors_loki.reads.CallIdentifierLabel
+    kind: struct
+    fields:
+      - {name: label, type: connectors_loki.reads.LabelName}
+  # A key matched on the server: the label a parser stage extracts and an exact label filter
+  # names (`| logfmt | key="…"`, `| pattern "…" | key="…"`). Loki rewrites a key that is no
+  # label name and keeps `__` names for itself, so a matched key is a label name without
+  # that prefix.
+  - name: connectors_loki.reads.MatchedKey
+    kind: newtype
+    of: String
+    alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
+    invariants:
+      - value.count: {gte: 1, lte: 128}
+      - not: {value: {starts_with: "__"}}
+      - not: {value: {starts_with: "0"}}
+      - not: {value: {starts_with: "1"}}
+      - not: {value: {starts_with: "2"}}
+      - not: {value: {starts_with: "3"}}
+      - not: {value: {starts_with: "4"}}
+      - not: {value: {starts_with: "5"}}
+      - not: {value: {starts_with: "6"}}
+      - not: {value: {starts_with: "7"}}
+      - not: {value: {starts_with: "8"}}
+      - not: {value: {starts_with: "9"}}
+  - name: connectors_loki.reads.CallIdentifierField
+    kind: struct
+    fields:
+      - {name: key, type: connectors_loki.reads.MatchedKey}
+      - {name: format, type: connectors_loki.reads.LineFormat}
+  - name: connectors_loki.reads.CallIdentifierSource
+    kind: union
+    tag: kind
+    variants:
+      label: connectors_loki.reads.CallIdentifierLabel
+      field: connectors_loki.reads.CallIdentifierField
+
+  # A trace profile: the stream selector, where the call identifier is carried and the label
+  # naming each line's source.
+  - name: connectors_loki.reads.TraceProfile
+    kind: struct
+    fields:
+      - {name: name, type: connectors_loki.reads.ProfileName}
+      - {name: selector, type: "List<connectors_loki.reads.LabelMatcher>"}
+      - {name: call_identifier, type: connectors_loki.reads.CallIdentifierSource}
+      - {name: source_label, type: connectors_loki.reads.LabelName}
+    invariants:
+      - selector.count: {gte: 1, lte: 16}
+      - exists:
+          in: selector
+          as: m
+          that: {all: [m.operator == equal, m.value.count >= 1]}
+
+  # `logs.profile_lines` input: the profile, the window, a limit and exact matches on fields
+  # the profile declares filterable. `logs.call_trace` input: the profile, the call
+  # identifier, the window and a limit, nothing else.
+  - name: connectors_loki.reads.ProfileLinesSelection
+    kind: struct
+    fields:
+      - {name: profile, type: connectors_loki.reads.ProfileName}
+      - {name: start_unix_ns, type: String}
+      - {name: end_unix_ns, type: String}
+      - {name: limit, type: "Optional<Integer>"}
+      - {name: match, type: "Optional<Map<connectors_loki.reads.FieldName, String>>"}
+    invariants:
+      - start_unix_ns.count: {gte: 1, lte: 19}
+      - end_unix_ns.count: {gte: 1, lte: 19}
+      - limit: {gte: 1, lte: 1000}
+  - name: connectors_loki.reads.CallTraceSelection
+    kind: struct
+    fields:
+      - {name: profile, type: connectors_loki.reads.ProfileName}
+      - {name: call_id, type: String}
+      - {name: start_unix_ns, type: String}
+      - {name: end_unix_ns, type: String}
+      - {name: limit, type: "Optional<Integer>"}
+    invariants:
+      - call_id.count: {gte: 1, lte: 512}
+      - start_unix_ns.count: {gte: 1, lte: 19}
+      - end_unix_ns.count: {gte: 1, lte: 19}
+      - limit: {gte: 1, lte: 1000}
+
+  # One typed record per selected line, and one trace line.
+  - name: connectors_loki.reads.ProfileRecord
+    kind: struct
+    fields:
+      - {name: timestamp_unix_ns, type: String}
+      - {name: call_id, type: String}
+      - {name: fields, type: "Map<connectors_loki.reads.FieldName, Json>"}
+  - name: connectors_loki.reads.TraceLine
+    kind: struct
+    fields:
+      - {name: timestamp_unix_ns, type: String}
+      - {name: source, type: String}
+      - {name: line, type: String}
+      - {name: line_truncated, type: Boolean}
+
+# ESS-LIMIT (profiles): the composition (adapters/loki/src/profile.rs) refuses these as an
+# invalid configuration and tests/profiles.rs asserts each; the model cannot say them and the
+# composition only ever refuses more. The pattern grammar (at least one named capture, no two
+# adjacent captures, no capture named twice) and that a pattern profile's field key is one of
+# its captures: ESS has no grammar predicate. That a filterable field's key is a MatchedKey
+# (the label name a parser stage extracts and an exact label filter names): `alphabet:` is
+# a property of a type, not a predicate, and the field's key of a never-matched field may be
+# any logfmt key. That a trace profile's call-identifier label is neither selected by its
+# selector nor its source label, and that its call-identifier key is neither a selector label
+# nor its source label: a union member's payload is not readable from a predicate. That the values of `match` name filterable fields of the named
+# profile, that a field's text reads as its declared type, and start < end within one day:
+# the input and the configuration are separate documents, and ESS has no numeric-text
+# predicate (see LogRangeSelection's limit above). `Json` field values are a string, an
+# integer or null, by the field's declared type. A map key reaches the generated schema as
+# its representation (`x-ess-map-key: String`), so `match` keys carry FieldName's alphabet
+# and length only in the descriptor's input schema, which refuses the rest
+# (tests/ess_model.rs asserts that difference).
