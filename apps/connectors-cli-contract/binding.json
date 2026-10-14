@@ -166,21 +166,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -241,7 +269,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -567,21 +596,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -642,7 +699,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -926,21 +984,49 @@
                           "kind": "string"
                         }
                       },
-                      "clock_radius_ms": {
-                        "kind": "optional",
-                        "of": {
-                          "kind": "integer"
-                        }
-                      },
                       "clock_refusal": {
                         "kind": "optional",
                         "of": {
                           "kind": "enum",
                           "variants": [
-                            "unreachable",
-                            "unverified",
+                            "below_quorum",
+                            "split",
                             "too_imprecise"
                           ]
+                        }
+                      },
+                      "clock_sources": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "list",
+                          "of": {
+                            "kind": "struct",
+                            "fields": {
+                              "address": {
+                                "kind": "string"
+                              },
+                              "index": {
+                                "kind": "integer"
+                              },
+                              "radius_ms": {
+                                "kind": "optional",
+                                "of": {
+                                  "kind": "integer"
+                                }
+                              },
+                              "result": {
+                                "kind": "enum",
+                                "variants": [
+                                  "agreed",
+                                  "outlier",
+                                  "verified",
+                                  "unreachable",
+                                  "unverified",
+                                  "too_imprecise"
+                                ]
+                              }
+                            }
+                          }
                         }
                       },
                       "code": {
@@ -1001,7 +1087,8 @@
                             "config_path_unresolved",
                             "config_missing",
                             "config_not_private",
-                            "owner_uid_mismatch"
+                            "owner_uid_mismatch",
+                            "approval_clock_format_retired"
                           ]
                         }
                       },
@@ -1274,21 +1361,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -1349,7 +1464,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -1642,21 +1758,49 @@
                           "kind": "string"
                         }
                       },
-                      "clock_radius_ms": {
-                        "kind": "optional",
-                        "of": {
-                          "kind": "integer"
-                        }
-                      },
                       "clock_refusal": {
                         "kind": "optional",
                         "of": {
                           "kind": "enum",
                           "variants": [
-                            "unreachable",
-                            "unverified",
+                            "below_quorum",
+                            "split",
                             "too_imprecise"
                           ]
+                        }
+                      },
+                      "clock_sources": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "list",
+                          "of": {
+                            "kind": "struct",
+                            "fields": {
+                              "address": {
+                                "kind": "string"
+                              },
+                              "index": {
+                                "kind": "integer"
+                              },
+                              "radius_ms": {
+                                "kind": "optional",
+                                "of": {
+                                  "kind": "integer"
+                                }
+                              },
+                              "result": {
+                                "kind": "enum",
+                                "variants": [
+                                  "agreed",
+                                  "outlier",
+                                  "verified",
+                                  "unreachable",
+                                  "unverified",
+                                  "too_imprecise"
+                                ]
+                              }
+                            }
+                          }
                         }
                       },
                       "code": {
@@ -1717,7 +1861,8 @@
                             "config_path_unresolved",
                             "config_missing",
                             "config_not_private",
-                            "owner_uid_mismatch"
+                            "owner_uid_mismatch",
+                            "approval_clock_format_retired"
                           ]
                         }
                       },
@@ -1990,21 +2135,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -2065,7 +2238,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -2329,6 +2503,37 @@
                 "lower_unix_ms": {
                   "kind": "integer"
                 },
+                "sources": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
+                },
                 "upper_unix_ms": {
                   "kind": "integer"
                 }
@@ -2355,21 +2560,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -2430,7 +2663,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -2739,21 +2973,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -2814,7 +3076,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -3137,21 +3400,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -3212,7 +3503,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -3535,21 +3827,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -3610,7 +3930,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -3933,21 +4254,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -4008,7 +4357,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -4331,21 +4681,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -4406,7 +4784,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -4729,21 +5108,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -4804,7 +5211,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -5121,21 +5529,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -5196,7 +5632,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -5527,21 +5964,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -5602,7 +6067,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -5924,21 +6390,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -5999,7 +6493,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -6502,21 +6997,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -6577,7 +7100,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -6933,21 +7457,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -7008,7 +7560,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -7352,21 +7905,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -7427,7 +8008,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -7718,21 +8300,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -7793,7 +8403,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -8139,21 +8750,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -8214,7 +8853,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -8573,21 +9213,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -8648,7 +9316,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -8995,21 +9664,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -9070,7 +9767,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -9370,21 +10068,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -9445,7 +10171,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -9865,21 +10592,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -9940,7 +10695,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -10259,21 +11015,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -10334,7 +11118,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -10761,21 +11546,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -10836,7 +11649,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -11170,21 +11984,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -11245,7 +12087,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -11577,21 +12420,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -11652,7 +12523,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -11950,21 +12822,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -12025,7 +12925,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -12309,21 +13210,49 @@
                   "kind": "string"
                 }
               },
-              "clock_radius_ms": {
-                "kind": "optional",
-                "of": {
-                  "kind": "integer"
-                }
-              },
               "clock_refusal": {
                 "kind": "optional",
                 "of": {
                   "kind": "enum",
                   "variants": [
-                    "unreachable",
-                    "unverified",
+                    "below_quorum",
+                    "split",
                     "too_imprecise"
                   ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
                 }
               },
               "code": {
@@ -12384,7 +13313,8 @@
                     "config_path_unresolved",
                     "config_missing",
                     "config_not_private",
-                    "owner_uid_mismatch"
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },
@@ -12501,6 +13431,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -12662,6 +13593,51 @@
                   "kind": "string"
                 }
               },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "below_quorum",
+                    "split",
+                    "too_imprecise"
+                  ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified",
+                          "too_imprecise"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -12670,6 +13646,7 @@
                   "configuration_exists",
                   "protected_entry_unavailable",
                   "custody_unavailable",
+                  "custody_read_only",
                   "metadata_unavailable",
                   "revision_conflict",
                   "outcome_unknown",
@@ -12706,7 +13683,21 @@
                   "variants": [
                     "connectors-local/1",
                     "connectors-local/2",
-                    "connectors-local/3"
+                    "connectors-local/3",
+                    "connectors-local/4"
+                  ]
+                }
+              },
+              "configuration_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "config_path_unresolved",
+                    "config_missing",
+                    "config_not_private",
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
                   ]
                 }
               },

@@ -20,7 +20,7 @@ types:
     # attempt ledger" below); nothing expires or is approved on that time.
     # ESS-LIMIT: a deployment must qualify its clock source; ESS 0.40 has no
     # trusted-time construct, so it proves neither the interval's provenance nor
-    # its containment of actual time. lower <= upper and the four-second width
+    # its containment of actual time. lower <= upper and the eight-second width
     # (docs/local-mutation-ledger.md:77) compare two sibling fields and subtract
     # them; ESS 0.40 reads a bare right-hand side as a text literal and has no
     # arithmetic in predicates. No entity or command uses this type: it names
