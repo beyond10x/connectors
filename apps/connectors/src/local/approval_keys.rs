@@ -14,9 +14,9 @@ pub(super) fn execute(
     alias: &str,
     adapter: &Adapter,
 ) -> Result<Value, Error> {
-    let store = Store::new(
+    let store = Store::for_selection(
         &paths.state,
-        config.secret_service_socket.as_deref(),
+        &config.selection(),
         &adapter.instance_id,
         &adapter.adapter_id,
         &adapter.configuration_revision,
@@ -92,6 +92,7 @@ pub(super) fn error(failure: Failure) -> Error {
         Failure::MetadataSchemaNewer(_) => Code::MetadataSchemaNewer,
         Failure::RevisionConflict => Code::RevisionConflict,
         Failure::CustodyUnavailable => Code::CustodyUnavailable,
+        Failure::CustodyReadOnly => Code::CustodyReadOnly,
         Failure::OutcomeUnknown => Code::OutcomeUnknown,
         Failure::Capacity => Code::Capacity,
     }

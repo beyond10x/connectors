@@ -1,0 +1,26 @@
+# Fictional local specification example; no installed artifact or runtime success.
+# The read-only mounted-secret custody binding, selected explicitly
+# (contracts/auth/custody/v1alpha1/semantics.md §5.2). Items are read from
+# <directory>/<adapter alias>/<profile>; no credential bytes are here.
+format = "connectors-local/4"
+owner_uid = 10001
+
+[custody]
+binding = "mounted_secret"
+directory = "/run/connectors/custody"
+
+[adapters.tavily]
+instance_id = "tavily-local"
+adapter_id = "fixture-tavily"
+configuration_revision = "cfg-1"
+protocol = "v1alpha1"
+private_protocol = "connectors-private/1"
+
+[adapters.tavily.executable]
+path = "/opt/connectors/fixture-tavily"
+sha256 = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+args = []
+
+[adapters.tavily.permissions]
+profiles = ["tavily.api-key"]
+operations = []

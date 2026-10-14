@@ -15,6 +15,11 @@ and guarded retirement. [Protected CLI entry and supervised GitLab reads](local-
 now use this binding. `setup check` qualifies the current daemon/storage against this exact
 binding; that prerequisite alone does not establish a usable saved connection.
 
+A headless or container host has no session bus and no keyring. There, an owner
+configuration can explicitly select the sibling, read-only
+[mounted-secret binding](local-mounted-secret-custody.md) instead; nothing selects it
+when this binding is unusable, which still answers `custody_unavailable`.
+
 ## Selected implementation
 
 The initial binding accepts the Arch Linux `gnome-keyring 1:50.0-1` daemon with
@@ -144,3 +149,16 @@ CARGO_BUILD_JOBS=2 cargo test --locked --offline -p connectors-custody -- \
 Set `TMPDIR` and `CARGO_TARGET_DIR` to the task-owned paths described in the
 [development guide](development.md). Qualification results and exact inputs belong
 in dated evidence receipts; an ignored test is not a passing runtime check.
+
+## Threat model
+
+The adversary is anyone other than the configured owner user, plus a careless operator.
+Connectors writes the bytes, from a protected entry source, into the encrypted `login`
+collection; the textual empty-password form is refused. Any process of the same user that
+can reach the unlocked collection over the session bus, and root, can read the items:
+same-user compromise is outside the promise. Item attributes are scoped and verified, the
+writer refuses an existing version, and every storage component is admitted without
+symbolic links. A locked or absent store is `custody_unavailable`, with no prompt and no
+fallback. No value, locator or scope id appears in output, logs or errors. The
+[mounted-secret binding](local-mounted-secret-custody.md#threat-model) compares the two
+side by side.

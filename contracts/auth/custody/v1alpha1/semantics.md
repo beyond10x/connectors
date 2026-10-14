@@ -65,6 +65,7 @@ Outcomes are distinct: `Missing` (never written or deleted), `Unavailable` (back
 - Bounded values: a version is at most 64 KiB (first-profile default; certificates with chains may need more and set it per binding).
 - No private references in diagnostics: read errors, ordinary logs and metrics expose neither values nor custody scope/version/generation ids. Use separately admitted safe correlation and error codes. Access-controlled internal custody state is not a diagnostic export.
 - Durability claims per binding: in-memory claims none; file binding claims fsync-before-return on the owner-only file; a database or Vault binding declares its own. A binding declares the guarantees it does not provide instead of emulating them (`docs/design.md:578`).
+- A read-only binding (`mounted_secret`, §5.2) provides no `write_new`, `confirm` or `delete`: its read capability is the whole of it, and a write against it does not compile. A version is published from a checked, pinned read, not a write. Reclamation deletes nothing it does not own: a retired version of a read-only binding is never deleted, and the mounted item is the platform's.
 - Startup: the host refuses to start an adapter whose required custody binding is missing rather than falling back to another binding (`docs/design.md:816`).
 
 ### 4.1 Scoped version identity and guarded reclamation
@@ -129,9 +130,10 @@ version afterwards does not reach the consumer's copy.
 
 ### 5.1 Platform bindings of the local host
 
-The local host's `versioned` custody has one binding per platform, fixed when the binary is built
-and reported by `setup check` as `custody_backend` (`connectors.cli.CustodyBackend`). No binding
-falls back to another, to a file or to an environment variable; without a usable binding, custody
+The local host's `versioned` custody has one platform binding per build, fixed when the binary is
+built, plus the explicitly selected read-only `mounted_secret` (§5.2). `setup check` reports the
+binding in use as `custody_backend` (`connectors.cli.CustodyBackend`). No binding falls back to
+another, to a file or to an environment variable; without a usable binding, custody
 answers `Unavailable` and the CLI refuses with `custody_unavailable`. None activates, unlocks or
 prompts.
 
@@ -151,6 +153,33 @@ read and `Conflict` rules of §4.1 hold unchanged. One conformance suite, generi
 runs against an in-memory reference on every platform and against each real binding on its own
 platform.
 
+### 5.2 The read-only mounted-secret binding
+
+`mounted_secret` (Linux) reads credentials a platform delivers as files in a read-only mounted
+directory, such as a Kubernetes Secret volume or a read-only bind mount
+([local mounted-secret custody](../../../../docs/local-mounted-secret-custody.md)). It is used only
+when the owner configuration selects it with a `[custody]` table (`connectors-local/4`,
+`connectors.cli.LocalCustodyBinding`); it is never a fallback, and no request selects a binding, a
+directory or an item. The directory is an infrastructure binding of the owner configuration.
+
+| Binding | Store | Value bound | Writes | Unusable directory or item |
+|---|---|---|---|---|
+| `mounted_secret` | items `<adapter alias>/<profile>` in the configured directory, projected (`..data` naming one `..`-prefixed sibling) or flat | 64 KiB | none: no `write_new`, `confirm` or `delete` | `Unavailable` |
+
+Every open is relative to an admitted descriptor with `O_NOFOLLOW`. Every directory above the
+configured one is owned by root or the effective user and is not group- or other-writable; the
+configured directory is owned by root or the effective user and on a read-only mount; `..data` is
+the single symbolic link resolved. An item is a regular file with one link, no write bit, no other
+bit, owned by the effective user or root, on a read-only mount; group read is admitted only on a
+root-owned item whose group the process holds. It is read once from the checked descriptor.
+
+A version pins its bytes with an HMAC-SHA-256 under a random key held owner-only in the state
+directory. A read returns the item's bytes only while they match the pin; otherwise it is `Missing`
+and never serves the new bytes, and the host asks for a revalidation, which publishes them as a new
+version. Under this binding `Missing` therefore never invalidates a version for good. A write that
+the host would make (a refresh-rotating profile, an approval-signing key) is refused as
+`custody_read_only` before any provider exchange.
+
 ## 6. Conformance scenarios (`docs/design.md:986`)
 
 - Write, publish, read: read returns the bytes; a second write creates a new version; the old version stays readable until deleted.
@@ -161,6 +190,9 @@ platform.
 - Crash between write and publish (file binding): after restart the active reference is unchanged and the orphan is reclaimable.
 - Serialize every error and log line produced by the suite; grep for the fixture's secret bytes → no match.
 - Same suite runs against the in-memory and file bindings; provider code untouched (`docs/design.md:1014`).
+- Read-only binding (`mounted_secret`): the read half of the suite runs against it over a read-only mount (`mounted::tests::contract_suite_read_only`); a write, confirm or delete against it does not compile (the `mounted` module's compile-fail examples).
+- Read-only binding checks, one case each with everything else valid: a symbolic link in place of the item, `..data` naming `/`, `../x`, `..` or a name without `..`, a second link, a FIFO, a write bit, an other bit, an owner that is neither root nor the effective user, group read of a group the process does not hold, a writable mount, and a value over the bound. Each is `Unavailable`, and no failure text carries the bytes or a path (`mounted::tests::refuses_each_check`, with the owner case in `an_item_owned_by_another_user_is_refused` and the group case in `group_read_needs_root_and_a_held_group`).
+- Read-only binding, projected layout: an item is read through `..data` only, and a kubelet-style update makes the pinned version `Missing` until it is pinned again (`mounted::tests::projected_layout_reads_through_data`).
 
 ## 7. Compatibility
 
@@ -186,12 +218,14 @@ platform.
 | Active credential reference | Optional Connection reference to CustodyVersion alongside distinct active generation/publication fence; publication couples generation, refresh ownership and revocation. |
 | Refresh coordination | [RefreshAttempt ESS](../../../../ess/domains/refresh.yaml), owned by acquisition/coordinator; not a custody entity or port |
 | External store layout, Vault paths | UNMAPPED, binding-private |
+| Read-only binding pins | binding-private (`custody-mounted/` in the state directory); `store_version` stays opaque |
 
 ## 10. Open decisions
 
 | Decision | Default taken |
 |---|---|
-| Second binding after file | SQLite through the same port tests (old repo had `state-sqlite`); Vault later |
+| Second binding after file | Taken for read-only: `mounted_secret` (§5.2), explicitly selected. A writable file, encrypted-file, SQLite or Vault binding remains open |
+| End state of a read-only binding's retired version | Open: a distinct `Released` state ("not owned; nothing deleted") needs a metadata store migration; until then such a version stays retired and is never deleted |
 | Retention of superseded versions | 24 h |
 | Value bound | 64 KiB, per-binding override for certificate chains |
 
