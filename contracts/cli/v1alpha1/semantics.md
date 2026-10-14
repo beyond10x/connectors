@@ -73,6 +73,7 @@ management wire payload or a persistent record.
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
 | `setup checkpoints-enable` | local metadata store, under the owner lifetime lock | `SetupCheckpointsEnableInput` → `SetupCheckpointsEnableResult` | no / no |
+| `setup owner-stop` | the running owner of the state directory, through its shutdown request ([owner transport](owner.md#stopping-an-owner)) | inputless Context → `SetupOwnerStopResult` | no / no |
 | `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
 | `approvals policy-status` | local policy inspector | `ApprovalPolicyStatusInput` → `ApprovalPolicyResult` | no / no |
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
@@ -360,8 +361,8 @@ starts no local host or adapter and runs in this order:
    waiting and holds it until it returns, so no owner starts meanwhile. A lock
    another process holds, a running owner for this state directory, refuses
    `lifecycle_conflict` (`stage = admission`, `next_action = stop_owner`) with the
-   store unchanged. The command never signals the owner; the user stops the
-   running `__connectors-owner` process, as for `owner_build_mismatch`.
+   store unchanged. The command never signals the owner; the user stops it with
+   `connectors setup owner-stop`, as for `owner_build_mismatch`.
 3. It opens the store as an admitted mutating open under `metadata.lock`, within
    the usual 30-second wait. As every mutating open does, it first migrates a
    level 1–8 database to level 9 ([local metadata](../../../docs/local-er-metadata.md#compatible-migration-from-levels-18)).
@@ -682,10 +683,10 @@ never replay a possible write after interruption, timeout or lost response.
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
-| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`) | `lifecycle_conflict` | 1 |
+| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
-| running owner is a different executable build (`next_action = stop_owner`) | `owner_build_mismatch` | 1 |
+| running owner is a different executable build (`next_action = stop_owner`: run `connectors setup owner-stop`) | `owner_build_mismatch` | 1 |
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
@@ -694,6 +695,9 @@ never replay a possible write after interruption, timeout or lost response.
 | known revoked connection | `revoked` | 1 |
 | current permission missing | `forbidden` (or shared `not_granted`) | 1 |
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
+| `setup owner-stop`: state directory, owner socket or lock file of another user (`stage = stop`, `next_action = check_configuration`) | `forbidden` | 1 |
+| `setup owner-stop`: the lifetime lock is held and no owner answers within the bound; nothing is signalled (`stage = stop`, `next_action = retry_explicitly`) | `unavailable` | 1 |
+| `setup owner-stop`: the owner accepted the request and still holds the lifetime lock at the bound (`stage = stop`, `next_action = retry_explicitly`) | `timeout` | 1 |
 | user interruption | `interrupted` | 130 |
 
 A configuration whose adapter entry contradicts its format — a

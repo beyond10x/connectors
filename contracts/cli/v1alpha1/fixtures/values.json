@@ -336,6 +336,75 @@
       }
     },
     {
+      "id": "owner-stop-stopped-names-the-incarnation",
+      "type": "connectors.cli.SetupOwnerStopResult",
+      "valid": true,
+      "value": {
+        "disposition": "stopped",
+        "state_path": "/fixture/.local/state/connectors",
+        "host_incarnation": "0b8d6b1e-3c55-4f7a-9d0e-2f6a4c1b7e90"
+      }
+    },
+    {
+      "id": "owner-stop-no-owner-is-a-typed-outcome",
+      "type": "connectors.cli.SetupOwnerStopResult",
+      "valid": true,
+      "value": {
+        "disposition": "no_owner",
+        "state_path": "/fixture/.local/state/connectors"
+      }
+    },
+    {
+      "id": "owner-stop-disposition-is-closed",
+      "type": "connectors.cli.SetupOwnerStopResult",
+      "valid": false,
+      "value": {
+        "disposition": "killed",
+        "state_path": "/fixture/.local/state/connectors"
+      }
+    },
+    {
+      "id": "owner-stop-result-names-the-state-directory",
+      "type": "connectors.cli.SetupOwnerStopResult",
+      "valid": false,
+      "value": {
+        "disposition": "no_owner"
+      }
+    },
+    {
+      "id": "owner-stop-owner-does-not-answer",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "stop",
+        "next_action": "retry_explicitly"
+      }
+    },
+    {
+      "id": "owner-stop-owner-does-not-exit-in-time",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "timeout",
+        "stage": "stop",
+        "next_action": "retry_explicitly"
+      }
+    },
+    {
+      "id": "owner-stop-owner-of-another-user",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "forbidden",
+        "stage": "stop",
+        "next_action": "check_configuration"
+      }
+    },
+    {
       "id": "valid-AdapterListInput-3",
       "type": "connectors.cli.AdapterListInput",
       "valid": true,
