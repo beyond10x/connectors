@@ -184,7 +184,13 @@ impl Configuration {
             .set_read_timeout(Some(remaining(deadline).map_err(|_| Cause::Unreachable)?))
             .map_err(|_| Cause::Unreachable)?;
         let mut bytes = [0u8; protocol::PACKET_SIZE + 1];
-        let n = socket.recv(&mut bytes).map_err(|_| Cause::Unreachable)?;
+        let n = match socket.recv(&mut bytes) {
+            Ok(n) => n,
+            // Windows refuses a datagram longer than the buffer (WSAEMSGSIZE) where other
+            // systems truncate it; either way the source answered with an overlong reply.
+            Err(e) if cfg!(windows) && e.raw_os_error() == Some(10040) => bytes.len(),
+            Err(_) => return Err(Cause::Unreachable.into()),
+        };
         let received = Stamp::read()?;
         remaining(deadline).map_err(|_| Cause::Unreachable)?;
         started.continuous_with(received)?;
