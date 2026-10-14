@@ -484,6 +484,9 @@ impl Metadata {
                 |row| row.get(0),
             )
             .map_err(unavailable)?;
+        if app == APPLICATION_ID && owner == fs::uid() {
+            newer_level(version, er::LEVEL)?;
+        }
         if app != APPLICATION_ID || !(1..=er::LEVEL).contains(&version) || owner != fs::uid() {
             return Err(Failure::MetadataUnavailable);
         }
@@ -1049,6 +1052,9 @@ impl Metadata {
             .pragma_query_value(None, "journal_mode", |row| row.get(0))
             .map_err(unavailable)?;
         let recorded = self.er.is_some();
+        if !recorded && app == APPLICATION_ID {
+            newer_level(version, er::LEVEL)?;
+        }
         if app != APPLICATION_ID
             || if recorded {
                 !(1..=8).contains(&version) || mode != "memory"
@@ -1240,6 +1246,18 @@ fn migration_digest() -> String {
     hex::encode(Sha256::digest(MIGRATION.as_bytes()))
 }
 
+/// A recorded level above `highest`, the highest this binary knows, was
+/// written by a newer binary that migrated the store: `metadata_schema_newer`,
+/// naming no release, since its marker would be read through a schema this
+/// binary does not know (semantics.md §3). Only a store carrying this
+/// project's application id is judged by its level.
+fn newer_level(level: i64, highest: i64) -> Result<()> {
+    if level > highest {
+        return Err(Failure::MetadataSchemaNewer(None));
+    }
+    Ok(())
+}
+
 fn unavailable(_: rusqlite::Error) -> Failure {
     Failure::MetadataUnavailable
 }
@@ -1350,11 +1368,7 @@ mod tests {
 
     /// A model digest no build persists.
     const OTHER_MODEL: &str = "0000000000000000000000000000000000000000000000000000000000000000";
-    const NEWER: Release = Release {
-        major: 999,
-        minor: 0,
-        patch: 0,
-    };
+    const NEWER: Release = Release::new(999, 0, 0);
 
     fn fresh_store() -> (tempfile::TempDir, PathBuf) {
         let root = tempfile::tempdir().unwrap();
@@ -1375,9 +1389,111 @@ mod tests {
     fn the_build_version_is_a_release_and_releases_order_numerically() {
         assert_eq!(Release::current().to_string(), BUILD_VERSION);
         assert!(Release::parse("0.10.0") > Release::parse("0.9.12"));
-        for refused in ["0.50", "0.50.0.1", "0.50.0-rc.1", "0..1", "", "v0.50.0"] {
+        for refused in ["0.50", "0.50.0.1", "0..1", "", "v0.50.0"] {
             assert_eq!(Release::parse(refused), None, "{refused}");
         }
+    }
+
+    /// A pre-release is ordered by SemVer 2.0.0 precedence (§11); build
+    /// metadata does not take part in it. Only what cannot be ordered, or a
+    /// pre-release longer than the bound, is refused.
+    #[test]
+    fn pre_releases_order_by_semver_precedence() {
+        let ordered = [
+            "0.49.9",
+            "1.0.0-alpha",
+            "1.0.0-alpha.1",
+            "1.0.0-alpha.beta",
+            "1.0.0-beta",
+            "1.0.0-beta.2",
+            "1.0.0-beta.11",
+            "1.0.0-rc.1",
+            "1.0.0",
+            "1.0.1-0",
+        ];
+        let parsed = ordered
+            .iter()
+            .map(|text| Release::parse(text).unwrap_or_else(|| panic!("{text}")))
+            .collect::<Vec<_>>();
+        for pair in parsed.windows(2) {
+            assert!(pair[0] < pair[1], "{} < {}", pair[0], pair[1]);
+        }
+        for (text, release) in ordered.iter().zip(&parsed) {
+            assert_eq!(release.to_string(), *text);
+        }
+        assert_eq!(Release::parse("1.0.0+build.7"), Release::parse("1.0.0"));
+        assert_eq!(
+            Release::parse("1.0.0-rc.1+build.7"),
+            Release::parse("1.0.0-rc.1")
+        );
+        let bound = "a".repeat(super::super::PRE_RELEASE_BOUND);
+        assert!(Release::parse(&format!("1.0.0-{bound}")).is_some());
+        for refused in [
+            "1.0.0-".to_owned(),
+            "1.0.0-01".to_owned(),
+            "1.0.0-rc..1".to_owned(),
+            "1.0.0-rc_1".to_owned(),
+            "1.0.0+".to_owned(),
+            "1.0.0+a..b".to_owned(),
+            format!("1.0.0-{bound}a"),
+        ] {
+            assert_eq!(Release::parse(&refused), None, "{refused}");
+        }
+    }
+
+    /// A marker version this binary cannot order: another model is a newer
+    /// store it cannot name; its own model is admitted and the marker kept,
+    /// since a version it cannot order is never known to be lower.
+    #[test]
+    fn an_unorderable_marker_is_newer_unrecorded_unless_the_model_is_the_same() {
+        let (_root, path) = fresh_store();
+        Metadata::record_writer_for_tests(&path, "edited", OTHER_MODEL).unwrap();
+        let refused = Some(Failure::MetadataSchemaNewer(None));
+        assert_eq!(Metadata::inspect(&path).err(), refused);
+        assert_eq!(Metadata::update(&path, false).err(), refused);
+        let (_root, path) = fresh_store();
+        let model = Metadata::model_digest().unwrap();
+        Metadata::record_writer_for_tests(&path, "edited", model).unwrap();
+        State::new(&path).suppress("fixture", true).unwrap();
+        assert_eq!(
+            Metadata::writer_for_tests(&path).unwrap(),
+            Some(("edited".to_owned(), model.to_owned()))
+        );
+    }
+
+    /// A store level above this binary's highest was written by a newer binary
+    /// that migrated it: every open refuses it before any record is replayed.
+    #[test]
+    fn a_level_above_this_binary_is_a_newer_store_unrecorded() {
+        let refused = Some(Failure::MetadataSchemaNewer(None));
+        let (_root, path) = fresh_store();
+        let connection = Connection::open(path.join(NAME)).unwrap();
+        connection
+            .pragma_update(None, "user_version", er::LEVEL + 1)
+            .unwrap();
+        drop(connection);
+        assert_eq!(Metadata::inspect(&path).err(), refused);
+        assert_eq!(Metadata::update(&path, false).err(), refused);
+        assert_eq!(Metadata::start_owner(&path).err(), refused);
+        assert_eq!(Metadata::authority_at(&path).err(), refused);
+        assert_eq!(Metadata::initialize(&path).err(), refused);
+    }
+
+    /// The recorded projection level cannot pass this binary's highest without
+    /// a migration: the authority table's own CHECK bounds it, so a newer
+    /// binary that raised it raised the store's level too.
+    #[test]
+    fn a_projection_level_above_this_binary_needs_a_newer_store_level() {
+        let (_root, path) = fresh_store();
+        let connection = Connection::open(path.join(NAME)).unwrap();
+        assert!(
+            connection
+                .execute(
+                    "UPDATE connectors_er_authority SET projection_level=9 WHERE singleton=1",
+                    [],
+                )
+                .is_err()
+        );
     }
 
     /// semantics.md §3: a store whose marker names a newer release with another

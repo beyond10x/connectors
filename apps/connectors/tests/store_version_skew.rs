@@ -185,3 +185,68 @@ fn a_store_without_a_marker_is_admitted_and_marked_by_its_first_write() {
         ))
     );
 }
+
+/// A pre-release is a release this binary orders by SemVer precedence: the
+/// marker names a newer one, so the store is refused naming it.
+#[test]
+fn a_newer_pre_release_marker_is_ordered_and_named() {
+    let root = configured();
+    let pre_release = "999.0.0-rc.1";
+    Metadata::record_writer_for_tests(&state(&root), pre_release, OTHER_MODEL).unwrap();
+    assert_schema_newer(
+        &command(&root, &["connections", "list", "--adapter", "forge"]),
+        pre_release,
+    );
+    assert_schema_newer(&command(&root, &["setup", "check"]), pre_release);
+}
+
+/// A marker version this binary cannot order (an edited store) under another
+/// model is refused as a newer store it cannot name, never as unavailable.
+#[test]
+fn an_unorderable_marker_version_with_another_model_is_a_newer_store_unrecorded() {
+    let root = configured();
+    Metadata::record_writer_for_tests(&state(&root), "edited", OTHER_MODEL).unwrap();
+    assert_schema_newer(
+        &command(&root, &["connections", "list", "--adapter", "forge"]),
+        "unrecorded",
+    );
+    assert_schema_newer(&command(&root, &["setup", "check"]), "unrecorded");
+}
+
+/// A store whose SQL level is above this binary's highest: a newer binary
+/// migrated it. Its marker is not read through a schema this binary does not
+/// know, so the refusal names no version.
+#[test]
+fn a_store_level_above_this_binary_is_a_newer_store_unrecorded() {
+    let root = configured();
+    Metadata::record_writer_for_tests(&state(&root), NEWER, OTHER_MODEL).unwrap();
+    let connection = rusqlite::Connection::open(state(&root).join("metadata.sqlite3")).unwrap();
+    let level: i64 = connection
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap();
+    connection
+        .pragma_update(None, "user_version", level + 1)
+        .unwrap();
+    drop(connection);
+    assert_schema_newer(
+        &command(&root, &["connections", "list", "--adapter", "forge"]),
+        "unrecorded",
+    );
+    assert_schema_newer(&command(&root, &["setup", "check"]), "unrecorded");
+    assert_schema_newer(
+        &command(
+            &root,
+            &[
+                "connections",
+                "revoke",
+                "--adapter",
+                "forge",
+                "--connection",
+                "absent",
+                "--expected-revision",
+                "1",
+            ],
+        ),
+        "unrecorded",
+    );
+}

@@ -58,9 +58,8 @@ fn configured() -> tempfile::TempDir {
 
 /// The failure a newer store must answer: not a retryable unavailability.
 fn assert_not_retryable_newer(output: &Output) {
-    let value: Value = serde_json::from_slice(&output.stderr).unwrap_or_else(|_| {
-        serde_json::from_slice(&output.stdout).unwrap_or(Value::Null)
-    });
+    let value: Value = serde_json::from_slice(&output.stderr)
+        .unwrap_or_else(|_| serde_json::from_slice(&output.stdout).unwrap_or(Value::Null));
     let data = &value["error"]["data"];
     assert_eq!(
         (data["code"].as_str(), data["next_action"].as_str()),
@@ -80,7 +79,10 @@ fn assert_not_retryable_newer(output: &Output) {
 fn adversary_an_unparseable_marker_version_is_not_a_retryable_unavailability() {
     let root = configured();
     Metadata::record_writer_for_tests(&state(&root), "1.0.0-rc.1", OTHER_MODEL).unwrap();
-    assert_not_retryable_newer(&command(&root, &["connections", "list", "--adapter", "forge"]));
+    assert_not_retryable_newer(&command(
+        &root,
+        &["connections", "list", "--adapter", "forge"],
+    ));
 }
 
 /// A future release that adds a SQL migration level (the store has had nine)
@@ -100,5 +102,8 @@ fn adversary_a_store_a_newer_binary_raised_past_this_level_is_refused_by_name() 
         .pragma_update(None, "user_version", level + 1)
         .unwrap();
     drop(connection);
-    assert_not_retryable_newer(&command(&root, &["connections", "list", "--adapter", "forge"]));
+    assert_not_retryable_newer(&command(
+        &root,
+        &["connections", "list", "--adapter", "forge"],
+    ));
 }

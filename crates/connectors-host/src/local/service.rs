@@ -456,11 +456,8 @@ mod tests {
         mode(&path, 0o700);
         let state = ServiceState::open(&path, "leaf", "fixture", "rev-1").unwrap();
         Metadata::record_writer_for_tests(&path, "999.0.0", &"0".repeat(64)).unwrap();
-        let refused = ledger::Failure::MetadataSchemaNewer(Some(super::super::Release {
-            major: 999,
-            minor: 0,
-            patch: 0,
-        }));
+        let refused =
+            ledger::Failure::MetadataSchemaNewer(Some(super::super::Release::new(999, 0, 0)));
         assert_eq!(state.attempt_count().err(), Some(refused));
         assert_eq!(
             state.attempt(&Uuid::new_v4().to_string()).err(),
