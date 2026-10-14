@@ -45,13 +45,21 @@ fn fixture(name: &str) -> Vec<u8> {
     .unwrap()
 }
 
-/// One received request: method, target with its query, and authorization.
+/// One received request: method, target with its query, authorization, the stack header
+/// (empty when absent) and the body.
 #[derive(Clone, Debug)]
 struct Call {
     method: String,
     target: String,
     authorization: String,
+    stack: String,
+    body: Vec<u8>,
 }
+
+/// The IRM API URL's path on the fixture server.
+const IRM_PREFIX: &str = "/oncall/";
+const QUERY_INCIDENTS: &str =
+    "/api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.QueryIncidents";
 
 struct Provider {
     stop: Option<oneshot::Sender<()>>,
@@ -61,25 +69,51 @@ struct Provider {
     calls: Arc<Mutex<Vec<Call>>>,
     /// Non-zero forces this status on `GET /api/datasources`.
     probe_status: Arc<AtomicU16>,
+    /// Non-zero forces this status on the IRM probe.
+    irm_probe_status: Arc<AtomicU16>,
 }
 
 /// The answer to one request: the recorded fixture its route selects.
-fn answer(method: &str, target: &str, authorization: &str, probe: u16) -> (u16, Vec<u8>) {
+fn answer(
+    method: &str,
+    target: &str,
+    authorization: &str,
+    probe: u16,
+    irm_probe: u16,
+) -> (u16, Vec<u8>) {
     if authorization != format!("Bearer {TOKEN_ONE}")
         && authorization != format!("Bearer {TOKEN_TWO}")
     {
         return (401, br#"{"message":"Unauthorized"}"#.to_vec());
     }
-    let route = target.split('?').next().unwrap_or_default();
+    let (route, query) = target.split_once('?').unwrap_or((target, ""));
+    let alert_groups = format!("{IRM_PREFIX}api/v1/alert_groups/");
     match (method, route) {
         ("GET", "/api/datasources") if probe != 0 => (probe, b"{}".to_vec()),
         ("GET", "/api/datasources") => (200, fixture("datasources.json")),
+        // The IRM probe: the fixed one-second window, one record per page.
+        ("GET", r) if r == alert_groups && query.ends_with("&perpage=1") => {
+            if irm_probe != 0 {
+                (irm_probe, b"{}".to_vec())
+            } else {
+                (
+                    200,
+                    br#"{"count":0,"next":null,"previous":null,"results":[]}"#.to_vec(),
+                )
+            }
+        }
+        ("GET", r) if r == alert_groups => (200, fixture("alert_groups_page2.json")),
+        ("POST", QUERY_INCIDENTS) => (200, fixture("incidents_page2.json")),
         _ => (404, br#"{"message":"Not found"}"#.to_vec()),
     }
 }
 
 impl Provider {
+    /// A stack with IRM: the configuration names `irm_api_url` on the same fixture server.
     fn new() -> Self {
+        Self::with_irm(true)
+    }
+    fn with_irm(irm: bool) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -103,6 +137,8 @@ impl Provider {
         let observed = calls.clone();
         let probe_status = Arc::new(AtomicU16::new(0));
         let forced = probe_status.clone();
+        let irm_probe_status = Arc::new(AtomicU16::new(0));
+        let irm_forced = irm_probe_status.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -129,41 +165,58 @@ impl Provider {
                     let mut line = request.split_whitespace();
                     let method = line.next().unwrap_or_default().to_owned();
                     let target = line.next().unwrap_or_default().to_owned();
-                    let authorization = request
-                        .lines()
-                        .filter_map(|l| l.split_once(':'))
-                        .find(|(name, _)| name.eq_ignore_ascii_case("authorization"))
-                        .map(|(_, value)| value.trim().to_owned())
-                        .unwrap_or_default();
-                    let (status, body) =
-                        answer(&method, &target, &authorization, forced.load(Ordering::SeqCst));
+                    let named = |wanted: &str| {
+                        request
+                            .lines()
+                            .filter_map(|l| l.split_once(':'))
+                            .find(|(name, _)| name.eq_ignore_ascii_case(wanted))
+                            .map(|(_, value)| value.trim().to_owned())
+                            .unwrap_or_default()
+                    };
+                    let authorization = named("authorization");
+                    let stack = named("x-grafana-url");
+                    let length: usize = named("content-length").parse().unwrap_or(0);
+                    assert!(length <= 64 * 1024, "fixture body bound");
+                    let mut body = vec![0; length];
+                    if stream.read_exact(&mut body).await.is_err() {
+                        continue;
+                    }
+                    let (status, answered) = answer(
+                        &method,
+                        &target,
+                        &authorization,
+                        forced.load(Ordering::SeqCst),
+                        irm_forced.load(Ordering::SeqCst),
+                    );
                     observed.lock().unwrap().push(Call {
                         method,
                         target,
                         authorization,
+                        stack,
+                        body,
                     });
                     let head = format!(
                         "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        body.len()
+                        answered.len()
                     );
                     let _ = stream.write_all(head.as_bytes()).await;
-                    let _ = stream.write_all(&body).await;
+                    let _ = stream.write_all(&answered).await;
                     let _ = stream.shutdown().await;
                 }
             });
         });
         let port = address_rx.recv().unwrap().port();
         let config = directory.join("grafana.json");
-        private(
-            &config,
-            &serde_json::to_vec(&json!({
-                "format": "connectors-grafana-local/1",
-                "instance": INSTANCE,
-                "base_url": format!("https://localhost:{port}/"),
-                "ca_file": ca,
-            }))
-            .unwrap(),
-        );
+        let mut document = json!({
+            "format": "connectors-grafana-local/1",
+            "instance": INSTANCE,
+            "base_url": format!("https://localhost:{port}/"),
+            "ca_file": ca,
+        });
+        if irm {
+            document["irm_api_url"] = json!(format!("https://localhost:{port}{IRM_PREFIX}"));
+        }
+        private(&config, &serde_json::to_vec(&document).unwrap());
         Self {
             stop: Some(stop),
             thread: Some(thread),
@@ -171,6 +224,7 @@ impl Provider {
             config,
             calls,
             probe_status,
+            irm_probe_status,
         }
     }
     fn selection(&self) -> Adapter {
@@ -209,6 +263,15 @@ impl Provider {
                 ],
             },
         }
+    }
+    /// The configured stack URL as the IRM API is told it: without its final `/`.
+    fn stack_url(&self) -> String {
+        let document: Value = serde_json::from_slice(&fs::read(&self.config).unwrap()).unwrap();
+        document["base_url"]
+            .as_str()
+            .unwrap()
+            .trim_end_matches('/')
+            .to_owned()
     }
     fn count(&self) -> usize {
         self.calls.lock().unwrap().len()
@@ -254,22 +317,43 @@ fn invoke(child: &mut Child, operation: &str, input: Value) -> Result<Value, Fai
 }
 
 #[test]
-fn the_bootstrap_advertises_the_service_account_profile_and_one_read() {
-    let provider = Provider::new();
-    let child = Child::spawn(&provider.selection()).unwrap();
-    let bootstrap = child.bootstrap();
-    assert_eq!(bootstrap.adapter, "grafana");
-    assert_eq!(bootstrap.instance, INSTANCE);
-    let profiles: Vec<&str> = bootstrap.profiles.iter().map(|p| p.id.as_str()).collect();
-    assert_eq!(profiles, ["grafana.service_account"]);
-    let operations: Vec<(&str, bool)> = bootstrap
-        .requirements
-        .iter()
-        .map(|r| (r.operation.as_str(), r.effect == Effect::Read))
-        .collect();
-    assert_eq!(operations, [("datasources.list", true)]);
-    // Spawning and describing perform no provider work.
-    assert_eq!(provider.count(), 0);
+fn the_bootstrap_advertises_both_service_account_profiles_and_only_reads() {
+    // With and without the IRM API URL the surface is the same; only what answers differs.
+    for irm in [true, false] {
+        let provider = Provider::with_irm(irm);
+        let child = Child::spawn(&provider.selection()).unwrap();
+        let bootstrap = child.bootstrap();
+        assert_eq!(bootstrap.adapter, "grafana");
+        assert_eq!(bootstrap.instance, INSTANCE);
+        let profiles: Vec<&str> = bootstrap.profiles.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(
+            profiles,
+            ["grafana.service_account", "grafana.irm_service_account"]
+        );
+        let operations: Vec<(&str, &str, bool)> = bootstrap
+            .requirements
+            .iter()
+            .map(|r| {
+                (
+                    r.operation.as_str(),
+                    r.profile.as_str(),
+                    r.effect == Effect::Read,
+                )
+            })
+            .collect();
+        assert_eq!(
+            operations,
+            [
+                ("datasources.list", "grafana.service_account", true),
+                ("irm.alert_groups.list", "grafana.irm_service_account", true),
+                ("irm.alert_group.get", "grafana.irm_service_account", true),
+                ("irm.incidents.list", "grafana.irm_service_account", true),
+                ("irm.incident.get", "grafana.irm_service_account", true),
+            ]
+        );
+        // Spawning and describing perform no provider work.
+        assert_eq!(provider.count(), 0);
+    }
 }
 
 #[test]
@@ -416,4 +500,129 @@ fn a_changed_configuration_refuses_the_cached_selection_before_provider_work() {
         Err(Failure::ReadinessMismatch)
     ));
     assert_eq!(provider.count(), 0);
+}
+
+/// story:grafana-irm-history-reads: a connection made under `grafana.irm_service_account`
+/// is proved by the IRM probe, and reads alert groups and incidents through the private
+/// runtime from the recorded answers.
+#[test]
+fn a_saved_irm_connection_reads_alert_groups_and_incidents_through_the_private_runtime() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let baseline = child
+        .validate("grafana.irm_service_account", &token(TOKEN_ONE), deadline())
+        .unwrap_or_else(|f| {
+            panic!(
+                "validation {f:?}; calls {:?}",
+                provider.calls.lock().unwrap()
+            )
+        });
+    assert_eq!(baseline.identity.kind, "grafana.connection");
+    assert_eq!(baseline.identity.subject, INSTANCE);
+    assert_eq!(baseline.valid_until_ms - baseline.collected_at_ms, 60_000);
+    let stack = provider.stack_url();
+    {
+        let calls = provider.calls.lock().unwrap();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].method, "GET");
+        assert_eq!(
+            calls[0].target,
+            "/oncall/api/v1/alert_groups/?started_at=2000-01-01T00%3A00%3A00_2000-01-01T00%3A00%3A01&perpage=1"
+        );
+        assert_eq!(calls[0].authorization, format!("Bearer {TOKEN_ONE}"));
+        assert_eq!(calls[0].stack, stack);
+    }
+    for (status, expected) in [
+        (401, Failure::InvalidCredential),
+        (403, Failure::InvalidCredential),
+        (429, Failure::Unavailable),
+        (503, Failure::Unavailable),
+        (404, Failure::Protocol),
+    ] {
+        provider.irm_probe_status.store(status, Ordering::SeqCst);
+        let result = child.validate("grafana.irm_service_account", &token(TOKEN_ONE), deadline());
+        assert!(
+            matches!(&result, Err(failure) if *failure == expected),
+            "status {status}: {:?}",
+            result.err()
+        );
+    }
+    provider.irm_probe_status.store(0, Ordering::SeqCst);
+
+    let before = provider.count();
+    let groups = invoke(
+        &mut child,
+        "irm.alert_groups.list",
+        json!({"since": "2026-01-01T00:00:00Z", "until": "2026-01-02T00:00:00Z"}),
+    )
+    .unwrap();
+    assert_eq!(groups["provenance"]["instance"], INSTANCE);
+    assert_eq!(groups["provenance"]["resource"], "grafana:irm.alert_groups");
+    assert_eq!(groups["complete"], true);
+    assert_eq!(groups["items"][0]["id"], "I9LPV30QXJ5KM");
+    assert!(!groups.to_string().contains("fixture-private"));
+    let incidents = invoke(
+        &mut child,
+        "irm.incidents.list",
+        json!({"since": "2026-01-01T00:00:00Z", "until": "2026-01-02T00:00:00Z"}),
+    )
+    .unwrap();
+    assert_eq!(incidents["provenance"]["resource"], "grafana:irm.incidents");
+    assert_eq!(incidents["items"][0]["incident_id"], "incident-103");
+    assert_eq!(
+        incidents["links"],
+        json!([{"incident_id": "incident-103", "alert_group_id": "I9LPV30QXJ5KM"}])
+    );
+    let calls = provider.calls.lock().unwrap();
+    let read = &calls[before..];
+    assert_eq!(read.len(), 2);
+    assert_eq!(read[0].method, "GET");
+    assert!(
+        read[0]
+            .target
+            .starts_with("/oncall/api/v1/alert_groups/?started_at=")
+    );
+    assert_eq!(read[0].stack, stack);
+    assert_eq!(read[1].method, "POST");
+    assert_eq!(read[1].target, format!("{QUERY_INCIDENTS}?"));
+    // The incident service is the stack itself; the stack header belongs to the IRM API.
+    assert_eq!(read[1].stack, "");
+    let body: Value = serde_json::from_slice(&read[1].body).unwrap();
+    assert_eq!(body["query"]["dateFrom"], "2026-01-01T00:00:00Z");
+    assert!(
+        read.iter()
+            .all(|c| c.authorization == format!("Bearer {TOKEN_ONE}"))
+    );
+}
+
+#[test]
+fn without_an_irm_api_url_the_irm_profile_and_reads_are_unavailable_before_provider_work() {
+    let provider = Provider::with_irm(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    assert!(matches!(
+        child.validate("grafana.irm_service_account", &token(TOKEN_ONE), deadline()),
+        Err(Failure::Unavailable)
+    ));
+    for (operation, input) in [
+        (
+            "irm.alert_groups.list",
+            json!({"since": "2026-01-01T00:00:00Z", "until": "2026-01-02T00:00:00Z"}),
+        ),
+        ("irm.alert_group.get", json!({"alert_group_id": "I1"})),
+        (
+            "irm.incidents.list",
+            json!({"since": "2026-01-01T00:00:00Z", "until": "2026-01-02T00:00:00Z"}),
+        ),
+        ("irm.incident.get", json!({"incident_id": "incident-1"})),
+    ] {
+        assert_eq!(
+            invoke(&mut child, operation, input),
+            Err(Failure::Unavailable),
+            "{operation}"
+        );
+    }
+    assert_eq!(provider.count(), 0);
+    // The data-source read is unchanged.
+    invoke(&mut child, "datasources.list", json!({})).unwrap();
+    assert_eq!(provider.routes(), ["/api/datasources"]);
 }

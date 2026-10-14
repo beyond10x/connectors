@@ -1,6 +1,6 @@
 [package]
 name = "connectors-grafana"
-description = "Grafana adapter: bounded data-source records from the Grafana HTTP API, one GET."
+description = "Grafana adapter: bounded data-source records from the Grafana HTTP API, and read-only IRM alert groups, incidents and their links over a since window."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
