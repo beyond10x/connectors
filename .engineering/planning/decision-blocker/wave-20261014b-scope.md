@@ -9,7 +9,8 @@ relations:
 - blocks: story:incident-call-traces
 - serves: vision:independent-contract-adapters
 - blocks: story:parity-slack-message-writes
-revision: 4
+- blocks: story:release-ships-catalog-provider
+revision: 5
 transitions:
 - {from: "open", to: "cleared", at: "2026-10-14T05:12:41Z", actor: "human:timo", revision: 2}
 ---
@@ -44,11 +45,12 @@ mounted custody, which merges in wave 20261014a.
 
 | unit | tree | branch | base | stage |
 |---|---|---|---|---|
-| story:incident-call-lookup (SQL read profile) | conn-u-lookup-sql | impl/incident-call-lookup-sql | 362d99320 | dispatched |
-| story:incident-call-lookup (Loki line profile), story:incident-call-traces | conn-u-loki-profiles | impl/incident-call-loki-profiles | 362d99320 | dispatched |
-| story:incident-call-lookup (cross-source join test) | conn-u-call-join | impl/incident-call-join | fedbfd5ca | dispatched |
+| story:incident-call-lookup (SQL read profile) | conn-u-lookup-sql | impl/incident-call-lookup-sql | 362d99320 | merged; adversary fixes in round 2 |
+| story:incident-call-lookup (Loki line profile), story:incident-call-traces | conn-u-loki-profiles | impl/incident-call-loki-profiles | 362d99320 | merged; adversary fixes in round 2 |
+| story:incident-call-lookup (cross-source join test) | conn-u-call-join | impl/incident-call-join | fedbfd5ca | merged |
 | story:parity-slack-message-writes | conn-u-slack-writes | impl/parity-slack-message-writes | fedbfd5ca | dispatched |
 | docs: moving a local install from `slack-credentials` to the catalog provider | conn-u-slack-migration | docs/slack-local-migration | fedbfd5ca | dispatched |
+| story:release-ships-catalog-provider | conn-u-release-provider | impl/release-ships-catalog-provider | 42ea39f46 | dispatched |
 
 Widened 2026-10-14: Slack message edit and delete (U08) joins the wave; it shares no source file
 with the SQL and Loki units. docs/catalog-slack.md is edited by both Slack units in different
