@@ -670,3 +670,50 @@ fn a_changed_configuration_refuses_key_status_as_a_changed_binding() {
     );
     assert!(store("adapter", "config").status().unwrap().is_none());
 }
+
+/// Under the read-only `mounted_secret` selection, signing with and retiring
+/// a key are refused by name before any custody is opened: the store and the
+/// key use name a bus socket that does not exist, which an opened custody
+/// would report as `CustodyUnavailable`, and no session keyring is reached.
+#[test]
+fn read_only_selection_refuses_signing_and_retirement_before_custody() {
+    let root = tempfile::tempdir_in(std::env::var_os("TMPDIR").unwrap()).unwrap();
+    let state = root.path().join("state");
+    fs::directory(&state, true, true).unwrap();
+    drop(Metadata::initialize(&state).unwrap());
+    let missing = root.path().join("missing-bus");
+    let selection = crate::local::config::Selection::Mounted {
+        directory: root.path().join("custody"),
+    };
+    let mut store = Store::for_selection(&state, &selection, "instance", "adapter", "cfg").unwrap();
+    store.socket = Some(missing.clone());
+    assert_eq!(
+        store.retire(Uuid::new_v4(), Uuid::new_v4()).unwrap_err(),
+        Failure::CustodyReadOnly
+    );
+    let use_key = KeyUse {
+        lease: Lease::acquire(&state, true).unwrap(),
+        key: approvals::ConfiguredApprovalKey {
+            issuer: "issuer".into(),
+            audience: "audience".into(),
+            kid: Uuid::new_v4().to_string(),
+            public_key: "unused".into(),
+            not_before_unix_ms: 0,
+            not_after_unix_ms: MAX_TIME,
+            revoked: false,
+        },
+        version: custody::Version::new(
+            custody::Scope::approval_signing(Uuid::new_v4(), Uuid::new_v4()).unwrap(),
+            Uuid::new_v4(),
+        )
+        .unwrap(),
+        socket: Some(missing),
+        read_only: store.read_only,
+    };
+    assert_eq!(
+        use_key
+            .with_signer(|_| -> Result<()> { panic!("no signer under a read-only selection") })
+            .unwrap_err(),
+        Failure::CustodyReadOnly
+    );
+}

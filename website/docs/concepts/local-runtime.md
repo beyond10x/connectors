@@ -3,7 +3,7 @@ title: The local runtime
 sidebar_position: 4
 description: How the local connectors CLI supervises adapters, keeps credentials in custody, records metadata and runs approved writes.
 lede: The local CLI never holds a credential in a file or a command line; a local owner supervises exact adapter processes, the keyring holds credentials and Entity Runtime records everything else.
-source: contracts/cli/v1alpha1/semantics.md, docs/local-er-metadata.md, docs/local-approvals.md, docs/local-clock.md, docs/local-consumer-launch.md, apps/connectors/tests/local_cli.rs
+source: contracts/cli/v1alpha1/semantics.md, docs/local-er-metadata.md, docs/local-mounted-secret-custody.md, docs/local-approvals.md, docs/local-clock.md, docs/local-consumer-launch.md, apps/connectors/tests/local_cli.rs
 ---
 
 # The local runtime
@@ -15,7 +15,7 @@ The grouped `connectors` commands (`setup`, `adapters`, `connections`, `operatio
 |---|---|---|
 | Configuration | the configured adapters, each with its executable's path and SHA-256 and the configuration revision it serves; consumers; the approval clock | a private TOML file, owner-only |
 | Metadata store | connections and their identities, validation evidence, approval policy and keys, mutation attempts and execution audit | Entity Runtime records over an Eventlog SQLite database |
-| Custody | credentials | the platform's protected store, fixed when the binary is built: the Linux Secret Service keyring, in a qualified binding. macOS login keychain and Windows Credential Manager bindings exist; the CLI does not yet run on macOS or Windows |
+| Custody | credentials | the platform's protected store, fixed when the binary is built: the Linux Secret Service keyring, in a qualified binding. macOS login keychain and Windows Credential Manager bindings exist; the CLI does not yet run on macOS or Windows. On a headless or container host, the owner configuration can instead select a read-only mounted directory (`mounted_secret`), never as a fallback |
 
 A **local owner** process starts on demand, holds the metadata store and supervises the adapter
 executables as child processes over a private protocol. It starts only the exact executable the

@@ -205,15 +205,13 @@ pub(in crate::local::owner) fn execute(
         };
         let captured = connection_use.captured.as_ref().ok_or(Code::Unavailable)?;
         let version = captured.version();
-        let material = custody::Store::open_at(
-            version.scope(),
-            current.config.secret_service_socket.as_deref(),
-        )
-        .and_then(|store| store.read(version));
+        let selection = current.config.selection();
+        let material = custody::Store::open_for(version.scope(), &selection, &paths.state)
+            .and_then(|store| store.read(version));
         let material = match material {
             Ok(value) => value,
             Err(error) => {
-                if matches!(error, custody::Failure::Missing) {
+                if crate::local::owner::read_invalidates(&selection, error) {
                     connection_use
                         .registry
                         .invalidate_read(
@@ -223,7 +221,7 @@ pub(in crate::local::owner) fn execute(
                         )
                         .map_err(Error::from)?;
                 }
-                return Err(Code::CustodyUnavailable.into());
+                return Err(crate::local::owner::read_error(&selection, error).into());
             }
         };
         control.check()?;
