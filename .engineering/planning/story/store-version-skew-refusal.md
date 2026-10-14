@@ -6,7 +6,7 @@ status: active
 title: An older binary on a store a newer one wrote says so
 relations:
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-13T21:20:40Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"verification":1}}}
 - {from: "proposed", to: "active", at: "2026-10-13T21:21:20Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"verification":1}}}
@@ -87,8 +87,10 @@ answering `metadata_unavailable` on a store a newer binary wrote. This story mak
 from its release on refuse by name, and documents the rule for the binaries before it.
 
 - **A store-level writer marker.** The metadata store records the newest writer it has seen: the
-  writing binary's version and a digest of the record model it persists (the Entity Runtime
-  schema the store's records are checked against). A binary raises the marker in the transaction
+  writing binary's version and a digest of the record model it persists: per entity, its name,
+  identity, lifecycle, field schema and sorted invariant assertions, not generated invariant
+  names or messages. Versions order by SemVer precedence, pre-releases included; a version that
+  cannot be ordered under another digest is refused as `unrecorded`. A binary raises the marker in the transaction
   of its first write when its own version is newer or the marker is absent; it never lowers it.
 - **The check.** Every command that opens the metadata store, `setup check` included, reads the
   marker before its first read of records. When the marker's model digest differs from the
@@ -98,7 +100,7 @@ from its release on refuse by name, and documents the rule for the binaries befo
   newer version (a release that changed no persisted record) is admitted.
 - **Defence in depth.** A store write the Entity Runtime refuses because a record carries a field
   the binary's schema does not declare is also `metadata_schema_newer`, with `store_version`
-  `unrecorded` when no marker names it, never `metadata_unavailable` with `retry_status`.
+  `unrecorded` when no marker names it, never `metadata_unavailable` with `retry_status`. So is a store at a database level above the binary's: its marker cannot be read without the newer schema.
 - **Sharing a state directory.** The CLI guide's state-directory section states the rule: once a
   binary has written a state directory, an older binary may not use it; binaries of different
   versions share one only while the oldest is at least the newest that wrote it. A consumer
