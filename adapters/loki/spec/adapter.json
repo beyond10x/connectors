@@ -44,6 +44,24 @@
           "required_equalities"
         ],
         "additionalProperties": false
+      },
+      "line_profiles": {
+        "description": "Configured line profiles (semantics.md §12), absent when none is configured. Modelled as connectors_loki.reads.LineProfile.",
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "$ref": "#/$defs/line_profile"
+        }
+      },
+      "trace_profiles": {
+        "description": "Configured trace profiles (semantics.md §12), absent when none is configured. Modelled as connectors_loki.reads.TraceProfile.",
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "$ref": "#/$defs/trace_profile"
+        }
       }
     },
     "required": [
@@ -53,7 +71,250 @@
       "ca_digest",
       "query_scope"
     ],
-    "additionalProperties": false
+    "additionalProperties": false,
+    "$defs": {
+      "label_name": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+      },
+      "matched_key": {
+        "type": "string",
+        "pattern": "^([A-Za-z][A-Za-z0-9_]{0,127}|_|_[A-Za-z0-9][A-Za-z0-9_]{0,126})$"
+      },
+      "profile_name": {
+        "type": "string",
+        "pattern": "^[a-z0-9_.-]{1,64}$"
+      },
+      "field_name": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]{1,64}$"
+      },
+      "selector": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "$ref": "#/$defs/label_name"
+            },
+            "operator": {
+              "enum": [
+                "equal",
+                "not_equal",
+                "matches",
+                "not_matches"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          "required": [
+            "label",
+            "operator",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "line_format": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "logfmt"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "pattern"
+              },
+              "value": {
+                "type": "object",
+                "properties": {
+                  "pattern": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "pattern"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "line_profile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/profile_name"
+          },
+          "selector": {
+            "$ref": "#/$defs/selector"
+          },
+          "format": {
+            "$ref": "#/$defs/line_format"
+          },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/$defs/field_name"
+                },
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "type": {
+                  "enum": [
+                    "string",
+                    "integer",
+                    "phone_number",
+                    "unix_seconds",
+                    "unix_millis",
+                    "unix_nanos"
+                  ]
+                },
+                "mask": {
+                  "enum": [
+                    "none",
+                    "redact",
+                    "last_four"
+                  ]
+                },
+                "optional": {
+                  "type": "boolean"
+                },
+                "filterable": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "name",
+                "key",
+                "type"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "call_identifier": {
+            "$ref": "#/$defs/field_name"
+          }
+        },
+        "required": [
+          "name",
+          "selector",
+          "format",
+          "fields",
+          "call_identifier"
+        ],
+        "additionalProperties": false
+      },
+      "trace_profile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/profile_name"
+          },
+          "selector": {
+            "$ref": "#/$defs/selector"
+          },
+          "call_identifier": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "label"
+                  },
+                  "value": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "$ref": "#/$defs/label_name"
+                      }
+                    },
+                    "required": [
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "kind",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "const": "field"
+                  },
+                  "value": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "$ref": "#/$defs/matched_key"
+                      },
+                      "format": {
+                        "$ref": "#/$defs/line_format"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "format"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "kind",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "source_label": {
+            "$ref": "#/$defs/label_name"
+          }
+        },
+        "required": [
+          "name",
+          "selector",
+          "call_identifier",
+          "source_label"
+        ],
+        "additionalProperties": false
+      }
+    }
   },
   "operations": [
     {
@@ -519,6 +780,393 @@
             "additionalProperties": false
           }
         }
+      }
+    },
+    {
+      "id": "logs.profile_lines",
+      "description": "Read the lines a configured line profile selects in a window and answer one typed record per line: the profile's declared fields, masked as declared (phone numbers by default), and its call identifier. The caller names the profile and may match exact values of the fields it declares filterable, each an exact filter on the parsed field, never a substring; it passes no LogQL. One GET /loki/api/v1/query_range, oldest first; unpaged, at most limit lines.",
+      "contract": "datasource.logs/v1alpha1",
+      "profile": "loki-line-profile",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.-]{1,64}$"
+          },
+          "start_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "end_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "match": {
+            "type": "object",
+            "maxProperties": 16,
+            "propertyNames": {
+              "pattern": "^[a-z0-9_]{1,64}$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        },
+        "required": [
+          "profile",
+          "start_unix_ns",
+          "end_unix_ns"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "unix_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp_unix_ns": {
+                  "type": "string"
+                },
+                "call_id": {
+                  "type": "string"
+                },
+                "fields": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": [
+                      "string",
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "timestamp_unix_ns",
+                "call_id",
+                "fields"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "skipped": {
+            "type": "object",
+            "properties": {
+              "unreadable": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "unreadable"
+            ],
+            "additionalProperties": false
+          },
+          "selection": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "loki-profile"
+              },
+              "start_unix_ns": {
+                "type": "string"
+              },
+              "end_unix_ns": {
+                "type": "string"
+              },
+              "direction": {
+                "const": "forward"
+              }
+            },
+            "required": [
+              "kind",
+              "start_unix_ns",
+              "end_unix_ns",
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "order": {
+            "const": "timestamp-forward"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "$ref": "#/$defs/truncation"
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        },
+        "required": [
+          "profile",
+          "records",
+          "skipped",
+          "selection",
+          "order",
+          "complete",
+          "truncation",
+          "provenance"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "truncation": {
+            "type": "object",
+            "properties": {
+              "causes": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "provider_limit",
+                    "stream_limit",
+                    "response_bytes"
+                  ]
+                }
+              },
+              "occurrences_dropped": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "stream_groups_dropped": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "causes",
+              "occurrences_dropped",
+              "stream_groups_dropped"
+            ],
+            "additionalProperties": false
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "resource": {
+                "const": "loki:query_range"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "logs.call_trace",
+      "description": "Follow one call through a configured trace profile: the lines every source wrote for the call identifier in a window, oldest first, each naming its source. The caller passes the profile, the call identifier, the window and a limit only; the identifier is escaped as a LogQL string literal. One GET /loki/api/v1/query_range; unpaged, at most limit lines.",
+      "contract": "datasource.logs/v1alpha1",
+      "profile": "loki-call-trace",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "pattern": "^[a-z0-9_.-]{1,64}$"
+          },
+          "call_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "start_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "end_unix_ns": {
+            "$ref": "#/$defs/unix_ns"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "profile",
+          "call_id",
+          "start_unix_ns",
+          "end_unix_ns"
+        ],
+        "additionalProperties": false,
+        "$defs": {
+          "unix_ns": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]{0,18})$"
+          }
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string"
+          },
+          "call_id": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp_unix_ns": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "string"
+                },
+                "line_truncated": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "timestamp_unix_ns",
+                "source",
+                "line",
+                "line_truncated"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "selection": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "const": "loki-call-trace"
+              },
+              "start_unix_ns": {
+                "type": "string"
+              },
+              "end_unix_ns": {
+                "type": "string"
+              },
+              "direction": {
+                "const": "forward"
+              }
+            },
+            "required": [
+              "kind",
+              "start_unix_ns",
+              "end_unix_ns",
+              "direction"
+            ],
+            "additionalProperties": false
+          },
+          "order": {
+            "const": "timestamp-forward"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "truncation": {
+            "type": "object",
+            "properties": {
+              "causes": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "provider_limit",
+                    "stream_limit",
+                    "response_bytes",
+                    "line_bytes"
+                  ]
+                }
+              },
+              "occurrences_dropped": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "stream_groups_dropped": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "causes",
+              "occurrences_dropped",
+              "stream_groups_dropped"
+            ],
+            "additionalProperties": false
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string"
+              },
+              "resource": {
+                "const": "loki:query_range"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer"
+              },
+              "source_revision": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "profile",
+          "call_id",
+          "lines",
+          "selection",
+          "order",
+          "complete",
+          "truncation",
+          "provenance"
+        ],
+        "additionalProperties": false
       }
     }
   ]

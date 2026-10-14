@@ -13,13 +13,14 @@
 //! yields the token's user id. `auth.test`, `team.info`, `emoji.list` and
 //! `search.messages`, whose pinned `token` parameter is required, ship with
 //! `token` named as the selection's credential; withholding it instead is
-//! still refused. The two writes, `chat.postMessage` and `conversations.open`,
-//! run on private protocol two through prepare and commit, the transport the
-//! host drives once it holds an approval: the exact JSON request after the
-//! guard's `auth.test` read, refusal without an approval, an ambiguous
-//! dispatch left unknown and sent once, and Slack's `200` with `ok: false`
-//! never applied. Every id, name and message is synthetic. No live credential
-//! and no network.
+//! still refused. The four writes, `chat.postMessage`, `conversations.open`,
+//! `chat.update` and `chat.delete`, run on private protocol two through
+//! prepare and commit, the transport the host drives once it holds an
+//! approval: the exact JSON request after the guard's `auth.test` read,
+//! refusal without an approval, an ambiguous dispatch left unknown and sent
+//! once, and Slack's `200` with `ok: false` never applied: refused when an
+//! edit or a delete names a declared refusal, unknown otherwise. Every id,
+//! name and message is synthetic. No live credential and no network.
 #![cfg(unix)]
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Effect, Engine, Selection};
@@ -138,7 +139,7 @@ fn shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_se
         declared.sort();
         // The bot set's file download names no bundle operation; it is pinned
         // in `tests/slack_files.rs`.
-        // The bot set's two writes are pinned in
+        // The bot set's four writes are pinned in
         // `the_two_writes_ship_as_guarded_writes_with_a_closed_json_body`.
         let mut expected: Vec<&str> = shipped.iter().map(|(id, _, _)| *id).collect();
         let mut writes: Vec<&str> = Vec::new();
@@ -580,6 +581,43 @@ fn opened(body: &Value) -> Value {
     }
 }
 
+/// A message in `C0FIXTURE01` that another user posted: the bot token may
+/// neither edit nor delete it.
+const FOREIGN_TS: &str = "1780000300.000300";
+/// A message in `C0FIXTURE01` whose edit Slack answers with an `ok: false`
+/// the selection does not declare a refusal (`is_inactive`).
+const INACTIVE_TS: &str = "1780000800.000800";
+
+/// Slack's answer to an edit or a delete in `C0FIXTURE01`: the bot's own
+/// message (`POSTED_TS`) is `None`, the method's success; any other is its
+/// refusal, `200` with `ok: false`, as the pinned error enum names it.
+fn refused(body: &Value, cant: &str) -> Option<Value> {
+    let error = match (body["channel"].as_str(), body["ts"].as_str()) {
+        (Some("C0FIXTURE01"), Some(POSTED_TS)) => return None,
+        (Some("C0FIXTURE01"), Some(FOREIGN_TS)) => cant,
+        (Some("C0FIXTURE01"), Some(INACTIVE_TS)) => "is_inactive",
+        (Some("C0FIXTURE01"), _) => "message_not_found",
+        _ => "channel_not_found",
+    };
+    Some(json!({"ok": false, "error": error}))
+}
+/// What `chat.update` answers: the pinned success schema's `ok`, `channel`,
+/// `ts`, `text` and `message`, or its refusal.
+fn edited(body: &Value) -> Value {
+    refused(body, "cant_update_message").unwrap_or_else(|| {
+        json!({"ok": true, "channel": body["channel"], "ts": body["ts"], "text": body["text"],
+               "message": {"type": "message", "user": "U0FIXTURE01", "bot_id": "B0FIXTURE01",
+                           "text": body["text"], "edited": {"user": "U0FIXTURE01",
+                           "ts": "1780000900.000900"}}})
+    })
+}
+/// What `chat.delete` answers: the pinned success schema's `ok`, `channel`
+/// and `ts`, or its refusal.
+fn deleted(body: &Value) -> Value {
+    refused(body, "cant_delete_message")
+        .unwrap_or_else(|| json!({"ok": true, "channel": body["channel"], "ts": body["ts"]}))
+}
+
 fn channel(n: u64) -> Value {
     json!({"id": format!("C0FIXTURE{n:02}"), "name": format!("fixture-channel-{n}"),
            "is_channel": true, "is_private": false, "is_archived": false,
@@ -855,6 +893,14 @@ impl Provider {
                             }
                             "/api/chat.postMessage" => Some((200, posted(&sent))),
                             "/api/conversations.open" => Some((200, opened(&sent))),
+                            "/api/chat.update" | "/api/chat.delete"
+                                if sent["channel"] == "C0FIXTUREDROP" =>
+                            {
+                                observed.lock().unwrap().push((path, authorization, token_header));
+                                continue;
+                            }
+                            "/api/chat.update" => Some((200, edited(&sent))),
+                            "/api/chat.delete" => Some((200, deleted(&sent))),
                             _ => None,
                         };
                         if let Some((status, answer)) = answer {
@@ -1669,14 +1715,16 @@ fn a_connection_admitting_a_host_no_selection_reaches_does_not_load() {
 
 // ── Message send: `chat.postMessage` and `conversations.open` ─────────────────
 
-/// The bot set's two writes, their pinned `operationId` and the path the
+/// The bot set's four writes, their pinned `operationId` and the path the
 /// bundle records. A renamed, dropped or added write fails here.
-const WRITES: [(&str, &str, &str); 2] = [
+const WRITES: [(&str, &str, &str); 4] = [
+    ("chat.delete", "chat_delete", "/api/chat.delete"),
     (
         "chat.postMessage",
         "chat_postMessage",
         "/api/chat.postMessage",
     ),
+    ("chat.update", "chat_update", "/api/chat.update"),
     (
         "conversations.open",
         "conversations_open",
@@ -1704,7 +1752,7 @@ fn post_input(channel: &str) -> Value {
                     "thread_ts": "1780000100.000100", "unfurl_links": false}})
 }
 
-/// Both writes ship as reviewed: `effect: write` over the pinned POST, the
+/// Every write ships as reviewed: `effect: write` over the pinned POST, the
 /// token as the credential, a closed typed body with its required keys, and a
 /// guard that reads `auth.test` before the write and requires `ok` true both
 /// there and in Slack's answer. The bundle records each with a JSON request
@@ -1727,7 +1775,8 @@ fn the_two_writes_ship_as_guarded_writes_with_a_closed_json_body() {
         .map(|o| o.id)
         .collect();
     writes.sort();
-    assert_eq!(writes, ["chat.postMessage", "conversations.open"]);
+    let ids: Vec<&str> = WRITES.iter().map(|(id, _, _)| *id).collect();
+    assert_eq!(writes, ids);
     let document = pinned();
     for (id, operation_id, path) in WRITES {
         let selection = shipped().into_iter().find(|s| s.id == id).unwrap();
@@ -1992,4 +2041,328 @@ fn conversations_open_returns_the_dm_channel_and_a_post_to_it_lands_there() {
     )
     .unwrap();
     assert_eq!(result.effect, WriteEffect::Unknown);
+}
+
+// ── Message edit and delete: `chat.update` and `chat.delete` ──────────────────
+
+fn edit_input(channel: &str, ts: &str) -> Value {
+    json!({"body": {"channel": channel, "ts": ts, "text": "fixture message edited"}})
+}
+fn delete_input(channel: &str, ts: &str) -> Value {
+    json!({"body": {"channel": channel, "ts": ts}})
+}
+
+/// The refusals each of edit and delete declares, as `(pointer, values, code)`:
+/// Slack's `200` with `ok: false` and one of these in `error` left the message
+/// as it was.
+fn declared(id: &str) -> Value {
+    let not_found = json!({"pointer": "/error",
+                           "values": ["message_not_found", "channel_not_found"],
+                           "code": "not_found"});
+    match id {
+        "chat.update" => json!([
+            not_found,
+            {"pointer": "/error", "values": ["cant_update_message", "edit_window_closed"],
+             "code": "forbidden"},
+            {"pointer": "/error", "values": ["msg_too_long", "no_text"], "code": "invalid_input"}
+        ]),
+        "chat.delete" => json!([
+            not_found,
+            {"pointer": "/error",
+             "values": ["cant_delete_message", "compliance_exports_prevent_deletion"],
+             "code": "forbidden"}
+        ]),
+        _ => unreachable!(),
+    }
+}
+
+/// story:parity-slack-message-writes: edit and delete name the message by
+/// `channel` and `ts`, both required non-empty strings (the pinned document
+/// types `chat.delete`'s `ts` as a number; Slack's `ts` is a string), edit
+/// also its new `text`; nothing else is admitted. Each declares Slack's
+/// refusals by name, every value one the pinned error enum of that method
+/// lists, while send declares none.
+#[test]
+fn edit_and_delete_ship_closed_bodies_and_declare_slacks_refusals_by_name() {
+    let document = pinned();
+    for (id, keys) in [
+        ("chat.update", vec!["channel", "ts", "text"]),
+        ("chat.delete", vec!["channel", "ts"]),
+    ] {
+        let selection = shipped().into_iter().find(|s| s.id == id).unwrap();
+        assert_eq!(selection.body_keys, keys, "`{id}`");
+        assert_eq!(selection.body_required, keys, "`{id}`");
+        assert_eq!(selection.body_nonempty, keys, "`{id}`");
+        for key in &keys {
+            assert_eq!(
+                serde_json::to_value(selection.body_types[*key]).unwrap(),
+                "string",
+                "`{id}` `{key}`"
+            );
+        }
+        let guard = selection.guard.as_ref().unwrap();
+        let refusals = serde_json::to_value(&guard.postflight).unwrap()["refusals"].clone();
+        assert_eq!(refusals, declared(id), "`{id}`");
+        let path = format!("/{id}");
+        let errors = &document["paths"][path.as_str()]["post"]["responses"]["default"]["schema"]["properties"]
+            ["error"]["enum"];
+        for value in refusals
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|r| r["values"].as_array().unwrap())
+        {
+            assert!(
+                errors.as_array().unwrap().contains(value),
+                "`{id}` declares {value}, which its pinned error enum does not list"
+            );
+        }
+    }
+    for id in ["chat.postMessage", "conversations.open"] {
+        let selection = shipped().into_iter().find(|s| s.id == id).unwrap();
+        let postflight = serde_json::to_value(&selection.guard.unwrap().postflight).unwrap();
+        assert!(postflight.get("refusals").is_none(), "`{id}`");
+    }
+}
+
+/// Approved, `chat.update` reads `auth.test`, then sends exactly one
+/// `POST /api/chat.update` with the body as supplied, as JSON, with the
+/// bearer token and no `token` parameter, and returns Slack's answer: the
+/// same `channel` and `ts` and the message's new text.
+#[test]
+fn an_approved_edit_sends_one_json_body_and_returns_the_edited_message() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let input = edit_input("C0FIXTURE01", POSTED_TS);
+    let result = write(&mut child, "chat.update", &input)
+        .unwrap_or_else(|failure| panic!("`chat.update` refused in prepare: {failure:?}"));
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let result = result.result.unwrap();
+    assert_eq!(result["status"], 200);
+    assert_eq!(result["body"]["ok"], true);
+    assert_eq!(result["body"]["channel"], "C0FIXTURE01");
+    assert_eq!(result["body"]["ts"], POSTED_TS);
+    assert_eq!(result["body"]["text"], "fixture message edited");
+    assert_eq!(result["body"]["message"]["text"], "fixture message edited");
+    assert_eq!(result["provenance"]["instance"], "fixture-slack");
+    let exchanges = provider.exchanges();
+    assert_eq!(exchanges.len(), 2, "{exchanges:?}");
+    assert_eq!(
+        (exchanges[0].0.as_str(), exchanges[0].1.as_str()),
+        ("GET", "/api/auth.test")
+    );
+    assert_eq!(
+        (exchanges[1].0.as_str(), exchanges[1].1.as_str()),
+        ("POST", "/api/chat.update")
+    );
+    assert!(
+        exchanges[1]
+            .2
+            .as_deref()
+            .is_some_and(|kind| kind.starts_with("application/json")),
+        "{:?}",
+        exchanges[1].2
+    );
+    assert_eq!(exchanges[1].3, input["body"]);
+    for (path, authorization, token_header) in provider.requests() {
+        assert_eq!(authorization.as_deref(), Some(HEADER), "{path}");
+        assert!(!token_header && !path.contains("token="), "{path}");
+    }
+}
+
+/// Approved, `chat.delete` reads `auth.test`, then sends exactly one
+/// `POST /api/chat.delete` with the body as supplied, as JSON, and returns
+/// Slack's answer, the deleted message's `channel` and `ts`.
+#[test]
+fn an_approved_delete_sends_one_json_body_and_returns_channel_and_ts() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let input = delete_input("C0FIXTURE01", POSTED_TS);
+    let result = write(&mut child, "chat.delete", &input)
+        .unwrap_or_else(|failure| panic!("`chat.delete` refused in prepare: {failure:?}"));
+    assert_eq!(result.effect, WriteEffect::Applied);
+    let result = result.result.unwrap();
+    assert_eq!(
+        result["body"],
+        json!({"ok": true, "channel": "C0FIXTURE01", "ts": POSTED_TS})
+    );
+    let exchanges = provider.exchanges();
+    assert_eq!(exchanges.len(), 2, "{exchanges:?}");
+    assert_eq!(
+        (exchanges[0].0.as_str(), exchanges[0].1.as_str()),
+        ("GET", "/api/auth.test")
+    );
+    assert_eq!(
+        (exchanges[1].0.as_str(), exchanges[1].1.as_str()),
+        ("POST", "/api/chat.delete")
+    );
+    assert!(
+        exchanges[1]
+            .2
+            .as_deref()
+            .is_some_and(|kind| kind.starts_with("application/json"))
+    );
+    assert_eq!(exchanges[1].3, input["body"]);
+    for (path, authorization, token_header) in provider.requests() {
+        assert_eq!(authorization.as_deref(), Some(HEADER), "{path}");
+        assert!(!token_header && !path.contains("token="), "{path}");
+    }
+}
+
+/// A bot token edits and deletes only its own messages: Slack answers another
+/// user's message `200` with `ok: false` and `cant_update_message` or
+/// `cant_delete_message`, which is refused as the provider's `forbidden`; a
+/// message or a channel Slack does not find is refused as the provider's
+/// `not_found`. Each was sent exactly once and never again.
+#[test]
+fn an_edit_or_delete_slack_refuses_by_name_is_refused_and_sent_once() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let cases = [
+        (
+            "chat.update",
+            edit_input("C0FIXTURE01", FOREIGN_TS),
+            Failure::ProviderForbidden,
+        ),
+        (
+            "chat.delete",
+            delete_input("C0FIXTURE01", FOREIGN_TS),
+            Failure::ProviderForbidden,
+        ),
+        (
+            "chat.update",
+            edit_input("C0FIXTURE01", "1780000999.000999"),
+            Failure::ProviderNotFound,
+        ),
+        (
+            "chat.delete",
+            delete_input("C0FIXTURE01", "1780000999.000999"),
+            Failure::ProviderNotFound,
+        ),
+        (
+            "chat.update",
+            edit_input("C0FIXTURE99", POSTED_TS),
+            Failure::ProviderNotFound,
+        ),
+        (
+            "chat.delete",
+            delete_input("C0FIXTURE99", POSTED_TS),
+            Failure::ProviderNotFound,
+        ),
+    ];
+    for (id, input, expected) in &cases {
+        let result = write(&mut child, id, input)
+            .unwrap_or_else(|failure| panic!("`{id}` refused in prepare: {failure:?}"));
+        assert_eq!(result.effect, WriteEffect::Refused, "`{id}` {input}");
+        assert_eq!(
+            format!("{:?}", result.result.err()),
+            format!("{:?}", Some(expected)),
+            "`{id}` {input}"
+        );
+    }
+    let posts = provider.posts();
+    let expected: Vec<(String, Value)> = cases
+        .iter()
+        .map(|(id, input, _)| (format!("/api/{id}"), input["body"].clone()))
+        .collect();
+    assert_eq!(posts, expected, "each was sent exactly once");
+}
+
+/// Without an approval there is no route to either write, and an input
+/// outside the closed body is refused in prepare: a missing `ts`, a `ts` sent
+/// as a number, an empty `text`, `as_user`, `blocks` or `token`. A token Slack
+/// refuses stops either write at the `auth.test` read. Nothing is sent.
+#[test]
+fn an_edit_or_delete_without_an_approval_or_outside_the_closed_body_sends_nothing() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    for (id, input) in [
+        ("chat.update", edit_input("C0FIXTURE01", POSTED_TS)),
+        ("chat.delete", delete_input("C0FIXTURE01", POSTED_TS)),
+    ] {
+        let outcome = attempt(&mut child, id, &input);
+        assert!(
+            matches!(outcome, Err(Failure::Unsupported)),
+            "`{id}`: {outcome:?}"
+        );
+    }
+    for (id, input) in [
+        (
+            "chat.update",
+            json!({"body": {"channel": "C0FIXTURE01", "text": "x"}}),
+        ),
+        (
+            "chat.update",
+            json!({"body": {"channel": "C0FIXTURE01", "ts": POSTED_TS, "text": ""}}),
+        ),
+        (
+            "chat.update",
+            json!({"body": {"channel": "C0FIXTURE01", "ts": POSTED_TS, "text": "x",
+                            "blocks": "[]"}}),
+        ),
+        (
+            "chat.update",
+            json!({"body": {"channel": "C0FIXTURE01", "ts": POSTED_TS, "text": "x",
+                            "as_user": "true"}}),
+        ),
+        ("chat.delete", json!({"body": {"channel": "C0FIXTURE01"}})),
+        (
+            "chat.delete",
+            json!({"body": {"channel": "C0FIXTURE01", "ts": 1780000700.0007}}),
+        ),
+        (
+            "chat.delete",
+            json!({"body": {"channel": "", "ts": POSTED_TS}}),
+        ),
+        (
+            "chat.delete",
+            json!({"body": {"channel": "C0FIXTURE01", "ts": POSTED_TS, "token": TOKEN}}),
+        ),
+    ] {
+        let outcome = write(&mut child, id, &input);
+        assert!(
+            matches!(outcome, Err(Failure::InvalidInput)),
+            "`{id}` {input}: {:?}",
+            outcome.map(|result| result.effect)
+        );
+    }
+    assert!(provider.exchanges().is_empty(), "a request was sent");
+    let rejected = Provider::writing(true);
+    let mut child = Child::spawn(&rejected.selection()).unwrap();
+    for (id, input) in [
+        ("chat.update", edit_input("C0FIXTURE01", POSTED_TS)),
+        ("chat.delete", delete_input("C0FIXTURE01", POSTED_TS)),
+    ] {
+        let outcome = write(&mut child, id, &input);
+        assert!(
+            matches!(outcome, Err(Failure::Forbidden)),
+            "`{id}`: {:?}",
+            outcome.map(|result| result.effect)
+        );
+    }
+    assert!(rejected.posts().is_empty(), "a write was sent");
+}
+
+/// An `ok: false` the selection does not declare (`is_inactive`), and a
+/// dispatch whose connection closes unanswered, may or may not have changed
+/// the message: each is unknown, never applied, and sent exactly once.
+#[test]
+fn an_undeclared_or_unanswered_edit_or_delete_is_unknown_and_sent_once() {
+    let provider = Provider::writing(false);
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let cases = [
+        ("chat.update", edit_input("C0FIXTURE01", INACTIVE_TS)),
+        ("chat.update", edit_input("C0FIXTUREDROP", POSTED_TS)),
+        ("chat.delete", delete_input("C0FIXTUREDROP", POSTED_TS)),
+    ];
+    for (id, input) in &cases {
+        let result = write(&mut child, id, input).unwrap();
+        assert_eq!(result.effect, WriteEffect::Unknown, "`{id}` {input}");
+        assert!(result.result.is_err(), "`{id}` {input}");
+    }
+    let expected: Vec<(String, Value)> = cases
+        .iter()
+        .map(|(id, input)| (format!("/api/{id}"), input["body"].clone()))
+        .collect();
+    assert_eq!(provider.posts(), expected);
 }

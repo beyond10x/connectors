@@ -11,7 +11,9 @@ Conversation, Message, User, File and Emoji. No relation is declared: every edge
   `search.messages` declare a required `token` parameter the catalog engine cannot withhold;
   the guide's *Methods that cannot be selected yet* names the engine change. Writes and files
   are not started. (Superseded, 2026-10-13: the four reads, the file reads and the writes
-  `chat.postMessage` and `conversations.open` are selected; the guide is current.)
+  `chat.postMessage` and `conversations.open` are selected; the guide is current.
+  2026-10-14: `chat.update` and `chat.delete` are selected too, with Slack's named refusals
+  declared in their guards, which completes U08.)
 - **Serves:** parity units U02, U08 and U13 of
   [the parity page](../../docs/fluxplane-plugin-parity.md#gap-units) (`:777`, `:783`, `:788`);
   stories `story:catalog-slack-reads`, `story:parity-slack-discovery-reads`,

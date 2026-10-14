@@ -44,6 +44,7 @@ pub const JSON: u8 = 0xf5;
 pub const NEWDECIMAL: u8 = 0xf6;
 pub const VAR_STRING: u8 = 0xfd;
 pub const UNSIGNED: u16 = 0x20;
+pub const ENUM_FLAG: u16 = 0x100;
 pub const BINARY_CHARSET: u16 = 63;
 pub const UTF8MB4: u16 = 255;
 
@@ -116,8 +117,11 @@ pub struct Script {
     pub columns: Vec<Col>,
     pub rows: Vec<Vec<Cell>>,
     pub params: u16,
-    /// `(code, sqlstate)` answered to the first statement preparation.
+    /// `(code, sqlstate)` answered to every statement preparation.
     pub prepare_error: Option<(u16, &'static str)>,
+    /// `(code, sqlstate)` answered to the preparation of the derived-table wrapper only,
+    /// after the caller's own statement prepared.
+    pub wrapped_prepare_error: Option<(u16, &'static str)>,
     /// `(code, sqlstate)` answered to statement execution.
     pub execute_error: Option<(u16, &'static str)>,
     /// `(code, sqlstate)` answered to authentication.
@@ -126,7 +130,16 @@ pub struct Script {
     pub stall: Option<Arc<Notify>>,
     /// Ignore the `KILL QUERY` and never answer the stalled execution.
     pub ignore_kill: bool,
+    /// Return at most this many rows to any execution, whatever its `LIMIT`
+    /// asks for, as a server or a proxy in front of it may.
+    pub row_cap: Option<usize>,
+    /// Answer an execution with only the rows this admits, given the values
+    /// bound to it and the row's index in `rows`: how a test scripts a
+    /// statement's `WHERE`, including a keyset cursor.
+    pub select: Option<Select>,
 }
+/// A scripted `WHERE`: the bound values (null as `None`) and a row index.
+pub type Select = Arc<dyn Fn(&[Option<String>], usize) -> bool + Send + Sync>;
 impl Default for Script {
     fn default() -> Self {
         Self {
@@ -138,10 +151,13 @@ impl Default for Script {
             rows: vec![vec![int4(42), None]],
             params: 0,
             prepare_error: None,
+            wrapped_prepare_error: None,
             execute_error: None,
             auth_error: None,
             stall: None,
             ignore_kill: false,
+            row_cap: None,
+            select: None,
         }
     }
 }
@@ -336,6 +352,11 @@ fn plan(script: &Script, query: &str) -> Plan {
             .map(|(_, n)| n.trim().parse().unwrap())
             .unwrap()
     });
+    // A keyset continuation binds one more value, after the derived table.
+    let continuation = wrapped
+        && query
+            .rsplit_once("\n) AS result (")
+            .is_some_and(|(_, tail)| tail.contains(" WHERE "));
     Plan {
         columns: script
             .columns
@@ -350,7 +371,7 @@ fn plan(script: &Script, query: &str) -> Plan {
                 (column.clone(), name)
             })
             .collect(),
-        params: script.params,
+        params: script.params + u16::from(continuation),
         limit,
     }
 }
@@ -483,6 +504,12 @@ async fn session(io: Box<dyn Io>, script: Script, log: Arc<Mutex<Log>>, killed: 
                     wire.error(code, state).await;
                     continue;
                 }
+                if let Some((code, state)) = script.wrapped_prepare_error
+                    && query.starts_with("SELECT * FROM (")
+                {
+                    wire.error(code, state).await;
+                    continue;
+                }
                 let statement = plan(&script, &query);
                 let mut ok = vec![0x00];
                 ok.extend((statements.len() as u32 + 1).to_le_bytes());
@@ -526,7 +553,7 @@ async fn session(io: Box<dyn Io>, script: Script, log: Arc<Mutex<Log>>, killed: 
                         rest = &rest[len..];
                     }
                 }
-                log.lock().unwrap().executions.push(values);
+                log.lock().unwrap().executions.push(values.clone());
                 if let Some(stall) = &script.stall {
                     stall.notify_one();
                     killed.notified().await;
@@ -550,8 +577,19 @@ async fn session(io: Box<dyn Io>, script: Script, log: Arc<Mutex<Log>>, killed: 
                 for (column, name) in &statement.columns {
                     wire.write(&definition(column, name)).await;
                 }
-                let rows = statement.limit.unwrap_or(usize::MAX).min(script.rows.len());
-                for row in &script.rows[..rows] {
+                let selected: Vec<&Vec<Cell>> = script
+                    .rows
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| script.select.as_ref().is_none_or(|s| s(&values, *index)))
+                    .map(|(_, row)| row)
+                    .collect();
+                let rows = statement
+                    .limit
+                    .unwrap_or(usize::MAX)
+                    .min(script.row_cap.unwrap_or(usize::MAX))
+                    .min(selected.len());
+                for row in &selected[..rows] {
                     let mut packet = vec![0x00];
                     let mut bitmap = vec![0; (row.len() + 7 + 2) / 8];
                     let mut cells: Vec<u8> = Vec::new();

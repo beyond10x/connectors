@@ -1,6 +1,6 @@
 [package]
 name = "connectors-sql"
-description = "SQL adapter (PostgreSQL and MySQL): bounded read-only queries and catalogue reads (databases, tables, columns and keys, indexes)."
+description = "SQL adapter (PostgreSQL and MySQL): bounded read-only queries, catalogue reads (databases, tables, columns and keys, indexes) and configured read profiles with typed, masked, keyset-paged output."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

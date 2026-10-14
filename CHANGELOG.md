@@ -4,6 +4,86 @@
 
 ### Added
 
+- Release archives carry the catalog provider: each `connectors-<version>-<target>.tar.gz` holds
+  `connectors` and `connectors-catalog-provider`, both built, checked against the tag's version,
+  signed and notarized on macOS where the signing secrets are set, and covered by `SHA256SUMS`
+  through their archive. Archives of 0.50.0 and earlier hold `connectors` alone; the other
+  adapters are still built from the checkout. `connectors-catalog-provider --version` prints the
+  package version.
+- The repository gate runs `connectors-build release-binaries`, which refuses a guide that runs an
+  installed binary the release workflow's `BINARIES` list leaves out.
+
+- SQL read profiles (`profile.read`), on PostgreSQL and MySQL. A connection's native file may
+  declare up to 32 `read_profiles`: an operator-written read statement, the names of its
+  parameters, its output columns with a type (`text`, `integer`, `timestamp` or
+  `phone_number`) and optional masking, the column that carries the call identifier and the
+  column pages follow. The repository holds only that shape and its validation, which the
+  adapter's ESS model (`connectors_sql.profiles`) fixes; the statement, columns and masking stay
+  in the operator's file. A caller names the profile and passes values for its declared
+  parameters only, bound and never interpolated; anything else is `invalid_input` before a
+  session opens. Each item carries the declared columns under their declared names; `phone_number`
+  columns are masked unless the profile unmasks them (the last four characters kept), and the
+  answer names its call identifier column so a workflow joins without a model. Pages follow a
+  keyset cursor over the ordering column, ordered and continued by one expression of it, and
+  never take a short page for the end, so a server that returns fewer rows than any `LIMIT`
+  asks for still yields every row. The ordering column must be unique: a page whose row past
+  the limit shares the last returned value is refused as `unsupported` rather than skipping a
+  row, and an ordering column the engine cannot follow consistently with the cursor (on MySQL
+  a binary string, written as base64; on either engine an `integer` or `timestamp` ordering
+  over a column of another type) is refused by name before a row is read. A cursor is not
+  signed; it is checked for its shape, its type and its context (the profile's definition,
+  the connection and the parameter values), and any other is `stale_cursor` before a session
+  opens. Every issued cursor fits the published 16,384 characters. `operations describe`
+  publishes each profile's exact input and output. The operation is a declared read,
+  advertised only when the file declares a profile; a file without profiles keeps its
+  configuration revision. Checked against scripted wire fixtures of both engines and a
+  synthetic call table, not a live database.
+- Loki line and trace profiles. An operator configures named profiles in the Loki connection's
+  configuration file (`line_profiles`, `trace_profiles`); the caller names one and passes no
+  LogQL. `logs.profile_lines` answers one typed record per line a line profile selects: its
+  declared fields read with logfmt or a declared pattern, typed (`string`, `integer`,
+  `phone_number`, or a Unix timestamp in seconds, milliseconds or nanoseconds, answered as
+  nanoseconds), masked per field (phone numbers to their last four characters unless declared
+  otherwise) and its call identifier, optionally narrowed to exact values of fields the profile
+  declares filterable. `logs.call_trace` answers the lines of one call, by its identifier, from
+  every source a trace profile selects, oldest first, each naming its source and none of another
+  call's. The adapter composes each query from the profile's structured selector and renders the
+  caller's value only as an escaped LogQL string literal; a matched value and a line-carried call
+  identifier are exact label filters after the format's parser stage (`| logfmt` or
+  `| pattern`), never substring filters, and no count or `complete` in either answer reflects a
+  line that does not hold the caller's exact value. A matched key must be a label name not
+  beginning with `__` and not a selector label (nor, for a trace profile, its source label).
+  Every profile must carry every configured scope equality. Both are reads with published output schemas, window-bounded to a
+  day and limit-bounded to 1,000 lines, unpaged. A configuration without profiles keeps its
+  configuration revision; adding or changing a profile changes it. The Loki contract gains §12.
+  Limits: the configuration still admits only the empty scope; a profile's output schema in
+  `operations describe` is the generic record shape, not the profile's own fields.
+- Slack message edit and delete through the catalog provider (`docs/catalog-slack.md`,
+  *Messages*): the bot selection set gains two writes under approval, `chat.update` (`channel`,
+  `ts` and `text`, all required and non-empty; scope `chat:write`; answers `channel`, `ts`, `text`
+  and `message`) and `chat.delete` (`channel` and `ts`, required and non-empty; scope
+  `chat:write`; answers `channel` and `ts`), each on a message the caller names, in a channel or a
+  direct message. Like send, each reads the token's `auth.test` first and is refused, with nothing
+  sent, unless it answers `ok` as the JSON boolean `true`, and Slack's answer must carry the same
+  to be applied. A bot token edits and deletes only its own messages: Slack's
+  `cant_update_message` and `cant_delete_message` (and `edit_window_closed`,
+  `compliance_exports_prevent_deletion`) are refused as `forbidden`, `message_not_found` and
+  `channel_not_found` as `not_found`, and an edit's `msg_too_long` and `no_text` as
+  `invalid_input`, each as the provider's own answer with the `error` value as its reason, never
+  sent again. Every other `ok` false answer stays `outcome_unknown`. `blocks`, `attachments`,
+  `as_user`, `parse` and `link_names` are not admitted; the pinned document says an omitted
+  `parse` or `link_names` is reset to its default, so every edit resets both. The cited amendment
+  `adapters/slack/upstream/slack-web.amendments.json` records both with a JSON request body. The
+  Slack ESS model gains the edit and delete inputs and answers and the named refusals
+  (`MessageEdit`, `MessageEdited`, `MessageDelete`, `MessageDeleted`, `MessageRefusal`).
+  Verified against a local fixture only, not a live Slack.
+- A catalog guard can name the answers a provider gives with a success status when it did not
+  apply the write, `postflight.refusals` (`docs/local-catalog-provider.md`, `guard`;
+  `connectors_catalog.guard.Refusal`): a 2xx answer that fails the postflight checks and carries
+  at a refusal's `pointer` a string equal to one of its `values` is refused with its `code`
+  (`invalid_input`, `forbidden` or `not_found`), as the provider's own answer, with the matched
+  value as its reason. Only on the write's own answer and beside at least one check; any other
+  answer is classified as before.
 - Grafana Cloud IRM reads in the native `grafana` adapter, read only:
   `irm.alert_groups.list` and `irm.incidents.list` over a since window (`since`, `until`, both
   `YYYY-MM-DDTHH:MM:SSZ`, UTC) with a page cursor of the same window, and
@@ -75,12 +155,26 @@
 
 ### Changed
 
+- SQL: a statement that prepares with columns but cannot run as a derived table is refused as
+  `unsupported` on both engines, as a statement that returns no columns already was. On
+  PostgreSQL that is `INSERT`, `UPDATE` or `DELETE` with `RETURNING`, `EXPLAIN` and `SHOW`,
+  which `query.read` answered `invalid_input` before; on MySQL, `SHOW` and `EXPLAIN`. A caller
+  that matched `invalid_input` for those statements now receives `unsupported`; a syntax error
+  in the statement itself stays `invalid_input`. The live PostgreSQL case that pins this was
+  updated, not re-run.
+
 - `connections connect` and `repair` no longer require a protected source flag in the parser.
   Under a platform binding a connect without one is refused with `protected_entry_unavailable`
   and `next_action = select_protected_source`; under the mounted binding a source flag is
   `invalid_input`.
 - The custody backend trait splits into a read capability (`ReadBackend`) and a write capability
   (`Backend: ReadBackend`); the mounted binding implements only the first.
+
+### Fixed
+
+- SQL on PostgreSQL: a `query.read` statement ending in a `--` comment ran into the derived
+  table's closing parenthesis and was refused; the derived table now closes on its own line,
+  as it already did on MySQL.
 
 ### Limitations
 
@@ -1215,7 +1309,6 @@
   `tests/metadata_store_previous_pin.rs` checks that a write leaves the store's schema as
   the previous runtime wrote it. The same test opens a committed store that Entity Runtime
   0.26.0 wrote (`tests/fixtures/metadata-store-er-0.26.0/`), reads it and writes to it.
-
 
 ## 0.31.0 — 2026-10-06
 

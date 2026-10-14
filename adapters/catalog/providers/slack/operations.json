@@ -59,6 +59,35 @@
      "guard": {
        "preflight": {"operation_id": "auth_test", "values": {},
                      "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
-       "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}]}}}
+       "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}]}}},
+    {"id": "chat.update", "operation_id": "chat_update", "effect": "write",
+     "description": "Replace the text of one message, the one body.channel (a conversation id, a channel or a direct message) and body.ts name, with body.text. Answers channel, ts and text, the message's address and its new text. Needs chat:write; a bot token edits only the messages it posted. The message's blocks and attachments are kept, and Slack resets parse and link_names to their defaults. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses as status 200 with ok false; the answer must carry ok true to be applied. cant_update_message and edit_window_closed are refused as forbidden, message_not_found and channel_not_found as not_found, msg_too_long and no_text as invalid_input, each with Slack's error as its reason; any other refusal is outcome_unknown, never applied",
+     "credential": ["token"],
+     "body_keys": ["channel", "ts", "text"],
+     "body_types": {"channel": "string", "ts": "string", "text": "string"},
+     "body_required": ["channel", "ts", "text"],
+     "body_nonempty": ["channel", "ts", "text"],
+     "guard": {
+       "preflight": {"operation_id": "auth_test", "values": {},
+                     "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
+       "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}],
+                      "refusals": [
+                        {"pointer": "/error", "values": ["message_not_found", "channel_not_found"], "code": "not_found"},
+                        {"pointer": "/error", "values": ["cant_update_message", "edit_window_closed"], "code": "forbidden"},
+                        {"pointer": "/error", "values": ["msg_too_long", "no_text"], "code": "invalid_input"}]}}},
+    {"id": "chat.delete", "operation_id": "chat_delete", "effect": "write",
+     "description": "Delete one message, the one body.channel (a conversation id, a channel or a direct message) and body.ts name; body.ts is the string Slack gives, not a number. Answers channel and ts. Needs chat:write; a bot token deletes only the messages it posted. The token's auth.test is read first and must answer ok true, or nothing is sent. Slack refuses as status 200 with ok false; the answer must carry ok true to be applied. cant_delete_message and compliance_exports_prevent_deletion are refused as forbidden, message_not_found and channel_not_found as not_found, each with Slack's error as its reason; any other refusal is outcome_unknown, never applied",
+     "credential": ["token"],
+     "body_keys": ["channel", "ts"],
+     "body_types": {"channel": "string", "ts": "string"},
+     "body_required": ["channel", "ts"],
+     "body_nonempty": ["channel", "ts"],
+     "guard": {
+       "preflight": {"operation_id": "auth_test", "values": {},
+                     "checks": [{"pointer": "/ok", "expect": {"boolean": true}}]},
+       "postflight": {"checks": [{"pointer": "/ok", "expect": {"boolean": true}}],
+                      "refusals": [
+                        {"pointer": "/error", "values": ["message_not_found", "channel_not_found"], "code": "not_found"},
+                        {"pointer": "/error", "values": ["cant_delete_message", "compliance_exports_prevent_deletion"], "code": "forbidden"}]}}}
   ]
 }

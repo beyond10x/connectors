@@ -104,6 +104,10 @@ fn every_shipped_guard_is_a_value_of_the_catalog_guard_model() {
             && invariants.contains("not (defined(absent)) or defined(read)"),
         "the model no longer holds absent to true beside a read: {invariants}"
     );
+    assert!(
+        invariants.contains("defined(refusals)"),
+        "the model no longer holds refusals to the write's own answer beside a check: {invariants}"
+    );
     // A boolean is compared with `boolean`, never a literal of its text; the engine refuses
     // those two literals when the selection loads (`adapters/catalog/tests/engine.rs`).
     let expectation =
@@ -119,6 +123,7 @@ fn every_shipped_guard_is_a_value_of_the_catalog_guard_model() {
         "postflight/read",
         "postflight/any_of",
         "postflight/absent",
+        "postflight/refusals",
     ] {
         assert!(
             guarded
@@ -192,7 +197,7 @@ fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
         .find(|(_, guard)| guard["postflight"].get("read").is_some())
         .expect("a shipped guard with a postflight read");
     type Change<'a> = &'a dyn Fn(&mut Value);
-    let variations: [(&str, Change); 5] = [
+    let variations: [(&str, Change); 6] = [
         ("as shipped", &|_| {}),
         ("postflight read null", &|g| {
             g["postflight"]["read"] = Value::Null
@@ -202,6 +207,9 @@ fn the_guard_reader_admits_exactly_the_shapes_the_compiled_model_admits() {
         }),
         ("any_of null", &|g| g["postflight"]["any_of"] = Value::Null),
         ("absent null", &|g| g["postflight"]["absent"] = Value::Null),
+        ("refusals null", &|g| {
+            g["postflight"]["refusals"] = Value::Null
+        }),
     ];
     for (name, change) in variations {
         let mut raw = shipped.clone();

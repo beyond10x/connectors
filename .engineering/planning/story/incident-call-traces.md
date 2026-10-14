@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:incident-call-traces
 kind: story
-status: draft
+status: active
 title: Follow a call's traces by its identifier across sources
 relations:
 - decomposes: epic:incident-collection-workflow
@@ -49,7 +49,10 @@ scope:
   path: website/docs/reference/adapters/loki/model/domains/connectors_loki-reads.md
 - confidence: inferred
   path: website/docs/status.md
-revision: 4
+revision: 6
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T05:12:49Z", actor: "human:timo", revision: 5}
+- {from: "proposed", to: "active", at: "2026-10-14T05:12:49Z", actor: "human:timo", revision: 6}
 ---
 ## Outcome
 

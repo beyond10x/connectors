@@ -27,6 +27,7 @@ mod ignored;
 mod metadata_conformance;
 mod metadata_entities;
 mod platform_gated;
+mod release_binaries;
 mod source_hashes;
 mod upstream_redaction;
 
@@ -65,6 +66,9 @@ enum Action {
     },
     /// Check shared ESS ownership and compile shared and adapter semantic models.
     EssBoundary,
+    /// Check that every binary a guide runs as an installed command is one the release
+    /// workflow's `BINARIES` list packages, and that the list names workspace binaries.
+    ReleaseBinaries,
     /// Re-derive every recorded upstream source digest from its archived bytes, and
     /// check every redacted upstream source against its record and its rule.
     SourceHashes,
@@ -200,6 +204,9 @@ fn execute(args: Args) -> Result<()> {
     }
     if let Action::Redact { input, output } = &args.command {
         return upstream_redaction::write(input, output);
+    }
+    if let Action::ReleaseBinaries = args.command {
+        return release_binaries::run(&root);
     }
     if let Action::SourceHashes = args.command {
         source_hashes::run(&root)?;
