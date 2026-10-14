@@ -1,7 +1,8 @@
-format: ess/14
+format: ess/23
 system: connectors_grafana
 version: v1
 domains:
   - connectors_grafana.discovery
   - connectors_grafana.records
   - connectors_grafana.connection
+  - connectors_grafana.irm

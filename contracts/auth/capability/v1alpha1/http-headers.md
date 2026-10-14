@@ -1,7 +1,38 @@
 # Receiver-owned HTTP headers
 
 **Status:** proposed configuration binding; current HttpConfig does not implement
-`http.extra_headers`. This supplements [auth.capability](semantics.md).
+`http.extra_headers`. One slice is implemented: a trusted composition may fix **one**
+nonsecret header on a native port, `ScopedHttp::with_fixed_header`
+(`crates/connectors-host/src/http.rs`), whose value it derives from the admitted configuration
+(first use: Grafana IRM's `X-Grafana-URL`, `adapters/grafana/src/local.rs`). This supplements
+[auth.capability](semantics.md).
+
+## Implemented slice: one composition-fixed header
+
+- The composition names the header and its value once, when it builds the port; the business
+  adapter holds only `AuthenticatedHttp` and can neither add, change nor remove it. No caller
+  input, provider response or adapter-built request reaches the value.
+- It cannot take the port's credential header name, or any name in these classes, each
+  compared case-insensitively; a trailing `*` is every name with that prefix:
+  - credential and cookie: `authorization`, `proxy-authorization`, `cookie`;
+  - routing and forwarding: `host`, `forwarded`, `x-forwarded-*`, `x-real-ip`;
+  - method override: `x-http-method-override`, `x-http-method`, `x-method-override`;
+  - framing and negotiation: `transfer-encoding`, `connection`, `proxy-connection`,
+    `keep-alive`, `te`, `trailer`, `expect`, `accept`, `accept-encoding`;
+  - content: `content-*`;
+  - upgrade: `upgrade`, `sec-websocket-*`.
+
+  Its value is 1–1,024 bytes of visible ASCII and spaces. A second fixed header on the same
+  port is refused. Each refusal is `invalid_input` at composition, before any request.
+- Every request of the port carries it once, beside the credential: reads, reads sent as a
+  POST, the probe capability and writes derived from the port. The credential-free form
+  exchange (`post_form`) carries neither.
+- The value is part of the admitted configuration, so a change is a new configuration
+  revision.
+
+What stays proposed: operator-declared `http.extra_headers`, more than one header,
+case-variant duplicate detection across several declared headers, and the mediated-parent
+placement below.
 
 An admitted direct connection may declare fixed extra request headers only when
 its selected strict configuration schema and transport capability support them.

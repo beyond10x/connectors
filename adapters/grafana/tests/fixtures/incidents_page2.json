@@ -1,0 +1,44 @@
+{
+  "incidents": [
+    {
+      "incidentID": "incident-103",
+      "refs": [
+        {
+          "key": "com.grafana.oncall",
+          "ref": "I9LPV30QXJ5KM",
+          "url": "https://stack.example/a/grafana-irm-app/alert-groups/I9LPV30QXJ5KM"
+        }
+      ],
+      "severity": "critical",
+      "labels": [],
+      "isDrill": false,
+      "incidentType": "internal",
+      "createdTime": "2026-01-01T23:59:59Z",
+      "modifiedTime": "2026-01-02T00:10:00Z",
+      "createdByUser": {
+        "name": "Fixture Person",
+        "photoURL": "",
+        "userID": "user-fixture-2"
+      },
+      "closedTime": "",
+      "durationSeconds": 0,
+      "status": "active",
+      "title": "Disk latency",
+      "overviewURL": "/a/grafana-irm-app/incidents/incident-103/title",
+      "summary": "fixture-private-summary",
+      "incidentStart": "2026-01-01T23:59:59Z",
+      "incidentEnd": "",
+      "incidentChannels": []
+    }
+  ],
+  "query": {
+    "limit": 50,
+    "dateFrom": "2026-01-01T00:00:00Z",
+    "dateTo": "2026-01-02T00:00:00Z",
+    "orderDirection": "ASC"
+  },
+  "cursor": {
+    "nextValue": "",
+    "hasMore": false
+  }
+}
