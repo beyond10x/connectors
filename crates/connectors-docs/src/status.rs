@@ -451,10 +451,17 @@ pub const CAPABILITIES: &[Capability] = &[
         "MCP invocation, projection, auth lifecycle, mutation replay and composition contracts are specified; there is no MCP runtime.",
         "/docs/reference/adapters",
     ),
+    shipped(
+        "Distribution",
+        "Release binaries",
+        "A release page carries an archive per Linux and macOS target (x86_64 and aarch64) holding connectors and connectors-catalog-provider, with SHA256SUMS; the other adapters are built from the checkout, and there is no Windows binary.",
+        "crates/connectors-build/src/release_binaries.rs::the_release_workflow_packages_the_cli_and_the_catalog_provider",
+        "/docs/getting-started",
+    ),
     planned(
         "Distribution",
-        "Binary and package distribution",
-        "Every release is a source release for Linux x86_64; build it from the checkout.",
+        "Package distribution",
+        "No package manager, container registry or Windows binary carries a release.",
         "/docs/getting-started",
     ),
 ];
@@ -576,7 +583,7 @@ fn page_for(root: &Path, capabilities: &[Capability]) -> Result<String> {
         3,
     );
     out.push_str(&format!(
-        "# Status\n\nAs of {AS_OF}: {} capabilities are shipped, {} are decided and {} are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. Every release is a source release for Linux x86_64; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.\n",
+        "# Status\n\nAs of {AS_OF}: {} capabilities are shipped, {} are decided and {} are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.\n",
         count("shipped"),
         count("decided"),
         count("planned"),

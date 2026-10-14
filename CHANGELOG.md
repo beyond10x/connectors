@@ -4,6 +4,15 @@
 
 ### Added
 
+- Release archives carry the catalog provider: each `connectors-<version>-<target>.tar.gz` holds
+  `connectors` and `connectors-catalog-provider`, both built, checked against the tag's version,
+  signed and notarized on macOS where the signing secrets are set, and covered by `SHA256SUMS`
+  through their archive. Archives of 0.50.0 and earlier hold `connectors` alone; the other
+  adapters are still built from the checkout. `connectors-catalog-provider --version` prints the
+  package version.
+- The repository gate runs `connectors-build release-binaries`, which refuses a guide that runs an
+  installed binary the release workflow's `BINARIES` list leaves out.
+
 - SQL read profiles (`profile.read`), on PostgreSQL and MySQL. A connection's native file may
   declare up to 32 `read_profiles`: an operator-written read statement, the names of its
   parameters, its output columns with a type (`text`, `integer`, `timestamp` or
