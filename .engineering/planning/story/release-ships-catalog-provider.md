@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: story:release-ships-catalog-provider
 kind: story
-status: active
+status: implemented
 title: Release archives carry the catalog provider binary
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T07:02:23Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-14T07:02:24Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-14T22:06:07Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

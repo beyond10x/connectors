@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: story:owner-stop-after-upgrade
 kind: story
-status: active
+status: implemented
 title: Stop an older owner after a CLI upgrade with one documented command
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T09:25:49Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-14T09:25:50Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-14T22:06:06Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

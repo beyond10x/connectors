@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:mounted-secret-custody
 kind: story
-status: active
+status: implemented
 title: Read-only mounted-secret custody, explicitly selected, for headless and container hosts
 relations:
 - serves: vision:independent-contract-adapters
@@ -96,10 +96,11 @@ scope:
   path: website/docs/reference
 - confidence: inferred
   path: website/docs/status.md
-revision: 6
+revision: 7
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-13T20:03:47Z", actor: "human:timo", revision: 3}
 - {from: "proposed", to: "active", at: "2026-10-14T02:55:05Z", actor: "human:timo", revision: 6}
+- {from: "active", to: "implemented", at: "2026-10-14T22:06:06Z", actor: "human:timo", revision: 7, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Problem
 
