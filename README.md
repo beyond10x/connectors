@@ -46,9 +46,11 @@ login keychain on macOS and the Credential Manager on Windows
 The macOS and Windows bindings have a CI job that runs the custody contract suite against their
 real stores. The CLI and its local host also build and run on macOS: a CI job runs their lint and
 test suites on `macos-latest`, and the guarantees macOS holds only in a weaker form are listed in
-the [CLI semantics](contracts/cli/v1alpha1/semantics.md#macos-platform-guarantees). They do not
-yet run on Windows. A release page carries Linux and macOS binaries besides the source
-archives ([install a release binary](#install-a-release-binary)). See the [catalog provider guide](docs/local-catalog-provider.md),
+the [CLI semantics](contracts/cli/v1alpha1/semantics.md#macos-platform-guarantees). Since 0.49.0
+they also build and run on Windows, where a CI job runs them on `windows-latest`
+([Windows platform guarantees](contracts/cli/v1alpha1/semantics.md#windows-platform-guarantees));
+there is no Windows release binary, so build it from the release tag's source. A release page
+carries Linux and macOS binaries besides the source archives ([install a release binary](#install-a-release-binary)). See the [catalog provider guide](docs/local-catalog-provider.md),
 the [Kubernetes CLI guide](docs/local-kubernetes-cli.md) and the
 [runtime binding](docs/local-runtime-foundation.md).
 
