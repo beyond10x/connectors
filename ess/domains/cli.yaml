@@ -260,6 +260,22 @@ types:
       - {name: name, type: String}
       - {name: label, type: String}
       - {name: max_bytes, type: Integer}
+  # A connection's identity is its instance, adapter, provider authority and this
+  # profile's authentication: every field but evidence_lifetime_ms
+  # (connectors.auth_bindings.LocalStaticProfile). A configuration revision that
+  # leaves the identity unchanged is upgraded by `connections revalidate` when the
+  # profile is unchanged; when only evidence_lifetime_ms changed, revalidate, repair
+  # and a read name create_connection, which connect under the same instance id
+  # admits; a saved connection whose profile id the configured adapter no longer
+  # declares is refused the same way, never as `unsupported`. Revalidate, connect,
+  # repair, a read and a write first replace an adapter process still running an
+  # earlier adapter entry. One that changes the identity refuses revalidate,
+  # repair, a read and connect under the same instance id with
+  # `lifecycle_conflict` and next_action check_configuration: only a new instance
+  # id helps, and `connections revoke` through the moved entry still reaches the
+  # connections left under an instance id no entry configures any longer.
+  # ESS-LIMIT: no construct relates two revisions' values field by field, so the
+  # host enforces the classification and tests pin it.
   - name: connectors.cli.PrivateStaticProfile
     kind: struct
     fields:
@@ -537,7 +553,7 @@ types:
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
   - name: connectors.cli.NextAction
     kind: enum
-    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, none]
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4]
@@ -615,6 +631,23 @@ types:
       # by tests.
       - {name: store_version, type: "Optional<String>"}
       - {name: binary_version, type: "Optional<String>"}
+      # ESS-LIMIT: clock_refusal appears only on an approval clock's `unavailable`
+      # (`stage = observation`), naming why no observation resulted
+      # (contracts/service/clock.md, "Refusals"); clock_radius_ms, the source's signed
+      # radius in milliseconds, appears exactly when it is too_imprecise. As for
+      # instance_id above, ESS declares no invariant on a CLI type, so the presence
+      # rules are enforced by the host and pinned by tests.
+      - {name: clock_refusal, type: "Optional<connectors.cli.ClockRefusal>"}
+      - {name: clock_radius_ms, type: "Optional<Integer>"}
+  # Why an approval clock acquisition produced no observation, each with its own
+  # next action: unreachable (no reply within the query timeout, or a send or receive
+  # error; retry_explicitly), unverified (the reply did not parse or verify against the
+  # configured key and protocol version; check_configuration), too_imprecise (a verified
+  # reply whose signed radius, with the measured delay and timer-rate error, is wider
+  # than the clock contract admits; choose_clock_source).
+  - name: connectors.cli.ClockRefusal
+    kind: enum
+    variants: [unreachable, unverified, too_imprecise]
   # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
   # keyring and persistent_custody_qualification under a platform binding; under the
   # explicitly selected mounted_secret binding, mounted_custody (the configured
@@ -770,6 +803,23 @@ types:
       # store carrying checkpoints. As for Failure.instance_id, ESS declares no
       # invariant on a CLI type, so the host pins the value and tests hold it.
       - {name: newest_incompatible_release, type: "String"}
+  # `setup owner-stop` (contracts/cli/v1alpha1/owner.md, "Stopping an owner"), the
+  # command the stop_owner next action names: asks the running owner of the state
+  # directory, of any build, to drain and exit through its private shutdown request
+  # and waits a bounded time for its lifetime lock. No process is ever signalled.
+  # no_owner is a success: no owner ran, and nothing was started or created.
+  - name: connectors.cli.OwnerStopDisposition
+    kind: enum
+    variants: [stopped, no_owner]
+  # host_incarnation is the incarnation that greeted and exited, present exactly
+  # when stopped; that cross-field requirement is a runtime obligation, as for
+  # AcquisitionObservation.
+  - name: connectors.cli.SetupOwnerStopResult
+    kind: struct
+    fields:
+      - {name: disposition, type: "connectors.cli.OwnerStopDisposition"}
+      - {name: state_path, type: "String"}
+      - {name: host_incarnation, type: "Optional<String>"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:
@@ -1133,7 +1183,7 @@ entities:
       - {name: last_connection_ref, type: String}
       - {name: page_limit, type: Integer}
       - {name: expires_at, type: Timestamp}
-    # contracts/cli/v1alpha1/semantics.md:526, docs/local-connection-registry.md:105-106;
+    # contracts/cli/v1alpha1/semantics.md:534, docs/local-connection-registry.md:184-185;
     # the host refuses any other limit before recording (registry/observation.rs `list`).
     invariants:
       - page_limit >= 1
@@ -1150,8 +1200,8 @@ entities:
     # connection or dispatch authority and is retained after logical expiry.
     # ESS-LIMIT: a cursor is stale when its registry_epoch differs from the
     # ServiceConfiguration's, which publication, revoke and known invalidity advance
-    # (docs/local-connection-registry.md:107-108); the 300 s expiry and the 10,000
-    # live-cursor cap (:104) are host rules. The guard over the related
+    # (docs/local-connection-registry.md:186-187); the 300 s expiry and the 10,000
+    # live-cursor cap (:183) are host rules. The guard over the related
     # configuration's field is `when_related:`, added in ESS 0.41 at source format
     # ess/18; this specification is ess/15, which refuses it
     # (unsupported_format_version), and the ESS 0.52 Entity Runtime lowering
@@ -1293,7 +1343,7 @@ commands:
         wrong_state: true
         error: connectors.cli.CursorStateConflict
     # DECIDED 2026-09-27: expiring an Expired cursor refuses with CursorStateConflict;
-    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:530) and the host
+    # stale cursors refuse (contracts/cli/v1alpha1/semantics.md:538) and the host
     # removal path (er.rs:4327-4329) only expires Active cursors. The error name is
     # the decision; no source names one.
 

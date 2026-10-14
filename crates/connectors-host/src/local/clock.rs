@@ -72,6 +72,42 @@ pub enum Failure {
 }
 type Result<T> = std::result::Result<T, Failure>;
 
+/// Why an acquisition yielded no observation (contracts/service/clock.md, "Refusals").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cause {
+    /// No reply within the query deadline, or a send or receive error.
+    Unreachable,
+    /// A reply that did not parse or verify against the configured key and protocol.
+    Unverified,
+    /// A verified reply whose signed radius, with the measured delay and timer-rate
+    /// error, makes the interval wider than the contract admits.
+    TooImprecise { radius_ms: u64 },
+}
+
+/// An acquisition's refusal: its [`Failure`], and its cause when the source
+/// itself is why. A local timer, continuity or calendar refusal has none.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Refused {
+    pub failure: Failure,
+    pub cause: Option<Cause>,
+}
+impl From<Failure> for Refused {
+    fn from(failure: Failure) -> Self {
+        Self {
+            failure,
+            cause: None,
+        }
+    }
+}
+impl From<Cause> for Refused {
+    fn from(cause: Cause) -> Self {
+        Self {
+            failure: Failure::Unavailable,
+            cause: Some(cause),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Configuration {
@@ -122,6 +158,10 @@ impl Configuration {
     /// One exchange; never call while holding a metadata transaction or a key/
     /// policy lease. No host clock modification, DNS, fallback, or retry occurs.
     pub fn acquire(&self) -> Result<BoundedClock> {
+        self.acquire_explained().map_err(|refused| refused.failure)
+    }
+    /// [`Self::acquire`], naming the [`Cause`] when the source is why it refused.
+    pub fn acquire_explained(&self) -> std::result::Result<BoundedClock, Refused> {
         let (address, key) = self.resolved()?;
         timer::qualify_resolution()?;
         let socket = UdpSocket::bind(if address.is_ipv4() {
@@ -129,30 +169,40 @@ impl Configuration {
         } else {
             "[::]:0"
         })
-        .map_err(|_| Failure::Unavailable)?;
-        socket.connect(address).map_err(|_| Failure::Unavailable)?;
+        .map_err(|_| Cause::Unreachable)?;
+        socket.connect(address).map_err(|_| Cause::Unreachable)?;
         let deadline = Instant::now() + query_timeout();
         let started = Stamp::read()?;
         let (request, nonce) = protocol::request(&key)?;
         socket
-            .set_write_timeout(Some(remaining(deadline)?))
-            .map_err(|_| Failure::Unavailable)?;
-        if socket.send(&request).map_err(|_| Failure::Unavailable)? != request.len() {
-            return Err(Failure::Unavailable);
+            .set_write_timeout(Some(remaining(deadline).map_err(|_| Cause::Unreachable)?))
+            .map_err(|_| Cause::Unreachable)?;
+        if socket.send(&request).map_err(|_| Cause::Unreachable)? != request.len() {
+            return Err(Cause::Unreachable.into());
         }
         socket
-            .set_read_timeout(Some(remaining(deadline)?))
-            .map_err(|_| Failure::Unavailable)?;
+            .set_read_timeout(Some(remaining(deadline).map_err(|_| Cause::Unreachable)?))
+            .map_err(|_| Cause::Unreachable)?;
         let mut bytes = [0u8; protocol::PACKET_SIZE + 1];
-        let n = socket.recv(&mut bytes).map_err(|_| Failure::Unavailable)?;
+        let n = match socket.recv(&mut bytes) {
+            Ok(n) => n,
+            // Windows refuses a datagram longer than the buffer (WSAEMSGSIZE) where other
+            // systems truncate it; either way the source answered with an overlong reply.
+            Err(e) if cfg!(windows) && e.raw_os_error() == Some(10040) => bytes.len(),
+            Err(_) => return Err(Cause::Unreachable.into()),
+        };
         let received = Stamp::read()?;
-        remaining(deadline)?;
+        remaining(deadline).map_err(|_| Cause::Unreachable)?;
         started.continuous_with(received)?;
-        if received.monotonic < started.monotonic || n > protocol::PACKET_SIZE {
-            return Err(Failure::Unavailable);
+        if received.monotonic < started.monotonic {
+            return Err(Failure::Unavailable.into());
         }
-        let sample = protocol::verify(&bytes[..n], &request, &nonce, &key)?;
-        remaining(deadline)?;
+        if n > protocol::PACKET_SIZE {
+            return Err(Cause::Unverified.into());
+        }
+        let sample =
+            protocol::verify(&bytes[..n], &request, &nonce, &key).map_err(|_| Cause::Unverified)?;
+        remaining(deadline).map_err(|_| Cause::Unreachable)?;
         let clock = BoundedClock {
             sample,
             started,
@@ -162,7 +212,17 @@ impl Configuration {
             process: std::process::id(),
             last_read: AtomicU64::new(received.monotonic),
         };
-        clock.observe()?;
+        let now = Stamp::read()?;
+        if clock.interval_at(now, std::process::id()).is_err() {
+            return Err(if clock.wider_than_admitted(now) {
+                Cause::TooImprecise {
+                    radius_ms: u64::from(clock.sample.radius) * 1000,
+                }
+                .into()
+            } else {
+                Failure::Unavailable.into()
+            });
+        }
         Ok(clock)
     }
 }
@@ -211,6 +271,36 @@ impl BoundedClock {
             return Err(Failure::Unavailable);
         }
         self.started.continuous_with(now)?;
+        let (origin_lower, lower, upper) = self.bounds_at(now)?;
+        if upper > MAX_SAFE_MS || upper.checked_sub(lower).is_none_or(|w| w > max_width_ms()) {
+            return Err(Failure::Unavailable);
+        }
+        // No leap announcement is consumed. Avoid extrapolating across any UTC
+        // midnight, including the possible skipped/repeated second around it.
+        let day_ms = 86_400_000;
+        let origin_ms = origin_lower / NS_PER_MS;
+        if origin_ms / day_ms != upper / day_ms
+            || origin_ms % day_ms < 1000
+            || upper % day_ms >= day_ms - 1000
+        {
+            return Err(Failure::Unavailable);
+        }
+        Ok(ClockInterval {
+            lower_unix_ms: lower as i64,
+            upper_unix_ms: upper as i64,
+        })
+    }
+    /// Whether the continuous interval at `now` is refused for its width alone:
+    /// the signed radius, with the measured delay and rate error, is too wide.
+    fn wider_than_admitted(&self, now: Stamp) -> bool {
+        self.started.continuous_with(now).is_ok()
+            && self
+                .bounds_at(now)
+                .is_ok_and(|(_, lower, upper)| upper.saturating_sub(lower) > max_width_ms())
+    }
+    /// The interval at `now` before any admission check: its origin's lower
+    /// bound in ns, then its lower and upper bounds in Unix ms, rounded outward.
+    fn bounds_at(&self, now: Stamp) -> Result<(u128, u128, u128)> {
         let from_start = now
             .monotonic
             .checked_sub(self.started.monotonic)
@@ -239,23 +329,7 @@ impl BoundedClock {
             .and_then(|v| v.checked_add(3 * NS_PER_MS))
             .ok_or(Failure::Unavailable)?
             .div_ceil(NS_PER_MS);
-        if upper > MAX_SAFE_MS || upper.checked_sub(lower).is_none_or(|w| w > max_width_ms()) {
-            return Err(Failure::Unavailable);
-        }
-        // No leap announcement is consumed. Avoid extrapolating across any UTC
-        // midnight, including the possible skipped/repeated second around it.
-        let day_ms = 86_400_000;
-        let origin_ms = origin_lower / NS_PER_MS;
-        if origin_ms / day_ms != upper / day_ms
-            || origin_ms % day_ms < 1000
-            || upper % day_ms >= day_ms - 1000
-        {
-            return Err(Failure::Unavailable);
-        }
-        Ok(ClockInterval {
-            lower_unix_ms: lower as i64,
-            upper_unix_ms: upper as i64,
-        })
+        Ok((origin_lower, lower, upper))
     }
 }
 impl Clock for BoundedClock {

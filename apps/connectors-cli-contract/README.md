@@ -1,6 +1,6 @@
 # `connectors` CLI contract
 
-Local integration access through explicitly configured adapters
+Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
 
 This generated package installs an unavailable handler. Application behavior enters through the `Handler` seam; schema-selected calls also require `DynamicValidator`. See `help.txt` for process options and `binding.json` for resolved types and targets.
 
@@ -238,6 +238,14 @@ Callable: `setup-init`. Input: `null (inputless)`. Result: `connectors.cli.Setup
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `setup owner-stop`
+
+Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner
+
+Callable: `setup-owner-stop`. Input: `null (inputless)`. Result: `connectors.cli.SetupOwnerStopResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ## Runtime obligations
 
 - handler:adapters-describe: implement the owner-qualified callable and its declared result/error contract
@@ -270,3 +278,4 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:setup-check: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-init: implement the owner-qualified callable and its declared result/error contract
+- handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract

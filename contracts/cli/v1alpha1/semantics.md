@@ -73,6 +73,7 @@ management wire payload or a persistent record.
 | `setup init` | local configuration writer | inputless Context → `SetupInitResult` | no / no |
 | `setup check` | local configuration inspector | inputless Context → `SetupCheckResult` | no / no |
 | `setup checkpoints-enable` | local metadata store, under the owner lifetime lock | `SetupCheckpointsEnableInput` → `SetupCheckpointsEnableResult` | no / no |
+| `setup owner-stop` | the running owner of the state directory, through its shutdown request ([owner transport](owner.md#stopping-an-owner)) | inputless Context → `SetupOwnerStopResult` | no / no |
 | `approvals clock-check` | configured clock inspector | `ApprovalClockCheckInput` → `ApprovalClockCheckResult` | no / no |
 | `approvals policy-status` | local policy inspector | `ApprovalPolicyStatusInput` → `ApprovalPolicyResult` | no / no |
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
@@ -112,6 +113,13 @@ Admission order, delivery, process rules and the same-user boundary are in
 `approvals clock-check` performs the bounded authenticated exchange specified in
 [the clock binding](../../service/clock.md). Its public observation cannot be
 reused as time evidence; it starts no service and reads no secret or metadata.
+When no observation results it refuses `unavailable` at `stage = observation`, and
+its `Failure` names the cause in `clock_refusal` with that cause's next action:
+`unreachable` with `retry_explicitly`, `unverified` with `check_configuration`, and
+`too_imprecise` with `choose_clock_source` and the signed radius in
+`clock_radius_ms` ([refusals](../../service/clock.md#refusals)). A local timer,
+continuity or calendar refusal names no cause and keeps `check_configuration`. The
+refusal never carries the observation's bounds, the request or the reply.
 
 `approvals policy-set` accepts only `--input-file`; its path is acquired by the
 production handler using the bounded document reader. `prepare` and `issue` use
@@ -360,8 +368,8 @@ starts no local host or adapter and runs in this order:
    waiting and holds it until it returns, so no owner starts meanwhile. A lock
    another process holds, a running owner for this state directory, refuses
    `lifecycle_conflict` (`stage = admission`, `next_action = stop_owner`) with the
-   store unchanged. The command never signals the owner; the user stops the
-   running `__connectors-owner` process, as for `owner_build_mismatch`.
+   store unchanged. The command never signals the owner; the user stops it with
+   `connectors setup owner-stop`, as for `owner_build_mismatch`.
 3. It opens the store as an admitted mutating open under `metadata.lock`, within
    the usual 30-second wait. As every mutating open does, it first migrates a
    level 1–8 database to level 9 ([local metadata](../../../docs/local-er-metadata.md#compatible-migration-from-levels-18)).
@@ -682,10 +690,10 @@ never replay a possible write after interruption, timeout or lost response.
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
-| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`) | `lifecycle_conflict` | 1 |
+| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
-| running owner is a different executable build (`next_action = stop_owner`) | `owner_build_mismatch` | 1 |
+| running owner is a different executable build (`next_action = stop_owner`: run `connectors setup owner-stop`) | `owner_build_mismatch` | 1 |
 | no selected cached description | `description_unavailable` | 1 |
 | schema/descriptor changed | `stale_description` | 1 |
 | absent selected operation/connection | `not_found` | 1 |
@@ -694,6 +702,9 @@ never replay a possible write after interruption, timeout or lost response.
 | known revoked connection | `revoked` | 1 |
 | current permission missing | `forbidden` (or shared `not_granted`) | 1 |
 | unavailable service / budget expired | `unavailable` / `timeout` | 1 |
+| `setup owner-stop`: state directory, owner socket or lock file of another user (`stage = stop`, `next_action = check_configuration`) | `forbidden` | 1 |
+| `setup owner-stop`: the lifetime lock is held and no owner answers within the bound; nothing is signalled (`stage = stop`, `next_action = retry_explicitly`) | `unavailable` | 1 |
+| `setup owner-stop`: the owner accepted the request and still holds the lifetime lock at the bound (`stage = stop`, `next_action = retry_explicitly`) | `timeout` | 1 |
 | user interruption | `interrupted` | 130 |
 
 A configuration whose adapter entry contradicts its format — a
@@ -848,8 +859,34 @@ it as `code = lifecycle_conflict` at `stage = admission`, never with
 when a revalidation can follow the configuration upgrade: its provider
 authority and profile declaration are unchanged, its credential is neither
 known invalid nor expired, and the new provider has not already refused it
-under the configured revision. Otherwise it is `create_connection`, because
-repair refuses a changed binding. A revalidation the new provider refuses (the
+under the configured revision. The connection's identity is the instance,
+adapter, provider authority and the profile's authentication, which is the
+profile declaration apart from its evidence lifetime. A configuration that
+changes only `evidence_lifetime_ms` leaves the identity unchanged, but the
+connection stays bound to the declaration it was admitted under, so the next
+action is `create_connection`, and `connections connect` under the same
+instance id admits the new connection; the old one stays revocable. When the
+provider authority or the profile's authentication changed, the next action is
+`check_configuration`: no command under the same instance id can help, since
+`connections connect` there is refused for the same reason (`lifecycle_conflict`
+at `stage = admission`, `next_action = check_configuration`), and only a new
+instance id admits a new connection. The connections left under the earlier
+instance id stay revocable through the entry, under the same adapter, that
+moved: `connections revoke` reaches a connection whose recorded instance id no
+entry configures any longer, never one another entry still configures.
+Otherwise it is `create_connection`, a saved connection whose profile id the
+configured adapter no longer declares included (revalidate and repair refuse it
+as a read does, never as `unsupported`); connect under a declared profile
+admits the new connection. A
+`connections repair` of a connection saved under another binding is classified
+the same way, never as `identity_mismatch`: repair refuses a changed binding. A
+`connections revalidate`, `connections connect`, `connections repair`, read or
+write whose adapter process still runs an earlier adapter entry stops that
+process and launches the configured one before it captures anything, so no
+command answers `retry_status` for it until `adapters stop`. Only a credential
+validation captured by the earlier process is still refused as
+`lifecycle_conflict`; its `connections connect` starts again with a launch
+that replaces the process. A revalidation the new provider refuses (the
 credential invalid, below scope or another identity) answers `create_connection`
 and records the refusal against the configured revision
 (`Connection.refused_configuration_revision`), so the next read names

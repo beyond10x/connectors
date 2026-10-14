@@ -86,7 +86,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_twenty_nine_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_thirty_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -97,6 +97,7 @@ fn the_selected_inventory_has_twenty_nine_grouped_commands_and_explicit_runtime_
         "setup init",
         "setup check",
         "setup checkpoints-enable",
+        "setup owner-stop",
         "adapters list",
         "adapters describe",
         "adapters status",
