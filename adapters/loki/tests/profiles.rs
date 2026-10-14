@@ -130,7 +130,7 @@ fn pattern_profile() -> Value {
         "format": {"kind": "pattern",
                    "value": {"pattern": "fx-cdr <dir> <src> -> <dst> at <start> id=<callid>"}},
         "fields": [
-            {"name": "direction", "key": "dir", "type": "string"},
+            {"name": "direction", "key": "dir", "type": "string", "filterable": true},
             {"name": "caller", "key": "src", "type": "phone_number", "mask": "redact"},
             {"name": "callee", "key": "dst", "type": "phone_number", "mask": "none"},
             {"name": "started_at", "key": "start", "type": "unix_millis"},
@@ -221,12 +221,13 @@ async fn a_line_profile_answers_one_typed_masked_record_per_line_in_time_order()
         )
         .await
         .unwrap();
-    // The composed query: the profile's selector and the matched value as a line
-    // filter, both string literals; the exact window, forward, the limit.
+    // The composed query: the profile's selector, the format's parser and an exact
+    // label filter on the matched key, never a substring line filter; every value a
+    // string literal; the exact window, forward, the limit.
     assert_eq!(
         sent(&seen, 0),
         json!({"path": "/loki/api/v1/query_range",
-               "query": r#"{service="edge-proxy",stream_kind="cdr"} |= "+15550100001""#,
+               "query": r#"{service="edge-proxy",stream_kind="cdr"} | logfmt | src="+15550100001""#,
                "start": START, "end": END, "direction": "forward", "limit": "50"})
     );
     assert_eq!(
@@ -244,9 +245,11 @@ async fn a_line_profile_answers_one_typed_masked_record_per_line_in_time_order()
         ]),
         "{out}"
     );
-    // The heartbeat does not read as the profile; the third CDR's caller only
-    // contains the matched number.
-    assert_eq!(out["skipped"], json!({"unreadable": 1, "unmatched": 1}));
+    // This server answers lines Loki would not for the exact filter: the heartbeat,
+    // which holds no caller, and the third CDR, whose caller only contains the
+    // matched number. The adapter checks the match again and drops both uncounted:
+    // with a match, only a line holding every matched value exactly is counted.
+    assert_eq!(out["skipped"], json!({"unreadable": 0}));
     assert_eq!(out["profile"], "fixture-cdr");
     assert_eq!(out["order"], "timestamp-forward");
     assert_eq!(out["complete"], true);
@@ -281,8 +284,49 @@ async fn a_pattern_profile_reads_its_captures_and_masks_as_declared() {
                            "call_id": "fx-leg-0001"}}]),
         "{out}"
     );
-    assert_eq!(out["skipped"], json!({"unreadable": 1, "unmatched": 0}));
+    // Without a match no caller value is involved: the garbled line is counted.
+    assert_eq!(out["skipped"], json!({"unreadable": 1}));
     published(&loki, "logs.profile_lines", &out);
+}
+
+/// §12.2: a match is an exact, server-side filter on the parsed field, for logfmt
+/// and for a pattern alike; matches combine with AND in field-name order, and a
+/// hostile value stays one string literal.
+#[tokio::test]
+async fn a_match_is_an_exact_filter_on_the_parsed_field_never_a_substring() {
+    let empty = json!({"status": "success", "data": {"resultType": "streams", "result": []}});
+    let (base, seen) = server(vec![empty.clone(), empty.clone(), empty]).await;
+    let loki = loki(&base);
+    for (profile, matched) in [
+        (
+            "fixture-cdr",
+            json!({"direction": "inbound", "callee": "+15550100002"}),
+        ),
+        ("fixture-cdr", json!({"caller": r#"x" |= "y"#})),
+        ("fixture-pattern", json!({"direction": "inbound"})),
+    ] {
+        let out = loki
+            .invoke(
+                "logs.profile_lines",
+                json!({"profile": profile, "start_unix_ns": START, "end_unix_ns": END,
+                       "match": matched}),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out["skipped"], json!({"unreadable": 0}));
+    }
+    assert_eq!(
+        sent(&seen, 0)["query"],
+        r#"{service="edge-proxy",stream_kind="cdr"} | logfmt | dst="+15550100002" | dir="inbound""#
+    );
+    assert_eq!(
+        sent(&seen, 1)["query"],
+        r#"{service="edge-proxy",stream_kind="cdr"} | logfmt | src="x\" |= \"y""#
+    );
+    assert_eq!(
+        sent(&seen, 2)["query"],
+        r#"{service="edge-proxy"} | pattern "fx-cdr <dir> <src> -> <dst> at <start> id=<callid>" | dir="inbound""#
+    );
 }
 
 #[tokio::test]
@@ -328,7 +372,8 @@ async fn a_trace_by_label_answers_one_calls_lines_from_two_sources_in_time_order
         ]
     );
     assert_eq!(out["call_id"], "fx-leg-0001");
-    assert_eq!(out["excluded"], 0);
+    // No count of other lines exists to tell a caller anything about other calls.
+    assert!(out.get("excluded").is_none(), "{out}");
     assert_eq!(out["complete"], true);
     assert_eq!(out["order"], "timestamp-forward");
     published(&loki, "logs.call_trace", &out);
@@ -346,9 +391,10 @@ async fn a_trace_by_field_keeps_only_lines_whose_field_is_exactly_the_call() {
         )
         .await
         .unwrap();
+    // The identifier is an exact filter on the parsed key, never a substring.
     assert_eq!(
         sent(&seen, 0)["query"],
-        r#"{env="fixture",service=~".+"} |= "fx-leg-0001""#
+        r#"{env="fixture",service=~".+"} | logfmt | callid="fx-leg-0001""#
     );
     let lines: Vec<(&str, &str)> = out["lines"]
         .as_array()
@@ -364,9 +410,12 @@ async fn a_trace_by_field_keeps_only_lines_whose_field_is_exactly_the_call() {
             ("edge-proxy", r#"callid=fx-leg-0001 msg="BYE received""#),
         ]
     );
-    // Another call whose identifier contains this one, another call naming it in
-    // its message, and a line the format cannot read: none is this call's.
-    assert_eq!(out["excluded"], 3);
+    // This server also answers lines Loki would not for the exact filter: another
+    // call whose identifier contains this one, another call naming it in its
+    // message, and a line the format cannot read. None is this call's, and none is
+    // counted anywhere in the answer.
+    assert!(out.get("excluded").is_none(), "{out}");
+    assert_eq!(out["complete"], true);
     published(&loki, "logs.call_trace", &out);
 }
 
@@ -404,22 +453,15 @@ async fn a_hostile_call_identifier_is_one_escaped_logql_string_literal() {
             format!(r#"{{env="fixture",service=~".+",call="{literal}"}}"#),
             "{id:?}"
         );
-        // A logfmt line writes such an identifier quoted and escaped, so the line
-        // filter looks for that spelling, again as one string literal.
-        let quoted = profile::logfmt_spelling(id);
+        // A line-carried identifier is the value of an exact label filter on the
+        // parsed key, again one string literal.
         assert_eq!(
             sent(&seen, 1)["query"],
-            format!(
-                r#"{{env="fixture",service=~".+"}} |= {}"#,
-                profile::string_literal(&quoted)
-            ),
+            format!(r#"{{env="fixture",service=~".+"}} | logfmt | callid="{literal}""#),
             "{id:?}"
         );
     }
     assert_eq!(profile::string_literal(r#"a"b\c"#), r#""a\"b\\c""#);
-    assert_eq!(profile::logfmt_spelling("plain-id"), "plain-id");
-    assert_eq!(profile::logfmt_spelling(r#"a"b"#), r#""a\"b""#);
-    assert_eq!(profile::logfmt_spelling("a b"), r#""a b""#);
 }
 
 #[tokio::test]
@@ -753,10 +795,60 @@ fn a_profile_the_adapter_cannot_honour_is_an_invalid_configuration() {
                 p["query"] = json!("{env=\"fixture\"}");
             }),
         ),
+        // A matched key is the name of a label filter after the parser: Loki
+        // rewrites a key that is no label name, keeps `__` names for itself, and a
+        // stream label of the same name shadows the parsed value.
+        (
+            "a filterable key that is no label name",
+            mutated("/line_profiles/0/fields/0", &|f| {
+                f["key"] = json!("dir.x");
+            }),
+        ),
+        (
+            "a filterable key Loki reserves",
+            mutated("/line_profiles/0/fields/0", &|f| {
+                f["key"] = json!("__error__");
+            }),
+        ),
+        (
+            "a filterable key that is a selector label",
+            mutated("/line_profiles/0/fields/0", &|f| {
+                f["key"] = json!("service");
+            }),
+        ),
+        (
+            "a trace key that is no label name",
+            mutated("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("call.id");
+            }),
+        ),
+        (
+            "a trace key Loki reserves",
+            mutated("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("__line__");
+            }),
+        ),
+        (
+            "a trace key that is the source label",
+            mutated("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("service");
+            }),
+        ),
+        (
+            "a trace key that is a selector label",
+            mutated("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("env");
+            }),
+        ),
     ];
     for (why, configuration) in refused {
         assert!(loki_with(base, &configuration).is_err(), "admitted: {why}");
     }
+    // A key that is never matched is only read, so it may be any logfmt key.
+    let unmatched = mutated("/line_profiles/0/fields/3", &|f| {
+        f["key"] = json!("start.ts");
+    });
+    assert!(loki_with(base, &unmatched).is_ok());
     // Without profiles the configuration is the one every existing connection has.
     let mut plain = effective(base);
     plain.as_object_mut().unwrap().remove("line_profiles");
