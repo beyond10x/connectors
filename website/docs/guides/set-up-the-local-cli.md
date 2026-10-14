@@ -3,7 +3,7 @@ title: Set up the local CLI
 sidebar_position: 2
 description: Create the local CLI's private configuration and metadata store, and check its prerequisites before adding an adapter.
 lede: setup init creates a private configuration and an Entity Runtime metadata store; setup check says whether this machine can hold credentials before anything asks for one.
-source: apps/connectors/tests/local_cli.rs, crates/connectors-host/tests/local_foundation.rs, contracts/cli/v1alpha1/semantics.md
+source: apps/connectors/tests/local_cli.rs, crates/connectors-host/tests/local_foundation.rs, contracts/cli/v1alpha1/semantics.md, docs/local-mounted-secret-custody.md, docs/local-container.md
 ---
 
 # Set up the local CLI
@@ -86,6 +86,17 @@ credentials; a machine without one cannot save a connection, and the check says 
 connect asks for a credential. `custody_backend` names the store custody uses, fixed when the
 binary is built: `secret_service` on Linux. The `macos_keychain` and `windows_credential_manager`
 bindings exist, but the CLI does not yet run on macOS or Windows.
+
+A headless host or a container has no Secret Service. There, a `connectors-local/4`
+configuration can select the read-only `mounted_secret` binding with a `[custody]` table: it
+reads each credential from a read-only mounted directory, such as a Kubernetes Secret volume,
+and writes nothing. It is never chosen on its own; without the table an unusable Secret Service
+still refuses with `custody_unavailable`. Under it `setup check` reports
+`custody_backend: mounted_secret` and a `mounted_custody` prerequisite.
+[Mounted-secret custody](https://github.com/beyond10x/connectors/blob/main/docs/local-mounted-secret-custody.md)
+describes the binding and its threat model, and
+[running in a container](https://github.com/beyond10x/connectors/blob/main/docs/local-container.md)
+the setup, with a CronJob example.
 
 ## Nothing is configured yet
 
