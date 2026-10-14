@@ -810,7 +810,7 @@ fn setup_owner_stop_refuses_an_owner_that_does_not_answer_and_never_signals_it()
         );
     };
     refused(stop(), "no socket");
-    let _silent = std::os::unix::net::UnixListener::bind(state.join("owner.sock")).unwrap();
+    let _silent = sockets::bind(&state, "owner.sock");
     fs::set_permissions(state.join("owner.sock"), fs::Permissions::from_mode(0o600)).unwrap();
     refused(stop(), "a socket nobody serves");
     assert!(
