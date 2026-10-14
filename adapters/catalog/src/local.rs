@@ -124,6 +124,11 @@ struct AuthConfig {
     scheme: Scheme,
     header: String,
     bearer: bool,
+    /// The scheme word a token profile's token travels behind, `<prefix> <token>`,
+    /// such as Opsgenie's `GenieKey`; never beside `bearer`. Omitted when absent,
+    /// so existing configuration revisions hold.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    prefix: Option<String>,
     /// The prompt label of the basic `account` field; only a basic profile has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     account_label: Option<String>,
@@ -600,6 +605,23 @@ fn scope_set(scope: &str) -> Result<BTreeSet<String>> {
     }
     Ok(granted)
 }
+/// The longest scheme word a token profile may send in front of its token.
+const PREFIX_LIMIT: usize = 32;
+/// A token profile's scheme word: 1 to 32 visible ASCII bytes, no space.
+fn valid_prefix(prefix: &str) -> bool {
+    !prefix.is_empty()
+        && prefix.len() <= PREFIX_LIMIT
+        && prefix.bytes().all(|b| b.is_ascii_graphic())
+}
+/// `<prefix> <token>`, sized up front so no credential byte is left behind in
+/// a reallocated buffer.
+fn prefixed(prefix: &str, token: &str) -> Secret {
+    let mut value = Vec::with_capacity(prefix.len() + 1 + token.len());
+    value.extend_from_slice(prefix.as_bytes());
+    value.push(b' ');
+    value.extend_from_slice(token.as_bytes());
+    Secret(value)
+}
 /// Scopes a configuration requests: each a bounded printable word.
 fn valid_scopes(scopes: &BTreeSet<String>) -> bool {
     !scopes.is_empty()
@@ -720,6 +742,12 @@ impl Local {
                     || a.query
                         .iter()
                         .any(|(k, v)| k.is_empty() || k.len() > 128 || v.len() > 1024)
+            })
+            || config.auth.prefix.as_deref().is_some_and(|prefix| {
+                // One visible-ASCII word of at most 32 bytes, in front of a
+                // token only, and never beside `Bearer `
+                // (`connectors_catalog.identity.Profile`).
+                config.auth.scheme != Scheme::Token || config.auth.bearer || !valid_prefix(prefix)
             })
             || match config.auth.scheme {
                 Scheme::Token => config.auth.account_label.is_some(),
@@ -1132,7 +1160,10 @@ impl Local {
                 let document = Self::document(document)?;
                 let entry: ProtectedEntry =
                     serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
-                Secret(entry.token.as_bytes().to_vec())
+                match &self.auth.prefix {
+                    Some(prefix) => prefixed(prefix, &entry.token),
+                    None => Secret(entry.token.as_bytes().to_vec()),
+                }
             }
             Scheme::Basic => {
                 let document = Self::document(document)?;

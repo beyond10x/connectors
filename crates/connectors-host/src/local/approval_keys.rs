@@ -39,6 +39,9 @@ pub enum Failure {
     /// The metadata store changed under the write; nothing was written.
     RevisionConflict,
     CustodyUnavailable,
+    /// The selected custody binding is read-only (`mounted_secret`): no signing
+    /// key is created, rotated or recovered under it.
+    CustodyReadOnly,
     OutcomeUnknown,
     Capacity,
 }
@@ -60,6 +63,7 @@ fn secret_error(value: custody::Failure) -> Failure {
     match value {
         custody::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
         custody::Failure::Conflict | custody::Failure::Denied => Failure::Conflict,
+        custody::Failure::ReadOnly => Failure::CustodyReadOnly,
         _ => Failure::CustodyUnavailable,
     }
 }
@@ -143,6 +147,9 @@ impl Record {
 pub struct Store {
     path: PathBuf,
     socket: Option<PathBuf>,
+    /// The selected custody binding is read-only: no key is created, rotated
+    /// or recovered.
+    read_only: bool,
     instance: String,
     adapter: String,
     configuration: String,
@@ -163,10 +170,31 @@ impl Store {
         Ok(Self {
             path: path.to_owned(),
             socket: socket.map(Path::to_owned),
+            read_only: false,
             instance: instance.into(),
             adapter: adapter.into(),
             configuration: configuration.into(),
         })
+    }
+    /// The store under the custody binding `selection` names. Under the
+    /// read-only `mounted_secret` binding every key creation, rotation and
+    /// recovery is `CustodyReadOnly` before anything is staged.
+    pub fn for_selection(
+        path: &Path,
+        selection: &super::config::Selection,
+        instance: &str,
+        adapter: &str,
+        configuration: &str,
+    ) -> Result<Self> {
+        let socket = match selection {
+            super::config::Selection::Platform {
+                secret_service_socket,
+            } => secret_service_socket.as_deref(),
+            super::config::Selection::Mounted { .. } => None,
+        };
+        let mut store = Self::new(path, socket, instance, adapter, configuration)?;
+        store.read_only = selection.read_only();
+        Ok(store)
     }
     /// Passive: no key lease creation, migration, secret access or service startup.
     pub fn status(&self) -> Result<Option<View>> {
@@ -188,6 +216,9 @@ impl Store {
         self.create(Some(expected_revision), Some(expected_key))
     }
     fn create(&self, revision: Option<Uuid>, previous: Option<Uuid>) -> Result<View> {
+        if self.read_only {
+            return Err(Failure::CustodyReadOnly);
+        }
         let _lease = Lease::acquire(&self.path, true)?;
         let mut seed = Secret(vec![0; 32]);
         SystemRandom::new()
@@ -268,6 +299,9 @@ impl Store {
         Ok((record, key))
     }
     pub fn recover(&self, revision: Uuid, candidate: Uuid) -> Result<View> {
+        if self.read_only {
+            return Err(Failure::CustodyReadOnly);
+        }
         let _lease = Lease::acquire(&self.path, true)?;
         let record = self.current()?;
         record.expect(revision)?;
@@ -360,6 +394,10 @@ impl Store {
             .view)
     }
     pub fn retire(&self, revision: Uuid, key: Uuid) -> Result<View> {
+        // Retirement deletes from custody, which a read-only binding never does.
+        if self.read_only {
+            return Err(Failure::CustodyReadOnly);
+        }
         let _lease = Lease::acquire(&self.path, true)?;
         let record = self.prepare_retirement(revision, key)?;
         if record.view.key(key)?.state == State::Deleted {
@@ -454,6 +492,7 @@ impl Store {
             lease,
             version,
             socket: self.socket.clone(),
+            read_only: self.read_only,
             key: approvals::ConfiguredApprovalKey {
                 issuer: record.view.issuer.clone(),
                 audience: record.view.audience.clone(),
@@ -591,6 +630,8 @@ pub struct KeyUse {
     key: approvals::ConfiguredApprovalKey,
     version: custody::Version,
     socket: Option<PathBuf>,
+    /// Under a read-only selection the signer is never opened.
+    read_only: bool,
 }
 impl KeyUse {
     pub fn key(&self) -> Result<&approvals::ConfiguredApprovalKey> {
@@ -602,6 +643,11 @@ impl KeyUse {
         use_signer: impl FnOnce(&approvals::Signer) -> Result<T>,
     ) -> Result<T> {
         self.lease.check()?;
+        // A read-only binding holds no signing key: never open the platform
+        // custody in its place.
+        if self.read_only {
+            return Err(Failure::CustodyReadOnly);
+        }
         let custody = custody::Store::open_at(self.version.scope(), self.socket.as_deref())
             .map_err(secret_error)?;
         let seed = custody.read(self.version).map_err(secret_error)?;

@@ -375,7 +375,7 @@ fn unchanged(first: &issuance::Resolved, current: &issuance::Resolved) -> Result
     if first.preparation.subject != current.preparation.subject
         || first.policy != current.policy
         || first.adapter.selection() != current.adapter.selection()
-        || first.config.secret_service_socket != current.config.secret_service_socket
+        || first.config.selection() != current.config.selection()
     {
         return Err(Code::Forbidden.into());
     }

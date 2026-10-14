@@ -98,6 +98,13 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
             "the model no longer refuses a configured subject under `{scheme}`: {invariants}"
         );
     }
+    // A prefix is never beside `bearer: true`, and belongs to a token profile.
+    assert!(
+        invariants.contains("not (defined(prefix)) or not (bearer == true)")
+            && invariants
+                .contains("not (defined(prefix)) or not (defined(scheme)) or scheme == token"),
+        "the model no longer confines a prefix to a token profile without bearer: {invariants}"
+    );
     let probe = jsonschema::validator_for(&read("Probe")).unwrap();
     let profile = jsonschema::validator_for(&schema).unwrap();
     let documented = documented();
@@ -113,8 +120,10 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
     for (guide, auth) in &documented {
         let identity = &auth["identity"];
         let mut projection = serde_json::json!({"identity": identity});
-        if let Some(scheme) = auth.get("scheme") {
-            projection["scheme"] = scheme.clone();
+        for field in ["scheme", "bearer", "prefix"] {
+            if let Some(value) = auth.get(field) {
+                projection[field] = value.clone();
+            }
         }
         let errors: Vec<String> = probe
             .iter_errors(identity)
@@ -127,7 +136,25 @@ fn every_documented_identity_probe_is_a_value_of_the_catalog_identity_model() {
             identity["source"] != "configuration" || ["token", "basic"].contains(&scheme),
             "{guide}: a configured subject under `{scheme}`"
         );
+        // The prefix invariants, checked by hand as the subject one is.
+        if let Some(prefix) = auth.get("prefix") {
+            let prefix = prefix.as_str().unwrap_or_default();
+            assert!(
+                scheme == "token"
+                    && auth["bearer"] != true
+                    && (1..=32).contains(&prefix.len())
+                    && prefix.bytes().all(|b| b.is_ascii_graphic()),
+                "{guide}: prefix `{prefix}` under `{scheme}`, bearer {}",
+                auth["bearer"]
+            );
+        }
     }
+    assert!(
+        documented
+            .iter()
+            .any(|(guide, auth)| guide == "catalog-opsgenie.md" && auth["prefix"] == "GenieKey"),
+        "the Opsgenie guide's prefixed profile was not read"
+    );
     assert!(
         documented
             .iter()

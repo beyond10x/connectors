@@ -59,6 +59,7 @@ result envelope does not make native query/continuation semantics shared.
 | [Alertmanager](alertmanager/design.md) | Native alert records, configuration and future model obligations |
 | HubSpot | Served by the catalog provider: pinned CRM Objects `2026-09` document in hubspot/upstream/, bundle and shipped read-only selection set under catalog/; see [the HubSpot guide](../docs/catalog-hubspot.md) |
 | Zendesk | Served by the catalog provider: pinned Support API document in zendesk/upstream/, bundle and shipped read-only selection set under catalog/; see [the Zendesk guide](../docs/catalog-zendesk.md) |
+| Opsgenie | Served by the catalog provider: pinned Swagger 2.0 REST API document and its Apache-2.0 licence in opsgenie/upstream/, its OpenAPI projection in opsgenie/generated/, one cited added operation, bundle and shipped read-only selection set under catalog/; see [the Opsgenie guide](../docs/catalog-opsgenie.md) |
 | Runpod | Served by the catalog provider: pinned REST API v1 document in runpod/upstream/, bundle and shipped selection set (one read, two approved writes) under catalog/; see [the Runpod guide](../docs/catalog-runpod.md) |
 | GitLab | Served by the catalog provider: pinned upstream in gitlab/upstream/, bundle and shipped selection set under catalog/; the native adapter was retired in 0.11.0 |
 | SQL | [Read profiles](sql/contracts/reads/v1alpha1/semantics.md) for PostgreSQL and MySQL, [ESS](sql/spec/ess/system.yaml); declaration, native runtime and tests live in sql/ |
