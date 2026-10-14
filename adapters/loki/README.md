@@ -1,9 +1,11 @@
 # Loki through the local CLI
 
-The `loki` adapter answers three LogQL reads, each one GET against Loki's HTTP API:
-`logs.query_range` (log lines), `logs.query_metric` (an instant or range metric query) and
-`logs.labels` (label names, or one label's values). The mapping, bounds and errors are in
-[the Loki profile](contracts/logs/v1alpha1/semantics.md) §11; the connection is §11.4. It
+The `loki` adapter answers five reads, each one GET against Loki's HTTP API:
+`logs.query_range` (log lines), `logs.query_metric` (an instant or range metric query),
+`logs.labels` (label names, or one label's values), and two reads through profiles the
+operator configures: `logs.profile_lines` (one typed, masked record per line) and
+`logs.call_trace` (one call's lines from every source). The mapping, bounds and errors are in
+[the Loki profile](contracts/logs/v1alpha1/semantics.md) §§11–12; the connection is §11.4. It
 requires Linux x86_64 and the [qualified Secret Service binding](../../docs/local-secret-service.md),
 like every saved credential.
 
@@ -53,7 +55,7 @@ restart = "never"
 
 [adapters.logs.permissions]
 profiles = ["loki.bearer"]
-operations = ["logs.query_range", "logs.query_metric", "logs.labels"]
+operations = ["logs.query_range", "logs.query_metric", "logs.labels", "logs.profile_lines", "logs.call_trace"]
 
 [adapters.logs.executable]
 path = "/absolute/path/target/release/connectors-loki"
@@ -74,6 +76,54 @@ target/release/connectors --output json operations invoke --adapter logs --conne
 Each operation has its own schema and revision from `operations describe`. For automation,
 `--credential-stdin` or `--credential-file /absolute/private/file.json` carries the complete
 native `{"token":"..."}` document.
+
+## Configured line and trace profiles
+
+A profile is LogQL the operator writes once, in the configuration file; the caller only names
+it (contract §12). Add `line_profiles` and `trace_profiles` to the native file. The labels,
+keys and numbers below are invented; a deployment's own are written only in its own file:
+
+```json
+{
+  "format": "connectors-loki-local/1",
+  "instance": "loki-prod",
+  "base_url": "https://loki.example.internal/",
+  "query_scope": {"required_equalities": []},
+  "line_profiles": [{
+    "name": "fixture-cdr",
+    "selector": [{"label": "service", "operator": "equal", "value": "edge-proxy"}],
+    "format": {"kind": "logfmt"},
+    "fields": [
+      {"name": "direction", "key": "dir", "type": "string", "filterable": true},
+      {"name": "caller", "key": "src", "type": "phone_number", "filterable": true},
+      {"name": "started_at", "key": "start", "type": "unix_seconds"},
+      {"name": "call_id", "key": "callid", "type": "string"}
+    ],
+    "call_identifier": "call_id"
+  }],
+  "trace_profiles": [{
+    "name": "fixture-by-label",
+    "selector": [{"label": "env", "operator": "equal", "value": "fixture"}],
+    "call_identifier": {"kind": "label", "value": {"label": "call"}},
+    "source_label": "service"
+  }]
+}
+```
+
+A changed profile changes `configuration_revision`: copy the new one into the adapter entry.
+A pattern format is `{"kind": "pattern", "value": {"pattern": "fx-cdr <dir> id=<callid>"}}`;
+a call identifier carried in the line is
+`{"kind": "field", "value": {"key": "callid", "format": {"kind": "logfmt"}}}`. Phone numbers
+are masked to their last four characters unless a field declares `"mask": "none"`.
+
+```sh
+target/release/connectors --output json operations invoke --adapter logs --connection CONNECTION --operation logs.profile_lines --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-cdr","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","match":{"caller":"+15550100001"}}'
+target/release/connectors --output json operations invoke --adapter logs --connection CONNECTION --operation logs.call_trace --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-by-label","call_id":"fx-leg-0001","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000"}'
+```
+
+The first answers one record per CDR line whose caller is exactly that number, with the
+number masked; the second answers the lines of one call from every source, oldest first,
+each naming its source. Neither accepts LogQL from the caller.
 
 ## What the connection is bound to
 

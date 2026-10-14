@@ -94,6 +94,13 @@ fn answer(
         ("GET", "/loki/api/v1/query_range") if query.contains("count_over_time") => {
             (200, fixture("query_range_matrix.json"))
         }
+        // The configured profiles' composed queries (tests/profiles.rs holds their text).
+        ("GET", "/loki/api/v1/query_range") if query.contains("stream_kind") => {
+            (200, fixture("profile_cdr_streams.json"))
+        }
+        ("GET", "/loki/api/v1/query_range") if query.contains("call") => {
+            (200, fixture("trace_label_streams.json"))
+        }
         ("GET", "/loki/api/v1/query_range") => (200, fixture("query_range_streams.json")),
         _ => (404, b"404 page not found\n".to_vec()),
     }
@@ -106,6 +113,10 @@ impl Provider {
     /// A Loki whose HTTP API is served below `prefix`, as Grafana's data-source proxy
     /// serves it; `base_url` carries the prefix.
     fn under(prefix: &'static str) -> Self {
+        Self::configured(prefix, json!({}))
+    }
+    /// A direct Loki whose configuration also carries `members` (the profiles).
+    fn configured(prefix: &'static str, members: Value) -> Self {
         let root = tempfile::tempdir().unwrap();
         let directory = root.path().join("private");
         filesystem::directory(&directory, true, true).unwrap();
@@ -186,17 +197,17 @@ impl Provider {
         });
         let port = address_rx.recv().unwrap().port();
         let config = directory.join("loki.json");
-        private(
-            &config,
-            &serde_json::to_vec(&json!({
-                "format": "connectors-loki-local/1",
-                "instance": INSTANCE,
-                "base_url": format!("https://localhost:{port}{prefix}"),
-                "ca_file": ca,
-                "query_scope": {"required_equalities": []},
-            }))
-            .unwrap(),
-        );
+        let mut document = json!({
+            "format": "connectors-loki-local/1",
+            "instance": INSTANCE,
+            "base_url": format!("https://localhost:{port}{prefix}"),
+            "ca_file": ca,
+            "query_scope": {"required_equalities": []},
+        });
+        for (name, value) in members.as_object().unwrap() {
+            document[name] = value.clone();
+        }
+        private(&config, &serde_json::to_vec(&document).unwrap());
         Self {
             stop: Some(stop),
             thread: Some(thread),
@@ -287,7 +298,7 @@ fn invoke(child: &mut Child, operation: &str, input: Value) -> Result<Value, Fai
 }
 
 #[test]
-fn the_bootstrap_advertises_the_bearer_profile_and_three_reads() {
+fn the_bootstrap_advertises_the_bearer_profile_and_five_reads() {
     let provider = Provider::new();
     let child = Child::spawn(&provider.selection()).unwrap();
     let bootstrap = child.bootstrap();
@@ -304,7 +315,9 @@ fn the_bootstrap_advertises_the_bearer_profile_and_three_reads() {
     assert_eq!(
         operations,
         [
+            ("logs.call_trace", true),
             ("logs.labels", true),
+            ("logs.profile_lines", true),
             ("logs.query_metric", true),
             ("logs.query_range", true)
         ]
@@ -542,5 +555,142 @@ fn a_connection_through_the_grafana_datasource_proxy_reads_below_the_proxy_prefi
             .unwrap()
             .iter()
             .all(|c| c.method == "GET" && c.authorization == format!("Bearer {TOKEN_ONE}"))
+    );
+}
+
+/// The synthetic line and trace profiles of tests/profiles.rs, as an operator writes
+/// them in the configuration file.
+fn profiles() -> Value {
+    json!({
+        "line_profiles": [{
+            "name": "fixture-cdr",
+            "selector": [{"label": "service", "operator": "equal", "value": "edge-proxy"},
+                         {"label": "stream_kind", "operator": "equal", "value": "cdr"}],
+            "format": {"kind": "logfmt"},
+            "fields": [
+                {"name": "direction", "key": "dir", "type": "string"},
+                {"name": "caller", "key": "src", "type": "phone_number", "filterable": true},
+                {"name": "callee", "key": "dst", "type": "phone_number"},
+                {"name": "call_id", "key": "callid", "type": "string"}
+            ],
+            "call_identifier": "call_id"
+        }],
+        "trace_profiles": [{
+            "name": "fixture-by-label",
+            "selector": [{"label": "env", "operator": "equal", "value": "fixture"}],
+            "call_identifier": {"kind": "label", "value": {"label": "call"}},
+            "source_label": "service"
+        }]
+    })
+}
+
+#[test]
+fn configured_profiles_answer_through_the_private_runtime() {
+    let provider = Provider::configured("/", profiles());
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    // `operations describe` publishes both output schemas.
+    let descriptor = child.bootstrap().descriptor().unwrap();
+    for (operation, member) in [
+        ("logs.profile_lines", "records"),
+        ("logs.call_trace", "lines"),
+    ] {
+        let declared = descriptor
+            .operations
+            .iter()
+            .find(|o| o.id == operation)
+            .unwrap_or_else(|| panic!("{operation} is not described"));
+        assert!(
+            declared.output_schema["properties"][member].is_object(),
+            "{operation}"
+        );
+    }
+    let lookup = invoke(
+        &mut child,
+        "logs.profile_lines",
+        json!({"profile": "fixture-cdr", "start_unix_ns": START, "end_unix_ns": END,
+               "match": {"caller": "+15550100001"}}),
+    )
+    .unwrap();
+    let legs: Vec<&str> = lookup["records"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["call_id"].as_str().unwrap())
+        .collect();
+    assert_eq!(legs, ["fx-leg-0001", "fx-leg-0002"], "{lookup}");
+    assert_eq!(lookup["records"][0]["fields"]["caller"], "********0001");
+    assert_eq!(lookup["provenance"]["instance"], INSTANCE);
+
+    let trace = invoke(
+        &mut child,
+        "logs.call_trace",
+        json!({"profile": "fixture-by-label", "call_id": "fx-leg-0001",
+               "start_unix_ns": START, "end_unix_ns": END}),
+    )
+    .unwrap();
+    let sources: Vec<&str> = trace["lines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|l| l["source"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        sources,
+        ["edge-proxy", "media", "edge-proxy", "media", "edge-proxy"]
+    );
+    assert_eq!(
+        provider.routes(),
+        ["/loki/api/v1/query_range", "/loki/api/v1/query_range"]
+    );
+    // A profile name the configuration does not hold refuses before provider work.
+    let before = provider.count();
+    assert!(
+        invoke(
+            &mut child,
+            "logs.call_trace",
+            json!({"profile": "absent", "call_id": "fx-leg-0001",
+                   "start_unix_ns": START, "end_unix_ns": END}),
+        )
+        .is_err()
+    );
+    assert_eq!(provider.count(), before);
+}
+
+#[test]
+fn a_changed_profile_refuses_the_cached_selection_and_no_profile_keeps_the_revision() {
+    let provider = Provider::configured("/", profiles());
+    let selection = provider.selection();
+    // The operator edits a profile: the configuration revision changes, so the
+    // launch recorded for the earlier profile refuses before provider work.
+    let mut document: Value = serde_json::from_slice(&fs::read(&provider.config).unwrap()).unwrap();
+    document["trace_profiles"][0]["source_label"] = json!("node");
+    private(&provider.config, &serde_json::to_vec(&document).unwrap());
+    assert!(matches!(
+        Child::spawn(&selection),
+        Err(Failure::ReadinessMismatch)
+    ));
+    assert_eq!(provider.count(), 0);
+
+    // A configuration without profiles resolves to exactly the effective document
+    // it resolved to before profiles existed, so a saved connection is unchanged.
+    let plain = Provider::new();
+    let output = Command::new(env!("CARGO_BIN_EXE_connectors-loki"))
+        .arg("--local-config")
+        .arg(&plain.config)
+        .arg("--print-local-bootstrap")
+        .output()
+        .unwrap();
+    let bootstrap: Bootstrap = serde_json::from_slice(&output.stdout).unwrap();
+    let written: Value = serde_json::from_slice(&fs::read(&plain.config).unwrap()).unwrap();
+    let ca = fs::read(written["ca_file"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        bootstrap.configuration_revision,
+        connectors_core::digest(&json!({
+            "format": "connectors-loki-local/1",
+            "instance": INSTANCE,
+            "base_url": written["base_url"],
+            "ca_digest": connectors_core::digest(&json!(ca)),
+            "query_scope": {"required_equalities": []},
+        }))
     );
 }

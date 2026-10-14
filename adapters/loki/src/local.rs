@@ -38,11 +38,17 @@ struct Configuration {
     #[serde(default, deserialize_with = "present")]
     ca_file: Option<PathBuf>,
     query_scope: QueryScope,
+    /// The configured profiles (semantics.md §12): absent or a list, never `null`.
+    /// The adapter admits each against the model when it is constructed below.
+    #[serde(default, deserialize_with = "present")]
+    line_profiles: Option<Vec<Value>>,
+    #[serde(default, deserialize_with = "present")]
+    trace_profiles: Option<Vec<Value>>,
 }
-fn present<'de, D: serde::Deserializer<'de>>(
+fn present<'de, D: serde::Deserializer<'de>, T: Deserialize<'de>>(
     deserializer: D,
-) -> std::result::Result<Option<PathBuf>, D::Error> {
-    PathBuf::deserialize(deserializer).map(Some)
+) -> std::result::Result<Option<T>, D::Error> {
+    T::deserialize(deserializer).map(Some)
 }
 
 pub struct Local {
@@ -84,10 +90,18 @@ impl Local {
             .map(|path| filesystem::read_bounded(filesystem::private_file(path)?, 1024 * 1024))
             .transpose()
             .map_err(|_| Failure::InvalidConfiguration)?;
-        let effective = json!({"format": config.format, "instance": config.instance,
+        let mut effective = json!({"format": config.format, "instance": config.instance,
             "base_url": base,
             "ca_digest": ca.as_ref().map(|b| connectors_core::digest(&json!(b))),
             "query_scope": {"required_equalities": []}});
+        // Profiles join the effective document, and so its revision, only when
+        // configured: a configuration without them keeps the revision it had.
+        if let Some(profiles) = config.line_profiles {
+            effective["line_profiles"] = Value::Array(profiles);
+        }
+        if let Some(profiles) = config.trace_profiles {
+            effective["trace_profiles"] = Value::Array(profiles);
+        }
         let configuration_revision = connectors_core::digest(&effective);
         let http = Arc::new(
             ScopedHttp::new_with_ca_bytes(
@@ -145,7 +159,8 @@ impl Local {
                     profile: auth::PROFILE_ID.into(),
                     scopes: BTreeSet::new(),
                     effect: match o.id.as_str() {
-                        "logs.query_range" | "logs.query_metric" | "logs.labels" => Effect::Read,
+                        "logs.query_range" | "logs.query_metric" | "logs.labels"
+                        | "logs.profile_lines" | "logs.call_trace" => Effect::Read,
                         _ => Effect::Unknown,
                     },
                 })
