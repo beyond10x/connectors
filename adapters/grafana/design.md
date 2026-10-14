@@ -2,8 +2,11 @@
 
 **Status:** native executable `connectors-grafana` (since 0.39.0). It serves
 `datasources.list` (records / `grafana-datasources`) through the local host under the profile
-`grafana.service_account`; see [README.md](README.md). Dashboards, datasource discovery and
-the parent route below are not implemented.
+`grafana.service_account`, and the IRM reads `irm.alert_groups.list`, `irm.alert_group.get`,
+`irm.incidents.list` and `irm.incident.get` (records / `grafana-irm-alert-groups`,
+`grafana-irm-incidents`) under `grafana.irm_service_account`; see [README.md](README.md) and
+[IRM reads](#irm-reads). Dashboards, datasource discovery and the parent route below are not
+implemented.
 
 Bounded dashboards/datasource metadata, [native discovery](contracts/discovery/v1alpha1/semantics.md),
 [parent routing](contracts/routes/v1alpha1/semantics.md) and
@@ -72,6 +75,42 @@ source's `uid`, with its name, type, access mode and default flag, and nothing e
 mediated route exists, an operator reaches a child through Grafana by naming that uid in the
 child's own `base_url` (`api/datasources/proxy/uid/<uid>/`), so the record must carry it.
 Discovery observations and the route keep the uid sealed as above.
+
+## IRM reads
+
+Implemented (2026-10-14, `story:grafana-irm-history-reads`), read only. Model:
+[irm.yaml](spec/ess/domains/irm.yaml); the optional `irm_api_url` and the second profile:
+[connection.yaml](spec/ess/domains/connection.yaml).
+
+| Operation | Port | Request |
+|---|---|---|
+| `irm.alert_groups.list` | IRM API URL, `X-Grafana-URL` fixed | `GET api/v1/alert_groups/`, `started_at=<since>_<until>`, `perpage=100`, `page` |
+| `irm.alert_group.get` | IRM API URL, `X-Grafana-URL` fixed | `GET api/v1/alert_groups/<id>` |
+| `irm.incidents.list` | stack (`base_url`), read POST | `api/plugins/grafana-irm-app/resources/api/v1/IncidentsService.QueryIncidents`, `query.dateFrom`/`dateTo`/`limit`/`orderDirection`, `cursor.nextValue` |
+| `irm.incident.get` | stack, read POST | `…/IncidentsService.GetIncident`, `{incidentID}` |
+
+Native, not the catalog provider: neither API publishes a licensed description, incidents are
+JSON-RPC POSTs, and alert groups need a second host with a fixed tenancy header. The
+composition builds two ports from configuration: the stack port with exactly the two incident
+read POSTs (`ScopedHttp::with_read_posts`), and, only when `irm_api_url` is configured, the IRM
+port with one fixed `X-Grafana-URL` (`ScopedHttp::with_fixed_header`, the one-header slice of
+[receiver-owned headers](../../contracts/auth/capability/v1alpha1/http-headers.md)). The
+header's value is `base_url` without its final `/`; no input reaches it.
+
+Decisions taken inside the read-only scope: a service-account token plus the fixed header
+(not a legacy OnCall API key); a second profile `grafana.irm_service_account` whose probe is
+`GET api/v1/alert_groups/?started_at=2000-01-01T00:00:00_2000-01-01T00:00:01&perpage=1`, so the
+connection proves the read it is used for and existing `grafana.service_account` connections
+keep their profile and revision; and the incident→alert-group link projected from the
+incident's `refs[]` under `com.grafana.oncall`, **inferred** until one real answer confirms it.
+
+Sources: the IRM alert-group HTTP API reference (documentation, no licence stated; cited, not
+vendored) and `github.com/grafana/incident-go` `client.gen.go` at
+`21a0e7878e0217665ba90db8cf67f6edad306f50` (Apache-2.0; read for method names and shapes, not
+vendored). Fixtures are authored from their documented examples with placeholder ids.
+
+Unknowns: IRM's alert-group sort order and the incident service's maximum `limit` are not
+documented (the adapter asks for 50); whether window bounds are inclusive is inferred.
 
 ## Sources and verification
 

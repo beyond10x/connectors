@@ -1,0 +1,95 @@
+{
+  "incidents": [
+    {
+      "incidentID": "incident-101",
+      "refs": [
+        {
+          "key": "com.grafana.oncall",
+          "ref": "I68T24C13IFW1",
+          "url": "https://stack.example/a/grafana-irm-app/alert-groups/I68T24C13IFW1"
+        },
+        {
+          "key": "com.example.tracker",
+          "ref": "TRACK-1",
+          "url": "https://tracker.example/TRACK-1"
+        },
+        {
+          "key": "com.grafana.oncall",
+          "ref": "I7XKBQYJYFW3M",
+          "url": ""
+        }
+      ],
+      "severity": "minor",
+      "labels": [
+        {
+          "key": "service_name",
+          "label": "fixture-private-label",
+          "description": "fixture-private-label-description",
+          "colorHex": "#ff0000"
+        }
+      ],
+      "isDrill": false,
+      "incidentType": "internal",
+      "createdTime": "2026-01-01T12:40:00Z",
+      "modifiedTime": "2026-01-01T13:40:00Z",
+      "createdByUser": {
+        "name": "Fixture Person",
+        "photoURL": "https://avatars.example/fixture.png",
+        "userID": "user-fixture-1"
+      },
+      "closedTime": "2026-01-01T13:40:00Z",
+      "durationSeconds": 3600,
+      "status": "resolved",
+      "title": "Memory pressure on the fixture cluster",
+      "overviewURL": "/a/grafana-irm-app/incidents/incident-101/title",
+      "incidentMembership": {
+        "assignments": [],
+        "totalAssignments": 0,
+        "totalParticipants": 0
+      },
+      "taskList": {
+        "tasks": [],
+        "todoCount": 0,
+        "doneCount": 0
+      },
+      "summary": "fixture-private-summary",
+      "incidentStart": "2026-01-01T12:35:00Z",
+      "incidentEnd": "2026-01-01T13:40:00Z",
+      "incidentChannels": []
+    },
+    {
+      "incidentID": "incident-102",
+      "refs": [],
+      "severity": "",
+      "labels": [],
+      "isDrill": true,
+      "incidentType": "internal",
+      "createdTime": "2026-01-01T20:00:00Z",
+      "modifiedTime": "2026-01-01T20:01:00Z",
+      "createdByUser": {
+        "name": "Fixture Person",
+        "photoURL": "",
+        "userID": "user-fixture-1"
+      },
+      "closedTime": "",
+      "durationSeconds": 60,
+      "status": "active",
+      "title": "Drill: failover",
+      "overviewURL": "/a/grafana-irm-app/incidents/incident-102/title",
+      "summary": "",
+      "incidentStart": "2026-01-01T20:00:00Z",
+      "incidentEnd": "",
+      "incidentChannels": []
+    }
+  ],
+  "query": {
+    "limit": 50,
+    "dateFrom": "2026-01-01T00:00:00Z",
+    "dateTo": "2026-01-02T00:00:00Z",
+    "orderDirection": "ASC"
+  },
+  "cursor": {
+    "nextValue": "fixture-next-value-1",
+    "hasMore": true
+  }
+}

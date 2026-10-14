@@ -57,6 +57,8 @@ pub struct ScopedHttp {
     /// The exact paths `post_json` may reach, fixed by trusted composition.
     read_posts: Arc<std::collections::BTreeSet<Vec<String>>>,
     read_post_timeout: Duration,
+    /// One nonsecret request header trusted composition fixed (`with_fixed_header`).
+    fixed_header: Option<(reqwest::header::HeaderName, reqwest::header::HeaderValue)>,
 }
 
 /// The largest JSON body a read sent as a POST may carry.
@@ -64,6 +66,8 @@ pub const READ_POST_BODY_LIMIT: usize = 64 * 1024;
 /// The longest deadline composition may give a read sent as a POST.
 pub const READ_POST_MAX_TIMEOUT: Duration = Duration::from_secs(180);
 const READ_POST_DEFAULT_TIMEOUT: Duration = Duration::from_secs(15);
+/// The longest value of a header composition fixes on a port (`with_fixed_header`).
+pub const FIXED_HEADER_VALUE_LIMIT: usize = 1024;
 
 impl ScopedHttp {
     pub fn from_config(config: &HttpConfig) -> Result<Self> {
@@ -150,6 +154,7 @@ impl ScopedHttp {
             bearer: config.bearer,
             read_posts: Arc::default(),
             read_post_timeout: READ_POST_DEFAULT_TIMEOUT,
+            fixed_header: None,
         })
     }
     /// Immutable per-command credential capability over the captured target/TLS
@@ -163,6 +168,7 @@ impl ScopedHttp {
             bearer: self.bearer,
             read_posts: self.read_posts.clone(),
             read_post_timeout: self.read_post_timeout,
+            fixed_header: self.fixed_header.clone(),
         }
     }
 }
@@ -232,6 +238,7 @@ impl ScopedHttp {
                 bearer: self.bearer,
                 read_posts: self.read_posts.clone(),
                 read_post_timeout: self.read_post_timeout,
+                fixed_header: self.fixed_header.clone(),
             },
             segments: fixed,
         }))
@@ -283,6 +290,74 @@ impl ScopedHttp {
             bearer: self.bearer,
             read_posts: Arc::new(fixed),
             read_post_timeout: timeout,
+            fixed_header: self.fixed_header.clone(),
+        })
+    }
+
+    /// Trusted composition only. Fixes, once, one nonsecret header every request of this
+    /// port carries beside the credential, such as a provider's tenancy header whose value
+    /// the admitted configuration derives (`contracts/auth/capability/v1alpha1/http-headers.md`).
+    /// It cannot take the credential header's place, a routing, framing, content or
+    /// upgrade header's, or a cookie's; its value is visible ASCII and spaces, at most
+    /// [`FIXED_HEADER_VALUE_LIMIT`] bytes. A port has at most one. A business adapter
+    /// holding only `AuthenticatedHttp` can neither add nor change it.
+    ///
+    /// ```compile_fail
+    /// use connectors_sdk::AuthenticatedHttp;
+    /// fn add(http: &dyn AuthenticatedHttp) {
+    ///     http.with_fixed_header("x-tenant", "a");
+    /// }
+    /// ```
+    pub fn with_fixed_header(&self, name: &str, value: &str) -> Result<Self> {
+        if self.fixed_header.is_some() {
+            return Err(Error::invalid("a port carries at most one fixed header"));
+        }
+        let name = reqwest::header::HeaderName::from_bytes(name.as_bytes())
+            .map_err(|_| Error::invalid("invalid fixed header name"))?;
+        if name == self.header
+            || name.as_str().starts_with("sec-websocket-")
+            || matches!(
+                name.as_str(),
+                "authorization"
+                    | "proxy-authorization"
+                    | "cookie"
+                    | "host"
+                    | "content-length"
+                    | "content-type"
+                    | "content-encoding"
+                    | "accept"
+                    | "accept-encoding"
+                    | "transfer-encoding"
+                    | "connection"
+                    | "proxy-connection"
+                    | "keep-alive"
+                    | "te"
+                    | "trailer"
+                    | "upgrade"
+                    | "expect"
+            )
+        {
+            return Err(Error::invalid(
+                "a fixed header cannot replace credential, routing, framing or content headers",
+            ));
+        }
+        if value.is_empty()
+            || value.len() > FIXED_HEADER_VALUE_LIMIT
+            || !value.bytes().all(|b| b == b' ' || b.is_ascii_graphic())
+        {
+            return Err(Error::invalid("invalid fixed header value"));
+        }
+        let value = reqwest::header::HeaderValue::from_str(value)
+            .map_err(|_| Error::invalid("invalid fixed header value"))?;
+        Ok(Self {
+            client: self.client.clone(),
+            base: self.base.clone(),
+            credential: self.credential.clone(),
+            header: self.header.clone(),
+            bearer: self.bearer,
+            read_posts: self.read_posts.clone(),
+            read_post_timeout: self.read_post_timeout,
+            fixed_header: Some((name, value)),
         })
     }
 
@@ -291,7 +366,19 @@ impl ScopedHttp {
         segments: &[&str],
         query: &[(&str, String)],
     ) -> Result<reqwest::Response> {
-        self.request(reqwest::Method::GET, segments, query)
+        // A read may name a collection whose path ends in `/`: one final empty segment
+        // after a named one. Nowhere else, and in no other method, is a segment empty.
+        let (named, slash) = match segments.split_last() {
+            Some((&"", named)) if !named.is_empty() => (named, true),
+            _ => (segments, false),
+        };
+        let mut url = self.url(named)?;
+        if slash {
+            url.path_segments_mut()
+                .map_err(|_| Error::invalid("endpoint cannot carry path segments"))?
+                .push("");
+        }
+        self.request_url(reqwest::Method::GET, url, query)
             .await?
             .send()
             .await
@@ -353,10 +440,22 @@ impl ScopedHttp {
         segments: &[&str],
         query: &[(&str, String)],
     ) -> Result<reqwest::RequestBuilder> {
-        let mut url = self.url(segments)?;
+        let url = self.url(segments)?;
+        self.request_url(method, url, query).await
+    }
+
+    async fn request_url(
+        &self,
+        method: reqwest::Method,
+        mut url: Url,
+        query: &[(&str, String)],
+    ) -> Result<reqwest::RequestBuilder> {
         url.query_pairs_mut()
             .extend_pairs(query.iter().map(|(k, v)| (*k, v.as_str())));
         let mut request = self.client.request(method, url);
+        if let Some((name, value)) = &self.fixed_header {
+            request = request.header(name, value.clone());
+        }
         if let Some(credential) = &self.credential {
             let secret = credential.resolve().await?;
             let value = zeroize::Zeroizing::new(if self.bearer {
@@ -1315,5 +1414,210 @@ mod tests {
         );
         assert!(lower.contains("content-type: application/json\r\n"));
         assert_eq!(body, br#"{"query":"rust"}"#);
+    }
+
+    /// Each accepted connection's request head, in order, answered `200 {}`.
+    async fn heads(count: usize) -> (String, tokio::task::JoinHandle<Vec<String>>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let mut seen = Vec::new();
+            for _ in 0..count {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut head = Vec::new();
+                while !head.ends_with(b"\r\n\r\n") {
+                    head.push(socket.read_u8().await.unwrap());
+                }
+                let head = String::from_utf8(head).unwrap();
+                let length: usize = head
+                    .lines()
+                    .find_map(|line| {
+                        line.split_once(':')
+                            .filter(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                            .map(|(_, value)| value.trim().parse().unwrap())
+                    })
+                    .unwrap_or(0);
+                let mut body = vec![0; length];
+                socket.read_exact(&mut body).await.unwrap();
+                socket
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}",
+                    )
+                    .await
+                    .unwrap();
+                seen.push(head);
+            }
+            seen
+        });
+        (format!("http://{address}/irm/"), server)
+    }
+
+    fn plaintext(base: &str) -> ScopedHttp {
+        ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: base.into(),
+                credential: None,
+                credential_header: "authorization".into(),
+                bearer: true,
+                allow_plaintext: true,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap()
+    }
+
+    /// story:grafana-irm-history-reads: one composition-fixed, nonsecret header travels
+    /// on every request of the port, beside the credential, and survives every later
+    /// derivation of the port.
+    #[tokio::test]
+    async fn a_fixed_header_is_sent_on_every_request_beside_the_credential() {
+        let (base, server) = heads(3).await;
+        let http = plaintext(&base)
+            .with_fixed_header("X-Grafana-URL", "https://stack.example")
+            .unwrap()
+            .with_read_posts(&[&["query"]], Duration::from_secs(30))
+            .unwrap()
+            .with_credential(Arc::new(FixtureCredential));
+        assert_eq!(http.get(&["items"], &[]).await.unwrap().status, 200);
+        assert_eq!(
+            http.post_json(&["query"], &[], &serde_json::json!({}))
+                .await
+                .unwrap()
+                .status,
+            200
+        );
+        let probe = http.probe_capability(&["whoami"]).unwrap();
+        assert_eq!(
+            probe.probe(&serde_json::json!({})).await.unwrap().status,
+            200
+        );
+        for head in server.await.unwrap() {
+            let lower = head.to_ascii_lowercase();
+            assert_eq!(
+                lower
+                    .matches("x-grafana-url: https://stack.example\r\n")
+                    .count(),
+                1,
+                "{head}"
+            );
+            assert!(
+                lower.contains("authorization: bearer fixture-credential\r\n"),
+                "{head}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_fixed_header_cannot_take_a_credential_routing_or_framing_place() {
+        let http = scoped();
+        for name in [
+            "authorization",
+            "Authorization",
+            "host",
+            "content-length",
+            "content-type",
+            "accept",
+            "transfer-encoding",
+            "connection",
+            "upgrade",
+            "cookie",
+            "proxy-authorization",
+            "sec-websocket-key",
+            "",
+            "bad name",
+        ] {
+            match http.with_fixed_header(name, "https://stack.example") {
+                Ok(_) => panic!("{name:?} was accepted as a fixed header"),
+                Err(error) => assert_eq!(error.code, ErrorCode::InvalidInput, "{name:?}"),
+            }
+        }
+        let long = "v".repeat(FIXED_HEADER_VALUE_LIMIT + 1);
+        for value in [
+            "",
+            "a\r\nx-injected: 1",
+            "tab\there",
+            "\u{e9}",
+            long.as_str(),
+        ] {
+            match http.with_fixed_header("x-grafana-url", value) {
+                Ok(_) => panic!("{value:?} was accepted as a fixed header value"),
+                Err(error) => assert_eq!(error.code, ErrorCode::InvalidInput, "{value:?}"),
+            }
+        }
+        let edge = "v".repeat(FIXED_HEADER_VALUE_LIMIT);
+        let fixed = http.with_fixed_header("x-grafana-url", &edge).unwrap();
+        // One fixed header per port: a second, of any name, is refused.
+        for name in ["x-grafana-url", "X-Grafana-URL", "x-other"] {
+            match fixed.with_fixed_header(name, "https://stack.example") {
+                Ok(_) => panic!("a second fixed header {name} was accepted"),
+                Err(error) => assert_eq!(error.code, ErrorCode::InvalidInput, "{name}"),
+            }
+        }
+        // A port whose credential is carried in another header refuses that name too.
+        let custom = ScopedHttp::new_with_ca_bytes(
+            &HttpConfig {
+                base_url: "https://probe.invalid/".into(),
+                credential: None,
+                credential_header: "x-api-key".into(),
+                bearer: false,
+                allow_plaintext: false,
+                ca_file: None,
+            },
+            None,
+            None,
+        )
+        .unwrap();
+        assert!(custom.with_fixed_header("X-Api-Key", "v").is_err());
+    }
+
+    /// story:grafana-irm-history-reads: a read names a collection whose path ends in `/`
+    /// with one final empty segment; nowhere else is an empty segment a path.
+    #[tokio::test]
+    async fn a_read_may_end_in_one_trailing_slash_and_nothing_else_is_empty() {
+        let (base, server) = heads(1).await;
+        let http = plaintext(&base);
+        let query = [("page", "1".to_owned())];
+        assert_eq!(
+            http.get(&["api", "v1", "alert_groups", ""], &query)
+                .await
+                .unwrap()
+                .status,
+            200
+        );
+        let seen = server.await.unwrap();
+        assert!(
+            seen[0].starts_with("GET /irm/api/v1/alert_groups/?page=1 HTTP/1.1\r\n"),
+            "{}",
+            seen[0]
+        );
+        for segments in [
+            &[""][..],
+            &["", "x"][..],
+            &["a", "", "b"][..],
+            &["a", "", ""][..],
+        ] {
+            let error = refused(http.get(segments, &[]).await);
+            assert_eq!(error.code, ErrorCode::InvalidInput, "{segments:?}");
+        }
+        // A read sent as a POST, a write and a form keep refusing it.
+        let posts = scoped()
+            .with_read_posts(&[&["q"]], Duration::from_secs(5))
+            .unwrap();
+        let error = refused(
+            posts
+                .post_json(&["q", ""], &[], &serde_json::json!({}))
+                .await,
+        );
+        assert_eq!(error.code, ErrorCode::Forbidden);
+        let Err(error) = scoped()
+            .post_form(&["token", ""], &[("v", b"x".as_slice())])
+            .await
+        else {
+            panic!("a form with an empty segment was sent");
+        };
+        assert_eq!(error.code, ErrorCode::InvalidInput);
     }
 }
