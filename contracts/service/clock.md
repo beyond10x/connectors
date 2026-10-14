@@ -133,6 +133,22 @@ is a configuration refusal; authentication, transport or time-bound failure is a
 safe operational refusal. Its output is an observation, never reusable evidence
 for a later operation. Listing and existing setup/status commands do not query it.
 
+### Refusals
+
+An acquisition that yields no observation names one of three causes, each with its
+own next action. None changes a bound above: the deadline, the width, the protocol
+version and the trusted source stay as configured.
+
+| Cause | When | Next action |
+|---|---|---|
+| `unreachable` | no reply within the query deadline, or a send or receive error | `retry_explicitly`: retry later, or check the configured address |
+| `unverified` | a reply that does not parse, carries another nonce or version, or fails either signature, the delegation interval or the Merkle path | `check_configuration`: check the configured key and the source's protocol version |
+| `too_imprecise` | a verified reply whose signed radius, with the measured delay and timer-rate error, makes the interval wider than 4,000 ms | `choose_clock_source`: select a source with a smaller radius |
+
+`too_imprecise` carries the signed radius in milliseconds. A local timer,
+continuity or UTC-midnight refusal names no cause. No refusal carries the
+observation's bounds, the request or the reply bytes.
+
 Verification must cover independent signed response fixtures and an explicit live
 source check; nonce/key/version/framing/Merkle substitutions; unknown metadata;
 oversized, unavailable and delayed peers; exact interval/expiry/rate/overflow
