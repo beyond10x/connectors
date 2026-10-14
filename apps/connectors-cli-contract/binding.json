@@ -12501,6 +12501,7 @@
                   "retry_explicitly",
                   "stop_owner",
                   "upgrade",
+                  "choose_clock_source",
                   "none"
                 ]
               },
@@ -12662,6 +12663,23 @@
                   "kind": "string"
                 }
               },
+              "clock_radius_ms": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "unreachable",
+                    "unverified",
+                    "too_imprecise"
+                  ]
+                }
+              },
               "code": {
                 "kind": "enum",
                 "variants": [
@@ -12670,6 +12688,7 @@
                   "configuration_exists",
                   "protected_entry_unavailable",
                   "custody_unavailable",
+                  "custody_read_only",
                   "metadata_unavailable",
                   "revision_conflict",
                   "outcome_unknown",
@@ -12706,7 +12725,20 @@
                   "variants": [
                     "connectors-local/1",
                     "connectors-local/2",
-                    "connectors-local/3"
+                    "connectors-local/3",
+                    "connectors-local/4"
+                  ]
+                }
+              },
+              "configuration_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "config_path_unresolved",
+                    "config_missing",
+                    "config_not_private",
+                    "owner_uid_mismatch"
                   ]
                 }
               },
