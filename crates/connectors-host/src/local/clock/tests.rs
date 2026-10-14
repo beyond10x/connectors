@@ -1,12 +1,36 @@
 use super::*;
+use fixture::Server;
 
-fn config(address: SocketAddr) -> Configuration {
-    Configuration {
-        format: "roughtime-clock/1".into(),
-        address: address.to_string(),
-        public_key: STANDARD.encode(fixture::root_key()),
-        max_rate_error_ppm: 10_000,
+/// The fixtures' signed midpoint, in Unix seconds.
+const T: u64 = 1_789_076_475;
+const DRAFT: RoughtimeVersion = RoughtimeVersion::Draft0x8000000c;
+
+fn source(server: &Server, seed: u8) -> Source {
+    Source {
+        address: server.address.clone(),
+        public_key: STANDARD.encode(fixture::key(seed)),
+        version: DRAFT,
     }
+}
+fn quorum(quorum: u32, sources: Vec<Source>) -> Configuration {
+    Configuration {
+        format: "roughtime-quorum/1".into(),
+        quorum,
+        max_rate_error_ppm: 10_000,
+        sources,
+    }
+}
+/// A source signing `midpoint` and `radius` (seconds) with key `seed`.
+fn answering(seed: u8, midpoint: u64, radius: u32) -> Server {
+    Server::fixture(fixture::Fixture {
+        seed,
+        midpoint,
+        radius,
+        ..Default::default()
+    })
+}
+fn results(reports: &[SourceReport]) -> Vec<SourceResult> {
+    reports.iter().map(|r| r.result).collect()
 }
 fn stamp(monotonic: u64) -> Stamp {
     Stamp {
@@ -15,48 +39,81 @@ fn stamp(monotonic: u64) -> Stamp {
         offset_upper: 1000,
     }
 }
+fn counted(index: usize, midpoint: u64, radius: u32, started: u64, received: u64) -> Counted {
+    Counted {
+        index,
+        sample: protocol::Sample { midpoint, radius },
+        started: stamp(started),
+        received: stamp(received),
+    }
+}
+fn report(index: usize) -> SourceReport {
+    SourceReport {
+        index,
+        address: format!("127.0.0.1:{}", 2002 + index),
+        result: SourceResult::Verified,
+        radius_ms: Some(1000),
+    }
+}
+/// Two identical counted sources at quorum two: the answer is the one
+/// source's own interval, so the single-source arithmetic still holds exactly.
 fn clock() -> BoundedClock {
     BoundedClock {
-        sample: protocol::Sample {
-            midpoint: 1_789_076_475,
-            radius: 1,
-        },
-        started: stamp(1_000_000_000),
-        received: stamp(1_100_000_000),
+        counted: vec![
+            counted(0, T, 1, 1_000_000_000, 1_100_000_000),
+            counted(1, T, 1, 1_000_000_000, 1_100_000_000),
+        ],
+        quorum: 2,
+        reports: vec![report(0), report(1)],
         rate_error_ppm: 10_000,
         configuration_sha256: "a".repeat(64),
         process: std::process::id(),
         last_read: AtomicU64::new(1_100_000_000),
     }
 }
+fn set_midpoint(c: &mut BoundedClock, midpoint: u64) {
+    for source in &mut c.counted {
+        source.sample.midpoint = midpoint;
+    }
+}
+fn received(c: &BoundedClock) -> Stamp {
+    c.counted[0].received
+}
+
 #[test]
 fn authenticated_acquisition_and_wrong_key_refusal() {
-    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-    socket
-        .set_read_timeout(Some(Duration::from_secs(3)))
-        .unwrap();
-    let mut config = config(socket.local_addr().unwrap());
-    let server = std::thread::spawn(move || {
-        for _ in 0..2 {
-            let mut b = [0; 1024];
-            let (n, addr) = socket.recv_from(&mut b).unwrap();
-            assert_eq!(n, 1024);
-            let reply = fixture::Fixture::default().reply(&b[..n]);
-            socket.send_to(&reply, addr).unwrap();
-        }
-    });
+    let (a, b) = (answering(7, T, 1), answering(8, T, 1));
+    let mut config = quorum(2, vec![source(&a, 7), source(&b, 8)]);
     let clock = config.acquire().unwrap();
     let view = clock.observe().unwrap();
     assert_eq!(view.configuration_sha256, config.sha256());
     assert!((2000..=4000).contains(&(view.upper_unix_ms - view.lower_unix_ms)));
+    assert_eq!(
+        results(&view.sources),
+        [SourceResult::Agreed, SourceResult::Agreed]
+    );
     assert!(clock.now().is_ok());
-    config.public_key = STANDARD.encode([17; 32]);
+    config.sources[1].public_key = STANDARD.encode([17; 32]);
     assert!(matches!(config.acquire(), Err(Failure::Unavailable)));
-    server.join().unwrap();
 }
+
 #[test]
 fn configuration_never_discovers_or_defaults_trust() {
-    let good = config("127.0.0.1:2002".parse().unwrap());
+    let good = quorum(
+        2,
+        vec![
+            Source {
+                address: "127.0.0.1:2002".into(),
+                public_key: STANDARD.encode(fixture::key(7)),
+                version: DRAFT,
+            },
+            Source {
+                address: "127.0.0.1:2003".into(),
+                public_key: STANDARD.encode(fixture::key(8)),
+                version: DRAFT,
+            },
+        ],
+    );
     good.validate().unwrap();
     for address in [
         "localhost:2002",
@@ -69,7 +126,7 @@ fn configuration_never_discovers_or_defaults_trust() {
         "127.0.0.1:02002",
     ] {
         let mut c = good.clone();
-        c.address = address.into();
+        c.sources[0].address = address.into();
         assert_eq!(c.validate(), Err(Failure::InvalidConfiguration));
     }
     for p in [0, 10_001, u32::MAX] {
@@ -82,16 +139,17 @@ fn configuration_never_discovers_or_defaults_trust() {
         STANDARD.encode([0; 32]),
         STANDARD.encode([1; 31]),
         STANDARD.encode([1; 33]),
-        good.public_key.trim_end_matches('=').into(),
+        good.sources[0].public_key.trim_end_matches('=').into(),
     ] {
         let mut c = good.clone();
-        c.public_key = key;
+        c.sources[0].public_key = key;
         assert!(c.validate().is_err());
     }
     let mut c = good;
     c.format = "future".into();
     assert!(c.validate().is_err());
 }
+
 #[test]
 fn elapsed_bounds_cover_both_rate_extremes_with_outward_rounding() {
     for ppm in [1, 500, 1000, 10_000] {
@@ -107,6 +165,7 @@ fn elapsed_bounds_cover_both_rate_extremes_with_outward_rounding() {
     assert_eq!(elapsed(0, 10_000, false).unwrap(), 0);
     assert_eq!(elapsed(0, 10_000, true).unwrap(), 2_020_203);
 }
+
 #[test]
 fn interval_includes_full_network_delay_and_ages_without_sliding() {
     let c = clock();
@@ -126,173 +185,103 @@ fn no_estimate_extrapolates_through_a_possible_utc_leap() {
     let midnight = 86_400 * 20_708;
     for midpoint in [midnight - 1, midnight, midnight + 1, midnight + 2] {
         let mut c = clock();
-        c.sample.midpoint = midpoint;
-        assert!(c.interval_at(c.received, c.process).is_err());
+        set_midpoint(&mut c, midpoint);
+        assert!(c.interval_at(received(&c), c.process).is_err());
     }
     let mut before = clock();
-    before.sample.midpoint = midnight - 3;
-    assert!(before.interval_at(before.received, before.process).is_ok());
+    set_midpoint(&mut before, midnight - 3);
+    assert!(
+        before
+            .interval_at(received(&before), before.process)
+            .is_ok()
+    );
     assert!(
         before
             .interval_at(
-                stamp(before.received.monotonic + 1_000_000_000),
+                stamp(received(&before).monotonic + 1_000_000_000),
                 before.process
             )
             .is_err()
     );
     let mut after = clock();
-    after.sample.midpoint = midnight + 3;
-    assert!(after.interval_at(after.received, after.process).is_ok());
+    set_midpoint(&mut after, midnight + 3);
+    assert!(after.interval_at(received(&after), after.process).is_ok());
 }
+
 #[test]
 fn process_suspend_backward_time_and_unsafe_bounds_refuse() {
     let c = clock();
     assert!(
-        c.interval_at(stamp(c.received.monotonic), c.process.wrapping_add(1))
+        c.interval_at(stamp(received(&c).monotonic), c.process.wrapping_add(1))
             .is_err()
     );
-    let mut suspended = stamp(c.received.monotonic + 1);
+    let mut suspended = stamp(received(&c).monotonic + 1);
     suspended.offset_lower += 2_000_000;
     suspended.offset_upper += 2_000_000;
     assert!(c.interval_at(suspended, c.process).is_err());
-    let mut changed = stamp(c.received.monotonic + 2);
+    let mut changed = stamp(received(&c).monotonic + 2);
     changed.offset_lower -= 2_000_000;
     changed.offset_upper -= 2_000_000;
     assert!(c.interval_at(changed, c.process).is_err());
     assert!(
-        c.interval_at(stamp(c.received.monotonic), c.process)
+        c.interval_at(stamp(received(&c).monotonic), c.process)
             .is_err()
     );
     for midpoint in [0, 1, u64::MAX] {
         let mut c = clock();
-        c.sample.midpoint = midpoint;
-        assert!(c.interval_at(c.received, c.process).is_err());
+        set_midpoint(&mut c, midpoint);
+        assert!(c.interval_at(received(&c), c.process).is_err());
     }
-    for radius in [2, u32::MAX] {
+    // A 4 s radius alone is an interval over the 8,000 ms cap.
+    for radius in [4, u32::MAX] {
         let mut c = clock();
-        c.sample.radius = radius;
-        assert!(c.interval_at(c.received, c.process).is_err());
+        for source in &mut c.counted {
+            source.sample.radius = radius;
+        }
+        assert!(c.interval_at(received(&c), c.process).is_err());
     }
     let mut c = clock();
-    c.received = stamp(c.started.monotonic + 2_000_000_000);
-    assert!(c.interval_at(c.received, c.process).is_err());
+    for source in &mut c.counted {
+        source.received = stamp(source.started.monotonic + 6_000_000_000);
+    }
+    assert!(c.interval_at(received(&c), c.process).is_err());
 }
+
 #[test]
 fn oversized_and_unavailable_peers_refuse() {
-    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-    socket
-        .set_read_timeout(Some(Duration::from_secs(3)))
-        .unwrap();
-    let c = config(socket.local_addr().unwrap());
-    let t = std::thread::spawn(move || {
-        let mut b = [0; 1024];
-        let (_, a) = socket.recv_from(&mut b).unwrap();
-        socket.send_to(&[0; 2048], a).unwrap();
-    });
+    let oversized = || Server::spawn(Box::new(|_, _| Some(vec![0; 2048])));
+    let (a, b) = (oversized(), oversized());
+    let c = quorum(2, vec![source(&a, 7), source(&b, 8)]);
+    let refused = c.acquire_explained().err().unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(
+        results(&refused.sources),
+        [SourceResult::Unverified, SourceResult::Unverified]
+    );
+    let (a, b) = (Server::silent(), Server::silent());
+    let c = quorum(2, vec![source(&a, 7), source(&b, 8)]);
     assert!(matches!(c.acquire(), Err(Failure::Unavailable)));
-    t.join().unwrap();
-    assert!(matches!(c.acquire(), Err(Failure::Unavailable)));
-}
-
-/// A source's reply to one request: `None` never answers, `Ok` answers that
-/// fixture's signed reply, `Err` answers these bytes.
-type SourceReply = Option<std::result::Result<fixture::Fixture, Vec<u8>>>;
-
-#[test]
-fn each_refusal_names_its_cause() {
-    // (configured key, the source's reply, the cause the refusal names)
-    let wrong_nonce = fixture::Fixture {
-        nonce_override: Some([3; 32]),
-        ..Default::default()
-    };
-    let cases: [(Option<[u8; 32]>, SourceReply, Cause); 6] = [
-        (None, None, Cause::Unreachable),
-        (None, Some(Err(vec![0; 2048])), Cause::Unverified),
-        (None, Some(Err(vec![0; 64])), Cause::Unverified),
-        (
-            Some([17; 32]),
-            Some(Ok(fixture::Fixture::default())),
-            Cause::Unverified,
-        ),
-        (None, Some(Ok(wrong_nonce)), Cause::Unverified),
-        (
-            None,
-            Some(Ok(fixture::Fixture {
-                radius: 2,
-                ..Default::default()
-            })),
-            Cause::TooImprecise { radius_ms: 2000 },
-        ),
-    ];
-    for (key, reply, cause) in cases {
-        set_test_query_timeout(Duration::from_millis(500));
-        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-        socket
-            .set_read_timeout(Some(Duration::from_secs(3)))
-            .unwrap();
-        let mut c = config(socket.local_addr().unwrap());
-        if let Some(key) = key {
-            c.public_key = STANDARD.encode(key);
-        }
-        let server = std::thread::spawn(move || {
-            let mut b = [0; 1024];
-            let (n, a) = socket.recv_from(&mut b).unwrap();
-            match reply {
-                Some(Ok(fixture)) => drop(socket.send_to(&fixture.reply(&b[..n]), a).unwrap()),
-                Some(Err(bytes)) => drop(socket.send_to(&bytes, a).unwrap()),
-                None => {}
-            }
-            socket
-        });
-        let refused = c.acquire_explained().err();
-        drop(server.join().unwrap());
-        assert_eq!(
-            refused,
-            Some(Refused {
-                failure: Failure::Unavailable,
-                cause: Some(cause)
-            }),
-            "{cause:?}"
-        );
-    }
-    set_test_query_timeout(QUERY_TIMEOUT);
-}
-
-#[test]
-#[ignore = "Explicit public Roughtime network interoperability; no physical clock guarantee"]
-fn independent_live_source() {
-    let c = Configuration {
-        format: "roughtime-clock/1".into(),
-        address: "192.36.143.134:2002".into(),
-        public_key: "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=".into(),
-        max_rate_error_ppm: 10_000,
-    };
-    let o = c.acquire().unwrap().observe().unwrap();
-    println!("{}", serde_json::to_string(&o).unwrap());
-    assert!(o.upper_unix_ms - o.lower_unix_ms <= 4000);
 }
 
 #[test]
 fn timeout_and_excessive_signed_radius_supply_no_capability() {
-    for (delay, radius) in [(Duration::from_millis(2200), 1), (Duration::ZERO, 2)] {
-        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
-        socket
-            .set_read_timeout(Some(Duration::from_secs(3)))
-            .unwrap();
-        let c = config(socket.local_addr().unwrap());
-        let server = std::thread::spawn(move || {
-            let mut b = [0; 1024];
-            let (n, address) = socket.recv_from(&mut b).unwrap();
-            std::thread::sleep(delay);
-            let reply = fixture::Fixture {
-                radius,
-                ..Default::default()
-            }
-            .reply(&b[..n]);
-            socket.send_to(&reply, address).unwrap();
-        });
+    for (delay, radius) in [(Duration::from_millis(2200), 1), (Duration::ZERO, 4)] {
+        let server = |seed: u8| {
+            Server::spawn(Box::new(move |_, request| {
+                std::thread::sleep(delay);
+                Some(
+                    fixture::Fixture {
+                        seed,
+                        radius,
+                        ..Default::default()
+                    }
+                    .reply(request),
+                )
+            }))
+        };
+        let (a, b) = (server(7), server(8));
+        let c = quorum(2, vec![source(&a, 7), source(&b, 8)]);
         assert!(matches!(c.acquire(), Err(Failure::Unavailable)));
-        server.join().unwrap();
     }
 }
 
@@ -300,9 +289,12 @@ fn timeout_and_excessive_signed_radius_supply_no_capability() {
 #[test]
 fn inherited_clock_refuses_in_an_actual_fork() {
     let mut c = clock();
-    c.started = Stamp::read().unwrap();
-    c.received = c.started;
-    c.last_read = AtomicU64::new(c.received.monotonic);
+    let now = Stamp::read().unwrap();
+    for source in &mut c.counted {
+        source.started = now;
+        source.received = now;
+    }
+    c.last_read = AtomicU64::new(now.monotonic);
     assert!(c.now().is_ok());
     // Child calls only clock/getpid/atomic operations and _exit, never allocator,
     // test assertions, logging or inherited locks. Parent retains sole cleanup.
@@ -317,4 +309,584 @@ fn inherited_clock_refuses_in_an_actual_fork() {
     assert!(libc::WIFEXITED(status));
     assert_eq!(libc::WEXITSTATUS(status), 0);
     assert!(c.now().is_ok());
+}
+
+// --- The quorum (docs/design/approval-clock-quorum.md, "Conformance scenarios").
+
+#[test]
+fn quorum_answer_is_hull_of_quorum_coverage() {
+    // The design's example table, quorum 2, intervals in ms from a common origin
+    // (an origin far from any UTC midnight); an `Err` is a refusal.
+    type Row<'a> = (
+        &'a [(u128, u128)],
+        std::result::Result<(u128, u128), Combined>,
+    );
+    let origin: u128 = 1_789_076_000_000;
+    let rows: [Row; 6] = [
+        (&[(0, 2000), (500, 2500), (9000, 11000)], Ok((500, 2000))),
+        (&[(0, 2000), (1500, 3500), (3000, 5000)], Ok((1500, 3500))),
+        (
+            &[(0, 2000), (5000, 7000), (10000, 12000)],
+            Err(Combined::Split),
+        ),
+        (
+            &[(0, 6000), (5000, 11000), (10000, 16000)],
+            Ok((5000, 11000)),
+        ),
+        (
+            &[(0, 7000), (6000, 13000), (12000, 19000)],
+            Ok((6000, 13000)),
+        ),
+        (
+            &[(0, 4000), (3000, 7000), (8000, 12000), (11000, 15000)],
+            Err(Combined::TooImprecise),
+        ),
+    ];
+    for (intervals, expected) in rows {
+        let ns: Vec<(u128, u128)> = intervals
+            .iter()
+            .map(|(l, u)| ((origin + l) * NS_PER_MS, (origin + u) * NS_PER_MS))
+            .collect();
+        assert_eq!(
+            quorum_answer(&ns, 2, MAX_WIDTH_MS),
+            expected.map(|(l, u)| (origin + l, origin + u)),
+            "{intervals:?}"
+        );
+    }
+    // Rounded outward: floor the lower bound, ceil the upper bound.
+    let ns = [(1_500_001, 3_999_999), (1_000_000, 3_000_001)];
+    assert_eq!(quorum_answer(&ns, 2, MAX_WIDTH_MS), Ok((1, 4)));
+    // Closed intervals: touching at one instant is coverage.
+    let ns = [(0, 5 * NS_PER_MS), (5 * NS_PER_MS, 9 * NS_PER_MS)];
+    assert_eq!(quorum_answer(&ns, 2, MAX_WIDTH_MS), Ok((5, 5)));
+}
+
+#[test]
+fn quorum_contains_truth_with_one_disjoint_liar() {
+    let (a, b, liar) = (
+        answering(7, T, 1),
+        answering(8, T, 1),
+        answering(9, T + 20, 1),
+    );
+    let config = quorum(2, vec![source(&a, 7), source(&liar, 9), source(&b, 8)]);
+    let view = config.acquire().unwrap().observe().unwrap();
+    let truth = i64::try_from(T * 1000).unwrap();
+    assert!(
+        view.lower_unix_ms <= truth && truth <= view.upper_unix_ms,
+        "{view:?}"
+    );
+    assert_eq!(
+        results(&view.sources),
+        [
+            SourceResult::Agreed,
+            SourceResult::Outlier,
+            SourceResult::Agreed
+        ]
+    );
+    assert_eq!(
+        view.sources.iter().map(|s| s.index).collect::<Vec<_>>(),
+        [0, 1, 2]
+    );
+    assert_eq!(view.sources[1].address, liar.address);
+    assert_eq!(view.sources[1].radius_ms, Some(1000));
+}
+
+#[test]
+fn quorum_overlapping_liar_cannot_exclude_truth() {
+    // The liar's [T + 1 s, T + 3 s] meets both honest [T - 1 s, T + 1 s]
+    // intervals near T + 1 s without containing T: their intersection excludes
+    // the truth, the hull of the doubly covered instants keeps it.
+    let (a, b, liar) = (
+        answering(7, T, 1),
+        answering(8, T, 1),
+        answering(9, T + 2, 1),
+    );
+    let config = quorum(2, vec![source(&a, 7), source(&b, 8), source(&liar, 9)]);
+    let view = config.acquire().unwrap().observe().unwrap();
+    let truth = i64::try_from(T * 1000).unwrap();
+    assert!(
+        view.lower_unix_ms <= truth && truth <= view.upper_unix_ms,
+        "{view:?}"
+    );
+    assert_eq!(
+        results(&view.sources),
+        [SourceResult::Agreed; 3],
+        "an overlapping liar is undetectable and harmless"
+    );
+}
+
+#[test]
+fn quorum_below_quorum_names_each_source() {
+    let good = answering(7, T, 1);
+    let silent = Server::silent();
+    let wrong_key = answering(8, T, 1);
+    let wide = answering(10, T, 5);
+    let mut sources = vec![
+        source(&good, 7),
+        source(&silent, 11),
+        source(&wrong_key, 9),
+        source(&wide, 10),
+    ];
+    let refused = quorum(2, sources.clone())
+        .acquire_explained()
+        .err()
+        .unwrap();
+    assert_eq!(refused.failure, Failure::Unavailable);
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(
+        results(&refused.sources),
+        [
+            SourceResult::Verified,
+            SourceResult::Unreachable,
+            SourceResult::Unverified,
+            SourceResult::TooImprecise
+        ]
+    );
+    assert_eq!(
+        refused
+            .sources
+            .iter()
+            .map(|s| s.radius_ms)
+            .collect::<Vec<_>>(),
+        [Some(1000), None, None, Some(5000)]
+    );
+    for (i, line) in refused.sources.iter().enumerate() {
+        assert_eq!(
+            (line.index, line.address.as_str()),
+            (i, sources[i].address.as_str())
+        );
+    }
+    // Next action by precedence: an unverified source first, then a too
+    // imprecise one, else a retry.
+    assert_eq!(refused.next_action(), NextAction::CheckConfiguration);
+    sources.remove(2);
+    let refused = quorum(2, sources.clone())
+        .acquire_explained()
+        .err()
+        .unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(refused.next_action(), NextAction::ChooseClockSource);
+    sources.remove(2);
+    let refused = quorum(2, sources).acquire_explained().err().unwrap();
+    assert_eq!(
+        results(&refused.sources),
+        [SourceResult::Verified, SourceResult::Unreachable]
+    );
+    assert_eq!(refused.next_action(), NextAction::RetryExplicitly);
+}
+
+#[test]
+fn quorum_split_refuses() {
+    let (a, b) = (answering(7, T, 1), answering(8, T + 20, 1));
+    let refused = quorum(2, vec![source(&a, 7), source(&b, 8)])
+        .acquire_explained()
+        .err()
+        .unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::Split));
+    assert_eq!(
+        results(&refused.sources),
+        [SourceResult::Verified, SourceResult::Verified]
+    );
+    assert_eq!(refused.next_action(), NextAction::ChooseClockSource);
+}
+
+#[test]
+fn quorum_combined_width_over_cap_refuses() {
+    // The design's last row: four 4 s intervals starting at 0, 3, 8 and 11 s.
+    let servers = [
+        answering(7, T + 2, 2),
+        answering(8, T + 5, 2),
+        answering(9, T + 10, 2),
+        answering(10, T + 13, 2),
+    ];
+    let sources = servers
+        .iter()
+        .zip(7..)
+        .map(|(server, seed)| source(server, seed))
+        .collect();
+    let refused = quorum(2, sources).acquire_explained().err().unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::TooImprecise));
+    assert_eq!(results(&refused.sources), [SourceResult::Verified; 4]);
+    assert_eq!(refused.next_action(), NextAction::ChooseClockSource);
+}
+
+#[test]
+fn quorum_source_over_cap_is_not_counted() {
+    let (wide, a, b) = (answering(7, T, 4), answering(8, T, 1), answering(9, T, 1));
+    let config = quorum(2, vec![source(&wide, 7), source(&a, 8), source(&b, 9)]);
+    let view = config.acquire().unwrap().observe().unwrap();
+    assert!(view.upper_unix_ms - view.lower_unix_ms <= 4000, "{view:?}");
+    assert_eq!(
+        results(&view.sources),
+        [
+            SourceResult::TooImprecise,
+            SourceResult::Agreed,
+            SourceResult::Agreed
+        ]
+    );
+    assert_eq!(view.sources[0].radius_ms, Some(4000));
+}
+
+#[test]
+fn quorum_width_cap_boundary() {
+    let ms = |l: u128, u: u128| (l * NS_PER_MS, u * NS_PER_MS);
+    let base = 1_789_076_000_000;
+    assert_eq!(MAX_WIDTH_MS, 8000);
+    assert_eq!(
+        quorum_answer(
+            &[ms(base, base + 8000), ms(base, base + 8000)],
+            2,
+            MAX_WIDTH_MS
+        ),
+        Ok((base, base + 8000))
+    );
+    assert_eq!(
+        quorum_answer(
+            &[ms(base, base + 8001), ms(base, base + 8001)],
+            2,
+            MAX_WIDTH_MS
+        ),
+        Err(Combined::TooImprecise)
+    );
+    // One nanosecond past 8,000 ms rounds outward to 8,001 ms.
+    let (l, u) = ms(base, base + 8000);
+    assert_eq!(
+        quorum_answer(&[(l, u + 1), (l, u + 1)], 2, MAX_WIDTH_MS),
+        Err(Combined::TooImprecise)
+    );
+    // The same cap applies to the clock's own readings.
+    let mut c = clock();
+    for source in &mut c.counted {
+        source.sample.radius = 3;
+    }
+    let width = |c: &BoundedClock, at: u64| {
+        c.interval_at(stamp(at), c.process)
+            .map(|i| i.upper_unix_ms - i.lower_unix_ms)
+    };
+    assert!(width(&c, 1_100_000_000).is_ok_and(|w| w <= 8000));
+}
+
+#[test]
+fn quorum_shared_deadline() {
+    // Two silent sources: queried in sequence they would cost 4 s; in
+    // parallel under one deadline the whole acquisition costs 2 s.
+    let (a, b, silent_1, silent_2) = (
+        answering(7, T, 1),
+        answering(8, T, 1),
+        Server::silent(),
+        Server::silent(),
+    );
+    let config = quorum(
+        2,
+        vec![
+            source(&silent_1, 9),
+            source(&a, 7),
+            source(&silent_2, 10),
+            source(&b, 8),
+        ],
+    );
+    let started = Instant::now();
+    let clock = config.acquire().unwrap();
+    let spent = started.elapsed();
+    assert!(spent >= Duration::from_millis(1900), "{spent:?}");
+    assert!(spent < Duration::from_millis(3000), "{spent:?}");
+    let view = clock.observe().unwrap();
+    assert_eq!(
+        results(&view.sources),
+        [
+            SourceResult::Unreachable,
+            SourceResult::Agreed,
+            SourceResult::Unreachable,
+            SourceResult::Agreed
+        ]
+    );
+    for server in [&a, &b, &silent_1, &silent_2] {
+        assert_eq!(server.requests.load(Ordering::SeqCst), 1, "no retry");
+    }
+}
+
+#[test]
+fn quorum_version_mismatch_is_unverified() {
+    // Each source is asked at its configured version only, and the reply must
+    // sign exactly that VER and list it in VERS.
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let recorder = |fixture: fixture::Fixture| {
+        let seen = seen.clone();
+        Server::spawn(Box::new(move |_, request| {
+            let fields = fixture::fields(&request[12..]);
+            seen.lock().unwrap().push(fields[b"VER\0"].clone());
+            Some(fixture.reply(request))
+        }))
+    };
+    let at_one = |seed| fixture::Fixture {
+        seed,
+        version: 1,
+        versions: vec![1],
+        ..Default::default()
+    };
+    let signed_other_ver = recorder(fixture::Fixture {
+        seed: 7,
+        versions: vec![1, 0x8000000c],
+        ..Default::default()
+    });
+    let vers_without_it = recorder(fixture::Fixture {
+        seed: 8,
+        version: 1,
+        versions: vec![0x8000000c],
+        ..Default::default()
+    });
+    let (good_1, good_2) = (recorder(at_one(9)), recorder(at_one(10)));
+    let at = |server: &Server, seed| Source {
+        version: RoughtimeVersion::Roughtime1,
+        ..source(server, seed)
+    };
+    let refused = quorum(
+        3,
+        vec![
+            at(&signed_other_ver, 7),
+            at(&vers_without_it, 8),
+            at(&good_1, 9),
+            at(&good_2, 10),
+        ],
+    )
+    .acquire_explained()
+    .err()
+    .unwrap();
+    assert_eq!(refused.refusal, Some(Refusal::BelowQuorum));
+    assert_eq!(
+        results(&refused.sources),
+        [
+            SourceResult::Unverified,
+            SourceResult::Unverified,
+            SourceResult::Verified,
+            SourceResult::Verified
+        ]
+    );
+    for server in [&signed_other_ver, &vers_without_it, &good_1, &good_2] {
+        assert_eq!(
+            server.requests.load(Ordering::SeqCst),
+            1,
+            "no second request"
+        );
+    }
+    assert_eq!(*seen.lock().unwrap(), vec![1u32.to_le_bytes().to_vec(); 4]);
+    // The same draft-version reply verifies when the source is configured at it.
+    let draft = answering(11, T, 1);
+    let view = quorum(2, vec![source(&draft, 11), at(&good_1, 9)])
+        .acquire()
+        .unwrap()
+        .observe()
+        .unwrap();
+    assert_eq!(results(&view.sources), [SourceResult::Agreed; 2]);
+}
+
+#[test]
+fn quorum_configuration_refusals() {
+    let at = |port: u16, seed: u8| Source {
+        address: format!("127.0.0.1:{port}"),
+        public_key: STANDARD.encode(fixture::key(seed)),
+        version: DRAFT,
+    };
+    let sources =
+        |n: u8| -> Vec<Source> { (0..n).map(|i| at(2002 + u16::from(i), 20 + i)).collect() };
+    quorum(2, sources(2)).validate().unwrap();
+    quorum(8, sources(8)).validate().unwrap();
+    let mut duplicate_address: Configuration = quorum(2, sources(3));
+    duplicate_address.sources[2].address = duplicate_address.sources[0].address.clone();
+    let mut duplicate_key = quorum(2, sources(3));
+    duplicate_key.sources[2].public_key = duplicate_key.sources[1].public_key.clone();
+    for (case, config) in [
+        ("one source", quorum(2, sources(1))),
+        ("nine sources", quorum(2, sources(9))),
+        ("quorum 1", quorum(1, sources(3))),
+        ("quorum 9", quorum(9, sources(8))),
+        ("quorum above the sources", quorum(4, sources(3))),
+        ("duplicate address", duplicate_address),
+        ("duplicate key", duplicate_key),
+    ] {
+        assert_eq!(
+            config.validate(),
+            Err(Failure::InvalidConfiguration),
+            "{case}"
+        );
+        assert_eq!(
+            config
+                .acquire_explained()
+                .err()
+                .map(|r| (r.failure, r.refusal)),
+            Some((Failure::InvalidConfiguration, None)),
+            "{case}"
+        );
+    }
+    // A source names its version: no default, no other spelling.
+    let table = |version: &str| {
+        format!(
+            "format='roughtime-quorum/1'\nquorum=2\nmax_rate_error_ppm=100\n[[sources]]\naddress='127.0.0.1:2002'\npublic_key='{}'\n{version}[[sources]]\naddress='127.0.0.1:2003'\npublic_key='{}'\nversion='roughtime-1'\n",
+            STANDARD.encode(fixture::key(7)),
+            STANDARD.encode(fixture::key(8)),
+        )
+    };
+    let parsed: ApprovalClock = toml::from_str(&table("version='roughtime-0x8000000c'\n")).unwrap();
+    parsed.validate().unwrap();
+    for version in ["", "version='roughtime-0x8000000b'\n", "version=1\n"] {
+        assert!(
+            toml::from_str::<ApprovalClock>(&table(version)).is_err(),
+            "{version:?}"
+        );
+    }
+    // The digest covers the whole table, source order included.
+    let mut reordered = quorum(2, sources(3));
+    let original = reordered.sha256();
+    reordered.sources.swap(0, 1);
+    assert_ne!(reordered.sha256(), original);
+}
+
+#[test]
+fn quorum_counted_set_is_fixed() {
+    // Source 0 was asked 20 s before the others; quorum 2 of 3. Once its own
+    // 30 s window has passed the clock refuses, although sources 1 and 2 alone
+    // would still answer: no reading drops a counted source.
+    let mut c = clock();
+    c.counted = vec![
+        counted(0, T - 20, 1, 1_000_000_000, 1_100_000_000),
+        counted(1, T, 1, 21_000_000_000, 21_100_000_000),
+        counted(2, T, 1, 21_000_000_000, 21_100_000_000),
+    ];
+    c.reports = vec![report(0), report(1), report(2)];
+    c.last_read = AtomicU64::new(21_100_000_000);
+    assert!(c.interval_at(stamp(21_100_000_000), c.process).is_ok());
+    assert!(c.interval_at(stamp(30_698_000_000), c.process).is_ok());
+    assert!(c.interval_at(stamp(30_698_000_001), c.process).is_err());
+    assert!(c.interval_at(stamp(40_000_000_000), c.process).is_err());
+    let mut rest = clock();
+    rest.counted = vec![
+        counted(1, T, 1, 21_000_000_000, 21_100_000_000),
+        counted(2, T, 1, 21_000_000_000, 21_100_000_000),
+    ];
+    rest.last_read = AtomicU64::new(21_100_000_000);
+    assert!(
+        rest.interval_at(stamp(40_000_000_000), rest.process)
+            .is_ok()
+    );
+}
+
+#[test]
+fn legacy_single_source_format_refuses_only_the_clock() {
+    let retired = |key: &str| {
+        format!(
+            "format='roughtime-clock/1'\naddress='127.0.0.1:2002'\npublic_key='{key}'\nmax_rate_error_ppm=10000\n"
+        )
+    };
+    let selection: ApprovalClock =
+        toml::from_str(&retired(&STANDARD.encode(fixture::root_key()))).unwrap();
+    // Parsed and admitted by the configuration, so reads that never use the
+    // clock keep working; never read as a one-source quorum.
+    selection.validate().unwrap();
+    assert!(matches!(selection, ApprovalClock::Retired(_)));
+    assert!(selection.is_retired());
+    // Approval issuance, execution and recovery refuse it as invalid
+    // configuration naming the retired format.
+    let error = crate::local::owner::Error::clock(&selection, Failure::InvalidConfiguration);
+    assert_eq!(error.code, crate::local::owner::Code::InvalidConfiguration);
+    assert!(error.clock_format_retired);
+    assert_eq!(
+        selection.configuration().err(),
+        Some(Failure::InvalidConfiguration)
+    );
+    assert!(matches!(
+        selection.acquire(),
+        Err(Failure::InvalidConfiguration)
+    ));
+    let refused = selection.acquire_explained().err().unwrap();
+    assert_eq!(refused.failure, Failure::InvalidConfiguration);
+    assert!(refused.retired);
+    assert_eq!(refused.refusal, None);
+    assert!(refused.sources.is_empty());
+    // The retired shape with a malformed key is still only the clock's refusal.
+    let malformed: ApprovalClock = toml::from_str(&retired("not-a-key")).unwrap();
+    malformed.validate().unwrap();
+    // Any other format string stays a whole-configuration refusal.
+    let other: ApprovalClock =
+        toml::from_str(&retired("k").replace("roughtime-clock/1", "roughtime-clock/2")).unwrap();
+    assert!(other.validate().is_err());
+
+    // The whole configuration loads; only its clock refuses.
+    #[cfg(unix)]
+    {
+        use crate::local::config::{Config, Paths};
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir_in(std::env::var_os("TMPDIR").unwrap()).unwrap();
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
+        let paths = Paths {
+            config: root.path().join("config/config.toml"),
+            state: root.path().join("state"),
+        };
+        Config::initialize(&paths).unwrap();
+        let mut text = std::fs::read_to_string(&paths.config).unwrap();
+        text.push_str("\n[approval_clock]\n");
+        text.push_str(&retired(&STANDARD.encode(fixture::root_key())));
+        std::fs::write(&paths.config, &text).unwrap();
+        let config = Config::load(&paths.config).unwrap();
+        let clock = config.approval_clock.as_ref().unwrap();
+        assert!(matches!(
+            clock.acquire(),
+            Err(Failure::InvalidConfiguration)
+        ));
+        assert_eq!(
+            clock.configuration().err(),
+            Some(Failure::InvalidConfiguration)
+        );
+        std::fs::write(
+            &paths.config,
+            text.replace("roughtime-clock/1", "roughtime-clock/9"),
+        )
+        .unwrap();
+        assert!(Config::load(&paths.config).is_err());
+    }
+}
+
+#[test]
+#[ignore = "Explicit public Roughtime network interoperability; no physical clock guarantee"]
+fn independent_live_quorum() {
+    // docs/design/approval-clock-quorum.md, "Sources".
+    let source = |address: &str, public_key: &str, version| Source {
+        address: address.into(),
+        public_key: public_key.into(),
+        version,
+    };
+    let c = Configuration {
+        format: "roughtime-quorum/1".into(),
+        quorum: 2,
+        max_rate_error_ppm: 10_000,
+        sources: vec![
+            source(
+                "162.159.200.123:2003",
+                "0GD7c3yP8xEc4Zl2zeuN2SlLvDVVocjsPSL8/Rl/7zg=",
+                RoughtimeVersion::Roughtime1,
+            ),
+            source(
+                "51.81.57.55:2002",
+                "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE=",
+                RoughtimeVersion::Draft0x8000000c,
+            ),
+            source(
+                "192.36.143.134:2002",
+                "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI=",
+                RoughtimeVersion::Roughtime1,
+            ),
+            source(
+                "148.113.255.71:2002",
+                "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA=",
+                RoughtimeVersion::Draft0x8000000c,
+            ),
+        ],
+    };
+    match c.acquire_explained() {
+        Ok(clock) => {
+            let o = clock.observe().unwrap();
+            println!("{}", serde_json::to_string(&o).unwrap());
+            assert!(o.upper_unix_ms - o.lower_unix_ms <= 8000);
+        }
+        Err(refused) => panic!("{refused:?}"),
+    }
 }

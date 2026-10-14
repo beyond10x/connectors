@@ -74,7 +74,7 @@ Indeterminate. Recovery never returns a gate receipt or sends. Indeterminate key
 remain Quarantined without automatic expiry or reconciliation.
 
 Known settlement requires a host clock interval containing actual current time.
-The interval is bounded to four seconds and sampled inside the transaction. The
+The interval is bounded to eight seconds and sampled inside the transaction. The
 upper bound fixes conservative settlement time; checked addition fixes expiry
 86,400 seconds later. Only a current trusted lower bound at or beyond expiry may
 retire the exact reservation generation. The store records a clock watermark,

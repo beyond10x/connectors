@@ -138,10 +138,11 @@ pub(super) fn apply(
     // Metadata housekeeping needs no current business/result grant. Time still
     // comes only from the currently selected qualified source. A changed or
     // unavailable source cannot settle Prepared, but does not stop quarantine.
+    // A retired single-source table selects no clock at all.
     let selected = Config::load(&paths.config)
         .ok()
         .and_then(|config| config.approval_clock)
-        .map(|source| source.sha256());
+        .and_then(|source| source.configuration().ok().map(|quorum| quorum.sha256()));
     let clock = batch
         .clock
         .filter(|clock| selected.as_deref() == Some(clock.configuration_sha256()));

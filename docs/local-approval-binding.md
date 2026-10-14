@@ -54,7 +54,7 @@ into the ordinary JSON Value decoder. This decoder alone neither verifies nor
 spends a proof; the invocation coordinator must perform current admission.
 
 Both issuance and verification require trusted time containment within a maximum
-four-second interval, with checked integer/unit arithmetic. There is no default
+eight-second interval, with checked integer/unit arithmetic. There is no default
 SystemTime source. Issuance uses the midpoint floor in seconds; `nbf=iat-5` and
 `exp=iat+295` are exact. Reception requires `nbf<=lower` and `upper<exp`, with no
 extra skew. Current configured key validity and revocation also apply. Production

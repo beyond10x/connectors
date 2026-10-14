@@ -56,19 +56,34 @@ A write runs through private protocol two, under the same rules for every provid
    spends the approval once and records the outcome in the execution audit.
 
 Approval-signing keys are created, rotated, recovered, revoked and retired with
-`approvals key-init`, `key-rotate`, `key-recover`, `key-revoke` and `key-retire`. Issuance needs a bounded clock: `approvals clock-check` verifies one
-explicitly configured Roughtime source, with the operator's stated bound on the local timer's
-rate error, and starts no owner or adapter. This configuration uses the public roughtime.se
-source checked on 2026-09-10 and an assumed 1% rate bound, which is a stated assumption, not a
-calibration:
+`approvals key-init`, `key-rotate`, `key-recover`, `key-revoke` and `key-retire`. Issuance needs a bounded clock: `approvals clock-check` asks two to
+eight explicitly configured Roughtime sources in parallel and answers only where a `quorum` of
+them agree, so one lying source cannot move the answer off true time and one unreachable source
+does not stop it. It reports each source's result, uses the operator's stated bound on the local
+timer's rate error, and starts no owner or adapter. This configuration uses two of the public
+sources checked on 2026-10-14 (the [clock guide](https://github.com/beyond10x/connectors/blob/main/docs/local-clock.md)
+lists all four) and an assumed 1% rate bound, which is a stated assumption, not a calibration:
 
 ```toml
 [approval_clock]
-format = "roughtime-clock/1"
-address = "192.36.143.134:2002"
-public_key = "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI="
+format = "roughtime-quorum/1"
+quorum = 2
 max_rate_error_ppm = 10000
+
+[[approval_clock.sources]]   # int08h, roughtime.int08h.com
+address = "51.81.57.55:2002"
+public_key = "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE="
+version = "roughtime-0x8000000c"
+
+[[approval_clock.sources]]   # time.txryan.com
+address = "148.113.255.71:2002"
+public_key = "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="
+version = "roughtime-0x8000000c"
 ```
+
+The single-source `roughtime-clock/1` table is retired: it still loads, but every use of the
+clock refuses it with `configuration_rule` `approval_clock_format_retired` until it is rewritten
+in this shape.
 
 Reads need no approval and no clock.
 
