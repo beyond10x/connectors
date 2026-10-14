@@ -475,8 +475,8 @@ Connectors serves Slack through the catalog provider since 2026-10-08,
 Web API document (`docs/catalog-slack.md`). A saved connection uses the profile `slack.bot`: a
 bot token as `Authorization: Bearer`, proved by `GET /api/auth.test`. The three conversation
 reads, `users.list`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `files.info` and the
-binary download `file.download` are selected there, with the writes `chat.postMessage` and
-`conversations.open` under approval; search is a
+binary download `file.download` are selected there, with the writes `chat.postMessage`,
+`conversations.open`, `chat.update` and `chat.delete` under approval; search is a
 second connection under the user-token profile `slack.user`, whose selection set
 `adapters/catalog/providers/slack/user-operations.json` selects `search.messages` alone. Every
 other row is still missing. The 2026-09-09 baseline listed Slack as
@@ -492,10 +492,10 @@ the Slack Web API method that would back it.
 | `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5) | covered | One page of at most 1,000 per call; no lookup by channel name. |
 | `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload, which the catalog cannot send (it reads binary answers only). |
-| `slack.message.edit` | 20 | 8 | 2026-10-03 | — | missing | No provider. Would be backed by `chat.update`. |
+| `slack.message.edit` | 20 | 8 | 2026-10-03 | `chat.update` (:63) | covered | One write under approval on a message named by `channel` and `ts`, in a channel or a direct message; replaces its `text` (scope `chat:write`). No `blocks`, and no Markdown conversion; Slack resets `parse` and `link_names` on every edit. A bot token edits only its own messages: `cant_update_message` and `edit_window_closed` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
 | `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:20) and `auth.test` (:26) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
 | `slack.file.download` | 11 | 8 | 2026-09-29 | `file.download` (:36) | covered | A binary read of a file's `url_private` or `url_private_download`: an `https` URL on `files.slack.com` under `/files-pri/`, sent with the bot token, answered as base64 with media type, length and SHA-256, refused above 2 MiB. The connection must admit `https://files.slack.com` with `"credential": true` in `hosts`; without it the download is refused as `forbidden` with nothing sent (2026-10-10). |
-| `slack.message.delete` | 10 | 6 | 2026-09-29 | — | missing | No provider. Would be backed by `chat.delete`. |
+| `slack.message.delete` | 10 | 6 | 2026-09-29 | `chat.delete` (:78) | covered | One write under approval on a message named by `channel` and `ts` (the string, not a number), in a channel or a direct message (scope `chat:write`). A bot token deletes only its own messages: `cant_delete_message` and `compliance_exports_prevent_deletion` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
 | `slack.file.delete` | 7 | 4 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.delete`. |
 | `slack.file.info` | 7 | 2 | 2026-09-29 | `files.info` (:32) | covered | One file by id, with `name`, `filetype`, `mimetype`, `size` and `url_private`; scope `files:read`. A Slack error is a `200` answer with `"ok": false` (2026-10-10). |
 | `slack.file.list` | 3 | 1 | 2026-09-29 | `files.list` (:29) | covered | Pages by `page` and `count`, not by cursor; narrowed by `channel`, `user`, `types`, `ts_from` and `ts_to`; scope `files:read` (2026-10-10). |

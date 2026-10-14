@@ -191,21 +191,24 @@ Adding `hosts` changes the configuration revision.
 
 ## Messages
 
-Two writes post a message. Each is a mutation: the host requires an approval
-that binds the operation and the whole input by digest, records the attempt,
-and sends the request once
+Two writes post a message, one edits it and one deletes it. Each is a
+mutation: the host requires an approval that binds the operation and the whole
+input by digest, records the attempt, and sends the request once
 ([the catalog provider guide](local-catalog-provider.md)).
 
 | id | pinned `operationId` | request | scope | body | answer |
 |---|---|---|---|---|---|
 | `chat.postMessage` | `chat_postMessage` | `POST /api/chat.postMessage`, JSON body | `chat:write` | `channel` and `text` required; `thread_ts`, `mrkdwn`, `unfurl_links` | `channel`, `ts` and `message` |
 | `conversations.open` | `conversations_open` | `POST /api/conversations.open`, JSON body | `im:write`; `mpim:write` for a group | `users` required; `return_im` | `channel.id` |
+| `chat.update` | `chat_update` | `POST /api/chat.update`, JSON body | `chat:write` | `channel`, `ts` and `text`, all required | `channel`, `ts`, `text` and `message` |
+| `chat.delete` | `chat_delete` | `POST /api/chat.delete`, JSON body | `chat:write` | `channel` and `ts`, both required | `channel` and `ts` |
 
-- **The body is closed.** Only the keys above are admitted, `channel`, `text`,
-  `thread_ts` and `users` as strings and the rest as JSON booleans; any other
+- **The body is closed.** Only the keys above are admitted: `channel`, `text`,
+  `thread_ts`, `ts` and `users` as strings, the rest as JSON booleans. Any other
   key, `token` included, is refused before any request. `blocks`,
-  `attachments`, `as_user` and the other members the pinned document declares
-  are not admitted.
+  `attachments`, `as_user`, `parse`, `link_names` and the other members the
+  pinned document declares are not admitted. `channel`, `text`, `ts` and
+  `users` must not be the empty string.
 - **`chat.postMessage`** posts `text` to `channel`, a channel id or the direct
   message `conversations.open` answers; the bot must be in the channel.
   `thread_ts`, the parent message's `ts`, makes it a reply in that thread.
@@ -221,6 +224,23 @@ and sends the request once
   pinned answer declares `already_open` and `no_op` for a conversation that
   was open before. A direct message
   is two invocations, open then post, each with its own approval and attempt.
+- **`chat.update`** replaces the text of the message `channel` and `ts` name,
+  in a channel or a direct message, with `text`, and answers the same
+  `channel` and `ts` with the new `text`. The pair is the one
+  `chat.postMessage` answered, or one `conversations.history` lists; `channel`
+  is the conversation id (`C…`, `D…`), not a name. The message's `blocks` and
+  `attachments` stay as they were, so a message that shows blocks may still
+  show them. The pinned document says an omitted `parse` or `link_names` is
+  reset to its default (`client`, `none`); neither is admitted, so every edit
+  resets both. The same edit approved and sent again sets the same text.
+- **`chat.delete`** deletes the message `channel` and `ts` name and answers
+  that `channel` and `ts`. `ts` is the string Slack gives, such as
+  `"1780000700.000700"`, although the pinned document types it as a number; a
+  number is refused before any request. A message deleted once is not found
+  the second time (`message_not_found`).
+- **Only the bot's own messages.** A bot token edits and deletes only the
+  messages it posted. Slack answers any other message `200` with
+  `"ok": false` and `cant_update_message` or `cant_delete_message`.
 - **The guard.** Before each write the provider reads `GET /api/auth.test`
   with the connection's token, which needs no scope, and refuses the write
   unless it answers `"ok": true`, the JSON boolean: the write is
@@ -242,6 +262,25 @@ and sends the request once
   message is there. A dispatch without a definite answer, a lost connection or
   a `5xx`, is `outcome_unknown` as well. An unknown write is never sent again
   by the provider or the host.
+- **Edit and delete refusals are named.** For `chat.update` and `chat.delete`
+  the selection declares the `error` values that leave the message unchanged
+  (`postflight.refusals`,
+  [the catalog provider guide](local-catalog-provider.md#configure-the-provider)).
+  Such an answer is classified `refused`, not `outcome_unknown`, with the
+  code below as the provider's own answer and the `error` value as its
+  reason, and it is never sent again:
+
+  | `error` | method | refused with |
+  |---|---|---|
+  | `cant_update_message`, `edit_window_closed` | `chat.update` | `forbidden` |
+  | `cant_delete_message`, `compliance_exports_prevent_deletion` | `chat.delete` | `forbidden` |
+  | `message_not_found`, `channel_not_found` | both | `not_found` |
+  | `msg_too_long`, `no_text` | `chat.update` | `invalid_input` |
+
+  Each value is one the pinned document's error enum lists for that method.
+  Any other `"ok": false` answer to an edit or a delete, such as
+  `not_in_channel`, `is_inactive` or `invalid_auth`, is `outcome_unknown`,
+  as for the other two writes.
 
 ## Errors are answers
 
