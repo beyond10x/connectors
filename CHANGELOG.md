@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.51.0 — 2026-10-15
 
 ### Added
 
@@ -223,6 +223,12 @@
   binding is reclaimed today.
 - The `fsGroup` group-read delivery is exercised against root-owned files in an unprivileged
   test jail; a run against a real Secret volume in a cluster is not part of the gate.
+- The Slack writes (send, open, edit, delete) run under approval, and an approval needs the
+  approval clock to answer. That clock is still the single Roughtime source with its 4,000 ms
+  width; where the source answers `too_imprecise` or `unreachable`, every write is refused
+  `unavailable`, with nothing sent. A multi-source clock with a quorum replaces it in a later
+  release. The local runs behind the move steps in `docs/catalog-slack.md` did not issue an
+  approval, invoke a write or call a real Slack.
 
 ## 0.50.0 — 2026-10-14
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:grafana-irm-history-reads
 kind: story
-status: active
+status: implemented
 title: Grafana Cloud IRM alert groups, incidents and their links over a since window, read only
 relations:
 - decomposes: epic:incident-collection-workflow
@@ -52,10 +52,11 @@ scope:
   path: website/docs/reference/adapters/grafana
 - confidence: cited
   path: website/docs/status.md
-revision: 25
+revision: 26
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T02:55:04Z", actor: "human:timo", revision: 24}
 - {from: "proposed", to: "active", at: "2026-10-14T02:55:05Z", actor: "human:timo", revision: 25}
+- {from: "active", to: "implemented", at: "2026-10-14T22:06:04Z", actor: "human:timo", revision: 26, decided_on: {"recorded":{"test_result":1}}}
 ---
 
 ## Placement

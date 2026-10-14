@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0500-store-version-skew
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.50.0: a store a newer binary wrote is refused by name'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-14T02:43:51Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-14T22:05:54Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
