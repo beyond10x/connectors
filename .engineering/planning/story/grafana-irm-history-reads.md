@@ -7,7 +7,52 @@ title: Grafana Cloud IRM alert groups, incidents and their links over a since wi
 relations:
 - decomposes: epic:incident-collection-workflow
 - serves: vision:independent-contract-adapters
-revision: 2
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: cited
+  path: adapters/grafana/README.md
+- confidence: cited
+  path: adapters/grafana/design.md
+- confidence: cited
+  path: adapters/grafana/generated/descriptor.json
+- confidence: cited
+  path: adapters/grafana/spec/adapter.json
+- confidence: inferred
+  path: adapters/grafana/spec/ess
+- confidence: cited
+  path: adapters/grafana/spec/ess/domains/connection.yaml
+- confidence: cited
+  path: adapters/grafana/spec/ess/domains/irm.yaml
+- confidence: cited
+  path: adapters/grafana/src/auth.rs
+- confidence: cited
+  path: adapters/grafana/src/lib.rs
+- confidence: cited
+  path: adapters/grafana/src/local.rs
+- confidence: cited
+  path: adapters/grafana/tests/ess_model.rs
+- confidence: cited
+  path: adapters/grafana/tests/fixtures
+- confidence: cited
+  path: adapters/grafana/tests/local_runtime.rs
+- confidence: cited
+  path: adapters/grafana/tests/protocol.rs
+- confidence: cited
+  path: contracts/auth/capability/v1alpha1/http-headers.md
+- confidence: cited
+  path: contracts/auth/capability/v1alpha1/semantics.md
+- confidence: inferred
+  path: crates/connectors-docs/src/status.rs
+- confidence: cited
+  path: crates/connectors-host/src/http.rs
+- confidence: cited
+  path: website/data/status.json
+- confidence: cited
+  path: website/docs/reference/adapters/grafana
+- confidence: cited
+  path: website/docs/status.md
+revision: 23
 ---
 
 ## Placement

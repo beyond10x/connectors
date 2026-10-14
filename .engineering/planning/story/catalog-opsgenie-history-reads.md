@@ -7,7 +7,48 @@ title: Opsgenie alerts, incidents and their links over a since window, read only
 relations:
 - decomposes: epic:incident-collection-workflow
 - serves: vision:independent-contract-adapters
-revision: 2
+scope:
+- confidence: cited
+  path: CHANGELOG.md
+- confidence: inferred
+  path: adapters/README.md
+- confidence: cited
+  path: adapters/catalog
+- confidence: cited
+  path: adapters/catalog/generated/bundles
+- confidence: cited
+  path: adapters/catalog/providers/opsgenie/operations.json
+- confidence: cited
+  path: adapters/catalog/spec/ess/domains/amendment.yaml
+- confidence: cited
+  path: adapters/catalog/spec/ess/domains/identity.yaml
+- confidence: cited
+  path: adapters/catalog/src/local.rs
+- confidence: cited
+  path: adapters/catalog/tests/opsgenie.rs
+- confidence: cited
+  path: adapters/opsgenie
+- confidence: cited
+  path: contracts/auth/capability/v1alpha1/semantics.md
+- confidence: cited
+  path: crates/connectors-catalog/src/amendment.rs
+- confidence: inferred
+  path: crates/connectors-catalog/src/inventory.rs
+- confidence: inferred
+  path: crates/connectors-catalog/src/lib.rs
+- confidence: inferred
+  path: crates/connectors-docs/src/status.rs
+- confidence: cited
+  path: docs/catalog-opsgenie.md
+- confidence: cited
+  path: docs/fluxplane-plugin-parity.md
+- confidence: cited
+  path: docs/local-catalog-provider.md
+- confidence: inferred
+  path: website/data/status.json
+- confidence: inferred
+  path: website/docs/status.md
+revision: 4
 ---
 
 ## Placement: a new story, and a narrowed `story:parity-opsgenie-alerts`
