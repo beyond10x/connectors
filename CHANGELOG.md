@@ -46,6 +46,49 @@
   reason, and counted unsupported in the bundle. `operationId` must be unique among the projected
   operations. Every document version 1 accepted projects to the same bytes; Slack's projection
   record names the new version and its bundle was rebuilt.
+- Read-only mounted-secret custody for headless and container hosts. A `connectors-local/4`
+  owner configuration can select it with a `[custody]` table (`binding = "mounted_secret"`,
+  `directory = "<absolute path>"`; Linux only): credentials are read from a read-only mounted
+  directory, such as a Kubernetes Secret volume in its projected `..data` layout or a read-only
+  bind mount, as items `<adapter alias>/<profile>`. It is never a fallback: without `[custody]`
+  custody is the platform binding exactly as before, and an unusable platform store still answers
+  `custody_unavailable`. Every item is opened without following symbolic links (only `..data` to
+  one `..`-prefixed sibling is resolved) and admitted only as a regular, singly linked file of at
+  most 64 KiB, with no write or other bits, owned by the effective user or root, on a read-only
+  mount; group read is admitted only on a root-owned item whose group the process holds, which
+  is how Kubernetes presents a Secret to a non-root pod with `fsGroup`. `setup check` reports
+  `custody_backend = "mounted_secret"` and a `mounted_custody` prerequisite.
+- Under that binding `connections connect` and `repair` take no protected source: the owner reads
+  the item itself and the provider validates those bytes. Each version pins its bytes with an
+  HMAC-SHA-256 under a key kept owner-only in the state directory; once the platform replaces an
+  item, a read is refused with `custody_unavailable` and `next_action = revalidate_connection`,
+  the new bytes are never sent, and `connections revalidate` publishes them as a new version.
+- A new failure code, `custody_read_only` (exit 1, `stage = custody`,
+  `next_action = check_configuration`): a write the read-only binding cannot make, a second
+  connection of the same profile, an OAuth-acquired (refresh-rotating) profile or an
+  approval-signing key, refused before any provider exchange.
+- `invalid_configuration` at stage `configuration` names the rule that refused in
+  `configuration_rule`: `config_path_unresolved`, `config_missing`, `config_not_private` or
+  `owner_uid_mismatch`, never a path.
+- `docs/local-mounted-secret-custody.md` describes the binding and its threat model beside the
+  Secret Service's; `docs/local-container.md` the container setup, with a CronJob example.
+
+### Changed
+
+- `connections connect` and `repair` no longer require a protected source flag in the parser.
+  Under a platform binding a connect without one is refused with `protected_entry_unavailable`
+  and `next_action = select_protected_source`; under the mounted binding a source flag is
+  `invalid_input`.
+- The custody backend trait splits into a read capability (`ReadBackend`) and a write capability
+  (`Backend: ReadBackend`); the mounted binding implements only the first.
+
+### Limitations
+
+- A retired version of the mounted binding stays retired: its own terminal state (`Released`,
+  nothing deleted) needs a metadata store migration and is not recorded yet. No version of any
+  binding is reclaimed today.
+- The `fsGroup` group-read delivery is exercised against root-owned files in an unprivileged
+  test jail; a run against a real Secret volume in a cluster is not part of the gate.
 
 ## 0.50.0 — 2026-10-14
 
