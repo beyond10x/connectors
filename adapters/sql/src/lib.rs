@@ -276,7 +276,8 @@ impl Sql {
 
     async fn profile_read(&self, input: Value) -> Result<Value> {
         let input: profile::Input = decode(input)?;
-        let (profile, prepared) = profile::prepare(&self.profiles, &input)?;
+        let revision = &self.descriptor.revision;
+        let (profile, prepared) = profile::prepare(&self.profiles, revision, &input)?;
         let result = self
             .query(Query {
                 query: prepared.statement,
@@ -287,7 +288,13 @@ impl Sql {
             })
             .await?;
         let rows = result["rows"].as_array().ok_or_else(Error::internal)?;
-        profile::page(profile, &input, rows, result["provenance"].clone())
+        profile::page(
+            profile,
+            revision,
+            &input,
+            rows,
+            result["provenance"].clone(),
+        )
     }
     async fn connect(&self) -> Result<(Client, ConnectionTask)> {
         let mut config = tokio_postgres::Config::new();
@@ -426,9 +433,21 @@ impl Sql {
             .unwrap_or(args.query.trim());
         let original = transaction.prepare(query).await.map_err(database_error)?;
         column_bounds(original.columns().len())?;
-        if let Some(keyset) = &args.keyset {
-            keyset.columns(original.columns().len())?;
-        }
+        let expression = match &args.keyset {
+            None => None,
+            Some(keyset) => {
+                keyset.columns(original.columns().len())?;
+                let native = original.columns()[keyset.column].type_().name();
+                Some(keyset.expression(
+                    profile::postgresql_keyset(
+                        keyset.kind,
+                        profile::PostgresqlOrderingType::of(native),
+                    ),
+                    native,
+                    Engine::Postgresql,
+                )?)
+            }
+        };
         if original.params().len() != args.parameters.len() {
             return Err(Error::invalid("parameter count does not match query"));
         }
@@ -453,36 +472,44 @@ impl Sql {
             .map(|c| format!("COALESCE(octet_length(result.{c}::text),0)::bigint"))
             .collect::<Vec<_>>()
             .join("+");
-        // A keyset page orders by its column and continues after the cursor, which is
-        // bound after the statement's own parameters; the server infers its type from
-        // the column it is compared with.
+        // A keyset page orders by one expression of its column and continues after
+        // the cursor compared by that same expression, the cursor bound after the
+        // statement's own parameters (a native comparison takes the column's type).
         let mut parameters = args.parameters;
-        let keyset = match &args.keyset {
-            None => String::new(),
-            Some(keyset) => {
+        let keyset = match (&args.keyset, expression) {
+            (Some(keyset), Some(expression)) => {
+                let column = expression.over(&format!("result.c{}", keyset.column));
                 let mut clause = String::new();
                 if let Some(after) = &keyset.after {
                     parameters.push(Some(after.clone()));
-                    clause = format!(" WHERE result.c{} > ${}", keyset.column, parameters.len());
+                    let cursor = expression.over(&format!("${}", parameters.len()));
+                    clause = format!(" WHERE {column} > {cursor}");
                 }
                 format!(
-                    "{clause} ORDER BY result.c{} LIMIT {}",
-                    keyset.column,
+                    "{clause} ORDER BY {column} LIMIT {}",
                     u32::from(args.limit) + 1
                 )
             }
+            _ => String::new(),
         };
         // Prepared single-statement subquery plus server-generated positional aliases.
         // PostgreSQL's text representation is explicit in the native-text profile.
+        // The derived table closes on its own line, so a trailing `--` comment in the
+        // caller's statement cannot reach the aliases, the keyset or LIMIT.
         let wrapped = format!(
-            "SELECT CASE WHEN ({size}) > {} THEN NULL::text[] ELSE ARRAY[{casts}] END FROM ({query}) AS result({}){keyset}",
+            "SELECT CASE WHEN ({size}) > {} THEN NULL::text[] ELSE ARRAY[{casts}] END FROM ({query}\n) AS result({}){keyset}",
             connectors_core::RESPONSE_LIMIT,
             aliases.join(",")
         );
-        let statement = transaction
-            .prepare(&wrapped)
-            .await
-            .map_err(database_error)?;
+        // The statement prepared on its own, so a syntax error now is the wrapper's:
+        // the statement is not a query (`DELETE … RETURNING`, `EXPLAIN`, `SHOW`).
+        let statement = transaction.prepare(&wrapped).await.map_err(|error| {
+            if error.code() == Some(&tokio_postgres::error::SqlState::SYNTAX_ERROR) {
+                not_a_query()
+            } else {
+                database_error(error)
+            }
+        })?;
         let values = parameters
             .into_iter()
             .map(TextParameter)
@@ -507,6 +534,19 @@ impl Sql {
             let Some(row) = result.first() else { break };
             if rows.len() == args.limit as usize {
                 truncated = true;
+                // A keyset page compares the row past the limit with the last one.
+                if let Some(keyset) = &args.keyset {
+                    let values: Option<Vec<Option<String>>> =
+                        row.try_get(0).map_err(database_error)?;
+                    let values = values.ok_or_else(|| {
+                        Error::new(ErrorCode::Capacity, "query row exceeds byte limit")
+                    })?;
+                    let next = values
+                        .into_iter()
+                        .map(|v| v.map(Value::String).unwrap_or(Value::Null))
+                        .collect::<Vec<_>>();
+                    keyset.boundary(rows.last(), &next)?;
+                }
                 break;
             }
             let values: Option<Vec<Option<String>>> = row.try_get(0).map_err(database_error)?;
@@ -614,11 +654,15 @@ struct Query {
     keyset: Option<Keyset>,
 }
 
-/// A keyset page over one output column: the rows ordered by it, after the
-/// cursor's value when there is one, one row past the limit at most. The
-/// statement must return exactly `columns` columns, checked before it runs.
+/// A keyset page over one output column: the rows ordered by one expression of
+/// it, after the cursor's value compared by that same expression when there is
+/// one, one row past the limit at most. The statement must return exactly
+/// `columns` columns, and the column must be one the engine can follow, both
+/// checked before it runs.
 pub(crate) struct Keyset {
     pub column: usize,
+    /// The profile's name for the column, which a refusal names.
+    pub name: String,
     pub kind: ColumnType,
     pub after: Option<String>,
     pub columns: usize,
@@ -633,6 +677,50 @@ impl Keyset {
         }
         Ok(())
     }
+    /// The expression the engine follows the column by, or a refusal naming it.
+    fn expression(
+        &self,
+        expression: Option<profile::KeysetExpression>,
+        native: &str,
+        engine: Engine,
+    ) -> Result<profile::KeysetExpression> {
+        expression.ok_or_else(|| {
+            Error::new(
+                ErrorCode::Unsupported,
+                format!(
+                    "the ordering column `{}` is {native}, which a {} keyset cannot follow on {}",
+                    self.name,
+                    self.kind.name(),
+                    engine.name()
+                ),
+            )
+        })
+    }
+    /// The row past the limit: the keyset continues strictly after the last
+    /// returned value, so a row that shares it would be dropped. Refuse instead.
+    fn boundary(&self, last: Option<&Vec<Value>>, next: &[Value]) -> Result<()> {
+        let last = last.and_then(|row| row.get(self.column));
+        if last.is_some() && last == next.get(self.column) {
+            return Err(Error::new(
+                ErrorCode::Unsupported,
+                format!(
+                    "the ordering column `{}` is not unique: the row past this page shares the last row's value",
+                    self.name
+                ),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// A statement that prepared on its own but that the server's syntax check
+/// refuses as a derived table is not a query (`DELETE … RETURNING`, `EXPLAIN`,
+/// `SHOW`): unsupported, as a statement that returns no columns is.
+pub(crate) fn not_a_query() -> Error {
+    Error::new(
+        ErrorCode::Unsupported,
+        "statement is not a query that can run as a derived table",
+    )
 }
 
 /// A table the read cannot find: it does not exist, the configured role or

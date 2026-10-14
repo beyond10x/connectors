@@ -262,8 +262,13 @@ the repository holds only the shape below. Add `read_profiles` to the native fil
   `********0101`.
 - `call_identifier` names the column the answer offers as the join key, and `ordering` the
   column pages follow. Neither may be a `phone_number` or masked, and neither may be null in
-  a row. The ordering column must hold distinct values for the rows the statement returns;
-  rows sharing a value across a page boundary would be skipped.
+  a row. The ordering column must hold distinct values for the rows the statement returns.
+  A page whose row past the limit shares the last returned value is refused as
+  `unsupported`, naming the column as not unique, rather than skipping a row; a row a server
+  cap withheld cannot be seen, so a unique column is still yours to choose. On PostgreSQL a
+  `text` or `phone_number` ordering pages by the returned text's bytes (`COLLATE "C"`), an
+  `integer` ordering needs an `int2`, `int4` or `int8` column and a `timestamp` ordering a
+  `timestamp` or `timestamptz` column; any other is refused by name before a row is read.
 
 A file the model refuses fails `--print-local-bootstrap`. Profiles are part of the
 configuration revision, so re-copy `configuration_revision` after changing one, and add
@@ -279,8 +284,11 @@ An answer names the profile, its `call_identifier` and `ordering` columns and ea
 type and masking, and carries `items`, one object per row. A server, or a proxy in front of
 it, may return fewer rows than any limit asks for, so a short page does not end the read:
 pass `next_cursor` back as `cursor` with the same profile and parameters until a page comes
-back with no items, `complete: true` and a null cursor. A cursor for another profile or
-other values is `stale_cursor`; an undeclared or missing parameter is `invalid_input`. Each
+back with no items, `complete: true` and a null cursor. A cursor is not signed: it is
+checked for its shape, its type (the ordering column's declared type must admit its value)
+and its context, so a cursor issued for another profile or other values, on another
+connection, or before any change to the profile is `stale_cursor`; an undeclared or missing
+parameter is `invalid_input`. Each
 page runs in its own read-only transaction, like `query.read`, so pages are not one
 snapshot. The full rules are in the
 [SQL reads contract](../adapters/sql/contracts/reads/v1alpha1/semantics.md#read-profiles).
@@ -336,8 +344,9 @@ schema and terminates only a correlated test backend. Explicit selection with
 missing prerequisites fails; an ignored case in the ordinary package run is
 unexecuted evidence, not a passing provider case.
 
-Write refusal checks distinguish columnless statements and unsupported PostgreSQL
-features (`unsupported`, including SQLSTATE `0A000`), rejected read-subquery syntax
-or multiple statements (`invalid_input`), and the mandatory
+Write refusal checks distinguish columnless statements, statements that return rows
+but cannot be a derived table (`INSERT … RETURNING`, refused by the server's syntax
+check of the wrapper) and unsupported PostgreSQL features (all `unsupported`,
+including SQLSTATE `0A000`), multiple statements (`invalid_input`), and the mandatory
 read-only transaction. They also compare independently observed fixture contents;
 an arbitrary transport failure is not accepted as write protection.

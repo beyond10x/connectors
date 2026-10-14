@@ -172,14 +172,14 @@ async fn every_row_of_a_number_pages_across_a_server_row_cap_by_keyset_cursor() 
     assert_eq!(
         wrapped[0].as_str(),
         format!(
-            "SELECT * FROM ({}\n) AS result (c0,c1,c2,c3,c4,c5,c6,c7) ORDER BY c0 LIMIT 6",
+            "SELECT * FROM ({}\n) AS result (c0,c1,c2,c3,c4,c5,c6,c7) ORDER BY CAST(c0 AS DECIMAL(65,0)) LIMIT 6",
             calls::STATEMENT
         )
     );
     assert_eq!(
         wrapped[1].as_str(),
         format!(
-            "SELECT * FROM ({}\n) AS result (c0,c1,c2,c3,c4,c5,c6,c7) WHERE c0 > CAST(? AS DECIMAL(65,0)) ORDER BY c0 LIMIT 6",
+            "SELECT * FROM ({}\n) AS result (c0,c1,c2,c3,c4,c5,c6,c7) WHERE CAST(c0 AS DECIMAL(65,0)) > CAST(? AS DECIMAL(65,0)) ORDER BY CAST(c0 AS DECIMAL(65,0)) LIMIT 6",
             calls::STATEMENT
         )
     );
@@ -483,4 +483,456 @@ fn a_profile_the_model_refuses_is_refused_by_the_library() {
         serde_json::from_value(calls::profile()).unwrap(),
     ];
     assert!(fresh().with_read_profiles(twice).is_err());
+}
+
+// ---------------------------------------------------------------------------------------
+// Cursors: what is checked is shape, type and context (semantics.md, "Read profiles";
+// `connectors_sql.profiles.Cursor` and `CursorAdmission`).
+
+fn decode_cursor(token: &str) -> Value {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(token)
+        .unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+fn encode_cursor(cursor: &Value) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(cursor).unwrap())
+}
+fn base64url(text: &str) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(text)
+}
+
+/// Every refusal below comes before a session: the issued cursor is altered in one respect
+/// at a time, and each alteration is one the adapter never issues.
+#[tokio::test]
+async fn a_cursor_of_the_wrong_shape_or_type_is_stale_before_any_session() {
+    let server = fixture::start(calls::script(None)).await;
+    let sql = sql(server.port, &[calls::profile()]);
+    let issued = read(&sql, calls::input(None, 2)).await.unwrap()["next_cursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let cursor = decode_cursor(&issued);
+    assert_eq!(cursor["after"], "12", "{cursor}");
+    let altered = |change: &dyn Fn(&mut Value)| {
+        let mut cursor = cursor.clone();
+        change(&mut cursor);
+        encode_cursor(&cursor)
+    };
+    let cases = [
+        // Type: the ordering column is an integer.
+        (
+            "a value the declared type does not admit",
+            altered(&|c| c["after"] = json!("12x")),
+        ),
+        ("an empty value", altered(&|c| c["after"] = json!(""))),
+        // Shape: longer than any issued value.
+        (
+            "a value over 8,192 bytes",
+            altered(&|c| c["after"] = json!("1".repeat(8193))),
+        ),
+        // Shape: the base64 form is issued only for a value JSON escapes.
+        (
+            "a non-canonical base64 value",
+            altered(&|c| {
+                c.as_object_mut().unwrap().remove("after");
+                c["after_base64"] = json!(base64url("12"));
+            }),
+        ),
+        (
+            "both value forms",
+            altered(&|c| c["after_base64"] = json!(base64url("12"))),
+        ),
+        (
+            "no value",
+            altered(&|c| {
+                c.as_object_mut().unwrap().remove("after");
+            }),
+        ),
+        (
+            "an unknown member",
+            altered(&|c| c["signature"] = json!("x")),
+        ),
+        ("a padded token", format!("{issued}=")),
+    ];
+    for (why, token) in cases {
+        let before = server.log.lock().unwrap().sessions;
+        let error = read(&sql, calls::input(Some(&token), 2))
+            .await
+            .expect_err(why);
+        assert_eq!(error.code, ErrorCode::StaleCursor, "{why}: {error:?}");
+        assert_eq!(
+            server.log.lock().unwrap().sessions,
+            before,
+            "{why} opened a session"
+        );
+    }
+    // A timestamp ordering admits only a timestamp: the cursor it issued, with its value
+    // replaced, is stale for its type alone.
+    let mut by_start = calls::profile();
+    by_start["ordering"] = json!("started_at");
+    let timed = self::sql(server.port, &[by_start]);
+    let issued = read(&timed, calls::input(None, 2)).await.unwrap()["next_cursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut forged = decode_cursor(&issued);
+    assert_eq!(forged["after"], "2026-01-02T09:01:10", "{forged}");
+    forged["after"] = json!("yesterday");
+    let before = server.log.lock().unwrap().sessions;
+    let error = read(&timed, calls::input(Some(&encode_cursor(&forged)), 2))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::StaleCursor);
+    assert_eq!(server.log.lock().unwrap().sessions, before);
+}
+
+/// The context covers the connection: a cursor issued by one connection is stale on
+/// another with the same profile, and stays good on its own.
+#[tokio::test]
+async fn a_cursor_issued_on_another_connection_is_stale() {
+    let first = fixture::start(calls::script(None)).await;
+    let second = fixture::start(calls::script(None)).await;
+    let one = sql(first.port, &[calls::profile()]);
+    let other = sql(second.port, &[calls::profile()]);
+    let issued = read(&one, calls::input(None, 2)).await.unwrap()["next_cursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let error = read(&other, calls::input(Some(&issued), 2))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::StaleCursor);
+    assert_eq!(second.log.lock().unwrap().sessions, 0);
+    read(&one, calls::input(Some(&issued), 2)).await.unwrap();
+}
+
+/// A changed profile is a changed context even when its id, parameters and ordering are
+/// the same: here only a column's masking changed.
+#[tokio::test]
+async fn a_cursor_issued_before_any_change_to_the_profile_is_stale() {
+    let server = fixture::start(calls::script(None)).await;
+    let before = sql(server.port, &[calls::profile()]);
+    let issued = read(&before, calls::input(None, 2)).await.unwrap()["next_cursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut changed = calls::profile();
+    changed["columns"][2]["masked"] = json!(true);
+    let after = sql(server.port, &[changed]);
+    let sessions = server.log.lock().unwrap().sessions;
+    let error = read(&after, calls::input(Some(&issued), 2))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::StaleCursor);
+    assert_eq!(server.log.lock().unwrap().sessions, sessions);
+}
+
+// ---------------------------------------------------------------------------------------
+// The cursor's size: every issued token fits the published 16,384 characters.
+
+fn keys_script(key: String) -> fixture::Script {
+    fixture::Script {
+        columns: vec![fixture::col(
+            "k",
+            fixture::VAR_STRING,
+            0,
+            fixture::UTF8MB4,
+            0,
+        )],
+        rows: vec![vec![fixture::text(&key)]],
+        params: 0,
+        // The one row is served to the first page only.
+        select: Some(Arc::new(|values: &[Option<String>], _| values.is_empty())),
+        ..fixture::Script::default()
+    }
+}
+fn keys_profile() -> Value {
+    json!({
+        "id": "k".repeat(64),
+        "statement": "SELECT k FROM fixture_keys",
+        "parameters": [],
+        "columns": [{"name": "key", "type": "text"}],
+        "call_identifier": "key",
+        "ordering": "key"
+    })
+}
+
+#[tokio::test]
+async fn the_longest_ordering_value_issues_a_cursor_the_published_schemas_admit() {
+    assert_eq!(connectors_sql::profile::MAX_CURSOR_VALUE, 8192);
+    assert!(
+        connectors_sql::profile::worst_cursor_length()
+            <= connectors_sql::profile::CURSOR_LENGTH_LIMIT
+    );
+    // The worst values: every byte escaped by JSON (`"`, `\`, a control character), and
+    // multi-byte characters.
+    for key in [
+        "\"".repeat(8192),
+        "\\".repeat(8192),
+        "\u{1}".repeat(8192),
+        "é".repeat(4096),
+        "1".repeat(8192),
+    ] {
+        let server = fixture::start(keys_script(key.clone())).await;
+        let sql = sql(server.port, &[keys_profile()]);
+        let schema = sql
+            .descriptor()
+            .operation("profile.read")
+            .unwrap()
+            .output_schema
+            .clone();
+        let input = json!({"profile": "k".repeat(64), "limit": 1});
+        let first = read(&sql, input.clone()).await.unwrap();
+        connectors_sdk::validate(&schema, &first).unwrap();
+        let cursor = first["next_cursor"].as_str().unwrap().to_owned();
+        assert!(cursor.len() <= 16384, "{} characters", cursor.len());
+        assert!(cursor.len() <= connectors_sql::profile::worst_cursor_length());
+        let mut next = input;
+        next["cursor"] = json!(cursor);
+        let last = read(&sql, next).await.unwrap();
+        assert_eq!(last["complete"], true);
+    }
+    // One byte more is refused, not issued.
+    let server = fixture::start(keys_script("1".repeat(8193))).await;
+    let sql = sql(server.port, &[keys_profile()]);
+    let error = read(&sql, json!({"profile": "k".repeat(64), "limit": 1}))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Unsupported);
+}
+
+// ---------------------------------------------------------------------------------------
+// A shared ordering value at a page boundary.
+
+#[tokio::test]
+async fn a_row_past_the_limit_sharing_the_last_ordering_value_refuses_the_page() {
+    let mut rows = calls::ROWS;
+    rows[2].row_key = rows[1].row_key;
+    let script = |rows: [calls::CallRow; 9]| fixture::Script {
+        rows: rows.iter().map(row_cells).collect(),
+        select: Some(Arc::new(move |values: &[Option<String>], index: usize| {
+            let after = values.get(3).cloned().flatten();
+            after.is_none_or(|a| rows[index].row_key > a.parse::<i64>().unwrap())
+        })),
+        ..calls::script(None)
+    };
+    // Rows 11, 12, 12: a page of two ends between the two 12s.
+    let server = fixture::start(script(rows)).await;
+    let sql = sql(server.port, &[calls::profile()]);
+    let error = read(&sql, calls::input(None, 2)).await.unwrap_err();
+    assert_eq!(error.code, ErrorCode::Unsupported);
+    assert!(error.message.contains("`row_key`"), "{}", error.message);
+    assert!(error.message.contains("not unique"), "{}", error.message);
+    // A page of one ends between 11 and 12, and a page of three after both 12s: each is
+    // served, and a shared value inside a page is not a boundary.
+    read(&sql, calls::input(None, 1)).await.unwrap();
+    let page = read(&sql, calls::input(None, 3)).await.unwrap();
+    assert_eq!(page["items"].as_array().unwrap().len(), 3);
+}
+
+fn row_cells(row: &calls::CallRow) -> Vec<fixture::Cell> {
+    use fixture::*;
+    let at = |t: [u8; 4]| datetime(2026, 1, t[0], [t[1], t[2], t[3]], 0);
+    vec![
+        int8(row.row_key),
+        text(row.call_id),
+        text(row.direction),
+        text(row.caller),
+        text(row.callee),
+        at(row.started),
+        at(row.ended),
+        text(row.leg_type),
+    ]
+}
+
+// ---------------------------------------------------------------------------------------
+// One expression for ORDER BY and the keyset comparison, per declared type (MySQL).
+
+/// The wrapper statement each page prepared: after the derived table's closing line.
+fn tails(server: &fixture::Server) -> Vec<String> {
+    server
+        .log
+        .lock()
+        .unwrap()
+        .prepares
+        .iter()
+        .filter_map(|p| p.split_once("\n) AS result (").map(|(_, t)| t.to_owned()))
+        .collect()
+}
+
+#[tokio::test]
+async fn mysql_orders_and_continues_by_the_same_expression_for_each_declared_type() {
+    let aliases = "c0,c1,c2,c3,c4,c5,c6,c7)";
+    for (ordering, expression, parameter) in [
+        (
+            "row_key",
+            "CAST(c0 AS DECIMAL(65,0))",
+            "CAST(? AS DECIMAL(65,0))",
+        ),
+        (
+            "started_at",
+            "CAST(c5 AS DATETIME(6))",
+            "CAST(? AS DATETIME(6))",
+        ),
+        (
+            "call_id",
+            "CAST(CONVERT(c1 USING utf8mb4) AS BINARY)",
+            "CAST(CONVERT(? USING utf8mb4) AS BINARY)",
+        ),
+    ] {
+        // Every row but the first, whatever is bound: only the statement text is under
+        // test, and no two of the first rows share a value of any of the three columns.
+        let server = fixture::start(fixture::Script {
+            rows: calls::ROWS[1..].iter().map(row_cells).collect(),
+            select: None,
+            ..calls::script(None)
+        })
+        .await;
+        let mut profile = calls::profile();
+        profile["ordering"] = json!(ordering);
+        let sql = sql(server.port, &[profile]);
+        let first = read(&sql, calls::input(None, 1)).await.unwrap();
+        read(&sql, calls::input(first["next_cursor"].as_str(), 1))
+            .await
+            .unwrap();
+        assert_eq!(
+            tails(&server),
+            [
+                format!("{aliases} ORDER BY {expression} LIMIT 2"),
+                format!("{aliases} WHERE {expression} > {parameter} ORDER BY {expression} LIMIT 2"),
+            ],
+            "{ordering}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn mysql_refuses_an_ordering_column_it_cannot_follow_by_name_before_any_row() {
+    use fixture::*;
+    let one = |column: Col, cell: Cell, kind: &str| {
+        (
+            Script {
+                columns: vec![column],
+                rows: vec![vec![cell]],
+                params: 0,
+                ..Script::default()
+            },
+            json!({
+                "id": "keys",
+                "statement": "SELECT k FROM fixture_keys",
+                "parameters": [],
+                "columns": [{"name": "the_key", "type": kind}],
+                "call_identifier": "the_key",
+                "ordering": "the_key"
+            }),
+        )
+    };
+    for (script, profile) in [
+        // A binary string is written as base64: its bytes and its text order differently.
+        one(
+            col("k", VAR_STRING, 0, BINARY_CHARSET, 0),
+            bytes(b"\x01\x02"),
+            "text",
+        ),
+        // A number is not text the server writes as the page does.
+        one(col("k", DOUBLE, 0, BINARY_CHARSET, 0), double(1.5), "text"),
+        one(col("k", JSON, 0, BINARY_CHARSET, 0), text("{}"), "text"),
+        // An integer is an integer column; a timestamp a DATETIME or TIMESTAMP.
+        one(col("k", VAR_STRING, 0, UTF8MB4, 0), text("12"), "integer"),
+        one(
+            col("k", NEWDECIMAL, 0, BINARY_CHARSET, 0),
+            text("12"),
+            "integer",
+        ),
+        one(
+            col("k", DATE, 0, BINARY_CHARSET, 0),
+            date(2026, 1, 2),
+            "timestamp",
+        ),
+        one(
+            col("k", VAR_STRING, 0, UTF8MB4, 0),
+            text("2026-01-02 09:00:00"),
+            "timestamp",
+        ),
+    ] {
+        let server = start(script).await;
+        let sql = sql(server.port, std::slice::from_ref(&profile));
+        let error = read(&sql, json!({"profile": "keys", "limit": 5}))
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, ErrorCode::Unsupported, "{profile}");
+        assert!(error.message.contains("`the_key`"), "{}", error.message);
+        let log = server.log.lock().unwrap();
+        assert!(log.executions.is_empty(), "{profile}: a row was read");
+        assert_eq!(log.prepares.len(), 1, "{profile}: the wrapper was prepared");
+    }
+    // ENUM and SET are text strings, ordered by their bytes rather than their index.
+    for (script, profile) in [
+        one(
+            col("k", VAR_STRING, ENUM_FLAG, UTF8MB4, 0),
+            text("inbound"),
+            "text",
+        ),
+        one(
+            col("k", LONG, UNSIGNED, BINARY_CHARSET, 0),
+            int4(7),
+            "integer",
+        ),
+        one(
+            col("k", TIMESTAMP, 0, BINARY_CHARSET, 0),
+            datetime(2026, 1, 2, [9, 0, 0], 0),
+            "timestamp",
+        ),
+    ] {
+        let server = start(script).await;
+        let sql = sql(server.port, std::slice::from_ref(&profile));
+        read(&sql, json!({"profile": "keys", "limit": 5}))
+            .await
+            .unwrap_or_else(|e| panic!("{profile}: {e:?}"));
+    }
+}
+
+// ---------------------------------------------------------------------------------------
+// A statement that is not a query, on MySQL.
+
+/// A statement that prepares with columns but cannot be a derived table (`SHOW`, `EXPLAIN`)
+/// is refused by the server's syntax check of the wrapper: that is `unsupported`, as a
+/// statement that returns no columns is, on both `query.read` and `profile.read`.
+#[tokio::test]
+async fn mysql_a_statement_that_cannot_be_a_derived_table_is_unsupported() {
+    let server = fixture::start(fixture::Script {
+        wrapped_prepare_error: Some((1064, "42000")),
+        ..calls::script(None)
+    })
+    .await;
+    let profiled = sql(server.port, &[calls::profile()]);
+    let error = read(&profiled, calls::input(None, 5)).await.unwrap_err();
+    assert_eq!(error.code, ErrorCode::Unsupported);
+    assert!(server.log.lock().unwrap().executions.is_empty());
+    let server = fixture::start(fixture::Script {
+        wrapped_prepare_error: Some((1064, "42000")),
+        ..fixture::Script::default()
+    })
+    .await;
+    let error = sql(server.port, &[])
+        .invoke("query.read", json!({"query": "SHOW TABLES", "limit": 5}))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::Unsupported);
+    assert!(server.log.lock().unwrap().executions.is_empty());
+    // The caller's own statement refused at its preparation keeps the server's class.
+    let server = fixture::start(fixture::Script {
+        prepare_error: Some((1064, "42000")),
+        ..fixture::Script::default()
+    })
+    .await;
+    let error = sql(server.port, &[])
+        .invoke("query.read", json!({"query": "SELEC 1", "limit": 5}))
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidInput);
 }
