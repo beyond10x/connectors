@@ -654,28 +654,22 @@ $ connectors connections revalidate --adapter slack-bot --connection conn_c4789c
 {"error":{"code":"failure","data":{"code":"owner_build_mismatch","kind":"operational","next_action":"stop_owner","stage":"readiness"}},"ok":false}
 ```
 
-The CLI has no command that stops the owner, and it never stops or replaces one itself
-([owner contract](../contracts/cli/v1alpha1/owner.md)). There are two ways out, and neither is a
-`connectors` command:
+`connectors setup owner-stop`, run with the same `--config` and `--state-dir`, asks that owner to
+drain and exit and waits up to 30 seconds for it; it answers `"disposition": "stopped"`, or
+`"no_owner"` when none runs, and never signals a process
+([owner contract](../contracts/cli/v1alpha1/owner.md#stopping-an-owner),
+[CLI guide](../website/docs/guides/set-up-the-local-cli.md#after-an-upgrade)). An idle owner also
+exits by itself after 10 minutes with no connected client and no work in flight.
 
-- **Wait.** An owner exits after 10 minutes with no connected client and no work in flight.
-- **Stop the process.** Its command line is `__connectors-owner <config> <state directory>`:
+The next command that needs an owner starts one from the current build. In this run, made before
+`setup owner-stop` existed, the older owner was stopped by its process instead:
 
-  ```console
-  $ pgrep -af -- '__connectors-owner'
-  2265212 /proc/self/fd/20 __connectors-owner ~/.cache/connectors-w20261014b/slack-migration/run/cfg/config.toml ~/.cache/connectors-w20261014b/slack-migration/run/state
-  $ kill 2265212
-  ```
-
-  Pick the line naming your own state directory. The next command that needs an owner starts one
-  from the current build:
-
-  ```console
-  $ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision 9559e85e-0df7-4808-ad1d-1b74b0d821f1 | jq -r '.result.connection.summary.state'
-  ready
-  $ connectors adapters status --adapter slack-bot | jq -r .result.observation.state
-  ready
-  ```
+```console
+$ connectors connections revalidate --adapter slack-bot --connection conn_c4789c790b6b4fdf944637d74f5317d7_3345b2425b5b47efb18a10301c8feba1 --expected-revision 9559e85e-0df7-4808-ad1d-1b74b0d821f1 | jq -r '.result.connection.summary.state'
+ready
+$ connectors adapters status --adapter slack-bot | jq -r .result.observation.state
+ready
+```
 
 ## Limits
 

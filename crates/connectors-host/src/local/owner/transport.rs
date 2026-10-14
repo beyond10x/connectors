@@ -811,6 +811,102 @@ pub fn enable_checkpoints(paths: &Paths) -> Result<super::super::metadata::Check
     Ok(enabled)
 }
 
+/// What `setup owner-stop` found for the state directory.
+#[derive(Debug, PartialEq, Eq)]
+pub enum OwnerStop {
+    /// The owner greeted as this incarnation, accepted the shutdown request and
+    /// released the lifetime lock.
+    Stopped { host_incarnation: String },
+    /// No owner held the lifetime lock: none ran for the state directory.
+    NoOwner,
+}
+
+/// `setup owner-stop` (contracts/cli/v1alpha1/owner.md, "Stopping an owner"):
+/// asks the running owner of `paths.state`, of any build, to drain and exit,
+/// and waits until `bound` for it to release the lifetime lock. The request is
+/// the private shutdown request, sent on the owner's own socket after a
+/// greeting that names this state directory's authority and the exact
+/// incarnation that answered; no process is ever signalled. A socket, state
+/// directory or lock file of another user is `Forbidden`; an owner that holds
+/// the lock but does not answer is `Unavailable`; one that has not exited by
+/// `bound` is `Timeout`. Nothing is started.
+pub fn stop_owner(paths: &Paths, bound: Duration) -> Result<OwnerStop> {
+    let deadline = Instant::now() + bound;
+    // No owner can run for a directory that does not exist.
+    match std::fs::symlink_metadata(&paths.state) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(OwnerStop::NoOwner);
+        }
+        #[cfg(unix)]
+        Ok(info) if info.uid() != fs::uid() => return Err(Code::Forbidden.into()),
+        _ => {}
+    }
+    let directory = fs::directory(&paths.state, false, true)?;
+    let name = std::ffi::OsStr::new("owner.lock");
+    // The socket and the lock file an owner of another user would hold.
+    #[cfg(unix)]
+    for path in [socket_path(&directory), paths.state.join(name)] {
+        if let Ok(info) = std::fs::symlink_metadata(&path)
+            && info.uid() != fs::uid()
+        {
+            return Err(Code::Forbidden.into());
+        }
+    }
+    // An owner always runs holding this file; without it none ever started, and
+    // none is created here.
+    if !fs::private_file_metadata_if_present_at(&directory, name)? {
+        return Ok(OwnerStop::NoOwner);
+    }
+    // Taken on a fresh open and released by closing it: free means no owner
+    // runs.
+    let free = || -> Result<bool> {
+        let lock = fs::private_file_at(&directory, name)?;
+        match try_lock(&lock) {
+            Ok(()) => Ok(true),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(false),
+            Err(_) => Err(Error::from(Code::Unavailable)),
+        }
+    };
+    if free()? {
+        return Ok(OwnerStop::NoOwner);
+    }
+    // The lock is held: an owner runs or is starting. Greet it, retrying while
+    // a starting owner is not listening yet.
+    let client = loop {
+        match Client::connect_version(paths, false, VERSION, deadline) {
+            Ok(client) => break client,
+            Err(error) if error.code == Code::Unavailable => {
+                // It retired or exited by itself meanwhile.
+                if free()? {
+                    return Ok(OwnerStop::NoOwner);
+                }
+                if Instant::now() >= deadline {
+                    return Err(error);
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(error) if error.code == Code::Timeout => return Err(Code::Unavailable.into()),
+            Err(error) => return Err(error),
+        }
+    };
+    let host_incarnation = client.host_incarnation.clone();
+    match client.shutdown(&host_incarnation) {
+        Ok(()) => {}
+        // A lost reply, or an owner already shutting down: its exit decides.
+        Err(error) if matches!(error.code, Code::Unavailable | Code::Timeout) => {}
+        Err(error) => return Err(error),
+    }
+    loop {
+        if free()? {
+            return Ok(OwnerStop::Stopped { host_incarnation });
+        }
+        if Instant::now() >= deadline {
+            return Err(Code::Timeout.into());
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
 /// The owner lifetime lock, taken now or not at all: `flock(LOCK_EX |
 /// LOCK_NB)` on the lock file. Windows takes a startup and a lifetime byte
 /// lock instead ([`windows::try_lock`]).

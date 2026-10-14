@@ -729,6 +729,23 @@ types:
       # store carrying checkpoints. As for Failure.instance_id, ESS declares no
       # invariant on a CLI type, so the host pins the value and tests hold it.
       - {name: newest_incompatible_release, type: "String"}
+  # `setup owner-stop` (contracts/cli/v1alpha1/owner.md, "Stopping an owner"), the
+  # command the stop_owner next action names: asks the running owner of the state
+  # directory, of any build, to drain and exit through its private shutdown request
+  # and waits a bounded time for its lifetime lock. No process is ever signalled.
+  # no_owner is a success: no owner ran, and nothing was started or created.
+  - name: connectors.cli.OwnerStopDisposition
+    kind: enum
+    variants: [stopped, no_owner]
+  # host_incarnation is the incarnation that greeted and exited, present exactly
+  # when stopped; that cross-field requirement is a runtime obligation, as for
+  # AcquisitionObservation.
+  - name: connectors.cli.SetupOwnerStopResult
+    kind: struct
+    fields:
+      - {name: disposition, type: "connectors.cli.OwnerStopDisposition"}
+      - {name: state_path, type: "String"}
+      - {name: host_incarnation, type: "Optional<String>"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:

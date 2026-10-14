@@ -301,6 +301,9 @@ _connectors() {
             connectors__subcmd__help__subcmd__setup,init)
                 cmd="connectors__subcmd__help__subcmd__setup__subcmd__init"
                 ;;
+            connectors__subcmd__help__subcmd__setup,owner-stop)
+                cmd="connectors__subcmd__help__subcmd__setup__subcmd__owner__subcmd__stop"
+                ;;
             connectors__subcmd__operations,describe)
                 cmd="connectors__subcmd__operations__subcmd__describe"
                 ;;
@@ -337,6 +340,9 @@ _connectors() {
             connectors__subcmd__setup,init)
                 cmd="connectors__subcmd__setup__subcmd__init"
                 ;;
+            connectors__subcmd__setup,owner-stop)
+                cmd="connectors__subcmd__setup__subcmd__owner__subcmd__stop"
+                ;;
             connectors__subcmd__setup__subcmd__help,check)
                 cmd="connectors__subcmd__setup__subcmd__help__subcmd__check"
                 ;;
@@ -348,6 +354,9 @@ _connectors() {
                 ;;
             connectors__subcmd__setup__subcmd__help,init)
                 cmd="connectors__subcmd__setup__subcmd__help__subcmd__init"
+                ;;
+            connectors__subcmd__setup__subcmd__help,owner-stop)
+                cmd="connectors__subcmd__setup__subcmd__help__subcmd__owner__subcmd__stop"
                 ;;
             *)
                 ;;
@@ -2228,7 +2237,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help__subcmd__setup)
-            opts="check checkpoints-enable init"
+            opts="check checkpoints-enable init owner-stop"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2270,6 +2279,20 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help__subcmd__setup__subcmd__init)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__setup__subcmd__owner__subcmd__stop)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2518,7 +2541,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__setup)
-            opts="-h --config --state-dir --output --help check checkpoints-enable init help"
+            opts="-h --config --state-dir --output --help check checkpoints-enable init owner-stop help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2600,7 +2623,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__setup__subcmd__help)
-            opts="check checkpoints-enable init help"
+            opts="check checkpoints-enable init owner-stop help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2669,7 +2692,47 @@ _connectors() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
+        connectors__subcmd__setup__subcmd__help__subcmd__owner__subcmd__stop)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
         connectors__subcmd__setup__subcmd__init)
+            opts="-h --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__setup__subcmd__owner__subcmd__stop)
             opts="-h --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )

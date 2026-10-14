@@ -1,4 +1,4 @@
-Local integration access through explicitly configured adapters
+Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
 
 Usage: connectors [OPTIONS] <COMMAND>
 
