@@ -581,13 +581,13 @@ fn fill_owner(directory: &sockets::Directory, socket: &str) -> Vec<std::os::unix
             held.len()
         );
         let mut probe = directory.connect(socket);
-        probe
-            .set_read_timeout(Some(std::time::Duration::from_millis(100)))
-            .unwrap();
+        // macOS refuses a socket option with EINVAL once the owner has answered
+        // and closed the probe; its reply is then already readable.
+        tolerate_closed(probe.set_read_timeout(Some(std::time::Duration::from_millis(100))));
         let mut first = [0u8; 1];
         match probe.read(&mut first) {
             Ok(1) => {
-                probe.set_read_timeout(None).unwrap();
+                tolerate_closed(probe.set_read_timeout(None));
                 let mut rest = [0u8; 11];
                 probe.read_exact(&mut rest).unwrap();
                 let mut sizes = [0u8; 12];
@@ -615,6 +615,14 @@ fn fill_owner(directory: &sockets::Directory, socket: &str) -> Vec<std::os::unix
             }
             other => panic!("the owner closed a probe without its capacity reply: {other:?}"),
         }
+    }
+}
+
+/// A socket option set on a probe the owner already closed: EINVAL on macOS.
+#[cfg(unix)]
+fn tolerate_closed(result: std::io::Result<()>) {
+    if let Err(error) = result {
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput, "{error}");
     }
 }
 

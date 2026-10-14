@@ -49,7 +49,14 @@ fn configured() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
     let init = command(&root, &["setup", "init"]);
     assert!(init.status.success(), "{init:?}");
-    let entry = ENTRY.replace("NOT_INSTALLED", "/not-installed");
+    let entry = ENTRY.replace(
+        "NOT_INSTALLED",
+        if cfg!(windows) {
+            "C:/not-installed"
+        } else {
+            "/not-installed"
+        },
+    );
     let path = root.path().join("config/config.toml");
     let text = fs::read_to_string(&path).unwrap() + &entry;
     fs::write(&path, text).unwrap();
