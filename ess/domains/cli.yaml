@@ -141,10 +141,31 @@ types:
       - {name: operations, type: "List<String>"}
   # secret_service_socket selects the Secret Service bus on Linux only; the macOS and
   # Windows backends take no binding and refuse one.
+  # binding and directory are the `[custody]` table of a `connectors-local/4`
+  # configuration (contracts/cli/v1alpha1/semantics.md §3). Absent, custody is the
+  # platform binding. binding names one the build supports; mounted_secret, Linux
+  # only, is the explicit read-only binding over a mounted directory
+  # (contracts/auth/custody/v1alpha1/semantics.md §5.2). directory is an
+  # infrastructure binding of the owner configuration, like secret_service_socket,
+  # never a per-credential locator; no request selects a binding, directory or item.
   - name: connectors.cli.LocalCustodyBinding
     kind: struct
     fields:
       - {name: secret_service_socket, type: "Optional<String>"}
+      - {name: binding, type: "Optional<connectors.cli.CustodyBackend>"}
+      - {name: directory, type: "Optional<String>"}
+    invariants:
+      # directory is defined exactly when the binding is mounted_secret.
+      - any:
+          - {binding: mounted_secret}
+          - {directory: {exists: false}}
+      - any:
+          - not: {binding: mounted_secret}
+          - {directory: {exists: true}}
+      # The Secret Service bus is never named beside the mounted binding.
+      - any:
+          - not: {binding: mounted_secret}
+          - {secret_service_socket: {exists: false}}
   # Lowercase hex SHA-256 of an executable, as owner/transport.rs writes it (hex::encode)
   # in own_build.
   - name: connectors.cli.BuildDigest
@@ -301,11 +322,14 @@ types:
     variants: [linux, macos, windows]
   # The protected store custody uses, fixed by the platform the binary was built for:
   # the freedesktop Secret Service on Linux, the login keychain on macOS, the
-  # Credential Manager on Windows (contracts/auth/custody/v1alpha1/semantics.md §5.1).
-  # There is no plain-text variant.
+  # Credential Manager on Windows (contracts/auth/custody/v1alpha1/semantics.md §5.1),
+  # or mounted_secret, the read-only binding over a mounted directory that only an
+  # explicit `[custody]` selection in the owner configuration chooses (§5.2).
+  # There is no fallback variant: mounted_secret is explicit and read-only, and
+  # nothing selects it when the platform binding is unusable.
   - name: connectors.cli.CustodyBackend
     kind: enum
-    variants: [secret_service, macos_keychain, windows_credential_manager]
+    variants: [secret_service, macos_keychain, windows_credential_manager, mounted_secret]
   # The operating-system guarantees the local host builds on, each fixed by the
   # platform the binary was built for (contracts/cli/v1alpha1/semantics.md §7,
   # "macOS platform guarantees" and "Windows platform guarantees"):
@@ -507,7 +531,7 @@ types:
     variants: [usage, operational, interrupted]
   - name: connectors.cli.FailureCode
     kind: enum
-    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer]
+    variants: [invalid_input, invalid_configuration, configuration_exists, protected_entry_unavailable, custody_unavailable, custody_read_only, metadata_unavailable, revision_conflict, outcome_unknown, identity_mismatch, lifecycle_conflict, incarnation_mismatch, readiness_mismatch, description_unavailable, stale_description, not_found, revoked, forbidden, not_granted, unavailable, timeout, capacity, stale_cursor, unsupported, interrupted, service_failure, approval_required, approval_refused, approval_replayed, idempotency_conflict, owner_build_mismatch, confirmation_required, metadata_schema_newer]
   - name: connectors.cli.FailureStage
     kind: enum
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
@@ -516,7 +540,15 @@ types:
     variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
-    variants: [connectors-local/1, connectors-local/2, connectors-local/3]
+    variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4]
+  # Which rule of the configuration stage refused (contracts/cli/v1alpha1/semantics.md
+  # §3): no absolute configuration path resolves (config_path_unresolved), no file is
+  # at the resolved path (config_missing), the file or a directory above it is not
+  # owner-only (config_not_private), or owner_uid is not the effective user
+  # (owner_uid_mismatch). It names the rule only, never a path or OS text.
+  - name: connectors.cli.ConfigurationRule
+    kind: enum
+    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created, state_initialized]
@@ -566,6 +598,10 @@ types:
       # ESS 0.52 `specify cli` refuses any invariant on a CLI type (see ApprovalClockCheckResult),
       # so both rules are enforced by the host and pinned by tests, not declared here.
       - {name: instance_id, type: "Optional<String>"}
+      # ESS-LIMIT: configuration_rule appears only on invalid_configuration at stage
+      # configuration. As for instance_id above, ESS declares no invariant on a CLI type,
+      # so the presence rule is enforced by the host and pinned by tests.
+      - {name: configuration_rule, type: "Optional<connectors.cli.ConfigurationRule>"}
       # ESS-LIMIT: store_version and binary_version appear together, only on
       # metadata_schema_newer (contracts/cli/v1alpha1/semantics.md). binary_version is
       # the refusing binary's release version; store_version is the release version the
@@ -579,6 +615,11 @@ types:
       # by tests.
       - {name: store_version, type: "Optional<String>"}
       - {name: binary_version, type: "Optional<String>"}
+  # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
+  # keyring and persistent_custody_qualification under a platform binding; under the
+  # explicitly selected mounted_secret binding, mounted_custody (the configured
+  # directory and its items pass the binding's checks) takes the place of keyring and
+  # persistent_custody_qualification (contracts/auth/custody/v1alpha1/semantics.md §5.2).
   - name: connectors.cli.Prerequisite
     kind: struct
     fields:
@@ -811,12 +852,16 @@ types:
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
   # EPHEMERAL LOCAL ACTION ONLY: protected source fills credential_document; never persist/log/serialize into public management, results or recording evidence.
+  # Under the read-only mounted_secret binding connect and repair take no protected source: the
+  # owner reads the item <adapter alias>/<profile> itself, and a source is invalid_input
+  # at arguments. Under a platform binding a missing source is protected_entry_unavailable
+  # (contracts/cli/v1alpha1/semantics.md §2).
   - name: connectors.cli.ConnectionConnectInput
     kind: struct
     fields:
       - {name: adapter, type: "String"}
       - {name: profile, type: "String"}
-      - {name: credential_document, type: "String"}
+      - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionConnectResult
     kind: struct
     fields:
@@ -829,7 +874,7 @@ types:
       - {name: adapter, type: "String"}
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
-      - {name: credential_document, type: "String"}
+      - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionRepairResult
     kind: struct
     fields:

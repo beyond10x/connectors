@@ -1302,6 +1302,42 @@
         "stale": true,
         "valid_until_ms": 1788951630000
       }
+    },
+    {
+      "id": "setup-check-mounted-custody",
+      "type": "connectors.cli.SetupCheckResult",
+      "valid": true,
+      "value": {"config_path":"/srv/connectors/config.toml","state_path":"/srv/connectors/state","os":"linux","keyring":"unavailable","custody_backend":"mounted_secret","prerequisites":[{"name":"configuration","state":"ready","next_action":"none"},{"name":"mounted_custody","state":"ready","next_action":"none"}]}
+    },
+    {
+      "id": "custody-read-only-refusal",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {"kind":"operational","code":"custody_read_only","stage":"custody","next_action":"check_configuration"}
+    },
+    {
+      "id": "mounted-item-changed-names-revalidation",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {"kind":"operational","code":"custody_unavailable","stage":"custody","next_action":"revalidate_connection"}
+    },
+    {
+      "id": "configuration-rule-named",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {"kind":"usage","code":"invalid_configuration","stage":"configuration","next_action":"check_configuration","configuration_rule":"config_path_unresolved"}
+    },
+    {
+      "id": "configuration-rule-is-closed",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {"kind":"usage","code":"invalid_configuration","stage":"configuration","next_action":"check_configuration","configuration_rule":"config_unreadable"}
+    },
+    {
+      "id": "custody-backend-has-no-plain-file-variant",
+      "type": "connectors.cli.SetupCheckResult",
+      "valid": false,
+      "value": {"config_path":"/srv/connectors/config.toml","state_path":"/srv/connectors/state","os":"linux","keyring":"unavailable","custody_backend":"plain_file","prerequisites":[]}
     }
   ]
 }

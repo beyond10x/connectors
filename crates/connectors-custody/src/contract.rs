@@ -4,8 +4,14 @@
 //!
 //! Every check uses fresh scope and version ids and deletes what it wrote, so
 //! it can run against a real store without touching any other item.
+//!
+//! [`run_read_only`] is the read half, generic over [`ReadBackend`]: the
+//! checks a read-only binding (`mounted_secret`, §5.2) answers as well as every
+//! writable one. A read-only binding holds what its platform placed, so the
+//! suite asks a [`Placement`] to put bytes behind a version.
 use crate::{
-    Backend, Failure, Material, Purpose, Result, SIGNING_SEED_BYTES, Scope, State, Version,
+    Backend, Failure, Material, Purpose, ReadBackend, Result, SIGNING_SEED_BYTES, Scope, State,
+    Version,
 };
 use std::{
     fmt::Debug,
@@ -317,5 +323,103 @@ impl<B: Backend + Debug> Suite<'_, B> {
             assert_eq!(backend.delete(version, until(), ok), Ok(()), "cleanup");
             assert!(matches!(backend.read(version), Err(Failure::Missing)));
         }
+    }
+}
+
+/// What holds the bytes behind a version of a read-only binding: its platform.
+/// For a writable binding, its own write.
+pub trait Placement {
+    type Binding: ReadBackend + Debug;
+    /// Open the binding under test for one scope.
+    fn open(&self, scope: Scope) -> Result<Self::Binding>;
+    /// Put `material` behind `version`, the way the binding's platform does.
+    fn place(&self, binding: &Self::Binding, version: Version, material: &[u8]);
+}
+
+/// Run every read check against the binding `placement` opens.
+pub fn run_read_only<P: Placement>(placement: &P) {
+    let mut outputs = Vec::new();
+    let marker = format!("custody-read-contract-secret-{}", Uuid::new_v4().simple());
+    let record = |outputs: &mut Vec<String>, result: &Result<Material>| {
+        outputs.push(format!("{result:?}"));
+        if let Err(failure) = result {
+            outputs.push(failure.to_string());
+        }
+    };
+    let open = |outputs: &mut Vec<String>, scope| {
+        let binding = placement.open(scope).expect("the binding under test opens");
+        outputs.push(format!("{binding:?}"));
+        binding
+    };
+
+    // The store is available, and its bound is its kind's.
+    let scope = credential();
+    let binding = open(&mut outputs, scope);
+    assert_eq!(binding.state(), State::Available, "store is available");
+    assert_eq!(binding.max_bytes(), binding.kind().max_bytes());
+    assert_eq!(binding.scope(), scope);
+
+    // A placed version reads back its exact bytes, from a second handle too.
+    let placed = version(scope);
+    let material = bytes(&marker, "exact");
+    placement.place(&binding, placed, &material);
+    let read = binding.read(placed);
+    record(&mut outputs, &read);
+    assert!(read.unwrap().ct_eq(&material), "read back the exact bytes");
+    let again = open(&mut outputs, scope);
+    let read = again.read(placed);
+    record(&mut outputs, &read);
+    assert!(read.unwrap().ct_eq(&material), "a second handle reads it");
+
+    // A version nothing was placed behind is missing.
+    let unknown = binding.read(version(scope));
+    record(&mut outputs, &unknown);
+    assert!(
+        matches!(unknown, Err(Failure::Missing)),
+        "an unknown version"
+    );
+
+    // Another scope's handle is denied, and admits nothing of this scope.
+    let other = open(&mut outputs, credential());
+    let denied = other.read(placed);
+    record(&mut outputs, &denied);
+    assert!(
+        matches!(denied, Err(Failure::Denied)),
+        "another scope's read"
+    );
+    assert_eq!(other.admit(placed), Err(Failure::Denied));
+    assert_eq!(binding.admit(placed), Ok(()));
+
+    // A value of exactly the bound reads back.
+    let largest_version = version(scope);
+    let mut largest = bytes(&marker, "largest");
+    largest.resize(binding.max_bytes(), 0x59);
+    placement.place(&binding, largest_version, &largest);
+    let read = binding.read(largest_version);
+    record(&mut outputs, &read);
+    assert!(
+        read.unwrap().ct_eq(&largest),
+        "a value of exactly the bound"
+    );
+
+    // No Debug or error output carries the bytes.
+    let material = Material::new(bytes(&marker, "debug"));
+    outputs.push(format!("{material:?}"));
+    for failure in [
+        Failure::Missing,
+        Failure::Unavailable,
+        Failure::Denied,
+        Failure::InvalidMaterial,
+        Failure::Conflict,
+        Failure::OutcomeUnknown,
+        Failure::ReadOnly,
+    ] {
+        outputs.push(format!("{failure:?} {failure}"));
+    }
+    for output in &outputs {
+        assert!(
+            !output.contains(&marker),
+            "a Debug or error output carries secret bytes"
+        );
     }
 }

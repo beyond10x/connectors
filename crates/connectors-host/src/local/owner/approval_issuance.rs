@@ -41,9 +41,9 @@ pub(super) fn key_store(
     config: &Config,
     adapter: &Adapter,
 ) -> Result<approval_keys::Store> {
-    approval_keys::Store::new(
+    approval_keys::Store::for_selection(
         &paths.state,
-        config.secret_service_socket.as_deref(),
+        &config.selection(),
         &adapter.instance_id,
         &adapter.adapter_id,
         &adapter.configuration_revision,
@@ -530,6 +530,7 @@ pub(super) fn key_error(failure: approval_keys::Failure) -> Error {
         MetadataUnavailable => Code::MetadataUnavailable,
         RevisionConflict => Code::RevisionConflict,
         CustodyUnavailable => Code::CustodyUnavailable,
+        CustodyReadOnly => Code::CustodyReadOnly,
         MetadataSchemaNewer(store) => return Error::schema_newer(store),
         OutcomeUnknown => Code::OutcomeUnknown,
         Capacity => Code::Capacity,

@@ -22,7 +22,11 @@ pub struct Config {
     pub default_adapter: Option<String>,
     #[serde(default)]
     pub adapters: BTreeMap<String, Adapter>,
-    /// Operator-pinned consumer executables (`connectors-local/3` only).
+    /// The explicitly selected custody binding (`connectors-local/4` only);
+    /// absent, custody is the platform binding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custody: Option<Custody>,
+    /// Operator-pinned consumer executables (`connectors-local/3` and `/4`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub consumers: BTreeMap<String, Consumer>,
 }
@@ -38,6 +42,7 @@ struct ConfigInput {
     approval_clock: Option<super::clock::Configuration>,
     secret_service_socket: Option<PathBuf>,
     default_adapter: Option<String>,
+    custody: Option<Custody>,
     #[serde(default)]
     adapters: BTreeMap<String, Adapter>,
     #[serde(default)]
@@ -50,6 +55,7 @@ impl Config {
             owner_uid: input.owner_uid,
             approval_clock: input.approval_clock,
             secret_service_socket: input.secret_service_socket,
+            custody: input.custody,
             default_adapter: input.default_adapter,
             adapters: input.adapters,
             consumers: input.consumers,
@@ -79,13 +85,104 @@ pub enum Refusal {
         format: String,
         instance_id: String,
     },
+    /// A rule of the configuration stage refused, named without a path or OS
+    /// text (`connectors.cli.ConfigurationRule`).
+    Rule(Rule),
 }
 impl Refusal {
     pub fn failure(&self) -> Failure {
         match self {
             Self::Failure(failure) => *failure,
-            Self::PrivateProtocolMismatch { .. } => Failure::InvalidConfiguration,
+            Self::PrivateProtocolMismatch { .. } | Self::Rule(_) => Failure::InvalidConfiguration,
         }
+    }
+}
+
+/// Which rule of the configuration stage refused (`connectors.cli.ConfigurationRule`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Rule {
+    /// No absolute configuration path resolves: no `--config`, no
+    /// `XDG_CONFIG_HOME` and no `HOME`, or one that is not admissible.
+    ConfigPathUnresolved,
+    /// No file is at the resolved path.
+    ConfigMissing,
+    /// The file, or a directory above it, is not owner-only.
+    ConfigNotPrivate,
+    /// `owner_uid` is not the effective user.
+    OwnerUidMismatch,
+}
+
+impl Rule {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ConfigPathUnresolved => "config_path_unresolved",
+            Self::ConfigMissing => "config_missing",
+            Self::ConfigNotPrivate => "config_not_private",
+            Self::OwnerUidMismatch => "owner_uid_mismatch",
+        }
+    }
+}
+
+/// The `[custody]` table of a `connectors-local/4` configuration
+/// (`connectors.cli.LocalCustodyBinding`): the binding, and the mounted
+/// directory exactly when the binding is `mounted_secret`.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct Custody {
+    pub binding: CustodyBinding,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub directory: Option<PathBuf>,
+}
+
+/// `connectors.cli.CustodyBackend`, as a configuration names it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CustodyBinding {
+    SecretService,
+    MacosKeychain,
+    WindowsCredentialManager,
+    MountedSecret,
+}
+
+impl CustodyBinding {
+    fn backend(self) -> connectors_custody::CustodyBackend {
+        use connectors_custody::CustodyBackend as B;
+        match self {
+            Self::SecretService => B::SecretService,
+            Self::MacosKeychain => B::MacosKeychain,
+            Self::WindowsCredentialManager => B::WindowsCredentialManager,
+            Self::MountedSecret => B::MountedSecret,
+        }
+    }
+}
+
+/// The custody binding a configuration selects: the platform binding with
+/// its optional Secret Service socket, or the read-only mounted directory.
+/// Never chosen by a request, and never another binding when this one is
+/// unusable.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Selection {
+    Platform {
+        secret_service_socket: Option<PathBuf>,
+    },
+    Mounted {
+        directory: PathBuf,
+    },
+}
+
+impl Selection {
+    /// The binding `setup check` reports: `None` where the build has no
+    /// platform binding.
+    pub fn backend(&self) -> Option<connectors_custody::CustodyBackend> {
+        match self {
+            Self::Platform { .. } => connectors_custody::PLATFORM,
+            Self::Mounted { .. } => Some(connectors_custody::CustodyBackend::MountedSecret),
+        }
+    }
+
+    /// Whether the binding is read-only: it writes, rotates and deletes nothing.
+    pub fn read_only(&self) -> bool {
+        matches!(self, Self::Mounted { .. })
     }
 }
 impl From<Failure> for Refusal {
@@ -241,7 +338,20 @@ impl Config {
     /// Load like [`Config::load`], keeping which rule refused the file where
     /// that can be named by operator-written coordinates alone.
     pub fn read(path: &Path) -> std::result::Result<Self, Refusal> {
-        let bytes = fs::read_bounded(fs::private_file(path)?, 1024 * 1024)?;
+        let file = fs::private_file(path).map_err(|failure| {
+            // Only the rule's name depends on this second look; admission was
+            // already refused by the descriptor walk above.
+            match std::fs::symlink_metadata(path) {
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    Refusal::Rule(Rule::ConfigMissing)
+                }
+                _ if failure == Failure::InvalidConfiguration => {
+                    Refusal::Rule(Rule::ConfigNotPrivate)
+                }
+                _ => Refusal::Failure(failure),
+            }
+        })?;
+        let bytes = fs::read_bounded(file, 1024 * 1024)?;
         let text = std::str::from_utf8(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
         // Decode the closed envelope without its embedded validation, so the
         // refusal below can name its rule instead of collapsing into serde's.
@@ -255,6 +365,46 @@ impl Config {
         self.check().map_err(|refusal| refusal.failure())
     }
 
+    /// The custody binding this configuration selects. Absent `[custody]`,
+    /// the platform binding, exactly as before `connectors-local/4`.
+    pub fn selection(&self) -> Selection {
+        match &self.custody {
+            Some(Custody {
+                binding: CustodyBinding::MountedSecret,
+                directory: Some(directory),
+            }) => Selection::Mounted {
+                directory: directory.clone(),
+            },
+            _ => Selection::Platform {
+                secret_service_socket: self.secret_service_socket.clone(),
+            },
+        }
+    }
+
+    /// `[custody]` is a `connectors-local/4` table. Its binding is one this
+    /// build supports: the platform's, or `mounted_secret` on Linux. The
+    /// directory is named exactly for `mounted_secret`, which never sits beside
+    /// a Secret Service socket.
+    fn check_custody(&self, custody: &Custody) -> std::result::Result<(), Refusal> {
+        let mounted = custody.binding == CustodyBinding::MountedSecret;
+        let supported = if mounted {
+            cfg!(target_os = "linux")
+        } else {
+            connectors_custody::PLATFORM == Some(custody.binding.backend())
+        };
+        if self.format != "connectors-local/4"
+            || !supported
+            || mounted != custody.directory.is_some()
+            || (mounted && self.secret_service_socket.is_some())
+        {
+            return Err(Failure::InvalidConfiguration.into());
+        }
+        if let Some(directory) = &custody.directory {
+            fs::validate_path(directory)?;
+        }
+        Ok(())
+    }
+
     fn check(&self) -> std::result::Result<(), Refusal> {
         if let Some(clock) = &self.approval_clock {
             clock
@@ -266,11 +416,25 @@ impl Config {
         }
         if !matches!(
             self.format.as_str(),
-            "connectors-local/1" | "connectors-local/2" | "connectors-local/3"
-        ) || self.owner_uid != fs::uid()
-            || self.adapters.len() > 64
+            "connectors-local/1"
+                | "connectors-local/2"
+                | "connectors-local/3"
+                | "connectors-local/4"
+        ) {
+            return Err(Failure::InvalidConfiguration.into());
+        }
+        if self.owner_uid != fs::uid() {
+            return Err(Refusal::Rule(Rule::OwnerUidMismatch));
+        }
+        if let Some(custody) = &self.custody {
+            self.check_custody(custody)?;
+        }
+        if self.adapters.len() > 64
             || self.consumers.len() > 64
-            || (self.format != "connectors-local/3" && !self.consumers.is_empty())
+            || (!matches!(
+                self.format.as_str(),
+                "connectors-local/3" | "connectors-local/4"
+            ) && !self.consumers.is_empty())
             || self
                 .default_adapter
                 .as_ref()
@@ -371,6 +535,7 @@ impl Config {
             owner_uid: fs::uid(),
             approval_clock: None,
             secret_service_socket: None,
+            custody: None,
             default_adapter: None,
             adapters: BTreeMap::new(),
             consumers: BTreeMap::new(),

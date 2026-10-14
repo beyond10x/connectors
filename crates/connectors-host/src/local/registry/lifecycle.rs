@@ -208,6 +208,60 @@ impl Registry {
         self.publish(stored, clock())
     }
 
+    /// The read-only binding's composition of the same boundaries: no write.
+    /// `reading` is the item read once under every check, the bytes the
+    /// provider validated; the binding pins them to the prepared version while
+    /// the coordinator's guard holds, and that acknowledgement, not a write,
+    /// is what publication consumes.
+    #[cfg(target_os = "linux")]
+    pub fn pin_and_publish(
+        &self,
+        prepared: PreparedCandidate,
+        item: &custody::Item,
+        reading: &connectors_custody::mounted::Reading,
+        store: &custody::Store,
+        clock: impl Fn() -> u64,
+    ) -> Result<String> {
+        if reading.material().len() != prepared.byte_size {
+            return Err(Failure::InvalidInput);
+        }
+        let mut refusal = None;
+        let receipt = store
+            .pin_guarded(prepared.version, item, reading, || {
+                self.write_allowed(&prepared, clock()).map_err(|error| {
+                    refusal = Some(error);
+                    custody::Failure::Denied
+                })
+            })
+            .map_err(|error| {
+                refusal.unwrap_or(match error {
+                    custody::Failure::OutcomeUnknown => Failure::OutcomeUnknown,
+                    custody::Failure::ReadOnly => Failure::CustodyReadOnly,
+                    _ => Failure::CustodyUnavailable,
+                })
+            })?;
+        let stored = self.acknowledge(prepared, receipt, clock())?;
+        self.publish(stored, clock())
+    }
+
+    /// Whether the binding's instance holds a published, unrevoked connection
+    /// of the binding's profile. Under the read-only binding one item backs one
+    /// connection, so a second one of the same profile is refused.
+    pub fn holds_profile(&self, binding: &Binding, now: u64) -> Result<bool> {
+        binding.validate()?;
+        let key = profile_key(binding)?;
+        self.transaction_observation(now, |tx, _, _| {
+            let held: i64 = tx
+                .query_row(
+                    "SELECT count(*) FROM registry_connections WHERE instance_id=?1 AND profile_key=?2 AND public=1 AND state!='revoked'",
+                    params![binding.instance_id, key],
+                    |r| r.get(0),
+                )
+                .map_err(db)?;
+            Ok(held > 0)
+        })
+    }
+
     pub fn fail(&self, claim: &Claim, now: u64) -> Result<()> {
         self.transaction(now, false, |tx, _, now| {
             let acquired = acquired(tx, &claim.acquisition.id, &claim.acquisition.owner)?;

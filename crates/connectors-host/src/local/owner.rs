@@ -34,6 +34,9 @@ pub enum Code {
     /// recorded revision moved under it; the store itself is readable.
     RevisionConflict,
     CustodyUnavailable,
+    /// The selected custody binding is read-only (`mounted_secret`): it writes,
+    /// rotates and deletes nothing, so the command cannot proceed under it.
+    CustodyReadOnly,
     OutcomeUnknown,
     Forbidden,
     NotFound,
@@ -169,6 +172,7 @@ impl From<registry::Failure> for Error {
             F::Capacity => Code::Capacity,
             F::NotReady | F::EvidenceExpired | F::InsufficientScope => Code::NotGranted,
             F::CustodyUnavailable => Code::CustodyUnavailable,
+            F::CustodyReadOnly => Code::CustodyReadOnly,
         });
         error.reconnect = reconnect;
         // Revalidation helps: it recollects expired evidence, and it follows a
@@ -359,7 +363,7 @@ pub fn admit_capture(
     }
     // Metadata must exist before any private owner startup or protected input.
     super::metadata::Metadata::inspect(&paths.state)?;
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     Ok(profile)
@@ -420,7 +424,7 @@ pub fn admit_revalidation(
     if !adapter.permissions.profiles.contains(&profile) {
         return Err(Code::Forbidden.into());
     }
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     // Nothing is cached for a configuration until the adapter is launched
@@ -476,7 +480,7 @@ pub fn admit_invoke(paths: &Paths, alias: &str, call: &Value, document: &[u8]) -
         &requirement.scopes,
         connectors_sdk::now_ms(),
     )?;
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     Ok(())
@@ -537,13 +541,65 @@ pub fn admit_launch(
             connectors_sdk::now_ms(),
         )
         .map_err(launch_failure)?;
-    if !custody::available_at(config.secret_service_socket.as_deref()) {
+    if !custody::available_for(&config.selection()) {
         return Err(Code::CustodyUnavailable.into());
     }
     Ok(LaunchAdmission {
         consumer: entry,
         binding,
     })
+}
+/// Whether a failed custody read proves the version's bytes gone for good, so
+/// the version is invalidated. Under the read-only binding `Missing` means the
+/// mounted item changed or went away underneath: a revalidation re-pins it, so
+/// it never invalidates.
+pub(crate) fn read_invalidates(
+    selection: &super::config::Selection,
+    failure: custody::Failure,
+) -> bool {
+    failure == custody::Failure::Missing && !selection.read_only()
+}
+/// The owner's answer to a failed custody read: `custody_unavailable`, naming
+/// a revalidation when the read-only binding's pinned bytes are no longer the
+/// item's. The changed bytes are never used.
+pub(crate) fn read_error(selection: &super::config::Selection, failure: custody::Failure) -> Error {
+    let mut error: Error = Code::CustodyUnavailable.into();
+    error.revalidate = failure == custody::Failure::Missing && selection.read_only();
+    error
+}
+/// The read-only binding's connect, repair and re-pin, after the claim is
+/// consumed: the owner reads the item `<alias>/<profile>` once under every
+/// check, the provider validates exactly those bytes, and the binding pins
+/// them to the prepared version, which is published. Nothing is written to the
+/// mounted directory; a missing or refused item is `custody_unavailable`.
+#[cfg(target_os = "linux")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn publish_mounted(
+    paths: &Paths,
+    selection: &super::config::Selection,
+    registry: &registry::Registry,
+    claim: &registry::Claim,
+    alias: &str,
+    profile: &str,
+    validate: impl FnOnce(connectors_sdk::Secret) -> Result<registry::ValidatedBaseline>,
+    recheck: impl FnOnce() -> Result<()>,
+) -> Result<String> {
+    let item = custody::Item::new(alias, profile).map_err(|_| Code::InvalidInput)?;
+    let reading = custody::read_mounted(selection, &paths.state, &item)
+        .map_err(|_| Code::CustodyUnavailable)?;
+    let baseline = validate(connectors_sdk::Secret(
+        reading.material().as_bytes().to_vec(),
+    ))?;
+    recheck()?;
+    let prepared = registry.prepare(
+        claim,
+        baseline,
+        reading.material().len(),
+        connectors_sdk::now_ms(),
+    )?;
+    let store = custody::Store::open_for(prepared.version().scope(), selection, &paths.state)
+        .map_err(|_| Code::CustodyUnavailable)?;
+    Ok(registry.pin_and_publish(prepared, &item, &reading, &store, connectors_sdk::now_ms)?)
 }
 /// Evidence that is not current is readiness, `unavailable`, as the
 /// connection's own observation reports it; never a grant refusal.
