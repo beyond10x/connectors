@@ -52,8 +52,8 @@ types:
   - name: connectors.clock.RoughtimeVersion
     kind: enum
     # The wire VER values a source may be configured to speak. roughtime-1 is
-    # RFC 10049's version 0x00000001 (IANA Roughtime Version Registry), which the
-    # public sources named in docs/design/approval-clock-quorum.md ("Sources") speak;
+    # RFC 10049's version 0x00000001 (IANA Roughtime Version Registry), the version
+    # the ecosystem list names for two of the sources in docs/design/approval-clock-quorum.md;
     # roughtime-0x8000000c is the draft-19 test version that
     # crates/connectors-host/src/local/clock/protocol.rs verifies today. Each variant
     # ships only together with its verifier and an independent signed fixture.
