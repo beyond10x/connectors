@@ -182,8 +182,12 @@ fn own_name(path: &Path) -> Option<&str> {
     path.file_name().and_then(|name| name.to_str())
 }
 
-/// The derivation of `source`, or the refusal that it is not one.
-fn derivation(from: &Path, source: &[u8]) -> std::result::Result<Derivation, Box<Failure>> {
+/// The derivation of `source`, with the operations its projection left out, or
+/// the refusal that it is not one.
+fn derivation(
+    from: &Path,
+    source: &[u8],
+) -> std::result::Result<(Derivation, Vec<inventory::Unsupported>), Box<Failure>> {
     let unreadable = || refused(Step::Read, Refusal::Unreadable.into(), None, None);
     let bytes = std::fs::read(from).map_err(|_| unreadable())?;
     let from_file = own_name(from).ok_or_else(unreadable)?;
@@ -203,14 +207,20 @@ fn derivation(from: &Path, source: &[u8]) -> std::result::Result<Derivation, Box
             None,
         ));
     }
-    Ok(projection.derivation(from_file))
+    Ok((projection.derivation(from_file), projection.gaps()))
 }
 
 fn run_from(request: &Request<'_>, from: Option<&Path>) -> std::result::Result<Run, Box<Failure>> {
     let unreadable = || refused(Step::Read, Refusal::Unreadable.into(), None, None);
     let bytes = std::fs::read(request.source).map_err(|_| unreadable())?;
     let file_name = own_name(request.source).ok_or_else(unreadable)?;
-    let derived = from.map(|from| derivation(from, &bytes)).transpose()?;
+    let (derived, gaps) = match from {
+        Some(from) => {
+            let (derivation, gaps) = derivation(from, &bytes)?;
+            (Some(derivation), gaps)
+        }
+        None => (None, Vec::new()),
+    };
 
     let mut source = ingest(file_name, &bytes)
         .map_err(|refusal| refused(Step::Ingest, refusal.into(), None, None))?;
@@ -228,6 +238,9 @@ fn run_from(request: &Request<'_>, from: Option<&Path>) -> std::result::Result<R
     let document = crate::parse_document(&bytes)
         .map_err(|refusal| refused(Step::Extract, refusal.into(), Some(source.clone()), None))?;
     let mut inventory = inventory::extract(&document);
+    // An operation the source document declares and its projection left out
+    // is a gap of this bundle like one the inventory could not represent.
+    inventory.unsupported.extend(gaps);
     if let Some(path) = request.amendments {
         let bytes = std::fs::read(path).map_err(|_| unreadable())?;
         let file_name = own_name(path).ok_or_else(unreadable)?;

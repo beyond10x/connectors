@@ -44,16 +44,31 @@ types:
     kind: enum
     variants: [token, basic, oauth2_refresh, oauth2_client_credentials]
 
-  # The part of an authentication profile (`auth`) that decides what its identity may be.
+  # The part of an authentication profile (`auth`) that decides what its identity may be, and
+  # the word its token is sent behind.
   # A `configuration` subject names the connection, not the credential's holder, so it is only
   # for a static credential (`token` or `basic`): an OAuth profile's credential belongs to a
   # user or client its provider can name, and a configured subject would let repair accept
   # another holder's credential as the same identity.
+  # `bearer: true` sends a token as `Bearer <token>`. `prefix` sends it as `<prefix> <token>`
+  # instead, for a provider whose header names another scheme word, such as Opsgenie's
+  # `Authorization: GenieKey <key>`. It belongs to a `token` profile only (absent `scheme` is
+  # `token`), and never beside `bearer: true`, which would put two words in front of one token.
+  # An absent `prefix` is omitted from the configuration revision, so every configuration written
+  # before the field existed keeps its revision. The engine also refuses a prefix holding a byte
+  # outside visible ASCII (`adapters/catalog/src/local.rs`); ESS 0.59 has no character-class
+  # constraint to state that by, so the model states the space it excludes.
   - name: connectors_catalog.identity.Profile
     kind: struct
     fields:
       - {name: scheme, type: "Optional<connectors_catalog.identity.Scheme>"}
+      - {name: bearer, type: "Optional<Boolean>"}
+      - {name: prefix, type: "Optional<String>"}
       - {name: identity, type: connectors_catalog.identity.Probe}
     invariants:
       - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_refresh}}]
       - any: [{not: {identity.source: configuration}}, {not: {scheme: oauth2_client_credentials}}]
+      - any: [{not: defined(prefix)}, {not: {bearer: true}}]
+      - any: [{not: defined(prefix)}, {not: defined(scheme)}, {scheme: token}]
+      - any: [{not: defined(prefix)}, {all: [prefix.utf8_bytes >= 1, prefix.utf8_bytes <= 32]}]
+      - any: [{not: defined(prefix)}, {not: {prefix: {contains: " "}}}]
