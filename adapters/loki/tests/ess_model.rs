@@ -424,6 +424,24 @@ fn the_profile_model_and_the_executable_admit_the_same_profiles() {
             }),
         ),
         (
+            "a trace key that is no label name",
+            changed("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("call.id");
+            }),
+        ),
+        (
+            "a trace key Loki reserves",
+            changed("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("__line__");
+            }),
+        ),
+        (
+            "a filterable key that is a selector label",
+            changed("/line_profiles/0/fields/0", &|f| {
+                f["key"] = json!("service");
+            }),
+        ),
+        (
             "an unknown call identifier kind",
             changed("/trace_profiles/0/call_identifier", &|c| {
                 c["kind"] = json!("header");
@@ -475,6 +493,30 @@ fn the_profile_model_and_the_executable_admit_the_same_profiles() {
             "the call label as the source label",
             changed("/trace_profiles/0", &|p| {
                 p["source_label"] = json!("call");
+            }),
+        ),
+        (
+            "a filterable key that is no label name",
+            changed("/line_profiles/0/fields/0", &|f| {
+                f["key"] = json!("dir.x");
+            }),
+        ),
+        (
+            "a filterable key Loki reserves",
+            changed("/line_profiles/0/fields/0", &|f| {
+                f["key"] = json!("__error__");
+            }),
+        ),
+        (
+            "a trace key that is the source label",
+            changed("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("service");
+            }),
+        ),
+        (
+            "a trace key that is a selector label",
+            changed("/trace_profiles/1/call_identifier/value", &|v| {
+                v["key"] = json!("env");
             }),
         ),
     ];

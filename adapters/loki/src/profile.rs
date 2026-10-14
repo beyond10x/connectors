@@ -177,7 +177,8 @@ enum Segment {
 #[derive(Clone, Debug)]
 enum Format {
     Logfmt,
-    Pattern(Vec<Segment>),
+    /// The pattern as configured, and its segments.
+    Pattern(String, Vec<Segment>),
 }
 
 impl Format {
@@ -189,7 +190,8 @@ impl Format {
                 if !(3..=1024).contains(&count) {
                     return Err(invalid());
                 }
-                Ok(Format::Pattern(pattern(&p.pattern)?))
+                let segments = pattern(&p.pattern)?;
+                Ok(Format::Pattern(p.pattern, segments))
             }
         }
     }
@@ -198,7 +200,7 @@ impl Format {
     fn produces(&self, key: &str) -> bool {
         match self {
             Format::Logfmt => true,
-            Format::Pattern(segments) => segments
+            Format::Pattern(_, segments) => segments
                 .iter()
                 .any(|s| matches!(s, Segment::Capture(Some(name)) if name == key)),
         }
@@ -208,17 +210,30 @@ impl Format {
     fn read(&self, line: &str) -> Option<BTreeMap<String, String>> {
         match self {
             Format::Logfmt => logfmt(line),
-            Format::Pattern(segments) => matched(segments, line),
+            Format::Pattern(_, segments) => matched(segments, line),
         }
     }
 
-    /// How `value` is spelled in a line of this format, for a line filter.
-    fn spelling(&self, value: &str) -> String {
+    /// The LogQL parser stage that extracts this format's keys as labels, so an
+    /// exact label filter can follow it.
+    fn stage(&self) -> String {
         match self {
-            Format::Logfmt => logfmt_spelling(value),
-            Format::Pattern(_) => value.to_owned(),
+            Format::Logfmt => "| logfmt".to_owned(),
+            Format::Pattern(source, _) => format!("| pattern {}", string_literal(source)),
         }
     }
+}
+
+/// `| <key>="<value>"` after a parser stage: Loki keeps a line only when the
+/// parsed key is exactly the value. Never a substring line filter (§12.2).
+fn exact(key: &str, value: &str) -> String {
+    format!(" | {key}={}", string_literal(value))
+}
+
+/// A key a label filter may name after a parser stage: a label name, since Loki
+/// rewrites any other key, and not a `__` name, which Loki keeps for itself.
+fn matched_key(text: &str) -> bool {
+    label_name(text) && !text.starts_with("__")
 }
 
 #[derive(Clone, Debug)]
@@ -384,6 +399,10 @@ fn line_profile(document: LineDocument, scope: &[Equality]) -> Result<LineProfil
             || !format.produces(&field.key)
             // Only text is masked: a masked integer or timestamp is no longer one.
             || (mask != Mask::None && !text)
+            // A matched key is named by an exact label filter after the parser, and
+            // a stream label of its name would shadow the parsed value there.
+            || (field.filterable == Some(true)
+                && (!matched_key(&field.key) || selector.iter().any(|m| m.label == field.key)))
         {
             return Err(invalid());
         }
@@ -434,7 +453,13 @@ fn trace_profile(document: TraceDocument, scope: &[Equality]) -> Result<TracePro
         }
         CallDocument::Field(f) => {
             let format = Format::admit(f.format)?;
-            if !key(&f.key) || !format.produces(&f.key) {
+            // The key is named by the exact label filter after the parser; a stream
+            // label of its name, the source label or a selected one, would shadow it.
+            if !matched_key(&f.key)
+                || !format.produces(&f.key)
+                || f.key == document.source_label
+                || selector.iter().any(|m| m.label == f.key)
+            {
                 return Err(invalid());
             }
             CallSource::Field { key: f.key, format }
@@ -535,6 +560,19 @@ pub struct Record {
     pub fields: Map<String, Value>,
 }
 
+/// What one selected line is to a line profile read.
+pub enum Read {
+    /// The line reads, holding every matched value exactly.
+    Record(Record),
+    /// The line does not read as the profile, and either there is no match or it
+    /// holds every matched value exactly: counted under `skipped.unreadable`.
+    Unreadable,
+    /// The line does not hold every matched value exactly, or there is a match
+    /// and its format does not read at all. Dropped and counted nowhere, so no
+    /// count in the answer reflects a value other than the caller's exact one.
+    Unmatched,
+}
+
 impl LineProfile {
     /// The stream selector, as LogQL.
     pub fn selector(&self) -> String {
@@ -563,39 +601,51 @@ impl LineProfile {
             .collect()
     }
 
-    /// The selector, then one line filter per match: a line whose field holds the
-    /// value contains that value as the format spells it.
+    /// The selector; with matches, the format's parser stage and one exact label
+    /// filter per match, so Loki answers only lines whose parsed field is exactly
+    /// the value (§12.2). No match is ever a substring line filter.
     pub fn query(&self, matches: &[Match]) -> String {
         let mut query = self.selector();
-        for m in matches {
-            query.push_str(" |= ");
-            query.push_str(&string_literal(&self.format.spelling(&m.value)));
+        if !matches.is_empty() {
+            query.push(' ');
+            query.push_str(&self.format.stage());
+            for m in matches {
+                query.push_str(&exact(&self.fields[m.field].key, &m.value));
+            }
         }
         query
     }
 
-    /// Read one line. `Err(())` is a line the profile cannot read; `Ok(None)` is a
-    /// line that reads but does not hold every matched value exactly.
-    #[allow(clippy::result_unit_err)]
-    pub fn read(&self, line: &str, matches: &[Match]) -> std::result::Result<Option<Record>, ()> {
-        let values = self.format.read(line).ok_or(())?;
-        let mut fields = Map::new();
-        for field in &self.fields {
-            let value = match values.get(&field.key) {
-                None if field.optional => Value::Null,
-                None => return Err(()),
-                Some(text) => typed(field, text).ok_or(())?,
+    /// Read one selected line. The matches are checked again, on the adapter's own
+    /// reading, before anything about the line is counted.
+    pub fn read(&self, line: &str, matches: &[Match]) -> Read {
+        let Some(values) = self.format.read(line) else {
+            return if matches.is_empty() {
+                Read::Unreadable
+            } else {
+                Read::Unmatched
             };
-            fields.insert(field.name.clone(), value);
-        }
+        };
         if matches
             .iter()
             .any(|m| values.get(&self.fields[m.field].key) != Some(&m.value))
         {
-            return Ok(None);
+            return Read::Unmatched;
+        }
+        let mut fields = Map::new();
+        for field in &self.fields {
+            let value = match values.get(&field.key) {
+                None if field.optional => Value::Null,
+                None => return Read::Unreadable,
+                Some(text) => match typed(field, text) {
+                    Some(value) => value,
+                    None => return Read::Unreadable,
+                },
+            };
+            fields.insert(field.name.clone(), value);
         }
         let call_id = values[&self.fields[self.call_identifier].key].clone();
-        Ok(Some(Record { call_id, fields }))
+        Read::Record(Record { call_id, fields })
     }
 }
 
@@ -611,12 +661,14 @@ impl TraceProfile {
         braces(matchers.into_iter())
     }
 
-    /// The whole query for one call.
+    /// The whole query for one call: for a line-carried identifier, the format's
+    /// parser stage and an exact label filter on its key (§12.3), never a substring.
     pub fn query(&self, call_id: &str) -> String {
         let mut query = self.selector_for(call_id);
-        if let CallSource::Field { format, .. } = &self.call {
-            query.push_str(" |= ");
-            query.push_str(&string_literal(&format.spelling(call_id)));
+        if let CallSource::Field { key, format } = &self.call {
+            query.push(' ');
+            query.push_str(&format.stage());
+            query.push_str(&exact(key, call_id));
         }
         query
     }
@@ -706,34 +758,6 @@ fn mask(mask: Mask, text: &str) -> String {
 /// backslash and control characters are escaped, so no caller text can end the
 /// literal or add a matcher, a filter or a stage.
 pub fn string_literal(value: &str) -> String {
-    let mut out = String::with_capacity(value.len() + 2);
-    out.push('"');
-    for c in value.chars() {
-        match c {
-            '"' => out.push_str("\\\""),
-            '\\' => out.push_str("\\\\"),
-            '\n' => out.push_str("\\n"),
-            '\r' => out.push_str("\\r"),
-            '\t' => out.push_str("\\t"),
-            c if c.is_control() => out.push_str(&format!("\\u{:04x}", c as u32)),
-            c => out.push(c),
-        }
-    }
-    out.push('"');
-    out
-}
-
-/// How a logfmt line spells `value`: bare when it holds no space, quote, equals sign,
-/// backslash or control character, otherwise quoted with those escaped as
-/// [`logfmt`] reads them.
-pub fn logfmt_spelling(value: &str) -> String {
-    let bare = !value.is_empty()
-        && !value
-            .chars()
-            .any(|c| c == ' ' || c == '"' || c == '=' || c == '\\' || c.is_control());
-    if bare {
-        return value.to_owned();
-    }
     let mut out = String::with_capacity(value.len() + 2);
     out.push('"');
     for c in value.chars() {
@@ -877,19 +901,20 @@ mod tests {
         ] {
             assert!(logfmt(bad).is_none(), "{bad}");
         }
-        // Whatever logfmt_spelling writes, logfmt reads back.
-        for value in [
-            "plain",
-            "a b",
-            "q\"",
-            "back\\slash",
-            "nl\n",
-            "nul\u{0}",
-            "",
-            "k=v",
+        // Bare, quoted and escaped spellings of one value read back as it.
+        for (line, value) in [
+            ("x=plain", "plain"),
+            (r#"x="a b""#, "a b"),
+            (r#"x="q\"""#, "q\""),
+            (r#"x="back\\slash""#, "back\\slash"),
+            (r#"x="nl\n""#, "nl\n"),
+            (r#"x="nul\u0000""#, "nul\u{0}"),
+            (r#"x="""#, ""),
+            ("x=", ""),
+            ("x=k=v", "k=v"),
+            (r#"x="k=v""#, "k=v"),
         ] {
-            let line = format!("x={}", logfmt_spelling(value));
-            assert_eq!(logfmt(&line).unwrap()["x"], value, "{line}");
+            assert_eq!(logfmt(line).unwrap()["x"], value, "{line}");
         }
     }
 
