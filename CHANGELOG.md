@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Grafana Cloud IRM reads in the native `grafana` adapter, read only:
+  `irm.alert_groups.list` and `irm.incidents.list` over a since window (`since`, `until`, both
+  `YYYY-MM-DDTHH:MM:SSZ`, UTC) with a page cursor of the same window, and
+  `irm.alert_group.get` and `irm.incident.get` to re-read one record's state by id. Each
+  incident answer carries `links`, the alert groups the incident references through its
+  `com.grafana.oncall` references; that such a reference names the alert group's id is
+  inferred and not yet confirmed against a real stack. They need the new optional
+  `irm_api_url` in the native configuration and a connection under the new profile
+  `grafana.irm_service_account`, whose probe is one alert-group read over a fixed one-second
+  window. A configuration without `irm_api_url` keeps its configuration revision, and the IRM
+  reads are unavailable on it; existing `grafana.service_account` connections are unchanged.
+- `ScopedHttp::with_fixed_header`: trusted composition may fix one nonsecret header on a
+  native port, refused for credential, routing, framing, content, upgrade and cookie names
+  (the implemented slice of the auth capability's receiver-owned headers). A read may name a
+  collection path ending in `/` with one final empty segment.
+- The catalog provider reads Opsgenie: `alerts.list` and `incidents.list` over a creation window
+  the caller advances (`query` `createdAt >= <epoch ms>`, `sort` held to `createdAt` and `order`
+  to `asc`, `offset` bounded to 19,899 under Opsgenie's 20K cap, `limit` 1..100), `alert.get`,
+  `incident.get`, and `incident.alert_ids`, the alert ids linked to an incident. All five are
+  reads with no approval. The caller holds the cursor: the last `createdAt` it read, sent back as
+  the next window's lower bound; delivery is at least once. The source is the Apache-2.0
+  `opsgenie/opsgenie-oas` Swagger document at `71c55343` (SHA-256 `60901e17`), vendored with its
+  `LICENSE`. Verified against a local fixture only; Opsgenie ends service on 2027-04-05
+  (`docs/catalog-opsgenie.md`).
+- A token profile's optional `auth.prefix` sends the token as `<prefix> <token>`, such as
+  `Authorization: GenieKey <key>`. It is 1 to 32 visible ASCII bytes, belongs to the `token`
+  scheme only and is refused beside `bearer: true`. A configuration without it keeps its
+  revision. Modelled in `connectors_catalog.identity.Profile`.
+- A fourth cited amendment kind, `add_operation`, adds a GET the vendor's reference documents and
+  its pinned document leaves out: a new `operationId`, a path no GET of the source has, path
+  parameters exactly its placeholders and otherwise query parameters only. Modelled in
+  `connectors_catalog.amendment.AddedOperation`.
+- The Swagger 2.0 projection moves to `swagger2-openapi/2`. It reads the document's shared
+  `parameters` and `responses` through `$ref` and inlines them, projects response headers, `csv`
+  and `multi` array query parameters, operation `x-*` extensions, `discriminator`, `nullable` and
+  a property's described `$ref`, and lists a shared entry no operation references. An operation
+  with no exact projection for its own reason (a request body no `consumes` gives a media type, a
+  `formData` file, a `schema` on a non-body parameter) is no longer a refusal of the document: it
+  is left out, listed in the projection record's new `unprojected_operations` with its pointer and
+  reason, and counted unsupported in the bundle. `operationId` must be unique among the projected
+  operations. Every document version 1 accepted projects to the same bytes; Slack's projection
+  record names the new version and its bundle was rebuilt.
+
 ## 0.50.0 — 2026-10-14
 
 ### Added
