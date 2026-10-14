@@ -63,6 +63,23 @@ fn resumes_suppression(task: &Task) -> bool {
             | Task::Revalidate { .. }
     )
 }
+/// Whether a job that finds the adapter process of an earlier adapter entry
+/// running stops it and launches the configured one, as it would launch one
+/// when none runs: every job that launches the adapter (story
+/// revision-change-keeps-a-recovery-path). A credential validation keeps the
+/// refusal: it is fenced to the process its `Ensure` captured, and its connect
+/// starts again with an `Ensure` that replaces the process. A write
+/// observation never reaches a process (it is answered before any launch).
+/// Exhaustive, so a new task is classified here before it compiles.
+fn replaces_a_stale_child(task: &Task) -> bool {
+    match task {
+        Task::Ensure { .. }
+        | Task::Invoke { .. }
+        | Task::Write { .. }
+        | Task::Revalidate { .. } => true,
+        Task::Validate { .. } | Task::ObserveWrite { .. } => false,
+    }
+}
 pub(super) enum Output {
     Bootstrap(runtime::Bootstrap, u64),
     Baseline(runtime::Baseline),
@@ -658,7 +675,22 @@ fn worker(
                 return Err(Code::Unavailable.into());
             }
             if child.is_some() && selection != current.selection() {
-                return Err(Code::LifecycleConflict.into());
+                // The running process was launched under an earlier adapter
+                // entry and serves nothing the configured one is asked for, so
+                // no retry could pass this point. A job that launches the
+                // adapter when none runs stops it and launches the configured
+                // one, as `adapters stop` and the next launch would. Earlier
+                // jobs have ended; a new epoch fences any queued under the old
+                // process, among them a credential validation captured by it.
+                if !replaces_a_stale_child(&job.task) {
+                    return Err(Code::LifecycleConflict.into());
+                }
+                let next = guard.epoch.checked_add(1).ok_or(Code::Capacity)?;
+                guard.epoch = next;
+                job.epoch = next;
+                guard.child = None;
+                // Dropping the child kills its exact process and reaps it.
+                child = None;
             }
             if resume {
                 state.suppress(&current.instance_id, false)?;
@@ -741,7 +773,7 @@ fn worker(
                     profile,
                 } => {
                     let registry = registry::Registry::with_system_clock(&paths.state);
-                    let binding = active.bootstrap().binding(&profile)?;
+                    let binding = saved_binding(active.bootstrap(), &profile)?;
                     let captured = registry.capture_revalidation(
                         &binding,
                         &connection,
@@ -987,6 +1019,63 @@ struct Activity {
 #[cfg(test)]
 mod maintenance_tests {
     use super::*;
+
+    /// story:revision-change-keeps-a-recovery-path: every job that launches an
+    /// adapter when none runs, a write among them, replaces the process of an
+    /// earlier adapter entry instead of answering a conflict no retry passes;
+    /// only a validation fenced to its captured process keeps the refusal.
+    #[test]
+    fn every_launching_job_replaces_the_process_of_an_earlier_entry() {
+        let text = || String::from("x");
+        let launching = [
+            Task::Ensure { resume: true },
+            Task::Ensure { resume: false },
+            Task::Invoke {
+                connection: text(),
+                operation: text(),
+                schema: text(),
+                revision: text(),
+                document: Vec::new(),
+            },
+            Task::Write {
+                connection: text(),
+                operation: text(),
+                schema: text(),
+                revision: text(),
+                document: text(),
+                key: None,
+                proof: None,
+                until: Instant::now(),
+            },
+            Task::Revalidate {
+                connection: text(),
+                revision: text(),
+                profile: text(),
+            },
+        ];
+        for task in &launching {
+            assert!(replaces_a_stale_child(task));
+        }
+        let fenced = [
+            Task::Validate {
+                profile: text(),
+                secret: Secret(Vec::new()),
+                capture_epoch: 0,
+            },
+            Task::ObserveWrite {
+                connection: text(),
+                operation: text(),
+                schema: text(),
+                revision: text(),
+                document: text(),
+                key: text(),
+                until: Instant::now(),
+            },
+        ];
+        for task in &fenced {
+            assert!(!replaces_a_stale_child(task));
+        }
+    }
 
     #[test]
     fn a_live_worker_with_an_idle_hint_queues_one_recovery_instead_of_taking_ownership() {

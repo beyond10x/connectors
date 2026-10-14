@@ -96,6 +96,11 @@ pub struct Error {
     /// new connection helps (`registry::Failure::BindingChanged`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reconnect: bool,
+    /// The connection's provider authority or profile authentication changed
+    /// under the configuration: no command under this instance id helps, a new
+    /// instance id does (`registry::Failure::AuthenticationChanged`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reconfigure: bool,
     /// A `not_granted` read whose connection's validation evidence expired
     /// while its credential is intact; a revalidation helps, not a repair
     /// (`registry::Failure::EvidenceExpired`).
@@ -116,6 +121,7 @@ impl From<Code> for Error {
             retry_after_seconds: None,
             origin: Origin::Host,
             reconnect: false,
+            reconfigure: false,
             revalidate: false,
             store_version: None,
         }
@@ -160,7 +166,7 @@ impl From<registry::Failure> for Error {
             F::ConcurrentRevision => Code::RevisionConflict,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
-            F::Conflict | F::UpgradeRequired => Code::LifecycleConflict,
+            F::Conflict | F::UpgradeRequired | F::AuthenticationChanged => Code::LifecycleConflict,
             F::Revoked => Code::Revoked,
             F::IdentityMismatch | F::UpgradeIdentityMismatch => Code::IdentityMismatch,
             F::Expired => Code::Timeout,
@@ -171,6 +177,8 @@ impl From<registry::Failure> for Error {
             F::CustodyUnavailable => Code::CustodyUnavailable,
         });
         error.reconnect = reconnect;
+        // Only a new instance id helps: connect refuses it under this one too.
+        error.reconfigure = e == F::AuthenticationChanged;
         // Revalidation helps: it recollects expired evidence, and it follows a
         // configuration upgrade of the connection's instance.
         error.revalidate = matches!(e, F::EvidenceExpired | F::UpgradeRequired);
@@ -233,6 +241,7 @@ impl From<runtime::Failure> for Error {
             retry_after_seconds: None,
             origin,
             reconnect: false,
+            reconfigure: false,
             revalidate: false,
             store_version: None,
         }
@@ -428,7 +437,7 @@ pub fn admit_revalidation(
     // connection was admitted under; the owner's capture compares it with the
     // launched provider's binding before any material is read.
     let binding = match cached(paths, alias) {
-        Ok(bootstrap) => bootstrap.binding(&profile)?,
+        Ok(bootstrap) => saved_binding(&bootstrap, &profile)?,
         Err(Error {
             code: Code::DescriptionUnavailable,
             ..
@@ -442,6 +451,20 @@ pub fn admit_revalidation(
         connectors_sdk::now_ms(),
     )?;
     Ok(profile)
+}
+/// The configured binding of a saved connection's profile. A profile the
+/// configured adapter no longer declares (its `auth.profile` id changed) is a
+/// changed binding, refused as a read refuses one (`create_connection`): a new
+/// connection under a declared profile follows it, and no command answers
+/// `unsupported` with nothing to do next.
+pub(crate) fn saved_binding(
+    bootstrap: &runtime::Bootstrap,
+    profile: &str,
+) -> Result<registry::Binding> {
+    bootstrap.binding(profile).map_err(|failure| match failure {
+        runtime::Failure::Unsupported => registry::Failure::BindingChanged.into(),
+        other => other.into(),
+    })
 }
 /// Validate the original text carrier, including duplicate-key and depth checks.
 pub fn validate_document(schema: &Value, document: &[u8], limit: usize) -> Result<()> {
@@ -733,5 +756,18 @@ mod cached_tests {
             answered.map(|b| b.instance).map_err(|e| e.code),
             Ok("owned".into())
         );
+    }
+
+    /// story:revision-change-keeps-a-recovery-path: a saved connection whose
+    /// profile the configured adapter no longer declares (its `auth.profile`
+    /// id changed) is a changed binding that a new connection follows, never
+    /// `unsupported` with no next action.
+    #[test]
+    fn a_profile_the_configuration_no_longer_declares_names_a_new_connection() {
+        let error = saved_binding(&bootstrap("fixture-instance"), "gitlab.pat").unwrap_err();
+        assert_eq!(error.code, Code::LifecycleConflict);
+        assert!(error.reconnect);
+        assert!(!error.reconfigure);
+        assert!(!error.revalidate);
     }
 }

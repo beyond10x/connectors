@@ -16,6 +16,10 @@ mod lifecycle;
 mod reason_cli_adversary;
 #[path = "retry_after_cli.rs"]
 mod retry_after_cli;
+#[path = "revision_recovery.rs"]
+mod revision_recovery;
+#[path = "revision_recovery_adversary.rs"]
+mod revision_recovery_adversary;
 #[path = "settlement_fault.rs"]
 mod settlement_fault;
 

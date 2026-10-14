@@ -1626,7 +1626,13 @@ fn action(
                 connection.as_deref(),
                 expected_revision.as_deref(),
             )?;
-            let binding = bootstrap.binding(&profile)?;
+            // A repair keeps the saved connection's profile, which the
+            // configuration may no longer declare; a connect names its own.
+            let binding = if connection.is_some() {
+                saved_binding(&bootstrap, &profile)?
+            } else {
+                bootstrap.binding(&profile)?
+            };
             let now = connectors_sdk::now_ms();
             let acquired = match connection {
                 Some(reference) => registry.begin_repair(
