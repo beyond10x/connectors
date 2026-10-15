@@ -225,6 +225,40 @@ pub fn read_bounded(file: File, limit: usize) -> Result<Vec<u8>> {
     Ok(data)
 }
 
+/// [`read_bounded`] for a file that may hold secrets: the bytes are read into
+/// one zeroizing buffer allocated to `limit + 1` (the bound and the byte that
+/// detects an oversized file) before the first read, so it never reallocates
+/// and no earlier block holding part of the file is released unzeroized.
+pub fn read_bounded_zeroizing(mut file: File, limit: usize) -> Result<zeroize::Zeroizing<Vec<u8>>> {
+    if file
+        .metadata()
+        .map_err(|_| Failure::InvalidConfiguration)?
+        .len()
+        > limit as u64
+    {
+        return Err(Failure::InvalidConfiguration);
+    }
+    let capacity = limit.checked_add(1).ok_or(Failure::InvalidConfiguration)?;
+    // Filled with zeros to its final length up front and read into in place,
+    // then shortened: shortening keeps the allocation, and dropping the
+    // Zeroizing wipes its whole capacity.
+    let mut data = zeroize::Zeroizing::new(vec![0u8; capacity]);
+    let mut filled = 0;
+    while filled < capacity {
+        match file.read(&mut data[filled..]) {
+            Ok(0) => break,
+            Ok(n) => filled += n,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => return Err(Failure::InvalidConfiguration),
+        }
+    }
+    if filled > limit {
+        return Err(Failure::InvalidConfiguration);
+    }
+    data.truncate(filled);
+    Ok(data)
+}
+
 /// Make a held directory's entries durable: an fsync on Linux and macOS. On
 /// Windows the handle is open for listing only and nothing is flushed: a name
 /// is durable through its write-through rename (`windows::publish`) and the
