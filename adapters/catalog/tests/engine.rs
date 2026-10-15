@@ -124,6 +124,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         withhold: Vec::new(),
         credential: Vec::new(),
         rate_limit_reasons: Vec::new(),
+        envelope: None,
         body_keys: Vec::new(),
         body_types: BTreeMap::new(),
         body_required: Vec::new(),
