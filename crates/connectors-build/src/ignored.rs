@@ -135,7 +135,7 @@ fn classify(suite: &Suite, name: &str) -> Entry {
                 entry.helper = true;
                 return entry;
             }
-            "local::clock::tests::independent_live_source" => Some((Live, vec![])),
+            "local::clock::tests::independent_live_quorum" => Some((Live, vec![])),
             "local::registry::tests::read_invoke_metadata_time"
             | "local::registry::store_cost_tests::read_invoke_cost_by_store_size"
             | "local::registry::store_cost_tests::batch_cost_by_subject"
@@ -1068,7 +1068,7 @@ mod local {{
     mod keyring {{ pub mod custody {{ mod tests {{
         #[test] #[ignore] fn disposable_secret_service_restart_and_failures() {{ assert!({}); }}
     }} }} }}
-    mod clock {{ mod tests {{ #[test] #[ignore] fn independent_live_source() {{ panic!("live never authorized"); }} }} }}
+    mod clock {{ mod tests {{ #[test] #[ignore] fn independent_live_quorum() {{ panic!("live never authorized"); }} }} }}
     mod audit {{ mod tests {{ #[test] #[ignore] fn crash_child() {{ panic!("helper never top level"); }} }} }}
 }}
 {}

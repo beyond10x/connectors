@@ -6,30 +6,128 @@ types:
     kind: struct
     fields:
       - {name: format, type: String}
+      - {name: quorum, type: Integer}
+      - {name: max_rate_error_ppm, type: Integer}
+      - {name: sources, type: "List<connectors.clock.Source>"}
+    # docs/design/approval-clock-quorum.md: format roughtime-quorum/1 replaces the
+    # single-source roughtime-clock/1. The host still parses a roughtime-clock/1
+    # table, so the rest of the configuration keeps loading, but every use of that
+    # clock refuses invalid_configuration with an upgrade message; it is never read
+    # as a one-source quorum. Two to eight sources; a quorum of two to eight
+    # verified answers; rate bound 1..10,000 ppm. Sources are identified by their
+    # zero-based position in `sources`, which the configuration digest covers.
+    invariants:
+      - format == "roughtime-quorum/1"
+      - quorum: {gte: 2, lte: 8}
+      - max_rate_error_ppm: {gte: 1, lte: 10000}
+      - sources.count >= 2
+      - sources.count <= 8
+    # ESS-LIMIT: quorum <= sources.count has a fact path on the right-hand side;
+    # ESS 0.59 validates it but keeps the predicate as text, and an earlier ESS
+    # read a bare right-hand side as a literal
+    # (connectors.mutations.SettlementClockInterval), so it is not declared. "No two
+    # sources share an address or a public key" (an IPv4-mapped IPv6 address is its
+    # IPv4 address) is uniqueness over list members,
+    # which no ESS 0.59 invariant states. The host refuses both as invalid
+    # configuration and tests pin them.
+    # ESS-LIMIT: source correctness, the independence of the sources' operators
+    # and the local timer's physical frequency bound are deployment trust
+    # assumptions; ESS has no construct for an environmental trust assumption, so
+    # they are never schema-proven facts.
+  - name: connectors.clock.Source
+    kind: struct
+    fields:
       - {name: address, type: String}
       - {name: public_key, type: String}
-      - {name: max_rate_error_ppm, type: Integer}
-    # contracts/service/clock.md:11-13: format roughtime-clock/1, rate bound 1..10,000 ppm.
+      - {name: version, type: connectors.clock.RoughtimeVersion}
+    # One configured Roughtime source: a numeric UDP socket address, its root
+    # Ed25519 key in canonical base64 (44 characters, 32 bytes, not all zero) and
+    # the one wire version the client sends to it and accepts from it. There is
+    # no negotiation and no downgrade: a reply whose signed VER differs, or whose
+    # VERS omits the configured version, is unverified.
     invariants:
-      - format == "roughtime-clock/1"
-      - max_rate_error_ppm: {gte: 1, lte: 10000}
-    # ESS-LIMIT: source correctness and the local timer's physical frequency bound
-    # are deployment trust assumptions (clock.md:14-19); ESS 0.40 has no construct
-    # for an environmental trust assumption, so they are never schema-proven facts.
+      - public_key.count == 44
+      - address.count <= 64
+    # ESS-LIMIT: numeric-address parsing, canonical base64 and the non-zero key are
+    # host checks (crates/connectors-host/src/local/clock.rs, Configuration::resolved).
+  - name: connectors.clock.RoughtimeVersion
+    kind: enum
+    # The wire VER values a source may be configured to speak. roughtime-0x8000000c
+    # is the draft-19 test version that
+    # crates/connectors-host/src/local/clock/protocol.rs verifies. A variant ships
+    # only together with its verifier and a recorded signed fixture; RFC 10049's
+    # version 0x00000001 has neither (no source answered it on 2026-10-14,
+    # docs/design/approval-clock-quorum.md "Sources"), so it is not a variant and a
+    # configuration naming it is refused as an unknown version.
+    variants: [roughtime-0x8000000c]
+  - name: connectors.clock.SourceResult
+    kind: enum
+    # What one configured source contributed to an acquisition
+    # (docs/design/approval-clock-quorum.md, "Refusals"):
+    #   agreed        verified, and its interval meets the answer;
+    #   outlier       verified, and its interval is disjoint from the answer, or its
+    #                 signed values give no interval (midpoint below radius + 3 ms,
+    #                 or an endpoint past the representable range); it never
+    #                 refuses the acquisition or a later reading on its own;
+    #   verified      verified, and no answer was formed (a refusal);
+    #   unreachable   no reply within the shared deadline, or a send or receive error;
+    #   unverified    a reply that does not parse or verify against the source's key and version.
+    # A verified source counts toward the quorum whatever its own radius or
+    # interval width: if `quorum` counted intervals contain true time the answer
+    # does, so the guarantee needs no per-source bound. Only the combined answer is
+    # capped (connectors.clock.Refusal too_imprecise); no source is too imprecise
+    # on its own.
+    variants: [agreed, outlier, verified, unreachable, unverified]
+  - name: connectors.clock.SourceReport
+    kind: struct
+    fields:
+      - {name: index, type: Integer}
+      - {name: address, type: String}
+      - {name: result, type: connectors.clock.SourceResult}
+      - {name: radius_ms, type: "Optional<Integer>"}
+    # One line per configured source, in configuration order, on an observation
+    # and on a quorum refusal. radius_ms is the source's signed radius in
+    # milliseconds, present exactly when the reply verified (agreed, outlier,
+    # verified). Never the reply bytes, the nonce or the source's
+    # own interval.
+    # ESS-LIMIT: index is 0..7 and radius_ms is present exactly for the verified
+    # results. The range is writable as an invariant, but this type is reached from
+    # a CLI output (connectors.cli.ApprovalClockCheckResult) and ESS `specify cli`
+    # refuses any invariant on a CLI type; the presence rule ties an optional field
+    # to an enum value, which ESS 0.59 cannot state. The host enforces both and
+    # tests pin them.
+  - name: connectors.clock.Refusal
+    kind: enum
+    # Why a quorum acquisition formed no answer, each with its own next action
+    # (docs/design/approval-clock-quorum.md, "Refusals"):
+    #   below_quorum  fewer than `quorum` sources verified; next action
+    #                 check_configuration if any source is unverified, else
+    #                 retry_explicitly;
+    #   split         no instant lies in the intervals of `quorum` counted sources;
+    #                 choose_clock_source (a source is wrong; retire its key);
+    #   too_imprecise the combined answer is wider than the 8,000 ms cap;
+    #                 choose_clock_source. Only the answer is capped: a single
+    #                 source is never too_imprecise.
+    # A local timer, continuity, overflow or UTC-midnight refusal names none.
+    variants: [below_quorum, split, too_imprecise]
   - name: connectors.clock.Observation
     kind: struct
     fields:
       - {name: configuration_sha256, type: String}
       - {name: lower_unix_ms, type: Integer}
       - {name: upper_unix_ms, type: Integer}
-    # ESS-LIMIT: clock.md:83-84 bounds each value to 0..9007199254740991 Unix ms,
-    # orders them and caps the width at 4,000 ms. The bounds are writable as
-    # invariants, but this type is a CLI output and ESS 0.40 `specify cli` refuses
-    # any invariant on a CLI type. The order compares two sibling fields, which an
-    # invariant cannot (ESS-ENTITY-002), and the width is arithmetic over them.
-    # Raw signature/nonce validation, process continuity, elapsed-time bounds,
-    # suspend rejection, TTL and outward rounding are runtime evidence: ESS 0.40
-    # has no signature, monotonic-clock or process-continuity construct.
+      - {name: sources, type: "List<connectors.clock.SourceReport>"}
+    # ESS-LIMIT: clock.md bounds each value to 0..9007199254740991 Unix ms,
+    # orders them and caps the width at 8,000 ms; the interval is the hull of the
+    # instants that at least `quorum` counted sources' intervals contain
+    # (docs/design/approval-clock-quorum.md, "Quorum rule"). The bounds are
+    # writable as invariants, but this type is a CLI output and ESS `specify cli`
+    # refuses any invariant on a CLI type. The order compares two sibling fields,
+    # which an invariant cannot (ESS-ENTITY-002), and the width is arithmetic over
+    # them. Raw signature/nonce validation, process continuity, elapsed-time
+    # bounds, suspend rejection, TTL, outward rounding and the quorum combination
+    # itself are runtime evidence: ESS 0.59 has no signature, monotonic-clock,
+    # process-continuity or interval-arithmetic construct.
   - name: connectors.clock.RegistryClockFloorFile
     kind: struct
     fields:

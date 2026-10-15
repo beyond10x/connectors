@@ -81,11 +81,16 @@ fn selection(
         configuration_revision: adapter.configuration_revision.clone(),
         descriptor_revision: bootstrap.descriptor()?.revision,
         executable_selection: adapter.selection(),
-        clock_configuration_sha256: config
-            .approval_clock
-            .as_ref()
-            .ok_or(Code::InvalidConfiguration)?
-            .sha256(),
+        clock_configuration_sha256: {
+            let selected = config
+                .approval_clock
+                .as_ref()
+                .ok_or(Code::InvalidConfiguration)?;
+            selected
+                .configuration()
+                .map_err(|failure| Error::clock(selected, failure))?
+                .sha256()
+        },
     })
 }
 fn required_write<'a>(
@@ -353,13 +358,14 @@ pub fn issue(
     filesystem::require_absent(&parent, name).map_err(|_| Code::InvalidInput)?;
     check(until)?;
     // Network acquisition must precede every policy/key/custody lease.
-    let clock = first
+    let selected = first
         .config
         .approval_clock
         .as_ref()
-        .ok_or(Code::InvalidConfiguration)?
+        .ok_or(Code::InvalidConfiguration)?;
+    let clock = selected
         .acquire()
-        .map_err(|_| Code::Unavailable)?;
+        .map_err(|failure| Error::clock(selected, failure))?;
     let current = resolve(paths, alias, request, until)?;
     if current.preparation.subject != first.preparation.subject
         || current.policy.selection != first.policy.selection
