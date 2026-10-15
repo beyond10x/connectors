@@ -9,7 +9,7 @@ custom_edit_url: null
 
 # Status
 
-As of 2026-10-10: 55 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
+As of 2026-10-10: 57 capabilities are shipped, 3 are decided and 5 are planned. **Shipped** means it runs on `main` and is held by a named test in the repository; an item marked *unreleased* is on `main` but not yet in a tagged release. **Decided** means specified, with no runtime. **Planned** means not built. `connectors-docs` generates this page and `website/data/status.json` from one list and fails when a test it names is gone. A release page carries the source archives and Linux and macOS binaries of `connectors` and `connectors-catalog-provider`; the [changelog](https://github.com/beyond10x/connectors/blob/main/CHANGELOG.md) records each change a user sees, release by release.
 
 ## Service boundary
 
