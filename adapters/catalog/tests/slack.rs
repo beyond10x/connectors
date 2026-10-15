@@ -91,9 +91,28 @@ const SHIPPED: [(&str, &str, &str); 9] = [
     ("team.info", "team_info", "/api/team.info"),
     ("users.list", "users_list", "/api/users.list"),
 ];
-/// The user selection set: search alone.
-const USER_SHIPPED: [(&str, &str, &str); 1] =
-    [("search.messages", "search_messages", "/api/search.messages")];
+/// The user selection set: the three conversation reads and `users.list`,
+/// which a user token answers for every conversation that user can read, and
+/// search. No write.
+const USER_SHIPPED: [(&str, &str, &str); 5] = [
+    (
+        "conversations.history",
+        "conversations_history",
+        "/api/conversations.history",
+    ),
+    (
+        "conversations.list",
+        "conversations_list",
+        "/api/conversations.list",
+    ),
+    (
+        "conversations.replies",
+        "conversations_replies",
+        "/api/conversations.replies",
+    ),
+    ("search.messages", "search_messages", "/api/search.messages"),
+    ("users.list", "users_list", "/api/users.list"),
+];
 /// The methods whose pinned `token` is required, so their selections name it
 /// as the credential instead of withholding it.
 const CREDENTIAL: [&str; 4] = ["auth_test", "emoji_list", "search_messages", "team_info"];
@@ -123,7 +142,7 @@ fn pinned() -> Value {
 }
 
 #[test]
-fn shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_search() {
+fn shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_reads() {
     let bundle = committed();
     assert_eq!(bundle.auth_profile, PROFILE);
     for (selections, shipped) in [
@@ -386,7 +405,13 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
         users_limit.contains("deliver you the entire result set"),
         "{users_limit}"
     );
-    for selection in shipped() {
+    // The same bound on both sets' `conversations.list`; search is pinned
+    // below.
+    for selection in shipped()
+        .into_iter()
+        .chain(user_shipped())
+        .filter(|s| s.id != "search.messages")
+    {
         let bound = selection.bounds.get("limit");
         if selection.id == "conversations.list" {
             assert_eq!(bound.and_then(|b| b.maximum), Some(1000));
@@ -412,7 +437,11 @@ fn the_paging_and_window_parameters_are_in_the_pinned_document() {
         .to_owned();
     assert!(count.contains("Maximum of `100`"), "{count}");
     let selections = user_shipped();
-    let bounds = &selections[0].bounds;
+    let search = selections
+        .iter()
+        .find(|s| s.id == "search.messages")
+        .unwrap();
+    let bounds = &search.bounds;
     assert_eq!(bounds.len(), 1);
     assert_eq!(
         bounds.get("count").map(|b| (b.minimum, b.maximum)),
@@ -489,6 +518,103 @@ fn guide_cites_each_discovery_read_and_search() {
     }
 }
 
+/// The guide's user-token section has a row for each read the user set adds,
+/// naming the user scopes it needs, and states that the set has no write.
+#[test]
+fn guide_cites_each_user_token_read_with_its_user_scopes() {
+    let guide = fs::read_to_string(root().join("../../docs/catalog-slack.md")).unwrap();
+    let heading = "## Reads and search on a user-token connection";
+    let section = guide
+        .split_once(heading)
+        .unwrap_or_else(|| panic!("no section `{heading}`"))
+        .1;
+    let section = section.split("\n## ").next().unwrap();
+    let rows: Vec<&str> = section.lines().filter(|l| l.starts_with('|')).collect();
+    for (id, operation_id, path, scopes) in [
+        (
+            "conversations.list",
+            "conversations_list",
+            "/api/conversations.list",
+            &["`channels:read`", "`groups:read`"][..],
+        ),
+        (
+            "conversations.history",
+            "conversations_history",
+            "/api/conversations.history",
+            &[
+                "`channels:history`",
+                "`groups:history`",
+                "`im:history`",
+                "`mpim:history`",
+            ][..],
+        ),
+        (
+            "conversations.replies",
+            "conversations_replies",
+            "/api/conversations.replies",
+            &[
+                "`channels:history`",
+                "`groups:history`",
+                "`im:history`",
+                "`mpim:history`",
+            ][..],
+        ),
+        (
+            "users.list",
+            "users_list",
+            "/api/users.list",
+            &["`users:read`"][..],
+        ),
+        (
+            "search.messages",
+            "search_messages",
+            "/api/search.messages",
+            &["`search:read`"][..],
+        ),
+    ] {
+        let row = rows
+            .iter()
+            .find(|row| row.contains(&format!("| `{id}` |")))
+            .unwrap_or_else(|| panic!("no user-token row for `{id}`"));
+        assert!(row.contains(&format!("`{operation_id}`")), "{row}");
+        assert!(row.contains(&format!("`GET {path}`")), "{row}");
+        for scope in scopes {
+            assert!(row.contains(scope), "`{id}` lacks {scope}: {row}");
+        }
+    }
+    assert!(
+        section.contains("no write"),
+        "the section must say the user set has no write"
+    );
+}
+
+/// The parity page scores the conversation and user-list rows by what the
+/// user-token profile serves, naming `slack.user` and its selection file.
+#[test]
+fn the_parity_page_names_the_user_profile_for_the_user_token_reads() {
+    let page = fs::read_to_string(root().join("../../docs/fluxplane-plugin-parity.md")).unwrap();
+    let section = page.split_once("\n## slack\n").unwrap().1;
+    let section = section.split("\n## ").next().unwrap();
+    for (row_id, operation) in [
+        ("slack.thread", "conversations.replies"),
+        ("slack.message.list", "conversations.history"),
+        ("slack.channel.list", "conversations.list"),
+        ("slack.user.list", "users.list"),
+    ] {
+        let row = section
+            .lines()
+            .find(|l| l.starts_with(&format!("| `{row_id}` |")))
+            .unwrap_or_else(|| panic!("no parity row `{row_id}`"));
+        assert!(row.contains(&format!("`{operation}`")), "{row}");
+        assert!(
+            row.contains("`slack.user`"),
+            "`{row_id}` names no user profile: {row}"
+        );
+        assert!(row.contains("user-operations.json"), "{row}");
+        assert!(row.contains("| covered |"), "{row}");
+    }
+}
+
 /// The guide's bot configuration example.
 fn documented_config() -> Value {
     documented_config_for(PROFILE)
@@ -511,7 +637,7 @@ fn documented_config_for(profile: &str) -> Value {
 /// The search connection: the same bundle and base, a user token under
 /// `slack.user`, the same `auth.test` identity read, and the user selection set.
 #[test]
-fn the_documented_user_profile_is_a_bearer_user_token_selecting_search_alone() {
+fn the_documented_user_profile_is_a_bearer_user_token_selecting_the_user_reads() {
     let config = documented_config_for(USER_PROFILE);
     let bot = documented_config();
     assert_eq!(config["api_base"], bot["api_base"]);
@@ -657,6 +783,12 @@ fn page(path: &str) -> Option<Value> {
         "/api/conversations.list" => json!({
             "ok": true, "channels": [channel(1), channel(2)],
             "response_metadata": more("fixture-list-2")}),
+        // The private channel only the user token reads: the bot is not in it.
+        "/api/conversations.history" | "/api/conversations.replies"
+            if has(&format!("channel={PRIVATE}")) =>
+        {
+            json!({"ok": false, "error": "not_in_channel"})
+        }
         "/api/conversations.history" if !has("channel=C0FIXTURE01") => json!({
             "ok": false, "error": "channel_not_found"}),
         "/api/conversations.history" if has("cursor=fixture-history-2") => json!({
@@ -717,12 +849,43 @@ const FILE_BYTES: &[u8] = b"%PDF-1.7\n\xff\xfe\x00\x01 fixture slack file\n";
 /// `url_private`.
 const FILE_PATH: &str = "/files-pri/T0FIXTURE01-F0FIXTURE01/fixture-1.pdf";
 
-/// What the fixture answers the user token: its own identity, and search.
+/// A private channel the user is a member of and the bot is not.
+const PRIVATE: &str = "C0FIXTURE09";
+/// The parent `ts` of the one thread in [`PRIVATE`].
+const PRIVATE_THREAD: &str = "1780000150.000150";
+fn private_message(ts: &str, text: &str) -> Value {
+    json!({"type": "message", "user": "U0FIXTURE02", "text": text, "ts": ts,
+           "thread_ts": PRIVATE_THREAD})
+}
+
+/// What the fixture answers the user token: its own identity, search, and
+/// the conversation and user reads, where the user also reads [`PRIVATE`].
 /// `None` for anything else, which the fixture answers 404.
 fn user_page(path: &str) -> Option<Value> {
     let (route, query) = path.split_once('?').unwrap_or((path, ""));
     let has = |pair: &str| query.split('&').any(|p| p == pair);
+    let private = has(&format!("channel={PRIVATE}"));
     Some(match route {
+        "/api/conversations.list" if !has("cursor=fixture-list-2") => json!({
+            "ok": true,
+            "channels": [channel(1),
+                         json!({"id": PRIVATE, "name": "fixture-private", "is_channel": false,
+                                "is_group": true, "is_private": true, "is_archived": false,
+                                "created": 1_780_000_009u64})],
+            "response_metadata": more("fixture-list-2")}),
+        "/api/conversations.history" if private => json!({
+            "ok": true,
+            "messages": [private_message(PRIVATE_THREAD, "fixture private parent")],
+            "has_more": false, "pin_count": 0, "response_metadata": more("")}),
+        "/api/conversations.replies" if private && has(&format!("ts={PRIVATE_THREAD}")) => json!({
+            "ok": true,
+            "messages": [private_message(PRIVATE_THREAD, "fixture private parent"),
+                         private_message("1780000160.000160", "fixture private reply")],
+            "has_more": false, "response_metadata": more("")}),
+        "/api/conversations.list"
+        | "/api/conversations.history"
+        | "/api/conversations.replies"
+        | "/api/users.list" => return page(path),
         "/api/auth.test" => json!({
             "ok": true, "url": "https://fixture.example.test/", "team": "Fixture Team",
             "user": "fixture-user-2", "team_id": "T0FIXTURE01", "user_id": "U0FIXTURE02",
@@ -1356,17 +1519,83 @@ fn search_runs_on_the_user_token_connection() {
         user_page(expected).unwrap(),
     );
 
+    // The bot set's other reads are not exposed on it.
     let before = provider.requests().len();
-    assert!(
-        attempt_as(
-            &mut child,
-            "conversations.list",
-            &json!({"limit": 2}),
-            &user_secret()
-        )
-        .is_err()
-    );
+    for operation in ["team.info", "files.list"] {
+        assert!(
+            attempt_as(&mut child, operation, &json!({}), &user_secret()).is_err(),
+            "`{operation}` on the user connection"
+        );
+    }
     assert_eq!(provider.requests().len(), before);
+}
+
+/// The user-token connection: connected under `slack.user`, each of the
+/// conversation reads and `users.list` sends its request with the user token
+/// in the header only and returns Slack's answer, including a private channel
+/// the bot is not in, whose history the bot connection is answered
+/// `not_in_channel`. No write is exposed on it, and nothing is sent for one.
+#[test]
+fn history_and_replies_read_on_the_user_token_connection() {
+    let provider = Provider::user();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let baseline = child
+        .validate(USER_PROFILE, &user_secret(), deadline())
+        .unwrap();
+    assert_eq!(baseline.identity.subject, "U0FIXTURE02");
+    let history = format!("/api/conversations.history?channel={PRIVATE}&limit=20");
+    let replies =
+        format!("/api/conversations.replies?channel={PRIVATE}&ts={PRIVATE_THREAD}&limit=20");
+    for (operation, input, expected) in [
+        (
+            "conversations.list",
+            json!({"types": "public_channel,private_channel", "limit": 2}),
+            "/api/conversations.list?types=public_channel%2Cprivate_channel&limit=2",
+        ),
+        (
+            "conversations.history",
+            json!({"channel": PRIVATE, "limit": 20}),
+            history.as_str(),
+        ),
+        (
+            "conversations.replies",
+            json!({"channel": PRIVATE, "ts": PRIVATE_THREAD, "limit": 20}),
+            replies.as_str(),
+        ),
+        ("users.list", json!({"limit": 2}), "/api/users.list?limit=2"),
+    ] {
+        let before = provider.requests().len();
+        let raw = attempt_as(&mut child, operation, &input, &user_secret())
+            .unwrap_or_else(|failure| panic!("`{operation}` failed: {failure:?}"));
+        assert_answered(
+            &provider,
+            before,
+            &raw,
+            operation,
+            expected,
+            USER_HEADER,
+            user_page(expected).unwrap(),
+        );
+    }
+    // No write: each is refused with nothing sent.
+    let before = provider.requests().len();
+    for operation in [
+        "chat.postMessage",
+        "chat.update",
+        "chat.delete",
+        "conversations.open",
+    ] {
+        assert!(
+            attempt_as(&mut child, operation, &json!({}), &user_secret()).is_err(),
+            "`{operation}` on the user connection"
+        );
+    }
+    assert_eq!(provider.requests().len(), before);
+    // The bot is not in the private channel.
+    assert_eq!(
+        page(&history).unwrap(),
+        json!({"ok": false, "error": "not_in_channel"})
+    );
 }
 
 /// The token in any spelling, a missing `query`, a `count` outside the

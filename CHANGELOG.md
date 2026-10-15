@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Slack history and threads on a user token. The user-token selection set
+  (`adapters/catalog/providers/slack/user-operations.json`, profile `slack.user`) selects
+  `conversations.list`, `conversations.history`, `conversations.replies` and `users.list` beside
+  `search.messages`, and still no write. A bot token reads only the channels the bot is a member
+  of (Slack answers `not_in_channel` elsewhere); a connection on a user token reads every
+  conversation that user can read, under the user scopes `channels:read`, `groups:read`,
+  `channels:history`, `groups:history`, `im:history`, `mpim:history` and `users:read`. A user
+  is looked up by reading `users.list`; `users.info` and `users.lookupByEmail` are not selected.
+  An existing `slack.user` connection serves the new reads once the adapter reloads the file; its
+  configuration revision changes. The parity page scores the history, thread, channel-list and
+  user-list rows by the user profile. Verified against a local fixture only.
+
 ## 0.51.0 — 2026-10-15
 
 ### Added

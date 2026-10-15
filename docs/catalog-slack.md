@@ -5,10 +5,12 @@ see, a channel's messages and one thread — the workspace's users, the
 workspace itself, its custom emoji, the token's identity and the files the token
 can see, with their content, from the pinned Slack Web API document, posts
 messages, a direct message included, under approval, and, on a
-second connection with a user token, searches messages. Nothing here is
+second connection with a user token, reads the conversations, history and
+threads that user can read, the channels the bot is not in included, and
+searches messages. Nothing here is
 Slack-specific code: the Swagger 2.0 document is projected into OpenAPI 3.1.0, the projection is compiled into a
-bundle, two reviewed selection sets expose ten reads and two writes for a bot
-token and search for a user token, and the engine described in
+bundle, two reviewed selection sets expose ten reads and four writes for a bot
+token and five reads for a user token, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there;
 this page covers what differs for Slack.
@@ -67,8 +69,9 @@ exposes ten reads for a bot token, each `effect: read`, and four writes,
 `effect: write`
 ([Messages](#messages)).
 [`adapters/catalog/providers/slack/user-operations.json`](../adapters/catalog/providers/slack/user-operations.json)
-exposes `search.messages` alone, for a user token
-([Search](#search-on-a-user-token-connection)). A selection id is the Slack
+exposes `search.messages`, the three conversation reads and `users.list`, and
+no write, for a user token
+([User token](#reads-and-search-on-a-user-token-connection)). A selection id is the Slack
 method name, except `file.download`, which names no method
 ([Files](#files)). `adapters/catalog/tests/slack.rs` pins both exact id lists and
 each id's `operationId` and path in the pinned document, so a renamed or
@@ -339,32 +342,52 @@ missing scope shows as `"error": "missing_scope"` on the read that needs it.
 
 Connect with the credential document `{"token": "<bot token>"}`.
 
-## Search on a user-token connection
+## Reads and search on a user-token connection
 
-Slack searches messages only for a user token (`xoxp-…`): the pinned
-`search.messages` requires the scope `search:read`, which Slack grants to a
-user token, not a bot token. A catalog connection holds one profile, so search
-is a second Slack connection: the same bundle and `api_base`, the profile
-`slack.user` with a user token, the same `auth.test` identity read — whose
-`user_id` is then the person's id — and the user selection set, which selects
-`search.messages` alone, so the bot connection never exposes it and the search
-connection exposes nothing else. Nothing in the local configuration ties a
-connection's profile to the bundle's recorded `auth_profile` (`slack.bot`), so
-this needs no change to the local host.
+A bot token reads only the conversations the bot is a member of: Slack answers
+`conversations.history` and `conversations.replies` on any other channel with
+`not_in_channel`. A user token (`xoxp-…`) reads every conversation that user
+can read, and only a user token can search: the pinned `search.messages`
+requires the scope `search:read`, which Slack grants to a user token, not a bot
+token. A catalog connection holds one profile, so these reads are a second
+Slack connection: the same bundle and `api_base`, the profile `slack.user` with
+a user token, the same `auth.test` identity read — whose `user_id` is then the
+person's id — and the user selection set. It selects the three conversation
+reads, `users.list` and `search.messages`, and no write, so the user
+connection never posts, edits or deletes, and the bot connection never
+exposes search. Nothing in the local configuration ties a connection's profile
+to the bundle's recorded `auth_profile` (`slack.bot`), so this needs no change
+to the local host.
 
-| id | pinned `operationId` | request | scope | paging |
+| id | pinned `operationId` | request | user scopes | paging |
 |---|---|---|---|---|
-| `search.messages` | `search_messages` | `GET /api/search.messages` | `search:read`, user token | `page` and `count` (1–100), not a cursor |
+| `conversations.list` | `conversations_list` | `GET /api/conversations.list` | `channels:read`, `groups:read`, and `im:read` and `mpim:read` for those types | `cursor`, `limit` (1–1000) |
+| `conversations.history` | `conversations_history` | `GET /api/conversations.history` | `channels:history`, `groups:history`, `im:history` or `mpim:history`, by the conversation's type | `cursor`, `limit` |
+| `conversations.replies` | `conversations_replies` | `GET /api/conversations.replies` | `channels:history`, `groups:history`, `im:history` or `mpim:history`, by the conversation's type | `cursor`, `limit` |
+| `users.list` | `users_list` | `GET /api/users.list` | `users:read` | `cursor`, `limit` |
+| `search.messages` | `search_messages` | `GET /api/search.messages` | `search:read` | `page` and `count` (1–100), not a cursor |
 
-- **`query`** is required, and an input without it is refused before any
-  request. `sort` takes `score` or `timestamp` and `sort_dir` `asc` or `desc`;
-  `highlight` set to `true` adds Slack's highlight markers.
-- **Paging.** Search pages by number, not by cursor: `page` selects the page
-  and `count` its size. The pinned `count` description says "Maximum of
+- **The conversation reads and `users.list`** take the same parameters, bounds
+  and end condition as on the bot connection ([above](#the-shipped-selection-set)):
+  `conversations.list` bounds `limit` to 1–1000, `conversations.history`
+  requires `channel` and `conversations.replies` `channel` and `ts`, and each
+  walk ends on an empty `response_metadata.next_cursor`. List the user's
+  conversations with `types` set to `public_channel,private_channel` (and
+  `mpim`, `im` for those), then read each one's history. A lookup of one user
+  by id or e-mail (`users.info`, `users.lookupByEmail`) is not selected on
+  either connection: read the list.
+- **`query`** is required for search, and an input without it is refused
+  before any request. `sort` takes `score` or `timestamp` and `sort_dir` `asc`
+  or `desc`; `highlight` set to `true` adds Slack's highlight markers.
+- **Search paging.** Search pages by number, not by cursor: `page` selects the
+  page and `count` its size. The pinned `count` description says "Maximum of
   `100`", so the selection bounds `count` to 1–100, and 0, 101 or a value that
   is not an integer is refused before any request. The pinned answer is the
   document's default success template, so the document states neither the
   matches nor where the paging totals are; read them from Slack's answer.
+- **The user's reach is the user's.** The connection reads what that person
+  can read in Slack, the private channels and direct messages they are in
+  included. Grant only the user scopes above.
 
 ```json
 {
@@ -678,8 +701,9 @@ ready
   the `oldest`/`latest` window and the bearer header, with no `token` query
   parameter or header, the returned body bytes, a two-page walk of each list to
   an empty `next_cursor`, an `ok: false` answer returned as `200`, the
-  `auth.test` identity read and its refusal, and search on a second connection
-  with a user token. The file reads are checked the same way: a two-page
+  `auth.test` identity read and its refusal, and, on a second connection with a
+  user token, search, the three conversation reads and `users.list`, a
+  private channel the bot is not in included. The file reads are checked the same way: a two-page
   `files.list` walk, `files.info` of one file, and the download of a
   non-UTF-8 body from a fixture file host admitted with and without the
   credential, refused when the connection does not admit the host or the URL
@@ -699,10 +723,10 @@ ready
 - The provider does not walk pages itself, and does not bound `limit` on the
   message reads or `users.list`: the pinned document states no maximum for
   them.
-- Only these eleven reads and two writes are selected. One user by id or
-  e-mail (`users.info`, `users.lookupByEmail`), message edit and delete
-  (`chat.update`, `chat.delete`), file upload and delete, reactions and every
-  other method of the document are not selected.
+- Only the bot set's ten reads and four writes and the user set's five reads
+  are selected. One user by id or e-mail (`users.info`, `users.lookupByEmail`),
+  file upload and delete, reactions and every other method of the document are
+  not selected.
   A file upload is a binary request body, which the catalog does not send.
 
 ## Credential parameters

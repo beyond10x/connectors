@@ -496,19 +496,21 @@ reads, `users.list`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `file
 binary download `file.download` are selected there, with the writes `chat.postMessage`,
 `conversations.open`, `chat.update` and `chat.delete` under approval; search is a
 second connection under the user-token profile `slack.user`, whose selection set
-`adapters/catalog/providers/slack/user-operations.json` selects `search.messages` alone. Every
-other row is still missing. The 2026-09-09 baseline listed Slack as
+`adapters/catalog/providers/slack/user-operations.json` selects `search.messages` and the
+reads `conversations.list`, `conversations.history`, `conversations.replies` and `users.list`,
+no write. A bot token reads only the channels the bot is a member of; on `slack.user` those reads
+reach every channel that user can read. Every other row is still missing. The 2026-09-09 baseline listed Slack as
 uncovered (`docs/recent-adapter-usage-20260909.md`, U12). The gap column of a missing row names
 the Slack Web API method that would back it.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13) | covered | One page per call; the caller follows `response_metadata.next_cursor`. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13), and on `slack.user` (`user-operations.json:17`) | covered | One page per call; the caller follows `response_metadata.next_cursor`. The bot connection reads only the channels the bot is in; the user-token connection (`slack.user`, scopes `channels:history`, `groups:history`, `im:history`, `mpim:history`) reads every thread that user can read. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.message.send` | 132 | 30 | 2026-10-05 | `chat.postMessage` (:41) plus `conversations.open` (:51) | covered | Two writes, each under its own approval: `conversations.open` gives a direct message's channel id, and `chat.postMessage` posts `text` there or to a channel, `thread_ts` for a thread reply; scopes `chat:write` and `im:write`. Plain text and Slack mrkdwn only: no `blocks`, and no Markdown conversion. Slack's refusal, a `200` answer with `"ok": false`, is `outcome_unknown`, not applied, and its `error` string is not returned (2026-10-13). |
-| `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9) | covered | One page per call, windowed by `oldest` and `latest`. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9), and on `slack.user` (`user-operations.json:13`) | covered | One page per call, windowed by `oldest` and `latest`. The bot connection reads only the channels the bot is in; the user-token connection (`slack.user`, scopes `channels:history`, `groups:history`, `im:history`, `mpim:history`) reads every channel that user can read. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.search` | 73 | 19 | 2026-10-05 | `search.messages` (`adapters/catalog/providers/slack/user-operations.json:5`) | covered | On a second connection with a user token (`slack.user`, scope `search:read`); a bot token cannot search. Pages by `page` and `count` (1–100), not by cursor. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5) | covered | One page of at most 1,000 per call; no lookup by channel name. |
+| `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17), and on `slack.user` (`user-operations.json:21`, scope `users:read`) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5), and on `slack.user` (`user-operations.json:9`) | covered | One page of at most 1,000 per call; no lookup by channel name. On the user-token connection (`slack.user`, scopes `channels:read`, `groups:read`) it lists the private channels and direct messages that user is in. |
 | `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload, which the catalog cannot send (it reads binary answers only). |
 | `slack.message.edit` | 20 | 8 | 2026-10-03 | `chat.update` (:63) | covered | One write under approval on a message named by `channel` and `ts`, in a channel or a direct message; replaces its `text` (scope `chat:write`). No `blocks`, and no Markdown conversion; Slack resets `parse` and `link_names` on every edit. A bot token edits only its own messages: `cant_update_message` and `edit_window_closed` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
 | `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:20) and `auth.test` (:26) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
