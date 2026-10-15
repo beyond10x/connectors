@@ -251,17 +251,22 @@ configuration. The adapter runs it only under these rules, from the
   `exec_plugin.env`, valued from the kubeconfig's `exec.env` or, failing that, from
   the adapter's own environment. A kubeconfig `exec.env`
   name that is not in `exec_plugin.env` refuses. `exec_plugin.env` itself cannot
-  name a variable that makes a program load or run other code (`LD_*`,
-  `PYTHON*`, `BASH_ENV`, `GLIBC_TUNABLES` and the rest the
+  name one of the variables the
   [reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md#exec-plugin-credentials)
-  lists); a configuration that does is refused. File reads are not sandboxed: point
+  lists because they load code or change how a loader or shell starts (`LD_*`,
+  `PYTHON*`, `DOTNET_*`, `BASH_ENV`, `ZDOTDIR`, `OPENSSL_CONF`, `GLIBC_TUNABLES`
+  and the rest); a configuration that does is refused. That list is exact, not
+  every variable a plugin might read: any other name you allow-list is yours to
+  judge. File reads are not sandboxed: point
   `home` at the directory holding the plugin's profile files (for the AWS CLI, the
   one containing `.aws/config` and `.aws/credentials`).
 - **Bounded, and only when admitted.** It runs inside a connect, repair or
   operation, never while loading the configuration, listing or describing.
   `exec_plugin.timeout_ms` (1 to 60000, default 10000) bounds one run; at the
-  deadline its whole process group is killed (`timeout`), and anything it left
-  running in its group is killed when it finishes. More than 64 KiB of
+  deadline its whole process group and the plugin itself are killed (`timeout`),
+  even if the plugin moved itself to another group, and anything it left
+  running in its group is killed when it finishes. A process that left the
+  plugin's group is not followed and keeps running. More than 64 KiB of
   output is refused (`protocol`), as is an answer that is not an `ExecCredential`
   with a bearer token; a non-zero exit is `unavailable`.
 - **Token in memory only.** The token is reused until its `expirationTimestamp`,
