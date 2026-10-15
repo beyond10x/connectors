@@ -916,3 +916,114 @@ fn independent_live_quorum() {
         Err(refused) => panic!("{refused:?}"),
     }
 }
+
+// --- Adversary cases (design "Threat model", "Quorum rule" step 1; contract
+// "Configuration and trust").
+
+/// A source signing `midpoint` and `radius` with a delegation valid for any time.
+fn answering_any_time(seed: u8, midpoint: u64, radius: u32) -> Server {
+    Server::fixture(fixture::Fixture {
+        seed,
+        midpoint,
+        radius,
+        mint: 0,
+        maxt: u64::MAX,
+        ..Default::default()
+    })
+}
+
+#[test]
+fn adversary_liar_on_another_utc_day_is_only_an_outlier() {
+    // Threat model: one lying source among honest ones "cannot move the answer
+    // off true time"; a disjoint liar "shows as outlier". A liar a day behind
+    // must not take the whole clock down.
+    let (a, b, liar) = (
+        answering(7, T, 1),
+        answering(8, T, 1),
+        answering_any_time(9, T - 86_400, 1),
+    );
+    let config = quorum(2, vec![source(&a, 7), source(&liar, 9), source(&b, 8)]);
+    let view = config
+        .acquire_explained()
+        .expect("two honest sources form the quorum")
+        .observe()
+        .unwrap();
+    let truth = i64::try_from(T * 1000).unwrap();
+    assert!(view.lower_unix_ms <= truth && truth <= view.upper_unix_ms);
+    assert_eq!(
+        results(&view.sources),
+        [
+            SourceResult::Agreed,
+            SourceResult::Outlier,
+            SourceResult::Agreed
+        ]
+    );
+}
+
+#[test]
+fn adversary_liar_signing_an_early_midpoint_is_only_an_outlier() {
+    // A liar's signed midpoint below its radius must not refuse the whole
+    // acquisition through interval underflow.
+    let (a, b, liar) = (
+        answering(7, T, 1),
+        answering(8, T, 1),
+        answering_any_time(9, 0, 1),
+    );
+    let config = quorum(2, vec![source(&a, 7), source(&liar, 9), source(&b, 8)]);
+    let view = config
+        .acquire_explained()
+        .expect("two honest sources form the quorum")
+        .observe()
+        .unwrap();
+    assert_eq!(
+        results(&view.sources),
+        [
+            SourceResult::Agreed,
+            SourceResult::Outlier,
+            SourceResult::Agreed
+        ]
+    );
+}
+
+#[test]
+fn adversary_wide_honest_source_counts_whatever_its_radius() {
+    // Quorum rule step 1: a source counts "whatever its own radius or interval
+    // width". An honest source with a radius of a few days contains T and must
+    // count; the answer is the narrow sources' interval.
+    let (wide, a, b) = (
+        answering(7, T, 200_000),
+        answering(8, T, 1),
+        answering(9, T, 1),
+    );
+    let config = quorum(2, vec![source(&wide, 7), source(&a, 8), source(&b, 9)]);
+    let view = config
+        .acquire_explained()
+        .expect("a wide honest source counts")
+        .observe()
+        .unwrap();
+    let truth = i64::try_from(T * 1000).unwrap();
+    assert!(view.lower_unix_ms <= truth && truth <= view.upper_unix_ms);
+    assert_eq!(results(&view.sources), [SourceResult::Agreed; 3]);
+}
+
+#[test]
+fn adversary_ipv4_mapped_address_is_the_same_address() {
+    // "No two sources share an address": the IPv4-mapped IPv6 spelling of an
+    // address is that address.
+    let config = quorum(
+        2,
+        vec![
+            Source {
+                address: "127.0.0.1:2002".into(),
+                public_key: STANDARD.encode(fixture::key(7)),
+                version: DRAFT,
+            },
+            Source {
+                address: "[::ffff:127.0.0.1]:2002".into(),
+                public_key: STANDARD.encode(fixture::key(8)),
+                version: DRAFT,
+            },
+        ],
+    );
+    assert_eq!(config.validate(), Err(Failure::InvalidConfiguration));
+}

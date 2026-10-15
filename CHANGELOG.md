@@ -171,11 +171,15 @@
   one wire `version` it speaks (only `roughtime-0x8000000c`; no negotiation; any other
   version, `roughtime-1` included, is refused as unknown, since no source answered RFC
   10049's version and no reply at it could be recorded). No
-  two sources share an address or a key. All sources are asked in parallel under one shared
+  two sources share an address or a key (an IPv4-mapped IPv6 address is its IPv4 address).
+  All sources are asked in parallel under one shared
   two-second deadline, with no retries; the answer is the hull of the instants at least
   `quorum` verified sources' intervals contain, so one lying source among honest ones cannot
   move it off true time and one unreachable source does not stop it while a quorum remains.
-  A verified source counts at any radius; only the combined answer is capped. The width cap
+  A verified source counts at any radius; only the combined answer is capped. A source whose
+  interval is disjoint from the answer, or whose signed values give no interval, is an
+  `outlier` and never refuses the clock; the UTC-midnight refusal looks at the answer alone,
+  so an outlier or a wide source on another UTC day refuses nothing. The width cap
   moves from 4,000 ms to 8,000 ms for the clock answer, the approval proof and the
   mutation ledger alike (the delegation contract's "at most eight seconds"). The observation
   adds `sources`, one line per source (`agreed`, `outlier`, `unreachable` or `unverified`,
