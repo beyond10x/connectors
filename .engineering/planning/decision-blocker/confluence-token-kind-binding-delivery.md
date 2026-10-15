@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:confluence-token-kind-binding-delivery
 kind: decision-blocker
-status: open
+status: cleared
 title: How the Confluence token-kind binding is delivered
 relations:
 - blocks: story:confluence-token-kind-binding
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-15T14:46:06Z", actor: "human:timo", revision: 3}
 ---
 ## Question
 
@@ -30,3 +32,17 @@ c. Probe on read: the child tries v2 and falls back to v1 on a scope-mismatch 40
 ## Recommendation
 
 b: the operator's token reads Confluence in today's release; (a) follows after the lease unit.
+
+## Decided (2026-10-15)
+
+Option b, in two steps:
+
+- Now: the Confluence REST v1 reads ship as their own provider configuration, `confluence-v1`.
+  Until the host-carried binding ships, the operator's configuration block selects v1 or v2.
+  The release that ships it names the exact configuration block and the commands that move a
+  local install onto it.
+- Next: option a, the host-carried binding, as story:confluence-token-kind-binding, after
+  story:connection-lease-holds-unattended: an optional binding in the private baseline, the
+  stored evidence, the bootstrap and invoke; a rebind on revalidate; `--connection` on
+  `operations list` and `describe`; spec first in the shared ESS.
+- Option c (probing on every read) is refused.

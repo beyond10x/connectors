@@ -8,7 +8,8 @@ relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:confluence-v1-authored-contract
-revision: 3
+- depends_on: story:connection-lease-holds-unattended
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-15T08:46:55Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-15T08:46:56Z", actor: "human:timo", revision: 3}
@@ -59,3 +60,22 @@ and its ESS domain, `docs/catalog-confluence.md` and `docs/local-catalog-provide
 - An id the bound binding lacks answers a named refusal.
 - The release notes give the exact configuration block and commands that move a local
   Confluence install to the bound form.
+
+## Delivery
+
+The provider child keeps no state between validate and invoke, so the binding is carried by
+the host (decision-blocker:confluence-token-kind-binding-delivery, option a). Surfaces, spec
+first in the shared ESS and the contracts:
+
+- an optional `binding` in the private validation baseline (`ess/domains/cli.yaml`) and the
+  stored evidence (`ess/domains/credential_evidence.yaml`), omitted when absent so stored
+  bytes do not change;
+- optional `bindings` in the private bootstrap, one descriptor and requirements per binding;
+- an optional `binding` on invoke, taken from the evidence the read captures;
+- a reason beside `insufficient_scope` on a failed validate, so a refusal names both answers;
+- a rebind field in the revalidate result;
+- `--connection` on `operations list` and `operations describe`.
+
+It starts after story:connection-lease-holds-unattended merges, which edits the same host
+files. Until it ships, the v1 reads are their own provider configuration, `confluence-v1`,
+selected by the operator's configuration block.
