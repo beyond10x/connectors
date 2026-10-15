@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.52.0 — 2026-10-15
 
 ### Added
 
@@ -102,6 +102,20 @@
   Migration: a caller that read `body.ok` of a Slack read now receives a refusal with exit status
   non-zero instead. Existing Slack connections take the change once the adapter reloads the
   files; their configuration revision changes. Verified against a local fixture only.
+
+### Limitations
+
+- Confluence REST v1 is chosen per adapter in the operator's configuration (`confluence-v1`
+  beside `confluence`); the host does not yet probe a token and bind v1 or v2 by itself. The v1
+  source document is authored from Atlassian's reference pages and was checked against a local
+  fixture only; no live Confluence site was read through it.
+- The Kubernetes exec credential plugin runs on Linux only, and was checked against local
+  plugins and a recorded API session; no live EKS cluster was read.
+- The approval clock quorum is configured with the two public sources that answered on
+  2026-10-14, a quorum of two of two: it tolerates no outage and no lying source until a third
+  source answers. Slack writes stay behind it.
+- A connection still needs a manual `connections revalidate` after its lease lapses; the
+  10-minute unattended read loop `live-read-loop` measures waits on that change.
 
 ## 0.51.0 — 2026-10-15
 
