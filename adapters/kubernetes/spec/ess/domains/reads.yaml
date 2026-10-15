@@ -1,5 +1,5 @@
 domain: connectors_kubernetes.reads
-summary: Kubernetes-owned read selections - resource kinds, single-object coordinates, configured namespace observations and Deployment rollout history.
+summary: Kubernetes-owned read selections - resource kinds, single-object coordinates, configured namespace observations, Deployment rollout history, cluster nodes and configured custom resources.
 
 # Normative owner: adapters/kubernetes/contracts/reads/v1alpha1/semantics.md.
 # Every value below selects or describes a provider-owned object this adapter only
@@ -9,17 +9,57 @@ summary: Kubernetes-owned read selections - resource kinds, single-object coordi
 types:
   - name: connectors_kubernetes.reads.ResourceKind
     kind: enum
-    variants: [pods, services, deployments, endpointslices, replicasets, events]
+    variants: [pods, services, deployments, endpointslices, replicasets, events, statefulsets]
     # The closed set a configuration may admit in resource_kinds and a caller may
     # name in a read. Each variant binds exactly one collection path:
     # pods, services, events -> /api/v1/namespaces/<ns>/<kind>;
-    # deployments, replicasets -> /apis/apps/v1/namespaces/<ns>/<kind>;
+    # deployments, replicasets, statefulsets -> /apis/apps/v1/namespaces/<ns>/<kind>;
     # endpointslices -> /apis/discovery.k8s.io/v1/namespaces/<ns>/endpointslices.
     # events is core/v1 Event (the collection kubectl get events reads), not
     # events.k8s.io/v1. Watches stay deferred: an events read is one bounded list.
     # Namespaces are deliberately not a variant: they are cluster-scoped, so a kind
     # would need a cluster-wide list and would disclose names outside the
-    # configured scope. NamespaceObservation covers them instead.
+    # configured scope. NamespaceObservation covers them instead. Nodes are not a
+    # variant for the same reason: NodeListAdmission covers them. A custom resource is
+    # not a variant either, because the set of them is the cluster's, not this
+    # adapter's: CustomResourceKind admits each one by configuration.
+  - name: connectors_kubernetes.reads.NodeListAdmission
+    kind: enum
+    variants: [off, full_objects]
+    # Whether nodes.list is advertised, set by the configuration's node_reads.
+    # off (the default) advertises nothing and refuses nodes.list as forbidden with
+    # zero requests. full_objects lists GET /api/v1/nodes one bounded page at a
+    # time, items as the full Node objects (labels, capacity, nodeInfo and
+    # conditions included), with the provider's continuation and collection revision
+    # as resources.list carries them. Nodes are cluster-scoped: the read takes no
+    # namespace, needs cluster-wide list on nodes, and is a separate admission from
+    # the configured namespaces, never implied by them. It is also separate from
+    # discover_hosts: hosts.discover reads the same collection but returns a fixed
+    # projection, so admitting one never discloses the other's shape.
+  - name: connectors_kubernetes.reads.CustomResourceKind
+    kind: struct
+    fields:
+      - {name: group, type: String}
+      - {name: version, type: String}
+      - {name: plural, type: String}
+    invariants:
+      - group.count: {gte: 3, lte: 253}
+      - version.count: {gte: 1, lte: 63}
+      - plural.count: {gte: 1, lte: 63}
+    # One namespaced custom resource collection a configuration admits in
+    # custom_resources (at most 32, no duplicates), and the selection a caller names
+    # in custom_resources.list. It binds exactly one collection path:
+    # /apis/<group>/<version>/namespaces/<ns>/<plural>, inside a configured
+    # namespace. group is a DNS-1123 subdomain with at least one dot, as Kubernetes
+    # requires of a CustomResourceDefinition's group, and is neither k8s.io,
+    # kubernetes.io nor a subdomain of either: those are the built-in API groups,
+    # whose kinds this adapter admits only through ResourceKind, so the custom
+    # resource allowlist can never reach Secrets or any other built-in collection.
+    # version and plural are DNS-1123 labels. A caller's selection that is not one
+    # of the configured entries is forbidden before any request; the provider's 404
+    # for a configured entry the cluster does not serve is not_found. Cluster-scoped
+    # custom resources are not admitted: their list would need a cluster-wide
+    # authority this read does not take.
   - name: connectors_kubernetes.reads.ObjectCoordinates
     kind: struct
     fields:
@@ -87,6 +127,11 @@ types:
     # spec.revisionHistoryLimit, so absent revisions are pruned or never existed and
     # this read cannot tell which.
 
+# ESS-LIMIT: the DNS-1123 predicates on CustomResourceKind's group, version and
+# plural, and the built-in-group exclusion, are character and suffix rules synthesis
+# cannot hold as type invariants either; configuration validation enforces them
+# before the adapter is built, and the selection check repeats the allowlist match
+# before every request.
 # ESS-LIMIT: the DNS-1123 predicate on name and deployment, the owner predicate
 # (an ownerReferences entry with controller true and the read uid), the selector
 # translation and the identity check of a returned object. The character-class half

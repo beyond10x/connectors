@@ -57,6 +57,8 @@ Rebuild adds what the old integration had and the first slice did not: pod logs,
 | `resources.get` | records `kubernetes-get` | read | `kubernetes.pod.show`, `kubernetes.deployment.show` |
 | `namespaces.list` | records `kubernetes-configured-namespaces` | read | `kubernetes.namespace.list` |
 | `deployments.history` | records `kubernetes-rollout-history` | read | `kubernetes.deployment.history` |
+| `nodes.list` (implemented 2026-10-15, `node_reads` enables it) | records `kubernetes-nodes-list` | read | `kubernetes.node.list` |
+| `custom_resources.list` (implemented 2026-10-15, `custom_resources` enables it) | records `kubernetes-custom-resources` | read | — |
 | `endpoints.discover` (exists) | endpoint_discovery | none | `kubernetes.databases` |
 | `hosts.discover` (exists) | host_discovery | none | — |
 | `pods.logs` (implemented 2026-10-10, `pod_logs` enables it) | logs `kubernetes-pod-logs` | read | `kubernetes.pod.logs` |

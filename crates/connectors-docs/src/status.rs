@@ -367,6 +367,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Native adapters",
+        "Kubernetes statefulsets, nodes and custom resources",
+        "statefulsets is a configurable kind; nodes.list pages the full Node objects when node_reads is configured; custom_resources.list pages one configured namespaced custom resource collection by group, version and plural; verified against API-shaped fixtures.",
+        "adapters/kubernetes/tests/parity_reads.rs::custom_resources_list_reads_a_configured_collection_page_by_page",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
         "Kubernetes pod logs",
         "pods.logs reads a bounded tail of one container's log in a configured namespace, at most 1,000 lines and 128 KiB, when pod_logs is configured; verified against API-shaped fixtures.",
         "adapters/kubernetes/tests/pod_logs.rs::pod_logs_are_bounded_and_container_selected",

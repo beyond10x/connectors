@@ -78,6 +78,52 @@ Required RBAC, per configured namespace: `get` on `namespaces` for
 `events` for those kinds, and `get` on `deployments` with `list` on `replicasets`
 for `deployments.history`.
 
+## Statefulsets, nodes and custom resources
+
+- **`statefulsets`** is an admissible `resource_kinds` entry (apps/v1,
+  `/apis/apps/v1/namespaces/<ns>/statefulsets`). `resources.list` and
+  `resources.get` read it like any other kind. Required RBAC: `list` (and `get`
+  for `resources.get`) on `statefulsets` in each configured namespace.
+- **`nodes.list`** (`kubernetes-nodes-list`) lists `GET /api/v1/nodes` one
+  bounded page at a time (`limit` 1–100, provider continuation and collection
+  revision as for `resources.list`), each item the full Node object. Nodes are
+  cluster-scoped, so the read takes no namespace and needs cluster-wide `list` on
+  `nodes`; it is a separate admission, `node_reads: true`, never implied by the
+  configured namespaces. Absent, the operation is not advertised and an invocation
+  is `forbidden` with zero requests. It is distinct from `hosts.discover`, which
+  reads the same collection under `discover_hosts` and returns a fixed projection;
+  enabling either does not enable the other, and a continuation issued by one is
+  not readable by the other.
+- **`custom_resources.list`** (`kubernetes-custom-resources`) lists one namespaced
+  custom resource collection, `GET /apis/<group>/<version>/namespaces/<ns>/<plural>`,
+  one bounded page at a time, items the full objects. Its input is `namespace`,
+  `group`, `version`, `plural`, `limit` (1–100) and `cursor`. The configuration
+  admits each collection explicitly in `custom_resources` (at most 32 distinct
+  `{group, version, plural}` entries); the operation is advertised only when it
+  admits at least one. A selection that is not a configured entry, or a namespace
+  outside the configured set, is `forbidden` before any request. A configured
+  `group` must be a DNS-1123 subdomain containing a dot and must not be `k8s.io`,
+  `kubernetes.io` or a subdomain of either, which is Kubernetes' own rule for a
+  custom resource's group and keeps every built-in collection, Secrets included,
+  out of this allowlist; `version` and `plural` are DNS-1123 labels. A
+  configuration breaking any of these is refused at load. A configured collection
+  the cluster does not serve answers the provider's 404 as `not_found`, never as an
+  empty page. The continuation is bound to the exact collection, so a cursor from
+  one custom resource cannot page another. Cluster-scoped custom resources are not
+  admitted. Required RBAC: `list` on `<plural>` in API group `<group>` in each
+  configured namespace it is read in.
+
+## Exec-plugin credentials
+
+A kubeconfig user that authenticates through an `exec` credential plugin (for
+example `aws eks get-token`) is not supported. Running a command a kubeconfig
+names is the bounded process execution family decided on 2026-10-03 for a
+pinned Helm binary, and that decision selects no arbitrary command, unpinned
+executable, filesystem access or credential inheritance by default; an exec
+credential plugin needs all four and is awaiting its own selection. The shared
+`exec_plugin` acquisition flow stays reserved
+([acquisition](../../../contracts/auth/acquisition.md)).
+
 ## Descriptor visibility
 
 The implemented adapter filters disabled hosts.discover from its public descriptor.
