@@ -26,7 +26,8 @@ types:
     # ESS 0.59 validates it but keeps the predicate as text, and an earlier ESS
     # read a bare right-hand side as a literal
     # (connectors.mutations.SettlementClockInterval), so it is not declared. "No two
-    # sources share an address or a public key" is uniqueness over list members,
+    # sources share an address or a public key" (an IPv4-mapped IPv6 address is its
+    # IPv4 address) is uniqueness over list members,
     # which no ESS 0.59 invariant states. The host refuses both as invalid
     # configuration and tests pin them.
     # ESS-LIMIT: source correctness, the independence of the sources' operators
@@ -64,7 +65,10 @@ types:
     # What one configured source contributed to an acquisition
     # (docs/design/approval-clock-quorum.md, "Refusals"):
     #   agreed        verified, and its interval meets the answer;
-    #   outlier       verified, and its interval is disjoint from the answer;
+    #   outlier       verified, and its interval is disjoint from the answer, or its
+    #                 signed values give no interval (midpoint below radius + 3 ms,
+    #                 or an endpoint past the representable range); it never
+    #                 refuses the acquisition or a later reading on its own;
     #   verified      verified, and no answer was formed (a refusal);
     #   unreachable   no reply within the shared deadline, or a send or receive error;
     #   unverified    a reply that does not parse or verify against the source's key and version.

@@ -31,7 +31,8 @@ an exact canonical base64 Ed25519 `public_key` and the one wire `version` it
 speaks. The one admitted version is `roughtime-0x8000000c` (the draft-19 test
 version); a version ships only with its verifier and a recorded signed reply, so
 any other value, `roughtime-1` included, is refused as an unknown version. `quorum` is two to eight and at
-most the number of sources. No two sources share an address or a key: two entries
+most the number of sources. No two sources share an address or a key (an
+IPv4-mapped IPv6 address is its IPv4 address): two entries
 for one key are one operator counted twice. There is no ambient server, DNS/key
 discovery, default key or fallback to SystemTime. The configured owner admits the
 sources' UTC uncertainty assertions and a bound on the local Linux
@@ -167,6 +168,9 @@ assumption or best-case network subtraction is permitted.
 
 A source is counted when its reply verified, whatever its own radius or interval
 width; no single source is too imprecise, and only the combined answer is capped.
+A counted source whose signed values give no interval (M_i below A_i + 3 ms, or an
+endpoint past the representable range) contributes none and is an `outlier`; it
+never refuses the acquisition or a later reading on its own.
 Fewer than `quorum` counted sources
 refuses `below_quorum`. The answer is the hull of the instants that at least
 `quorum` counted intervals contain (closed intervals), rounded outward to Unix
@@ -179,13 +183,13 @@ no per-source width bound, and a wide or lying interval can only widen the answe
 Each counted source's conservative elapsed upper bound from S_i must remain at most
 30,000 ms. Every answer must be within 0..9007199254740991 Unix ms, ordered and at
 most 8,000 ms wide; a wider answer refuses `too_imprecise`. Expiry, overflow,
-uncertain continuity, excessive radius/delay or clock-read failure returns
+uncertain continuity, excessive delay or clock-read failure returns
 unavailable, never expiry proof for a retained key.
 Without an admitted leap-announcement source, do not extrapolate across any UTC
-midnight: the earliest counted source's origin lower bound (M_i - A_i - 3 ms) and the
-answer's current upper bound must lie in the same
-UTC day, at least one second after its start and strictly more than one second
-before its end. This conservative daily refusal window covers both positive and
+midnight: the answer's lower and upper bounds must lie in the same UTC day, at
+least one second after its start and strictly more than one second before its end.
+No single source's interval is the origin, so an outlier on another UTC day or a
+wide counted source reaching across midnight never refuses the answer. This conservative daily refusal window covers both positive and
 negative leap seconds without claiming leap-calendar authority; see
 [NIST's UTC explanation](https://www.nist.gov/pml/time-and-frequency-division/leap-seconds-faqs).
 This bound is conditional on the explicitly admitted source and timer assumptions;
