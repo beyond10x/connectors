@@ -603,7 +603,7 @@ fn malformed_or_missing_clock_never_settles_a_known_result_or_shortens_retention
     for (lower, upper) in [
         (-1, 0),
         (NOW, NOW - 1),
-        (NOW, NOW + 4001),
+        (NOW, NOW + 8001),
         (i64::MAX - 1, i64::MAX),
     ] {
         let (_root, store, candidate) = fixture();

@@ -10,6 +10,9 @@ pub struct ClockInterval {
     pub lower_unix_ms: i64,
     pub upper_unix_ms: i64,
 }
+/// The widest interval any clock use admits (contracts/service/clock.md): the
+/// clock's own answer, the approval proof and the ledger read this one bound.
+pub const MAX_CLOCK_WIDTH_MS: i64 = 8000;
 pub trait Clock: Send + Sync {
     /// A bounded local observation, without provider/network I/O or a blocking
     /// synchronization operation while the metadata transaction is held.
