@@ -477,7 +477,13 @@ fn exchange(source: &Resolved, socket: Option<UdpSocket>, deadline: Instant) -> 
     let Some(n) = remaining(deadline)
         .ok()
         .and_then(|left| socket.set_read_timeout(Some(left)).ok())
-        .and_then(|()| socket.recv(&mut bytes).ok())
+        .and_then(|()| match socket.recv(&mut bytes) {
+            Ok(n) => Some(n),
+            // Windows refuses a datagram longer than the buffer (WSAEMSGSIZE) where other
+            // systems truncate it; either way the source answered with an overlong reply.
+            Err(e) if cfg!(windows) && e.raw_os_error() == Some(10040) => Some(bytes.len()),
+            Err(_) => None,
+        })
     else {
         return unreachable;
     };

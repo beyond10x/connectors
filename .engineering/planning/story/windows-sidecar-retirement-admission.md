@@ -2,14 +2,15 @@
 format: aep.planning-md/3
 id: story:windows-sidecar-retirement-admission
 kind: story
-status: active
+status: implemented
 title: A Windows sidecar being deleted does not refuse a store open
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 4
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T05:27:42Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-14T05:27:42Z", actor: "human:timo", revision: 3}
+- {from: "active", to: "implemented", at: "2026-10-14T22:06:09Z", actor: "human:timo", revision: 4, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

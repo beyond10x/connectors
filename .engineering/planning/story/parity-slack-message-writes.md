@@ -2,17 +2,18 @@
 format: aep.planning-md/3
 id: story:parity-slack-message-writes
 kind: story
-status: active
+status: implemented
 title: Slack message send, edit and delete
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:catalog-slack-reads
 - depends_on: story:slack-message-send
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T06:22:50Z", actor: "human:timo", revision: 4}
 - {from: "proposed", to: "active", at: "2026-10-14T06:22:51Z", actor: "human:timo", revision: 5}
+- {from: "active", to: "implemented", at: "2026-10-14T22:06:07Z", actor: "human:timo", revision: 6, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 

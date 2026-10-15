@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:incident-call-lookup
 kind: story
-status: active
+status: implemented
 title: Look up a call by its number, one typed line per leg
 relations:
 - decomposes: epic:incident-collection-workflow
@@ -76,10 +76,11 @@ scope:
   path: website/docs/reference/adapters/sql
 - confidence: cited
   path: website/docs/status.md
-revision: 7
+revision: 8
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T05:12:48Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-14T05:12:49Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-10-14T22:06:05Z", actor: "human:timo", revision: 8, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
