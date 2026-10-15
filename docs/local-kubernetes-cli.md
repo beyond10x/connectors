@@ -40,12 +40,12 @@ Replace the example target and scope with your cluster coordinates:
 `resource_kinds` are the complete configured scope: a request outside either is
 refused before any provider work, and no wildcard or all-namespaces mode is
 available in this profile. `resource_kinds` accepts only `pods`, `services`,
-`deployments`, `endpointslices`, `replicasets` and `events` (the core/v1 Event
+`deployments`, `endpointslices`, `replicasets`, `statefulsets` and `events` (the core/v1 Event
 collection that `kubectl get events` reads). The optional `ca_file` names an owner-only PEM
 certificate file; supply the cluster CA there when it is not in the system store.
 
 `discover_hosts` is optional and defaults to false. While it is false the adapter
-does not advertise `hosts.discover` at all, so node reads cannot be requested.
+does not advertise `hosts.discover` at all, so the node projection cannot be requested; `node_reads` below admits the full Node objects separately.
 
 `helm_release_reads` is optional and defaults to `"off"`. It selects how much of
 a Helm release this binding may read:
@@ -56,13 +56,13 @@ a Helm release this binding may read:
 | `"metadata"` | `helm_releases.history`, `helm_releases.status` |
 | `"redacted_content"` | those two plus `helm_releases.values`, `helm_releases.manifest` |
 
-Release reads do not touch `resource_kinds`: that enum stays the six kinds above,
+Release reads do not touch `resource_kinds`: that enum stays the seven kinds above,
 and no setting adds a general Secret read.
 Adding or changing this field changes the effective document, so the
 `configuration_revision` changes with it and must be copied from
 `--print-local-bootstrap` again.
 
-Three more fields are optional and each enables one operation. Absent, each is
+Five more fields are optional and each enables one operation. Absent, each is
 off and leaves the effective document, and so the `configuration_revision`, as it
 was before the field existed; set, it changes the revision.
 
@@ -71,6 +71,8 @@ was before the field existed; set, it changes the revision.
 | `pod_logs` | `pods.logs` ([Read pod logs](#read-pod-logs)) | `true`; absent means false |
 | `kubeconfig` | `contexts.list` ([List kubeconfig contexts](#list-kubeconfig-contexts)) | the absolute path of an owner-only kubeconfig file |
 | `pod_exec` | `pods.exec`, a write ([Run a command in a pod](#run-a-command-in-a-pod)) | `true`; absent means false |
+| `node_reads` | `nodes.list` ([Read statefulsets, nodes and custom resources](#read-statefulsets-nodes-and-custom-resources)) | `true`; absent means false |
+| `custom_resources` | `custom_resources.list` (same section) | a list of `{"group","version","plural"}` collections; absent or empty means none |
 
 ```json
 {
@@ -91,7 +93,8 @@ Pod logs are admitted apart from `resource_kinds`, because log text routinely
 carries values a pod object does not. The kubeconfig is read and parsed once when
 the configuration loads, and a path that is not an owner-only, readable kubeconfig
 refuses the configuration; the revision records a digest of the path, not of the
-file. The federated service configuration can enable `pod_logs`, but not
+file. The federated service configuration can enable `pod_logs`, `node_reads`
+and `custom_resources`, but not
 `kubeconfig` or `pod_exec`.
 
 The block above is the file format. The adapter's published
@@ -230,6 +233,8 @@ revision, then invoke with the saved connection as above. The request shapes are
 | `deployments.history` | `{"namespace":"default","name":"api","limit":50}` |
 | `endpoints.discover` | `{"namespace":"default","limit":50}` |
 | `hosts.discover` | `{"limit":50}` |
+| `nodes.list` | `{"limit":50}` |
+| `custom_resources.list` | `{"namespace":"default","group":"monitoring.coreos.com","version":"v1","plural":"servicemonitors","limit":50}` |
 | `helm_releases.history` | `{"namespace":"default","release":"api","limit":50}` |
 | `helm_releases.status` | `{"namespace":"default","release":"api","limit":50}` |
 | `helm_releases.values` | `{"namespace":"default","release":"api","revision":3,"limit":50}` |
@@ -304,6 +309,44 @@ The authorization namespace of a namespace object is its own name, so a Role in
 namespace `default` granting `get` on `namespaces` is enough to read the
 `default` namespace. No ClusterRole is needed, and the binding never asks for
 `list` on namespaces.
+
+## Read statefulsets, nodes and custom resources
+
+StatefulSets are a resource kind: add `statefulsets` to `resource_kinds` and read
+them with `resources.list` and `resources.get`. The credential needs `list` (and
+`get` for `resources.get`) on `statefulsets` in `apps` in each configured
+namespace.
+
+`nodes.list` lists the cluster's Node objects in full, one bounded page at a
+time, and is advertised only while `node_reads` is true. Nodes are not in any
+namespace, so the read needs a ClusterRole granting `list` on `nodes`, and the
+configured `namespaces` neither grant nor limit it. It is separate from
+`hosts.discover`: that operation reads the same collection under
+`discover_hosts` but returns only names, addresses and conditions.
+
+`custom_resources.list` lists one namespaced custom resource collection in a
+configured namespace, one bounded page at a time, and is advertised only while
+`custom_resources` names at least one collection:
+
+```json
+"custom_resources": [
+  {"group": "monitoring.coreos.com", "version": "v1", "plural": "servicemonitors"}
+]
+```
+
+A request for a collection that is not listed there, or in a namespace outside
+`namespaces`, is refused as `forbidden` before any request. A `group` must
+contain a dot and must not be `k8s.io`, `kubernetes.io` or end in either, so
+this list cannot reach Secrets or any other built-in collection; `version` and
+`plural` are lower-case DNS labels. At most 32 collections, without duplicates;
+a configuration breaking any of these is refused when it loads. A listed
+collection the cluster does not serve answers `not_found`, not an empty page.
+Cluster-scoped custom resources are not read. The credential needs `list` on
+the plural in its API group in each namespace it reads.
+
+A kubeconfig user that authenticates through an `exec` credential plugin, such as
+`aws eks get-token` for EKS, is not supported: the binding runs no credential
+plugin and uses only the saved bearer token.
 
 ## Read pod logs
 
@@ -440,7 +483,7 @@ page.
 
 ## Limitations
 
-This binding advertises up to twelve read operations and one write, `pods.exec`.
+This binding advertises up to fourteen read operations and one write, `pods.exec`.
 Events are read as a list of core/v1 Event objects in one namespace; there is no
 watch, and no read filters events by the object they involve. Conditions, log
 following, interactive exec (stdin or a terminal), copy, port forwarding and

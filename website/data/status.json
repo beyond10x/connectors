@@ -284,6 +284,13 @@
     },
     {
       "area": "Native adapters",
+      "detail": "statefulsets is a configurable kind; nodes.list pages the full Node objects when node_reads is configured; custom_resources.list pages one configured namespaced custom resource collection by group, version and plural; verified against API-shaped fixtures.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes statefulsets, nodes and custom resources",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
       "detail": "pods.logs reads a bounded tail of one container's log in a configured namespace, at most 1,000 lines and 128 KiB, when pod_logs is configured; verified against API-shaped fixtures.",
       "href": "/docs/reference/adapters/kubernetes",
       "label": "Kubernetes pod logs",

@@ -18,7 +18,7 @@ use connectors_host::{
         },
     },
 };
-use connectors_kubernetes::{Config, HelmReleaseReads, Kubernetes, auth, exec};
+use connectors_kubernetes::{Config, CustomResource, HelmReleaseReads, Kubernetes, auth, exec};
 use connectors_sdk::{
     Adapter as _, AuthProbe, AuthenticatedWrite, Credential, MessageStream, Secret, UpgradeBounds,
     Upgraded, WriteOutcome,
@@ -55,6 +55,13 @@ struct Configuration {
     /// it; the write runs over the host's upgraded-stream write capability.
     #[serde(default)]
     pod_exec: bool,
+    /// Advertises `nodes.list`. Absent means false.
+    #[serde(default)]
+    node_reads: bool,
+    /// The namespaced custom resource collections `custom_resources.list` may
+    /// read. Absent or empty means none.
+    #[serde(default)]
+    custom_resources: Vec<CustomResource>,
     /// The absolute path of the kubeconfig whose contexts `contexts.list`
     /// reads. Its digest is part of the configuration revision the host
     /// admitted, and the operation takes no path, so a connection reads the
@@ -93,6 +100,8 @@ impl Local {
         // it, so the revision must not depend on how it was written down.
         config.namespaces.sort();
         config.resource_kinds.sort();
+        // Sorted for the same reason; a duplicate is refused by the adapter.
+        config.custom_resources.sort();
         if config.namespaces.windows(2).any(|n| n[0] == n[1])
             || config.resource_kinds.windows(2).any(|k| k[0] == k[1])
         {
@@ -137,6 +146,12 @@ impl Local {
         if config.pod_exec {
             effective["pod_exec"] = json!(true);
         }
+        if config.node_reads {
+            effective["node_reads"] = json!(true);
+        }
+        if !config.custom_resources.is_empty() {
+            effective["custom_resources"] = json!(config.custom_resources);
+        }
         if let Some(path) = &config.kubeconfig {
             let path = path.to_str().ok_or(Failure::InvalidConfiguration)?;
             effective["kubeconfig_path_digest"] = json!(connectors_core::digest(&json!(path)));
@@ -171,6 +186,8 @@ impl Local {
                 helm_release_reads: config.helm_release_reads,
                 pod_logs: config.pod_logs,
                 pod_exec: config.pod_exec,
+                node_reads: config.node_reads,
+                custom_resources: config.custom_resources,
                 kubeconfig_contexts: config.kubeconfig.is_some(),
             },
             effective,
@@ -209,6 +226,8 @@ impl Local {
                 | "resources.get"
                 | "namespaces.list"
                 | "deployments.history"
+                | "nodes.list"
+                | "custom_resources.list"
                 | "endpoints.discover"
                 | "hosts.discover"
                 | "helm_releases.history"
