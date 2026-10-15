@@ -103,6 +103,11 @@
             "description": "Advertises nodes.list, which lists the cluster's Node objects in full and needs cluster-wide list on nodes. Absent means false: the effective document carries it only when true, so a configuration that does not enable it keeps its revision.",
             "const": true
           },
+          "exec_plugin_digest": {
+            "description": "Digest of the exec_plugin binding the native configuration names: the plugin's absolute path and pinned sha256, the kubeconfig user whose exec block supplies its arguments, the environment variable allow-list, the HOME directory and the run deadline. Present only when the configuration names one, and then the kubernetes.exec_plugin profile replaces kubernetes.token and the plugin runs only inside an admitted validation or operation. Absent means no plugin ever runs.",
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
           "custom_resources": {
             "description": "The namespaced custom resource collections custom_resources.list may read, each by group, version and plural. Absent means none: the effective document carries it only when non-empty, sorted, so a configuration that admits none keeps its revision. A group is a dotted DNS-1123 subdomain outside k8s.io and kubernetes.io.",
             "type": "array",

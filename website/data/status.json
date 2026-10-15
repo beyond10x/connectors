@@ -305,6 +305,13 @@
     },
     {
       "area": "Native adapters",
+      "detail": "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes exec credential plugin",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
       "detail": "pods.logs reads a bounded tail of one container's log in a configured namespace, at most 1,000 lines and 128 KiB, when pod_logs is configured; verified against API-shaped fixtures.",
       "href": "/docs/reference/adapters/kubernetes",
       "label": "Kubernetes pod logs",

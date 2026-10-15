@@ -18,7 +18,9 @@ use connectors_host::{
         },
     },
 };
-use connectors_kubernetes::{Config, CustomResource, HelmReleaseReads, Kubernetes, auth, exec};
+use connectors_kubernetes::{
+    Config, CustomResource, HelmReleaseReads, Kubernetes, auth, exec, exec_credential,
+};
 use connectors_sdk::{
     Adapter as _, AuthProbe, AuthenticatedWrite, Credential, MessageStream, Secret, UpgradeBounds,
     Upgraded, WriteOutcome,
@@ -68,6 +70,26 @@ struct Configuration {
     /// file it was configured with and no other.
     #[serde(default)]
     kubeconfig: Option<PathBuf>,
+    /// The pinned exec credential plugin. Absent means no plugin ever runs
+    /// and the profile is `kubernetes.token`. Present, it requires
+    /// `kubeconfig`, whose `users[user].user.exec` block supplies the
+    /// arguments, and the profile is `kubernetes.exec_plugin`.
+    #[serde(default)]
+    exec_plugin: Option<exec_credential::Binding>,
+}
+
+/// The `kubernetes.exec_plugin` protected entry: a confirmation of the
+/// kubeconfig user the plugin runs for, not a secret.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExecEntry {
+    user: String,
+}
+
+/// A configured plugin and the kubeconfig it reads when it runs.
+struct ExecPlugin {
+    credentials: Arc<exec_credential::Credentials>,
+    kubeconfig: PathBuf,
 }
 
 pub struct Local {
@@ -77,6 +99,7 @@ pub struct Local {
     http: Arc<ScopedHttp>,
     adapter: Kubernetes,
     kubeconfig: Option<PathBuf>,
+    exec_plugin: Option<ExecPlugin>,
 }
 impl Local {
     pub fn load(path: &Path) -> Result<Self> {
@@ -156,6 +179,31 @@ impl Local {
             let path = path.to_str().ok_or(Failure::InvalidConfiguration)?;
             effective["kubeconfig_path_digest"] = json!(connectors_core::digest(&json!(path)));
         }
+        // Nothing runs here: the binding is checked and digested, and the
+        // plugin runs only inside an admitted validation or operation.
+        let exec_plugin = match config.exec_plugin {
+            None => None,
+            Some(binding) => {
+                let kubeconfig = config
+                    .kubeconfig
+                    .clone()
+                    .ok_or(Failure::InvalidConfiguration)?;
+                effective["exec_plugin_digest"] =
+                    json!(connectors_core::digest(&binding.canonical()));
+                Some(ExecPlugin {
+                    credentials: Arc::new(
+                        exec_credential::Credentials::new(binding)
+                            .ok_or(Failure::InvalidConfiguration)?,
+                    ),
+                    kubeconfig,
+                })
+            }
+        };
+        let profile_id = if exec_plugin.is_some() {
+            exec_credential::PROFILE_ID
+        } else {
+            auth::PROFILE_ID
+        };
         let configuration_revision = connectors_core::digest(&effective);
         let http = Arc::new(
             ScopedHttp::new_with_ca_bytes(
@@ -197,8 +245,23 @@ impl Local {
         // Kubernetes authorization is RBAC on the authenticated name, not a
         // scope grant carried by the credential. An empty required set is the
         // truthful representation; it is not a claim that any read is permitted.
+        // With an exec plugin the token comes from the plugin, and the one
+        // entry field confirms the kubeconfig user it runs for.
+        let field = if exec_plugin.is_some() {
+            EntryField {
+                name: "user".into(),
+                label: "Kubeconfig user of the exec credential plugin".into(),
+                max_bytes: 256,
+            }
+        } else {
+            EntryField {
+                name: "token".into(),
+                label: "Kubernetes bearer token".into(),
+                max_bytes: 8192,
+            }
+        };
         let mut profile = Profile {
-            id: auth::PROFILE_ID.into(),
+            id: profile_id.into(),
             revision: String::new(),
             purpose: registry::Purpose::DelegatedUser,
             subject: registry::Subject::User,
@@ -206,11 +269,7 @@ impl Local {
             capability: "http-bearer".into(),
             minimum_scopes: BTreeSet::new(),
             evidence_lifetime_ms: auth::EVIDENCE_LIFETIME_MS,
-            fields: vec![EntryField {
-                name: "token".into(),
-                label: "Kubernetes bearer token".into(),
-                max_bytes: 8192,
-            }],
+            fields: vec![field],
             acquisition: None,
         };
         profile.revision = connectors_core::digest(
@@ -219,7 +278,7 @@ impl Local {
         let full = adapter.descriptor();
         let requirement = |o: &connectors_core::Operation| Requirement {
             operation: o.id.clone(),
-            profile: auth::PROFILE_ID.into(),
+            profile: profile_id.into(),
             scopes: BTreeSet::new(),
             effect: match o.id.as_str() {
                 "resources.list"
@@ -281,25 +340,83 @@ impl Local {
             http,
             adapter,
             kubeconfig: config.kubeconfig,
+            exec_plugin,
         })
     }
     pub fn description(&self) -> &Bootstrap {
         &self.bootstrap
     }
-    fn authenticated(&self, mut document: Secret) -> Result<ScopedHttp> {
-        let token = auth::ProtectedEntry::parse(std::mem::take(&mut document.0))
-            .map_err(native_failure)?
-            .into_secret();
+    /// The bearer token for one admitted use: the protected entry itself
+    /// under `kubernetes.token`; under `kubernetes.exec_plugin`, the entry
+    /// confirms the kubeconfig user and the pinned plugin supplies the token.
+    async fn token(&self, mut document: Secret) -> Result<Secret> {
+        let document = zeroize::Zeroizing::new(std::mem::take(&mut document.0));
+        let Some(plugin) = &self.exec_plugin else {
+            return Ok(auth::ProtectedEntry::parse(document.to_vec())
+                .map_err(native_failure)?
+                .into_secret());
+        };
+        if document.len() > auth::DOCUMENT_LIMIT {
+            return Err(Failure::InvalidInput);
+        }
+        let entry: ExecEntry =
+            serde_json::from_slice(&document).map_err(|_| Failure::InvalidInput)?;
+        if entry.user != plugin.credentials.binding().user {
+            return Err(Failure::InvalidInput);
+        }
+        let credentials = plugin.credentials.clone();
+        let kubeconfig = plugin.kubeconfig.clone();
+        let mut token = tokio::task::spawn_blocking(move || {
+            // Read when the plugin runs, and only then, so the exec block in
+            // force is used and a held token never touches the file.
+            let read = || {
+                Ok(zeroize::Zeroizing::new(
+                    filesystem::read_bounded(
+                        filesystem::private_file(&kubeconfig)
+                            .map_err(|_| exec_credential::Refusal::KubeconfigMismatch)?,
+                        connectors_kubernetes::kubeconfig::MAX_FILE_BYTES,
+                    )
+                    .map_err(|_| exec_credential::Refusal::KubeconfigMismatch)?,
+                ))
+            };
+            credentials.token_with(&read, &connectors_sdk::now_ms, &|name| {
+                std::env::var(name).ok()
+            })
+        })
+        .await
+        .map_err(|_| Failure::Unavailable)?
+        .map_err(exec_failure)?;
+        Ok(Secret(std::mem::take(&mut *token)))
+    }
+    async fn authenticated(&self, document: Secret) -> Result<ScopedHttp> {
+        let token = self.token(document).await?;
         Ok(self.http.with_credential(Arc::new(Fixed(token))))
     }
-    fn probe_with(&self, mut document: Secret) -> Result<Arc<dyn AuthProbe>> {
-        let token = auth::ProtectedEntry::parse(std::mem::take(&mut document.0))
-            .map_err(native_failure)?
-            .into_secret();
+    async fn probe_with(&self, document: Secret) -> Result<Arc<dyn AuthProbe>> {
+        let token = self.token(document).await?;
         self.http
             .with_credential(Arc::new(Fixed(token)))
             .probe_capability(&auth::REVIEW_ENDPOINT)
             .map_err(Failure::from_service)
+    }
+    fn profile_id(&self) -> &'static str {
+        if self.exec_plugin.is_some() {
+            exec_credential::PROFILE_ID
+        } else {
+            auth::PROFILE_ID
+        }
+    }
+}
+/// The contract's mapping of one plugin run's refusal.
+fn exec_failure(value: exec_credential::Refusal) -> Failure {
+    use exec_credential::Refusal;
+    match value {
+        Refusal::DigestMismatch | Refusal::PluginUnavailable | Refusal::KubeconfigMismatch => {
+            Failure::InvalidConfiguration
+        }
+        Refusal::Timeout => Failure::Timeout,
+        Refusal::OutputTooLarge | Refusal::MalformedCredential => Failure::Protocol,
+        Refusal::PluginFailed => Failure::Unavailable,
     }
 }
 /// The largest single exec message the host admits: well above the 64 KiB
@@ -362,10 +479,12 @@ impl connectors_host::local::runtime::Adapter for Local {
     fn bootstrap_v2(&self) -> Result<Bootstrap> {
         self.bootstrap_v2.clone().ok_or(Failure::Unsupported)
     }
-    /// Every refusal here precedes any I/O: the namespace, the input bounds
-    /// and the protected entry are checked, and the prepared write only holds
-    /// the capability. The upgrade happens in `execute`, after the host
-    /// committed the write it admitted.
+    /// Every refusal here precedes any provider I/O: the namespace, the input
+    /// bounds and the protected entry are checked, and the prepared write only
+    /// holds the capability. Under `kubernetes.exec_plugin` the pinned plugin
+    /// may run here, after the input was admitted, to supply the token. The
+    /// upgrade happens in `execute`, after the host committed the write it
+    /// admitted.
     async fn prepare_write(
         &self,
         operation: &str,
@@ -387,14 +506,17 @@ impl connectors_host::local::runtime::Adapter for Local {
             prepared.timeout(),
         )
         .map_err(|_| Failure::Protocol)?;
-        let write = self.authenticated(document)?.into_upgrade_write(bounds);
+        let write = self
+            .authenticated(document)
+            .await?
+            .into_upgrade_write(bounds);
         Ok(Box::new(Exec { prepared, write }))
     }
     async fn validate(&self, profile: &str, document: Secret) -> Result<Baseline> {
-        if profile != auth::PROFILE_ID {
+        if profile != self.profile_id() {
             return Err(Failure::Unsupported);
         }
-        let probe = self.probe_with(document)?;
+        let probe = self.probe_with(document).await?;
         let value = auth::validate(probe.as_ref(), connectors_sdk::now_ms)
             .await
             .map_err(native_failure)?;
@@ -437,7 +559,7 @@ impl connectors_host::local::runtime::Adapter for Local {
                 .contexts_page(&bytes, input)
                 .map_err(Failure::from_provider);
         }
-        let http = self.authenticated(document)?;
+        let http = self.authenticated(document).await?;
         self.adapter
             .with_authenticated_http(Arc::new(http), partition)
             .map_err(Failure::from_service)?
