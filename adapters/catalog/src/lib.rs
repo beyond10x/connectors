@@ -136,6 +136,92 @@ impl RefusalCode {
     }
 }
 
+/// The code a read's body-level refusal answers with, as the provider's own
+/// answer (`connectors_catalog.selection.EnvelopeCode`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EnvelopeCode {
+    InvalidInput,
+    Unauthorized,
+    Forbidden,
+    NotFound,
+    RateLimited,
+    Internal,
+}
+
+impl EnvelopeCode {
+    fn code(self) -> ErrorCode {
+        match self {
+            Self::InvalidInput => ErrorCode::InvalidInput,
+            Self::Unauthorized => ErrorCode::Unauthorized,
+            Self::Forbidden => ErrorCode::Forbidden,
+            Self::NotFound => ErrorCode::NotFound,
+            Self::RateLimited => ErrorCode::RateLimited,
+            Self::Internal => ErrorCode::Internal,
+        }
+    }
+}
+
+/// One classified body-level refusal
+/// (`connectors_catalog.selection.EnvelopeRefusal`): the provider's error
+/// name equal to one of `values` refuses the read with `code`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EnvelopeRefusal {
+    pub values: Vec<String>,
+    pub code: EnvelopeCode,
+}
+
+/// The success envelope of a read whose provider signals failure in the body
+/// of a 2xx answer (`connectors_catalog.selection.Envelope`), such as Slack's
+/// `{"ok": false, "error": "<name>"}`. A 2xx JSON answer is a success only
+/// when the value at the pointer `ok` is the JSON boolean `true`. `false`
+/// refuses the read with the code of the refusal naming the string at the
+/// pointer `error`, or `otherwise`, that string, as admitted, its reason; any
+/// other answer is one this engine cannot read.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Envelope {
+    pub ok: String,
+    pub error: String,
+    /// Omitted when empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refusals: Vec<EnvelopeRefusal>,
+    pub otherwise: EnvelopeCode,
+}
+
+impl Envelope {
+    /// The refusal a 2xx answer's JSON `body` carries under this envelope,
+    /// or `None` when it is a success.
+    fn refusal(&self, response: &HttpResponse, body: &Value) -> Option<Error> {
+        match body.pointer(&self.ok) {
+            Some(Value::Bool(true)) => return None,
+            Some(Value::Bool(false)) => {}
+            _ => {
+                return Some(Error::new(
+                    ErrorCode::UpstreamProtocol,
+                    "provider answered without its success member",
+                ));
+            }
+        }
+        let name = body.pointer(&self.error).and_then(Value::as_str);
+        let code = name
+            .and_then(|name| {
+                self.refusals
+                    .iter()
+                    .find(|refusal| refusal.values.iter().any(|value| value == name))
+            })
+            .map_or(self.otherwise, |refusal| refusal.code);
+        let mut error = Error::new(code.code(), "provider refused the request")
+            .answered()
+            .with_upstream_reason(name.and_then(connectors_core::reason::admit));
+        if code == EnvelopeCode::RateLimited {
+            error.retry_after_seconds = retry_after_header(response);
+        }
+        Some(error)
+    }
+}
+
 /// One declared refusal (`connectors_catalog.guard.Refusal`): the string at
 /// `pointer` in the write's own answer equal to one of `values` refuses the
 /// write with `code`, the matched value carried as the provider's reason.
@@ -454,6 +540,12 @@ pub struct Selection {
     /// `403` stays `forbidden`. Omitted when empty.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rate_limit_reasons: Vec<String>,
+    /// The success envelope of a read whose provider signals failure in the
+    /// body of a 2xx answer, such as Slack's `ok`: a 2xx JSON answer is a
+    /// success only when it holds `true` there, and is refused otherwise.
+    /// Only on a read answering JSON. Omitted when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<Envelope>,
     /// The only top-level keys a write's JSON body may carry. When set, the
     /// declaration types `body` as an object with exactly these properties,
     /// and a body carrying any key outside the set is refused before any
@@ -794,6 +886,7 @@ impl Engine {
                 )));
             }
             check_binary(selection)?;
+            check_envelope(selection)?;
             if let Some(download) = &selection.download {
                 check_download(selection, download)?;
                 downloads.push(Downloaded {
@@ -1248,6 +1341,12 @@ impl Engine {
                 declaration.output_schema["properties"]["body"] = binary_body_schema();
             }
             let text = expects_text(selection, &operation);
+            if text && selection.envelope.is_some() {
+                return Err(refuse(format!(
+                    "selection `{}` declares an envelope on a text read",
+                    selection.id
+                )));
+            }
             exposed.push(Exposed {
                 selection: selection.clone(),
                 operation,
@@ -1463,6 +1562,16 @@ impl Engine {
             exposed.text,
             &exposed.selection.rate_limit_reasons,
         )?;
+        // A provider that refuses in the body of a 2xx answer is refused here,
+        // never returned as a success.
+        if let Some(refusal) = exposed
+            .selection
+            .envelope
+            .as_ref()
+            .and_then(|envelope| envelope.refusal(&response, &body))
+        {
+            return Err(refusal);
+        }
         Ok(json!({
             "status": response.status,
             "body": body,
@@ -2042,11 +2151,7 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             .answered()
             .with_upstream_reason(connectors_core::reason::from_body(&response.body));
         if response.status == 429 {
-            error.retry_after_seconds = response
-                .headers
-                .iter()
-                .find(|(name, _)| name.eq_ignore_ascii_case("retry-after"))
-                .and_then(|(_, value)| retry_after(value, std::time::SystemTime::now()));
+            error.retry_after_seconds = retry_after_header(response);
         }
         return Err(error);
     }
@@ -2071,6 +2176,15 @@ fn read_body(response: &HttpResponse, text: bool, rate_limit_reasons: &[String])
             .map_err(|_| unreadable());
     }
     connectors_core::read_json(&response.body).map_err(|_| unreadable())
+}
+
+/// The delay an answer's `Retry-After` names, as [`retry_after`] reads it.
+fn retry_after_header(response: &HttpResponse) -> Option<u64> {
+    response
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("retry-after"))
+        .and_then(|(_, value)| retry_after(value, std::time::SystemTime::now()))
 }
 
 /// The delay a `Retry-After` value names, in whole seconds from `now`: either
@@ -2439,6 +2553,48 @@ fn declare_download(selection: &Selection, download: &Download) -> connectors_co
             "additionalProperties": false,
         }),
         output_schema,
+    }
+}
+
+/// What a selection's envelope must be: on a read, not a download or a binary
+/// read (a text read is refused once its kind is known), with both pointers
+/// led by `/`, at most sixteen refusals, each naming at least one value, and
+/// each value non-empty and named by one refusal alone.
+fn check_envelope(selection: &Selection) -> Result<()> {
+    let Some(envelope) = &selection.envelope else {
+        return Ok(());
+    };
+    let problem = if selection.effect != Effect::Read {
+        Some("on a write")
+    } else if selection.download.is_some()
+        || selection.binary.is_some()
+        || selection.response == Some(ResponseKind::Binary)
+    {
+        Some("on a binary read")
+    } else if !envelope.ok.starts_with('/') || !envelope.error.starts_with('/') {
+        Some("with a pointer without a leading `/`")
+    } else if envelope.refusals.len() > 16 {
+        Some("with more than sixteen refusals")
+    } else {
+        let mut named = BTreeSet::new();
+        envelope
+            .refusals
+            .iter()
+            .any(|refusal| {
+                refusal.values.is_empty()
+                    || refusal
+                        .values
+                        .iter()
+                        .any(|value| value.is_empty() || !named.insert(value))
+            })
+            .then_some("with a refusal of no value, an empty value or a value two refusals name")
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares an envelope {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
     }
 }
 

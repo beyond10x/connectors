@@ -262,3 +262,62 @@ fn every_shipped_bound_is_a_value_of_the_catalog_selection_model() {
         }
     }
 }
+
+/// Every shipped read's `envelope` is a value of `connectors_catalog.selection.ReadEnvelope`, and
+/// the engine's reader admits exactly the envelope shapes the compiled model admits: an unknown
+/// code or member, or a refusal of no value, is neither (story:slack-ok-false-is-a-refusal).
+#[test]
+fn every_shipped_envelope_is_a_value_of_the_catalog_selection_model() {
+    let schema = compiled("connectors_catalog.selection.ReadEnvelope");
+    let invariants =
+        schema["$defs"]["connectors_catalog.selection.Envelope"]["x-ess-invariants"].to_string();
+    for clause in ["ok.count", "error.count", "refusals.count"] {
+        assert!(
+            invariants.contains(clause),
+            "the model no longer states `{clause}` of an envelope: {invariants}"
+        );
+    }
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let enveloped: Vec<(String, Value)> = shipped()
+        .into_iter()
+        .filter_map(|(name, s)| Some((name, s.get("envelope")?.clone())))
+        .collect();
+    assert!(
+        !enveloped.is_empty(),
+        "no shipped selection declares `envelope`, so this check would not cover it"
+    );
+    for (name, envelope) in &enveloped {
+        assert_valid(
+            &validator,
+            name,
+            &serde_json::json!({ "envelope": envelope }),
+        );
+    }
+    let (_, shipped) = &enveloped[0];
+    type Change<'a> = &'a dyn Fn(&mut Value);
+    let variations: [(&str, Change); 5] = [
+        ("as shipped", &|_| {}),
+        ("unknown otherwise", &|e| e["otherwise"] = "capacity".into()),
+        ("unknown member", &|e| e["extra"] = true.into()),
+        ("unknown refusal code", &|e| {
+            e["refusals"][0]["code"] = "capacity".into()
+        }),
+        ("no otherwise", &|e| {
+            e.as_object_mut().unwrap().remove("otherwise");
+        }),
+    ];
+    for (name, change) in variations {
+        let mut envelope = shipped.clone();
+        change(&mut envelope);
+        let model = validator.is_valid(&serde_json::json!({ "envelope": envelope }));
+        let reader = serde_json::from_value::<Selection>(serde_json::json!({
+            "id": "users.list", "operation_id": "users_list", "effect": "read",
+            "envelope": envelope
+        }))
+        .is_ok();
+        assert_eq!(
+            reader, model,
+            "{name}: reader admits {reader}, model admits {model}"
+        );
+    }
+}
