@@ -320,8 +320,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Slack conversations",
-        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only.",
-        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_search",
+        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and on a second connection with a user token search.messages and the three conversation reads and users.list, which reach every conversation that user can read, the channels the bot is not in included; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_reads",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -336,6 +336,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "Slack files",
         "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::the_download_reads_url_private_with_the_token_on_an_admitted_host",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "Slack read refusals",
+        "A Slack read answered 200 with ok false is refused, never returned as an empty read: Slack's error is the reason, and missing_scope and not_in_channel are forbidden, invalid_auth and its kin unauthorized, an unknown channel, thread, file or user not_found, ratelimited rate_limited with its Retry-After, a bad cursor or argument invalid_input, and any other name internal, on every JSON read of both Slack sets; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::each_slack_error_answered_ok_false_is_a_refusal_naming_it",
         "/docs/reference/adapters/catalog",
     ),
     shipped(

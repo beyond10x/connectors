@@ -8,7 +8,10 @@ summary: Slack-owned provider records the parity units read or write — convers
 # (`conversations.history`, `conversations.replies`; found by `search.messages` on a
 # user-token connection), User (`users.list`), Emoji (`emoji.list`), Workspace
 # (`team.info`) and File (`files.list`, `files.info`, and its content by the
-# download `file.download`). Written through the catalog provider, each under an
+# download `file.download`). On a user-token connection (profile `slack.user`) the
+# Conversation, Message and User reads are selected as well, beside search and with no
+# write, and reach every conversation that user can read; on the bot connection a
+# Message is read only from a conversation the bot is a member of. Written through the catalog provider, each under an
 # approval: a Message is posted by `chat.postMessage` (MessagePost in, MessagePosted
 # out), edited by `chat.update` (MessageEdit, MessageEdited) and deleted by
 # `chat.delete` (MessageDelete, MessageDeleted), and a direct-message Conversation

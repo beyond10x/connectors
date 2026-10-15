@@ -613,6 +613,27 @@ The complete configuration used against the sandbox is
   `error.status` is `rate_limited`, for a read and for a write's definite
   refusal; every other `403` stays `forbidden`. An empty reason is refused
   when the selection loads.
+- `envelope` is optional, for a read answering JSON: `{"ok": "<pointer>",
+  "error": "<pointer>", "refusals": [{"values": ["<name>", …], "code":
+  "<code>"}, …], "otherwise": "<code>"}`, each code one of `invalid_input`,
+  `unauthorized`, `forbidden`, `not_found`, `rate_limited` and `internal`. It
+  is for a provider that answers a failed read with a `2xx` status and says so
+  in the body, such as Slack's `200` with `{"ok": false, "error":
+  "not_in_channel"}`. A `2xx` answer is then a success only when the value at
+  the RFC 6901 pointer `ok` is exactly the JSON boolean `true`. When it is
+  `false` the read is refused, never returned: with the code of the refusal
+  whose `values` holds the string at the pointer `error`, or `otherwise`, as
+  the provider's own answer, with that string, as admitted, as its reason; a
+  `rate_limited` refusal carries the delay the answer's `Retry-After` names
+  and is sent once more as a `429` is. An answer that is not a JSON object, or
+  whose `ok` is absent or any other value, is `upstream_protocol`. A non-`2xx`
+  answer is classified by its status as before. An envelope on a write, a
+  download, a binary or a text read, a pointer without a leading `/`, a
+  refusal of no value, an empty value, a value two refusals name, or more than
+  sixteen refusals is refused when the selection loads. The member is
+  modelled as `connectors_catalog.selection.ReadEnvelope` in
+  `adapters/catalog/spec/ess`, and every shipped envelope is checked against
+  it.
 - `body_keys` is optional, for a write: `["<key>", …]` closes its JSON body to
   exactly those top-level keys. The declared input schema types `body` as an
   object with those properties and no others, and a body carrying any other key
