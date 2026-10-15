@@ -27,6 +27,28 @@
   An existing `slack.user` connection serves the new reads once the adapter reloads the file; its
   configuration revision changes. The parity page scores the history, thread, channel-list and
   user-list rows by the user profile. Verified against a local fixture only.
+- Kubernetes reads of statefulsets (`apps/v1`), nodes (`nodes.list`, the full Node objects of
+  `GET /api/v1/nodes`) and configured custom resources (`custom_resources.list`, one namespaced
+  collection by group, version and plural). `nodes.list` is offered only when the native
+  configuration sets `node_reads`, and refused as `forbidden` with no request otherwise; a custom
+  resource collection or namespace outside `custom_resources` is `forbidden` before any request,
+  and an unserved collection is `not_found`. An existing binding that sets neither keeps its
+  configuration revision. Setup and permissions: [the Kubernetes guide](docs/local-kubernetes-cli.md),
+  "Read statefulsets, nodes and custom resources".
+- Kubernetes connections through an `exec` credential plugin, such as `aws eks get-token`, on
+  Linux. The native configuration pins the plugin (`exec_plugin.path`, `exec_plugin.sha256`); the
+  adapter verifies the file from an opened descriptor (regular, not group or other writable, no
+  set-ID bit, no `security.capability` attribute, owned by root or the adapter's user), runs that
+  descriptor from an empty environment in its own process group with no inherited descriptor, and
+  passes only the allow-listed variables; loader, interpreter and shell start-up names are refused.
+  The token is held zeroized until its `expirationTimestamp`; the deadline or more than 64 KiB of
+  output ends the run. The kubeconfig command must name the pinned path byte for byte or its bare
+  file name. Off Linux no plugin runs. Setup: [the Kubernetes guide](docs/local-kubernetes-cli.md),
+  "Authenticate through an exec credential plugin". Verified against local plugins and a recorded
+  API session; no live EKS cluster was read.
+- `connectors-build live-read-loop` runs a declared set of reads through the command line for a
+  bounded time with no revalidation, and writes a report of every call's outcome and latency
+  without inputs or results ([the development guide](docs/development.md)).
 
 ### Changed
 
