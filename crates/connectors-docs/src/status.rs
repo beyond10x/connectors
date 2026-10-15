@@ -284,6 +284,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "Confluence Cloud REST v1",
+        "CQL search, changed pages by CQL, spaces, one space, a space's content, one page with its body and a page's comments under the provider id confluence-v1, from a source document this repository writes from Atlassian's v1 reference; exercised against local fixtures only.",
+        "adapters/catalog/tests/confluence_v1.rs::shipped_confluence_v1_selections_are_exactly_the_seven_reads",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
         "HubSpot CRM",
         "One object type's records, paged, and one record by id; exercised against local fixtures only.",
         "adapters/catalog/tests/hubspot.rs::shipped_hubspot_selections_are_exactly_the_two_reads",

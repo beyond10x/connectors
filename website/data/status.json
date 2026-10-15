@@ -200,6 +200,13 @@
     },
     {
       "area": "Catalog provider",
+      "detail": "CQL search, changed pages by CQL, spaces, one space, a space's content, one page with its body and a page's comments under the provider id confluence-v1, from a source document this repository writes from Atlassian's v1 reference; exercised against local fixtures only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Confluence Cloud REST v1",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
       "detail": "One object type's records, paged, and one record by id; exercised against local fixtures only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "HubSpot CRM",
