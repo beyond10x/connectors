@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Slack history and threads on a user token. The user-token selection set
+  (`adapters/catalog/providers/slack/user-operations.json`, profile `slack.user`) selects
+  `conversations.list`, `conversations.history`, `conversations.replies` and `users.list` beside
+  `search.messages`, and still no write. A bot token reads only the channels the bot is a member
+  of (Slack answers `not_in_channel` elsewhere); a connection on a user token reads every
+  conversation that user can read, under the user scopes `channels:read`, `groups:read`,
+  `channels:history`, `groups:history`, `im:history`, `mpim:history` and `users:read`. A user
+  is looked up by reading `users.list`; `users.info` and `users.lookupByEmail` are not selected.
+  An existing `slack.user` connection serves the new reads once the adapter reloads the file; its
+  configuration revision changes. The parity page scores the history, thread, channel-list and
+  user-list rows by the user profile. Verified against a local fixture only.
+
+### Changed
+
+- A Slack read answered `200` with `{"ok": false, "error": "<name>"}` is a refusal, no longer a
+  successful invocation with Slack's body. Every JSON read of both Slack selection sets declares
+  the new selection member `envelope`: `missing_scope`, `not_in_channel`, `no_permission` and
+  `user_is_bot` are `forbidden`; `not_authed`, `invalid_auth`, `account_inactive` and
+  `token_revoked` are `unauthorized`; an unknown channel, thread, file or user is `not_found`;
+  `ratelimited` is `rate_limited` with the delay its `Retry-After` names, sent once more when that
+  fits the deadline, as a `429` is; a cursor or argument Slack refuses is `invalid_input`; any other
+  name is `internal`. Slack's `error` is the provider's reason, and an answer without a boolean
+  `ok` is `upstream_protocol`. The member is generic: any read answering JSON may declare
+  `envelope` for a provider that signals failure in the body of a `2xx` answer
+  ([the catalog provider guide](docs/local-catalog-provider.md#configure-the-provider)).
+  Migration: a caller that read `body.ok` of a Slack read now receives a refusal with exit status
+  non-zero instead. Existing Slack connections take the change once the adapter reloads the
+  files; their configuration revision changes. Verified against a local fixture only.
+
 ## 0.51.0 — 2026-10-15
 
 ### Added
