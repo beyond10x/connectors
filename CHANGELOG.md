@@ -40,10 +40,11 @@
   adapter verifies the file from an opened descriptor (regular, not group or other writable, no
   set-ID bit, no `security.capability` attribute, owned by root or the adapter's user), runs that
   descriptor from an empty environment in its own process group with no inherited descriptor, and
-  passes only the allow-listed variables; loader, interpreter and shell start-up names are refused.
-  The token is held zeroized until its `expirationTimestamp`; the deadline or more than 64 KiB of
-  output ends the run. The kubeconfig command must name the pinned path byte for byte or its bare
-  file name. Off Linux no plugin runs. Setup: [the Kubernetes guide](docs/local-kubernetes-cli.md),
+  passes only the allow-listed variables; an exact list of loader, interpreter, shell start-up and
+  library module names is refused. The token is held zeroized until its `expirationTimestamp`; the
+  deadline or more than 64 KiB of output ends the run and kills the plugin and its process group.
+  The kubeconfig command must name the pinned path byte for byte or its bare file name. Off Linux
+  no plugin runs. Setup: [the Kubernetes guide](docs/local-kubernetes-cli.md),
   "Authenticate through an exec credential plugin". Verified against local plugins and a recorded
   API session; no live EKS cluster was read.
 - `connectors-build live-read-loop` runs a declared set of reads through the command line for a
@@ -110,7 +111,8 @@
   source document is authored from Atlassian's reference pages and was checked against a local
   fixture only; no live Confluence site was read through it.
 - The Kubernetes exec credential plugin runs on Linux only, and was checked against local
-  plugins and a recorded API session; no live EKS cluster was read.
+  plugins and a recorded API session; no live EKS cluster was read. A process the plugin starts
+  that leaves its process group is not followed and keeps running.
 - The approval clock quorum is configured with the two public sources that answered on
   2026-10-14, a quorum of two of two: it tolerates no outage and no lying source until a third
   source answers. Slack writes stay behind it.
