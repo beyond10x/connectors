@@ -3,7 +3,7 @@ format: aep.planning-md/3
 id: story:tests-stop-the-owners-they-start
 kind: story
 status: draft
-title: Tests stop the owner daemons they start
+title: Tests stop every owner daemon they start
 relations:
 - serves: vision:independent-contract-adapters
 revision: 1

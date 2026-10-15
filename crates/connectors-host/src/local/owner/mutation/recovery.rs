@@ -42,14 +42,15 @@ pub(in crate::local::owner) fn recover_observation(
         // Quarantining uncertain dispatch has no expiry and needs no clock.
         let clock = if original.state == ledger::State::Prepared {
             issuance::check(until)?;
+            let selected = first
+                .config
+                .approval_clock
+                .as_ref()
+                .ok_or(Code::Unavailable)?;
             Some(
-                first
-                    .config
-                    .approval_clock
-                    .as_ref()
-                    .ok_or(Code::Unavailable)?
+                selected
                     .acquire()
-                    .map_err(|_| Code::Unavailable)?,
+                    .map_err(|failure| Error::clock(selected, failure))?,
             )
         } else {
             None

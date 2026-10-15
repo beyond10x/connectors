@@ -80,13 +80,14 @@ pub(super) fn ledger_error(error: ledger::Failure) -> Failure {
 }
 fn time(current: &issuance::Resolved, until: Instant) -> Result<clock::BoundedClock, Error> {
     issuance::check(until)?;
-    let clock = current
+    let selected = current
         .config
         .approval_clock
         .as_ref()
-        .ok_or(Code::InvalidConfiguration)?
+        .ok_or(Code::InvalidConfiguration)?;
+    let clock = selected
         .acquire()
-        .map_err(|_| Code::Unavailable)?;
+        .map_err(|failure| Error::clock(selected, failure))?;
     issuance::check(until)?;
     Ok(clock)
 }

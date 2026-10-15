@@ -538,11 +538,22 @@ The clock is a top-level table of the configuration:
 
 ```toml
 [approval_clock]
-format = "roughtime-clock/1"
-address = "192.36.143.134:2002"
-public_key = "S3AzfZJ5CjSdkJ21ZJGbxqdYP/SoE8fXKY0+aicsehI="
+format = "roughtime-quorum/1"
+quorum = 2
 max_rate_error_ppm = 10000
+
+[[approval_clock.sources]]
+address = "51.81.57.55:2002"
+public_key = "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE="
+version = "roughtime-0x8000000c"
+
+[[approval_clock.sources]]
+address = "148.113.255.71:2002"
+public_key = "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="
+version = "roughtime-0x8000000c"
 ```
+
+[The clock](local-clock.md) lists the four public sources and how many a quorum needs.
 
 ```console
 $ connectors approvals key-init --adapter slack-bot
