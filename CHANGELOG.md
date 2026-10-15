@@ -4,6 +4,18 @@
 
 ### Added
 
+- Confluence Cloud REST v1 reads as their own provider configuration, `confluence-v1`, chosen by
+  `provider` in the native configuration beside the REST v2 provider `confluence`. Its selection
+  set (`adapters/catalog/providers/confluence-v1/operations.json`, profile `atlassian.basic`)
+  selects seven reads and no write: `spaces.list`, `space.get`, `space.pages`, `pages.changed`
+  (CQL with `lastmodified`), `page.get`, `page.comments` and `content.search` (CQL search). The
+  source is a contract this repository writes itself from Atlassian's public REST v1 reference
+  pages (`adapters/atlassian/contracts/confluence-rest-v1/confluence-rest-v1.yaml`); no Atlassian
+  v1 document is vendored, because Atlassian's declares no licence. Its access read is the v1
+  space list, so a token with classic scopes only, whose v2 reads answer `401` "scope does not
+  match", connects and reads through it. Verified against a local fixture only; no live site has
+  been read through REST v1. A local install moves with the steps in
+  [docs/catalog-confluence.md, "Moving a local install onto REST v1"](docs/catalog-confluence.md#moving-a-local-install-onto-rest-v1).
 - Slack history and threads on a user token. The user-token selection set
   (`adapters/catalog/providers/slack/user-operations.json`, profile `slack.user`) selects
   `conversations.list`, `conversations.history`, `conversations.replies` and `users.list` beside
