@@ -340,6 +340,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "Slack read refusals",
+        "A Slack read answered 200 with ok false is refused, never returned as an empty read: Slack's error is the reason, and missing_scope and not_in_channel are forbidden, invalid_auth and its kin unauthorized, an unknown channel, thread, file or user not_found, ratelimited rate_limited with its Retry-After, a bad cursor or argument invalid_input, and any other name internal, on every JSON read of both Slack sets; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::each_slack_error_answered_ok_false_is_a_refusal_naming_it",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
         "Opsgenie alerts and incidents",
         "alerts.list and incidents.list over a creation window the caller advances, alert.get, incident.get and incident.alert_ids, read only, with the key sent as GenieKey <key>; verified against a local fixture only.",
         "adapters/catalog/tests/opsgenie.rs::shipped_opsgenie_selections_are_exactly_the_five_reads",

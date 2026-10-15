@@ -27,7 +27,9 @@ use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
-    runtime::{self, Bootstrap, Child, Failure, PrivateProtocol, WriteEffect, WriteResult},
+    runtime::{
+        self, Bootstrap, Child, Failure, PrivateProtocol, Refusal, WriteEffect, WriteResult,
+    },
 };
 use connectors_sdk::Secret;
 use serde_json::{Value, json};
@@ -808,6 +810,23 @@ fn page(path: &str) -> Option<Value> {
             "messages": [reply("1780000100.000100", "fixture thread parent"),
                          reply("1780000300.000300", "fixture reply one")],
             "has_more": true, "response_metadata": more("fixture-replies-2")}),
+        // Slack's `200` with `ok: false`, the error named by the cursor, and
+        // answers that are not Slack's envelope at all.
+        "/api/users.list" if query.contains("cursor=fixture-error-") => {
+            let name = query
+                .split('&')
+                .find_map(|p| p.strip_prefix("cursor=fixture-error-"))
+                .unwrap();
+            json!({"ok": false, "error": name})
+        }
+        "/api/users.list" if has("cursor=fixture-ratelimited-soon") => {
+            json!({"ok": false, "error": "ratelimited"})
+        }
+        "/api/users.list" if has("cursor=fixture-no-ok") => json!({"members": []}),
+        "/api/users.list" if has("cursor=fixture-ok-string") => {
+            json!({"ok": "true", "members": []})
+        }
+        "/api/users.list" if has("cursor=fixture-not-object") => json!([{"ok": true}]),
         "/api/users.list" if has("cursor=fixture-users-2") => json!({
             "ok": true, "members": [user(13)], "cache_ts": 1_780_000_500u64,
             "response_metadata": more("")}),
@@ -849,6 +868,9 @@ const FILE_BYTES: &[u8] = b"%PDF-1.7\n\xff\xfe\x00\x01 fixture slack file\n";
 /// `url_private`.
 const FILE_PATH: &str = "/files-pri/T0FIXTURE01-F0FIXTURE01/fixture-1.pdf";
 
+/// The `Retry-After` the fixture names on a `ratelimited` answer: beyond the
+/// invocation deadline, so the provider does not send the read again.
+const RATE_LIMIT_DELAY: u64 = 120;
 /// A private channel the user is a member of and the bot is not.
 const PRIVATE: &str = "C0FIXTURE09";
 /// The parent `ts` of the one thread in [`PRIVATE`].
@@ -1118,13 +1140,23 @@ impl Provider {
                         Some(body) => (200, body),
                         None => (404, json!({"ok": false, "error": "no fixture"})),
                     };
+                    // Slack's `ratelimited` names its delay in `Retry-After`:
+                    // one that fits the deadline for the `soon` cursor, one
+                    // that does not otherwise.
+                    let retry = if body["error"] != "ratelimited" {
+                        String::new()
+                    } else if path.contains("cursor=fixture-ratelimited-soon") {
+                        "Retry-After: 1\r\n".to_owned()
+                    } else {
+                        format!("Retry-After: {RATE_LIMIT_DELAY}\r\n")
+                    };
                     observed
                         .lock()
                         .unwrap()
                         .push((path, authorization, token_header));
                     let body = serde_json::to_vec(&body).unwrap();
                     let header = format!(
-                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\n{retry}Connection: close\r\n\r\n",
                         body.len()
                     );
                     let _ = stream.write_all(header.as_bytes()).await;
@@ -1623,22 +1655,358 @@ fn search_refuses_a_token_a_missing_query_or_an_out_of_bound_count_before_any_re
     assert!(provider.requests().is_empty());
 }
 
-/// Slack reports a failed read as `200` with `ok: false`. The provider returns
-/// that answer as it came: the caller reads `ok`.
+/// Slack reports a failed read as `200` with `ok: false`. The provider refuses
+/// it: Slack's `error` is the reason and its classification the code, so a
+/// failed read never looks like an empty one.
 #[test]
-fn a_slack_error_answer_is_returned_with_status_200_and_ok_false() {
+fn a_slack_error_answer_is_a_refusal_naming_slacks_error() {
     let provider = Provider::new();
     let mut child = Child::spawn(&provider.selection()).unwrap();
-    let result = invoke(
+    let before = provider.requests().len();
+    let refusal = explained(
         &mut child,
         "conversations.history",
         &json!({"channel": "C0FIXTURE99"}),
+    )
+    .expect_err("an ok: false answer");
+    assert_eq!(provider.requests().len(), before + 1);
+    assert_eq!(refusal.failure, Failure::ProviderNotFound);
+    assert_eq!(refusal.reason.as_deref(), Some("channel_not_found"));
+    // The bot is not in the private channel the user token reads.
+    let refusal = explained(
+        &mut child,
+        "conversations.history",
+        &json!({"channel": PRIVATE}),
+    )
+    .expect_err("not_in_channel");
+    assert_eq!(refusal.failure, Failure::ProviderForbidden);
+    assert_eq!(refusal.reason.as_deref(), Some("not_in_channel"));
+}
+
+/// How the Slack sets classify Slack's `200` with `ok: false`: each named
+/// `error` and the code it is refused with. `otherwise` is every other name.
+const MAPPED: [(&str, &str); 22] = [
+    ("missing_scope", "forbidden"),
+    ("not_in_channel", "forbidden"),
+    ("no_permission", "forbidden"),
+    ("user_is_bot", "forbidden"),
+    ("not_authed", "unauthorized"),
+    ("invalid_auth", "unauthorized"),
+    ("account_inactive", "unauthorized"),
+    ("token_revoked", "unauthorized"),
+    ("channel_not_found", "not_found"),
+    ("thread_not_found", "not_found"),
+    ("file_not_found", "not_found"),
+    ("file_deleted", "not_found"),
+    ("user_not_found", "not_found"),
+    ("ratelimited", "rate_limited"),
+    ("invalid_cursor", "invalid_input"),
+    ("invalid_limit", "invalid_input"),
+    ("limit_required", "invalid_input"),
+    ("invalid_ts_latest", "invalid_input"),
+    ("invalid_ts_oldest", "invalid_input"),
+    ("invalid_arg_name", "invalid_input"),
+    ("invalid_array_arg", "invalid_input"),
+    ("unknown_type", "invalid_input"),
+];
+/// The names the pinned document lists for a selected read that are left to
+/// `otherwise` (`internal`): a request the engine formed wrongly, or a
+/// failure on Slack's side.
+const INTERNAL: [&str; 11] = [
+    "invalid_charset",
+    "invalid_form_data",
+    "invalid_post_type",
+    "missing_post_type",
+    "invalid_json",
+    "json_not_object",
+    "request_timeout",
+    "upgrade_required",
+    "fatal_error",
+    "team_added_to_org",
+    "timezone_count_failed",
+];
+
+/// One read through the child, refused with its reason and delay.
+fn explained(child: &mut Child, operation: &str, input: &Value) -> Result<Vec<u8>, Refusal> {
+    explained_as(child, operation, input, &secret())
+}
+fn explained_as(
+    child: &mut Child,
+    operation: &str,
+    input: &Value,
+    secret: &Secret,
+) -> Result<Vec<u8>, Refusal> {
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    child.invoke_explained(
+        operation,
+        &revision,
+        "one",
+        secret,
+        &serde_json::to_vec(input).unwrap(),
+        deadline(),
+    )
+}
+
+/// Every error name the pinned document lists for a selected JSON read, in
+/// its `default` answer's `error` enum, is classified: named by the envelope
+/// or one of the [`INTERNAL`] names left to `otherwise`. A source refresh
+/// that adds a name fails here until it is classified.
+#[test]
+fn every_documented_error_of_a_slack_read_is_classified() {
+    let pinned = pinned();
+    let mut documented = 0;
+    for selection in shipped().into_iter().chain(user_shipped()) {
+        if selection.effect == Effect::Write || selection.id == "file.download" {
+            continue;
+        }
+        let path = format!("/{}", selection.id);
+        let names =
+            pinned["paths"][&path]["get"]["responses"]["default"]["schema"]["properties"]["error"]
+                ["enum"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default();
+        for name in names {
+            let name = name.as_str().unwrap();
+            assert!(
+                MAPPED.iter().any(|(mapped, _)| *mapped == name) || INTERNAL.contains(&name),
+                "`{}` documents `{name}`, which no class names",
+                selection.id
+            );
+            documented += 1;
+        }
+    }
+    assert!(
+        documented > 100,
+        "the pinned enums were not read: {documented}"
     );
+}
+
+/// Every Slack read that answers JSON, in both sets, declares the `ok`
+/// envelope: `ok` at `/ok`, Slack's error name at `/error`, the same
+/// classification on each, and `internal` for any other name. The download,
+/// which answers bytes, and the writes, whose guard reads `ok`, declare none.
+#[test]
+fn every_slack_read_declares_the_ok_envelope_and_no_write_does() {
+    let all: Vec<(&str, Selection)> = shipped()
+        .into_iter()
+        .map(|s| ("bot", s))
+        .chain(user_shipped().into_iter().map(|s| ("user", s)))
+        .collect();
+    let mut enveloped = 0;
+    for (set, selection) in &all {
+        let raw = serde_json::to_value(selection).unwrap();
+        let envelope = raw.get("envelope");
+        if selection.effect == Effect::Write || selection.id == "file.download" {
+            assert!(envelope.is_none(), "{set} `{}`", selection.id);
+            continue;
+        }
+        let envelope =
+            envelope.unwrap_or_else(|| panic!("{set} `{}` declares no envelope", selection.id));
+        enveloped += 1;
+        assert_eq!(envelope["ok"], "/ok", "{set} `{}`", selection.id);
+        assert_eq!(envelope["error"], "/error", "{set} `{}`", selection.id);
+        assert_eq!(
+            envelope["otherwise"], "internal",
+            "{set} `{}`",
+            selection.id
+        );
+        let refusals = envelope["refusals"].as_array().unwrap();
+        let named: usize = refusals
+            .iter()
+            .map(|r| r["values"].as_array().unwrap().len())
+            .sum();
+        assert_eq!(named, MAPPED.len(), "{set} `{}` names more", selection.id);
+        for (name, code) in MAPPED {
+            let found: Vec<&Value> = refusals
+                .iter()
+                .filter(|r| r["values"].as_array().unwrap().iter().any(|v| v == name))
+                .collect();
+            assert_eq!(found.len(), 1, "{set} `{}` `{name}`", selection.id);
+            assert_eq!(found[0]["code"], code, "{set} `{}` `{name}`", selection.id);
+        }
+    }
+    assert_eq!(enveloped, 9 + 5, "the enveloped reads");
+}
+
+/// Each mapped Slack error, served `200` with `ok: false`, is a refusal
+/// through the provider child: its code, Slack's `error` as the reason, and
+/// for `ratelimited` the `Retry-After` delay, sent once when the delay does
+/// not fit the deadline and twice when it does, as a `429` is. Any other name
+/// is `internal`, and an answer whose `ok` is absent or not the boolean, or
+/// that is not an object, is unreadable. Never a success.
+#[test]
+fn each_slack_error_answered_ok_false_is_a_refusal_naming_it() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection()).unwrap();
+    let expect = |code: &str| match code {
+        "forbidden" => Failure::ProviderForbidden,
+        "unauthorized" => Failure::InvalidCredential,
+        "not_found" => Failure::ProviderNotFound,
+        "rate_limited" => Failure::ProviderRateLimited,
+        "invalid_input" => Failure::InvalidInput,
+        "internal" => Failure::ProviderInternal,
+        other => panic!("unmapped `{other}`"),
+    };
+    for (name, code) in MAPPED
+        .into_iter()
+        .chain(INTERNAL.into_iter().map(|name| (name, "internal")))
+    {
+        let before = provider.requests().len();
+        let refusal = explained(
+            &mut child,
+            "users.list",
+            &json!({"limit": 2, "cursor": format!("fixture-error-{name}")}),
+        )
+        .expect_err(name);
+        assert_eq!(provider.requests().len(), before + 1, "`{name}` sent once");
+        assert_eq!(refusal.failure, expect(code), "`{name}`");
+        assert_eq!(refusal.reason.as_deref(), Some(name), "`{name}`");
+        let delay = (name == "ratelimited").then_some(RATE_LIMIT_DELAY);
+        assert_eq!(refusal.retry_after_seconds, delay, "`{name}`");
+    }
+    // A delay that fits the deadline: sent once more, as a `429` is, and
+    // refused again with the delay.
+    let before = provider.requests().len();
+    let refusal = explained(
+        &mut child,
+        "users.list",
+        &json!({"limit": 2, "cursor": "fixture-ratelimited-soon"}),
+    )
+    .expect_err("ratelimited soon");
+    assert_eq!(provider.requests().len(), before + 2);
+    assert_eq!(refusal.failure, Failure::ProviderRateLimited);
+    assert_eq!(refusal.retry_after_seconds, Some(1));
+    for cursor in ["fixture-no-ok", "fixture-ok-string", "fixture-not-object"] {
+        let refusal = explained(
+            &mut child,
+            "users.list",
+            &json!({"limit": 2, "cursor": cursor}),
+        )
+        .expect_err(cursor);
+        assert_eq!(refusal.failure, Failure::Protocol, "`{cursor}`");
+    }
+    // `ok: true` is still the answer as served.
+    let raw = invoke_raw(&mut child, "users.list", &json!({"limit": 2}));
+    let result: Value = serde_json::from_slice(&raw).unwrap();
     assert_eq!(result["status"], 200);
-    assert_eq!(
-        result["body"],
-        json!({"ok": false, "error": "channel_not_found"})
+    assert_eq!(result["body"]["ok"], true);
+}
+
+/// No Slack read answers success on `ok: false`: a token Slack does not
+/// accept is answered `200` with `ok: false` and `invalid_auth` on every
+/// route, and every JSON read of both sets is refused as an invalid
+/// credential naming it.
+#[test]
+fn no_slack_read_answers_success_on_ok_false() {
+    let revoked =
+        Secret(serde_json::to_vec(&json!({"token": "fixture-slack-revoked-token"})).unwrap());
+    let input = |id: &str| match id {
+        "conversations.history" => json!({"channel": "C0FIXTURE01"}),
+        "conversations.replies" => json!({"channel": "C0FIXTURE01", "ts": "1780000100.000100"}),
+        "files.info" => json!({"file": "F0FIXTURE01"}),
+        "search.messages" => json!({"query": "fixture"}),
+        _ => json!({}),
+    };
+    let mut read = 0;
+    for (provider, selections) in [
+        (Provider::new(), shipped()),
+        (Provider::user(), user_shipped()),
+    ] {
+        let mut child = Child::spawn(&provider.selection()).unwrap();
+        for selection in selections
+            .iter()
+            .filter(|s| s.effect == Effect::Read && s.id != "file.download")
+        {
+            let id = selection.id.as_str();
+            let before = provider.requests().len();
+            let refusal = explained_as(&mut child, id, &input(id), &revoked).expect_err(id);
+            assert_eq!(provider.requests().len(), before + 1, "`{id}` sent once");
+            assert_eq!(refusal.failure, Failure::InvalidCredential, "`{id}`");
+            assert_eq!(refusal.reason.as_deref(), Some("invalid_auth"), "`{id}`");
+            read += 1;
+        }
+    }
+    assert_eq!(read, 9 + 5);
+}
+
+/// The envelope is a read's: on a write, a download, a text read or a binary
+/// read it is refused when the selection loads, as are a pointer without a
+/// leading `/`, an empty value, a value two refusals name, a refusal of no
+/// value and more than sixteen refusals.
+#[test]
+fn an_envelope_outside_a_json_read_or_malformed_is_refused_when_the_selection_loads() {
+    let envelope = || {
+        json!({"ok": "/ok", "error": "/error",
+               "refusals": [{"values": ["missing_scope"], "code": "forbidden"}],
+               "otherwise": "internal"})
+    };
+    let with = |id: &str, change: &dyn Fn(&mut Value)| -> Vec<Selection> {
+        let mut raw: Vec<Value> = serde_json::from_value(
+            serde_json::from_slice::<Value>(
+                &fs::read(root().join("providers/slack/operations.json")).unwrap(),
+            )
+            .unwrap()["operations"]
+                .clone(),
+        )
+        .unwrap();
+        for operation in raw.iter_mut().filter(|o| o["id"] == id) {
+            change(operation);
+        }
+        serde_json::from_value(Value::Array(raw)).unwrap()
+    };
+    // The shipped sets load.
+    Engine::new(&committed(), BASE, &shipped()).unwrap();
+    Engine::new(&committed(), BASE, &user_shipped()).unwrap();
+    for id in ["chat.postMessage", "file.download"] {
+        let message = refusal(&with(id, &|o| o["envelope"] = envelope()));
+        assert!(message.contains("envelope"), "`{id}`: {message}");
+    }
+    let text = refusal(&with("users.list", &|o| o["response"] = json!("text")));
+    assert!(text.contains("envelope"), "text: {text}");
+    let mut bad: Vec<(&str, Value)> = Vec::new();
+    let mut e = envelope();
+    e["ok"] = json!("ok");
+    bad.push(("pointer", e));
+    let mut e = envelope();
+    e["error"] = json!("");
+    bad.push(("empty error pointer", e));
+    let mut e = envelope();
+    e["refusals"][0]["values"] = json!([""]);
+    bad.push(("empty value", e));
+    let mut e = envelope();
+    e["refusals"] = json!([{"values": ["a"], "code": "forbidden"},
+                           {"values": ["a"], "code": "not_found"}]);
+    bad.push(("repeated value", e));
+    let mut e = envelope();
+    e["refusals"][0]["values"] = json!([]);
+    bad.push(("no values", e));
+    let mut e = envelope();
+    e["refusals"] = Value::Array(
+        (0..17)
+            .map(|n| json!({"values": [format!("v{n}")], "code": "forbidden"}))
+            .collect(),
     );
+    bad.push(("seventeen", e));
+    for (what, envelope) in bad {
+        let message = refusal(&with("users.list", &|o| o["envelope"] = envelope.clone()));
+        assert!(message.contains("envelope"), "{what}: {message}");
+    }
+    // An unknown code or member is not a selection at all.
+    for change in [
+        &(|e: &mut Value| e["otherwise"] = json!("capacity")) as &dyn Fn(&mut Value),
+        &|e: &mut Value| e["extra"] = json!(true),
+    ] {
+        let mut e = envelope();
+        change(&mut e);
+        assert!(
+            serde_json::from_value::<Selection>(json!({
+                "id": "users.list", "operation_id": "users_list", "effect": "read",
+                "envelope": e
+            }))
+            .is_err()
+        );
+    }
 }
 
 /// Walk one list from `first`, sending each page's non-empty
