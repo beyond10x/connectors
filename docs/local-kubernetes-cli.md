@@ -232,30 +232,41 @@ configuration. The adapter runs it only under these rules, from the
   `exec_plugin.sha256` the SHA-256 of its bytes. Both are checked before every run;
   a different file refuses with `invalid_configuration` and nothing runs. The file
   must not be writable by group or others, must carry no set-user-ID or
-  set-group-ID bit and must be owned by root or by you. `path` must name the file
+  set-group-ID bit and no file capabilities (`getcap` shows none), and must be
+  owned by root or by you. `path` must name the file
   itself, not a symbolic link: the adapter opens it once without following a
   link, hashes it through that open file and runs that same open file, so a file
-  swapped in at `path` after the check never runs. Plugins run on Linux only.
+  swapped in at `path` after the check never runs. The plugin inherits no open
+  file of the adapter beyond its standard streams. Plugins run on Linux only.
 - **Arguments from the kubeconfig, as data.** `exec_plugin.user` names the
   kubeconfig `users` entry; its `exec.args` become the argument vector, and no shell
-  runs. The entry's `exec.command` must be the pinned path or its bare file name
+  runs. The entry's `exec.command` must be the pinned path, written exactly as in
+  `exec_plugin.path`, or its bare file name
   (`aws` for `/usr/local/aws-cli/v2/current/bin/aws`): the kubeconfig cannot pick
-  another program.
+  another program. The kubeconfig is read each time the plugin runs, not while a
+  held token is reused.
 - **Nothing inherited that you did not name.** The plugin starts from an empty
   environment. It receives `HOME` only when `exec_plugin.home` is set (and runs in
   that directory, otherwise in `/`), `KUBERNETES_EXEC_INFO`, and each name in
-  `exec_plugin.env`, valued from the kubeconfig's `exec.env`. A kubeconfig `exec.env`
-  name that is not in `exec_plugin.env` refuses. File reads are not sandboxed: point
+  `exec_plugin.env`, valued from the kubeconfig's `exec.env` or, failing that, from
+  the adapter's own environment. A kubeconfig `exec.env`
+  name that is not in `exec_plugin.env` refuses. `exec_plugin.env` itself cannot
+  name a variable that makes a program load or run other code (`LD_*`,
+  `PYTHON*`, `BASH_ENV`, `GLIBC_TUNABLES` and the rest the
+  [reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md#exec-plugin-credentials)
+  lists); a configuration that does is refused. File reads are not sandboxed: point
   `home` at the directory holding the plugin's profile files (for the AWS CLI, the
   one containing `.aws/config` and `.aws/credentials`).
 - **Bounded, and only when admitted.** It runs inside a connect, repair or
   operation, never while loading the configuration, listing or describing.
   `exec_plugin.timeout_ms` (1 to 60000, default 10000) bounds one run; at the
-  deadline its whole process group is killed (`timeout`). More than 64 KiB of
+  deadline its whole process group is killed (`timeout`), and anything it left
+  running in its group is killed when it finishes. More than 64 KiB of
   output is refused (`protocol`), as is an answer that is not an `ExecCredential`
   with a bearer token; a non-zero exit is `unavailable`.
 - **Token in memory only.** The token is reused until its `expirationTimestamp`,
-  then the plugin runs again. It is never written to disk. The adapter process
+  then the plugin runs again; an `expirationTimestamp` already past (Go's zero
+  time `0001-01-01T00:00:00Z` included) serves only the use that ran it. It is never written to disk. The adapter process
   holds it, so stopping the adapter forgets it.
 
 `exec_plugin` requires `kubeconfig`. No default configuration sets it. With it set,
