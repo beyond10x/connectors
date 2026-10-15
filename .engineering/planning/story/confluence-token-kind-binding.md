@@ -2,13 +2,16 @@
 format: aep.planning-md/3
 id: story:confluence-token-kind-binding
 kind: story
-status: draft
+status: active
 title: A Confluence connection binds v1 or v2 by probing its token once
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - depends_on: story:confluence-v1-authored-contract
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-15T08:46:55Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-15T08:46:56Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 

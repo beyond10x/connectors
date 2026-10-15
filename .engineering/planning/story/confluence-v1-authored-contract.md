@@ -2,13 +2,16 @@
 format: aep.planning-md/3
 id: story:confluence-v1-authored-contract
 kind: story
-status: draft
+status: active
 title: Confluence REST v1 reads from a contract this repository writes
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
 - supersedes: story:parity-confluence-cql-search-v1-held
-revision: 1
+revision: 3
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-15T08:46:55Z", actor: "human:timo", revision: 2}
+- {from: "proposed", to: "active", at: "2026-10-15T08:46:55Z", actor: "human:timo", revision: 3}
 ---
 ## Outcome
 
