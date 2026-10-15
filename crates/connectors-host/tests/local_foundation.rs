@@ -442,3 +442,33 @@ fn owner_and_migration_tampering_refuse_inspection() {
         ));
     }
 }
+
+/// A bounded read that may hold secrets (a kubeconfig whose `exec.env`
+/// values an exec plugin receives) is read into one buffer allocated to the
+/// bound, which never reallocates, so no earlier block holding part of the
+/// file is released unzeroized. The capacity is the bound plus the one byte
+/// that detects an oversized file: any growth would have changed it.
+#[test]
+fn zeroizing_bounded_read_allocates_once_to_its_bound() {
+    let root = root();
+    let limit = 1024 * 1024;
+    for size in [0, 1, 200_000, limit] {
+        let path = root.path().join(format!("bounded-{size}"));
+        let content: Vec<u8> = (0..size).map(|i| (i % 251) as u8).collect();
+        fs::write(&path, &content).unwrap();
+        let data =
+            filesystem::read_bounded_zeroizing(fs::File::open(&path).unwrap(), limit).unwrap();
+        assert_eq!(data.as_slice(), content.as_slice(), "{size}");
+        assert_eq!(
+            data.capacity(),
+            limit + 1,
+            "{size}: the buffer was reallocated"
+        );
+    }
+    let over = root.path().join("bounded-over");
+    fs::write(&over, vec![b'x'; limit + 1]).unwrap();
+    assert!(matches!(
+        filesystem::read_bounded_zeroizing(fs::File::open(&over).unwrap(), limit),
+        Err(Failure::InvalidConfiguration)
+    ));
+}
