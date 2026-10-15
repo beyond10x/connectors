@@ -4,6 +4,8 @@ id: story:adapter-private-protocol-refusal-named
 kind: story
 status: draft
 title: An adapter refusing its private protocol is named, not unavailable
+relations:
+- serves: vision:independent-contract-adapters
 revision: 1
 ---
 ## Observed
