@@ -9,11 +9,12 @@
 //! - its arguments come from the kubeconfig as data, never through a shell;
 //! - it starts from an empty environment and receives only `HOME` (when
 //!   configured), `KUBERNETES_EXEC_INFO` and the allow-listed names, none of
-//!   which may be a loader or start-up variable;
+//!   which may be one of the listed loader or start-up variables;
 //! - it inherits no descriptor of the adapter beyond stdio (and, for a script,
 //!   the plugin descriptor its interpreter reads);
-//! - one run is bounded in time and in output, and its process group is killed
-//!   when the run ends, while the plugin's own process is still unreaped;
+//! - one run is bounded in time and in output, and its process group and its
+//!   own process are killed when the run ends, while the plugin's own process
+//!   is still unreaped;
 //! - the token is held in memory until its stated expiry and never written
 //!   anywhere; the buffers that held it or the environment are zeroized.
 //!
@@ -87,8 +88,8 @@ pub struct Binding {
     pub timeout_ms: Option<u64>,
 }
 /// The exact names `ExecPluginEnvName` refuses: the two the adapter sets
-/// itself, and every name that makes a process load or run code it was not
-/// given or changes how its loader or shell starts. The model
+/// itself, and these names, which load code or change how a loader or shell
+/// starts. The list is exact, not every name a plugin might read. The model
 /// (`spec/ess/domains/exec_credentials.yaml`) is the list; a test holds these
 /// constants to it.
 pub const REFUSED_ENV_NAMES: &[&str] = &[
@@ -97,6 +98,9 @@ pub const REFUSED_ENV_NAMES: &[&str] = &[
     "JAVA_TOOL_OPTIONS",
     "_JAVA_OPTIONS",
     "JDK_JAVA_OPTIONS",
+    "CLASSPATH",
+    "LUA_INIT",
+    "TCLLIBPATH",
     "BASH_ENV",
     "ENV",
     "SHELLOPTS",
@@ -106,6 +110,13 @@ pub const REFUSED_ENV_NAMES: &[&str] = &[
     "CDPATH",
     "GLOBIGNORE",
     "PROMPT_COMMAND",
+    "ZDOTDIR",
+    "FPATH",
+    "OPENSSL_CONF",
+    "OPENSSL_MODULES",
+    "OPENSSL_ENGINES",
+    "GIO_MODULE_DIR",
+    "GTK_MODULES",
     "GCONV_PATH",
     "GETCONF_DIR",
     "GLIBC_TUNABLES",
@@ -119,8 +130,18 @@ pub const REFUSED_ENV_NAMES: &[&str] = &[
     "RES_OPTIONS",
 ];
 /// The name prefixes `ExecPluginEnvName` refuses: the dynamic loader and the
-/// start-up variables of the interpreters a plugin is commonly written in.
-pub const REFUSED_ENV_PREFIXES: &[&str] = &["LD_", "PYTHON", "PERL", "RUBY", "NODE_"];
+/// start-up variables of the interpreters and runtimes a plugin is commonly
+/// written in (`DOTNET_` covers `DOTNET_STARTUP_HOOKS`).
+pub const REFUSED_ENV_PREFIXES: &[&str] = &[
+    "LD_",
+    "PYTHON",
+    "PERL",
+    "RUBY",
+    "NODE_",
+    "DOTNET_",
+    "COREHOST_",
+    "LUA_INIT_",
+];
 /// `connectors_kubernetes.exec_credentials.ExecPluginEnvName`.
 fn env_name(name: &str) -> bool {
     let mut bytes = name.bytes();
@@ -556,17 +577,23 @@ fn exited_unreaped(pid: libc::pid_t) -> std::io::Result<Option<bool>> {
     Ok(Some(info.si_code == libc::CLD_EXITED && status == 0))
 }
 
-/// Ends a run: kills the plugin's whole process group once, then reaps the
-/// plugin. Called exactly once per spawned plugin, and nothing before it
-/// reaps the child.
+/// Ends a run: kills the plugin's whole process group once and the plugin's
+/// own process once, then reaps the plugin. Killing the process as well as
+/// the group ends the run even when the plugin moved itself to another
+/// group, so the wait below cannot outlast the deadline; a descendant that
+/// left the group is not followed. Called exactly once per spawned plugin,
+/// and nothing before it reaps the child.
 #[cfg(target_os = "linux")]
 fn end(child: &mut std::process::Child, pid: libc::pid_t) {
     // SAFETY: the plugin is unreaped (only `exited_unreaped`, which does not
-    // reap, has waited on it), so its pid, which is its process group id
-    // from process_group(0), cannot have been reused. After the wait below
-    // the group is never signalled again.
+    // reap, has waited on it), so its pid cannot name another process, and
+    // the group id it was given by process_group(0) cannot name another
+    // group: a process group id stays reserved while its leader's pid is
+    // held, even after the leader moved to another group. kill only sends a
+    // signal. After the wait below neither is signalled again.
     unsafe {
         libc::kill(-pid, libc::SIGKILL);
+        libc::kill(pid, libc::SIGKILL);
     }
     let _ = child.wait();
 }
