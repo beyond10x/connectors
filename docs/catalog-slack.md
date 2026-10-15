@@ -148,8 +148,8 @@ The three reads that are not lists each answer in one call:
   an externally shared channel.
 - **`emoji.list`** lists the workspace's custom emoji, not the standard set.
   The pinned answer is the document's default success template, so the
-  document states no member beyond `ok`; Slack's answer is returned as it
-  came.
+  document states no member beyond `ok`; Slack's answer with `"ok": true` is
+  returned as it came.
 - **`auth.test`** returns the answer of the request connecting already makes
   ([Authentication](#authentication)), as an operation a caller reads:
   together with `team.info` it gives the token's identity and workspace.
@@ -287,15 +287,35 @@ input by digest, records the attempt, and sends the request once
   `not_in_channel`, `is_inactive` or `invalid_auth`, is `outcome_unknown`,
   as for the other two writes.
 
-## Errors are answers
+## Errors are refusals
 
 Slack reports most failures of a read — `channel_not_found`, `not_in_channel`,
 `missing_scope`, `invalid_auth` — as HTTP `200` with `"ok": false` and an
-`error` string. The provider classifies by HTTP status, so such an answer is
-returned as a successful invocation with `status` `200` and Slack's body. Read
-`body.ok` before reading a page. A rate-limited read is HTTP `429` with
-`Retry-After` and is handled as for every catalog read
-([Limits](local-catalog-provider.md#limits)).
+`error` string. Every read that answers JSON, in both sets, declares Slack's
+success envelope (`envelope`,
+[the catalog provider guide](local-catalog-provider.md#configure-the-provider)),
+so such an answer is refused, never returned as an empty read: Slack's `error`
+is the provider's reason, and the refusal's code is the provider's own answer:
+
+| `error` | refused with |
+|---|---|
+| `missing_scope`, `not_in_channel`, `no_permission`, `user_is_bot` | `forbidden` |
+| `not_authed`, `invalid_auth`, `account_inactive`, `token_revoked` | `unauthorized` |
+| `channel_not_found`, `thread_not_found`, `file_not_found`, `file_deleted`, `user_not_found` | `not_found` |
+| `ratelimited` | `rate_limited`, with the delay its `Retry-After` names |
+| `invalid_cursor`, `invalid_limit`, `limit_required`, `invalid_ts_latest`, `invalid_ts_oldest`, `invalid_arg_name`, `invalid_array_arg`, `unknown_type` | `invalid_input` |
+| any other name | `internal` |
+
+Every name the pinned document lists for a selected read is either in this
+table or one the test leaves to `internal` on purpose, a request the engine
+formed wrongly or a failure on Slack's side, and a source refresh that adds a
+name fails the test until it is classified. An answer whose `ok` is absent or
+not the boolean, or that is not a JSON object, is `upstream_protocol`. A
+`ratelimited` answer, like a `429`, is sent once more when the delay it names
+fits the invocation's deadline ([Limits](local-catalog-provider.md#limits)).
+`file.download` answers bytes, not Slack's envelope, and the writes are
+checked by their guard ([Messages](#messages)), so none of them declares the
+envelope.
 
 ## Authentication
 
@@ -700,7 +720,11 @@ ready
   with synthetic ids and messages: the exact request of each read, including
   the `oldest`/`latest` window and the bearer header, with no `token` query
   parameter or header, the returned body bytes, a two-page walk of each list to
-  an empty `next_cursor`, an `ok: false` answer returned as `200`, the
+  an empty `next_cursor`, each classified `ok: false` error name and an
+  unnamed one refused with its code and Slack's `error` as the reason, a
+  `ratelimited` answer sent once more only when its `Retry-After` fits the
+  deadline, an answer without a boolean `ok` refused as unreadable, every JSON
+  read of both sets refused on a token Slack answers `invalid_auth`, the
   `auth.test` identity read and its refusal, and, on a second connection with a
   user token, search, the three conversation reads and `users.list`, a
   private channel the bot is not in included. The file reads are checked the same way: a two-page
