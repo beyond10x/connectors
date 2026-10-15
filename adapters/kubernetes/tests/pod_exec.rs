@@ -78,6 +78,8 @@ fn kubernetes(pod_exec: bool) -> (Kubernetes, Arc<Reads>) {
         helm_release_reads: HelmReleaseReads::Off,
         pod_logs: false,
         pod_exec,
+        node_reads: false,
+        custom_resources: Vec::new(),
         kubeconfig_contexts: false,
     };
     // The local effective document: the federated schema refuses pod_exec.
