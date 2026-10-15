@@ -214,10 +214,13 @@ impl Source {
         if self.address.len() > 64 || self.public_key.len() != 44 {
             return Err(Failure::InvalidConfiguration);
         }
-        let address: SocketAddr = self
+        let parsed: SocketAddr = self
             .address
             .parse()
             .map_err(|_| Failure::InvalidConfiguration)?;
+        // One address has one form: an IPv4-mapped IPv6 address is its IPv4
+        // address for every check, the duplicate check included, and the socket.
+        let address = SocketAddr::new(parsed.ip().to_canonical(), parsed.port());
         let key = STANDARD
             .decode(&self.public_key)
             .map_err(|_| Failure::InvalidConfiguration)?;
@@ -225,8 +228,8 @@ impl Source {
             || address.ip().is_unspecified()
             || address.ip().is_multicast()
             || matches!(address, SocketAddr::V4(a) if a.ip().is_broadcast())
-            || matches!(address, SocketAddr::V6(a) if a.scope_id() != 0 || a.flowinfo() != 0)
-            || address.to_string() != self.address
+            || matches!(parsed, SocketAddr::V6(a) if a.scope_id() != 0 || a.flowinfo() != 0)
+            || parsed.to_string() != self.address
             || key.len() != 32
             || key.iter().all(|b| *b == 0)
             || STANDARD.encode(&key) != self.public_key
@@ -342,6 +345,8 @@ impl Configuration {
         let mut counted = Vec::with_capacity(replies.len());
         for source in replies {
             source.started.continuous_with(now)?;
+            // A local timer refusal refuses here; a source whose signed values
+            // give no interval stays counted and contributes none (an outlier).
             bounds_ns(&source, now, self.max_rate_error_ppm)?;
             counted.push(source);
         }
@@ -578,10 +583,11 @@ struct Counted {
     received: Stamp,
 }
 
-/// The answer at one reading: its interval and each counted source's own.
+/// The answer at one reading: its interval and each counted source's own, none
+/// when the source's signed values give no interval.
 struct Answer {
     interval: ClockInterval,
-    sources: Vec<(usize, u128, u128)>,
+    sources: Vec<(usize, Option<(u128, u128)>)>,
     lower_ns: u128,
     upper_ns: u128,
 }
@@ -607,11 +613,12 @@ impl BoundedClock {
             .answer_at(Stamp::read()?, std::process::id())
             .map_err(|_| Failure::Unavailable)?;
         let mut sources = self.reports.clone();
-        for (index, lower, upper) in answer.sources {
-            sources[index].result = if lower <= answer.upper_ns && upper >= answer.lower_ns {
-                SourceResult::Agreed
-            } else {
-                SourceResult::Outlier
+        for (index, interval) in answer.sources {
+            sources[index].result = match interval {
+                Some((lower, upper)) if lower <= answer.upper_ns && upper >= answer.lower_ns => {
+                    SourceResult::Agreed
+                }
+                _ => SourceResult::Outlier,
             };
         }
         Ok(Observation {
@@ -632,30 +639,28 @@ impl BoundedClock {
         {
             return Err(Combined::Local);
         }
-        let mut origin = u128::MAX;
         let mut sources = Vec::with_capacity(self.counted.len());
         for source in &self.counted {
             source
                 .started
                 .continuous_with(now)
                 .map_err(|_| Combined::Local)?;
-            let (origin_lower, lower, upper) =
+            let interval =
                 bounds_ns(source, now, self.rate_error_ppm).map_err(|_| Combined::Local)?;
-            origin = origin.min(origin_lower);
-            sources.push((source.index, lower, upper));
+            sources.push((source.index, interval));
         }
-        let intervals: Vec<_> = sources.iter().map(|(_, l, u)| (*l, *u)).collect();
+        let intervals: Vec<_> = sources.iter().filter_map(|(_, i)| *i).collect();
         let (lower, upper) = quorum_answer(&intervals, self.quorum, max_width_ms())?;
         if upper > MAX_SAFE_MS {
             return Err(Combined::Local);
         }
         // No leap announcement is consumed. Avoid extrapolating across any UTC
         // midnight, including the possible skipped/repeated second around it,
-        // from the earliest counted source's origin.
+        // from the answer's own lower bound: never from one source's interval,
+        // so an outlier or a wide source on another day refuses nothing.
         let day_ms = 86_400_000;
-        let origin_ms = origin / NS_PER_MS;
-        if origin_ms / day_ms != upper / day_ms
-            || origin_ms % day_ms < 1000
+        if lower / day_ms != upper / day_ms
+            || lower % day_ms < 1000
             || upper % day_ms >= day_ms - 1000
         {
             return Err(Combined::Local);
@@ -671,11 +676,12 @@ impl BoundedClock {
         })
     }
 }
-/// A source's interval at `now` before any admission check, in ns: its origin's
-/// lower bound (M - A - 3 ms), then l = origin + elapsed_lower(N - R) and
-/// u = M + A + 3 ms + elapsed_upper(N - S). Refused once elapsed_upper(N - S)
-/// passes 30 s.
-fn bounds_ns(source: &Counted, now: Stamp, ppm: u32) -> Result<(u128, u128, u128)> {
+/// A source's interval at `now` before any admission check, in ns:
+/// l = M - A - 3 ms + elapsed_lower(N - R) and u = M + A + 3 ms + elapsed_upper(N - S).
+/// A local timer refusal, including elapsed_upper(N - S) past 30 s, refuses;
+/// signed values that give no interval (M below A + 3 ms, or past the range) are
+/// that source's alone and give `None`, never a refusal of the whole clock.
+fn bounds_ns(source: &Counted, now: Stamp, ppm: u32) -> Result<Option<(u128, u128)>> {
     let from_start = now
         .monotonic
         .checked_sub(source.started.monotonic)
@@ -690,19 +696,16 @@ fn bounds_ns(source: &Counted, now: Stamp, ppm: u32) -> Result<(u128, u128, u128
     }
     let midpoint = u128::from(source.sample.midpoint) * NS_PER_S;
     let radius = u128::from(source.sample.radius) * NS_PER_S;
-    let origin_lower = midpoint
+    let elapsed_lower = elapsed(from_receive, ppm, false)?;
+    let lower = midpoint
         .checked_sub(radius)
         .and_then(|v| v.checked_sub(3 * NS_PER_MS))
-        .ok_or(Failure::Unavailable)?;
-    let lower = origin_lower
-        .checked_add(elapsed(from_receive, ppm, false)?)
-        .ok_or(Failure::Unavailable)?;
+        .and_then(|v| v.checked_add(elapsed_lower));
     let upper = midpoint
         .checked_add(radius)
         .and_then(|v| v.checked_add(elapsed_upper))
-        .and_then(|v| v.checked_add(3 * NS_PER_MS))
-        .ok_or(Failure::Unavailable)?;
-    Ok((origin_lower, lower, upper))
+        .and_then(|v| v.checked_add(3 * NS_PER_MS));
+    Ok(lower.zip(upper))
 }
 impl Clock for BoundedClock {
     fn now(&self) -> mutations::Result<ClockInterval> {
