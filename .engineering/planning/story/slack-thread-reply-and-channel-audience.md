@@ -4,6 +4,10 @@ id: story:slack-thread-reply-and-channel-audience
 kind: story
 status: draft
 title: Slack thread replies, updates and a channel-audience read that refuses outside readers
+relations:
+- decomposes: epic:fluxplane-plugin-parity
+- serves: vision:independent-contract-adapters
+- depends_on: story:parity-slack-message-writes
 revision: 1
 ---
 ## Outcome
