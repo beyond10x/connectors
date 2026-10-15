@@ -320,8 +320,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Slack conversations",
-        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only.",
-        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_search",
+        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and on a second connection with a user token search.messages and the three conversation reads and users.list, which reach every conversation that user can read, the channels the bot is not in included; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_reads",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
