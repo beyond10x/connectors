@@ -126,15 +126,25 @@ are the `exec_credentials` ESS domain.
   `exec_plugin` binding: `path`, the plugin's absolute path; `sha256`, the hex
   digest of its bytes; `user`, the kubeconfig `users` entry whose `exec` block
   supplies the arguments; `env`, the allow-list of environment variable names
-  (each `ExecPluginEnvName`: never `HOME` or `KUBERNETES_EXEC_INFO`, and never a
-  name that makes a process load or run code it was not given: `LD_*`,
-  `PYTHON*`, `PERL*`, `RUBY*`, `NODE_*`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`,
-  `JDK_JAVA_OPTIONS`, `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, `PS4`, `IFS`,
-  `CDPATH`, `GLOBIGNORE`, `PROMPT_COMMAND`, and the names the C library drops for
-  a set-ID program, `GCONV_PATH`, `GETCONF_DIR`, `GLIBC_TUNABLES`, `HOSTALIASES`,
-  `LOCALDOMAIN`, `LOCPATH`, `MALLOC_TRACE`, `NIS_PATH`, `NLSPATH`,
-  `RESOLV_HOST_CONF` and `RES_OPTIONS`; a binding naming one is refused when the
-  configuration loads); optionally `home`, an absolute directory; and optionally `timeout_ms` (1 to
+  (each `ExecPluginEnvName`: never `HOME` or `KUBERNETES_EXEC_INFO`, and never
+  one of these names, which load code or change how a loader or shell starts:
+  the dynamic loader's `LD_*`; the interpreter and runtime start-up names
+  `PYTHON*`, `PERL*`, `RUBY*`, `NODE_*`, `DOTNET_*` (`DOTNET_STARTUP_HOOKS`
+  among them), `COREHOST_*`, `LUA_INIT`, `LUA_INIT_*`, `JAVA_TOOL_OPTIONS`,
+  `_JAVA_OPTIONS`, `JDK_JAVA_OPTIONS`, `CLASSPATH` and `TCLLIBPATH`; the shell
+  start-up and parsing names `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, `PS4`,
+  `IFS`, `CDPATH`, `GLOBIGNORE`, `PROMPT_COMMAND`, `ZDOTDIR` and `FPATH`; the
+  library module and configuration names `OPENSSL_CONF`, `OPENSSL_MODULES`,
+  `OPENSSL_ENGINES`, `GIO_MODULE_DIR` and `GTK_MODULES`; and the names glibc
+  drops for a set-ID program other than `LD_*`, `TMPDIR` and `TZDIR`:
+  `GCONV_PATH`, `GETCONF_DIR`, `GLIBC_TUNABLES`, `HOSTALIASES`, `LOCALDOMAIN`,
+  `LOCPATH`, `MALLOC_TRACE`, `NIS_PATH`, `NLSPATH`, `RESOLV_HOST_CONF` and
+  `RES_OPTIONS`. `TMPDIR` and `TZDIR` load no code and are admitted. The
+  contract refuses exactly the listed names and prefixes; it does not claim
+  that no other variable can influence a plugin, and a name not listed that a
+  particular plugin or library reads is the operator's to allow-list or not. A
+  binding naming a listed one is refused when the configuration loads);
+  optionally `home`, an absolute directory; and optionally `timeout_ms` (1 to
   60000, 10000 when omitted). It requires `kubeconfig`. No default configuration
   and no federated service configuration enables it. Absent, no plugin ever runs,
   the `kubernetes.exec_plugin` profile is not offered and validating it is
@@ -161,7 +171,12 @@ are the `exec_credentials` ESS domain.
   executable inherits no descriptor. Besides that one descriptor and its
   standard input, output and error, the plugin inherits no descriptor of the
   adapter: every other one is closed on the exec, whether or not the adapter
-  opened it close-on-exec. Running a plugin needs Linux; elsewhere it
+  opened it close-on-exec. Limitation: on a kernel before Linux 5.11, which
+  cannot mark a range close-on-exec in one call, the adapter marks descriptors
+  one by one up to the open-files hard limit, capped at 1048576 (2^20, the
+  default `fs.nr_open`); where `fs.nr_open` was raised and the adapter holds a
+  descriptor numbered above that cap, that descriptor is not marked. Running a
+  plugin needs Linux; elsewhere it
   is `plugin_unavailable`. The kubeconfig's `command` must equal `path` byte for
   byte (a trailing or repeated slash is another spelling and refuses) or be a
   bare file name equal byte for byte to the path's file name.
@@ -180,13 +195,17 @@ are the `exec_credentials` ESS domain.
   operating system lets it open.
 - **When it runs.** Only inside an admitted credential validation or operation:
   never while loading the configuration or answering a description. One run is
-  bounded by `timeout_ms`; at the deadline the plugin's whole process group is
-  killed, and the caller is released then even when a descendant that left the
-  group still holds stdout open (its read end is closed). stdout is bounded to
-  65536 bytes; more kills the process group. The run ends when stdout is closed
-  and the plugin's process has exited; whatever the outcome, the group is then
-  killed once, while that process is still unreaped so its id cannot name
-  another group, and never signalled after it is reaped.
+  bounded by `timeout_ms`; at the deadline the plugin's whole process group and
+  the plugin's own process are killed, and the caller is released then, whatever
+  group the plugin's process moved itself to, and even when a descendant that
+  left the group still holds stdout open (its read end is closed). stdout is
+  bounded to 65536 bytes; more kills the process group and the plugin. The run
+  ends when stdout is closed and the plugin's process has exited; whatever the
+  outcome, the group and the plugin's own process are then each killed once,
+  while that process is still unreaped so its id cannot name another process or
+  group, and neither is signalled after it is reaped. Limitation: a descendant
+  that left the plugin's process group is not followed; it is not killed and
+  only loses its stdout.
 - **The token.** The answer must be an `ExecCredential` of the requested
   `apiVersion` (`client.authentication.k8s.io/v1` or `v1beta1`) whose
   `status.token` is 1 to 8192 printable ASCII bytes; a client certificate answer
@@ -198,7 +217,9 @@ are the `exec_credentials` ESS domain.
   before now serves only the use that ran the plugin and is not
   `malformed_credential`. A numeric offset is `+HH:MM` or `-HH:MM` with `HH` 00
   to 23 and `MM` 00 to 59. The adapter's own buffers holding the token, the
-  output it came in and the environment strings built for the exec are zeroized
+  output it came in, the environment strings built for the exec and the
+  kubeconfig bytes read for a run (read into one buffer allocated to the file
+  bound, which never reallocates, so no earlier copy is released) are zeroized
   before their memory is released (the kubeconfig parser's internal copies of
   `exec.env` values are not). It is never written to disk, a configuration, a
   description, a log or an error.
