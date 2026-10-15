@@ -1,0 +1,368 @@
+# Confluence Cloud REST v1 reads, as this repository describes them.
+#
+# Written by this repository, in its own words and structure, from Atlassian's public REST v1
+# reference pages; no Atlassian document is copied, vendored or fetched to produce it. Each
+# operation names the reference page it was written from in `externalDocs.url`. It describes
+# only the paths, the query parameters and the response fields the shipped `confluence-v1`
+# reads rely on (adapters/catalog/providers/confluence-v1/operations.json); everything else
+# the v1 API offers is left out. See README.md beside this file.
+openapi: 3.1.0
+info:
+  title: Confluence Cloud REST v1 reads (authored by Connectors)
+  version: "2026-10-15"
+  summary: >-
+    The Confluence Cloud REST v1 reads the Connectors catalog provider serves under the
+    provider id confluence-v1. Not an Atlassian document; Atlassian does not endorse it.
+  license:
+    name: MIT OR Apache-2.0
+    identifier: MIT OR Apache-2.0
+servers:
+  - url: https://{site}/wiki
+    variables:
+      site:
+        default: your-domain.atlassian.net
+        description: The Confluence Cloud site's host.
+paths:
+  /rest/api/space:
+    get:
+      operationId: getSpaces
+      summary: List the spaces the account can see, one page per call.
+      externalDocs:
+        url: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-space/#api-wiki-rest-api-space-get
+      parameters:
+        - name: spaceKey
+          in: query
+          description: Only these spaces, by key; one pair per key.
+          schema:
+            type: array
+            items: {type: string}
+        - name: type
+          in: query
+          description: Only spaces of this kind.
+          schema: {type: string, enum: [global, personal]}
+        - name: status
+          in: query
+          description: Only spaces in this state.
+          schema: {type: string, enum: [current, archived]}
+        - name: expand
+          in: query
+          description: Comma-separated properties to include in each space, such as description.plain.
+          schema: {type: string}
+        - name: start
+          in: query
+          description: The offset of the first space on this page; the next page's offset is in _links.next.
+          schema: {type: integer, minimum: 0}
+        - name: limit
+          in: query
+          description: The most spaces on one page; the site may return fewer.
+          schema: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: One page of spaces.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SpacePage"}
+  /rest/api/space/{spaceKey}:
+    get:
+      operationId: getSpace
+      summary: Read one space by its key.
+      externalDocs:
+        url: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-space/#api-wiki-rest-api-space-spacekey-get
+      parameters:
+        - name: spaceKey
+          in: path
+          required: true
+          description: The space's key, such as DOCS; not its numeric id.
+          schema: {type: string}
+        - name: expand
+          in: query
+          description: Comma-separated properties to include, such as description.plain or homepage.
+          schema: {type: string}
+      responses:
+        "200":
+          description: The space.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Space"}
+  /rest/api/content:
+    get:
+      operationId: getContent
+      summary: List content of one type, in one space or across the site, one page per call.
+      externalDocs:
+        url: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content/#api-wiki-rest-api-content-get
+      parameters:
+        - name: spaceKey
+          in: query
+          description: Only content in the space with this key.
+          schema: {type: string}
+        - name: type
+          in: query
+          description: The kind of content to list; pages when absent.
+          schema: {type: string, enum: [page, blogpost]}
+        - name: title
+          in: query
+          description: Only content with exactly this title.
+          schema: {type: string}
+        - name: status
+          in: query
+          description: Only content in this state.
+          schema: {type: string}
+        - name: orderby
+          in: query
+          description: How to order the list, such as "history.lastUpdated desc".
+          schema: {type: string}
+        - name: expand
+          in: query
+          description: Comma-separated properties to include in each item, such as version or body.storage.
+          schema: {type: string}
+        - name: start
+          in: query
+          description: The offset of the first item on this page; the next page's offset is in _links.next.
+          schema: {type: integer, minimum: 0}
+        - name: limit
+          in: query
+          description: The most items on one page; the site may return fewer.
+          schema: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: One page of content.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContentPage"}
+  /rest/api/content/search:
+    get:
+      operationId: searchContentByCQL
+      summary: List the content a CQL query selects, one page per call.
+      externalDocs:
+        url: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content/#api-wiki-rest-api-content-search-get
+      parameters:
+        - name: cql
+          in: query
+          required: true
+          description: >-
+            The CQL query, such as: space = DOCS and type = page and lastmodified >= "2026-09-01"
+            order by lastmodified desc.
+          schema: {type: string}
+        - name: cqlcontext
+          in: query
+          description: A JSON object naming the space or content the query runs in, when it refers to one.
+          schema: {type: string}
+        - name: expand
+          in: query
+          description: Comma-separated properties to include in each item, such as version or body.storage.
+          schema: {type: string}
+        - name: cursor
+          in: query
+          description: Where the next page starts, taken from the cursor in _links.next; absent on the first page.
+          schema: {type: string}
+        - name: limit
+          in: query
+          description: The most items on one page; the site may return fewer.
+          schema: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: One page of the content the query selects.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContentPage"}
+  /rest/api/content/{id}:
+    get:
+      operationId: getContentById
+      summary: Read one piece of content, its body included when expand asks for it.
+      externalDocs:
+        url: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content/#api-wiki-rest-api-content-id-get
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The content's id.
+          schema: {type: string}
+        - name: status
+          in: query
+          description: Read the content in this state; current when absent.
+          schema: {type: string}
+        - name: version
+          in: query
+          description: Read this version number rather than the latest.
+          schema: {type: integer}
+        - name: expand
+          in: query
+          description: Comma-separated properties to include; body.storage carries the body in storage format.
+          schema: {type: string}
+      responses:
+        "200":
+          description: The content.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Content"}
+  /rest/api/content/{id}/child/comment:
+    get:
+      operationId: getContentComments
+      summary: List the comments on one piece of content, one page per call.
+      externalDocs:
+        url: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-content---children-and-descendants/#api-wiki-rest-api-content-id-child-comment-get
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The id of the content whose comments are listed.
+          schema: {type: string}
+        - name: expand
+          in: query
+          description: Comma-separated properties to include in each comment, such as body.storage.
+          schema: {type: string}
+        - name: parentVersion
+          in: query
+          description: List the comments of this version of the content rather than the latest.
+          schema: {type: integer}
+        - name: location
+          in: query
+          description: Only comments in these places on the content; one pair per place.
+          schema:
+            type: array
+            items: {type: string, enum: [footer, inline, resolved]}
+        - name: depth
+          in: query
+          description: Set to all to include replies to comments as well as top-level comments.
+          schema: {type: string}
+        - name: start
+          in: query
+          description: The offset of the first comment on this page; the next page's offset is in _links.next.
+          schema: {type: integer, minimum: 0}
+        - name: limit
+          in: query
+          description: The most comments on one page; the site may return fewer.
+          schema: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: One page of comments.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ContentPage"}
+  /rest/api/search:
+    get:
+      operationId: searchByCQL
+      summary: Search the site with a CQL query, one page of results per call.
+      externalDocs:
+        url: https://developer.atlassian.com/cloud/confluence/rest/v1/api-group-search/#api-wiki-rest-api-search-get
+      parameters:
+        - name: cql
+          in: query
+          required: true
+          description: 'The CQL query, such as type = page and text ~ "release notes".'
+          schema: {type: string}
+        - name: cqlcontext
+          in: query
+          description: A JSON object naming the space or content the query runs in, when it refers to one.
+          schema: {type: string}
+        - name: expand
+          in: query
+          description: Comma-separated properties to include in each result's content, such as content.version.
+          schema: {type: string}
+        - name: cursor
+          in: query
+          description: Where the next page starts, taken from the cursor in _links.next; absent on the first page.
+          schema: {type: string}
+        - name: limit
+          in: query
+          description: The most results on one page; the site may return fewer.
+          schema: {type: integer, minimum: 1}
+      responses:
+        "200":
+          description: One page of search results.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SearchPage"}
+components:
+  schemas:
+    # The links every page carries. `next` is present only while another page follows; it is a
+    # path relative to `base` (the site's /wiki root) with the query of that next page.
+    PageLinks:
+      type: object
+      properties:
+        base: {type: string, description: The site's /wiki root URL.}
+        context: {type: string}
+        self: {type: string}
+        next: {type: string, description: The next page's path and query; absent on the last page.}
+    ItemLinks:
+      type: object
+      properties:
+        webui: {type: string, description: "The item's page in the browser, relative to base."}
+    Space:
+      type: object
+      properties:
+        id: {type: integer}
+        key: {type: string}
+        name: {type: string}
+        type: {type: string}
+        status: {type: string}
+        _links: {$ref: "#/components/schemas/ItemLinks"}
+    SpacePage:
+      type: object
+      properties:
+        results:
+          type: array
+          items: {$ref: "#/components/schemas/Space"}
+        start: {type: integer}
+        limit: {type: integer}
+        size: {type: integer, description: How many results this page holds.}
+        _links: {$ref: "#/components/schemas/PageLinks"}
+    Version:
+      type: object
+      properties:
+        number: {type: integer}
+        when: {type: string, format: date-time, description: When this version was made.}
+    Content:
+      type: object
+      properties:
+        id: {type: string}
+        type: {type: string, description: "page, blogpost or comment."}
+        status: {type: string}
+        title: {type: string}
+        space:
+          type: object
+          properties:
+            key: {type: string}
+            name: {type: string}
+        version: {$ref: "#/components/schemas/Version"}
+        body:
+          type: object
+          description: Present only when expand asks for a representation, such as body.storage.
+          properties:
+            storage:
+              type: object
+              properties:
+                value: {type: string, description: The body in storage format (XHTML).}
+                representation: {type: string}
+        _links: {$ref: "#/components/schemas/ItemLinks"}
+    ContentPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items: {$ref: "#/components/schemas/Content"}
+        start: {type: integer}
+        limit: {type: integer}
+        size: {type: integer, description: How many results this page holds.}
+        _links: {$ref: "#/components/schemas/PageLinks"}
+    SearchResult:
+      type: object
+      properties:
+        content: {$ref: "#/components/schemas/Content"}
+        title: {type: string}
+        excerpt: {type: string, description: Matched text around the query's terms.}
+        url: {type: string, description: "The result's page, relative to the site's /wiki root."}
+        entityType: {type: string, description: "What the result is, such as content or space."}
+        lastModified: {type: string, format: date-time}
+    SearchPage:
+      type: object
+      properties:
+        results:
+          type: array
+          items: {$ref: "#/components/schemas/SearchResult"}
+        start: {type: integer}
+        limit: {type: integer}
+        size: {type: integer, description: How many results this page holds.}
+        totalSize: {type: integer, description: How many results the query matched in all.}
+        cqlQuery: {type: string, description: The query as the site ran it.}
+        _links: {$ref: "#/components/schemas/PageLinks"}

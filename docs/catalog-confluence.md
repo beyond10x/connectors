@@ -10,6 +10,11 @@ there; this page covers what differs for Confluence. Jira and Confluence share
 one Atlassian credential and one authentication profile, `atlassian.basic`; see
 [Authentication](#authentication) and [the Jira guide](catalog-jira.md).
 
+The same reads, CQL search and the space reads are also served from Confluence
+Cloud REST v1, under a second provider id, `confluence-v1`, built from a source
+document this repository writes itself; see [REST v1](#rest-v1). A token that
+carries only classic scopes reads Confluence through v1 alone.
+
 ## Source and bundle
 
 The pinned source is
@@ -95,6 +100,105 @@ Whether a new comment moves its page's `version.createdAt` is Confluence's
 behaviour and has not been checked against a live site here. Every other query
 parameter the pinned document declares for an operation is accepted by name; one
 it does not declare is refused before any request.
+
+## REST v1
+
+Atlassian's REST v1 OpenAPI document declares no licence, so it is not vendored,
+copied or fetched. Instead
+[`adapters/atlassian/contracts/confluence-rest-v1/confluence-rest-v1.yaml`](../adapters/atlassian/contracts/confluence-rest-v1/README.md)
+is an OpenAPI 3.1 document this repository writes itself from Atlassian's public
+REST v1 reference pages. Each operation names the page it was written from in
+`externalDocs.url`, and the document holds only the paths, query parameters and
+response fields the reads below rely on. Its server path is the site's `/wiki`
+root, so `/rest/api/search` is recorded as `/wiki/rest/api/search`. The catalog
+pipeline compiles it into the `confluence-v1` bundle like any pinned source:
+
+```sh
+cargo run --locked -p connectors-build -- catalog \
+  --provider confluence-v1 \
+  --source adapters/atlassian/contracts/confluence-rest-v1/confluence-rest-v1.yaml \
+  --directory adapters/catalog/generated/bundles \
+  --auth-profile atlassian.basic
+```
+
+It carries seven operations and no unsupported one.
+`adapters/catalog/tests/bundle_drift.rs` refuses a committed bundle a fresh run
+over the authored document would not reproduce byte for byte.
+
+[`adapters/catalog/providers/confluence-v1/operations.json`](../adapters/catalog/providers/confluence-v1/operations.json)
+exposes seven reads, each `effect: read`. An id that REST v2 also serves means
+the same read there, so a caller's id is the same whichever API serves it;
+`spaces.list`, `space.get` and `content.search` exist under v1 only. The
+Atlassian ESS model names both sets (`ConfluenceV1Read`, `ConfluenceV2Read` in
+`adapters/atlassian/spec/ess/domains/documents.yaml`), and
+`adapters/catalog/tests/confluence_v1.rs` holds each selection set to it.
+
+| id | `operationId` | request | paging parameters | end condition | time filter or deltas |
+|---|---|---|---|---|---|
+| `spaces.list` | `getSpaces` | `GET /wiki/rest/api/space` with `spaceKey`, `type`, `status` | `start`, `limit` | `_links.next` absent | none |
+| `space.get` | `getSpace` | `GET /wiki/rest/api/space/{spaceKey}` | single item | n/a | none |
+| `space.pages` | `getContent` | `GET /wiki/rest/api/content` with `spaceKey`, `type` (`page` or `blogpost`), `orderby` | `start`, `limit` | `_links.next` absent | none; deltas come from `pages.changed` |
+| `pages.changed` | `searchContentByCQL` | `GET /wiki/rest/api/content/search` with `cql` (required), `expand` | `cursor`, `limit` | `_links.next` absent | in the query: `lastmodified >= "<cutoff>"` |
+| `page.get` | `getContentById` | `GET /wiki/rest/api/content/{id}` with `expand=body.storage` | single item | n/a | none; deltas come from `pages.changed` |
+| `page.comments` | `getContentComments` | `GET /wiki/rest/api/content/{id}/child/comment` with `location`, `expand` | `start`, `limit` | `_links.next` absent | none; deltas come from `pages.changed` |
+| `content.search` | `searchByCQL` | `GET /wiki/rest/api/search` with `cql` (required) | `cursor`, `limit` | `_links.next` absent | in the query |
+
+- **Following a page.** Send the first page without `start` or `cursor`. While
+  another page follows, `_links.next` is a path relative to `_links.base` whose
+  query holds the next page's position. For the next page of a list
+  (`spaces.list`, `space.pages`, `page.comments`) send the `start` from that
+  link; for a CQL read (`pages.changed`, `content.search`) send its `cursor`.
+  Keep the other parameters unchanged. A page without `_links.next` is the last.
+  The selection set bounds `limit` to 1..=100 on each list, so a value outside it
+  is refused before any request; the reference states no maximum, and the site
+  may return fewer items than asked.
+- **`pages.changed`** is the delta read, and the time window is part of the CQL
+  query rather than a stop rule: for one space's pages changed since a time, send
+  `cql` as `space = DOCS and type = page and lastmodified >= "2026-09-01" order by
+  lastmodified desc` and `expand=version`. Each item's last modification is
+  `version.when`. Walk to the last page.
+- **`content.search`** answers the CQL query with one result per match: `title`,
+  `excerpt`, `url` (relative to `/wiki`), `entityType`, `lastModified` and the
+  matched `content`. `totalSize` counts every match. A query without `cql` is
+  refused before any request.
+- **`space.pages`** takes the space key (`spaceKey`, such as `DOCS`), not the
+  numeric id REST v2 takes, and `type` (`page` when absent).
+- **`page.get`** takes the content `id`. Send `expand=body.storage` to receive the
+  body in storage format under `body.storage.value`.
+- **`page.comments`** takes the content `id`; `location=footer` limits it to
+  footer comments, and `expand=body.storage` adds their bodies.
+
+The configuration differs from REST v2 in `provider`, `operations_file` and the
+access read, which is a v1 space list:
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "confluence-cloud-v1",
+  "provider": "confluence-v1",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://your-domain.atlassian.net/wiki",
+  "auth": {
+    "profile": "atlassian.basic",
+    "scheme": "basic",
+    "header": "Authorization",
+    "bearer": false,
+    "account_label": "Account email",
+    "label": "API token",
+    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"},
+    "access": {"path": "rest/api/space", "query": {"limit": "1"}}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/confluence-v1/operations.json"
+}
+```
+
+Verified against a local HTTPS fixture in the v1 response shape only
+(`adapters/catalog/tests/confluence_v1.rs`): each read's exact request and basic
+header, the returned body, and a two-page walk of each list to the page without
+`_links.next`. No live Confluence Cloud site has been read through REST v1 here,
+so the authored paths, parameters and fields rest on the reference pages they
+name and have not been checked against a site. The page anchors in
+`externalDocs.url` were not checked live.
 
 ## Authentication
 
