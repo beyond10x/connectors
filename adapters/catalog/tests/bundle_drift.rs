@@ -20,14 +20,23 @@ use std::path::Path;
 /// none of them changes what is sent. Zendesk's 35 are `deepObject` query
 /// parameters this pass does not expand, each sent as one value as given: 34
 /// `page` parameters that also accept an offset page number, and one nested
-/// `filter`; no shipped read is among them.
-const SOURCES: [(&str, &str, Option<&str>, &str, usize); 12] = [
+/// `filter`; no shipped read is among them. Confluence v1's source is the
+/// document this repository authors from Atlassian's v1 reference pages, not a
+/// pinned upstream; it describes only the shipped reads and has no gap.
+const SOURCES: [(&str, &str, Option<&str>, &str, usize); 13] = [
     (
         "confluence",
         "../atlassian/upstream/confluence/confluence-v2.json",
         None,
         "atlassian.basic",
         30,
+    ),
+    (
+        "confluence-v1",
+        "../atlassian/contracts/confluence-rest-v1/confluence-rest-v1.yaml",
+        None,
+        "atlassian.basic",
+        0,
     ),
     (
         "gitlab",
@@ -239,5 +248,17 @@ fn every_committed_bundle_matches_a_fresh_pipeline_run() {
             .any(
                 |o| o.operation_id.as_deref() == Some("getPages") && o.path == "/wiki/api/v2/pages"
             )
+    );
+    // The authored Confluence REST v1 reads, CQL search among them, are a
+    // second provider on the same profile.
+    let confluence_v1 = bundle::load(&committed, "confluence-v1").unwrap();
+    assert_eq!(confluence_v1.auth_profile, jira.auth_profile);
+    assert!(
+        confluence_v1
+            .inventory
+            .operations
+            .iter()
+            .any(|o| o.operation_id.as_deref() == Some("searchByCQL")
+                && o.path == "/wiki/rest/api/search")
     );
 }
