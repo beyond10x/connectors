@@ -97,7 +97,8 @@ until a third source answers (see Threat model).
   smallest configuration that tolerates one lying source; four with quorum two
   tolerates one lying and one unreachable source at once (see Threat model).
 - **What identifies one.** Its root public key is its trust identity; its address
-  is where it is asked. No two sources may share an address or a key: two entries
+  is where it is asked. No two sources may share an address or a key (an
+  IPv4-mapped IPv6 address is its IPv4 address): two entries
   for one key are one operator counted twice, which defeats the quorum. Each check
   stays the one `Configuration::resolved` applies today (`clock.rs:86-115`), per
   source. In output a source is named by its zero-based position in `sources` and
@@ -156,7 +157,10 @@ exactly today's interval (`clock.md:107-109`, `clock.rs:226-241`), per source.
 1. **Count.** At acquisition, a source is *counted* when its reply verified,
    whatever its own radius or interval width. No source is `too_imprecise` on its
    own: only the combined answer is capped (step 5). The counted set is fixed at
-   acquisition; later readings never add or drop a source.
+   acquisition; later readings never add or drop a source. A counted source whose
+   signed values give no interval (M_i below A_i + 3 ms, or an endpoint past the
+   representable range) contributes no interval to steps 3 to 6 and is reported
+   `outlier`; it never refuses the acquisition or a later reading on its own.
 2. **Below quorum.** Fewer than `quorum` counted sources refuses `below_quorum`.
 3. **Coverage.** For an instant x, c(x) is the number of counted sources with
    l_i <= x <= u_i (closed intervals). The answer is the hull of the instants that
@@ -174,8 +178,12 @@ exactly today's interval (`clock.md:107-109`, `clock.rs:226-241`), per source.
 4. **Split.** If no instant has c(x) >= quorum, the acquisition refuses `split`.
 5. **Width.** U - L, rounded outward, over 8,000 ms refuses `too_imprecise`.
 6. **Day and range.** The overflow bound and the UTC-midnight rule (`clock.rs:242-254`)
-   apply to the answer, with the earliest counted source's origin lower bound
-   (M_i - A_i - 3 ms) as the origin. These refusals name no cause.
+   apply to the answer alone, with its own lower bound as the origin: the answer's
+   lower and upper bounds must lie in the same UTC day, at least one second after
+   its start and strictly more than one second before its end. No single source's
+   interval is the origin, so an outlier on another UTC day, or a wide honest
+   source reaching across midnight, never refuses the answer. These refusals name
+   no cause.
 7. **Validity.** The answer is available while every counted source's
    `elapsed_upper(N - S_i)` is at most 30,000 ms (`clock.rs:222-225`). Each later
    `Clock::now` recomputes steps 3 to 6 at its own N, over the counted set, with no
@@ -365,6 +373,14 @@ Host (`crates/connectors-host/src/local/clock/tests.rs`, fixtures from
 - `quorum_configuration_refusals`: one source; nine sources; quorum 1; quorum above the
   source count; duplicate address; duplicate key; missing `version`; an unknown
   version, `roughtime-1` included.
+- `adversary_ipv4_mapped_address_is_the_same_address`: `127.0.0.1:2002` and
+  `[::ffff:127.0.0.1]:2002` are one address, refused as a duplicate.
+- `adversary_liar_on_another_utc_day_is_only_an_outlier`: a liar a day behind the
+  two honest sources is `outlier`; the answer contains the fixture time.
+- `adversary_liar_signing_an_early_midpoint_is_only_an_outlier`: a liar signing
+  midpoint 0 gives no interval; it is `outlier` and the honest two answer.
+- `adversary_wide_honest_source_counts_whatever_its_radius`: a radius-200,000 s
+  honest source reaching across midnight is `agreed` with two narrow ones.
 - `quorum_counted_set_is_fixed`: a later `Clock::now` past one source's 30 s window
   refuses; it never drops that source and answers from the rest.
 - `legacy_single_source_format_refuses_only_the_clock`: a `roughtime-clock/1` table

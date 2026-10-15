@@ -53,7 +53,8 @@ answer in. The one admitted version is `roughtime-0x8000000c` (the draft-19 test
 version); any other value, `roughtime-1` included, is refused as an unknown
 version, because a version ships only with its verifier and a recorded reply and no
 source answered RFC 10049's version `0x00000001` on 2026-10-14. There is no
-negotiation. No two sources may share an address or a key. Three sources at quorum
+negotiation. No two sources may share an address or a key; an IPv4-mapped IPv6
+address is its IPv4 address. Three sources at quorum
 two tolerate one lying source; four at quorum two tolerate one lying and one
 unreachable source at once. A quorum equal to the number of sources tolerates no
 liar.
@@ -74,8 +75,8 @@ Success contains `adapter` and `observation`, whose fields are
 `configuration_sha256`, `lower_unix_ms`, `upper_unix_ms` and `sources`. Width is at
 most eight seconds. `sources` has one line per configured source, in configuration
 order: its `index`, `address`, `result` (`agreed` when its interval meets the answer,
-`outlier` when it is disjoint from it, or why it was not counted: `unreachable` or
-`unverified`) and, when its reply
+`outlier` when it is disjoint from it or its signed values give no interval, or why
+it was not counted: `unreachable` or `unverified`) and, when its reply
 verified, its signed radius in `radius_ms`. An `outlier` does not stop the answer;
 it names the key to examine. This output is a historical observation; copying it
 into a file or a later request cannot supply approval clock evidence.
