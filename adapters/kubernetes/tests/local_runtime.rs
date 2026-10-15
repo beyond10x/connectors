@@ -1427,6 +1427,44 @@ fn local_contexts_list_reads_only_the_configured_kubeconfig_without_credentials(
 }
 
 #[test]
+fn local_node_and_custom_resource_reads_are_advertised_only_when_configured() {
+    let cluster = Cluster::new(false);
+    let unconfigured = cluster.selection();
+    // An empty list admits nothing and keeps the revision.
+    configure(&cluster, "custom_resources", json!([]));
+    assert_eq!(
+        cluster.selection().configuration_revision,
+        unconfigured.configuration_revision
+    );
+    configure(&cluster, "node_reads", json!(true));
+    let monitors =
+        json!({"group":"monitoring.coreos.com","version":"v1","plural":"servicemonitors"});
+    let rules = json!({"group":"monitoring.coreos.com","version":"v1","plural":"prometheusrules"});
+    configure(&cluster, "custom_resources", json!([monitors, rules]));
+    let selection = cluster.selection();
+    assert_ne!(
+        selection.configuration_revision,
+        unconfigured.configuration_revision
+    );
+    // The order the collections are written in is not part of the scope.
+    configure(&cluster, "custom_resources", json!([rules, monitors]));
+    assert_eq!(
+        cluster.selection().configuration_revision,
+        selection.configuration_revision
+    );
+    let child = Child::spawn(&selection).unwrap();
+    let operations = child.bootstrap().descriptor().unwrap().operations;
+    for id in ["nodes.list", "custom_resources.list"] {
+        assert!(operations.iter().any(|o| o.id == id), "{id}");
+    }
+    let plain = Child::spawn(&Cluster::new(false).selection()).unwrap();
+    let operations = plain.bootstrap().descriptor().unwrap().operations;
+    for id in ["nodes.list", "custom_resources.list"] {
+        assert!(!operations.iter().any(|o| o.id == id), "{id}");
+    }
+}
+
+#[test]
 fn local_pod_logs_are_advertised_only_when_configured() {
     let cluster = Cluster::new(false);
     let unconfigured = cluster.selection();
