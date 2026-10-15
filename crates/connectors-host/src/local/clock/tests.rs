@@ -209,6 +209,28 @@ fn no_estimate_extrapolates_through_a_possible_utc_leap() {
 }
 
 #[test]
+fn no_reading_extrapolates_a_sample_across_midnight() {
+    // Design "Quorum rule" step 6: the origin is the answer as acquired,
+    // back-dated by the elapsed time since the earliest counted exchange start,
+    // so a reading whose answer lies wholly after midnight still refuses when
+    // its sample was taken before it.
+    let midnight = 86_400 * 20_708;
+    let mut c = clock();
+    set_midpoint(&mut c, midnight - 10);
+    let before = c
+        .interval_at(stamp(received(&c).monotonic + 2_000_000_000), c.process)
+        .expect("a reading before midnight answers");
+    assert!(before.upper_unix_ms < i64::try_from(midnight * 1000).unwrap());
+    // About five seconds after midnight: the answer alone lies inside the next
+    // UTC day, more than a second from its start, yet the span from the sample
+    // to the reading crosses a possible leap.
+    assert!(
+        c.interval_at(stamp(received(&c).monotonic + 15_000_000_000), c.process)
+            .is_err()
+    );
+}
+
+#[test]
 fn process_suspend_backward_time_and_unsafe_bounds_refuse() {
     let c = clock();
     assert!(

@@ -656,11 +656,14 @@ impl BoundedClock {
         }
         // No leap announcement is consumed. Avoid extrapolating across any UTC
         // midnight, including the possible skipped/repeated second around it,
-        // from the answer's own lower bound: never from one source's interval,
-        // so an outlier or a wide source on another day refuses nothing.
+        // from the answer as acquired, back-dated to the earliest exchange
+        // start: never from one source's interval, so an outlier or a wide
+        // source on another day refuses nothing, and no span from a sample to
+        // this reading crosses a possible leap.
+        let origin = self.origin_ms().map_err(|_| Combined::Local)?;
         let day_ms = 86_400_000;
-        if lower / day_ms != upper / day_ms
-            || lower % day_ms < 1000
+        if origin / day_ms != upper / day_ms
+            || origin % day_ms < 1000
             || upper % day_ms >= day_ms - 1000
         {
             return Err(Combined::Local);
@@ -674,6 +677,41 @@ impl BoundedClock {
             lower_ns: lower * NS_PER_MS,
             upper_ns: upper * NS_PER_MS,
         })
+    }
+    /// The UTC-midnight origin in Unix ms: the answer's lower bound at N_0 less
+    /// elapsed_upper(N_0 - S_min), N_0 = R_max the latest counted reply receipt
+    /// and S_min the earliest counted exchange start. It is a function of the
+    /// counted set fixed at acquisition, so no reading can move it.
+    fn origin_ms(&self) -> Result<u128> {
+        let acquired = self
+            .counted
+            .iter()
+            .map(|s| s.received)
+            .max_by_key(|s| s.monotonic)
+            .ok_or(Failure::Unavailable)?;
+        let mut intervals = Vec::with_capacity(self.counted.len());
+        for source in &self.counted {
+            if let Some(interval) = bounds_ns(source, acquired, self.rate_error_ppm)? {
+                intervals.push(interval);
+            }
+        }
+        let (lower, _) = quorum_answer(&intervals, self.quorum, max_width_ms())
+            .map_err(|_| Failure::Unavailable)?;
+        let earliest = self
+            .counted
+            .iter()
+            .map(|s| s.started.monotonic)
+            .min()
+            .ok_or(Failure::Unavailable)?;
+        let since = acquired
+            .monotonic
+            .checked_sub(earliest)
+            .ok_or(Failure::Unavailable)?;
+        let back = elapsed(since, self.rate_error_ppm, true)?;
+        (lower * NS_PER_MS)
+            .checked_sub(back)
+            .map(|origin| origin / NS_PER_MS)
+            .ok_or(Failure::Unavailable)
     }
 }
 /// A source's interval at `now` before any admission check, in ns:
