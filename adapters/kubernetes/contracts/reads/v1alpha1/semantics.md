@@ -101,13 +101,105 @@ for `deployments.history`.
 ## Exec-plugin credentials
 
 A kubeconfig user that authenticates through an `exec` credential plugin (for
-example `aws eks get-token`) is not supported. Running a command a kubeconfig
-names is the bounded process execution family decided on 2026-10-03 for a
-pinned Helm binary, and that decision selects no arbitrary command, unpinned
-executable, filesystem access or credential inheritance by default; an exec
-credential plugin needs all four and is awaiting its own selection. The shared
-`exec_plugin` acquisition flow stays reserved
-([acquisition](../../../../../contracts/auth/acquisition/v1alpha1/semantics.md)).
+example `aws eks get-token`) is supported in one pinned form, decided on
+2026-10-15 (`decision-blocker:kubernetes-exec-credential-plugin`, option b) inside
+the bounded pinned-binary process family of 2026-10-03. Running whatever the
+kubeconfig names is refused. The typed binding, selection, lifetime and refusals
+are the [`exec_credentials` ESS domain](../../../spec/ess/domains/exec_credentials.yaml).
+
+- **Only by explicit configuration.** The local native configuration names an
+  `exec_plugin` binding: `path`, the plugin's absolute path; `sha256`, the hex
+  digest of its bytes; `user`, the kubeconfig `users` entry whose `exec` block
+  supplies the arguments; `env`, the allow-list of environment variable names
+  (each `ExecPluginEnvName`: never `HOME` or `KUBERNETES_EXEC_INFO`, and never a
+  name that makes a process load or run code it was not given: `LD_*`,
+  `PYTHON*`, `PERL*`, `RUBY*`, `NODE_*`, `JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS`,
+  `JDK_JAVA_OPTIONS`, `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, `PS4`, `IFS`,
+  `CDPATH`, `GLOBIGNORE`, `PROMPT_COMMAND`, and the names the C library drops for
+  a set-ID program, `GCONV_PATH`, `GETCONF_DIR`, `GLIBC_TUNABLES`, `HOSTALIASES`,
+  `LOCALDOMAIN`, `LOCPATH`, `MALLOC_TRACE`, `NIS_PATH`, `NLSPATH`,
+  `RESOLV_HOST_CONF` and `RES_OPTIONS`; a binding naming one is refused when the
+  configuration loads); optionally `home`, an absolute directory; and optionally `timeout_ms` (1 to
+  60000, 10000 when omitted). It requires `kubeconfig`. No default configuration
+  and no federated service configuration enables it. Absent, no plugin ever runs,
+  the `kubernetes.exec_plugin` profile is not offered and validating it is
+  `unsupported`. The binding enters the effective configuration as
+  `exec_plugin_digest`, so any change to it changes the configuration revision.
+- **The profile.** With a binding, the bootstrap offers `kubernetes.exec_plugin`
+  instead of `kubernetes.token`, and every operation requires it. Its scheme is
+  `http_bearer`: the plugin's token is sent as a bearer token. Its one protected
+  entry field, `user`, is a confirmation, not a secret: it must equal the
+  binding's `user`, so connecting is an explicit act that names the kubeconfig
+  user the plugin runs for. The SelfSubjectReview identity probe and every rule of
+  the token profile apply to the plugin's token unchanged.
+- **The executable.** Before every run the adapter opens `path` once, without
+  following a symbolic link as its final component, refuses a file that is not
+  regular, is writable by group or others, carries the set-user-ID or
+  set-group-ID bit or file capabilities (a `security.capability` extended
+  attribute), or is owned by a user other than root and the adapter's own,
+  and hashes its bytes through that open descriptor; a digest that is not
+  `sha256` refuses before any process starts. The process executes that same
+  descriptor (`fexecve`), never `path` again, so a file swapped in at `path`
+  after the check never runs. `path` must therefore name the file itself, not a
+  symbolic link to it. A script plugin (`#!`) keeps the descriptor open across
+  the exec, because its interpreter reads the script through `/dev/fd`; a native
+  executable inherits no descriptor. Besides that one descriptor and its
+  standard input, output and error, the plugin inherits no descriptor of the
+  adapter: every other one is closed on the exec, whether or not the adapter
+  opened it close-on-exec. Running a plugin needs Linux; elsewhere it
+  is `plugin_unavailable`. The kubeconfig's `command` must equal `path` byte for
+  byte (a trailing or repeated slash is another spelling and refuses) or be a
+  bare file name equal byte for byte to the path's file name.
+- **Arguments and environment.** The kubeconfig is read when the plugin runs,
+  and only then: a use that a held token serves does not read it. Its
+  `args` are the argument vector as data; no shell runs. The plugin starts from an
+  empty environment and receives exactly: `HOME` when `home` is configured (it is
+  then also the working directory, otherwise `/`), `KUBERNETES_EXEC_INFO`
+  (`apiVersion`, `kind: ExecCredential`, `spec.interactive: false`), and each
+  allow-listed name, valued from the kubeconfig's `exec.env` entry or, failing
+  that, from the adapter's own environment (which the local owner clears). A
+  kubeconfig `exec.env` name outside the allow-list refuses rather than being
+  dropped. `interactiveMode: Always` refuses; `provideClusterInfo` is not
+  honoured. stdin is closed and stderr is discarded. File reads beyond `HOME` are
+  not sandboxed: the allow-list bounds what the plugin is told, not what the
+  operating system lets it open.
+- **When it runs.** Only inside an admitted credential validation or operation:
+  never while loading the configuration or answering a description. One run is
+  bounded by `timeout_ms`; at the deadline the plugin's whole process group is
+  killed, and the caller is released then even when a descendant that left the
+  group still holds stdout open (its read end is closed). stdout is bounded to
+  65536 bytes; more kills the process group. The run ends when stdout is closed
+  and the plugin's process has exited; whatever the outcome, the group is then
+  killed once, while that process is still unreaped so its id cannot name
+  another group, and never signalled after it is reaped.
+- **The token.** The answer must be an `ExecCredential` of the requested
+  `apiVersion` (`client.authentication.k8s.io/v1` or `v1beta1`) whose
+  `status.token` is 1 to 8192 printable ASCII bytes; a client certificate answer
+  is not admitted. The token is held in adapter memory, zeroized on drop, and
+  reused until its `status.expirationTimestamp`; the next admitted use at or after
+  it runs the plugin again. With no expirationTimestamp the token serves only the
+  use that ran the plugin. Any valid RFC 3339 date-time is an expiry, one before
+  1970 included (Go's zero time `0001-01-01T00:00:00Z` among them); one at or
+  before now serves only the use that ran the plugin and is not
+  `malformed_credential`. A numeric offset is `+HH:MM` or `-HH:MM` with `HH` 00
+  to 23 and `MM` 00 to 59. The adapter's own buffers holding the token, the
+  output it came in and the environment strings built for the exec are zeroized
+  before their memory is released (the kubeconfig parser's internal copies of
+  `exec.env` values are not). It is never written to disk, a configuration, a
+  description, a log or an error.
+- **Refusals.** `digest_mismatch`, `plugin_unavailable` and `kubeconfig_mismatch`
+  are `invalid_configuration`; `timeout` is `timeout`; `output_too_large` and
+  `malformed_credential` are `protocol`; a non-zero exit (`plugin_failed`) is
+  `unavailable`.
+
+The shared `exec_plugin` acquisition flow stays reserved
+([acquisition](../../../../../contracts/auth/acquisition/v1alpha1/semantics.md)):
+this binding is Kubernetes-native, and the host sees an ordinary `http_bearer`
+protected-entry profile.
+Source facts:
+https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins
+and https://kubernetes.io/docs/reference/config-api/client-authentication.v1/.
+Source access: 2026-10-15.
 
 ## Descriptor visibility
 

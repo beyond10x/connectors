@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 pub mod auth;
 pub mod exec;
+pub mod exec_credential;
 pub mod helm;
 pub mod kubeconfig;
 pub mod logs;

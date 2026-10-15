@@ -388,6 +388,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Native adapters",
+        "Kubernetes exec credential plugin",
+        "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
+        "adapters/kubernetes/tests/local_runtime.rs::exec_plugin_credential_authenticates_a_recorded_api_session",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
         "Kubernetes pod logs",
         "pods.logs reads a bounded tail of one container's log in a configured namespace, at most 1,000 lines and 128 KiB, when pod_logs is configured; verified against API-shaped fixtures.",
         "adapters/kubernetes/tests/pod_logs.rs::pod_logs_are_bounded_and_container_selected",
