@@ -24,6 +24,7 @@ mod gate;
 #[cfg(test)]
 mod gitlab_feed_conformance;
 mod ignored;
+mod live_read_loop;
 mod metadata_conformance;
 mod metadata_entities;
 mod platform_gated;
@@ -51,6 +52,9 @@ enum Action {
     Check,
     /// Account for every ignored workspace test and run explicitly selected families.
     Ignored(ignored::Options),
+    /// Run a declared set of live reads through the `connectors` binary for a bounded time,
+    /// with no revalidation, and report each call. On demand only; never in CI.
+    LiveReadLoop(live_read_loop::Options),
     /// Generate or compare the selected local CLI contract fixture.
     Cli {
         #[arg(long)]
@@ -198,6 +202,9 @@ fn execute(args: Args) -> Result<()> {
     let root = args.root.canonicalize()?;
     if let Action::Ignored(options) = args.command {
         return ignored::run(&root, options);
+    }
+    if let Action::LiveReadLoop(options) = args.command {
+        return live_read_loop::run(&root, options);
     }
     if let Action::DocsAudit { directory } = args.command {
         return docs::audit(&directory.unwrap_or_else(|| root.join("website/build")));
