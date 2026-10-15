@@ -2,11 +2,13 @@
 format: aep.planning-md/3
 id: decision-blocker:kubernetes-exec-credential-plugin
 kind: decision-blocker
-status: open
+status: cleared
 title: Nobody has decided whether Connectors runs a kubeconfig-named exec credential plugin
 relations:
 - blocks: story:kubernetes-eks-exec-auth-and-kinds
-revision: 1
+revision: 3
+transitions:
+- {from: "open", to: "cleared", at: "2026-10-15T08:13:24Z", actor: "human:timo", revision: 3}
 ---
 ## The question
 
@@ -41,3 +43,20 @@ environment's credentials. So the exec half of
 ## Today
 
 The reads contract and `docs/local-kubernetes-cli.md` say exec credentials are not supported.
+
+## Decided (2026-10-15)
+
+Option b, within the bounded pinned-binary process family the execution-family decision
+admitted:
+
+- The exec credential plugin runs only when a connection's configuration names it
+  explicitly: an absolute path and a sha256 digest, verified before every run and refused on
+  a mismatch.
+- The argument list comes from the kubeconfig, as data, never through a shell.
+- The configuration names, per connection, an allow-list of environment variables and any
+  files the plugin may read (for example the AWS profile files). Nothing the configuration
+  does not name is inherited.
+- It runs only inside an admitted operation, with a bounded deadline and bounded output.
+- Its token is held in memory until its stated expiry and never written to disk.
+- No default configuration enables it. Running whatever the kubeconfig names (option c) is
+  refused.
