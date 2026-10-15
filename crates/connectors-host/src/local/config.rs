@@ -15,7 +15,7 @@ pub struct Config {
     pub format: String,
     pub owner_uid: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub approval_clock: Option<super::clock::Configuration>,
+    pub approval_clock: Option<super::clock::ApprovalClock>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secret_service_socket: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -39,7 +39,7 @@ pub struct Config {
 struct ConfigInput {
     format: String,
     owner_uid: u32,
-    approval_clock: Option<super::clock::Configuration>,
+    approval_clock: Option<super::clock::ApprovalClock>,
     secret_service_socket: Option<PathBuf>,
     default_adapter: Option<String>,
     custody: Option<Custody>,
@@ -110,6 +110,9 @@ pub enum Rule {
     ConfigNotPrivate,
     /// `owner_uid` is not the effective user.
     OwnerUidMismatch,
+    /// A clock use's refusal, not the whole configuration's: `[approval_clock]`
+    /// is the retired single-source `roughtime-clock/1` table.
+    ApprovalClockFormatRetired,
 }
 
 impl Rule {
@@ -119,6 +122,7 @@ impl Rule {
             Self::ConfigMissing => "config_missing",
             Self::ConfigNotPrivate => "config_not_private",
             Self::OwnerUidMismatch => "owner_uid_mismatch",
+            Self::ApprovalClockFormatRetired => "approval_clock_format_retired",
         }
     }
 }

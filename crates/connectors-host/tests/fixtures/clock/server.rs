@@ -1,18 +1,137 @@
 //! Synthetic test-only source. Its chosen clock is not evidence of actual UTC.
 //! Independent encoder: no production framing/verifier helpers are called.
+// Three test crates include this file and each uses a different part of it.
+#![allow(dead_code)]
 use ring::{
     digest,
     signature::{Ed25519KeyPair, KeyPair},
 };
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    net::UdpSocket,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    thread::JoinHandle,
+    time::Duration,
+};
 
+/// The default source's root key (seed 7).
 pub fn root_key() -> [u8; 32] {
-    Ed25519KeyPair::from_seed_unchecked(&[7; 32])
+    key(7)
+}
+
+/// The root key of the synthetic source whose constant seed is `seed`; each
+/// quorum source in a test uses its own seed, so no two share a key.
+pub fn key(seed: u8) -> [u8; 32] {
+    Ed25519KeyPair::from_seed_unchecked(&[seed; 32])
         .unwrap()
         .public_key()
         .as_ref()
         .try_into()
         .unwrap()
+}
+
+/// One synthetic source's TOML `[[approval_clock.sources]]` entry at the wire
+/// version the fixture signs by default.
+pub fn source_toml(address: &str, seed: u8) -> String {
+    use base64::Engine;
+    format!(
+        "[[approval_clock.sources]]\naddress='{address}'\npublic_key='{}'\nversion='roughtime-0x8000000c'\n",
+        base64::engine::general_purpose::STANDARD.encode(key(seed))
+    )
+}
+
+/// A `roughtime-quorum/1` `[approval_clock]` table over `sources`
+/// (address and seed), in that order.
+pub fn quorum_toml(quorum: usize, max_rate_error_ppm: u32, sources: &[(&str, u8)]) -> String {
+    let mut table = format!(
+        "[approval_clock]\nformat='roughtime-quorum/1'\nquorum={quorum}\nmax_rate_error_ppm={max_rate_error_ppm}\n"
+    );
+    for (address, seed) in sources {
+        table.push_str(&source_toml(address, *seed));
+    }
+    table
+}
+
+/// The answer a [`Server`] gives to its `n`th request (from 0): the reply
+/// bytes, or `None` to stay silent.
+pub type Answer = Box<dyn Fn(usize, &[u8]) -> Option<Vec<u8>> + Send>;
+
+/// One synthetic UDP source on 127.0.0.1. It counts every request in
+/// `requests` and answers only while `respond` holds.
+pub struct Server {
+    pub address: String,
+    pub requests: Arc<AtomicUsize>,
+    pub respond: Arc<AtomicBool>,
+    stop: Arc<AtomicBool>,
+    thread: Option<JoinHandle<()>>,
+}
+impl Server {
+    /// A source answering every request with `fixture`'s signed reply.
+    pub fn fixture(fixture: Fixture) -> Self {
+        Self::spawn(Box::new(move |_, request| Some(fixture.reply(request))))
+    }
+    /// A source that receives and never answers.
+    pub fn silent() -> Self {
+        Self::spawn(Box::new(|_, _| None))
+    }
+    pub fn spawn(answer: Answer) -> Self {
+        Self::shared(
+            Arc::new(AtomicUsize::new(0)),
+            Arc::new(AtomicBool::new(true)),
+            answer,
+        )
+    }
+    /// A source whose request count and answering switch are shared with
+    /// other sources, so one switch silences a whole quorum.
+    pub fn shared(requests: Arc<AtomicUsize>, respond: Arc<AtomicBool>, answer: Answer) -> Self {
+        let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_millis(50)))
+            .unwrap();
+        let address = socket.local_addr().unwrap().to_string();
+        let stop = Arc::new(AtomicBool::new(false));
+        let (stopped, counted, answering) = (stop.clone(), requests.clone(), respond.clone());
+        let thread = std::thread::spawn(move || {
+            let mut packet = [0; 4096];
+            while !stopped.load(Ordering::SeqCst) {
+                match socket.recv_from(&mut packet) {
+                    Ok((size, peer)) => {
+                        let n = counted.fetch_add(1, Ordering::SeqCst);
+                        if !answering.load(Ordering::SeqCst) {
+                            continue;
+                        }
+                        if let Some(reply) = answer(n, &packet[..size]) {
+                            socket.send_to(&reply, peer).unwrap();
+                        }
+                    }
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                        ) => {}
+                    Err(e) => panic!("fixture clock source: {e}"),
+                }
+            }
+        });
+        Self {
+            address,
+            requests,
+            respond,
+            stop,
+            thread: Some(thread),
+        }
+    }
+}
+impl Drop for Server {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
 }
 fn hash(parts: &[&[u8]]) -> [u8; 32] {
     let mut ctx = digest::Context::new(&digest::SHA512);
@@ -68,7 +187,10 @@ fn signed(pair: &Ed25519KeyPair, context: &[u8], bytes: &[u8]) -> Vec<u8> {
     pair.sign(&[context, bytes].concat()).as_ref().to_vec()
 }
 
+#[derive(Clone)]
 pub struct Fixture {
+    /// The root key's seed ([`key`]); 7 is [`root_key`].
+    pub seed: u8,
     pub midpoint: u64,
     pub radius: u32,
     pub mint: u64,
@@ -84,6 +206,7 @@ pub struct Fixture {
 impl Default for Fixture {
     fn default() -> Self {
         Self {
+            seed: 7,
             midpoint: 1_789_076_475,
             radius: 1,
             mint: 1_789_000_000,
@@ -100,7 +223,7 @@ impl Default for Fixture {
 }
 impl Fixture {
     pub fn reply(&self, request: &[u8]) -> Vec<u8> {
-        let root = Ed25519KeyPair::from_seed_unchecked(&[7; 32]).unwrap();
+        let root = Ed25519KeyPair::from_seed_unchecked(&[self.seed; 32]).unwrap();
         let delegated = Ed25519KeyPair::from_seed_unchecked(&[9; 32]).unwrap();
         let mut delegation = vec![
             (*b"PUBK", delegated.public_key().as_ref().to_vec()),

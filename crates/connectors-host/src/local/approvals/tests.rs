@@ -567,7 +567,7 @@ fn issuer_audience_time_key_and_clock_refusals_are_current() {
     clock.set(NOW + 296000, NOW + 296000);
     assert!(matches!(verify(&e, &s, &p, &clock), Err(Failure::Refused)));
     for (lower, upper) in [
-        (NOW, NOW + 4001),
+        (NOW, NOW + 8001),
         (NOW + 1, NOW),
         (-1, 0),
         (i64::MAX - 1, i64::MAX),
@@ -593,6 +593,28 @@ fn issuer_audience_time_key_and_clock_refusals_are_current() {
     p.0.write().unwrap().1.revoked = false;
     p.0.write().unwrap().1.not_after_unix_ms = NOW + 2000;
     assert!(matches!(verify(&e, &s, &p, &clock), Err(Failure::Refused)));
+}
+
+/// The proof clock admits the clock's own 8,000 ms cap (contracts/service/
+/// delegation.md, "at most eight seconds"), for issuing and verifying alike,
+/// and refuses 8,001 ms.
+#[test]
+fn proof_clock_admits_8000_ms() {
+    let s = subject();
+    let p = policy(&s);
+    let clock = TestClock::new();
+    clock.set(NOW, NOW + 8000);
+    let e = signer().issue(&s, &p, &clock).unwrap();
+    verify(&e, &s, &p, &clock).unwrap();
+    clock.set(NOW, NOW + 8001);
+    assert!(matches!(
+        signer().issue(&s, &p, &clock),
+        Err(Failure::Unavailable)
+    ));
+    assert!(matches!(
+        verify(&e, &s, &p, &clock),
+        Err(Failure::Unavailable)
+    ));
 }
 
 #[test]

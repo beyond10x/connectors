@@ -1,4 +1,5 @@
-//! Bounded UTC under explicitly configured source and local timer assumptions.
+//! Bounded UTC from a quorum of explicitly configured Roughtime sources under
+//! local timer assumptions (docs/design/approval-clock-quorum.md).
 //! Acquisition does network I/O; an acquired Clock only reads local timers.
 //! Public observations cannot reconstruct the process-bound capability.
 #[cfg(test)]
@@ -13,6 +14,7 @@ use super::mutations::{self, Clock, ClockInterval};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeSet,
     net::{SocketAddr, UdpSocket},
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, Instant},
@@ -22,9 +24,16 @@ use timer::Stamp;
 const MAX_SAFE_MS: u128 = 9_007_199_254_740_991;
 const NS_PER_MS: u128 = 1_000_000;
 const NS_PER_S: u128 = 1_000_000_000;
+/// The one deadline every source shares: sends, receives and verification.
 const QUERY_TIMEOUT: Duration = Duration::from_secs(2);
-// contracts/service/clock.md: an observation is at most 4,000 ms wide.
-const MAX_WIDTH_MS: u128 = 4000;
+/// contracts/service/clock.md: a source's interval and the combined answer are
+/// each at most this wide; the approval proof and the ledger admit the same.
+const MAX_WIDTH_MS: u128 = mutations::MAX_CLOCK_WIDTH_MS as u128;
+/// The `roughtime-quorum/1` bounds on the number of sources and the quorum.
+const SOURCES: std::ops::RangeInclusive<usize> = 2..=8;
+pub const FORMAT: &str = "roughtime-quorum/1";
+/// The retired single-source format: parsed, never used as a clock.
+pub const RETIRED_FORMAT: &str = "roughtime-clock/1";
 
 // A test whose fake clock server does contended work before it replies sets
 // its own bound here, so a loaded scheduler cannot spend production's 2 s.
@@ -72,159 +81,441 @@ pub enum Failure {
 }
 type Result<T> = std::result::Result<T, Failure>;
 
-/// Why an acquisition yielded no observation (contracts/service/clock.md, "Refusals").
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Cause {
-    /// No reply within the query deadline, or a send or receive error.
-    Unreachable,
-    /// A reply that did not parse or verify against the configured key and protocol.
-    Unverified,
-    /// A verified reply whose signed radius, with the measured delay and timer-rate
-    /// error, makes the interval wider than the contract admits.
-    TooImprecise { radius_ms: u64 },
+/// Why a quorum acquisition formed no answer (`connectors.clock.Refusal`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Refusal {
+    /// Fewer than `quorum` sources verified.
+    BelowQuorum,
+    /// No instant lies in the intervals of `quorum` counted sources.
+    Split,
+    /// The combined answer is wider than the cap. Only the answer is capped:
+    /// a verified source counts whatever its own radius.
+    TooImprecise,
 }
 
-/// An acquisition's refusal: its [`Failure`], and its cause when the source
-/// itself is why. A local timer, continuity or calendar refusal has none.
+/// What one configured source contributed (`connectors.clock.SourceResult`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SourceResult {
+    /// Counted; its interval meets the answer.
+    Agreed,
+    /// Counted; its interval is disjoint from the answer.
+    Outlier,
+    /// Counted; no answer formed.
+    Verified,
+    /// No verified reply by the shared deadline, or a send or receive error.
+    Unreachable,
+    /// A reply that does not parse or verify against this source's key and version.
+    Unverified,
+}
+
+/// One line per configured source, in configuration order
+/// (`connectors.clock.SourceReport`). Never the reply, nonce or own interval.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SourceReport {
+    pub index: usize,
+    pub address: String,
+    pub result: SourceResult,
+    /// The signed radius, exactly when the reply verified.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub radius_ms: Option<u64>,
+}
+
+/// The next action a quorum refusal names (contracts/service/clock.md, "Refusals").
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NextAction {
+    CheckConfiguration,
+    ChooseClockSource,
+    RetryExplicitly,
+}
+impl NextAction {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CheckConfiguration => "check_configuration",
+            Self::ChooseClockSource => "choose_clock_source",
+            Self::RetryExplicitly => "retry_explicitly",
+        }
+    }
+}
+
+/// An acquisition's refusal: its [`Failure`], the combined [`Refusal`] and one
+/// line per source when the quorum formed no answer. A local timer,
+/// continuity, overflow or calendar refusal has neither.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Refused {
     pub failure: Failure,
-    pub cause: Option<Cause>,
+    pub refusal: Option<Refusal>,
+    pub sources: Vec<SourceReport>,
+    /// The configured table is the retired `roughtime-clock/1` shape.
+    pub retired: bool,
 }
 impl From<Failure> for Refused {
     fn from(failure: Failure) -> Self {
         Self {
             failure,
-            cause: None,
+            refusal: None,
+            sources: Vec::new(),
+            retired: false,
         }
     }
 }
-impl From<Cause> for Refused {
-    fn from(cause: Cause) -> Self {
+impl Refused {
+    fn quorum(refusal: Refusal, sources: Vec<SourceReport>) -> Self {
         Self {
             failure: Failure::Unavailable,
-            cause: Some(cause),
+            refusal: Some(refusal),
+            sources,
+            retired: false,
+        }
+    }
+    /// `below_quorum` names `check_configuration` if any source is unverified,
+    /// else `retry_explicitly`; `split` and `too_imprecise` name
+    /// `choose_clock_source`; any other refusal `check_configuration`.
+    pub fn next_action(&self) -> NextAction {
+        let any = |result| self.sources.iter().any(|s| s.result == result);
+        match self.refusal {
+            Some(Refusal::BelowQuorum) if any(SourceResult::Unverified) => {
+                NextAction::CheckConfiguration
+            }
+            Some(Refusal::BelowQuorum) => NextAction::RetryExplicitly,
+            Some(Refusal::Split | Refusal::TooImprecise) => NextAction::ChooseClockSource,
+            None => NextAction::CheckConfiguration,
         }
     }
 }
 
+/// The one wire version a source speaks (`connectors.clock.RoughtimeVersion`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RoughtimeVersion {
+    /// The draft-19 test version 0x8000000c.
+    #[serde(rename = "roughtime-0x8000000c")]
+    Draft0x8000000c,
+}
+impl RoughtimeVersion {
+    fn wire(self) -> u32 {
+        match self {
+            Self::Draft0x8000000c => 0x8000_000c,
+        }
+    }
+}
+
+/// One configured source (`connectors.clock.Source`): its root key is its
+/// trust identity, its numeric address where it is asked.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Configuration {
-    pub format: String,
+pub struct Source {
     pub address: String,
     pub public_key: String,
-    /// Deployment assertion covering hardware error and kernel clock adjustment.
-    /// Neither a public source sample nor the configured number proves it.
-    pub max_rate_error_ppm: u32,
+    pub version: RoughtimeVersion,
 }
-impl Configuration {
-    fn resolved(&self) -> Result<(SocketAddr, [u8; 32])> {
+impl Source {
+    fn resolved(&self) -> Result<Resolved> {
         if self.address.len() > 64 || self.public_key.len() != 44 {
             return Err(Failure::InvalidConfiguration);
         }
-        let address: SocketAddr = self
+        let parsed: SocketAddr = self
             .address
             .parse()
             .map_err(|_| Failure::InvalidConfiguration)?;
+        // One address has one form: an IPv4-mapped IPv6 address is its IPv4
+        // address for every check, the duplicate check included, and the socket.
+        let address = SocketAddr::new(parsed.ip().to_canonical(), parsed.port());
         let key = STANDARD
             .decode(&self.public_key)
             .map_err(|_| Failure::InvalidConfiguration)?;
-        if self.format != "roughtime-clock/1"
-            || !(1..=10_000).contains(&self.max_rate_error_ppm)
-            || address.port() == 0
+        if address.port() == 0
             || address.ip().is_unspecified()
             || address.ip().is_multicast()
             || matches!(address, SocketAddr::V4(a) if a.ip().is_broadcast())
-            || matches!(address, SocketAddr::V6(a) if a.scope_id() != 0 || a.flowinfo() != 0)
-            || address.to_string() != self.address
+            || matches!(parsed, SocketAddr::V6(a) if a.scope_id() != 0 || a.flowinfo() != 0)
+            || parsed.to_string() != self.address
             || key.len() != 32
             || key.iter().all(|b| *b == 0)
             || STANDARD.encode(&key) != self.public_key
         {
             return Err(Failure::InvalidConfiguration);
         }
-        Ok((
+        Ok(Resolved {
             address,
-            key.try_into().map_err(|_| Failure::InvalidConfiguration)?,
-        ))
+            key: key.try_into().map_err(|_| Failure::InvalidConfiguration)?,
+            version: self.version.wire(),
+        })
+    }
+}
+struct Resolved {
+    address: SocketAddr,
+    key: [u8; 32],
+    version: u32,
+}
+
+/// The `roughtime-quorum/1` table (`connectors.clock.Configuration`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Configuration {
+    pub format: String,
+    pub quorum: u32,
+    /// Deployment assertion covering hardware error and kernel clock adjustment.
+    /// Neither a public source sample nor the configured number proves it.
+    pub max_rate_error_ppm: u32,
+    pub sources: Vec<Source>,
+}
+impl Configuration {
+    fn resolved(&self) -> Result<Vec<Resolved>> {
+        let quorum = usize::try_from(self.quorum).map_err(|_| Failure::InvalidConfiguration)?;
+        if self.format != FORMAT
+            || !(1..=10_000).contains(&self.max_rate_error_ppm)
+            || !SOURCES.contains(&self.sources.len())
+            || !SOURCES.contains(&quorum)
+            || quorum > self.sources.len()
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        let resolved = self
+            .sources
+            .iter()
+            .map(Source::resolved)
+            .collect::<Result<Vec<_>>>()?;
+        // Two entries for one address or one key are one source counted twice.
+        let addresses: BTreeSet<_> = resolved.iter().map(|s| s.address).collect();
+        let keys: BTreeSet<_> = resolved.iter().map(|s| s.key).collect();
+        if addresses.len() != resolved.len() || keys.len() != resolved.len() {
+            return Err(Failure::InvalidConfiguration);
+        }
+        Ok(resolved)
     }
     pub fn validate(&self) -> Result<()> {
         self.resolved().map(|_| ())
     }
+    /// Covers the whole table, source order included.
     pub fn sha256(&self) -> String {
         connectors_core::digest(&serde_json::json!(self))
     }
-    /// One exchange; never call while holding a metadata transaction or a key/
-    /// policy lease. No host clock modification, DNS, fallback, or retry occurs.
+    /// One parallel exchange per source; never call while holding a metadata
+    /// transaction or a key/policy lease. No host clock modification, DNS,
+    /// fallback, or retry occurs.
     pub fn acquire(&self) -> Result<BoundedClock> {
         self.acquire_explained().map_err(|refused| refused.failure)
     }
-    /// [`Self::acquire`], naming the [`Cause`] when the source is why it refused.
+    /// [`Self::acquire`], naming the combined [`Refusal`] and each source's
+    /// result when the quorum is why it refused.
     pub fn acquire_explained(&self) -> std::result::Result<BoundedClock, Refused> {
-        let (address, key) = self.resolved()?;
+        let resolved = self.resolved()?;
+        let quorum = self.quorum as usize;
         timer::qualify_resolution()?;
-        let socket = UdpSocket::bind(if address.is_ipv4() {
-            "0.0.0.0:0"
-        } else {
-            "[::]:0"
-        })
-        .map_err(|_| Cause::Unreachable)?;
-        socket.connect(address).map_err(|_| Cause::Unreachable)?;
+        // Sockets are bound and connected before the shared deadline starts.
+        let sockets: Vec<Option<UdpSocket>> = resolved.iter().map(|s| connect(s.address)).collect();
         let deadline = Instant::now() + query_timeout();
-        let started = Stamp::read()?;
-        let (request, nonce) = protocol::request(&key)?;
-        socket
-            .set_write_timeout(Some(remaining(deadline).map_err(|_| Cause::Unreachable)?))
-            .map_err(|_| Cause::Unreachable)?;
-        if socket.send(&request).map_err(|_| Cause::Unreachable)? != request.len() {
-            return Err(Cause::Unreachable.into());
+        let exchanges: Vec<Exchange> = std::thread::scope(|scope| {
+            let running: Vec<_> = resolved
+                .iter()
+                .zip(sockets)
+                .map(|(source, socket)| scope.spawn(move || exchange(source, socket, deadline)))
+                .collect();
+            running
+                .into_iter()
+                .map(|thread| {
+                    thread
+                        .join()
+                        .unwrap_or(Exchange::Local(Failure::Unavailable))
+                })
+                .collect()
+        });
+        let mut reports = Vec::with_capacity(exchanges.len());
+        let mut replies = Vec::new();
+        for (index, exchange) in exchanges.into_iter().enumerate() {
+            let address = self.sources[index].address.clone();
+            let (result, radius_ms) = match exchange {
+                Exchange::Local(failure) => return Err(failure.into()),
+                Exchange::Source(result) => (result, None),
+                Exchange::Reply(reply) => {
+                    let radius_ms = u64::from(reply.sample.radius) * 1000;
+                    replies.push(Counted { index, ..reply });
+                    (SourceResult::Verified, Some(radius_ms))
+                }
+            };
+            reports.push(SourceReport {
+                index,
+                address,
+                result,
+                radius_ms,
+            });
         }
-        socket
-            .set_read_timeout(Some(remaining(deadline).map_err(|_| Cause::Unreachable)?))
-            .map_err(|_| Cause::Unreachable)?;
-        let mut bytes = [0u8; protocol::PACKET_SIZE + 1];
-        let n = match socket.recv(&mut bytes) {
-            Ok(n) => n,
-            // Windows refuses a datagram longer than the buffer (WSAEMSGSIZE) where other
-            // systems truncate it; either way the source answered with an overlong reply.
-            Err(e) if cfg!(windows) && e.raw_os_error() == Some(10040) => bytes.len(),
-            Err(_) => return Err(Cause::Unreachable.into()),
-        };
-        let received = Stamp::read()?;
-        remaining(deadline).map_err(|_| Cause::Unreachable)?;
-        started.continuous_with(received)?;
-        if received.monotonic < started.monotonic {
-            return Err(Failure::Unavailable.into());
+        let now = Stamp::read()?;
+        let mut counted = Vec::with_capacity(replies.len());
+        for source in replies {
+            source.started.continuous_with(now)?;
+            // A local timer refusal refuses here; a source whose signed values
+            // give no interval stays counted and contributes none (an outlier).
+            bounds_ns(&source, now, self.max_rate_error_ppm)?;
+            counted.push(source);
         }
-        if n > protocol::PACKET_SIZE {
-            return Err(Cause::Unverified.into());
+        if counted.len() < quorum {
+            return Err(Refused::quorum(Refusal::BelowQuorum, reports));
         }
-        let sample =
-            protocol::verify(&bytes[..n], &request, &nonce, &key).map_err(|_| Cause::Unverified)?;
-        remaining(deadline).map_err(|_| Cause::Unreachable)?;
         let clock = BoundedClock {
-            sample,
-            started,
-            received,
+            last_read: AtomicU64::new(
+                counted
+                    .iter()
+                    .map(|s| s.received.monotonic)
+                    .max()
+                    .unwrap_or_default(),
+            ),
+            counted,
+            quorum,
+            reports,
             rate_error_ppm: self.max_rate_error_ppm,
             configuration_sha256: self.sha256(),
             process: std::process::id(),
-            last_read: AtomicU64::new(received.monotonic),
         };
-        let now = Stamp::read()?;
-        if clock.interval_at(now, std::process::id()).is_err() {
-            return Err(if clock.wider_than_admitted(now) {
-                Cause::TooImprecise {
-                    radius_ms: u64::from(clock.sample.radius) * 1000,
-                }
-                .into()
-            } else {
-                Failure::Unavailable.into()
-            });
+        match clock.answer_at(now, std::process::id()) {
+            Ok(_) => Ok(clock),
+            Err(Combined::Split) => Err(Refused::quorum(Refusal::Split, clock.reports)),
+            Err(Combined::TooImprecise) => {
+                Err(Refused::quorum(Refusal::TooImprecise, clock.reports))
+            }
+            Err(Combined::Local) => Err(Failure::Unavailable.into()),
         }
-        Ok(clock)
     }
+}
+
+/// The retired single-source `roughtime-clock/1` table. It is parsed so the
+/// rest of the configuration keeps loading, and refused for every clock use.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Retired {
+    pub format: String,
+    pub address: String,
+    pub public_key: String,
+    pub max_rate_error_ppm: u32,
+}
+
+/// The configured `[approval_clock]` table: the quorum, or the retired shape.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ApprovalClock {
+    Quorum(Configuration),
+    Retired(Retired),
+}
+impl ApprovalClock {
+    /// The configuration-load check: a malformed quorum table or any format
+    /// other than the two refuses the whole configuration; the retired shape
+    /// does not.
+    pub fn validate(&self) -> Result<()> {
+        match self {
+            Self::Quorum(configuration) => configuration.validate(),
+            Self::Retired(retired) if retired.format == RETIRED_FORMAT => Ok(()),
+            Self::Retired(_) => Err(Failure::InvalidConfiguration),
+        }
+    }
+    /// The quorum table every clock use needs; the retired shape refuses
+    /// `InvalidConfiguration` (rewrite it as `roughtime-quorum/1`,
+    /// docs/local-clock.md).
+    pub fn configuration(&self) -> Result<&Configuration> {
+        match self {
+            Self::Quorum(configuration) => Ok(configuration),
+            Self::Retired(_) => Err(Failure::InvalidConfiguration),
+        }
+    }
+    /// Whether the table is the retired `roughtime-clock/1` shape.
+    pub fn is_retired(&self) -> bool {
+        matches!(self, Self::Retired(_))
+    }
+    pub fn acquire(&self) -> Result<BoundedClock> {
+        self.configuration()?.acquire()
+    }
+    pub fn acquire_explained(&self) -> std::result::Result<BoundedClock, Refused> {
+        match self {
+            Self::Quorum(configuration) => configuration.acquire_explained(),
+            Self::Retired(_) => Err(Refused {
+                retired: true,
+                ..Failure::InvalidConfiguration.into()
+            }),
+        }
+    }
+}
+
+fn connect(address: SocketAddr) -> Option<UdpSocket> {
+    let socket = UdpSocket::bind(if address.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    })
+    .ok()?;
+    socket.connect(address).ok()?;
+    Some(socket)
+}
+
+/// One source's exchange, on its own thread under the shared deadline.
+enum Exchange {
+    Reply(Counted),
+    Source(SourceResult),
+    /// A local timer or randomness failure: the whole acquisition refuses.
+    Local(Failure),
+}
+fn exchange(source: &Resolved, socket: Option<UdpSocket>, deadline: Instant) -> Exchange {
+    let unreachable = Exchange::Source(SourceResult::Unreachable);
+    let Some(socket) = socket else {
+        return unreachable;
+    };
+    let started = match Stamp::read() {
+        Ok(stamp) => stamp,
+        Err(failure) => return Exchange::Local(failure),
+    };
+    let (request, nonce) = match protocol::request(&source.key, source.version) {
+        Ok(request) => request,
+        Err(failure) => return Exchange::Local(failure),
+    };
+    let sent = remaining(deadline)
+        .ok()
+        .and_then(|left| socket.set_write_timeout(Some(left)).ok())
+        .and_then(|()| socket.send(&request).ok());
+    if sent != Some(request.len()) {
+        return unreachable;
+    }
+    let mut bytes = [0u8; protocol::PACKET_SIZE + 1];
+    let Some(n) = remaining(deadline)
+        .ok()
+        .and_then(|left| socket.set_read_timeout(Some(left)).ok())
+        .and_then(|()| match socket.recv(&mut bytes) {
+            Ok(n) => Some(n),
+            // Windows refuses a datagram longer than the buffer (WSAEMSGSIZE) where other
+            // systems truncate it; either way the source answered with an overlong reply.
+            Err(e) if cfg!(windows) && e.raw_os_error() == Some(10040) => Some(bytes.len()),
+            Err(_) => None,
+        })
+    else {
+        return unreachable;
+    };
+    let received = match Stamp::read() {
+        Ok(stamp) => stamp,
+        Err(failure) => return Exchange::Local(failure),
+    };
+    if remaining(deadline).is_err() {
+        return unreachable;
+    }
+    if let Err(failure) = started.continuous_with(received) {
+        return Exchange::Local(failure);
+    }
+    if received.monotonic < started.monotonic {
+        return Exchange::Local(Failure::Unavailable);
+    }
+    if n > protocol::PACKET_SIZE {
+        return Exchange::Source(SourceResult::Unverified);
+    }
+    let Ok(sample) = protocol::verify(&bytes[..n], &request, &nonce, &source.key, source.version)
+    else {
+        return Exchange::Source(SourceResult::Unverified);
+    };
+    if remaining(deadline).is_err() {
+        return unreachable;
+    }
+    Exchange::Reply(Counted {
+        index: 0,
+        sample,
+        started,
+        received,
+    })
 }
 fn remaining(deadline: Instant) -> Result<Duration> {
     deadline
@@ -233,20 +524,87 @@ fn remaining(deadline: Instant) -> Result<Duration> {
         .ok_or(Failure::Unavailable)
 }
 
+/// Why no answer formed at one reading.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Combined {
+    Split,
+    TooImprecise,
+    /// A local timer, continuity, overflow, validity or calendar refusal.
+    Local,
+}
+
+/// The quorum rule (docs/design/approval-clock-quorum.md, "Quorum rule") over
+/// closed intervals in ns: the hull of the instants at least `quorum`
+/// intervals contain, rounded outward to ms, and at most `max_width_ms` wide.
+fn quorum_answer(
+    intervals: &[(u128, u128)],
+    quorum: usize,
+    max_width_ms: u128,
+) -> std::result::Result<(u128, u128), Combined> {
+    // Starts sort before ends at equal values, so touching intervals overlap.
+    let mut events: Vec<(u128, bool)> = intervals
+        .iter()
+        .flat_map(|(lower, upper)| [(*lower, false), (*upper, true)])
+        .collect();
+    events.sort_unstable();
+    let (mut covering, mut lower, mut upper) = (0usize, None, None);
+    for (at, end) in events {
+        if end {
+            if covering == quorum {
+                upper = Some(at);
+            }
+            covering -= 1;
+        } else {
+            covering += 1;
+            if covering == quorum && lower.is_none() {
+                lower = Some(at);
+            }
+        }
+    }
+    let (Some(lower), Some(upper)) = (lower, upper) else {
+        return Err(Combined::Split);
+    };
+    let (lower, upper) = (lower / NS_PER_MS, upper.div_ceil(NS_PER_MS));
+    if upper - lower > max_width_ms {
+        return Err(Combined::TooImprecise);
+    }
+    Ok((lower, upper))
+}
+
 /// Safe observation only. It is never accepted as clock evidence on an ingress.
 #[derive(Debug, Serialize)]
 pub struct Observation {
     pub configuration_sha256: String,
     pub lower_unix_ms: i64,
     pub upper_unix_ms: i64,
+    pub sources: Vec<SourceReport>,
 }
 
-/// No Clone or Deserialize; a restart/fork must acquire a new signed sample.
-/// Consumers separately retain current clock-selection and authorization policy.
-pub struct BoundedClock {
+/// A counted source: its signed sample and its own monotonic stamps, S_i read
+/// before its nonce was created and R_i after its reply arrived.
+struct Counted {
+    index: usize,
     sample: protocol::Sample,
     started: Stamp,
     received: Stamp,
+}
+
+/// The answer at one reading: its interval and each counted source's own, none
+/// when the source's signed values give no interval.
+struct Answer {
+    interval: ClockInterval,
+    sources: Vec<(usize, Option<(u128, u128)>)>,
+    lower_ns: u128,
+    upper_ns: u128,
+}
+
+/// No Clone or Deserialize; a restart/fork must acquire new signed samples.
+/// Consumers separately retain current clock-selection and authorization policy.
+/// The counted set is fixed at acquisition; no reading adds or drops a source.
+pub struct BoundedClock {
+    counted: Vec<Counted>,
+    quorum: usize,
+    reports: Vec<SourceReport>,
     rate_error_ppm: u32,
     configuration_sha256: String,
     process: u32,
@@ -257,80 +615,141 @@ impl BoundedClock {
         &self.configuration_sha256
     }
     pub fn observe(&self) -> Result<Observation> {
-        let interval = self.interval_at(Stamp::read()?, std::process::id())?;
+        let answer = self
+            .answer_at(Stamp::read()?, std::process::id())
+            .map_err(|_| Failure::Unavailable)?;
+        let mut sources = self.reports.clone();
+        for (index, interval) in answer.sources {
+            sources[index].result = match interval {
+                Some((lower, upper)) if lower <= answer.upper_ns && upper >= answer.lower_ns => {
+                    SourceResult::Agreed
+                }
+                _ => SourceResult::Outlier,
+            };
+        }
         Ok(Observation {
             configuration_sha256: self.configuration_sha256.clone(),
-            lower_unix_ms: interval.lower_unix_ms,
-            upper_unix_ms: interval.upper_unix_ms,
+            lower_unix_ms: answer.interval.lower_unix_ms,
+            upper_unix_ms: answer.interval.upper_unix_ms,
+            sources,
         })
     }
     fn interval_at(&self, now: Stamp, process: u32) -> Result<ClockInterval> {
+        self.answer_at(now, process)
+            .map(|answer| answer.interval)
+            .map_err(|_| Failure::Unavailable)
+    }
+    fn answer_at(&self, now: Stamp, process: u32) -> std::result::Result<Answer, Combined> {
         if process != self.process
             || now.monotonic < self.last_read.fetch_max(now.monotonic, Ordering::SeqCst)
         {
-            return Err(Failure::Unavailable);
+            return Err(Combined::Local);
         }
-        self.started.continuous_with(now)?;
-        let (origin_lower, lower, upper) = self.bounds_at(now)?;
-        if upper > MAX_SAFE_MS || upper.checked_sub(lower).is_none_or(|w| w > max_width_ms()) {
-            return Err(Failure::Unavailable);
+        let mut sources = Vec::with_capacity(self.counted.len());
+        for source in &self.counted {
+            source
+                .started
+                .continuous_with(now)
+                .map_err(|_| Combined::Local)?;
+            let interval =
+                bounds_ns(source, now, self.rate_error_ppm).map_err(|_| Combined::Local)?;
+            sources.push((source.index, interval));
+        }
+        let intervals: Vec<_> = sources.iter().filter_map(|(_, i)| *i).collect();
+        let (lower, upper) = quorum_answer(&intervals, self.quorum, max_width_ms())?;
+        if upper > MAX_SAFE_MS {
+            return Err(Combined::Local);
         }
         // No leap announcement is consumed. Avoid extrapolating across any UTC
-        // midnight, including the possible skipped/repeated second around it.
+        // midnight, including the possible skipped/repeated second around it,
+        // from the answer as acquired, back-dated to the earliest exchange
+        // start: never from one source's interval, so an outlier or a wide
+        // source on another day refuses nothing, and no span from a sample to
+        // this reading crosses a possible leap.
+        let origin = self.origin_ms().map_err(|_| Combined::Local)?;
         let day_ms = 86_400_000;
-        let origin_ms = origin_lower / NS_PER_MS;
-        if origin_ms / day_ms != upper / day_ms
-            || origin_ms % day_ms < 1000
+        if origin / day_ms != upper / day_ms
+            || origin % day_ms < 1000
             || upper % day_ms >= day_ms - 1000
         {
-            return Err(Failure::Unavailable);
+            return Err(Combined::Local);
         }
-        Ok(ClockInterval {
-            lower_unix_ms: lower as i64,
-            upper_unix_ms: upper as i64,
+        Ok(Answer {
+            interval: ClockInterval {
+                lower_unix_ms: lower as i64,
+                upper_unix_ms: upper as i64,
+            },
+            sources,
+            lower_ns: lower * NS_PER_MS,
+            upper_ns: upper * NS_PER_MS,
         })
     }
-    /// Whether the continuous interval at `now` is refused for its width alone:
-    /// the signed radius, with the measured delay and rate error, is too wide.
-    fn wider_than_admitted(&self, now: Stamp) -> bool {
-        self.started.continuous_with(now).is_ok()
-            && self
-                .bounds_at(now)
-                .is_ok_and(|(_, lower, upper)| upper.saturating_sub(lower) > max_width_ms())
-    }
-    /// The interval at `now` before any admission check: its origin's lower
-    /// bound in ns, then its lower and upper bounds in Unix ms, rounded outward.
-    fn bounds_at(&self, now: Stamp) -> Result<(u128, u128, u128)> {
-        let from_start = now
-            .monotonic
-            .checked_sub(self.started.monotonic)
+    /// The UTC-midnight origin in Unix ms: the answer's lower bound at N_0 less
+    /// elapsed_upper(N_0 - S_min), N_0 = R_max the latest counted reply receipt
+    /// and S_min the earliest counted exchange start. It is a function of the
+    /// counted set fixed at acquisition, so no reading can move it.
+    fn origin_ms(&self) -> Result<u128> {
+        let acquired = self
+            .counted
+            .iter()
+            .map(|s| s.received)
+            .max_by_key(|s| s.monotonic)
             .ok_or(Failure::Unavailable)?;
-        let from_receive = now
-            .monotonic
-            .checked_sub(self.received.monotonic)
-            .ok_or(Failure::Unavailable)?;
-        let elapsed_upper = elapsed(from_start, self.rate_error_ppm, true)?;
-        if elapsed_upper > 30 * NS_PER_S {
-            return Err(Failure::Unavailable);
+        let mut intervals = Vec::with_capacity(self.counted.len());
+        for source in &self.counted {
+            if let Some(interval) = bounds_ns(source, acquired, self.rate_error_ppm)? {
+                intervals.push(interval);
+            }
         }
-        let midpoint = u128::from(self.sample.midpoint) * NS_PER_S;
-        let radius = u128::from(self.sample.radius) * NS_PER_S;
-        let origin_lower = midpoint
-            .checked_sub(radius)
-            .and_then(|v| v.checked_sub(3 * NS_PER_MS))
+        let (lower, _) = quorum_answer(&intervals, self.quorum, max_width_ms())
+            .map_err(|_| Failure::Unavailable)?;
+        let earliest = self
+            .counted
+            .iter()
+            .map(|s| s.started.monotonic)
+            .min()
             .ok_or(Failure::Unavailable)?;
-        let lower = origin_lower
-            .checked_add(elapsed(from_receive, self.rate_error_ppm, false)?)
-            .ok_or(Failure::Unavailable)?
-            / NS_PER_MS;
-        let upper = midpoint
-            .checked_add(radius)
-            .and_then(|v| v.checked_add(elapsed_upper))
-            .and_then(|v| v.checked_add(3 * NS_PER_MS))
-            .ok_or(Failure::Unavailable)?
-            .div_ceil(NS_PER_MS);
-        Ok((origin_lower, lower, upper))
+        let since = acquired
+            .monotonic
+            .checked_sub(earliest)
+            .ok_or(Failure::Unavailable)?;
+        let back = elapsed(since, self.rate_error_ppm, true)?;
+        (lower * NS_PER_MS)
+            .checked_sub(back)
+            .map(|origin| origin / NS_PER_MS)
+            .ok_or(Failure::Unavailable)
     }
+}
+/// A source's interval at `now` before any admission check, in ns:
+/// l = M - A - 3 ms + elapsed_lower(N - R) and u = M + A + 3 ms + elapsed_upper(N - S).
+/// A local timer refusal, including elapsed_upper(N - S) past 30 s, refuses;
+/// signed values that give no interval (M below A + 3 ms, or past the range) are
+/// that source's alone and give `None`, never a refusal of the whole clock.
+fn bounds_ns(source: &Counted, now: Stamp, ppm: u32) -> Result<Option<(u128, u128)>> {
+    let from_start = now
+        .monotonic
+        .checked_sub(source.started.monotonic)
+        .ok_or(Failure::Unavailable)?;
+    let from_receive = now
+        .monotonic
+        .checked_sub(source.received.monotonic)
+        .ok_or(Failure::Unavailable)?;
+    let elapsed_upper = elapsed(from_start, ppm, true)?;
+    if elapsed_upper > 30 * NS_PER_S {
+        return Err(Failure::Unavailable);
+    }
+    let midpoint = u128::from(source.sample.midpoint) * NS_PER_S;
+    let radius = u128::from(source.sample.radius) * NS_PER_S;
+    let elapsed_lower = elapsed(from_receive, ppm, false)?;
+    let lower = midpoint
+        .checked_sub(radius)
+        .and_then(|v| v.checked_sub(3 * NS_PER_MS))
+        .and_then(|v| v.checked_add(elapsed_lower));
+    let upper = midpoint
+        .checked_add(radius)
+        .and_then(|v| v.checked_add(elapsed_upper))
+        .and_then(|v| v.checked_add(3 * NS_PER_MS));
+    Ok(lower.zip(upper))
 }
 impl Clock for BoundedClock {
     fn now(&self) -> mutations::Result<ClockInterval> {

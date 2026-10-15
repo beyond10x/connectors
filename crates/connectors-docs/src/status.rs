@@ -159,8 +159,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Local runtime",
         "Approval clock refusals",
-        "approvals clock-check names why no observation resulted: an unreachable source, a reply that does not verify against the configured key, or a source whose signed radius is too wide for approvals, each with its own next action.",
-        "apps/connectors/tests/local_cli.rs::clock_check_names_a_verified_source_too_imprecise_for_the_width",
+        "approvals clock-check names why the quorum formed no answer (below quorum, split or too imprecise) with its next action, and each source's result: unreachable, unverified or verified at any radius; only the combined answer is capped.",
+        "apps/connectors/tests/local_cli.rs::clock_check_below_quorum_refusal",
         "/docs/concepts/local-runtime",
     ),
     shipped(
@@ -194,7 +194,7 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Local runtime",
         "Approval clock check",
-        "approvals clock-check verifies one configured Roughtime source without starting the owner or reading metadata.",
+        "approvals clock-check answers from a quorum of two to eight configured Roughtime sources, naming each source's result, without starting the owner or reading metadata.",
         "apps/connectors/tests/local_cli.rs::clock_check_uses_current_configured_key_without_metadata_or_service_start",
         "/docs/concepts/local-runtime",
     ),

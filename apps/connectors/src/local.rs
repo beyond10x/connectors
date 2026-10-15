@@ -224,6 +224,9 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     if let Some(retry_after_seconds) = error.retry_after_seconds {
         data["retry_after_seconds"] = json!(retry_after_seconds);
     }
+    if error.clock_format_retired && error.code == InvalidConfiguration {
+        data["configuration_rule"] = json!(Rule::ApprovalClockFormatRetired.as_str());
+    }
     if usage {
         HandlerReply::UsageError {
             code: "failure".into(),
@@ -252,23 +255,32 @@ fn failure(code: &str, stage: &str, next_action: &str, usage: bool) -> HandlerRe
     }
 }
 
-/// An approval clock that yielded no observation: `unavailable`, naming the
-/// source's cause and its next action (contracts/service/clock.md, "Refusals").
-/// Never the observation's bounds, the request or the reply.
+/// An approval clock that yielded no observation (contracts/service/clock.md,
+/// "Refusals"). A retired `roughtime-clock/1` table is `invalid_configuration`
+/// naming `approval_clock_format_retired`; a quorum that formed no answer is
+/// `unavailable` naming the combined refusal, its next action and each
+/// source's line. Never the observation's bounds, the request or the reply.
 fn clock_failure(refused: connectors_host::local::clock::Refused) -> HandlerReply {
-    use connectors_host::local::clock::Cause;
-    let (cause, action) = match refused.cause {
-        Some(Cause::Unreachable) => (Some("unreachable"), "retry_explicitly"),
-        Some(Cause::Unverified) => (Some("unverified"), "check_configuration"),
-        Some(Cause::TooImprecise { .. }) => (Some("too_imprecise"), "choose_clock_source"),
-        None => (None, "check_configuration"),
-    };
-    let mut reply = failure("unavailable", "observation", action, false);
-    if let (Some(cause), HandlerReply::Error { data, .. }) = (cause, &mut reply) {
-        data["clock_refusal"] = json!(cause);
-        if let Some(Cause::TooImprecise { radius_ms }) = refused.cause {
-            data["clock_radius_ms"] = json!(radius_ms);
-        }
+    if refused.retired {
+        return configuration_refusal(Refusal::Rule(Rule::ApprovalClockFormatRetired));
+    }
+    if refused.failure == connectors_host::local::clock::Failure::InvalidConfiguration {
+        return failure(
+            "invalid_configuration",
+            "configuration",
+            "check_configuration",
+            true,
+        );
+    }
+    let mut reply = failure(
+        "unavailable",
+        "observation",
+        refused.next_action().as_str(),
+        false,
+    );
+    if let (Some(refusal), HandlerReply::Error { data, .. }) = (refused.refusal, &mut reply) {
+        data["clock_refusal"] = json!(refusal);
+        data["clock_sources"] = json!(refused.sources);
     }
     reply
 }
