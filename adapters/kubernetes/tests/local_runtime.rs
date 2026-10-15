@@ -1698,6 +1698,58 @@ fn exec_plugin_is_disabled_without_configuration_and_never_runs_from_a_kubeconfi
     assert_eq!(plugin.runs(), 0);
 }
 
+/// The kubeconfig is read when the plugin runs, and only then: once a token
+/// is held, an operation is served without the kubeconfig, even after it is
+/// gone.
+#[test]
+fn exec_plugin_held_token_serves_without_reading_the_kubeconfig() {
+    let cluster = Cluster::new(false);
+    let plugin = ExecPlugin::new();
+    let kubeconfig = plugin.kubeconfig(&cluster);
+    configure(&cluster, "kubeconfig", json!(kubeconfig));
+    configure(&cluster, "exec_plugin", plugin.binding());
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+    child
+        .validate(
+            "kubernetes.exec_plugin",
+            &exec_confirmation(EXEC_USER),
+            deadline(),
+        )
+        .unwrap();
+    assert_eq!(plugin.runs(), 1);
+    fs::remove_file(&kubeconfig).unwrap();
+    let page = invoke(
+        &mut child,
+        "resources.list",
+        "one",
+        &exec_confirmation(EXEC_USER),
+        json!({"namespace":"fixture","kind":"pods","limit":1}),
+    )
+    .unwrap();
+    assert_eq!(page["items"][0]["metadata"]["name"], "pod-0");
+    assert_eq!(plugin.runs(), 1);
+}
+
+/// A binding whose allow-list names a loader variable is refused when the
+/// configuration loads; nothing runs.
+#[test]
+fn exec_plugin_binding_allowing_a_loader_variable_is_refused_at_load() {
+    let cluster = Cluster::new(false);
+    let plugin = ExecPlugin::new();
+    configure(&cluster, "kubeconfig", json!(plugin.kubeconfig(&cluster)));
+    let mut binding = plugin.binding();
+    binding["env"] = json!(["AWS_PROFILE", "LD_PRELOAD"]);
+    configure(&cluster, "exec_plugin", binding);
+    let output = Command::new(env!("CARGO_BIN_EXE_connectors-kubernetes"))
+        .arg("--local-config")
+        .arg(&cluster.config)
+        .arg("--print-local-bootstrap")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert_eq!(plugin.runs(), 0);
+}
+
 #[test]
 fn exec_plugin_digest_mismatch_refuses_validation_before_it_runs() {
     let cluster = Cluster::new(false);

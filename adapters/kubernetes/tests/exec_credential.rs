@@ -514,4 +514,271 @@ fn rfc3339_timestamps_convert_to_unix_milliseconds() {
     ] {
         assert_eq!(rfc3339_ms(bad), None, "{bad}");
     }
+    // A valid instant before the epoch is a past expiry: it reads as 0, which
+    // no clock this adapter reads is before.
+    for past in ["1969-12-31T23:59:59Z", "0001-01-01T00:00:00Z"] {
+        assert_eq!(rfc3339_ms(past), Some(0), "{past}");
+    }
+    for bad in ["2030-01-01T00:00:00+24:00", "2030-01-01T00:00:00-00:60"] {
+        assert_eq!(rfc3339_ms(bad), None, "{bad}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Fix pass of wave 20261015b: the allow-list's refused names, file
+// capabilities, the group after the run, the read end at the deadline and
+// the kubeconfig read only when the plugin runs.
+// ---------------------------------------------------------------------------
+
+/// `ExecPluginEnvName`: a binding that allows a loader or start-up variable
+/// is refused before anything runs; ordinary names, PATH among them, are not.
+#[test]
+fn exec_plugin_binding_refuses_loader_and_start_up_names() {
+    let plugin = Plugin::answering();
+    for name in [
+        "LD_PRELOAD",
+        "LD_LIBRARY_PATH",
+        "LD_AUDIT",
+        "BASH_ENV",
+        "ENV",
+        "SHELLOPTS",
+        "PS4",
+        "IFS",
+        "PYTHONSTARTUP",
+        "PYTHONPATH",
+        "PERL5OPT",
+        "RUBYOPT",
+        "NODE_OPTIONS",
+        "JAVA_TOOL_OPTIONS",
+        "GCONV_PATH",
+        "GLIBC_TUNABLES",
+        "HOSTALIASES",
+    ] {
+        let mut binding = plugin.binding();
+        binding.env = vec!["AWS_PROFILE".into(), name.into()];
+        assert!(!binding.admissible(), "{name}");
+        assert!(Credentials::new(binding).is_none(), "{name}");
+    }
+    for name in [
+        "PATH",
+        "AWS_PROFILE",
+        "LD",
+        "ENVIRONMENT",
+        "LANG",
+        "TZ",
+        "ld_preload",
+    ] {
+        let mut binding = plugin.binding();
+        binding.env = vec![name.into()];
+        assert!(binding.admissible(), "{name}");
+    }
+    assert_eq!(plugin.runs(), 0);
+}
+
+/// The refused names are one list, written in the ESS model and enforced by
+/// the code: every name and prefix the model's `ExecPluginEnvName` excludes
+/// is refused by `Binding::admissible`, and the code's lists are exactly the
+/// model's.
+#[test]
+fn exec_plugin_refused_env_names_are_the_ess_model_names() {
+    use connectors_kubernetes::exec_credential::{REFUSED_ENV_NAMES, REFUSED_ENV_PREFIXES};
+    use std::collections::BTreeSet;
+    let model: serde_yaml_ng::Value = serde_yaml_ng::from_str(
+        &fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/spec/ess/domains/exec_credentials.yaml"
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let name = model["types"]
+        .as_sequence()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "connectors_kubernetes.exec_credentials.ExecPluginEnvName")
+        .expect("the model declares ExecPluginEnvName");
+    let (mut names, mut prefixes) = (BTreeSet::new(), BTreeSet::new());
+    for invariant in name["invariants"].as_sequence().unwrap() {
+        let Some(refused) = invariant["none"].as_sequence() else {
+            continue;
+        };
+        for predicate in refused {
+            let value = &predicate["value"];
+            if let Some(exact) = value["eq"].as_str() {
+                names.insert(exact.to_owned());
+            } else if let Some(prefix) = value["starts_with"].as_str() {
+                // A leading digit is the name grammar, not a refused prefix.
+                if !prefix.bytes().all(|b| b.is_ascii_digit()) {
+                    prefixes.insert(prefix.to_owned());
+                }
+            } else {
+                panic!("unread refusal {predicate:?}");
+            }
+        }
+    }
+    assert_eq!(
+        names,
+        REFUSED_ENV_NAMES.iter().map(|s| s.to_string()).collect()
+    );
+    assert_eq!(
+        prefixes,
+        REFUSED_ENV_PREFIXES.iter().map(|s| s.to_string()).collect()
+    );
+    let plugin = Plugin::answering();
+    let refused = names
+        .iter()
+        .cloned()
+        .chain(prefixes.iter().map(|p| format!("{p}FIXTURE")));
+    for name in refused {
+        let mut binding = plugin.binding();
+        binding.env = vec![name.clone()];
+        assert!(!binding.admissible(), "{name}");
+    }
+}
+
+/// A file carrying file capabilities runs with privileges its owner did not
+/// have, like a set-ID file, and is refused the same way. The capability is
+/// set from an unprivileged user namespace, which the kernel records as a
+/// namespaced (v3) `security.capability` attribute.
+#[test]
+#[cfg(target_os = "linux")]
+fn exec_plugin_file_with_capabilities_is_refused() {
+    let plugin = Plugin::answering();
+    plugin.answer(Some(LATER));
+    let set = std::process::Command::new("unshare")
+        .args(["-Ur", "setcap", "cap_net_raw+ep"])
+        .arg(&plugin.path)
+        .output();
+    if !set.is_ok_and(|o| o.status.success()) {
+        eprintln!("skipped: no unprivileged user namespace or no setcap");
+        return;
+    }
+    let credentials = Credentials::new(plugin.binding()).unwrap();
+    assert_eq!(
+        token(
+            &credentials,
+            &kubeconfig(&plugin.path, &[]),
+            &clock("2029-01-01T00:00:00Z")
+        ),
+        Err(Refusal::PluginUnavailable)
+    );
+    assert_eq!(plugin.runs(), 0);
+}
+
+/// A plugin that answers and exits 0, leaving a process in its group that
+/// no longer holds stdout: the run succeeds, and what it left behind is
+/// killed with the group before the plugin is reaped.
+#[test]
+#[cfg(target_os = "linux")]
+fn exec_plugin_group_left_behind_is_killed_when_the_run_ends() {
+    let sleep = ["/usr/bin/sleep", "/bin/sleep"]
+        .into_iter()
+        .find(|p| Path::new(p).exists())
+        .unwrap();
+    let plugin = Plugin::new("");
+    plugin.answer(Some(LATER));
+    let d = plugin.dir.path().display();
+    let script = fs::read_to_string(&plugin.path).unwrap()
+        + &format!(
+            "{sleep} 30 > /dev/null 2>&1 &\necho $! > {d}/left\n\
+             read -r line < {d}/answer\nprintf '%s\\n' \"$line\"\nexit 0\n"
+        );
+    fs::write(&plugin.path, script).unwrap();
+    let credentials = Credentials::new(plugin.binding()).unwrap();
+    assert_eq!(
+        token(
+            &credentials,
+            &kubeconfig(&plugin.path, &[]),
+            &clock("2029-01-01T00:00:00Z")
+        ),
+        Ok(TOKEN.to_owned())
+    );
+    let left: i32 = fs::read_to_string(plugin.dir.path().join("left"))
+        .unwrap()
+        .trim()
+        .parse()
+        .unwrap();
+    let until = Instant::now() + Duration::from_secs(5);
+    while !dead(left) {
+        if Instant::now() >= until {
+            // SAFETY: the pid is this test's own fixture process.
+            unsafe { libc::kill(left, libc::SIGKILL) };
+            panic!("a process the plugin left in its group survived the run");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// At the deadline the caller lets go of stdout: a descendant that left the
+/// plugin's group and still holds it gets EPIPE on its next write, rather
+/// than writing into a pipe some reader still keeps open.
+#[test]
+#[cfg(target_os = "linux")]
+fn exec_plugin_deadline_closes_stdout_for_an_escaped_descendant() {
+    let plugin = Plugin::new("");
+    let d = plugin.dir.path().display();
+    let script = fs::read_to_string(&plugin.path).unwrap()
+        + &format!(
+            "/usr/bin/setsid /bin/sh -c 'trap \"\" PIPE; echo $$ > {d}/escaped; \
+             /usr/bin/sleep 1; echo late || : > {d}/epipe' &\n/usr/bin/sleep 30\n"
+        );
+    fs::write(&plugin.path, script).unwrap();
+    let mut binding = plugin.binding();
+    binding.timeout_ms = Some(300);
+    let credentials = Credentials::new(binding).unwrap();
+    let started = Instant::now();
+    assert_eq!(
+        token(
+            &credentials,
+            &kubeconfig(&plugin.path, &[]),
+            &clock("2029-01-01T00:00:00Z")
+        ),
+        Err(Refusal::Timeout)
+    );
+    assert!(started.elapsed() < Duration::from_secs(4));
+    let epipe = plugin.dir.path().join("epipe");
+    let until = Instant::now() + Duration::from_secs(6);
+    while !epipe.exists() && Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    if let Ok(pid) = fs::read_to_string(plugin.dir.path().join("escaped"))
+        && let Ok(pid) = pid.trim().parse::<i32>()
+    {
+        // SAFETY: the pid is this test's own fixture descendant.
+        unsafe { libc::kill(pid, libc::SIGKILL) };
+    }
+    assert!(
+        epipe.exists(),
+        "the read end of the plugin's stdout outlived the timeout"
+    );
+}
+
+/// The kubeconfig is read when the plugin runs and only then: a use the
+/// held token serves never asks for it, and an unreadable kubeconfig is
+/// `kubeconfig_mismatch` before anything runs.
+#[test]
+fn exec_plugin_held_token_reads_no_kubeconfig() {
+    let plugin = Plugin::answering();
+    plugin.answer(Some(LATER));
+    let credentials = Credentials::new(plugin.binding()).unwrap();
+    let config = kubeconfig(&plugin.path, &[]);
+    let reads = std::cell::Cell::new(0);
+    let load = || {
+        reads.set(reads.get() + 1);
+        Ok(zeroize::Zeroizing::new(config.clone()))
+    };
+    let now = clock("2029-01-01T00:00:00Z");
+    for _ in 0..3 {
+        let token = credentials.token_with(&load, &now, &ambient).unwrap();
+        assert_eq!(&token[..], TOKEN.as_bytes());
+    }
+    assert_eq!((reads.get(), plugin.runs()), (1, 1));
+    let fresh = Credentials::new(plugin.binding()).unwrap();
+    assert_eq!(
+        fresh
+            .token_with(&|| Err(Refusal::KubeconfigMismatch), &now, &ambient)
+            .err(),
+        Some(Refusal::KubeconfigMismatch)
+    );
+    assert_eq!(plugin.runs(), 1);
 }

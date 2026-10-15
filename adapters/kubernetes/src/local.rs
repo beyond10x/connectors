@@ -367,16 +367,19 @@ impl Local {
         let credentials = plugin.credentials.clone();
         let kubeconfig = plugin.kubeconfig.clone();
         let mut token = tokio::task::spawn_blocking(move || {
-            // Read when the plugin runs, so the exec block in force is used.
-            let bytes = zeroize::Zeroizing::new(
-                filesystem::read_bounded(
-                    filesystem::private_file(&kubeconfig)
-                        .map_err(|_| exec_credential::Refusal::KubeconfigMismatch)?,
-                    connectors_kubernetes::kubeconfig::MAX_FILE_BYTES,
-                )
-                .map_err(|_| exec_credential::Refusal::KubeconfigMismatch)?,
-            );
-            credentials.token(&bytes, &connectors_sdk::now_ms, &|name| {
+            // Read when the plugin runs, and only then, so the exec block in
+            // force is used and a held token never touches the file.
+            let read = || {
+                Ok(zeroize::Zeroizing::new(
+                    filesystem::read_bounded(
+                        filesystem::private_file(&kubeconfig)
+                            .map_err(|_| exec_credential::Refusal::KubeconfigMismatch)?,
+                        connectors_kubernetes::kubeconfig::MAX_FILE_BYTES,
+                    )
+                    .map_err(|_| exec_credential::Refusal::KubeconfigMismatch)?,
+                ))
+            };
+            credentials.token_with(&read, &connectors_sdk::now_ms, &|name| {
                 std::env::var(name).ok()
             })
         })
