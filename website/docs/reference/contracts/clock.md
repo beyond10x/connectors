@@ -186,8 +186,12 @@ most 8,000 ms wide; a wider answer refuses `too_imprecise`. Expiry, overflow,
 uncertain continuity, excessive delay or clock-read failure returns
 unavailable, never expiry proof for a retained key.
 Without an admitted leap-announcement source, do not extrapolate across any UTC
-midnight: the answer's lower and upper bounds must lie in the same UTC day, at
-least one second after its start and strictly more than one second before its end.
+midnight. The origin is the answer's lower bound as acquired, at the latest
+counted R_i, back-dated by the conservative elapsed upper bound from the earliest
+counted S_i to that R_i; it depends only on the counted samples. The origin and
+each reading's upper bound must lie in the same UTC day, the origin at least one
+second after its start and the upper bound strictly more than one second before
+its end, so no span from a sample to a reading crosses a possible leap.
 No single source's interval is the origin, so an outlier on another UTC day or a
 wide counted source reaching across midnight never refuses the answer. This conservative daily refusal window covers both positive and
 negative leap seconds without claiming leap-calendar authority; see

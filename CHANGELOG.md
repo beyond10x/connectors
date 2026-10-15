@@ -178,8 +178,10 @@
   move it off true time and one unreachable source does not stop it while a quorum remains.
   A verified source counts at any radius; only the combined answer is capped. A source whose
   interval is disjoint from the answer, or whose signed values give no interval, is an
-  `outlier` and never refuses the clock; the UTC-midnight refusal looks at the answer alone,
-  so an outlier or a wide source on another UTC day refuses nothing. The width cap
+  `outlier` and never refuses the clock. The UTC-midnight refusal starts from the answer as
+  acquired, back-dated to the earliest exchange start, never from one source's interval: an
+  outlier or a wide source on another UTC day refuses nothing, and a reading refuses once it
+  reaches past the first UTC midnight after the samples were taken. The width cap
   moves from 4,000 ms to 8,000 ms for the clock answer, the approval proof and the
   mutation ledger alike (the delegation contract's "at most eight seconds"). The observation
   adds `sources`, one line per source (`agreed`, `outlier`, `unreachable` or `unverified`,

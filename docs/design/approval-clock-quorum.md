@@ -178,9 +178,13 @@ exactly today's interval (`clock.md:107-109`, `clock.rs:226-241`), per source.
 4. **Split.** If no instant has c(x) >= quorum, the acquisition refuses `split`.
 5. **Width.** U - L, rounded outward, over 8,000 ms refuses `too_imprecise`.
 6. **Day and range.** The overflow bound and the UTC-midnight rule (`clock.rs:242-254`)
-   apply to the answer alone, with its own lower bound as the origin: the answer's
-   lower and upper bounds must lie in the same UTC day, at least one second after
-   its start and strictly more than one second before its end. No single source's
+   apply to the answer alone. The origin is the answer's lower bound as acquired,
+   at N_0 = R_max, back-dated by `elapsed_upper(N_0 - S_min)`: R_max is the latest
+   counted reply receipt and S_min the earliest counted exchange start, so the
+   origin depends only on the counted samples. The origin and each reading's upper
+   bound must lie in the same UTC day, the origin at least one second after its
+   start and the upper bound strictly more than one second before its end, so no
+   span from a sample to a reading crosses a possible leap. No single source's
    interval is the origin, so an outlier on another UTC day, or a wide honest
    source reaching across midnight, never refuses the answer. These refusals name
    no cause.
@@ -381,6 +385,8 @@ Host (`crates/connectors-host/src/local/clock/tests.rs`, fixtures from
   midpoint 0 gives no interval; it is `outlier` and the honest two answer.
 - `adversary_wide_honest_source_counts_whatever_its_radius`: a radius-200,000 s
   honest source reaching across midnight is `agreed` with two narrow ones.
+- `no_reading_extrapolates_a_sample_across_midnight`: a sample ten seconds before
+  midnight answers a reading before it and refuses one about five seconds after.
 - `quorum_counted_set_is_fixed`: a later `Clock::now` past one source's 30 s window
   refuses; it never drops that source and answers from the rest.
 - `legacy_single_source_format_refuses_only_the_clock`: a `roughtime-clock/1` table

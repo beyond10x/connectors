@@ -123,7 +123,9 @@ once any counted source's window passes, the clock refuses rather than dropping 
 Samples are kept only in the acquiring process; restart/fork requires new samples.
 Suspend or uncertain timer continuity invalidates them. Without a leap-announcement
 binding, estimates also refuse around UTC midnight instead of extrapolating through
-a possible repeated/skipped second. See the [clock contract](../contracts/service/clock.md)
+a possible repeated/skipped second: a reading refuses once it would reach past the
+first UTC midnight after the samples were taken, even when its own answer lies
+wholly in the next day. See the [clock contract](../contracts/service/clock.md)
 for exact bounds, the quorum rule and the separate source/hardware trust assumptions.
 
 The native Rust client verifies each source at its configured version against its
