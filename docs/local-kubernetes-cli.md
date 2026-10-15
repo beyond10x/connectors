@@ -95,7 +95,8 @@ the configuration loads, and a path that is not an owner-only, readable kubeconf
 refuses the configuration; the revision records a digest of the path, not of the
 file. The federated service configuration can enable `pod_logs`, `node_reads`
 and `custom_resources`, but not
-`kubeconfig` or `pod_exec`.
+`kubeconfig`, `pod_exec` or `exec_plugin`
+([Authenticate through an exec credential plugin](#authenticate-through-an-exec-credential-plugin)).
 
 The block above is the file format. The adapter's published
 `configuration_schema` has two branches, and the local one describes the
@@ -219,6 +220,100 @@ This binding does not observe a credential expiry. A bound service-account token
 carries its own lifetime inside the credential, which this adapter does not decode,
 so `credential_expires_at_ms` is absent — meaning not observed, not unlimited. An
 expired token is reported when it is next used.
+
+## Authenticate through an exec credential plugin
+
+A cluster whose kubeconfig user authenticates through an `exec` credential plugin,
+such as `aws eks get-token` for EKS, is reached by naming that plugin in the native
+configuration. The adapter runs it only under these rules, from the
+[reads contract](../adapters/kubernetes/contracts/reads/v1alpha1/semantics.md#exec-plugin-credentials):
+
+- **Pinned.** `exec_plugin.path` is the plugin's absolute path and
+  `exec_plugin.sha256` the SHA-256 of its bytes. Both are checked before every run;
+  a different file refuses with `invalid_configuration` and nothing runs. The file
+  must not be writable by group or others, must carry no set-user-ID or
+  set-group-ID bit and must be owned by root or by you. `path` must name the file
+  itself, not a symbolic link: the adapter opens it once without following a
+  link, hashes it through that open file and runs that same open file, so a file
+  swapped in at `path` after the check never runs. Plugins run on Linux only.
+- **Arguments from the kubeconfig, as data.** `exec_plugin.user` names the
+  kubeconfig `users` entry; its `exec.args` become the argument vector, and no shell
+  runs. The entry's `exec.command` must be the pinned path or its bare file name
+  (`aws` for `/usr/local/aws-cli/v2/current/bin/aws`): the kubeconfig cannot pick
+  another program.
+- **Nothing inherited that you did not name.** The plugin starts from an empty
+  environment. It receives `HOME` only when `exec_plugin.home` is set (and runs in
+  that directory, otherwise in `/`), `KUBERNETES_EXEC_INFO`, and each name in
+  `exec_plugin.env`, valued from the kubeconfig's `exec.env`. A kubeconfig `exec.env`
+  name that is not in `exec_plugin.env` refuses. File reads are not sandboxed: point
+  `home` at the directory holding the plugin's profile files (for the AWS CLI, the
+  one containing `.aws/config` and `.aws/credentials`).
+- **Bounded, and only when admitted.** It runs inside a connect, repair or
+  operation, never while loading the configuration, listing or describing.
+  `exec_plugin.timeout_ms` (1 to 60000, default 10000) bounds one run; at the
+  deadline its whole process group is killed (`timeout`). More than 64 KiB of
+  output is refused (`protocol`), as is an answer that is not an `ExecCredential`
+  with a bearer token; a non-zero exit is `unavailable`.
+- **Token in memory only.** The token is reused until its `expirationTimestamp`,
+  then the plugin runs again. It is never written to disk. The adapter process
+  holds it, so stopping the adapter forgets it.
+
+`exec_plugin` requires `kubeconfig`. No default configuration sets it. With it set,
+the bootstrap offers the profile `kubernetes.exec_plugin` instead of
+`kubernetes.token`, and every operation requires that profile.
+
+```json
+{
+  "format": "connectors-kubernetes-local/1",
+  "instance": "eks-local",
+  "api_base": "https://ABCDEF0123456789.gr7.eu-central-1.eks.amazonaws.com/",
+  "ca_file": "/absolute/private/eks-ca.pem",
+  "namespaces": ["default"],
+  "resource_kinds": ["pods", "deployments", "statefulsets"],
+  "kubeconfig": "/absolute/private/kubeconfig",
+  "exec_plugin": {
+    "path": "/usr/local/aws-cli/v2/current/bin/aws",
+    "sha256": "REPLACE_WITH_sha256sum_OF_THE_PLUGIN",
+    "user": "arn:aws:eks:eu-central-1:111122223333:cluster/fixture",
+    "env": ["AWS_PROFILE", "AWS_REGION"],
+    "home": "/absolute/private/eks-home",
+    "timeout_ms": 15000
+  }
+}
+```
+
+The kubeconfig entry it selects is the one `aws eks update-kubeconfig` writes:
+
+```yaml
+users:
+- name: arn:aws:eks:eu-central-1:111122223333:cluster/fixture
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: aws
+      args: ["--region", "eu-central-1", "eks", "get-token", "--cluster-name", "fixture", "--output", "json"]
+      env:
+      - name: AWS_PROFILE
+        value: fixture
+```
+
+Pin the plugin with `sha256sum` of the file `path` names. The AWS CLI's
+installer makes `/usr/local/bin/aws` a symbolic link, so name the file it
+resolves to (`readlink -f "$(command -v aws)"`); a directory link on the way,
+such as `current`, is followed. Upgrading the plugin changes its digest, so the
+configuration and its `configuration_revision` change with it. Grant
+`profiles = ["kubernetes.exec_plugin"]` in the adapter entry. The protected
+entry is not a secret: it is `{"user":"..."}`, the same kubeconfig user name,
+which confirms whom the plugin runs for:
+
+```sh
+printf '{"user":"%s"}' 'arn:aws:eks:eu-central-1:111122223333:cluster/fixture' |
+  target/release/connectors --output json connections connect --adapter cluster --profile kubernetes.exec_plugin --credential-stdin
+```
+
+Connect runs the plugin once and validates its token with the SelfSubjectReview
+above; the identity saved is the username the cluster maps the plugin's identity
+to.
 
 ## Read resources, endpoints and hosts
 
@@ -345,8 +440,8 @@ Cluster-scoped custom resources are not read. The credential needs `list` on
 the plural in its API group in each namespace it reads.
 
 A kubeconfig user that authenticates through an `exec` credential plugin, such as
-`aws eks get-token` for EKS, is not supported: the binding runs no credential
-plugin and uses only the saved bearer token.
+`aws eks get-token` for EKS, is supported in one pinned form: see
+[Authenticate through an exec credential plugin](#authenticate-through-an-exec-credential-plugin).
 
 ## Read pod logs
 
