@@ -1708,7 +1708,42 @@ impl runtime::Adapter for Local {
             .await
             .map_err(|refusal| refusal.failure)
     }
+    /// A cached OAuth access token the provider refuses is dropped and the
+    /// read is sent once more with a token the stored entry is exchanged for,
+    /// so `invalid_credential` names a refusal of the stored credential only:
+    /// a refused exchange, or its fresh token refused. The host records that
+    /// as a Stale connection (story:ess-connector-vocabulary-model decision 16).
     async fn invoke_explained(
+        &self,
+        operation: &str,
+        partition: &str,
+        document: Secret,
+        input: Value,
+        deadline: Instant,
+    ) -> std::result::Result<Value, runtime::Refusal> {
+        let cached = self.oauth.as_deref().is_some_and(|oauth| {
+            document.0.len() <= DOCUMENT_LIMIT
+                && oauth
+                    .cached(&Sha256::digest(document.0.as_slice()).into())
+                    .is_some()
+        });
+        let again = cached.then(|| Secret(document.0.clone()));
+        let result = self
+            .read_once(operation, partition, document, input.clone(), deadline)
+            .await;
+        match (result, again) {
+            (Err(refusal), Some(document)) if refusal.failure == Failure::InvalidCredential => {
+                self.read_once(operation, partition, document, input, deadline)
+                    .await
+            }
+            (result, _) => result,
+        }
+    }
+}
+impl Local {
+    /// One read with the credential the stored entry yields now: the cached
+    /// access token while it is usable, otherwise a fresh exchange.
+    async fn read_once(
         &self,
         operation: &str,
         _partition: &str,
