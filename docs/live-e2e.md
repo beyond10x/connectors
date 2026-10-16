@@ -88,7 +88,7 @@ and atomically rename it over the binding. A projected service-account symlink
 cannot be passed to this strict file store; a host-owned credential implementation
 or an explicit private copy/rotation process must handle that deployment.
 
-## Configure and start the HTTP adapters
+## Configure and start the Kubernetes service
 
 Generate non-secret configuration referencing the private files:
 
@@ -98,7 +98,7 @@ jq -n --arg base "https://$CONNECTORS_KUBE_ADDRESS/" \
     service_credential:{kind:"file",path:".local/e2e/service.secret"}},
   http:{base_url:$base,credential:{kind:"file",path:".local/e2e/kubernetes.secret"},
     credential_header:"authorization",bearer:true,ca_file:".local/e2e/kubernetes-ca.pem"},
-  adapter:{namespaces:["engineering"],
+  adapter:{namespaces:["engineering"],  # settings of the internal adapter
     resource_kinds:["pods","services","deployments","endpointslices"],
     discover_hosts:true}}' > .local/e2e/kubernetes.json
 ```
@@ -131,7 +131,7 @@ CONNECTORS_SQL_ADDRESS=$(jq -er \
 jq -n --arg host "$CONNECTORS_SQL_ADDRESS" \
   '{service:{instance:"sql-live",listen:"127.0.0.1:17103",
     service_credential:{kind:"file",path:".local/e2e/service.secret"}},
-  adapter:{host:$host,port:5432,database:"engineering",user:"connector_reader",
+  adapter:{host:$host,port:5432,database:"engineering",user:"connector_reader",  # internal adapter
     allow_plaintext:true},password:{kind:"file",path:".local/e2e/reader.secret"}}' \
   > .local/e2e/sql.json
 ```
@@ -143,7 +143,7 @@ target/debug/connectors-sql --config .local/e2e/sql.json
 ```
 
 The plaintext PostgreSQL setting is specific to this disposable local database.
-The adapter requires verified database TLS unless that option is explicitly set.
+The internal SQL adapter requires verified database TLS unless that option is explicitly set.
 
 ## Federate and verify
 
