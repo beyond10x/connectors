@@ -4,6 +4,7 @@
 use connectors_cli_contract::{
     AcquireError, Context, DynamicError, DynamicPhase, DynamicValidator, Handler, HandlerReply,
     Invocation, ProcessOutput, ProtectedSource, Sources,
+    wire::{ArgumentSource, Shape},
 };
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, ffi::OsString};
@@ -618,7 +619,7 @@ const INVOKE: &[&str] = &[
     "json",
 ];
 fn invocation_result(result: Value) -> Value {
-    json!({"adapter":"forge","operation":"read","revision":"r1","result":result})
+    json!({"adapter":"forge","connector":"fixture-forge","instance":"forge","operation":"read","revision":"r1","result":result})
 }
 
 #[test]
@@ -661,7 +662,7 @@ fn describe_and_invoke_answer_json_values_not_json_text() {
     let input_schema = json!({"type":"object","properties":{"selector":{"type":"string"}}});
     let output_schema = json!({"type":"object","properties":{"count":{"type":"integer"}}});
     let operation = json!({"id":"read","description":"Read","contract":"operations/v1alpha1","profile":"read","input_schema":input_schema,"output_schema":output_schema});
-    let described = json!({"adapter":"forge","revision":"r1","schema":"fixture-input","operation":operation,"source":"cached","stale":true});
+    let described = json!({"adapter":"forge","connector":"fixture-forge","instance":"forge","revision":"r1","schema":"fixture-input","operation":operation,"source":"cached","stale":true});
     let mut adapter = fixture("AdapterDescribeResult");
     adapter["descriptor"]["operations"] = json!([operation]);
     let cases: [(&[&str], Value); 2] = [
@@ -866,4 +867,98 @@ fn a_configuration_refusal_may_name_the_format_and_entry_and_nothing_else() {
     );
     refusal(&refused, 1);
     assert!(!refused.stderr.contains("TOML"));
+}
+
+/// Whether every struct of the shape that carries `adapter` requires
+/// `connector` and `instance` beside it. A service descriptor's `adapter`
+/// (`configuration_schema` beside it) is the implementation it describes, not
+/// a selector.
+fn names_selection(shape: &Shape) -> bool {
+    match shape.required() {
+        Shape::Struct { fields } => {
+            (!fields.contains_key("adapter")
+                || fields.contains_key("configuration_schema")
+                || ["adapter", "connector", "instance"]
+                    .iter()
+                    .all(|name| fields.get(*name) == Some(&Shape::String)))
+                && fields.values().all(names_selection)
+        }
+        Shape::List { of } => names_selection(of),
+        Shape::Map { value } => names_selection(value),
+        _ => true,
+    }
+}
+
+/// story:cli-connector-instance-selectors: every command that takes
+/// `--adapter` takes `--connector` and `--instance`, each an optional field of
+/// its input, so the parser requires none of them and the handler decides
+/// which one selected. Every result type that names a selected alias requires
+/// its connector and instance beside it.
+#[test]
+fn every_adapter_command_also_selects_by_connector_and_instance() {
+    let plan = connectors_cli_contract::plan();
+    let optional = Shape::Optional {
+        of: Box::new(Shape::String),
+    };
+    let mut selecting = Vec::new();
+    for command in &plan.commands {
+        let longs: BTreeSet<&str> = command
+            .arguments
+            .iter()
+            .filter_map(|argument| match &argument.source {
+                ArgumentSource::Option { long } => Some(long.as_str()),
+                _ => None,
+            })
+            .collect();
+        if !longs.contains("adapter") {
+            continue;
+        }
+        selecting.push(command.path.join(" "));
+        assert!(
+            longs.contains("connector") && longs.contains("instance"),
+            "{:?}",
+            command.path
+        );
+        let callable = &plan.callables[&command.callable];
+        let Some(Shape::Struct { fields }) = callable.input.as_ref().map(|input| &input.shape)
+        else {
+            panic!("{:?}: no struct input", command.path);
+        };
+        for name in ["adapter", "connector", "instance"] {
+            assert_eq!(
+                fields.get(name),
+                Some(&optional),
+                "{:?} {name}",
+                command.path
+            );
+        }
+    }
+    assert_eq!(selecting.len(), 25, "{selecting:?}");
+    for (name, callable) in &plan.callables {
+        assert!(names_selection(&callable.result.shape), "{name}");
+    }
+    for selector in [
+        &["--connector", "fixture", "--instance", "main"][..],
+        &["--adapter", "forge"],
+        &[],
+    ] {
+        let mut handler = Recorder::new(fixture("ApprovalPolicyResult"));
+        let output = run(
+            &[
+                &["approvals", "policy-status", "--output", "json"][..],
+                selector,
+            ]
+            .concat(),
+            &mut InputSources::default(),
+            &mut handler,
+            None,
+        );
+        assert_eq!(output.exit_code, 0, "{selector:?}: {output:?}");
+        let (_, input, _) = handler.last.unwrap();
+        let expected: serde_json::Map<String, Value> = selector
+            .chunks(2)
+            .map(|pair| (pair[0].trim_start_matches("--").to_owned(), json!(pair[1])))
+            .collect();
+        assert_eq!(input, Value::Object(expected), "{selector:?}");
+    }
 }

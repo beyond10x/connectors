@@ -70,6 +70,8 @@ impl Session {
             let mut selectors = json!({});
             for field in [
                 "adapter",
+                "connector",
+                "instance",
                 "profile",
                 "connection",
                 "expected_revision",
@@ -128,7 +130,8 @@ impl Session {
                 selection.context.state_dir.as_deref(),
             )
             .ok()?;
-            let bootstrap = owner::cached(&paths, selection.selectors["adapter"].as_str()?).ok()?;
+            let alias = super::select::alias_at(&selection.selectors, &paths).ok()?;
+            let bootstrap = owner::cached(&paths, &alias).ok()?;
             let operation = selection.selectors["operation"].as_str()?;
             Some(
                 bootstrap
@@ -181,7 +184,8 @@ impl Session {
             return Err(Code::InvalidInput.into());
         }
         let text = |key| selection.selectors.get(key).and_then(Value::as_str);
-        let alias = text("adapter").ok_or(Code::InvalidInput)?;
+        let alias = super::select::alias_at(&selection.selectors, &paths)?;
+        let alias = alias.as_str();
         owner::admit_capture(
             &paths,
             alias,
@@ -263,7 +267,20 @@ impl Session {
         {
             return Err(Code::InvalidInput.into());
         }
-        for field in ["adapter", "profile", "connection", "expected_revision"] {
+        // The handler's input names the alias the preparsed selector named.
+        let paths = Paths::resolve(
+            call.context.config.as_deref(),
+            call.context.state_dir.as_deref(),
+        )?;
+        if call.input.get("adapter")
+            != Some(&json!(super::select::alias_at(
+                &selection.selectors,
+                &paths
+            )?))
+        {
+            return Err(Code::InvalidInput.into());
+        }
+        for field in ["profile", "connection", "expected_revision"] {
             if call.input.get(field) != selection.selectors.get(field) {
                 return Err(Code::InvalidInput.into());
             }
@@ -369,8 +386,8 @@ impl DynamicValidator for NativeValidator {
                 call.context.config.as_deref(),
                 call.context.state_dir.as_deref(),
             )?;
-            let alias = call.input["adapter"].as_str().ok_or(Code::InvalidInput)?;
-            let bootstrap = owner::operation_snapshot(&paths, alias, &call.input)?;
+            let alias = super::select::alias_at(&call.input, &paths)?;
+            let bootstrap = owner::operation_snapshot(&paths, &alias, &call.input)?;
             let descriptor = bootstrap.descriptor()?;
             let operation = descriptor
                 .operation(call.input["operation"].as_str().ok_or(Code::InvalidInput)?)

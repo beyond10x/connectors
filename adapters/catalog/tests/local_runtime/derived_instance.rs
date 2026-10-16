@@ -44,13 +44,25 @@ const DRAFT_MESSAGE: &str = "fixture-draft-message-1";
 const RAW: &str =
     "VG86IHJlY2lwaWVudEBleGFtcGxlLnRlc3QNClN1YmplY3Q6IEZpeHR1cmUNCg0KRml4dHVyZSBib2R5DQo";
 
-/// How the acceptance selects the instance it connects:
-/// `--connector gmail --instance private`, which
-/// story:cli-connector-instance-selectors adds to the CLI. Until that story is
-/// merged the CLI knows the instance only by its derived alias, its id, which
-/// every other command here uses.
-const CONNECT_SELECTION: &[&str] = &["--connector", "gmail", "--instance", "private"];
-const SELECTION: [&str; 2] = ["--adapter", "gmail.private"];
+/// How every command selects the instance (story:cli-connector-instance-selectors).
+const SELECTION: &[&str] = &["--connector", "gmail", "--instance", "private"];
+
+/// How many objects in `value` name the alias `gmail.private`; each must name
+/// `connector` `gmail` and `instance` `private` beside it.
+fn names_the_instance(value: &Value) -> usize {
+    match value {
+        Value::Object(object) => {
+            let own = usize::from(object.get("adapter") == Some(&json!("gmail.private")));
+            if own == 1 {
+                assert_eq!(object.get("connector"), Some(&json!("gmail")), "{value}");
+                assert_eq!(object.get("instance"), Some(&json!("private")), "{value}");
+            }
+            own + object.values().map(names_the_instance).sum::<usize>()
+        }
+        Value::Array(items) => items.iter().map(names_the_instance).sum(),
+        _ => 0,
+    }
+}
 
 fn carries_material(haystack: &[u8]) -> bool {
     [
@@ -78,11 +90,11 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
 
     // One connect: consent at accounts.google.com, the code exchanged at
     // oauth2.googleapis.com, and the stored triple validated by a refresh.
-    let connected = success(
+    let connect = success(
         journey.follow(
             &[
                 &["connections", "connect"][..],
-                CONNECT_SELECTION,
+                SELECTION,
                 &[
                     "--profile",
                     "google.oauth",
@@ -92,8 +104,8 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
             ]
             .concat(),
         ),
-    )["connection"]
-        .clone();
+    );
+    let connected = connect["connection"].clone();
     assert_eq!(connected["summary"]["state"], "ready", "{connected}");
     let connection = connected["summary"]["connection"]
         .as_str()
@@ -129,7 +141,7 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
     );
 
     // Both writes need an approval proof, and each succeeds with its own.
-    journey.cli(&[&["approvals", "key-init"][..], &SELECTION].concat());
+    journey.cli(&[&["approvals", "key-init"][..], SELECTION].concat());
     let policy = journey.root.join("private/policy.json");
     private(
         &policy,
@@ -138,7 +150,7 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
     journey.cli(
         &[
             &["approvals", "policy-set"][..],
-            &SELECTION,
+            SELECTION,
             &["--input-file", policy.to_str().unwrap()],
         ]
         .concat(),
@@ -191,12 +203,18 @@ fn a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_
     );
 
     // One connection carried all three, and no request left the three hosts.
-    let listed = success(journey.cli_output(&[&["connections", "list"][..], &SELECTION].concat()));
+    let listed = success(journey.cli_output(&[&["connections", "list"][..], SELECTION].concat()));
     assert_eq!(
         listed["connections"].as_array().unwrap().len(),
         1,
         "{listed}"
     );
+    // Every result that names the derived alias names its connector and
+    // instance beside it.
+    let adapters = journey.cli(&["adapters", "list"]);
+    for result in [&connect, &listed, &adapters] {
+        assert!(names_the_instance(result) > 0, "{result}");
+    }
     for request in fixture.requests() {
         assert!(HOSTS.contains(&request.host.as_str()), "{}", request.host);
     }
@@ -800,27 +818,28 @@ impl Journey {
         let description = self.cli(
             &[
                 &["operations", "describe"][..],
-                &SELECTION,
+                SELECTION,
                 &["--operation", operation],
             ]
             .concat(),
         );
-        [
-            SELECTION[0],
-            SELECTION[1],
-            "--connection",
-            connection,
-            "--operation",
-            operation,
-            "--schema",
-            description["schema"].as_str().unwrap(),
-            "--revision",
-            description["revision"].as_str().unwrap(),
-            "--input-json",
-            &input.to_string(),
-        ]
-        .map(str::to_owned)
-        .to_vec()
+        let mut target: Vec<String> = SELECTION.iter().map(|arg| (*arg).to_owned()).collect();
+        target.extend(
+            [
+                "--connection",
+                connection,
+                "--operation",
+                operation,
+                "--schema",
+                description["schema"].as_str().unwrap(),
+                "--revision",
+                description["revision"].as_str().unwrap(),
+                "--input-json",
+                &input.to_string(),
+            ]
+            .map(str::to_owned),
+        );
+        target
     }
 
     /// Prepare, approve and invoke one write with its proof.
