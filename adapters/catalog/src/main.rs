@@ -1,15 +1,29 @@
 //! One process per provider bundle, reached only through the host's private
 //! protocol. There is no standalone service realization here.
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 use std::path::PathBuf;
 mod local;
 
 #[derive(Parser)]
 #[command(version)]
+#[command(group(ArgGroup::new("configuration").required(true).args(["local_config", "connector"])))]
 struct Args {
     /// Owner-only nonsecret configuration for the private host binding.
     #[arg(long)]
-    local_config: PathBuf,
+    local_config: Option<PathBuf>,
+    /// A connector this binary ships, configured from its declaration instead
+    /// of a configuration file.
+    #[arg(long, requires = "instance")]
+    connector: Option<String>,
+    /// The instance's name; its id is `<connector>.<instance>`.
+    #[arg(long, requires = "connector")]
+    instance: Option<String>,
+    /// The instance's API base, in place of the connector's default endpoint.
+    #[arg(long, requires = "connector")]
+    endpoint: Option<String>,
+    /// The auth profile, when the connector declares more than one.
+    #[arg(long, requires = "connector")]
+    profile: Option<String>,
     /// Print the independently computed bootstrap and configuration revision.
     #[arg(long, conflicts_with = "connectors_private_fd")]
     print_local_bootstrap: bool,
@@ -19,7 +33,16 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let result = (|| -> connectors_host::local::runtime::Result<()> {
-        let adapter = local::Local::load(&args.local_config)?;
+        let adapter = match (&args.local_config, &args.connector, &args.instance) {
+            (Some(path), _, _) => local::Local::load(path)?,
+            (None, Some(connector), Some(name)) => local::Local::derive(&local::Instance {
+                connector,
+                name,
+                endpoint: args.endpoint.as_deref(),
+                profile: args.profile.as_deref(),
+            })?,
+            _ => return Err(connectors_host::local::runtime::Failure::InvalidInput),
+        };
         if args.print_local_bootstrap {
             println!(
                 "{}",
