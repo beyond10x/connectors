@@ -558,8 +558,8 @@ types:
   # after the owner's bounded retries within the revalidation deadline
   # (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). provider_unavailable:
   # the adapter's validation answered unavailable (a provider connection refused, reset or
-  # closed, a name that does not resolve; the catalog provider's identity or scope probe
-  # also on an HTTP 429 or 5xx). provider_timeout: the probe's deadline passed.
+  # closed, a name that does not resolve; an adapter whose identity or scope probe maps
+  # an HTTP 429 or 5xx to unavailable). provider_timeout: the probe's deadline passed.
   # provider_rate_limited and provider_internal: an adapter that reports the provider's 429
   # or internal error itself. provider_capacity: a marked upstream capacity answer.
   # adapter_exited: the adapter process was no longer running after the failed attempt.
