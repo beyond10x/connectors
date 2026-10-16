@@ -23,6 +23,7 @@ components:
         - connectors.auth_bindings.RecordProfile
         - connectors.auth_bindings.AllocateConnection
         - connectors.auth_bindings.RevokeConnection
+        - connectors.auth_bindings.MarkConnectionStale
         - connectors.auth_bindings.PublishBinding
         - connectors.auth_bindings.BeginAcquisition
         - connectors.auth_bindings.ConsumeAcquisition

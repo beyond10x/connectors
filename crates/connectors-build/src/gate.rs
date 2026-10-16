@@ -309,6 +309,8 @@ pub fn run(root: &Path, ess: &Path, aep: &Path, msrv: bool) -> Result<()> {
         "contracts/operations/v1alpha1/scenarios",
         "contracts/auth/acquisition/v1alpha1/scenarios",
         "contracts/auth/evidence/v1alpha1/scenarios",
+        "contracts/auth/connection/v1alpha1/scenarios",
+        "contracts/service/v1alpha1/scenarios",
         // Inbound only. These are `ess-scenario/1` and ESS owns them, so synthesising them
         // against the shared IR is a real check.
         //

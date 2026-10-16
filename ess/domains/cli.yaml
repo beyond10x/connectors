@@ -9,7 +9,12 @@ summary: Selected local CLI presentation values and the existing local configura
 # `--connector <name> --instance <name>` (connectors.declarations.Connector
 # and its instance, ServiceConfiguration). The fields keep their names in this
 # pass; the migration plan carries `adapter` beside `connector` and `instance`
-# for a deprecation window.
+# for a deprecation window. A new instance's instance_id is
+# `<connector>.<instance>` (`mail.personal`); a migrated alias keeps its
+# instance_id (story:ess-connector-vocabulary-model decision 10). An instance
+# holds at most one non-revoked connection (decision 11,
+# connectors.auth_bindings.AllocateConnection); the `connection` selectors
+# below keep their shape in this pass.
 types:
   # Local approval commands project existing policy/subject owners. A preparation
   # is metadata, not a lease or proof; issuance returns no protected proof bytes.
@@ -562,7 +567,7 @@ types:
     variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
-    variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4]
+    variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4, connectors-local/5]
   # Which rule of the configuration stage refused (contracts/cli/v1alpha1/semantics.md
   # §3): no absolute configuration path resolves (config_path_unresolved), no file is
   # at the resolved path (config_missing), the file or a directory above it is not
