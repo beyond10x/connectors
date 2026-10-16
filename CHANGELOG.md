@@ -18,6 +18,29 @@
   every owner of its state directory: an owner that has not exited within 5 seconds of the
   harness's shutdown request is killed through its pidfd (Linux) and waited for.
 
+## 0.52.1 — 2026-10-16
+
+### Fixed
+
+- `connections revalidate` no longer fails `unavailable` at `dispatch` when the provider closed
+  the adapter's idle keep-alive connection (beyond10x/connectors#174). The adapter child kept the
+  connection a connect or an earlier probe left in its pool; once the provider's keep-alive
+  timeout had closed it, the next identity probe went out on it and failed, the owner recorded
+  the revalidation as failed, and only a second command, on a new connection, succeeded. The
+  owner now sends a revalidation's validation again when it fails transiently (the adapter's
+  `unavailable`, a provider timeout, rate limit, internal error or capacity answer; the catalog
+  provider's probe also on a 429 or 5xx): at most three attempts, 200 ms and then 1 s apart, only
+  while the adapter runs, the owner is not stopping and the next attempt can end before the
+  revalidation's 30 s deadline. A credential (401), permission (403), scope, identity or protocol
+  refusal is never sent again. A revalidation that still fails keeps its code, stage and next
+  action and now names `cause` (`connectors.cli.FailureCause`: `provider_unavailable`,
+  `provider_timeout`, `provider_rate_limited`, `provider_internal`, `provider_capacity`,
+  `adapter_exited`, `owner_stopping`) and `attempts` in its error data; no other command or
+  failure carries them (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). A
+  provider that is down for longer than the deadline still fails the revalidation, now after
+  three probes instead of one. A provider's Retry-After is not read; a rate-limited probe is
+  re-sent after 200 ms and 1 s.
+
 ## 0.52.0 — 2026-10-15
 
 ### Added
