@@ -1427,6 +1427,44 @@ fn local_contexts_list_reads_only_the_configured_kubeconfig_without_credentials(
 }
 
 #[test]
+fn local_node_and_custom_resource_reads_are_advertised_only_when_configured() {
+    let cluster = Cluster::new(false);
+    let unconfigured = cluster.selection();
+    // An empty list admits nothing and keeps the revision.
+    configure(&cluster, "custom_resources", json!([]));
+    assert_eq!(
+        cluster.selection().configuration_revision,
+        unconfigured.configuration_revision
+    );
+    configure(&cluster, "node_reads", json!(true));
+    let monitors =
+        json!({"group":"monitoring.coreos.com","version":"v1","plural":"servicemonitors"});
+    let rules = json!({"group":"monitoring.coreos.com","version":"v1","plural":"prometheusrules"});
+    configure(&cluster, "custom_resources", json!([monitors, rules]));
+    let selection = cluster.selection();
+    assert_ne!(
+        selection.configuration_revision,
+        unconfigured.configuration_revision
+    );
+    // The order the collections are written in is not part of the scope.
+    configure(&cluster, "custom_resources", json!([rules, monitors]));
+    assert_eq!(
+        cluster.selection().configuration_revision,
+        selection.configuration_revision
+    );
+    let child = Child::spawn(&selection).unwrap();
+    let operations = child.bootstrap().descriptor().unwrap().operations;
+    for id in ["nodes.list", "custom_resources.list"] {
+        assert!(operations.iter().any(|o| o.id == id), "{id}");
+    }
+    let plain = Child::spawn(&Cluster::new(false).selection()).unwrap();
+    let operations = plain.bootstrap().descriptor().unwrap().operations;
+    for id in ["nodes.list", "custom_resources.list"] {
+        assert!(!operations.iter().any(|o| o.id == id), "{id}");
+    }
+}
+
+#[test]
 fn local_pod_logs_are_advertised_only_when_configured() {
     let cluster = Cluster::new(false);
     let unconfigured = cluster.selection();
@@ -1446,4 +1484,289 @@ fn local_pod_logs_are_advertised_only_when_configured() {
             .iter()
             .any(|o| o.id == "pods.logs")
     );
+}
+
+/// A digest-pinned fixture exec credential plugin in its own temporary
+/// directory, apart from the cluster fixture's configuration directory. It
+/// uses shell builtins only and answers the cluster's fictional TOKEN_ONE.
+struct ExecPlugin {
+    dir: tempfile::TempDir,
+    path: PathBuf,
+}
+const EXEC_USER: &str = "eks-fixture-user";
+impl ExecPlugin {
+    fn new() -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture-plugin");
+        let d = dir.path().display();
+        fs::create_dir(dir.path().join("home")).unwrap();
+        // The token is assembled from two halves, so the script's own bytes
+        // never contain it and a disk scan for it stays meaningful.
+        let (head, tail) = TOKEN_ONE.split_at(8);
+        fs::write(
+            &path,
+            format!(
+                "#!/bin/sh\necho run >> {d}/runs\n\
+                 printf '{{\"apiVersion\":\"client.authentication.k8s.io/v1\",\"kind\":\"ExecCredential\",\
+                 \"status\":{{\"token\":\"%s%s\",\"expirationTimestamp\":\"2099-01-01T00:00:00Z\"}}}}\\n' '{head}' '{tail}'\n"
+            ),
+        )
+        .unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+        Self { dir, path }
+    }
+    fn runs(&self) -> usize {
+        fs::read_to_string(self.dir.path().join("runs"))
+            .map(|s| s.lines().count())
+            .unwrap_or(0)
+    }
+    fn binding(&self) -> Value {
+        json!({
+            "path": self.path,
+            "sha256": hex::encode(Sha256::digest(fs::read(&self.path).unwrap())),
+            "user": EXEC_USER,
+            "env": ["AWS_PROFILE"],
+            "home": self.dir.path().join("home"),
+            "timeout_ms": 5000
+        })
+    }
+    /// A kubeconfig whose user authenticates through this plugin.
+    fn kubeconfig(&self, cluster: &Cluster) -> PathBuf {
+        let path = cluster.root.path().join("private").join("kubeconfig");
+        private(
+            &path,
+            format!(
+                "apiVersion: v1\nkind: Config\ncurrent-context: eks\n\
+                 contexts:\n- name: eks\n  context:\n    cluster: fixture-cluster\n    user: {EXEC_USER}\n\
+                 users:\n- name: {EXEC_USER}\n  user:\n    exec:\n      apiVersion: client.authentication.k8s.io/v1\n      \
+                 command: {}\n      args: [\"eks\", \"get-token\", \"--cluster-name\", \"fixture\"]\n      \
+                 env:\n      - name: AWS_PROFILE\n        value: fixture\n",
+                self.path.display()
+            )
+            .as_bytes(),
+        );
+        path
+    }
+}
+fn exec_confirmation(user: &str) -> Secret {
+    Secret(serde_json::to_vec(&json!({ "user": user })).unwrap())
+}
+/// Every byte the adapter could have written under the fixture's state:
+/// its configuration directory, CA and kubeconfig included.
+fn files_containing(root: &std::path::Path, needle: &[u8]) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if fs::read(&path)
+                .unwrap()
+                .windows(needle.len())
+                .any(|w| w == needle)
+            {
+                found.push(path);
+            }
+        }
+    }
+    found
+}
+
+#[test]
+fn exec_plugin_credential_authenticates_a_recorded_api_session() {
+    let cluster = Cluster::new(false);
+    let plugin = ExecPlugin::new();
+    let unconfigured = cluster.selection();
+    configure(&cluster, "kubeconfig", json!(plugin.kubeconfig(&cluster)));
+    configure(&cluster, "exec_plugin", plugin.binding());
+    // Describing the adapter runs nothing.
+    let selection = cluster.selection();
+    assert_ne!(
+        selection.configuration_revision,
+        unconfigured.configuration_revision
+    );
+    let mut child = Child::spawn(&selection).unwrap();
+    let profiles: Vec<_> = child
+        .bootstrap()
+        .profiles
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
+    assert_eq!(profiles, ["kubernetes.exec_plugin"]);
+    assert_eq!(plugin.runs(), 0);
+    assert_eq!(cluster.count(), 0);
+    // The protected entry confirms the kubeconfig user; another name refuses
+    // before the plugin runs.
+    assert!(matches!(
+        child.validate(
+            "kubernetes.exec_plugin",
+            &exec_confirmation("someone-else"),
+            deadline()
+        ),
+        Err(Failure::InvalidInput)
+    ));
+    assert_eq!(plugin.runs(), 0);
+    let baseline = child
+        .validate(
+            "kubernetes.exec_plugin",
+            &exec_confirmation(EXEC_USER),
+            deadline(),
+        )
+        .unwrap();
+    assert_eq!(baseline.identity.subject, USER_ONE);
+    assert_eq!(plugin.runs(), 1);
+    assert_eq!(
+        cluster.routes(),
+        ["/apis/authentication.k8s.io/v1/selfsubjectreviews"]
+    );
+    // The recorded session answers the plugin's token; the token is held in
+    // memory until its stated expiry, so these reads run the plugin no more.
+    let page = invoke(
+        &mut child,
+        "resources.list",
+        "one",
+        &exec_confirmation(EXEC_USER),
+        json!({"namespace":"fixture","kind":"pods","limit":1}),
+    )
+    .unwrap();
+    assert_eq!(page["items"][0]["metadata"]["name"], "pod-0");
+    invoke(
+        &mut child,
+        "resources.list",
+        "one",
+        &exec_confirmation(EXEC_USER),
+        json!({"namespace":"fixture","kind":"pods","limit":1}),
+    )
+    .unwrap();
+    assert_eq!(plugin.runs(), 1);
+    // No token bytes reach disk under the fixture's state.
+    assert_eq!(
+        files_containing(cluster.root.path(), TOKEN_ONE.as_bytes()),
+        Vec::<PathBuf>::new()
+    );
+    assert_eq!(
+        files_containing(plugin.dir.path(), TOKEN_ONE.as_bytes()),
+        Vec::<PathBuf>::new()
+    );
+}
+
+#[test]
+fn exec_plugin_is_disabled_without_configuration_and_never_runs_from_a_kubeconfig() {
+    let cluster = Cluster::new(false);
+    let plugin = ExecPlugin::new();
+    // The kubeconfig names the plugin, but the configuration does not.
+    configure(&cluster, "kubeconfig", json!(plugin.kubeconfig(&cluster)));
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+    let profiles: Vec<_> = child
+        .bootstrap()
+        .profiles
+        .iter()
+        .map(|p| p.id.clone())
+        .collect();
+    assert_eq!(profiles, ["kubernetes.token"]);
+    assert!(matches!(
+        child.validate(
+            "kubernetes.exec_plugin",
+            &exec_confirmation(EXEC_USER),
+            deadline()
+        ),
+        Err(Failure::Unsupported)
+    ));
+    assert_eq!(
+        invoke(
+            &mut child,
+            "resources.list",
+            "one",
+            &exec_confirmation(EXEC_USER),
+            json!({"namespace":"fixture","kind":"pods","limit":1}),
+        ),
+        Err(Failure::InvalidInput)
+    );
+    assert_eq!(plugin.runs(), 0);
+    assert_eq!(cluster.count(), 0);
+    // A binding without the kubeconfig it reads is refused at load.
+    let lone = Cluster::new(false);
+    configure(&lone, "exec_plugin", plugin.binding());
+    let output = Command::new(env!("CARGO_BIN_EXE_connectors-kubernetes"))
+        .arg("--local-config")
+        .arg(&lone.config)
+        .arg("--print-local-bootstrap")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert_eq!(plugin.runs(), 0);
+}
+
+/// The kubeconfig is read when the plugin runs, and only then: once a token
+/// is held, an operation is served without the kubeconfig, even after it is
+/// gone.
+#[test]
+fn exec_plugin_held_token_serves_without_reading_the_kubeconfig() {
+    let cluster = Cluster::new(false);
+    let plugin = ExecPlugin::new();
+    let kubeconfig = plugin.kubeconfig(&cluster);
+    configure(&cluster, "kubeconfig", json!(kubeconfig));
+    configure(&cluster, "exec_plugin", plugin.binding());
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+    child
+        .validate(
+            "kubernetes.exec_plugin",
+            &exec_confirmation(EXEC_USER),
+            deadline(),
+        )
+        .unwrap();
+    assert_eq!(plugin.runs(), 1);
+    fs::remove_file(&kubeconfig).unwrap();
+    let page = invoke(
+        &mut child,
+        "resources.list",
+        "one",
+        &exec_confirmation(EXEC_USER),
+        json!({"namespace":"fixture","kind":"pods","limit":1}),
+    )
+    .unwrap();
+    assert_eq!(page["items"][0]["metadata"]["name"], "pod-0");
+    assert_eq!(plugin.runs(), 1);
+}
+
+/// A binding whose allow-list names a loader variable is refused when the
+/// configuration loads; nothing runs.
+#[test]
+fn exec_plugin_binding_allowing_a_loader_variable_is_refused_at_load() {
+    let cluster = Cluster::new(false);
+    let plugin = ExecPlugin::new();
+    configure(&cluster, "kubeconfig", json!(plugin.kubeconfig(&cluster)));
+    let mut binding = plugin.binding();
+    binding["env"] = json!(["AWS_PROFILE", "LD_PRELOAD"]);
+    configure(&cluster, "exec_plugin", binding);
+    let output = Command::new(env!("CARGO_BIN_EXE_connectors-kubernetes"))
+        .arg("--local-config")
+        .arg(&cluster.config)
+        .arg("--print-local-bootstrap")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert_eq!(plugin.runs(), 0);
+}
+
+#[test]
+fn exec_plugin_digest_mismatch_refuses_validation_before_it_runs() {
+    let cluster = Cluster::new(false);
+    let plugin = ExecPlugin::new();
+    configure(&cluster, "kubeconfig", json!(plugin.kubeconfig(&cluster)));
+    let mut binding = plugin.binding();
+    binding["sha256"] = json!(hex::encode(Sha256::digest(b"another plugin")));
+    configure(&cluster, "exec_plugin", binding);
+    let mut child = Child::spawn(&cluster.selection()).unwrap();
+    assert!(matches!(
+        child.validate(
+            "kubernetes.exec_plugin",
+            &exec_confirmation(EXEC_USER),
+            deadline()
+        ),
+        Err(Failure::InvalidConfiguration)
+    ));
+    assert_eq!(plugin.runs(), 0);
+    assert_eq!(cluster.count(), 0);
 }

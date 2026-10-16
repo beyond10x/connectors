@@ -284,6 +284,13 @@ pub const CAPABILITIES: &[Capability] = &[
     ),
     shipped(
         "Catalog provider",
+        "Confluence Cloud REST v1",
+        "CQL search, changed pages by CQL, spaces, one space, a space's content, one page with its body and a page's comments under the provider id confluence-v1, from a source document this repository writes from Atlassian's v1 reference; exercised against local fixtures only.",
+        "adapters/catalog/tests/confluence_v1.rs::shipped_confluence_v1_selections_are_exactly_the_seven_reads",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
         "HubSpot CRM",
         "One object type's records, paged, and one record by id; exercised against local fixtures only.",
         "adapters/catalog/tests/hubspot.rs::shipped_hubspot_selections_are_exactly_the_two_reads",
@@ -320,8 +327,8 @@ pub const CAPABILITIES: &[Capability] = &[
     shipped(
         "Catalog provider",
         "Slack conversations",
-        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only.",
-        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_search",
+        "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and on a second connection with a user token search.messages and the three conversation reads and users.list, which reach every conversation that user can read, the channels the bot is not in included; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::shipped_slack_selections_are_exactly_the_bot_reads_and_writes_and_the_user_reads",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -336,6 +343,13 @@ pub const CAPABILITIES: &[Capability] = &[
         "Slack files",
         "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only.",
         "adapters/catalog/tests/slack.rs::the_download_reads_url_private_with_the_token_on_an_admitted_host",
+        "/docs/reference/adapters/catalog",
+    ),
+    shipped(
+        "Catalog provider",
+        "Slack read refusals",
+        "A Slack read answered 200 with ok false is refused, never returned as an empty read: Slack's error is the reason, and missing_scope and not_in_channel are forbidden, invalid_auth and its kin unauthorized, an unknown channel, thread, file or user not_found, ratelimited rate_limited with its Retry-After, a bad cursor or argument invalid_input, and any other name internal, on every JSON read of both Slack sets; verified against a local fixture only.",
+        "adapters/catalog/tests/slack.rs::each_slack_error_answered_ok_false_is_a_refusal_naming_it",
         "/docs/reference/adapters/catalog",
     ),
     shipped(
@@ -363,6 +377,20 @@ pub const CAPABILITIES: &[Capability] = &[
         "Kubernetes single objects, namespaces and rollout history",
         "resources.get reads one object by name, namespaces.list the configured namespaces the cluster has, deployments.history the ReplicaSets a Deployment controls; replicasets and events are configurable kinds; verified against API-shaped fixtures.",
         "adapters/kubernetes/tests/parity_reads.rs::the_new_kinds_are_configurable_and_the_new_reads_are_advertised",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
+        "Kubernetes statefulsets, nodes and custom resources",
+        "statefulsets is a configurable kind; nodes.list pages the full Node objects when node_reads is configured; custom_resources.list pages one configured namespaced custom resource collection by group, version and plural; verified against API-shaped fixtures.",
+        "adapters/kubernetes/tests/parity_reads.rs::custom_resources_list_reads_a_configured_collection_page_by_page",
+        "/docs/reference/adapters/kubernetes",
+    ),
+    shipped(
+        "Native adapters",
+        "Kubernetes exec credential plugin",
+        "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
+        "adapters/kubernetes/tests/local_runtime.rs::exec_plugin_credential_authenticates_a_recorded_api_session",
         "/docs/reference/adapters/kubernetes",
     ),
     shipped(

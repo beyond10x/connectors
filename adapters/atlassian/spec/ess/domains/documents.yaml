@@ -22,6 +22,40 @@ types:
     # adapters/atlassian/contracts/documents/v1alpha1/semantics.md:190: limit 1–100.
     invariants:
       - limit: {gte: 1, lte: 100}
+  # The Confluence Cloud REST API a catalog read is served from, by the catalog provider id its
+  # bundle is built under (docs/catalog-confluence.md). REST v2 is compiled from Atlassian's
+  # pinned v2 document (adapters/atlassian/upstream/confluence/); REST v1 from the source
+  # document this repository writes itself from Atlassian's public v1 reference pages
+  # (adapters/atlassian/contracts/confluence-rest-v1/), because the v1 document declares no
+  # licence and is not vendored.
+  - name: connectors_atlassian.documents.ConfluenceRestApi
+    kind: enum
+    variants:
+      - {name: rest_v1, wire: confluence-v1}
+      - {name: rest_v2, wire: confluence}
+  # The reads served under REST v1: the ids of adapters/catalog/providers/confluence-v1/
+  # operations.json, each `effect: read`. An id that also exists under REST v2 means the same
+  # read there, so a caller's id is the same whichever API serves it; `spaces.list`, `space.get`
+  # and `content.search` (CQL search) exist under REST v1 only.
+  - name: connectors_atlassian.documents.ConfluenceV1Read
+    kind: enum
+    variants:
+      - {name: content_search, wire: content.search}
+      - {name: page_comments, wire: page.comments}
+      - {name: page_get, wire: page.get}
+      - {name: pages_changed, wire: pages.changed}
+      - {name: space_get, wire: space.get}
+      - {name: space_pages, wire: space.pages}
+      - {name: spaces_list, wire: spaces.list}
+  # The reads served under REST v2: the ids of adapters/catalog/providers/confluence/
+  # operations.json, each `effect: read`.
+  - name: connectors_atlassian.documents.ConfluenceV2Read
+    kind: enum
+    variants:
+      - {name: page_comments, wire: page.comments}
+      - {name: page_get, wire: page.get}
+      - {name: pages_changed, wire: pages.changed}
+      - {name: space_pages, wire: space.pages}
 
 # The public spelling (confluence.storage versus jira.fields.v2) is declared as
 # the representation variants' wire names above.

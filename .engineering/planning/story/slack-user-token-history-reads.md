@@ -2,12 +2,16 @@
 format: aep.planning-md/3
 id: story:slack-user-token-history-reads
 kind: story
-status: draft
+status: implemented
 title: Slack history and replies on a user token
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 5
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T23:35:15Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-14T23:35:15Z", actor: "human:timo", revision: 4}
+- {from: "active", to: "implemented", at: "2026-10-16T02:05:09Z", actor: "human:timo", revision: 5, decided_on: {"recorded":{"test_result":1}}}
 ---
 ## Outcome
 
@@ -34,3 +38,7 @@ parity page rows to partial until this ships, then covered with the operation na
 
 - Each read answers through `connections` of the user profile against a recorded provider fixture.
 - The parity page names the user profile for these rows.
+
+## Scope
+
+Primary: adapters/catalog/providers/slack/user-operations.json, adapters/catalog/tests/slack.rs; docs fluxplane-plugin-parity.md § slack, catalog-slack.md, status.rs "Slack conversations", CHANGELOG. Not cli.yaml, not apps/connectors, not adapters/catalog/src. Open: which "user lookups" (users.list vs users.info/lookupByEmail).

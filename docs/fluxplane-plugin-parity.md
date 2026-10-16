@@ -268,6 +268,17 @@ Sources:
   moves from missing to covered, the summary and total rows move by 2 operations and no call,
   and [Not planned until used](#not-planned-until-used) falls from 177 to 175. The writes, on-call,
   schedules and `opsgenie.test` stay missing.
+- **Confluence REST v1, 2026-10-15 (unreleased).** `confluence.page.search` moved from missing
+  to covered when the catalog provider gained a second Confluence provider, `confluence-v1`,
+  built from a REST v1 source document this repository authors from Atlassian's v1 reference
+  rather than vendoring Atlassian's unlicensed v1 document
+  ([Confluence guide](catalog-confluence.md#rest-v1)). Its CQL search is `content.search`
+  (`searchByCQL`); it also serves `spaces.list`, `space.get` and the four REST v2 ids under v1.
+  Verified against a fixture in the v1 response shape, not a live Confluence. The `confluence`
+  row now reads 5 / 13 covered and 10 / 0 missing; the summary and total rows move by 1
+  operation and 8 calls from missing to covered. The open column of [Gap units](#gap-units)
+  and [Waves](#waves) falls from 415 to 407: U20 is covered. No mapped call of
+  [Used but not declared](#used-but-not-declared) lands on this operation.
 - **Recount, 2026-10-08 18:03 UTC.** Calls from 2026-09-09 to 2026-10-08, read from the Claude
   Code and Codex session transcripts on this machine: every `fluxplane-plugin operation
   invoke|call <plugin> <operation>` site in a shell tool call, each tool call counted once by its
@@ -294,9 +305,9 @@ Sources:
 
 | verdict | declared operations | calls | used operations (calls > 0) | calls |
 |---|---:|---:|---:|---:|
-| covered | 108 | 5,949 | 91 | 5,949 |
+| covered | 109 | 5,957 | 92 | 5,957 |
 | partial | 7 | 5 | 1 | 5 |
-| missing | 186 | 402 | 17 | 402 |
+| missing | 185 | 394 | 16 | 394 |
 | **total** | **301** | **6,356** | **109** | **6,356** |
 
 Some calls used operation names that the plugin does not declare (fluxplane inventory §4). They
@@ -318,7 +329,7 @@ Per plugin (operations / calls):
 | loki | 5 | 4 | 370 | 4 / 370 | 0 / 0 | 1 / 0 |
 | kubernetes | 24 | 14 | 72 | 15 / 67 | 2 / 0 | 7 / 5 |
 | homer | 8 | 5 | 32 | 0 / 0 | 0 / 0 | 8 / 32 |
-| confluence | 15 | 3 | 13 | 4 / 5 | 0 / 0 | 11 / 8 |
+| confluence | 15 | 3 | 13 | 5 / 13 | 0 / 0 | 10 / 0 |
 | prometheus | 8 | 2 | 2 | 4 / 2 | 0 / 0 | 4 / 0 |
 | alertmanager | 5 | 1 | 1 | 0 / 0 | 0 / 0 | 5 / 1 |
 | asterisk | 8 | 0 | 0 | 0 / 0 | 0 / 0 | 8 / 0 |
@@ -335,7 +346,7 @@ Per plugin (operations / calls):
 | tavily | 1 | 0 | 0 | 1 / 0 | 0 / 0 | 0 / 0 |
 | vision | 2 | 0 | 0 | 0 / 0 | 0 / 0 | 2 / 0 |
 | websearch | 2 | 0 | 0 | 0 / 0 | 2 / 0 | 0 / 0 |
-| **total** | **301** | **109** | **6,356** | **108 / 5,949** | **7 / 5** | **186 / 402** |
+| **total** | **301** | **109** | **6,356** | **109 / 5,957** | **7 / 5** | **185 / 394** |
 
 Per plugin, the verdict of the plugin as a whole: **missing** when no declared operation is
 covered or partial, otherwise the best verdict any of its operations reaches.
@@ -496,19 +507,21 @@ reads, `users.list`, `team.info`, `emoji.list`, `auth.test`, `files.list`, `file
 binary download `file.download` are selected there, with the writes `chat.postMessage`,
 `conversations.open`, `chat.update` and `chat.delete` under approval; search is a
 second connection under the user-token profile `slack.user`, whose selection set
-`adapters/catalog/providers/slack/user-operations.json` selects `search.messages` alone. Every
-other row is still missing. The 2026-09-09 baseline listed Slack as
+`adapters/catalog/providers/slack/user-operations.json` selects `search.messages` and the
+reads `conversations.list`, `conversations.history`, `conversations.replies` and `users.list`,
+no write. A bot token reads only the channels the bot is a member of; on `slack.user` those reads
+reach every channel that user can read. Every other row is still missing. The 2026-09-09 baseline listed Slack as
 uncovered (`docs/recent-adapter-usage-20260909.md`, U12). The gap column of a missing row names
 the Slack Web API method that would back it.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13) | covered | One page per call; the caller follows `response_metadata.next_cursor`. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.thread` | 225 | 50 | 2026-10-06 | `conversations.replies` (:13), and on `slack.user` (`user-operations.json:17`) | covered | One page per call; the caller follows `response_metadata.next_cursor`. The bot connection reads only the channels the bot is in; the user-token connection (`slack.user`, scopes `channels:history`, `groups:history`, `im:history`, `mpim:history`) reads every thread that user can read. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.message.send` | 132 | 30 | 2026-10-05 | `chat.postMessage` (:41) plus `conversations.open` (:51) | covered | Two writes, each under its own approval: `conversations.open` gives a direct message's channel id, and `chat.postMessage` posts `text` there or to a channel, `thread_ts` for a thread reply; scopes `chat:write` and `im:write`. Plain text and Slack mrkdwn only: no `blocks`, and no Markdown conversion. Slack's refusal, a `200` answer with `"ok": false`, is `outcome_unknown`, not applied, and its `error` string is not returned (2026-10-13). |
-| `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9) | covered | One page per call, windowed by `oldest` and `latest`. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.message.list` | 92 | 34 | 2026-10-05 | `conversations.history` (:9), and on `slack.user` (`user-operations.json:13`) | covered | One page per call, windowed by `oldest` and `latest`. The bot connection reads only the channels the bot is in; the user-token connection (`slack.user`, scopes `channels:history`, `groups:history`, `im:history`, `mpim:history`) reads every channel that user can read. A Slack error is a `200` answer with `"ok": false`. |
 | `slack.search` | 73 | 19 | 2026-10-05 | `search.messages` (`adapters/catalog/providers/slack/user-operations.json:5`) | covered | On a second connection with a user token (`slack.user`, scope `search:read`); a bot token cannot search. Pages by `page` and `count` (1–100), not by cursor. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
-| `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5) | covered | One page of at most 1,000 per call; no lookup by channel name. |
+| `slack.user.list` | 41 | 17 | 2026-10-05 | `users.list` (:17), and on `slack.user` (`user-operations.json:21`, scope `users:read`) | covered | One page per call; the caller follows `response_metadata.next_cursor`. No lookup by id or e-mail: read the list. A Slack error is a `200` answer with `"ok": false`. |
+| `slack.channel.list` | 40 | 20 | 2026-10-05 | `conversations.list` (:5), and on `slack.user` (`user-operations.json:9`) | covered | One page of at most 1,000 per call; no lookup by channel name. On the user-token connection (`slack.user`, scopes `channels:read`, `groups:read`) it lists the private channels and direct messages that user is in. |
 | `slack.file.upload` | 24 | 10 | 2026-09-29 | — | missing | Not selected. Would be backed by `files.getUploadURLExternal` and `files.completeUploadExternal`: a binary upload, which the catalog cannot send (it reads binary answers only). |
 | `slack.message.edit` | 20 | 8 | 2026-10-03 | `chat.update` (:63) | covered | One write under approval on a message named by `channel` and `ts`, in a channel or a direct message; replaces its `text` (scope `chat:write`). No `blocks`, and no Markdown conversion; Slack resets `parse` and `link_names` on every edit. A bot token edits only its own messages: `cant_update_message` and `edit_window_closed` are refused as `forbidden`, `message_not_found` and `channel_not_found` as `not_found`; any other `"ok": false` is `outcome_unknown` (2026-10-14). |
 | `slack.info` | 15 | 8 | 2026-09-25 | `team.info` (:20) and `auth.test` (:26) | covered | Two reads, not one: `team.info` gives the workspace's id, name and domain, and `auth.test` the token's user, bot and workspace ids. |
@@ -698,13 +711,16 @@ sessions, not capture search.
 
 Source: fluxplane inventory §2 confluence.
 
-Connectors catalog provider: `adapters/catalog/providers/confluence/operations.json`. The pinned
-source is Confluence Cloud REST v2 only (`adapters/atlassian/upstream/confluence/README.md`), and
-v2 has no CQL search and no user search.
+Connectors catalog providers: `adapters/catalog/providers/confluence/operations.json` (REST v2) and
+`adapters/catalog/providers/confluence-v1/operations.json` (REST v1). The REST v2 source is
+Atlassian's pinned document (`adapters/atlassian/upstream/confluence/README.md`), which has no CQL
+search and no user search; the REST v1 source is a document this repository authors from
+Atlassian's v1 reference (`adapters/atlassian/contracts/confluence-rest-v1/README.md`). A
+`(:<line>)` citation refers to the REST v2 file.
 
 | fluxplane operation | calls | sessions | last used | Connectors operation | verdict | gap |
 |---|---:|---:|---|---|---|---|
-| `confluence.page.search` | 8 | 2 | 2026-09-21 | — | missing | No CQL search. It needs the REST v1 source. |
+| `confluence.page.search` | 8 | 2 | 2026-09-21 | `content.search` (`confluence-v1/operations.json:21`) | covered | Served from REST v1, provider `confluence-v1`. |
 | `confluence.page.show` | 4 | 3 | 2026-09-24 | `page.get` (:11) | covered | The body comes in storage format, not Markdown. |
 | `confluence.test` | 1 | 1 | 2026-09-21 | `connections revalidate` (identity probe, `docs/catalog-confluence.md:111`) | covered | — |
 | `confluence.attachment.delete` | 0 | 0 | - | — | missing | `deleteAttachment` (v2) is not selected. |
@@ -1115,13 +1131,13 @@ The "provider in Connectors" column uses three values:
 | U17 | Homer SIP capture reads | homer | new | A new catalog provider, if the Homer API's Swagger document can be pinned (not checked). Otherwise a new native adapter. | `homer.call.list`, `homer.call.show`, `homer.test`, `homer.call.qos`, `homer.search` | 32 | 1 | 33 | 33 |
 | U18 | Kubernetes reads: namespaces, single objects, events, rollout history | kubernetes | native | Change the native adapter: new kinds (namespaces, events, ReplicaSets) and a single-object read. | `kubernetes.namespace.list`, `kubernetes.pod.show`, `kubernetes.deployment.show`, `kubernetes.deployment.history`, `kubernetes.event.list` | 17 | 0 | 17 | 0 |
 | U19 | Kubernetes exec and port-forward | kubernetes | native | Change the native adapter: the streaming subresources. The execution profile is deferred (README.md:115-116). | `kubernetes.pod.exec`, `kubernetes.portforward.start`, `kubernetes.portforward.stop` | 13 | 0 | 13 | 4 |
-| U20 | Confluence CQL search | confluence | catalog | A new pinned OpenAPI source (Confluence REST v1) for the existing catalog provider. | `confluence.page.search` | 8 | 0 | 8 | 8 |
+| U20 | Confluence CQL search | confluence | catalog | A new pinned OpenAPI source (Confluence REST v1) for the existing catalog provider. | `confluence.page.search` | 8 | 0 | 8 | 0 |
 | U21 | Kubernetes contexts | kubernetes | native | Change the native adapter and the CLI connection setup: discover kubeconfig contexts. | `kubernetes.cluster.list` | 5 | 0 | 5 | 0 |
 | U22 | Kubernetes pod logs | kubernetes | native | Change the native adapter: implement the specified `adapters/kubernetes/contracts/logs`. | `kubernetes.pod.logs` | 5 | 0 | 5 | 0 |
 | U23 | Jira attachment download | jira | catalog | A catalog engine change: binary responses. | `jira.issue.attachment.get` | 2 | 0 | 2 | 0 |
 | U24 | Alertmanager alerts | alertmanager | new (`adapters/alertmanager`: design only) | A new native adapter. The alert record schema is still unauthored. | `alertmanager.alerts` | 1 | 1 | 2 | 2 |
 | U25 | Kubernetes Secret read | kubernetes | native | Change the native adapter. It needs a disclosure decision first. | `kubernetes.secret.read` | 1 | 0 | 1 | 1 |
-| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** | **415** |
+| | **total** | | | | 89 operations | **3,697** | **91** | **3,788** | **407** |
 
 The operation, declared, undeclared and total columns are the 2026-10-07 baseline: the units
 covered exactly the 89 declared operations that then had calls and were partial (16) or missing
@@ -1130,11 +1146,11 @@ that baseline.
 
 The open column is recounted from the rows above: a unit's declared calls whose operation is
 still partial or missing, plus its mapped calls in [Used but not declared](#used-but-not-declared)
-that do not land on covered. A unit with 0 open is covered. The 18 operations still open are
-exactly the operations with calls that are partial (1) or missing (17) in the
-[Summary](#summary), and their 407 declared calls equal its partial (5) and missing (402)
-totals; the other 8 open calls are the mapped calls added to the gap units. On 2026-10-14,
-U01, U04, U05, U07–U12, U14–U16, U18 and U21–U23 are covered. U02 keeps only its 5 mapped
+that do not land on covered. A unit with 0 open is covered. The 17 operations still open are
+exactly the operations with calls that are partial (1) or missing (16) in the
+[Summary](#summary), and their 399 declared calls equal its partial (5) and missing (394)
+totals; the other 8 open calls are the mapped calls added to the gap units. On 2026-10-15,
+U01, U04, U05, U07–U12, U14–U16, U18 and U20–U23 are covered. U02 keeps only its 5 mapped
 single-user reads open, U03 only `jira.issue.create_meta` (partial), U13 only its upload and
 delete (31 calls) and U19 only its port-forward (4 calls).
 
@@ -1157,10 +1173,10 @@ the sum of its units' open calls in [Gap units](#gap-units); a wave with 0 open 
 | W2 | U05 Grafana datasources and Loki through Grafana · U06 Jira issue writes · U08 Slack message writes · U09 GitLab merge-request writes | grafana, jira, slack, gitlab | 1,006 | 326 |
 | W3 | U07 Jira transitions · U10 GitLab repository reads · U12 Prometheus PromQL · U18 Kubernetes reads | jira, gitlab, prometheus, kubernetes | 453 | 0 |
 | W4 | U11 GitLab merge-request reads · U13 Slack files · U17 Homer SIP capture reads · U19 Kubernetes exec and port-forward | gitlab, slack, homer, kubernetes | 204 | 68 |
-| W5 | U14 GitLab tags and releases · U20 Confluence CQL search · U21 Kubernetes contexts · U23 Jira attachment download | gitlab, confluence, kubernetes, jira | 60 | 8 |
+| W5 | U14 GitLab tags and releases · U20 Confluence CQL search · U21 Kubernetes contexts · U23 Jira attachment download | gitlab, confluence, kubernetes, jira | 60 | 0 |
 | W6 | U15 GitLab CI/CD writes and environments · U22 Kubernetes pod logs · U24 Alertmanager alerts | gitlab, kubernetes, alertmanager | 43 | 2 |
 | W7 | U16 GitLab project and repository writes · U25 Kubernetes Secret read | gitlab, kubernetes | 37 | 1 |
-| | **total** | | **3,788** | **415** |
+| | **total** | | **3,788** | **407** |
 
 ## Not planned until used
 

@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:sustained-live-read-loop
 kind: story
-status: draft
+status: active
 title: A 10-minute live read loop runs with no manual revalidate
 relations:
 - decomposes: epic:fluxplane-plugin-parity
@@ -12,7 +12,10 @@ relations:
 - depends_on: story:slack-user-token-history-reads
 - depends_on: story:slack-ok-false-is-a-refusal
 - depends_on: story:refusals-name-the-field
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T23:35:16Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-14T23:35:17Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
@@ -40,3 +43,7 @@ writes its report outside the repository. It runs on demand, never in CI.
   Kubernetes and SQL connections ends with 0 unanswered reads and 0 revalidations by the caller,
   and its report is attached to the release that ships the reliability stories.
 - Depends on the lease, upgrade, Slack user-token, `ok:false` and field-name stories.
+
+## Scope
+
+Primary: crates/connectors-build (main.rs Action enum :49, new live_read_loop.rs), docs/development.md. No ESS. depends_on connection-lease-holds-unattended (ordered). Open: subprocess vs connectors-client; where the read loop is declared.

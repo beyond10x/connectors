@@ -2,12 +2,15 @@
 format: aep.planning-md/3
 id: story:connection-lease-holds-unattended
 kind: story
-status: draft
+status: active
 title: A revalidated connection keeps serving reads, and concurrent revalidations finish within the admission bound
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+revision: 4
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-14T23:35:15Z", actor: "human:timo", revision: 3}
+- {from: "proposed", to: "active", at: "2026-10-14T23:35:15Z", actor: "human:timo", revision: 4}
 ---
 ## Outcome
 
@@ -47,3 +50,7 @@ revalidation joins the first instead of queueing behind it to the timeout.
   admission bound.
 - The cause of the 60 s-class admission timeout is named with file:line in the PR, verified by a
   trace of one instance.
+
+## Scope
+
+Primary: connectors-host local/registry (revalidation.rs, use_and_retirement.rs, observation.rs), owner/supervisor.rs, owner.rs, metadata.rs WAIT_BOUND, transport.rs; apps local/connections.rs, local.rs; contracts cli semantics.md:801 ("never revalidates on its own" must change), owner.md, auth read-refresh-once.md, evidence semantics; ess cli.yaml, credential_evidence.yaml. Needs a diagnosis (several 30 s bounds; 60 s EVIDENCE_LIFETIME_MS in adapters auth.rs). Collides with revision-recovery (wave c B, registry) and refusals-name-the-field (local.rs, cli.yaml).

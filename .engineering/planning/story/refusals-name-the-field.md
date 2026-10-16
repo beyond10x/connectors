@@ -7,7 +7,8 @@ title: invalid_input and cli_parse refusals name the field they refused
 relations:
 - decomposes: epic:fluxplane-plugin-parity
 - serves: vision:independent-contract-adapters
-revision: 1
+- depends_on: story:connection-lease-holds-unattended
+revision: 2
 ---
 ## Outcome
 
@@ -34,3 +35,7 @@ upstream dependency.
 - Tests: an invalid operation input names its JSON pointer; an invalid CLI argument that Connectors
   checks names the argument.
 - The upstream dependency is recorded as a relation, not a workaround.
+
+## Scope
+
+Primary: ess/domains/cli.yaml connectors.cli.Failure (+field), regenerated CLI contract, apps/connectors/src/local.rs and local/*.rs, connectors-host owner.rs validate_document, connectors-sdk validate (keep instance path), catalog lib.rs/feed.rs/local.rs; inferred private channel Reply::Failed in runtime.rs/process.rs, connectors-core Error, private-adapter.md. Wide: collides with every cli.yaml/local.rs/runtime.rs unit. Safety: field from declared schema, never caller text (additionalProperties).

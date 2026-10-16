@@ -78,6 +78,8 @@ fn kubernetes(kubeconfig_contexts: bool) -> (Kubernetes, Arc<Reads>) {
         helm_release_reads: HelmReleaseReads::Off,
         pod_logs: false,
         pod_exec: false,
+        node_reads: false,
+        custom_resources: Vec::new(),
         kubeconfig_contexts,
     };
     let mut effective = json!({"format":"connectors-kubernetes-local/1","instance":"recorded",
