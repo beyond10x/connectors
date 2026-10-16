@@ -326,17 +326,15 @@ fn guide_cites_each_operation_its_window_and_its_paging() {
     }
 }
 
-/// The `auth` profile of the configuration example in the Opsgenie guide, so
-/// the fixture runs the profile the guide tells a reader to write.
+/// The `auth` profile the `opsgenie` connector declares
+/// (`providers/opsgenie/connector.json`), so the fixture runs the profile the
+/// guide's instance uses.
 fn documented_auth() -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-opsgenie.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains("\"provider\": \"opsgenie\""))
-        .expect("the documented Opsgenie configuration");
-    serde_json::from_str::<Value>(example).unwrap()["auth"].clone()
+    let declaration: Value = serde_json::from_slice(
+        &fs::read(root().join("providers/opsgenie/connector.json")).unwrap(),
+    )
+    .unwrap();
+    declaration["profiles"][0].clone()
 }
 
 #[test]

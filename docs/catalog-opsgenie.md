@@ -14,8 +14,10 @@ into OpenAPI 3.1.0, one cited amendment adds the incident-to-alert link the
 document leaves out, the result is compiled into a bundle, a reviewed selection
 set exposes five reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection and invocation work as described there; this page
-covers what differs for Opsgenie. No read needs an approval.
+Connection and invocation work as described there; this page configures the
+`opsgenie` connector and covers what differs for Opsgenie. No read needs an
+approval. Connector, instance and connection are defined in
+[the README](../README.md#vocabulary).
 
 ## Source and bundle
 
@@ -127,27 +129,43 @@ puts the scheme word in front of the key: the protected entry is
 `{"token": "<API key>"}` and every request carries
 `Authorization: GenieKey <API key>`.
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "opsgenie",
-  "provider": "opsgenie",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://api.opsgenie.com",
-  "auth": {
-    "profile": "opsgenie.api-key",
-    "header": "Authorization",
-    "bearer": false,
-    "prefix": "GenieKey",
-    "label": "Opsgenie API integration key",
-    "identity": {"path": "v2/alerts", "kind": "opsgenie.integration", "source": "configuration"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/opsgenie/operations.json"
-}
+The `opsgenie` connector declares that profile, `opsgenie.api-key`, and the
+default endpoint `https://api.opsgenie.com`
+([`adapters/catalog/providers/opsgenie/connector.json`](../adapters/catalog/providers/opsgenie/connector.json)).
+Add to the host configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`):
+
+```toml
+[connectors.opsgenie]
+enabled = true
+
+[connectors.opsgenie.instances.work]
 ```
 
-An account on Opsgenie's EU instance uses `"api_base": "https://api.eu.opsgenie.com"`.
+An account on Opsgenie's EU instance states its endpoint in the instance
+table: `endpoint = "https://api.eu.opsgenie.com"`. The bundle, the five reads,
+the profile and the provider executable are derived from the shipped
+connector. The instance id, and so the connection's subject, is
+`opsgenie.work`:
+
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"opsgenie.work","adapter_id":"catalog","connector":"opsgenie","instance":"work","instance_id":"opsgenie.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
 The key needs read access to alerts, and to incidents for the incident reads.
+Connect with the credential document `{"token": "<API key>"}` in an owner-only
+file:
+
+```sh
+connectors connections connect --connector opsgenie --instance work \
+  --profile opsgenie.api-key --credential-file ~/private/opsgenie.json
+```
+
+An installation configured before connectors were declared converts its
+entries with `connectors setup migrate`, which keeps each instance id and
+revision; the pinned form it writes is described in
+[the catalog provider guide](local-catalog-provider.md).
 
 ## Limits
 

@@ -7,6 +7,8 @@
 //! refusal is driven on the guard preflight and on every feed binding, the two sites
 //! the unit's own suite does not reach. No live Runpod account, no network.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::{
     bundle::{self, Bundle},
     ingest, inventory,
@@ -419,15 +421,9 @@ impl Drop for Provider {
     }
 }
 
+/// The hand-written Runpod configuration (`hand_written`).
 fn documented_config() -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-runpod.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains("\"provider\": \"runpod\""))
-        .expect("the documented Runpod configuration");
-    serde_json::from_str(example).unwrap()
+    serde_json::from_str(&hand_written::blocks("catalog-runpod.md")[0]).unwrap()
 }
 fn root_path(relative: &str) -> PathBuf {
     root().join(relative).canonicalize().unwrap()

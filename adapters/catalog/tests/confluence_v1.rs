@@ -323,16 +323,20 @@ fn guide_cites_each_v1_read_its_request_and_its_paging() {
     }
 }
 
-/// The `auth` object of the guide's configuration example for `provider`.
+/// The `auth` profile the connector `provider` declares
+/// (`providers/<provider>/connector.json`), which the guide's instance uses.
 fn documented_auth(provider: &str) -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-confluence.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(&format!("\"provider\": \"{provider}\"")))
-        .unwrap_or_else(|| panic!("the documented {provider} configuration"));
-    serde_json::from_str::<Value>(example).unwrap()["auth"].clone()
+    let declaration: Value = serde_json::from_slice(
+        &fs::read(
+            root()
+                .join("providers")
+                .join(provider)
+                .join("connector.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    declaration["profiles"][0].clone()
 }
 
 /// REST v1 is read with the same Atlassian credential and profile as REST v2
