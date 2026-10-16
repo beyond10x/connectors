@@ -112,7 +112,8 @@ types:
     kind: struct
     fields:
       # The service instance id; the ServiceConfiguration the host records at
-      # start carries it as `instance_id`.
+      # start carries it as `instance_id`. Vocabulary: the instance (design
+      # § Decision); the field keeps its name.
       - {name: instance, type: String}
       # A directory path. Required for a host that serves
       # POST /v1alpha2/invoke: the host keeps its execution-audit anchors and its
@@ -126,6 +127,10 @@ types:
 # Immutable declarations, not the lifecycle of a running process or connection.
 # Interaction and failure semantics are in contracts/service/v1alpha1/semantics.md.
 entities:
+  # Vocabulary: "adapter" is internal only (design § Decision): the
+  # implementation of a contract (`adapter_id = "catalog"`) and its running
+  # process. It is not a user-facing noun; the user configures a Connector and
+  # its instances (ServiceConfiguration).
   - name: connectors.declarations.AdapterSpecification
     identity:
       name: adapter_id
@@ -156,6 +161,82 @@ entities:
       states: [Declared]
       terminal: [Declared]
 
+  # User vocabulary (docs/design/connector-vocabulary.md § Decision): a
+  # provider is the company or technology behind one or more connectors
+  # (Google, GitLab). Not today's catalog `provider` value (`google-gmail`,
+  # adapters/catalog/src/local.rs:173): that names one API, which is a
+  # Connector below.
+  # UNMAPPED: whether a provider appears in configuration at all or only in the
+  # catalog that lists connectors (design § Open questions). Recorded here as a
+  # declaration either way; the owner decides where it is read from.
+  # UNMAPPED: the provider_id format (`google`? `Google`?). No code or document
+  # fixes it.
+  - name: connectors.declarations.Provider
+    identity:
+      name: provider_id
+      type: String
+    fields: []
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  # User vocabulary (design § Decision; ADR connector-vocabulary decision 2): a
+  # connector is one service or app of a provider with one API (Gmail, Drive,
+  # GitLab), enabled in configuration (`[connectors.<connector>]`, design
+  # § What changes, a sketch and not a schema). Many connectors per provider.
+  # It replaces the user-facing "adapter" alias; "adapter" stays the internal
+  # name of the implementation (AdapterSpecification) and of its process.
+  # UNMAPPED: the connector_id format, and whether it equals today's catalog
+  # `provider` value (`google-gmail`, adapters/catalog/src/local.rs:173), which
+  # is inside the configuration-revision digest the migration must keep
+  # (migration-plan connector-vocabulary § Invariant).
+  # UNMAPPED: which AdapterSpecification implements a connector, and its
+  # cardinality (one adapter_id such as `catalog` serves several connectors
+  # today). The design says the executable is "resolved from the installed
+  # connector" and names no relation. Open question for the owner.
+  # UNMAPPED: an operation is "one callable tool of a connector" and an auth
+  # profile is "one way to authenticate that a connector declares" (design
+  # § Decision), but OperationDeclaration is owned by AdapterSpecification via
+  # adapter_id and AuthProfile references AdapterSpecification via adapter_id.
+  # No connector_id is carried on either; whether they gain one, or reach the
+  # connector through the adapter, is open. Not modelled here.
+  # UNMAPPED: enabling a connector is stated as configuration (`enabled =
+  # true`), not as a command. Whether a connector that is not enabled is a
+  # record at all (catalog) or only an enabled one is (configuration) is the
+  # same open question as for Provider. No command is modelled.
+  - name: connectors.declarations.Connector
+    identity:
+      name: connector_id
+      type: String
+    fields:
+      - name: provider_id
+        type: String
+      - name: enabled
+        type: Boolean
+      # The endpoint an instance without `endpoint` uses (design § What
+      # changes: "An instance without `endpoint` uses the connector's default
+      # endpoint").
+      # UNMAPPED: whether every connector has a default endpoint (a catalog
+      # connector has `api_base`; a stdio MCP or credential-binary connector
+      # may have none). Optional is the weaker claim, not a decision.
+      - name: default_endpoint
+        type: Optional<String>
+    relations:
+      - name: provider
+        kind: references
+        target: connectors.declarations.Provider
+        cardinality: one
+        via: provider_id
+    lifecycle:
+      initial: Declared
+      states: [Declared]
+      terminal: [Declared]
+
+  # Vocabulary: this is the operation, "one callable tool of a connector"
+  # (design § Decision). Every operation of an enabled connector is available
+  # on its instances; no grouping or per-instance filter. Its link to a
+  # Connector is UNMAPPED (see Connector).
   - name: connectors.declarations.OperationDeclaration
     identity:
       name: operation_id
@@ -187,6 +268,27 @@ entities:
       states: [Declared]
       terminal: [Declared]
 
+  # User vocabulary: this is the instance (design § Decision; ADR
+  # connector-vocabulary decision 3), the user's name for one configured
+  # connector. Reused, not a parallel entity: its identity is the
+  # `instance_id` of an `[adapters.<alias>]` entry
+  # (crates/connectors-host/src/local/config.rs:269), the host's
+  # `registry_instances` row (registry/lifecycle.rs:451), and the key
+  # Connection.instance_id references (auth_bindings.yaml). A migrated
+  # instance keeps that value byte for byte (migration-plan
+  # connector-vocabulary § Invariant, step 2). Old -> new: "adapter alias" /
+  # `--adapter <alias>` -> connector + instance (`--connector <name>
+  # --instance <name>`); ServiceConfiguration -> instance. The entity keeps its
+  # name in this pass; the rename is a later story.
+  # UNMAPPED: the instance_id format of a new (not migrated) instance, "derived
+  # from connector and instance name" (migration-plan step 2), and whether `/`
+  # passes the selector check (config.rs:530-533).
+  # CONTRADICTION: the design says an instance "holds at most one connection";
+  # the host admits up to 1000 connections per instance_id
+  # (registry/lifecycle.rs:20-22), and Connection's notes (auth_bindings.yaml)
+  # follow a lifetime-only profile change with a new Connection under the same
+  # instance id. Not modelled as a cardinality until the owner decides whether
+  # "at most one" counts revoked or superseded connections.
   - name: connectors.declarations.ServiceConfiguration
     identity:
       name: instance_id
@@ -198,12 +300,39 @@ entities:
         type: String
       - name: registry_epoch
         type: Integer
+      # The connector this instance belongs to (design § Decision: "An
+      # instance belongs to one connector and is never shared across
+      # connectors"). Optional only because a legacy `[adapters.<alias>]`
+      # entry names no connector while both formats are read (migration-plan
+      # step 1).
+      # UNMAPPED: whether it becomes required once `[adapters.*]` reading ends
+      # (migration-plan step 9).
+      - name: connector_id
+        type: Optional<String>
+      # The user's free instance name (`private`, `work`; design § Decision),
+      # which addresses an instance within its connector. Absent on a legacy
+      # alias, whose name is its `[adapters.<alias>]` key.
+      # UNMAPPED: uniqueness of (connector_id, name) is implied by "the
+      # instance name is what addresses the right one" and is not declared;
+      # this format has no uniqueness construct used here.
+      - name: name
+        type: Optional<String>
+      # Absent: the connector's default_endpoint (design § What changes).
+      - name: endpoint
+        type: Optional<String>
+      - name: description
+        type: Optional<String>
     relations:
       - name: adapter
         kind: references
         target: connectors.declarations.AdapterSpecification
         cardinality: one
         via: adapter_id
+      - name: connector
+        kind: references
+        target: connectors.declarations.Connector
+        cardinality: one
+        via: connector_id
     lifecycle:
       initial: Declared
       states: [Declared]
@@ -227,6 +356,11 @@ commands:
   # /v1alpha2/invoke.
   # ESS-LIMIT: the start sequence spans a view read and several commands; ESS
   # has no host-procedure construct, so the sequence is a host obligation.
+  # UNMAPPED: no command sets ServiceConfiguration's connector_id, name,
+  # endpoint or description. The design states adding an instance as
+  # configuration (`[connectors.<c>.instances.<i>]`), not as a command, and
+  # does not say whether the host records them through this command, a new
+  # one, or reads them from configuration only.
   - name: connectors.declarations.RecordServiceConfiguration
     input:
       - {name: instance_id, type: String}

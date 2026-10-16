@@ -4,6 +4,12 @@ summary: Selected local CLI presentation values and the existing local configura
 # Owner: contracts/cli/v1alpha1/semantics.md. Process globals live in ess-cli/1
 # Context, not these payloads. Existing auth/declaration identities retain their
 # String representations; these value references establish no entity relations.
+# Vocabulary (docs/design/connector-vocabulary.md § What changes): every
+# `adapter` field below is the `--adapter <alias>` value, which becomes
+# `--connector <name> --instance <name>` (connectors.declarations.Connector
+# and its instance, ServiceConfiguration). The fields keep their names in this
+# pass; the migration plan carries `adapter` beside `connector` and `instance`
+# for a deprecation window.
 types:
   # Local approval commands project existing policy/subject owners. A preparation
   # is metadata, not a lease or proof; issuance returns no protected proof bytes.

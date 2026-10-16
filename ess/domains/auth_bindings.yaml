@@ -83,6 +83,11 @@ types:
     # under the same instance id, not by moving the existing one.
 
 entities:
+  # Vocabulary: this record and its ProfileDeclaration are the auth profile,
+  # "one way to authenticate that a connector declares" (`google.oauth`,
+  # `gitlab.pat`; docs/design/connector-vocabulary.md § Decision). It ships
+  # with the connector and an instance names it. Its link is still
+  # adapter_id; a connector link is UNMAPPED (declarations.yaml Connector).
   - name: connectors.auth_bindings.AuthProfile
     identity: {name: profile_record_ref, type: String}
     fields:
@@ -100,6 +105,10 @@ entities:
     # Exact immutable (adapter_id, profile_id, declaration_revision) key.
     # No delete command or cascade into referencing Connections is selected.
 
+  # Vocabulary: the connection, "the stored credential of one instance,
+  # obtained through one auth profile" (design § Decision). `instance` below
+  # references the instance (ServiceConfiguration) by instance_id; the
+  # `Stale` state of the design (§ Connection lifecycle) is a later story.
   - name: connectors.auth_bindings.Connection
     identity: {name: connection_ref, type: String}
     fields:
@@ -144,12 +153,37 @@ entities:
           - none: [defined(active_generation_id), defined(active_custody_version_ref)]
     lifecycle:
       initial: Live
-      states: [Live, Revoked]
+      states: [Live, Stale, Revoked]
       terminal: [Revoked]
       transitions:
-        - {name: publish, from: [Live], to: Live}
-        - {name: revoke, from: [Live], to: Revoked}
-    # Live is administrative non-revocation, not readiness/publication/permission.
+        - {name: publish, from: [Live, Stale], to: Live}
+        - {name: mark_stale, from: [Live], to: Stale}
+        - {name: revoke, from: [Live, Stale], to: Revoked}
+    # Live and Stale are both administrative non-revocation; neither is
+    # readiness, publication or permission. Stale (operator decision
+    # 2026-10-16) is a connection whose stored credential the provider refused
+    # (an OAuth refresh token expired or revoked at the provider, a changed
+    # password: invalid_grant or unauthorized on refresh), so a retry cannot
+    # succeed. The way out is a reconnect: the same consent or credential entry
+    # on the same instance and connection_ref, today `connections repair` (an
+    # Acquisition with repair_connection_ref, then PublishBinding), whose
+    # publication of a new credential moves it back to Live. Revocation stays
+    # terminal and is admitted from Live and Stale.
+    # UNMAPPED: contracts/auth/connection/v1alpha1/semantics.md §4.1 says status
+    # is "not a persisted lifecycle that transitions through every provider
+    # observation" and §4.2 names the lifecycle `Live → Revoked`; Stale
+    # contradicts both until the contract is amended. Stale covers part of its
+    # derived `reauthorization_required` status (next_action `reconnect`).
+    # UNMAPPED: no host code reaches Stale today. The registry stores only
+    # live/revoked (metadata/er.rs connection_row), maps every Live→Live row
+    # change to PublishBinding, and the invoke path persists no refusal: the
+    # OAuth invalid_grant CLI journey test invokes again successfully once the
+    # token host grants again.
+    # UNMAPPED: Stale→Live takes every allowed PublishBinding, and the host also
+    # names a revalidation's baseline/fence update and an upgrade PublishBinding.
+    # Whether only a reconnect's publication leaves Stale, or also a
+    # revalidation the provider now answers valid or a published refresh, is
+    # not settled; no field tells the publications apart.
     # Optional via carriers mean zero-or-one, as in RefreshAttempt's candidate.
     # baseline_evidence is one current-generation material baseline value, not a
     # history or operation-permission cache: at most six distinct baseline checks
@@ -343,6 +377,33 @@ commands:
       - {name: unavailable, when: decision == unknown, error: connectors.auth_bindings.Unavailable}
       - {name: refused, error: connectors.auth_bindings.Refused}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
+  - name: connectors.auth_bindings.MarkConnectionStale
+    # The provider refused this connection's stored credential: an OAuth
+    # refresh answered invalid_grant, or the provider answered unauthorized for
+    # it (apps/connectors/src/local.rs invoke_failure: service_failure with
+    # service_code unauthorized names repair_connection). A trusted host
+    # observation like InvalidateCustodyVersion, which records a revalidation's
+    # refusal on the custody version and cannot move the Connection under
+    # format ess/18.
+    # A refusal of an already Stale connection answers wrong-state, as the
+    # operator's lifecycle moves only Live to Stale.
+    # UNMAPPED: a non-OAuth profile (a personal access token, basic or bearer
+    # entry) the provider answers unauthorized gets the same repair_connection
+    # (invoke_failure checks no profile); whether that makes it Stale is not
+    # settled by code or docs.
+    # UNMAPPED: an OAuth cached access token the API refuses is reported as the
+    # stored credential's (the same journey test) without a refresh
+    # refusal; whether that alone makes the connection Stale is not settled.
+    # UNMAPPED: revalidation (registry/revalidation.rs finish_revalidation)
+    # invalidates the custody version as `invalid` for a refused credential and
+    # for another identity, `insufficient` for scope below the minimum and
+    # `missing` for a lost keyring entry. Which of these also mark the
+    # Connection Stale is not settled; only the provider refusal is decided.
+    input:
+      - {name: connection_ref, type: String}
+    outcomes:
+      - {name: marked-stale, moves: connectors.auth_bindings.Connection.mark_stale, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionMarkedStale], payload: {connectors.auth_bindings.ConnectionMarkedStale: {connection_ref: input.connection_ref}}}
+      - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
   - name: connectors.auth_bindings.PublishBinding
     # Names an acknowledged host metadata update, not another lifecycle or a
     # substitute for RefreshAttempt's consumed-source/publication protocol.
@@ -372,6 +433,8 @@ commands:
     # with ConnectionStateConflict, as RevokeConnection does; input guards decide first (refuse → Refused, unknown → Unavailable).
     # The host (crates/connectors-host/src/local/metadata/er.rs:2989-2994) maps no
     # Revoked row change to this command, so no code states another answer.
+    # On a Stale Connection an allowed publication is the reconnect and moves it
+    # back to Live.
   - name: connectors.auth_bindings.BeginAcquisition
     # Owner refuses static_config, expired/unsupported flows and capacity before
     # creation. No business operation, public callback or material read is implied.
@@ -580,6 +643,8 @@ events:
     fields: [{name: connection_ref, type: String}]
   - name: connectors.auth_bindings.ConnectionRevoked
     fields: [{name: connection_ref, type: String}]
+  - name: connectors.auth_bindings.ConnectionMarkedStale
+    fields: [{name: connection_ref, type: String}]
   - name: connectors.auth_bindings.BindingPublished
     fields: [{name: connection_ref, type: String}]
   - name: connectors.auth_bindings.AcquisitionBegan
@@ -729,6 +794,7 @@ actors:
       - connectors.auth_bindings.ExpireAcquisition
       - connectors.auth_bindings.FailAcquisition
       - connectors.auth_bindings.InvalidateCustodyVersion
+      - connectors.auth_bindings.MarkConnectionStale
       - connectors.auth_bindings.PublishBinding
       - connectors.auth_bindings.RecordAcquisitionCandidate
       - connectors.auth_bindings.RecordCustodyVersion
