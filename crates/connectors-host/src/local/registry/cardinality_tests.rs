@@ -102,13 +102,24 @@ fn a_stale_connection_is_held_as_a_live_one_is() {
 #[test]
 fn only_a_connect_in_flight_blocks_beside_a_published_one() {
     let (_root, registry) = fixture();
+    assert_eq!(registry.in_flight("fixture-instance", NOW).unwrap(), None);
     let acquisition = registry.begin(&binding(), NOW).unwrap();
     assert_eq!(
         registry.begin(&binding(), NOW).map(|_| ()),
         Err(Failure::Conflict)
     );
+    // The refusal's `retry_status` follows this acquisition.
+    assert_eq!(
+        registry
+            .in_flight("fixture-instance", NOW)
+            .unwrap()
+            .as_deref(),
+        Some(acquisition.reference())
+    );
+    assert_eq!(registry.in_flight("other-instance", NOW).unwrap(), None);
     let claim = registry.consume(acquisition, NOW).unwrap();
     registry.fail(&claim, NOW).unwrap();
+    assert_eq!(registry.in_flight("fixture-instance", NOW).unwrap(), None);
     registry.begin(&binding(), NOW).unwrap();
 
     // Abandoned without a recorded failure: it ends at its deadline, before
