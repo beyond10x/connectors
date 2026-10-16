@@ -14,7 +14,9 @@
     "https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/",
     "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#get-read-log-of-the-specified-pod",
     "https://kubernetes.io/docs/reference/config-api/kubeconfig.v1/",
-    "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#get-connect-get-requests-to-exec-of-pod"
+    "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#get-connect-get-requests-to-exec-of-pod",
+    "https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/stateful-set-v1/",
+    "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/"
   ],
   "configuration_schema": {
     "oneOf": [
@@ -68,7 +70,8 @@
                 "deployments",
                 "endpointslices",
                 "replicasets",
-                "events"
+                "events",
+                "statefulsets"
               ]
             }
           },
@@ -95,6 +98,54 @@
             "description": "Digest of the absolute kubeconfig path the native configuration names; present only when it names one, and then contexts.list is advertised and reads that file alone.",
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "node_reads": {
+            "description": "Advertises nodes.list, which lists the cluster's Node objects in full and needs cluster-wide list on nodes. Absent means false: the effective document carries it only when true, so a configuration that does not enable it keeps its revision.",
+            "const": true
+          },
+          "exec_plugin_digest": {
+            "description": "Digest of the exec_plugin binding the native configuration names: the plugin's absolute path and pinned sha256, the kubeconfig user whose exec block supplies its arguments, the environment variable allow-list, the HOME directory and the run deadline. Present only when the configuration names one, and then the kubernetes.exec_plugin profile replaces kubernetes.token and the plugin runs only inside an admitted validation or operation. Absent means no plugin ever runs.",
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "custom_resources": {
+            "description": "The namespaced custom resource collections custom_resources.list may read, each by group, version and plural. Absent means none: the effective document carries it only when non-empty, sorted, so a configuration that admits none keeps its revision. A group is a dotted DNS-1123 subdomain outside k8s.io and kubernetes.io.",
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 253,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$",
+                  "not": {
+                    "pattern": "(^|\\.)(k8s\\.io|kubernetes\\.io)$"
+                  }
+                },
+                "version": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                },
+                "plural": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 63,
+                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                }
+              },
+              "required": [
+                "group",
+                "version",
+                "plural"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -143,7 +194,8 @@
                     "deployments",
                     "endpointslices",
                     "replicasets",
-                    "events"
+                    "events",
+                    "statefulsets"
                   ]
                 }
               },
@@ -165,6 +217,48 @@
               "pod_exec": {
                 "description": "Advertises pods.exec when true; the federated service has no write exchange, so it is refused there.",
                 "const": false
+              },
+              "node_reads": {
+                "description": "Advertises nodes.list when true.",
+                "type": "boolean"
+              },
+              "custom_resources": {
+                "description": "The namespaced custom resource collections custom_resources.list may read; empty advertises nothing.",
+                "type": "array",
+                "maxItems": 32,
+                "uniqueItems": true,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "type": "string",
+                      "minLength": 3,
+                      "maxLength": 253,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$",
+                      "not": {
+                        "pattern": "(^|\\.)(k8s\\.io|kubernetes\\.io)$"
+                      }
+                    },
+                    "version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 63,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                    },
+                    "plural": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 63,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+                    }
+                  },
+                  "required": [
+                    "group",
+                    "version",
+                    "plural"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [
@@ -204,7 +298,8 @@
               "deployments",
               "endpointslices",
               "replicasets",
-              "events"
+              "events",
+              "statefulsets"
             ]
           },
           "limit": {
@@ -318,7 +413,8 @@
               "deployments",
               "endpointslices",
               "replicasets",
-              "events"
+              "events",
+              "statefulsets"
             ]
           },
           "name": {
@@ -532,6 +628,230 @@
         "required": [
           "namespace",
           "name",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "nodes.list",
+      "description": "Read a bounded page of the cluster's Node objects when node reads are configured.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-nodes-list",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "instance": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              "resource": {
+                "type": "string"
+              },
+              "observed_at_unix_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "source_revision": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "instance",
+              "resource",
+              "observed_at_unix_ms",
+              "source_revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor",
+          "complete",
+          "provenance"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "custom_resources.list",
+      "description": "Read a bounded page of one configured namespaced custom resource collection.",
+      "contract": "datasource.records/v1alpha1",
+      "profile": "kubernetes-custom-resources",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "group": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$",
+            "not": {
+              "pattern": "(^|\\.)(k8s\\.io|kubernetes\\.io)$"
+            }
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "plural": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16384
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "namespace",
+          "group",
+          "version",
+          "plural",
           "limit"
         ],
         "additionalProperties": false

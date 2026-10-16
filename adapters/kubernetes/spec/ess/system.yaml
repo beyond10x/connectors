@@ -4,6 +4,7 @@ version: v1
 domains:
   - connectors_kubernetes.contexts
   - connectors_kubernetes.discovery
+  - connectors_kubernetes.exec_credentials
   - connectors_kubernetes.helm
   - connectors_kubernetes.logs
   - connectors_kubernetes.mutations

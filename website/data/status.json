@@ -200,6 +200,13 @@
     },
     {
       "area": "Catalog provider",
+      "detail": "CQL search, changed pages by CQL, spaces, one space, a space's content, one page with its body and a page's comments under the provider id confluence-v1, from a source document this repository writes from Atlassian's v1 reference; exercised against local fixtures only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Confluence Cloud REST v1",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
       "detail": "One object type's records, paged, and one record by id; exercised against local fixtures only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "HubSpot CRM",
@@ -235,7 +242,7 @@
     },
     {
       "area": "Catalog provider",
-      "detail": "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and search.messages on a second connection with a user token; verified against a local fixture only.",
+      "detail": "conversations.list, conversations.history and conversations.replies with a bot token (since 0.38.0), users.list, team.info, emoji.list and auth.test, and on a second connection with a user token search.messages and the three conversation reads and users.list, which reach every conversation that user can read, the channels the bot is not in included; verified against a local fixture only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Slack conversations",
       "status": "shipped"
@@ -252,6 +259,13 @@
       "detail": "files.list, files.info and file.download, which reads a file's url_private on files.slack.com as a binary body with the bot token, only where the connection admits that host with the credential; verified against a local fixture only.",
       "href": "/docs/reference/adapters/catalog",
       "label": "Slack files",
+      "status": "shipped"
+    },
+    {
+      "area": "Catalog provider",
+      "detail": "A Slack read answered 200 with ok false is refused, never returned as an empty read: Slack's error is the reason, and missing_scope and not_in_channel are forbidden, invalid_auth and its kin unauthorized, an unknown channel, thread, file or user not_found, ratelimited rate_limited with its Retry-After, a bad cursor or argument invalid_input, and any other name internal, on every JSON read of both Slack sets; verified against a local fixture only.",
+      "href": "/docs/reference/adapters/catalog",
+      "label": "Slack read refusals",
       "status": "shipped"
     },
     {
@@ -280,6 +294,20 @@
       "detail": "resources.get reads one object by name, namespaces.list the configured namespaces the cluster has, deployments.history the ReplicaSets a Deployment controls; replicasets and events are configurable kinds; verified against API-shaped fixtures.",
       "href": "/docs/reference/adapters/kubernetes",
       "label": "Kubernetes single objects, namespaces and rollout history",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "statefulsets is a configurable kind; nodes.list pages the full Node objects when node_reads is configured; custom_resources.list pages one configured namespaced custom resource collection by group, version and plural; verified against API-shaped fixtures.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes statefulsets, nodes and custom resources",
+      "status": "shipped"
+    },
+    {
+      "area": "Native adapters",
+      "detail": "A kubeconfig user that authenticates through an exec plugin, such as aws eks get-token, is reached when the local configuration pins the plugin by absolute path and sha256: it runs on Linux from the descriptor it was hashed through, with the kubeconfig arguments, an empty environment plus an allow-list, a deadline and an output bound, and its token is held in memory until expiry; verified with fixture plugins against a recorded API session, not a live EKS cluster.",
+      "href": "/docs/reference/adapters/kubernetes",
+      "label": "Kubernetes exec credential plugin",
       "status": "shipped"
     },
     {

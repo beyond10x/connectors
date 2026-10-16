@@ -9,6 +9,14 @@
       "unsupported": 30
     },
     {
+      "provider": "confluence-v1",
+      "file_name": "confluence-v1.bundle.json",
+      "bundle_sha256": "48bbdd7fe558ff7f6c9811256177c9ad568163c125a52a743633bd719ee82953",
+      "source_sha256": "fed740a5343255686c481d63c53644eb3163a90676061f9fb1c12659c4fa234e",
+      "operations": 7,
+      "unsupported": 0
+    },
+    {
       "provider": "gitlab",
       "file_name": "gitlab.bundle.json",
       "bundle_sha256": "79ce6c959045d173c45d206eaf0bfd8dcdf9ba87215df4654ff207733865025c",

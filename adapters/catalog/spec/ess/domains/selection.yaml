@@ -1,8 +1,8 @@
 domain: connectors_catalog.selection
-summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, and those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request.
+summary: The members of a selection in a `connectors-catalog-operations/1` file that bound its query parameters, those of a selected write that close, type, require and fix its JSON body, which the engine holds before it sends the request, and the success envelope a read's answer is held to after it.
 
 # Normative owner: docs/local-catalog-provider.md, "Configure the provider" (`bounds`, `body_keys`,
-# `body_types`, `body_required`, `body_nonempty`, `body_fixed`). The engine reads these as members of a
+# `body_types`, `body_required`, `body_nonempty`, `body_fixed`, `envelope`). The engine reads these as members of a
 # selection; each is omitted when empty, so a selection without it keeps its serialised form.
 #
 # The bundle records no request body schema, so every name here is declared by the selection
@@ -79,3 +79,52 @@ types:
     kind: struct
     fields:
       - {name: bounds, type: "Optional<Map<String, connectors_catalog.selection.Bound>>"}
+
+  # The code a body-level refusal answers with, as the provider's own answer: `invalid_input` for
+  # the input it refused, `unauthorized` for a credential it does not accept, `forbidden` for a
+  # read the credential may not perform on that target, `not_found` for a target that does not
+  # exist, `rate_limited` for a read it asks to be sent again later, with the `Retry-After` delay
+  # the answer names, and `internal` for a failure it names without one of those causes.
+  - name: connectors_catalog.selection.EnvelopeCode
+    kind: enum
+    variants: [invalid_input, unauthorized, forbidden, not_found, rate_limited, internal]
+
+  # One classified body-level refusal: the provider's error string at the envelope's `error`
+  # pointer equal to one of `values` refuses the read with `code`.
+  - name: connectors_catalog.selection.EnvelopeRefusal
+    kind: struct
+    fields:
+      - {name: values, type: "List<String>"}
+      - {name: code, type: connectors_catalog.selection.EnvelopeCode}
+    invariants:
+      - values.count >= 1
+
+  # The success envelope of a read whose provider signals failure in the body of a 2xx answer,
+  # such as Slack's Web API, which answers a failed read `200` with `{"ok": false, "error":
+  # "<name>"}`. A 2xx JSON answer is a success only when the value at the RFC 6901 pointer `ok`
+  # is exactly the JSON boolean `true`. When it is `false`, the read is refused, never returned:
+  # with the code of the first refusal whose `values` holds the string at the pointer `error`, or
+  # `otherwise`, and that string, as admitted, as the provider's reason. An answer that is not a
+  # JSON object, or whose `ok` is absent or any other value, is an answer the engine cannot read
+  # (`upstream_protocol`). A non-2xx answer is classified by its status as before. What the
+  # engine refuses when the selection loads beyond these invariants (an envelope on a write, a
+  # download or a text or binary read, a pointer without a leading `/`, an empty value or one two
+  # refusals name, more than sixteen refusals) is stated in the owner and pinned by the engine's
+  # tests.
+  - name: connectors_catalog.selection.Envelope
+    kind: struct
+    fields:
+      - {name: ok, type: String}
+      - {name: error, type: String}
+      - {name: refusals, type: "Optional<List<connectors_catalog.selection.EnvelopeRefusal>>"}
+      - {name: otherwise, type: connectors_catalog.selection.EnvelopeCode}
+    invariants:
+      - ok.count >= 1
+      - error.count >= 1
+      - any: [{not: defined(refusals)}, {refusals.count: {lte: 16}}]
+
+  # The member of a read selection that declares its success envelope.
+  - name: connectors_catalog.selection.ReadEnvelope
+    kind: struct
+    fields:
+      - {name: envelope, type: "Optional<connectors_catalog.selection.Envelope>"}

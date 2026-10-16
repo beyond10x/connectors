@@ -288,9 +288,10 @@ async fn a_token_inside_another_value_stays_inside_it() {
     );
 }
 
-/// The user-token connection reaches `search.messages` and nothing the bot
-/// set selects; the bot connection does not reach search. Each refusal is
-/// `not_found` before any request.
+/// The user-token connection reaches `search.messages` and the four reads the
+/// story `slack-user-token-history-reads` gives it, and nothing else the bot
+/// set selects, no write included; the bot connection does not reach search.
+/// Each refusal is `not_found` before any request.
 #[tokio::test]
 async fn the_user_connection_cannot_reach_bot_operations_nor_the_bot_search() {
     let bot = Engine::new(
@@ -305,20 +306,34 @@ async fn the_user_connection_cannot_reach_bot_operations_nor_the_bot_search() {
         &shipped_in("providers/slack/user-operations.json"),
     )
     .unwrap();
-    let ids: Vec<String> = user
+    let mut ids: Vec<String> = user
         .declarations(&[Effect::Read, Effect::Write])
         .into_iter()
         .map(|d| d.id)
         .collect();
-    assert_eq!(ids, vec!["search.messages".to_string()]);
+    ids.sort();
+    assert_eq!(
+        ids,
+        [
+            "conversations.history",
+            "conversations.list",
+            "conversations.replies",
+            "search.messages",
+            "users.list",
+        ]
+    );
+    assert!(user.declarations(&[Effect::Write]).is_empty());
     for id in [
         "auth.test",
         "team.info",
         "emoji.list",
-        "conversations.list",
-        "conversations.history",
-        "conversations.replies",
-        "users.list",
+        "files.list",
+        "files.info",
+        "file.download",
+        "chat.postMessage",
+        "conversations.open",
+        "chat.update",
+        "chat.delete",
     ] {
         let http = Reads::default();
         let error = user
