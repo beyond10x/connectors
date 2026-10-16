@@ -1,0 +1,7 @@
+{
+  "instance": "google-slides-write",
+  "auth": {
+    "minimum_scopes": ["https://www.googleapis.com/auth/presentations"],
+    "requested_scopes": ["openid", "https://www.googleapis.com/auth/presentations"]
+  }
+}

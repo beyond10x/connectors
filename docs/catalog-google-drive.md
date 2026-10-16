@@ -7,8 +7,9 @@ here is Drive-specific code: the Discovery document is projected into OpenAPI,
 the projection is compiled into a bundle, a reviewed selection set exposes six
 reads and three guarded metadata writes ([Writes](#writes)), and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection, approval and invocation work as described there; this
-page covers what differs for Drive. Authentication is the `oauth2_refresh`
+Connection, approval and invocation work as described there; this page
+configures the `drive` connector and covers what differs for Drive. Connector,
+instance and connection are defined in [the README](../README.md#vocabulary). Authentication is the `oauth2_refresh`
 profile `google.oauth`; see [Authentication](#authentication).
 
 ## Source and bundle
@@ -120,12 +121,12 @@ table). The table's last column names the effects most likely to matter; it is
 not exhaustive, because the `body` is Drive's File resource and every writable
 member of it reaches Drive. Each is a
 required-approval mutation: it runs only through the host's approval, audit and
-mutation coordinator, needs `private_protocol = "connectors-private/2"` and an
-approval policy naming it, and is prepared, approved and invoked as
+mutation coordinator, needs an approval policy naming it, and is prepared,
+approved and invoked as
 [the guarded merge guide](local-gitlab-merge.md) describes. Without a proof the
 write is refused before the provider is asked anything.
 
-The approval binds the whole input by its digest: the subject's `input_sha256`
+The approval binds the whole input by its digest: the subject's input digest
 is the SHA-256 of the canonical input — every `body` member, the target
 `fileId`, the pinned `version` and every query parameter — so a proof issued for
 one input is refused for any other. The subject shows only that digest; the
@@ -134,7 +135,7 @@ connection and descriptor revision, not the input
 (`crates/connectors-host/src/local/owner/approval_issuance.rs`). Read the input
 file itself before approving — the whole input, not only the members the table
 names: its query parameters and `body` decide what the write does. Writes run on
-a separate write instance with the write scope; see
+the same instance as the reads, whose consent requests the write scope; see
 [The write scope](#the-write-scope).
 
 | id | Discovery id | request | guard | beyond naming and describing a file |
@@ -195,37 +196,49 @@ a separate write instance with the write scope; see
 ## Authentication
 
 Drive uses Google OAuth: the `oauth2_refresh` scheme under the profile
-`google.oauth`, as described in
-[the catalog provider guide](local-catalog-provider.md). The protected entry is
+`google.oauth`, declared by the `drive` connector
+([`adapters/catalog/providers/google-drive/connector.json`](../adapters/catalog/providers/google-drive/connector.json)).
+The protected entry is
 `{"client_id":"...","client_secret":"...","refresh_token":"..."}` for an
-installed-app OAuth client. The provider exchanges it at `token_url` for an
-access token and sends that as `Authorization: Bearer <access token>`. The
-identity comes from the token answer's `id_token` (`identity.source: id_token`),
-and `minimum_scopes` asks for the Drive read-only scope. `authorize_url` and
-`requested_scopes` are never called by the provider; they are handed to the host
-for obtaining the entry by consent.
+installed-app OAuth client. The provider exchanges it at
+`https://oauth2.googleapis.com/token` for an access token and sends that as
+`Authorization: Bearer <access token>`. The identity comes from the token
+answer's `id_token` (`identity.source: id_token`). The consent address,
+`https://accounts.google.com/o/oauth2/auth`, is handed to the host for
+obtaining the entry by consent; the provider never calls it.
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "google-drive",
-  "provider": "google-drive",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://www.googleapis.com/drive/v3",
-  "auth": {
-    "profile": "google.oauth",
-    "scheme": "oauth2_refresh",
-    "header": "Authorization",
-    "bearer": true,
-    "label": "Google refresh token",
-    "identity": {"source": "id_token", "kind": "google.user"},
-    "minimum_scopes": ["https://www.googleapis.com/auth/drive.readonly"],
-    "token_url": "https://oauth2.googleapis.com/token",
-    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
-    "requested_scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly"]
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/google-drive/operations.json"
-}
+One instance per Google account reads and writes. Its consent requests
+`openid`, `https://www.googleapis.com/auth/drive.readonly` and
+`https://www.googleapis.com/auth/drive.file`, and the connection's
+`minimum_scopes` are both Drive scopes, so an entry consented for one of them
+alone fails validation as insufficient scope. The read scope lets its reads and
+each update's preflight see every file.
+
+Add to the host configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`):
+
+```toml
+[connectors.drive]
+enabled = true
+
+[connectors.drive.instances.private]
+```
+
+The `drive` connector's default endpoint is
+`https://www.googleapis.com/drive/v3`. The bundle, the nine operations, the
+profile and the provider executable are derived from the shipped connector:
+
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"drive.private","adapter_id":"catalog","connector":"drive","instance":"private","instance_id":"drive.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
+Then connect it with the Google client file, as
+[the Google OAuth guide](catalog-google-oauth.md) describes:
+
+```sh
+connectors connections connect --connector drive --instance private \
+  --profile google.oauth --credential-file ~/Downloads/client_secret_1234.json
 ```
 
 ### The write scope
@@ -239,52 +252,28 @@ verified: no live Drive file has been written, and whether a token holding both
 scopes may, for example, copy any readable file or create a file in a folder the
 app did not create is not known here.
 
-Writes use a separate instance. Configure a second instance id, such as
-`google-drive-write`: the read configuration above with that instance id and
-`drive.file` added to both `minimum_scopes` and `requested_scopes`, as its own
-adapter entry in the host configuration, with the writes in its operation
-permissions and `private_protocol = "connectors-private/2"`. The read scope
-stays in it, so its reads and each update's preflight still see every file:
+### Moving from read and write entries
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "google-drive-write",
-  "provider": "google-drive",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://www.googleapis.com/drive/v3",
-  "auth": {
-    "profile": "google.oauth",
-    "scheme": "oauth2_refresh",
-    "header": "Authorization",
-    "bearer": true,
-    "label": "Google refresh token",
-    "identity": {"source": "id_token", "kind": "google.user"},
-    "minimum_scopes": ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/drive.file"],
-    "token_url": "https://oauth2.googleapis.com/token",
-    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
-    "requested_scopes": ["openid", "https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/drive.file"]
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/google-drive/operations.json"
-}
-```
-
-Take its `configuration_revision` from `--print-local-bootstrap` for its
-adapter entry, then `connections connect` that instance with the Google client
-file. Validation checks the granted scopes against `minimum_scopes`, so an
-entry consented for the read scope alone is refused as insufficient scope on
-this instance. An existing read-only connection cannot be widened in place:
-`connections repair` cannot add a scope, because the configuration revision and
-the profile, whose `minimum_scopes` the scope changes, are part of the
-connection binding. Changing the scopes of the read instance itself leaves its
-connection bound to the old configuration, and a new connection on that same
-instance is refused while the old one exists.
+An installation configured before connectors were declared may hold two Drive
+entries, one with the read-only scope and one that adds `drive.file`.
+`connectors setup migrate` keeps each as it is, with its revision, and does not
+merge them: the one instance asks for both scopes, so its configuration differs
+and its connection needs a consent of its own. Add the instance above, connect
+it, move callers to `--connector drive --instance private`, then revoke the
+connections of the old pair with `connections revoke` and remove their entries.
 
 ## Limits
 
+- The configuration this page shows, one instance whose consent requests
+  both scopes, is checked by derivation only: its configuration revision
+  equals that of a hand-written configuration with the declared fields
+  (`adapters/catalog/tests/connector_declarations.rs`). The reads and
+  writes below ran against the fixture under the hand-written read and
+  write configurations that preceded it, one scope set each
+  (`adapters/catalog/tests/hand_written/`).
 - Verified against a local HTTPS fixture only
-  (`adapters/catalog/tests/google_drive.rs`): the guide's configuration with the
-  fixture as API and token host, one token exchange, the exact request of each
+  (`adapters/catalog/tests/google_drive.rs`): the hand-written read
+  configuration with the fixture as API and token host, one token exchange, the exact request of each
   read with the exchanged bearer, the returned body as JSON (the export as
   text), a two-page walk of `files.list` to a page without `nextPageToken` and of
   `changes.list` to `newStartPageToken`, and the `pageSize` bounds. No live Drive
