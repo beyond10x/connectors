@@ -150,3 +150,37 @@ fn an_instance_named_alone_without_an_installed_provider_is_an_invalid_configura
     installation.configure(GMAIL);
     invalid_configuration(&installation.run(&["adapters", "list"]));
 }
+
+/// The coordinator's rule for a connector declaring several profiles, round
+/// 3: an instance naming none of them loads without an entry, the rest of the
+/// file loads with it, and selecting it is refused as a configuration to
+/// check. The stand-in refuses a selection without `--profile` and names two
+/// profiles for `--print-profiles`, as the catalog provider does.
+#[test]
+fn an_instance_of_a_two_profile_connector_naming_none_loads_and_is_refused_on_selection() {
+    let installation = Installation::new();
+    private_file(
+        &installation.root.path().join("bin/connectors-catalog-provider"),
+        b"#!/bin/sh\ncase \" $* \" in\n*' --print-profiles '*) echo '[\"zendesk.basic\",\"zendesk.oauth\"]';;\n*) exit 1;;\nesac\n",
+        0o700,
+    );
+    installation.configure(
+        "[connectors.zendesk]\nenabled=true\n[connectors.zendesk.instances.support]\nendpoint='https://example.zendesk.com'\n",
+    );
+    let listed = installation.run(&["adapters", "list"]);
+    assert!(listed.status.success(), "{listed:?}");
+    let refused = installation.run(&[
+        "connections",
+        "list",
+        "--connector",
+        "zendesk",
+        "--instance",
+        "support",
+    ]);
+    invalid_configuration(&refused);
+    let refused: Value = serde_json::from_slice(&refused.stderr).unwrap();
+    assert_eq!(
+        refused["error"]["data"]["next_action"], "check_configuration",
+        "{refused}"
+    );
+}

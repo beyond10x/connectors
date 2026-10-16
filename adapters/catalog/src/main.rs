@@ -27,12 +27,27 @@ struct Args {
     /// Print the independently computed bootstrap and configuration revision.
     #[arg(long, conflicts_with = "connectors_private_fd")]
     print_local_bootstrap: bool,
+    /// Print the auth profiles the connector declares, as a JSON array.
+    #[arg(long, requires = "connector", conflicts_with_all = ["print_local_bootstrap", "connectors_private_fd"])]
+    print_profiles: bool,
     #[arg(long, hide = true)]
     connectors_private_fd: Option<i32>,
 }
 fn main() {
     let args = Args::parse();
     let result = (|| -> connectors_host::local::runtime::Result<()> {
+        if args.print_profiles {
+            let connector = args
+                .connector
+                .as_deref()
+                .ok_or(connectors_host::local::runtime::Failure::InvalidInput)?;
+            println!(
+                "{}",
+                serde_json::to_string(&local::profiles(connector)?)
+                    .map_err(|_| connectors_host::local::runtime::Failure::Protocol)?
+            );
+            return Ok(());
+        }
         let adapter = match (&args.local_config, &args.connector, &args.instance) {
             (Some(path), _, _) => local::Local::load(path)?,
             (None, Some(connector), Some(name)) => local::Local::derive(&local::Instance {

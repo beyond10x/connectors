@@ -363,6 +363,13 @@ pub struct Instance {
     /// Whether the entry is derived rather than pinned; a derived instance is
     /// written back without pins.
     pub derived: bool,
+    /// The profile a derived instance names (`profile`), when its connector
+    /// declares more than one.
+    pub profile: Option<String>,
+    /// The profiles the connector of a derived instance declares when there
+    /// are several and the instance names none: it has no entry in
+    /// `Config::adapters` until it does ([`Config::awaiting_profile`]).
+    pub awaiting_profile: Option<BTreeSet<String>>,
 }
 
 /// `[connectors.<connector>]` as written.
@@ -383,6 +390,8 @@ struct InstanceTable {
     description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    profile: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     alias: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -411,6 +420,10 @@ impl InstanceTable {
     /// every pin the legacy entry requires. `startup`, `restart` and
     /// `permissions` default as in the legacy entry.
     fn pinned(self) -> Option<(Instance, Adapter)> {
+        // A profile is the derived instance's; the pins already select one.
+        if self.profile.is_some() {
+            return None;
+        }
         let adapter = Adapter {
             instance_id: self.instance_id?,
             adapter_id: self.adapter_id?,
@@ -427,6 +440,8 @@ impl InstanceTable {
             endpoint: self.endpoint,
             alias: self.alias?,
             derived: false,
+            profile: None,
+            awaiting_profile: None,
         };
         Some((instance, adapter))
     }
@@ -438,6 +453,7 @@ impl InstanceTable {
         Self {
             description: instance.description,
             endpoint: instance.endpoint,
+            profile: None,
             alias: Some(instance.alias),
             instance_id: Some(adapter.instance_id),
             adapter_id: Some(adapter.adapter_id),
@@ -472,15 +488,18 @@ impl InstanceTable {
     /// of the bootstrap it prints for exactly that selection, and the profiles
     /// and every operation, writes included, of the bootstrap a
     /// `connectors-private/2` child of that entry reports, which must name the
-    /// same instance and revision. A connector the provider does not ship
-    /// (Slack, the Atlassian gateway, every non-catalog implementation) is
-    /// refused.
+    /// same instance and revision. A stated `profile` is passed as
+    /// `--profile`. With none, an instance of a connector declaring several
+    /// profiles is listed without an entry, naming them (the coordinator's
+    /// decision, round 3), and refuses nothing else. A connector the provider
+    /// does not ship (Slack, the Atlassian gateway, every non-catalog
+    /// implementation) is refused.
     fn derived(
         self,
         connector: &str,
         name: &str,
         installation: &Installation,
-    ) -> Result<(Instance, Adapter)> {
+    ) -> Result<(Instance, Option<Adapter>)> {
         // `<connector>.<instance>` stays unambiguous: neither name has a `.`.
         let plain = |value: &str| {
             !value.is_empty()
@@ -495,7 +514,11 @@ impl InstanceTable {
                     .chars()
                     .any(|c| c.is_control() || c.is_whitespace())
         });
-        if !plain(connector) || !plain(name) || !endpoint_admitted {
+        if !plain(connector)
+            || !plain(name)
+            || !endpoint_admitted
+            || self.profile.as_deref().is_some_and(|p| !selector(p))
+        {
             return Err(Failure::InvalidConfiguration);
         }
         let mut args = ["--connector", connector, "--instance", name]
@@ -504,14 +527,24 @@ impl InstanceTable {
         if let Some(endpoint) = &self.endpoint {
             args.extend(["--endpoint".to_owned(), endpoint.clone()]);
         }
-        let instance = Instance {
+        if let Some(profile) = &self.profile {
+            args.extend(["--profile".to_owned(), profile.clone()]);
+        }
+        let mut instance = Instance {
             description: self.description,
             endpoint: self.endpoint,
             alias: format!("{connector}.{name}"),
             derived: true,
+            profile: self.profile,
+            awaiting_profile: None,
         };
-        let adapter = installation.derive(&instance.alias, args)?;
-        Ok((instance, adapter))
+        match installation.derive(&instance.alias, args, instance.profile.is_some())? {
+            Derived::Entry(adapter) => Ok((instance, Some(adapter))),
+            Derived::Awaiting(profiles) => {
+                instance.awaiting_profile = Some(profiles);
+                Ok((instance, None))
+            }
+        }
     }
 
     /// The table written for a derived instance: its own keys, no pin.
@@ -519,6 +552,7 @@ impl InstanceTable {
         Self {
             description: instance.description,
             endpoint: instance.endpoint,
+            profile: instance.profile,
             alias: None,
             instance_id: None,
             adapter_id: None,
@@ -569,11 +603,11 @@ impl From<Config> for Written {
                         .instances
                         .into_iter()
                         .filter_map(|(name, instance)| {
-                            let adapter = adapters.remove(&instance.alias)?;
+                            let adapter = adapters.remove(&instance.alias);
                             let table = if instance.derived {
                                 InstanceTable::bare(instance)
                             } else {
-                                InstanceTable::written(instance, adapter)
+                                InstanceTable::written(instance, adapter?)
                             };
                             Some((name, table))
                         })
@@ -623,12 +657,16 @@ impl Config {
                     {
                         table.derived(&name, &instance_name, installation)?
                     }
-                    _ => table.pinned().ok_or(Failure::InvalidConfiguration)?,
+                    _ => table
+                        .pinned()
+                        .map(|(instance, adapter)| (instance, Some(adapter)))
+                        .ok_or(Failure::InvalidConfiguration)?,
                 };
-                if self
-                    .adapters
-                    .insert(instance.alias.clone(), adapter)
-                    .is_some()
+                if let Some(adapter) = adapter
+                    && self
+                        .adapters
+                        .insert(instance.alias.clone(), adapter)
+                        .is_some()
                 {
                     return Err(Failure::InvalidConfiguration.into());
                 }
@@ -675,6 +713,9 @@ impl Config {
                     || !text(&instance.description, true, 1024, true)
                     || !text(&instance.endpoint, false, 2048, false)
                     || !aliases.insert(&instance.alias)
+                    // A listed instance without an entry keeps its alias.
+                    || (instance.awaiting_profile.is_some()
+                        && self.adapters.contains_key(&instance.alias))
                 {
                     return Err(Failure::InvalidConfiguration.into());
                 }
@@ -905,16 +946,18 @@ impl Installation {
         })
     }
 
-    /// The entry of the instance `alias`, the provider started with `args`.
-    /// It is remembered for the life of this process per provider file and
-    /// arguments, because an owner loads its configuration for every request:
-    /// a provider file that changed in any way (device, inode, size, mtime,
-    /// ctime) is derived again. A remembered digest that no longer matches the
-    /// file is refused when a child starts, from its sealed snapshot.
-    fn derive(&self, alias: &str, args: Vec<String>) -> Result<Adapter> {
-        use super::runtime::PrivateProtocol;
+    /// What the provider derives for the instance `alias`, started with
+    /// `args`: its entry or, when the instance names no profile (`stated`
+    /// false), the provider refuses the selection and the connector declares
+    /// more than one profile, those profiles. It is remembered for the life
+    /// of this process per provider file and arguments, because an owner
+    /// loads its configuration for every request: a provider file that changed
+    /// in any way ([`file_identity`]) is derived again. A remembered digest
+    /// that no longer matches the file is refused when a child starts, from
+    /// its sealed snapshot.
+    fn derive(&self, alias: &str, args: Vec<String>, stated: bool) -> Result<Derived> {
         type Key = (PathBuf, Vec<String>, Vec<u64>, usize);
-        static DERIVED: std::sync::OnceLock<std::sync::Mutex<BTreeMap<Key, Adapter>>> =
+        static DERIVED: std::sync::OnceLock<std::sync::Mutex<BTreeMap<Key, Derived>>> =
             std::sync::OnceLock::new();
         fs::validate_path(&self.provider)?;
         let selection = Executable {
@@ -932,21 +975,51 @@ impl Installation {
                 handshake,
             )
         });
-        let derived = DERIVED.get_or_init(Default::default);
+        let cache = DERIVED.get_or_init(Default::default);
         if let Some(key) = &key
-            && let Some(adapter) = derived
-                .lock()
-                .ok()
-                .and_then(|cache| cache.get(key).cloned())
+            && let Some(derived) = cache.lock().ok().and_then(|cache| cache.get(key).cloned())
         {
-            return Ok(adapter);
+            return Ok(derived);
         }
         let executable = Executable {
             sha256: digest(&mut source)?,
             ..selection
         };
         executable.validate()?;
-        let printed = executable.print_bootstrap()?;
+        let derived = match executable.print("--print-local-bootstrap") {
+            Ok(printed) => Derived::Entry(self.entry(alias, executable, &printed)?),
+            // Only a refusal is asked about; a provider past its deadline is
+            // not started again.
+            Err(Unprinted::Refused) if !stated => {
+                let printed = executable
+                    .print("--print-profiles")
+                    .map_err(|_| Failure::InvalidConfiguration)?;
+                let profiles: BTreeSet<String> =
+                    serde_json::from_slice(&printed).map_err(|_| Failure::InvalidConfiguration)?;
+                if !(2..=64).contains(&profiles.len()) || !profiles.iter().all(|p| selector(p)) {
+                    return Err(Failure::InvalidConfiguration);
+                }
+                Derived::Awaiting(profiles)
+            }
+            Err(_) => return Err(Failure::InvalidConfiguration),
+        };
+        if let (Some(key), Ok(mut cache)) = (key, cache.lock()) {
+            if cache.len() >= 64 {
+                cache.clear();
+            }
+            cache.insert(key, derived.clone());
+        }
+        Ok(derived)
+    }
+
+    /// The entry of `executable` from the bootstrap it `printed`: the
+    /// instance id and revision it printed, the profiles and every operation,
+    /// writes included, of the bootstrap a `connectors-private/2` child of
+    /// that entry reports, which must name the same instance and revision.
+    fn entry(&self, alias: &str, executable: Executable, printed: &[u8]) -> Result<Adapter> {
+        use super::runtime::PrivateProtocol;
+        let printed: super::runtime::Bootstrap =
+            serde_json::from_slice(printed).map_err(|_| Failure::InvalidConfiguration)?;
         if printed.validate().is_err()
             || printed.instance != alias
             || printed.adapter != "catalog"
@@ -983,14 +1056,43 @@ impl Installation {
                 .map(|r| r.operation)
                 .collect(),
         };
-        if let (Some(key), Ok(mut cache)) = (key, derived.lock()) {
-            if cache.len() >= 64 {
-                cache.clear();
-            }
-            cache.insert(key, adapter.clone());
-        }
         Ok(adapter)
     }
+}
+
+/// What the installed provider derives for an unpinned instance.
+#[derive(Clone)]
+enum Derived {
+    /// The instance's entry.
+    Entry(Adapter),
+    /// The profiles its connector declares, more than one, of which the
+    /// instance names none: nothing is derived until it does.
+    Awaiting(BTreeSet<String>),
+}
+
+/// Why a provider printed nothing usable.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Unprinted {
+    /// It exited unsuccessfully: it refused the selection.
+    Refused,
+    /// It did not start, printed more than the bound, or outlived the
+    /// deadline, it or a descendant holding its output.
+    Failed,
+}
+
+/// Kills a printing provider's process group (on Unix; on Windows the
+/// provider itself) and reaps the provider.
+fn stop(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    if let Ok(group) = i32::try_from(child.id()) {
+        // SAFETY: a negative pid names the process group the provider was
+        // started as the leader of; kill takes no pointers.
+        unsafe {
+            libc::kill(-group, libc::SIGKILL);
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 /// What identifies an admitted file's content without reading it: any write
@@ -1017,9 +1119,23 @@ fn file_identity(file: &std::fs::File) -> Option<Vec<u64>> {
     ])
 }
 
+/// Without an inode, a file's length and modification time ([`portable_identity`]).
 #[cfg(windows)]
-fn file_identity(_: &std::fs::File) -> Option<Vec<u64>> {
-    None
+fn file_identity(file: &std::fs::File) -> Option<Vec<u64>> {
+    let metadata = file.metadata().ok()?;
+    portable_identity(metadata.len(), metadata.modified().ok()?)
+}
+
+/// A file's length and modification time to the nanosecond; `None` before
+/// the Unix epoch.
+#[cfg_attr(unix, allow(dead_code))]
+fn portable_identity(length: u64, modified: std::time::SystemTime) -> Option<Vec<u64>> {
+    let since = modified.duration_since(std::time::UNIX_EPOCH).ok()?;
+    Some(vec![
+        length,
+        since.as_secs(),
+        u64::from(since.subsec_nanos()),
+    ])
 }
 
 /// The bootstrap a child of `adapter` reports when it starts: the child is
@@ -1029,18 +1145,46 @@ fn handshake(adapter: &Adapter) -> Result<super::runtime::Bootstrap> {
     Ok(child.bootstrap().clone())
 }
 
-/// The catalog provider installed beside the running CLI: in [`INSTALLATION`]
-/// when the variable is set, otherwise in the running executable's directory.
-/// What it is, is decided when it is admitted and digested, not here.
+/// The directory the installed catalog provider is in: `handed`, the value of
+/// [`INSTALLATION`], when set, otherwise that of the `running` executable.
+fn installation_from(
+    handed: Option<std::ffi::OsString>,
+    running: Option<PathBuf>,
+) -> Option<PathBuf> {
+    match handed {
+        Some(directory) => Some(PathBuf::from(directory)),
+        None => Some(running?.parent()?.to_owned()),
+    }
+}
+
+/// The installation this process derives from. A CLI hands it to the owner
+/// it starts, in [`INSTALLATION`], so both bind the same executable.
+pub fn installation_directory() -> Option<PathBuf> {
+    installation_from(std::env::var_os(INSTALLATION), std::env::current_exe().ok())
+}
+
+/// The catalog provider in [`installation_directory`]. What it is, is decided
+/// when it is admitted and digested, not here.
 pub fn installed_provider() -> Option<PathBuf> {
-    let directory = match std::env::var_os(INSTALLATION) {
-        Some(directory) => PathBuf::from(directory),
-        None => std::env::current_exe().ok()?.parent()?.to_owned(),
-    };
-    Some(directory.join(format!(
+    Some(installation_directory()?.join(format!(
         "connectors-catalog-provider{}",
         std::env::consts::EXE_SUFFIX
     )))
+}
+
+impl Config {
+    /// The profiles the connector of the listed instance `<connector>/<instance>`
+    /// declares when the instance names none and there are several: it has
+    /// no entry, and every command that needs it is refused naming them.
+    pub fn awaiting_profile(&self, connector: &str, instance: &str) -> Option<&BTreeSet<String>> {
+        self.connectors
+            .as_ref()?
+            .get(connector)?
+            .instances
+            .get(instance)?
+            .awaiting_profile
+            .as_ref()
+    }
 }
 
 impl Config {
@@ -1382,55 +1526,63 @@ impl Executable {
         Ok(file)
     }
 
-    /// The bootstrap the selected catalog provider prints for its arguments
-    /// (`--print-local-bootstrap`): no private channel and no credential, an
-    /// empty environment, bounded output and at most ten seconds. Its
-    /// configuration revision is checked again when the child starts, against
-    /// the bootstrap the child itself reports.
-    fn print_bootstrap(&self) -> Result<super::runtime::Bootstrap> {
+    /// What the selected catalog provider prints for its arguments and `flag`
+    /// (`--print-local-bootstrap`, `--print-profiles`): no private channel and
+    /// no credential, an empty environment, at most 4 MiB and ten seconds.
+    /// The provider runs in its own process group, which is killed when it
+    /// ends or at the deadline, and its output is not waited for past the
+    /// deadline, even while a descendant still holds it open. A printed
+    /// revision is checked again when the child starts, against the bootstrap
+    /// the child itself reports.
+    fn print(&self, flag: &str) -> std::result::Result<Vec<u8>, Unprinted> {
         use std::process::{Command, Stdio};
+        use std::time::{Duration, Instant};
         const LIMIT: u64 = 4 * 1024 * 1024;
         let mut command = Command::new(&self.path);
         command
             .args(&self.args)
-            .arg("--print-local-bootstrap")
+            .arg(flag)
             .env_clear()
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
+        #[cfg(unix)]
+        std::os::unix::process::CommandExt::process_group(&mut command, 0);
         #[cfg(windows)]
         if let Some(root) = std::env::var_os("SystemRoot") {
             command.env("SystemRoot", root);
         }
-        let mut child = command.spawn().map_err(|_| Failure::InvalidConfiguration)?;
-        let stdout = child.stdout.take().ok_or(Failure::InvalidConfiguration)?;
-        let reader = std::thread::spawn(move || {
+        let mut child = command.spawn().map_err(|_| Unprinted::Failed)?;
+        let Some(stdout) = child.stdout.take() else {
+            stop(&mut child);
+            return Err(Unprinted::Failed);
+        };
+        let (sender, received) = std::sync::mpsc::channel();
+        // Detached: a descendant holding the output keeps only this thread,
+        // until the group is killed and the pipe closes.
+        std::thread::spawn(move || {
             let mut printed = Vec::new();
-            stdout
-                .take(LIMIT + 1)
-                .read_to_end(&mut printed)
-                .map(|_| printed)
+            let read = stdout.take(LIMIT + 1).read_to_end(&mut printed);
+            let _ = sender.send(read.map(|_| printed));
         });
-        let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let until = Instant::now() + Duration::from_secs(10);
         let status = loop {
             match child.try_wait() {
                 Ok(Some(status)) => break Some(status),
-                Ok(None) if std::time::Instant::now() < until => {
-                    std::thread::sleep(std::time::Duration::from_millis(5));
-                }
-                _ => {
-                    let _ = child.kill();
-                    let _ = child.wait();
-                    break None;
-                }
+                Ok(None) if Instant::now() < until => std::thread::sleep(Duration::from_millis(5)),
+                _ => break None,
             }
         };
-        let printed = reader.join().map_err(|_| Failure::InvalidConfiguration)?;
+        let printed = status.and_then(|_| {
+            received
+                .recv_timeout(until.saturating_duration_since(Instant::now()))
+                .ok()
+        });
+        stop(&mut child);
         match (status, printed) {
-            (Some(status), Ok(printed)) if status.success() && printed.len() as u64 <= LIMIT => {
-                serde_json::from_slice(&printed).map_err(|_| Failure::InvalidConfiguration)
-            }
-            _ => Err(Failure::InvalidConfiguration),
+            (Some(status), _) if !status.success() => Err(Unprinted::Refused),
+            (Some(_), Some(Ok(printed))) if printed.len() as u64 <= LIMIT => Ok(printed),
+            _ => Err(Unprinted::Failed),
         }
     }
 
@@ -2130,6 +2282,42 @@ mod derived_instance_tests {
             ))
         }
 
+        /// The provider, after it records its arguments, runs `body`, in
+        /// which `BOOTSTRAP` is the path of the bootstrap it prints.
+        fn behave(&self, body: &str) {
+            std::fs::write(
+                &self.provider,
+                format!(
+                    "#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\n{}\n",
+                    self.root.path().join("args").display(),
+                    body.replace(
+                        "BOOTSTRAP",
+                        &self
+                            .root
+                            .path()
+                            .join("bootstrap.json")
+                            .display()
+                            .to_string()
+                    )
+                ),
+            )
+            .unwrap();
+        }
+
+        /// A provider of a connector declaring two profiles: it prints a
+        /// bootstrap only for `--profile`, its declared profiles for
+        /// `--print-profiles`, and otherwise refuses, as the catalog provider
+        /// does.
+        fn zendesk() -> Self {
+            let fixture = Self::new(Some(
+                &serde_json::to_string(&bootstrap("zendesk.support", false)).unwrap(),
+            ));
+            fixture.behave(
+                "case \" $* \" in\n*' --print-profiles '*) echo '[\"zendesk.basic\",\"zendesk.oauth\"]';;\n*' --profile '*) cat 'BOOTSTRAP';;\n*) exit 1;;\nesac",
+            );
+            fixture
+        }
+
         fn read(&self, body: &str) -> std::result::Result<Config, Refusal> {
             self.read_from(body, Some(&self.provider))
         }
@@ -2274,6 +2462,139 @@ mod derived_instance_tests {
             selected.adapter.configuration_revision,
             "derived-revision-1"
         );
+    }
+
+    const ZENDESK: &str = "[connectors.zendesk]\nenabled=true\n[connectors.zendesk.instances.support]\nendpoint='https://example.zendesk.com'\n";
+
+    /// An instance names one of its connector's profiles with `profile`; the
+    /// provider derives the entry for that profile.
+    #[test]
+    fn a_stated_profile_is_passed_to_the_provider_and_written_back() {
+        let fixture = Fixture::zendesk();
+        let body = ZENDESK.replace("endpoint=", "profile='zendesk.basic'\nendpoint=");
+        let config = fixture.read(&body).unwrap();
+        assert_eq!(
+            config.adapters["zendesk.support"].executable.args,
+            [
+                "--connector",
+                "zendesk",
+                "--instance",
+                "support",
+                "--endpoint",
+                "https://example.zendesk.com",
+                "--profile",
+                "zendesk.basic"
+            ]
+        );
+        assert_eq!(config.awaiting_profile("zendesk", "support"), None);
+        let written: toml::Value = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
+        assert_eq!(
+            written["connectors"]["zendesk"]["instances"]["support"]["profile"].as_str(),
+            Some("zendesk.basic")
+        );
+        // A profile is a selector.
+        let invalid = body.replace("'zendesk.basic'", "'zendesk basic'");
+        assert_eq!(fixture.read(&invalid).err(), INVALID);
+    }
+
+    /// The coordinator's rule for a connector declaring more than one profile
+    /// and an instance that names none: the file loads, the instance is
+    /// listed with its connector's profiles and has no entry, so nothing
+    /// selects it, and every other entry loads as before.
+    #[test]
+    fn an_instance_of_a_two_profile_connector_naming_none_is_listed_without_an_entry() {
+        let fixture = Fixture::zendesk();
+        let legacy = "[adapters.tools]\ninstance_id='tools'\nadapter_id='mcp'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.tools.executable]\npath='/opt/connectors/bin/connectors-mcp'\nsha256='3333333333333333333333333333333333333333333333333333333333333333'\n";
+        let config = fixture.read(&format!("{legacy}{ZENDESK}")).unwrap();
+        assert_eq!(config.adapters.keys().collect::<Vec<_>>(), ["tools"]);
+        assert_eq!(
+            config.awaiting_profile("zendesk", "support"),
+            Some(&BTreeSet::from([
+                "zendesk.basic".to_owned(),
+                "zendesk.oauth".to_owned()
+            ]))
+        );
+        let instance = &config.connectors.as_ref().unwrap()["zendesk"].instances["support"];
+        assert_eq!(instance.alias, "zendesk.support");
+        assert!(
+            config
+                .select(Selector::Instance {
+                    connector: "zendesk",
+                    instance: "support"
+                })
+                .is_none()
+        );
+        assert!(
+            fixture.args().contains("--print-profiles"),
+            "{}",
+            fixture.args()
+        );
+        // Written back as written: no pins and no profile.
+        let written: toml::Value = toml::from_str(&toml::to_string(&config).unwrap()).unwrap();
+        assert_eq!(
+            written["connectors"]["zendesk"]["instances"]["support"],
+            toml::Value::Table(toml::map::Map::from_iter([(
+                "endpoint".to_owned(),
+                toml::Value::String("https://example.zendesk.com".into())
+            )]))
+        );
+        // A provider that refuses and declares fewer than two profiles still
+        // refuses the file, as does a legacy entry under the listed alias.
+        fixture.behave("case \" $* \" in\n*' --print-profiles '*) echo '[\"zendesk.basic\"]';;\n*) exit 1;;\nesac");
+        assert_eq!(fixture.read(ZENDESK).err(), INVALID);
+        let fixture = Fixture::zendesk();
+        let taken = legacy.replace("adapters.tools", "adapters.'zendesk.support'");
+        assert_eq!(fixture.read(&format!("{taken}{ZENDESK}")).err(), INVALID);
+    }
+
+    /// The provider is started in its own process group; at the deadline the
+    /// group is killed and its output abandoned, so a descendant holding the
+    /// output open does not hold the load, and nothing else is asked.
+    #[test]
+    fn printing_the_bootstrap_is_bounded_when_a_descendant_keeps_the_output() {
+        let fixture = Fixture::gmail("gmail.private");
+        fixture.behave("sleep 25 &\nexit 0");
+        let started = std::time::Instant::now();
+        assert_eq!(fixture.read(GMAIL).err(), INVALID);
+        assert!(started.elapsed() < std::time::Duration::from_secs(12));
+        assert_eq!(fixture.args().matches("--connector").count(), 1);
+    }
+
+    /// Where no inode identifies a file (Windows), the cache key is its
+    /// length and modification time, beside the path.
+    #[test]
+    fn the_portable_cache_key_moves_with_length_and_modification_time() {
+        let at = |seconds| std::time::UNIX_EPOCH + std::time::Duration::from_nanos(seconds);
+        let key = portable_identity(10, at(1_000_000_007));
+        assert_eq!(key, portable_identity(10, at(1_000_000_007)));
+        assert!(key.is_some());
+        assert_ne!(key, portable_identity(11, at(1_000_000_007)));
+        assert_ne!(key, portable_identity(10, at(1_000_000_008)));
+        // Before the epoch nothing is remembered.
+        assert_eq!(
+            portable_identity(
+                10,
+                std::time::UNIX_EPOCH - std::time::Duration::from_secs(1)
+            ),
+            None
+        );
+    }
+
+    /// The CLI and the owner it starts derive from one installation: the
+    /// owner is handed the directory the CLI resolved.
+    #[test]
+    fn the_installation_is_the_handed_directory_else_the_executables() {
+        let handed = Some(std::ffi::OsString::from("/opt/connectors/bin"));
+        let running = Some(PathBuf::from("/usr/local/bin/connectors"));
+        assert_eq!(
+            installation_from(handed, running.clone()),
+            Some(PathBuf::from("/opt/connectors/bin"))
+        );
+        assert_eq!(
+            installation_from(None, running),
+            Some(PathBuf::from("/usr/local/bin"))
+        );
+        assert_eq!(installation_from(None, None), None);
     }
 
     #[test]
