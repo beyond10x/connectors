@@ -2,7 +2,7 @@
 # Generated package is a contract fixture; production handlers remain separate.
 format: ess-cli/1
 binary: connectors
-about: Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
+about: Local integration access through explicitly configured connector instances. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
 globals: {config: config, state: state-dir, output: output}
 callables:
   approval-policy-status:
@@ -355,7 +355,7 @@ commands:
   - path: [setup, migrate]
     aliases: []
     callable: setup-migrate
-    about: Rewrite each adapter entry that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-<UTC timestamp>
+    about: Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)
     arguments:
       - field: mode
         source: {kind: option, long: mode}
@@ -382,7 +382,7 @@ commands:
   - path: [instances, status]
     aliases: [[adapters, status]]
     callable: adapters-status
-    about: Observe the lifecycle owner of one instance's adapter process; `adapters status` is its deprecated name
+    about: Observe the lifecycle owner of the process that serves one instance; `adapters status` is its deprecated name
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
@@ -393,7 +393,7 @@ commands:
   - path: [instances, stop]
     aliases: [[adapters, stop]]
     callable: adapters-stop
-    about: Stop only the exact owned adapter incarnation of one instance; `adapters stop` is its deprecated name
+    about: Stop only the exact owned incarnation of the process that serves one instance; `adapters stop` is its deprecated name
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}

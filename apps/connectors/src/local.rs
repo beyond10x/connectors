@@ -23,6 +23,11 @@ mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     let args = migrate::shorthand(args);
+    // Help is no envelope and runs no command: it says nothing more on standard
+    // error, under a deprecated name too; the help itself marks that name.
+    if let Some(help) = connectors::help::render(&args) {
+        return help_output(help, is_root_help(&args));
+    }
     let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
     let mut output = run_selected(args);
@@ -32,8 +37,23 @@ pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     output
 }
 
+/// The help `connectors::help` rendered; root help is followed by the explicit
+/// service commands, which the generated tree does not carry.
+fn help_output(mut stdout: String, root: bool) -> connectors_cli_contract::ProcessOutput {
+    if root {
+        stdout.push_str("\nExplicit service commands (use COMMAND --help for options):\n");
+        for (name, summary) in connectors::compat::SUMMARIES {
+            stdout.push_str(&format!("  {name:<8}  {summary}\n"));
+        }
+    }
+    connectors_cli_contract::ProcessOutput {
+        exit_code: 0,
+        stdout,
+        stderr: String::new(),
+    }
+}
+
 fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
-    let root_help = is_root_help(&args);
     let session = session::Session::new(&args);
     if let Some(output) = configuration_preflight(&session.borrow()) {
         return output;
@@ -53,14 +73,6 @@ fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
             stdout: String::new(),
             stderr: String::new(),
         };
-    }
-    if root_help && output.exit_code == 0 {
-        output
-            .stdout
-            .push_str("\nExplicit service commands (use COMMAND --help for options):\n");
-        for (name, summary) in connectors::compat::SUMMARIES {
-            output.stdout.push_str(&format!("  {name:<8}  {summary}\n"));
-        }
     }
     output
 }
