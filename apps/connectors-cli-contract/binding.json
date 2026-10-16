@@ -269,6 +269,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -282,6 +288,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -291,7 +303,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -705,6 +718,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -718,6 +737,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -727,7 +752,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -1111,6 +1137,12 @@
                           "metadata_schema_newer"
                         ]
                       },
+                      "configuration_bytes": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "configuration_format": {
                         "kind": "optional",
                         "of": {
@@ -1124,6 +1156,12 @@
                           ]
                         }
                       },
+                      "configuration_limit": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "configuration_rule": {
                         "kind": "optional",
                         "of": {
@@ -1133,7 +1171,8 @@
                             "config_missing",
                             "config_not_private",
                             "owner_uid_mismatch",
-                            "approval_clock_format_retired"
+                            "approval_clock_format_retired",
+                            "config_too_large"
                           ]
                         }
                       },
@@ -1491,6 +1530,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -1504,6 +1549,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -1513,7 +1564,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -1906,6 +1958,12 @@
                           "metadata_schema_newer"
                         ]
                       },
+                      "configuration_bytes": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "configuration_format": {
                         "kind": "optional",
                         "of": {
@@ -1919,6 +1977,12 @@
                           ]
                         }
                       },
+                      "configuration_limit": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
                       "configuration_rule": {
                         "kind": "optional",
                         "of": {
@@ -1928,7 +1992,8 @@
                             "config_missing",
                             "config_not_private",
                             "owner_uid_mismatch",
-                            "approval_clock_format_retired"
+                            "approval_clock_format_retired",
+                            "config_too_large"
                           ]
                         }
                       },
@@ -2286,6 +2351,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -2299,6 +2370,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -2308,7 +2385,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -2731,6 +2809,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -2744,6 +2828,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -2753,7 +2843,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -3165,6 +3256,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -3178,6 +3275,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -3187,7 +3290,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -3613,6 +3717,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -3626,6 +3736,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -3635,7 +3751,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -4061,6 +4178,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -4074,6 +4197,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -4083,7 +4212,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -4509,6 +4639,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -4522,6 +4658,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -4531,7 +4673,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -4957,6 +5100,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -4970,6 +5119,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -4979,7 +5134,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -5405,6 +5561,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -5418,6 +5580,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -5427,7 +5595,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -5847,6 +6016,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -5860,6 +6035,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -5869,7 +6050,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -6303,6 +6485,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -6316,6 +6504,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -6325,7 +6519,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -6750,6 +6945,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -6763,6 +6964,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -6772,7 +6979,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -7378,6 +7586,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -7391,6 +7605,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -7400,7 +7620,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -7859,6 +8080,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -7872,6 +8099,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -7881,7 +8114,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -8328,6 +8562,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -8341,6 +8581,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -8350,7 +8596,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -8738,6 +8985,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -8751,6 +9004,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -8760,7 +9019,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -9209,6 +9469,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -9222,6 +9488,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -9231,7 +9503,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -9693,6 +9966,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -9706,6 +9985,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -9715,7 +10000,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -10165,6 +10451,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -10178,6 +10470,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -10187,7 +10485,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -10590,6 +10889,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -10603,6 +10908,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -10612,7 +10923,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -11135,6 +11447,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -11148,6 +11466,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -11157,7 +11481,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -11579,6 +11904,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -11592,6 +11923,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -11601,7 +11938,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -12131,6 +12469,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -12144,6 +12488,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -12153,7 +12503,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -12590,6 +12941,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -12603,6 +12960,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -12612,7 +12975,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -13026,6 +13390,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -13039,6 +13409,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -13048,7 +13424,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -13428,6 +13805,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -13441,6 +13824,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -13450,7 +13839,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -13816,6 +14206,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -13829,6 +14225,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -13838,7 +14240,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -14178,7 +14581,13 @@
                         "startup",
                         "restart",
                         "executable",
-                        "permissions"
+                        "permissions",
+                        "instance",
+                        "enabled",
+                        "description",
+                        "endpoint",
+                        "profile",
+                        "format"
                       ]
                     }
                   },
@@ -14325,6 +14734,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -14338,6 +14753,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -14347,7 +14768,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },
@@ -14708,6 +15130,12 @@
                   "metadata_schema_newer"
                 ]
               },
+              "configuration_bytes": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_format": {
                 "kind": "optional",
                 "of": {
@@ -14721,6 +15149,12 @@
                   ]
                 }
               },
+              "configuration_limit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
               "configuration_rule": {
                 "kind": "optional",
                 "of": {
@@ -14730,7 +15164,8 @@
                     "config_missing",
                     "config_not_private",
                     "owner_uid_mismatch",
-                    "approval_clock_format_retired"
+                    "approval_clock_format_retired",
+                    "config_too_large"
                   ]
                 }
               },

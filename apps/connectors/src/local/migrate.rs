@@ -6,8 +6,15 @@
 //! file is read back before anything is written, and an entry that reads back
 //! with any other value is not migrated, naming the field.
 use super::*;
-use connectors_host::local::{config::Adapter, filesystem};
-use std::{collections::BTreeMap, ffi::OsStr, path::Path};
+use connectors_host::local::{
+    config::{Adapter, CONFIG_LIMIT},
+    filesystem,
+};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ffi::OsStr,
+    path::Path,
+};
 
 /// The connector declarations the catalog provider ships
 /// (`adapters/catalog/providers/<provider>/connector.json`), compiled in: the
@@ -139,6 +146,10 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
         }
         let candidate = config.with_instances(&moved).map_err(host_failure)?;
         let written = candidate.to_text().map_err(host_failure)?;
+        // A file every later read refuses is never planned or written.
+        if written.len() > CONFIG_LIMIT {
+            return Err(too_large(written.len()));
+        }
         let after = Config::parse(&written).map_err(|_| {
             failure(
                 "invalid_configuration",
@@ -151,19 +162,27 @@ pub(super) fn execute(call: &Invocation<'_>, paths: &Paths) -> Result<Value, Han
         if shared(&config) != shared(&after) {
             return Err(host_failure(Failure::InvalidConfiguration));
         }
-        let mut changed = false;
+        let mut differences = Vec::new();
         for (alias, entry) in &config.adapters {
-            let Some(field) = differing(entry, after.adapters.get(alias)) else {
-                continue;
-            };
-            if moved.remove(alias).is_none() {
-                return Err(host_failure(Failure::InvalidConfiguration));
+            if let Some(field) = differing(entry, after.adapters.get(alias)) {
+                if !moved.contains_key(alias) {
+                    return Err(host_failure(Failure::InvalidConfiguration));
+                }
+                differences.push((alias.clone(), field));
             }
-            kept.insert(alias.clone(), Kept::Selection(field));
-            changed = true;
         }
-        if !changed {
+        differences.extend(
+            connectors_differing(&candidate, &after, &moved)
+                .map_err(|()| host_failure(Failure::InvalidConfiguration))?,
+        );
+        if differences.is_empty() {
             break (written, after);
+        }
+        for (alias, field) in differences {
+            // The first difference named for an entry is the one reported.
+            if moved.remove(&alias).is_some() {
+                kept.insert(alias, Kept::Selection(field));
+            }
         }
     };
     let entries: Vec<Value> = legacy
@@ -278,6 +297,98 @@ fn shared(config: &Config) -> Value {
         config.custody,
         config.consumers,
     ])
+}
+
+/// `invalid_configuration` naming `config_too_large`, the rewritten text's
+/// size and the bound a read admits.
+fn too_large(bytes: usize) -> HandlerReply {
+    let mut reply = configuration_refusal(Refusal::Rule(Rule::ConfigTooLarge));
+    if let HandlerReply::UsageError { data, .. } = &mut reply {
+        data["configuration_bytes"] = json!(bytes);
+        data["configuration_limit"] = json!(CONFIG_LIMIT);
+    }
+    reply
+}
+
+/// Where the `[connectors]` table and `format` of `after`, the file read
+/// back, differ from `expected`, the configuration written: per moved alias,
+/// the first field that keeps it. A moved entry's own instance table names
+/// `instance` when it is absent or reads back as another instance, else its
+/// differing `description`, `endpoint` or `profile`. A difference in its
+/// connector's table (`enabled`, an existing instance's keys) keeps every
+/// entry moving to that connector, and a differing `format` every moved
+/// entry. A difference no moved entry accounts for is `Err`.
+fn connectors_differing(
+    expected: &Config,
+    after: &Config,
+    moved: &BTreeMap<String, String>,
+) -> Result<Vec<(String, &'static str)>, ()> {
+    if after.format != expected.format {
+        if moved.is_empty() {
+            return Err(());
+        }
+        return Ok(moved
+            .keys()
+            .map(|alias| (alias.clone(), "format"))
+            .collect());
+    }
+    if expected.connectors.is_some() != after.connectors.is_some() {
+        return Err(());
+    }
+    let none = BTreeMap::new();
+    let (expected, after) = (
+        expected.connectors.as_ref().unwrap_or(&none),
+        after.connectors.as_ref().unwrap_or(&none),
+    );
+    let mut kept = Vec::new();
+    // Every entry moving to `connector`, kept naming `field`.
+    let keep_all = |connector: &str, field: &'static str, kept: &mut Vec<_>| {
+        let aliases: Vec<(String, &'static str)> = moved
+            .iter()
+            .filter(|(_, to)| to.as_str() == connector)
+            .map(|(alias, _)| (alias.clone(), field))
+            .collect();
+        if aliases.is_empty() {
+            return Err(());
+        }
+        kept.extend(aliases);
+        Ok(())
+    };
+    let names: BTreeSet<&String> = expected.keys().chain(after.keys()).collect();
+    for connector in names {
+        let (wrote, read) = (expected.get(connector), after.get(connector));
+        if wrote.map(|t| t.enabled) != read.map(|t| t.enabled) {
+            keep_all(connector, "enabled", &mut kept)?;
+            continue;
+        }
+        let empty = BTreeMap::new();
+        let (wrote, read) = (
+            wrote.map_or(&empty, |t| &t.instances),
+            read.map_or(&empty, |t| &t.instances),
+        );
+        let instances: BTreeSet<&String> = wrote.keys().chain(read.keys()).collect();
+        for name in instances {
+            let (a, b) = (wrote.get(name), read.get(name));
+            if a == b {
+                continue;
+            }
+            let field = match (a, b) {
+                (Some(a), Some(b)) if a.alias == b.alias && a.description != b.description => {
+                    "description"
+                }
+                (Some(a), Some(b)) if a.alias == b.alias && a.endpoint != b.endpoint => "endpoint",
+                (Some(a), Some(b)) if a.alias == b.alias && a.profile != b.profile => "profile",
+                _ => "instance",
+            };
+            // An instance this migration added is named like its alias.
+            if moved.get(name.as_str()) == Some(connector) {
+                kept.push((name.clone(), field));
+            } else {
+                keep_all(connector, field, &mut kept)?;
+            }
+        }
+    }
+    Ok(kept)
 }
 
 /// The first field of [`FIELDS`] in which `after` differs from `before`.
@@ -453,5 +564,114 @@ mod tests {
         let mut other = entry.clone();
         other.permissions.profiles.insert("p".into());
         assert_eq!(differing(&entry, Some(&other)), Some("permissions"));
+    }
+
+    /// The `[connectors]` table read back is compared with the one written:
+    /// a moved entry's new instance table, its connector's existing table
+    /// (`enabled`, existing instances' keys) and `format`. A difference keeps
+    /// the entries it belongs to and names the field; one that belongs to no
+    /// moved entry refuses.
+    #[cfg(unix)]
+    #[test]
+    fn a_connectors_table_that_reads_back_differently_keeps_its_entries() {
+        let pins = |table: &str, alias: &str, extra: &str| {
+            format!(
+                "[{table}]\n{extra}instance_id='{alias}-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-{alias}'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[{table}.executable]\npath='/opt/connectors/bin/catalog'\nsha256='{}'\nargs=[]\n",
+                "1".repeat(64)
+            )
+        };
+        let text = format!(
+            "format='connectors-local/5'\nowner_uid={}\n{}{}[connectors.gmail]\nenabled=true\n{}[connectors.drive]\nenabled=true\n",
+            filesystem::uid(),
+            pins("adapters.mail", "mail", ""),
+            pins("adapters.files", "files", ""),
+            pins(
+                "connectors.gmail.instances.old",
+                "pinned",
+                "alias='pinned'\nendpoint='https://example.invalid'\n"
+            ),
+        );
+        let config = Config::parse(&text).unwrap();
+        let moved: BTreeMap<String, String> = [("mail", "gmail"), ("files", "calendar")]
+            .into_iter()
+            .map(|(a, c)| (a.to_owned(), c.to_owned()))
+            .collect();
+        let written = config.with_instances(&moved).unwrap();
+        let after = Config::parse(&written.to_text().unwrap()).unwrap();
+        assert_eq!(connectors_differing(&written, &after, &moved), Ok(vec![]));
+        let changed = |change: &dyn Fn(&mut Config)| {
+            let mut after = after.clone();
+            change(&mut after);
+            connectors_differing(&written, &after, &moved)
+        };
+        fn tables(
+            config: &mut Config,
+        ) -> &mut BTreeMap<String, connectors_host::local::config::Connector> {
+            config.connectors.as_mut().unwrap()
+        }
+        let kept = |pairs: &[(&str, &'static str)]| {
+            Ok(pairs
+                .iter()
+                .map(|(alias, field)| ((*alias).to_owned(), *field))
+                .collect::<Vec<_>>())
+        };
+        // The new instance table of `mail`.
+        assert_eq!(
+            changed(&|c| {
+                tables(c)
+                    .get_mut("gmail")
+                    .unwrap()
+                    .instances
+                    .get_mut("mail")
+                    .unwrap()
+                    .description = Some("x".into())
+            }),
+            kept(&[("mail", "description")])
+        );
+        assert_eq!(
+            changed(&|c| {
+                tables(c).get_mut("gmail").unwrap().instances.remove("mail");
+            }),
+            kept(&[("mail", "instance")])
+        );
+        assert_eq!(
+            changed(&|c| {
+                tables(c)
+                    .get_mut("calendar")
+                    .unwrap()
+                    .instances
+                    .get_mut("files")
+                    .unwrap()
+                    .profile = Some("p".into())
+            }),
+            kept(&[("files", "profile")])
+        );
+        // An existing instance of the connector `mail` moves to.
+        assert_eq!(
+            changed(&|c| {
+                tables(c)
+                    .get_mut("gmail")
+                    .unwrap()
+                    .instances
+                    .get_mut("old")
+                    .unwrap()
+                    .endpoint = None
+            }),
+            kept(&[("mail", "endpoint")])
+        );
+        assert_eq!(
+            changed(&|c| tables(c).get_mut("calendar").unwrap().enabled = false),
+            kept(&[("files", "enabled")])
+        );
+        // The format keeps every moved entry.
+        assert_eq!(
+            changed(&|c| c.format = "connectors-local/4".into()),
+            kept(&[("files", "format"), ("mail", "format")])
+        );
+        // A connector no moved entry belongs to.
+        assert_eq!(
+            changed(&|c| tables(c).get_mut("drive").unwrap().enabled = false),
+            Err(())
+        );
     }
 }
