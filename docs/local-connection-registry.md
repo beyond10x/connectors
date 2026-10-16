@@ -3,12 +3,14 @@
 The host's `local::registry` module binds the existing connection, acquisition,
 credential evidence and custody contracts to one private SQLite authority. It
 supports static-entry profiles. Provider work and keyring I/O happen outside
-metadata transactions. Adapter libraries receive authenticated capabilities;
+metadata transactions. The implementation libraries (the internal adapters) receive authenticated capabilities;
 they never open this database or select arbitrary keyring items.
 
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
 The production CLI uses this authority for connection list, describe, status,
-terminal local revoke, protected connect/repair and explicit saved-material
-revalidation. Its persistent owner binds the private adapter transport. Disposable
+terminal local revoke, protected connect/reconnect and explicit saved-material
+revalidation. Its persistent owner binds the private transport of each instance's process. Disposable
 GitLab HTTPS and qualified Secret Service fixtures cover saved reads after restart
 and real evidence expiry; dedicated GitLab sandbox acceptance remains open.
 
@@ -88,14 +90,14 @@ already be in flight; revocation cannot undo it or allow another dispatch.
 A connection is bound to the configuration revision of its instance that it was
 admitted under. When the configuration moves to a new revision (a rebuilt bundle,
 a changed selection, a new provider executable or CA file), the connection reports
-`pending` with `stale` set, and reads, repair and approvals refuse it.
+`pending` with `stale` set, and reads, reconnect and approvals refuse it.
 
 Explicit revalidation upgrades it in place. It captures the connection's current
 custody version, never a credential entry, runs the new provider's declared
 validation against it, and publishes the connection under the configured binding
 only when:
 
-- the instance id, adapter id and provider authority are unchanged;
+- the instance id, `adapter_id` and provider authority are unchanged;
 - the profile declaration is unchanged: the same id and declaration revision, so
   the same scheme, capability, purpose, subject, entry fields, minimum scopes and
   evidence lifetime. The registry keeps only the declaration's revision, which
@@ -113,26 +115,26 @@ admitted under the new binding and refused under the old one.
 
 A changed provider authority or profile authentication refuses before provider
 work as `lifecycle_conflict` with `next_action = check_configuration`, from
-revalidate, repair, a read and a new connect under the same instance id alike:
+revalidate, reconnect, a read and a new connect under the same instance id alike:
 only a new instance id helps. The connections left under the earlier instance
 id stay revocable through the moved entry: `connections revoke` reaches a
-connection of the entry's adapter whose instance id no entry configures any
+connection of the entry's implementation (`adapter_id`) whose instance id no entry configures any
 longer. The profile's authentication is the declaration
 apart from its evidence lifetime: a revision that differs is the same
 authentication only when the configured declaration, given the admitted
-lifetime, digests to the admitted revision, as every shipped adapter computes
+lifetime, digests to the admitted revision, as every shipped implementation computes
 it. Any other binding difference, a lifetime-only change included, refuses as
 `lifecycle_conflict` with `next_action = create_connection`, and a new
 connection under the same instance id is admitted. A saved connection whose
-profile id the configured adapter no longer declares is such a difference too,
-never `unsupported`. A repair of a
+profile id the configured instance no longer declares is such a difference too,
+never `unsupported`. A reconnect of a
 connection whose binding differs answers the same refusal a read does, never
-`identity_mismatch`. A revalidation, connect, repair, read or write whose
-adapter process still runs an earlier adapter entry stops it and starts the
+`identity_mismatch`. A revalidation, connect, reconnect, read or write whose
+instance's process still runs an earlier configuration entry stops it and starts the
 configured one first; only a credential validation captured by the earlier
 process keeps refusing. A different
 validated identity refuses as `identity_mismatch`, also with `next_action =
-create_connection`, because repair refuses the changed binding; outside an
+create_connection`, because reconnect refuses the changed binding; outside an
 upgrade it keeps `repair_connection`. A credential the new provider refuses
 answers its usual code, again with `next_action = create_connection`. None of
 these changes anything: the credential is not proved invalid under the
@@ -156,9 +158,12 @@ a changed evidence lifetime alone does not.
 A refused upgrade (a credential the new provider refuses, or another identity)
 is recorded on the connection, so reads, approval targets and launches answer
 `next_action = create_connection` instead of sending the caller back to
-revalidation; a repair or a successful upgrade clears the record. A stale
+revalidation; a reconnect or a successful upgrade clears the record. A stale
 connection whose credential is known invalid or has expired is answered the same
-way, since revalidation cannot move it.
+way, since revalidation cannot move it. A connection whose credential the provider
+refused is Stale, and lists with the status `stale` until `connections reconnect`
+publishes a new credential
+([connection semantics §4.2](../contracts/auth/connection/v1alpha1/semantics.md)).
 
 ## Read use and retirement
 
@@ -182,7 +187,7 @@ The initial bounds are 1,000 connections per instance, 10,000 total connections,
 100,000 acquisition histories, eight retained material versions per connection,
 1,000 concurrent read-use records and 10,000 live cursors. Exhaustion refuses;
 it does not evict authority or pretend an incomplete list is complete. Pages accept
-1–500 members, bind adapter/instance/configuration/limit/epoch, and expire at the
+1–500 members, bind instance/configuration/limit/epoch, and expire at the
 original five-minute deadline. Publication, revoke and known invalidity invalidate
 continuations. These are implementation bounds, not additional provider semantics.
 

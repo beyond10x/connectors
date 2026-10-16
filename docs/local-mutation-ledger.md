@@ -26,7 +26,7 @@ The trusted host supplies resolved namespace and fingerprint values. They are
 never deserialized from a public request as caller authority. The exact key is
 the contract's tagged `mutation-key/v1` JSON array, preserving nulls and opaque
 key bytes. Fingerprints use `mutation-request/v2` with every coordinate retained;
-the operation is qualified by a tagged tuple of instance, adapter and operation.
+the operation is qualified by a tagged tuple of instance, implementation (`adapter_id`) and operation.
 Digests alone do not decide tuple equality. Registry instance and connection
 references retain historical meaning after revocation; no cascading delete or
 unqualified operation foreign key is introduced.
