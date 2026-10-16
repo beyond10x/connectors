@@ -25,8 +25,17 @@ struct Journey {
     outputs: std::cell::RefCell<Vec<u8>>,
 }
 
+/// The owner's custody table for the create, as every journey but one configures it.
+const CUSTODY_TABLE: &str = "[adapters.gitlab.permissions.custody]\n'group_token.create'={adapter='minted',profile='gitlab.pat'}\n";
+
 impl Journey {
     fn new(create_mode: u8) -> Self {
+        Self::with_custody(create_mode, CUSTODY_TABLE)
+    }
+
+    /// [`Journey::new`] with `custody_table` as the owner's custody table for
+    /// the create; empty configures none.
+    fn with_custody(create_mode: u8, custody_table: &str) -> Self {
         let provider = Provider::new();
         provider.create_mode.store(create_mode, Ordering::SeqCst);
         let custody = Custody::new(provider.root.path());
@@ -56,7 +65,7 @@ impl Journey {
             )
         };
         let configuration = format!(
-            "format='connectors-local/2'\nowner_uid={}\nsecret_service_socket={}\n{}[adapters.gitlab.permissions.custody]\n'group_token.create'={{adapter='minted',profile='gitlab.pat'}}\n{}\n{}",
+            "format='connectors-local/2'\nowner_uid={}\nsecret_service_socket={}\n{}{}{}\n{}",
             filesystem::uid(),
             serde_json::to_string(custody.socket.to_str().unwrap()).unwrap(),
             entry(
@@ -64,6 +73,7 @@ impl Journey {
                 &provider.selection(),
                 "['project.get','group_token.create']"
             ),
+            custody_table,
             entry(
                 "minted",
                 &provider.selection_of(&target_config, "fixture-minted"),
@@ -341,4 +351,27 @@ fn a_created_token_custody_refuses_is_reported_by_its_hash_and_held_nowhere() {
     assert_eq!(journey.provider.create_effects.load(Ordering::SeqCst), 1);
     journey.cli.shutdown();
     journey.assert_nowhere(UNACCEPTED_TOKEN);
+}
+
+/// Integrity of the pre-dispatch custody check (design §8a, "Admit"): an
+/// operation whose selection declares custody, granted to the writer while the
+/// owner names no custody target for it, can only end with a created
+/// credential nobody holds. It is refused with nothing sent, so a credential
+/// is never created that cannot be held or named by its hash.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn a_create_whose_operation_has_no_custody_target_is_refused_before_it_is_sent() {
+    let journey = Journey::with_custody(0, "");
+    let invocation = journey.approved("tenant-key");
+    let output = journey.run(&invocation);
+    assert!(!output.status.success());
+    let failure: Value = serde_json::from_slice(&output.stderr).unwrap();
+    assert_eq!(
+        journey.provider.create_effects.load(Ordering::SeqCst),
+        0,
+        "the create was sent with no custody target configured: {failure}"
+    );
+    assert!(journey.minted().is_empty());
+    journey.cli.shutdown();
+    journey.assert_nowhere(CREATED_TOKEN);
 }
