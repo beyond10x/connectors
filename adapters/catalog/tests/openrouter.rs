@@ -12,6 +12,8 @@
 //! exactly those bytes, as the owner does when it holds them in custody.
 #![cfg(unix)]
 use connectors_catalog::bundle;
+#[path = "../../../crates/connectors-host/tests/fixtures/clock/server.rs"]
+mod clock_fixture;
 use connectors_catalog_provider::{Effect, Engine, Selection};
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
@@ -919,20 +921,133 @@ fn a_create_body_outside_the_selection_is_refused_before_any_request() {
     assert!(provider.requests().is_empty());
 }
 
+/// A background process the fixture owns and kills when it ends.
+struct Owned(std::process::Child);
+impl Drop for Owned {
+    fn drop(&mut self) {
+        let _ = self.0.kill();
+        let _ = self.0.wait();
+    }
+}
+
+/// A disposable session bus and an unlocked GNOME Keyring on it, under `parent`,
+/// as the custody journeys of `local_runtime` start them. Returns the bus socket.
+fn serve_custody(parent: &Path) -> (Owned, Owned, PathBuf) {
+    use std::process::Stdio;
+    let directory = parent.join("custody");
+    for sub in ["", "home", "data/keyrings", "r1"] {
+        filesystem::directory(&directory.join(sub), true, true).unwrap();
+    }
+    let socket = directory.join("bus");
+    let bus = Owned(
+        Command::new("/usr/bin/dbus-daemon")
+            .args(["--session", "--nofork", "--nopidfile"])
+            .arg(format!("--address=unix:path={}", socket.display()))
+            .env_clear()
+            .env("PATH", "/usr/bin")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    let until = std::time::Instant::now() + Duration::from_secs(5);
+    while std::os::unix::net::UnixStream::connect(&socket).is_err() {
+        assert!(
+            std::time::Instant::now() < until,
+            "fixture bus did not start"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let mut daemon = Owned(
+        Command::new("/usr/bin/gnome-keyring-daemon")
+            .args([
+                "--foreground",
+                "--components=secrets",
+                "--unlock",
+                "--control-directory",
+            ])
+            .arg(directory.join("r1"))
+            .env_clear()
+            .env("PATH", "/usr/bin")
+            .env("HOME", directory.join("home"))
+            .env("XDG_DATA_HOME", directory.join("data"))
+            .env("XDG_RUNTIME_DIR", directory.join("r1"))
+            .env(
+                "DBUS_SESSION_BUS_ADDRESS",
+                format!("unix:path={}", socket.display()),
+            )
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    {
+        use std::io::Write;
+        daemon
+            .0
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"fictional-catalog-fixture-keyring-password")
+            .unwrap();
+    }
+    let until = std::time::Instant::now() + Duration::from_secs(10);
+    while !connectors_host::local::keyring::custody::available_at(Some(&socket)) {
+        assert!(
+            std::time::Instant::now() < until,
+            "fixture custody unavailable"
+        );
+        std::thread::sleep(Duration::from_millis(30));
+    }
+    (bus, daemon, socket)
+}
+
 /// Not a test: serves the fixture so the guide's commands can be run against it.
-/// `OPENROUTER_FIXTURE_SECONDS=600 cargo test -p connectors-catalog-provider --test openrouter
-/// -- --ignored --nocapture serve_the_fixture` prints the configuration path and
-/// answers until the time is up.
+/// It serves the HTTPS provider, a disposable Secret Service and two synthetic
+/// Roughtime sources, prints where each is, and answers until the file
+/// `FIXTURE_STOP` (named in its output) exists or `OPENROUTER_FIXTURE_SECONDS`
+/// (default 300) pass. `cargo test -p connectors-catalog-provider --test openrouter
+/// -- --ignored --nocapture serve_the_fixture`.
 #[test]
 #[ignore = "serves the fixture for the guide's commands"]
 fn serve_the_fixture() {
     let provider = Provider::new();
+    let root = provider._root.path().to_path_buf();
+    let (_bus, _daemon, socket) = serve_custody(&root);
+    let started = std::time::Instant::now();
+    let sources: Vec<clock_fixture::Server> = [7u8, 8]
+        .into_iter()
+        .map(|seed| {
+            clock_fixture::Server::spawn(Box::new(move |sequence, request| {
+                let mut fixture = clock_fixture::Fixture {
+                    seed,
+                    ..Default::default()
+                };
+                fixture.midpoint += started.elapsed().as_secs() + sequence as u64;
+                Some(fixture.reply(request))
+            }))
+        })
+        .collect();
+    let clock = clock_fixture::quorum_toml(
+        2,
+        100,
+        &[(&sources[0].address, 7), (&sources[1].address, 8)],
+    );
+    let stop = root.join("stop");
     println!("FIXTURE_CONFIG={}", provider.config.display());
     println!("FIXTURE_INFERENCE_CONFIG={}", provider.inference.display());
     println!("FIXTURE_KEY={KEY}");
+    println!("FIXTURE_BUS={}", socket.display());
+    println!("FIXTURE_CLOCK_TOML_BEGIN\n{clock}FIXTURE_CLOCK_TOML_END");
+    println!("FIXTURE_STOP={}", stop.display());
     let seconds: u64 = std::env::var("OPENROUTER_FIXTURE_SECONDS")
         .ok()
         .and_then(|value| value.parse().ok())
         .unwrap_or(300);
-    std::thread::sleep(Duration::from_secs(seconds));
+    let until = std::time::Instant::now() + Duration::from_secs(seconds);
+    while !stop.exists() && std::time::Instant::now() < until {
+        std::thread::sleep(Duration::from_millis(200));
+    }
 }
