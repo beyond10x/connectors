@@ -186,17 +186,18 @@ impl Session {
         let text = |key| selection.selectors.get(key).and_then(Value::as_str);
         let alias = super::select::alias_at(&selection.selectors, &paths)?;
         let alias = alias.as_str();
+        let connection = reconnected(&selection.callable, &paths, alias, text("connection"))?;
         owner::admit_capture(
             &paths,
             alias,
             text("profile"),
-            text("connection"),
+            connection.as_deref(),
             text("expected_revision"),
         )?;
         let capture = owner::Client::connect(&paths, true)?.begin(
             alias,
             text("profile").map(str::to_owned),
-            text("connection").map(str::to_owned),
+            connection,
             text("expected_revision").map(str::to_owned),
         )?;
         let result = match source {
@@ -242,18 +243,19 @@ impl Session {
         }
         let text = |key| call.input.get(key).and_then(Value::as_str);
         let alias = text("adapter").ok_or(Code::InvalidInput)?;
+        let connection = reconnected(call.callable, &paths, alias, text("connection"))?;
         owner::admit_capture(
             &paths,
             alias,
             text("profile"),
-            text("connection"),
+            connection.as_deref(),
             text("expected_revision"),
         )?;
         owner::Client::connect(&paths, true)?
             .begin(
                 alias,
                 text("profile").map(str::to_owned),
-                text("connection").map(str::to_owned),
+                connection,
                 text("expected_revision").map(str::to_owned),
             )?
             .complete_mounted()
@@ -426,5 +428,24 @@ impl DynamicValidator for NativeValidator {
             self.0.borrow_mut().early = Some((call.callable.into(), call.context.clone(), error));
             kind
         })
+    }
+}
+
+/// The connection a `connections reconnect` reconnects: the one it names, or
+/// else the instance's one published non-revoked connection
+/// (story:connect-refused-while-instance-holds-connection). A connect names
+/// none.
+fn reconnected(
+    callable: &str,
+    paths: &Paths,
+    alias: &str,
+    named: Option<&str>,
+) -> owner::Result<Option<String>> {
+    match named {
+        Some(connection) => Ok(Some(connection.to_owned())),
+        None if callable == "connections-reconnect" => {
+            super::connections::held_one(paths, alias).map(Some)
+        }
+        None => Ok(None),
     }
 }
