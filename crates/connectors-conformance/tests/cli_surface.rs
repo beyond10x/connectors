@@ -4,10 +4,13 @@
 use connectors_cli_contract::{
     AcquireError, Context, DynamicError, DynamicPhase, DynamicValidator, Handler, HandlerReply,
     Invocation, ProcessOutput, ProtectedSource, Sources,
-    wire::{ArgumentSource, Shape},
+    wire::{ArgumentSource, Plan, Shape},
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, ffi::OsString};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ffi::OsString,
+};
 
 fn fixture(name: &str) -> Value {
     let data: Value = serde_json::from_str(include_str!(
@@ -87,7 +90,7 @@ fn refusal(output: &ProcessOutput, exit: i32) -> Value {
 }
 
 #[test]
-fn the_selected_inventory_has_thirty_grouped_commands_and_explicit_runtime_obligations() {
+fn the_selected_inventory_has_thirty_one_grouped_commands_and_explicit_runtime_obligations() {
     let plan = connectors_cli_contract::plan();
     let actual: BTreeSet<_> = plan
         .commands
@@ -99,6 +102,7 @@ fn the_selected_inventory_has_thirty_grouped_commands_and_explicit_runtime_oblig
         "setup check",
         "setup checkpoints-enable",
         "setup owner-stop",
+        "setup migrate",
         "instances list",
         "instances describe",
         "instances status",
@@ -1071,4 +1075,91 @@ fn every_renamed_path_is_an_alias_of_its_new_name() {
         assert_eq!(by_new.1, by_old.1, "{old} -> {new}");
         assert_eq!(by_new.2, by_old.2, "{old} -> {new}");
     }
+}
+
+/// What makes two declarations of `plan` reach one parser entry: the same path
+/// declared twice, as a path or an alias; a path that is also another's group;
+/// or a reserved word. The generated tree keys each leaf by its name
+/// (`apps/connectors-cli-contract/src/runtime.rs`, `command`), so the later of
+/// two would silently replace the earlier one.
+fn path_collisions(plan: &Plan) -> Vec<String> {
+    let mut collisions = Vec::new();
+    let mut seen = BTreeMap::<&[String], &str>::new();
+    for command in &plan.commands {
+        for path in std::iter::once(&command.path).chain(&command.aliases) {
+            let words = path.join(" ");
+            if path.is_empty() || ["help", "completions", "version"].contains(&path[0].as_str()) {
+                collisions.push(format!("`{words}` takes a reserved word"));
+            }
+            if let Some(earlier) = seen.insert(path, &command.callable) {
+                collisions.push(format!(
+                    "`{words}` names {earlier} and {}",
+                    command.callable
+                ));
+            }
+        }
+    }
+    for path in seen.keys() {
+        if seen
+            .keys()
+            .any(|other| other.len() > path.len() && other.starts_with(path))
+        {
+            collisions.push(format!("`{}` is a command and a group", path.join(" ")));
+        }
+    }
+    collisions
+}
+
+/// The leaf `path` names in `tree`, if any.
+fn leaf<'a>(tree: &'a clap::Command, path: &[String]) -> Option<&'a clap::Command> {
+    path.iter()
+        .try_fold(tree, |command, word| command.find_subcommand(word))
+}
+
+/// story:cli-text-without-adapter: an alias that collides with a command is
+/// refused, not silently overwritten. `ess generate cli` refuses such a
+/// binding; this refuses a plan that carries one anyway, and holds that every
+/// declared path reaches its own declaration in the generated tree.
+#[test]
+fn no_alias_or_path_replaces_another_command() {
+    let plan = connectors_cli_contract::plan();
+    assert_eq!(path_collisions(&plan), Vec::<String>::new());
+    let tree = connectors_cli_contract::command();
+    let mut reached = 0;
+    for command in &plan.commands {
+        for path in std::iter::once(&command.path).chain(&command.aliases) {
+            let about = leaf(&tree, path).and_then(|leaf| leaf.get_about());
+            assert_eq!(
+                about.map(ToString::to_string).as_deref(),
+                Some(command.about.as_str()),
+                "{path:?}"
+            );
+            reached += 1;
+        }
+    }
+    assert_eq!(reached, 36);
+    // What the check refuses, the generated tree would hide: an alias onto
+    // `connections list` replaces that command without a word.
+    let mut colliding = plan.clone();
+    let listed = colliding
+        .commands
+        .iter_mut()
+        .find(|command| command.path == ["instances", "list"])
+        .unwrap();
+    listed
+        .aliases
+        .push(vec!["connections".into(), "list".into()]);
+    let replaced = listed.about.clone();
+    let tree = connectors_cli_contract::runtime::command(&colliding);
+    let path = ["connections".to_owned(), "list".to_owned()];
+    assert_eq!(
+        leaf(&tree, &path)
+            .and_then(|leaf| leaf.get_about())
+            .map(ToString::to_string),
+        Some(replaced)
+    );
+    assert_eq!(
+        path_collisions(&colliding),
+        ["`connections list` names connections-list and adapters-list"]
+    );
 }

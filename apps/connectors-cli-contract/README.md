@@ -1,6 +1,6 @@
 # `connectors` CLI contract
 
-Local integration access through explicitly configured adapters. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
+Local integration access through explicitly configured connector instances. After an upgrade, `connectors setup owner-stop` stops the owner an older binary started
 
 This generated package installs an unavailable handler. Application behavior enters through the `Handler` seam; schema-selected calls also require `DynamicValidator`. See `help.txt` for process options and `binding.json` for resolved types and targets.
 
@@ -182,7 +182,7 @@ Error `failure`: `connectors.cli.Failure`.
 
 ### `instances status`
 
-Observe the lifecycle owner of one instance's adapter process; `adapters status` is its deprecated name
+Observe the lifecycle owner of the process that serves one instance; `adapters status` is its deprecated name
 
 Callable: `adapters-status`. Input: `connectors.cli.AdapterStatusInput`. Result: `connectors.cli.AdapterStatusResult`.
 
@@ -192,7 +192,7 @@ Error `failure`: `connectors.cli.Failure`.
 
 ### `instances stop`
 
-Stop only the exact owned adapter incarnation of one instance; `adapters stop` is its deprecated name
+Stop only the exact owned incarnation of the process that serves one instance; `adapters stop` is its deprecated name
 
 Callable: `adapters-stop`. Input: `connectors.cli.AdapterStopInput`. Result: `connectors.cli.AdapterStopResult`.
 
@@ -250,7 +250,7 @@ Error `failure`: `connectors.cli.Failure`.
 
 ### `setup migrate`
 
-Rewrite each adapter entry that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-<UTC timestamp>
+Rewrite each entry of the legacy configuration format that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-TIMESTAMP (UTC)
 
 Callable: `setup-migrate`. Input: `connectors.cli.SetupMigrateInput`. Result: `connectors.cli.SetupMigrateResult`.
 
