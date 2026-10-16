@@ -6,7 +6,7 @@ status: active
 title: 'Release 0.52.0: Confluence REST v1, Slack user-token history, Kubernetes exec credentials and the clock quorum'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 2
+revision: 3
 transitions:
 - {from: "draft", to: "active", at: "2026-10-16T02:05:22Z", actor: "human:timo", revision: 2}
 ---
@@ -46,8 +46,12 @@ The stories moved to implemented with this release:
   its process group, admitted code-loading environment names, the set-ID list wording, the
   descriptor-marking cap, the kubeconfig buffer) ran its packages green: 719 passed, 0 failed, with
   clippy, format and drift checks.
+- The pull request's first CI run (on 8f3a57a25) failed two jobs, both in tests: the Windows build
+  of connectors-build's tests used Unix-only helpers, and the exec credential tests parsed `export
+  -p` in bash's form while the runner's `/bin/sh` is dash. Fixed in 66dbb3814: connectors-build and
+  connectors-kubernetes tests, clippy (Linux and the Windows GNU target) and format exit 0, and the
+  five exec credential test binaries pass under dash (ubuntu:25.10).
 - The pull request's CI is the gate for the merge into `main`.
-
 
 ## Completion boundary
 
