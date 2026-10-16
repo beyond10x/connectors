@@ -26,7 +26,7 @@ sha2.workspace = true
 connectors-host = { workspace = true, optional = true }
 async-trait.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 serde_yaml_ng.workspace = true
 zeroize.workspace = true
 libc = "0.2"
