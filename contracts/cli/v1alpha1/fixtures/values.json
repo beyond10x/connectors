@@ -651,8 +651,8 @@
       }
     },
     {
-      "id": "valid-ConnectionRepairInput-17",
-      "type": "connectors.cli.ConnectionRepairInput",
+      "id": "valid-ConnectionReconnectInput-17",
+      "type": "connectors.cli.ConnectionReconnectInput",
       "valid": true,
       "value": {
         "adapter": "forge",
@@ -662,8 +662,8 @@
       }
     },
     {
-      "id": "valid-ConnectionRepairResult-18",
-      "type": "connectors.cli.ConnectionRepairResult",
+      "id": "valid-ConnectionReconnectResult-18",
+      "type": "connectors.cli.ConnectionReconnectResult",
       "valid": true,
       "value": {
         "connection": {
@@ -895,8 +895,8 @@
       }
     },
     {
-      "id": "valid-ConnectionRepairRequest-34",
-      "type": "connectors.cli.ConnectionRepairRequest",
+      "id": "valid-ConnectionReconnectRequest-34",
+      "type": "connectors.cli.ConnectionReconnectRequest",
       "valid": true,
       "value": {
         "adapter": "forge",
@@ -1207,7 +1207,7 @@
     },
     {
       "id": "repair-requires-revision",
-      "type": "connectors.cli.ConnectionRepairInput",
+      "type": "connectors.cli.ConnectionReconnectInput",
       "valid": false,
       "value": {
         "adapter": "forge",
