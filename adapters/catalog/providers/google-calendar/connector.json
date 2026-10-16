@@ -1,0 +1,30 @@
+{
+  "format": "connectors-catalog-connector/1",
+  "connector_id": "calendar",
+  "provider_id": "google",
+  "adapter_id": "catalog",
+  "catalog_provider": "google-calendar",
+  "default_endpoint": "https://www.googleapis.com/calendar/v3",
+  "selection": "operations.json",
+  "profiles": [
+    {
+      "profile": "google.oauth",
+      "scheme": "oauth2_refresh",
+      "header": "Authorization",
+      "bearer": true,
+      "label": "Google refresh token",
+      "identity": {"source": "id_token", "kind": "google.user"},
+      "minimum_scopes": [
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar.readonly"
+      ],
+      "token_url": "https://oauth2.googleapis.com/token",
+      "authorize_url": "https://accounts.google.com/o/oauth2/auth",
+      "requested_scopes": [
+        "openid",
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar.readonly"
+      ]
+    }
+  ]
+}
