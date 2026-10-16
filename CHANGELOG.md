@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- An owner no longer outlives its state directory. A Unix owner exits, as a shutdown request
+  stops it, once its socket is no longer in its state directory or the state directory's path no
+  longer names the directory it opened (removed or replaced); it checks at least every 250 ms and
+  lets connected clients finish for at most 5 seconds. Such an owner was unreachable and, with its
+  directory deleted, never became idle, so it ran until killed. A Windows owner holds its state
+  directory open, so that directory cannot be removed beneath it; it has no such check. Idle
+  retirement after 10 minutes is unchanged.
+- Journey tests stop the owners they start (#175). A CLI built with debug assertions passes
+  `CONNECTORS_TEST_OWNER_PARENT` to the owner it starts on Unix, and that owner exits once the named
+  process has ended; a release build reads no such variable. The catalog journey harness names its
+  own test process, so its owners end with it however it ends, and on drop, pass or panic, it stops
+  every owner of its state directory: an owner that has not exited within 5 seconds of the
+  harness's shutdown request is killed through its pidfd (Linux) and waited for.
+
 ## 0.52.0 — 2026-10-15
 
 ### Added

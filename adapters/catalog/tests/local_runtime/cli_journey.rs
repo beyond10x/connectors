@@ -12,6 +12,8 @@ use std::{
 mod guarded_merge;
 #[path = "lifecycle.rs"]
 mod lifecycle;
+#[path = "owner_guard.rs"]
+mod owner_guard;
 #[path = "reason_cli_adversary.rs"]
 mod reason_cli_adversary;
 #[path = "retry_after_cli.rs"]
@@ -139,6 +141,9 @@ pub(super) struct Cli {
     pub(super) paths: Paths,
     recorded: std::cell::RefCell<Option<recorded_state::Reader>>,
     fault: Option<settlement_fault::Controller>,
+    /// The process every owner this harness starts is tied to: this test
+    /// process unless a journey names a stand-in (contracts/cli/v1alpha1/owner.md).
+    pub(super) parent: Option<u32>,
 }
 
 impl Cli {
@@ -150,6 +155,7 @@ impl Cli {
             binary,
             recorded: std::cell::RefCell::new(None),
             fault: None,
+            parent: None,
             paths: Paths {
                 config: root.join("cli/config.toml"),
                 state: root.join("cli/state"),
@@ -161,6 +167,12 @@ impl Cli {
         let mut command = Command::new(&self.binary);
         command
             .env_clear()
+            // A test build's owner exits once this process has ended, however
+            // the journey ends (contracts/cli/v1alpha1/owner.md).
+            .env(
+                "CONNECTORS_TEST_OWNER_PARENT",
+                self.parent.unwrap_or_else(std::process::id).to_string(),
+            )
             .args(["--output", "json", "--config"])
             .arg(&self.paths.config)
             .arg("--state-dir")
@@ -269,8 +281,26 @@ impl Cli {
 }
 
 impl Drop for Cli {
+    /// Pass or panic, no owner of this harness's state directory outlives it:
+    /// each is found before the shutdown request, and one still alive 5 s
+    /// after it is killed through its pidfd and waited for.
     fn drop(&mut self) {
-        self.shutdown();
+        #[cfg(target_os = "linux")]
+        let owners = owner_guard::owners_of(&self.paths);
+        if std::thread::panicking() {
+            // A second panic here would abort the test process and skip every
+            // other cleanup; the by-pid stop below does not depend on this.
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.shutdown()));
+        } else {
+            self.shutdown();
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let killed = owner_guard::stop(owners, Duration::from_secs(5));
+            if !killed.is_empty() {
+                eprintln!("journey owners {killed:?} did not exit after shutdown; killed by pidfd");
+            }
+        }
         // Observational bridge retires while all fault listeners still exist.
         drop(self.recorded.get_mut().take());
     }

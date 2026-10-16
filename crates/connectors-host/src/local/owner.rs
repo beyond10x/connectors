@@ -5,6 +5,8 @@ mod lifecycle;
 mod maintenance;
 pub mod mutation;
 mod supervisor;
+#[cfg(unix)]
+mod tether;
 mod transport;
 use super::{
     config::{Adapter, Config, Paths},
