@@ -1,0 +1,12 @@
+{
+  "format": "connectors-catalog-operations/1",
+  "provider": "openrouter",
+  "operations": [
+    {"id": "key.get", "operation_id": "getCurrentKey", "effect": "read",
+     "description": "Read the connection's own key record: its label, limits, usage and whether it is a management key"},
+    {"id": "workspaces.list", "operation_id": "listWorkspaces", "effect": "read",
+     "description": "List the account's workspaces, one page per call, paged by offset and limit"},
+    {"id": "keys.list", "operation_id": "list", "effect": "read",
+     "description": "List the account's API keys by hash, label, limits and usage, one page per call, filtered by workspace_id and paged by offset; never their secrets"}
+  ]
+}
