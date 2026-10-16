@@ -270,10 +270,15 @@ for `connectors`: a command line whose command word, after any leading
 `--output` selections, is one of them completes that command's own options;
 any other line is completed by the generated function, with the three command
 words added at the root and as the word after a leading `help`.
-Root `--help` or `-h`, alone or after leading process globals, prints the
-generated grouped help (the short form of the long help
-in `apps/connectors-cli-contract/help.txt`), one blank line and then this block,
-which the generated help does not carry:
+Help is the generated grouped tree as `connectors::help` presents it
+(`apps/connectors/src/help.rs`) with what the `ess-cli/1` binding cannot
+declare: each group's summary, a deprecated command path marked `Deprecated` in
+its parent's listing and in its own usage line, and `--adapter` marked
+deprecated. It parses exactly as the generated tree does, and help prints no
+deprecation line on standard error, under an old path or with `--adapter` too.
+Root `--help` or `-h`, alone or after leading process globals, prints that
+help's short form, one blank line and then this block, which the generated help
+does not carry:
 
 ```text
 Explicit service commands (use COMMAND --help for options):

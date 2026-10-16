@@ -322,7 +322,9 @@ pub(super) fn json_output(args: &[OsString]) -> bool {
 /// once: under `--output human` one line each on standard error; under
 /// `--output json` nothing more on standard error, and the one envelope,
 /// success or failure, carries `deprecations`. Output that is no envelope
-/// (help, completions, a launched consumer's) is left as it is.
+/// (completions, a launched consumer's) is left as it is under `--output json`.
+/// Help never reaches here: `run` answers it first, and the help marks a
+/// deprecated name itself (`connectors::help`).
 pub(super) fn deprecate(output: &mut ProcessOutput, json: bool, deprecations: &[Deprecation]) {
     if !json {
         let lines: String = deprecations.iter().map(Deprecation::line).collect();
