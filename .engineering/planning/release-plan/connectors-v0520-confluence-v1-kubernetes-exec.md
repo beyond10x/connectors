@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: release-plan:connectors-v0520-confluence-v1-kubernetes-exec
 kind: release-plan
-status: active
+status: implemented
 title: 'Release 0.52.0: Confluence REST v1, Slack user-token history, Kubernetes exec credentials and the clock quorum'
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "active", at: "2026-10-16T02:05:22Z", actor: "human:timo", revision: 2}
+- {from: "active", to: "implemented", at: "2026-10-16T10:54:28Z", actor: "human:timo", revision: 5}
 ---
 ## Outcome
 
@@ -68,3 +69,12 @@ The stories moved to implemented with this release:
 - The clock quorum is two of two configured sources; Slack writes stay behind it.
 - The Windows clock quorum flake is story:clock-quorum-windows-unreachable-flake.
 - macOS release signing waits on the signing secrets.
+
+## Release
+
+- Released 2026-10-16: https://github.com/beyond10x/connectors/releases/tag/v0.52.0. Pull request
+  https://github.com/beyond10x/connectors/pull/173 merged as 74d8d857d after all eight checks
+  passed on 730b8dba0; the merge commit's tree is that tree.
+- Tag `v0.52.0`, annotated, tagger b10x-bot[bot], peels to 74d8d857d; the release page is authored
+  by b10x-bot[bot] and is Latest. The release-binaries run 38867720859 succeeded; the four archives
+  and `SHA256SUMS` are on the page, and `sha256sum -c SHA256SUMS` reports OK for all four.

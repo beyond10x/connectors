@@ -6,7 +6,7 @@ status: active
 title: OpenRouter management keys read and created through the catalog provider, the created key held in custody
 relations:
 - serves: vision:independent-contract-adapters
-revision: 3
+revision: 5
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T06:55:07Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-16T06:55:07Z", actor: "human:timo", revision: 3}
@@ -71,3 +71,24 @@ validates with the repository's pinned `ess` and its conformance suite runs gree
   the secret appears nowhere.
 - Docs: `docs/catalog-openrouter.md` shows the configuration, the protected-prompt connect and
   each operation from a run in the tree.
+
+## Status
+
+- Reads shipped on their own: the pinned OpenRouter source (redaction rule `upstream-redaction/3`),
+  the bundle, `key.get`, `workspaces.list` and `keys.list` with their fixture tests, and
+  `docs/catalog-openrouter.md`. The shared ESS models the custody outcome
+  (`CustodyOutcome`, `CredentialCustody`; catalog `Custody`, `CustodyWrite`), and the catalog
+  design §8a describes the custody write.
+- `key.create` ships under the current operator setting `[adapters.<alias>.permissions.custody]`;
+  the connector-vocabulary migration reads that name as a legacy alias during its deprecation
+  window, so it moves with the other settings. It is finished on branch `unit/openrouter-custody`
+  (from 5631f1fa8d: engine `custody` member and `execute_holding`, provider child
+  `execute_created`, host `Created` frame with the protected secret slot, owner
+  `mutation/custody.rs`, config `Permissions.custody`, CLI error data, tests; `custody` and
+  `created` added to `connectors.cli.Failure` in `ess/domains/cli.yaml`, CLI contract
+  regenerated), then the package suites and the three CLI journey cases (stored key,
+  `outcome_unknown` with one create, custody failure), and a security review of the write.
+- Risks found, owed before `key.create` ships:
+  - a custody store that answers `outcome_unknown` is reported as custody `failed`, though the
+    connection may have been published;
+  - the HTTP client's serde_json buffers that held the answer are not wiped.
