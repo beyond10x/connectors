@@ -183,9 +183,10 @@ pub(super) fn follow_instance(tx: &Transaction<'_>, instance: &str, revision: &s
 /// the upgrade's configured revision (`Connection.refused_configuration_revision`).
 /// It invalidates nothing under the connection's own revision; a read under
 /// that configured revision then names a new connection (`changed`).
-/// A Stale connection records none: its lifecycle has no change that keeps
-/// it Stale (`MarkConnectionStale` moves only Live), and a publication, the
-/// one way out, clears a recorded refusal anyway (`lifecycle::follow`).
+/// A Stale connection does not reach here: it is not ready, so `admitted`
+/// refuses its revalidation at capture and at finish. Should one, it records
+/// none, since its lifecycle has no change that keeps it Stale
+/// (`MarkConnectionStale` moves only Live).
 fn refuse_upgrade(tx: &Transaction<'_>, row: &ConnectionRow, upgrade: &Binding) -> Result<()> {
     if row.kept.stale
         || row.kept.refused.as_deref() == Some(upgrade.configuration_revision.as_str())
@@ -378,13 +379,6 @@ impl Registry {
                             &native,dispatched.captured.captured,dispatched.consumed)?;
                         tx.execute("UPDATE registry_connections SET baseline=?2,publication_fence=?3 WHERE connection_ref=?1",
                             params![row.reference,encode(&snapshot)?,new_id()]).map_err(db)?;
-                        // The provider accepted the credential: this publication
-                        // leaves Stale (decision 14). An upgrade rewrites the
-                        // whole binding below, which keeps nothing beside it.
-                        if row.kept.stale && upgrade.is_none() {
-                            tx.execute("UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
-                                params![row.reference,encode_stored(&row.binding,&Kept {stale:false,..row.kept.clone()})?]).map_err(db)?;
-                        }
                         if let Some(upgrade) = upgrade {
                             // The binding changed, so the public revision advances.
                             tx.execute("UPDATE registry_connections SET binding=?2,semantic_revision=?3 WHERE connection_ref=?1",
