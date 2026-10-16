@@ -1760,21 +1760,17 @@ fn connection_row(
     } else {
         None
     };
-    // A Stale connection lists only versions a publication made active: the
-    // Connection lifecycle has no change that keeps it Stale, and a reconnect
-    // allocates its candidate version before the publication that leaves
-    // Stale. A Live or Revoked one lists every other version, as before.
-    let stale = binding.get("lifecycle").is_some();
+    // Every version but the active one, whatever the lifecycle: a reconnect's
+    // candidate on a Stale connection is recorded by
+    // `RecordConnectionCandidate`, which keeps it Stale (`update_command`).
     let mut statement = connection
         .prepare(
-            "SELECT m.version_id FROM registry_materials m \
-             LEFT JOIN registry_acquisitions a ON a.acquisition_ref=m.acquisition_ref \
-             WHERE m.connection_ref=?1 AND (?2 IS NULL OR m.version_id<>?2) \
-             AND (?3=0 OR a.state='completed') ORDER BY m.version_id",
+            "SELECT version_id FROM registry_materials \
+             WHERE connection_ref=?1 AND (?2 IS NULL OR version_id<>?2) ORDER BY version_id",
         )
         .map_err(unavailable)?;
     let superseded = statement
-        .query_map(rusqlite::params![id, active_material, stale], |record| {
+        .query_map(rusqlite::params![id, active_material], |record| {
             record.get::<_, String>(0)
         })
         .map_err(unavailable)?
@@ -4243,9 +4239,16 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
             Ok("connectors.declarations.AdvanceRegistryEpoch")
         }
         // Any publication leaves Stale (story:ess-connector-vocabulary-model
-        // decision 14); a Stale connection changes in no other way.
+        // decision 14). Short of that, a Stale connection changes only by a
+        // reconnect's candidate custody version, allocated before the
+        // publication (`ess/domains/auth_bindings.yaml`, `record_candidate`).
         ("connectors.auth_bindings.Connection", ("Live" | "Stale", "Live")) => {
             Ok("connectors.auth_bindings.PublishBinding")
+        }
+        ("connectors.auth_bindings.Connection", ("Stale", "Stale"))
+            if connection_candidate(current, next).is_some() =>
+        {
+            Ok("connectors.auth_bindings.RecordConnectionCandidate")
         }
         ("connectors.auth_bindings.Connection", ("Live", "Stale")) => {
             Ok("connectors.auth_bindings.MarkConnectionStale")
@@ -4368,6 +4371,25 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
         }
         _ => Err(Failure::MetadataUnavailable),
     }
+}
+
+/// The one custody version `next` lists among a connection's superseded
+/// versions and `current` does not, when that addition is the whole change.
+fn connection_candidate<'a>(current: &RowImage, next: &'a RowImage) -> Option<&'a Value> {
+    const LISTED: &str = "superseded_custody_version_refs";
+    let before = current.fields.get(LISTED)?.as_array()?;
+    let after = next.fields.get(LISTED)?.as_array()?;
+    let mut added = after.iter().filter(|version| !before.contains(version));
+    let candidate = added.next()?;
+    let only_addition = added.next().is_none()
+        && after.len() == before.len() + 1
+        && before.iter().all(|version| after.contains(version));
+    let nothing_else = current.fields.len() == next.fields.len()
+        && current
+            .fields
+            .iter()
+            .all(|(name, value)| name == LISTED || next.fields.get(name) == Some(value));
+    (only_addition && nothing_else).then_some(candidate)
 }
 
 fn read_use_transition(current: &RowImage, next: &RowImage, changed: &str) -> bool {
@@ -4493,6 +4515,10 @@ fn command_arguments(
     }
     if input_schema.properties.contains_key("publication") {
         candidates.insert("publication".into(), publication_value(current, next, all)?);
+    }
+    if binding.name == "connectors.auth_bindings.RecordConnectionCandidate" {
+        let candidate = connection_candidate(current, next).ok_or(Failure::MetadataUnavailable)?;
+        candidates.insert("candidate_custody_version_ref".into(), candidate.clone());
     }
     if binding.name == "connectors.execution_audit.AppendFinalObservation" {
         // The owner-allocated id, flattened from the observation being appended
@@ -7832,6 +7858,202 @@ mod tests {
         let (_, stale) = step(&mut authority, &live, "Stale");
         let (command, _) = step(&mut authority, &stale, "Revoked");
         assert_eq!(command, "connectors.auth_bindings.RevokeConnection");
+    }
+
+    /// story:stale-connection-reconnect-candidate: a reconnect allocates its
+    /// candidate custody version on the Stale connection before the
+    /// publication that leaves Stale. The host records that as
+    /// `RecordConnectionCandidate` (Stale to Stale), so the connection stays
+    /// Stale with the candidate among its custody versions, a failed reconnect
+    /// keeps it listed, and the next reconnect's publication returns it to Live.
+    #[test]
+    fn a_reconnect_candidate_on_a_stale_connection_is_recorded_and_it_stays_stale() {
+        use crate::local::{
+            keyring::custody,
+            metadata::Metadata,
+            registry::{self, ExternalIdentity, Registry, State, ValidatedBaseline},
+        };
+        const NOW: u64 = 1_789_056_000_000;
+        let baseline = |now: u64| ValidatedBaseline {
+            identity: ExternalIdentity {
+                kind: "fixture-account".into(),
+                subject: "one".into(),
+            },
+            granted_scopes: Some(std::collections::BTreeSet::from(["read".into()])),
+            credential_expires_at_ms: Some(now + 3_600_000),
+            collected_at_ms: now,
+            valid_until_ms: now + 60_000,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("state");
+        crate::local::filesystem::directory(&path, true, true).unwrap();
+        drop(Metadata::initialize(&path).unwrap());
+        let binding = registry::fixture_binding("fixture-instance");
+        let registry = Registry::new(&path);
+        let acquisition = registry.begin(&binding, NOW).unwrap();
+        let claim = registry.consume(acquisition, NOW).unwrap();
+        let prepared = registry.prepare(&claim, baseline(NOW), 12, NOW).unwrap();
+        let receipt = custody::WrittenVersion::fixture(prepared.version());
+        let stored = registry.acknowledge(prepared, receipt, NOW).unwrap();
+        let reference = registry.publish(stored, NOW).unwrap();
+        let describe = |now: u64| {
+            registry
+                .describe(
+                    "fixture-instance",
+                    "adapter",
+                    "config",
+                    &reference,
+                    now,
+                    true,
+                )
+                .unwrap()
+        };
+        let revision = describe(NOW).revision;
+        let captured = registry
+            .capture_read(
+                &binding,
+                &reference,
+                &std::collections::BTreeSet::new(),
+                NOW,
+                NOW + 1000,
+            )
+            .unwrap();
+        let dispatched = registry.dispatch_read(captured, NOW).unwrap();
+        registry.refuse_read(dispatched, NOW).unwrap();
+        assert_eq!(describe(NOW).state, State::Stale);
+        // The recorded Connection subject and the candidate its acquisition
+        // names, as a restarted owner reads them back.
+        let recorded = || {
+            let metadata = Metadata::inspect(&path).unwrap();
+            let facts = snapshot_facts(metadata.er.as_ref().unwrap());
+            let connection = facts
+                .iter()
+                .find(|(entity, id, _, _)| {
+                    entity == "connectors.auth_bindings.Connection"
+                        && id == &format!("s:{reference}")
+                })
+                .map(|(_, _, state, fields)| (state.clone(), fields.clone()))
+                .unwrap();
+            // Every candidate an acquisition of this connection allocated,
+            // but the one its publication made active.
+            let candidates = facts
+                .iter()
+                .filter(|(entity, _, _, fields)| {
+                    entity == "connectors.auth_bindings.Acquisition"
+                        && fields.get("target_connection_ref") == Some(&json!(reference))
+                })
+                .filter_map(|(_, _, _, fields)| fields.get("candidate_custody_version_ref"))
+                .filter(|candidate| {
+                    connection.1.get("active_custody_version_ref") != Some(*candidate)
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            (connection, candidates)
+        };
+        let ((state, before), _) = recorded();
+        assert_eq!(state, "Stale");
+        let active = before["active_custody_version_ref"].clone();
+        assert_eq!(before["superseded_custody_version_refs"], json!([]));
+
+        let later = NOW + 1;
+        let acquisition = registry
+            .begin_repair(&binding, &reference, &revision, later)
+            .unwrap();
+        let claim = registry.consume(acquisition, later).unwrap();
+        registry
+            .prepare(&claim, baseline(later), 12, later)
+            .unwrap_or_else(|error| panic!("the reconnect candidate was not recorded: {error:?}"));
+        let ((state, fields), candidates) = recorded();
+        assert_eq!(state, "Stale", "recording the candidate left Stale");
+        assert_eq!(candidates.len(), 1, "{candidates:?}");
+        assert_ne!(candidates[0], active);
+        assert_eq!(
+            fields["superseded_custody_version_refs"],
+            json!([candidates[0]]),
+            "the Stale connection does not list its reconnect candidate"
+        );
+        assert_eq!(fields["active_custody_version_ref"], active);
+        assert_eq!(describe(later).state, State::Stale);
+
+        // A failed reconnect publishes nothing: still Stale, still listed.
+        registry.fail(&claim, later).unwrap();
+        let ((state, fields), _) = recorded();
+        assert_eq!(state, "Stale");
+        assert_eq!(
+            fields["superseded_custody_version_refs"],
+            json!([candidates[0]])
+        );
+
+        // The next reconnect's publication returns it to Live.
+        let acquisition = registry
+            .begin_repair(&binding, &reference, &revision, later)
+            .unwrap();
+        let claim = registry.consume(acquisition, later).unwrap();
+        let prepared = registry
+            .prepare(&claim, baseline(later), 12, later)
+            .unwrap();
+        let receipt = custody::WrittenVersion::fixture(prepared.version());
+        let stored = registry.acknowledge(prepared, receipt, later).unwrap();
+        assert_eq!(registry.publish(stored, later).unwrap(), reference);
+        let ((state, _), _) = recorded();
+        assert_eq!(state, "Live");
+        assert_eq!(describe(later).state, State::Ready);
+    }
+
+    /// Only the reconnect candidate keeps a Stale connection Stale: a
+    /// Stale-to-Stale change that adds no custody version, or that changes
+    /// anything else, is no command the model declares.
+    #[test]
+    fn a_stale_connection_changes_without_publication_only_by_a_new_candidate() {
+        let mut stale = live_connection("conn-stale");
+        stale.lifecycle_state = "Stale".into();
+        stale.fields.insert(
+            "superseded_custody_version_refs".into(),
+            json!(["version-a"]),
+        );
+        let changed = |change: &dyn Fn(&mut RowImage)| {
+            let mut next = stale.clone();
+            next.revision += 1;
+            change(&mut next);
+            update_command(&stale, &next)
+        };
+        assert_eq!(
+            changed(&|next| {
+                next.fields.insert(
+                    "superseded_custody_version_refs".into(),
+                    json!(["version-a", "version-b"]),
+                );
+            }),
+            Ok("connectors.auth_bindings.RecordConnectionCandidate")
+        );
+        assert!(changed(&|_| {}).is_err());
+        assert!(
+            changed(&|next| {
+                next.fields
+                    .insert("superseded_custody_version_refs".into(), json!([]));
+            })
+            .is_err()
+        );
+        assert!(
+            changed(&|next| {
+                next.fields.insert(
+                    "superseded_custody_version_refs".into(),
+                    json!(["version-b"]),
+                );
+            })
+            .is_err()
+        );
+        assert!(
+            changed(&|next| {
+                next.fields.insert(
+                    "superseded_custody_version_refs".into(),
+                    json!(["version-a", "version-b"]),
+                );
+                next.fields
+                    .insert("configuration_revision".into(), json!("revision-2"));
+            })
+            .is_err()
+        );
     }
 
     // `CompleteAcquisition` yields exactly its fixed target
