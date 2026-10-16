@@ -413,10 +413,10 @@ fn revalidation_preserves_transient_failures_but_cannot_resurrect_known_invalidi
                 .finish_revalidation(attempt, Err(Some(InvalidCredential::Invalid)), NOW)
                 .unwrap();
         }
-        assert_eq!(
-            describe(&registry, &reference, NOW).state,
-            State::ReauthorizationRequired
-        );
+        // Known invalidity makes the connection Stale (story:ess-connector-
+        // vocabulary-model decision 17); the late success below still cannot
+        // publish over it.
+        assert_eq!(describe(&registry, &reference, NOW).state, State::Stale);
         assert_eq!(
             registry.finish_revalidation(late_success, Ok(baseline("one", NOW)), NOW),
             Err(Failure::NotReady)
@@ -1395,9 +1395,11 @@ fn receipt_identity_and_known_missing_material_cannot_be_substituted() {
     registry
         .invalidate_read(&captured, InvalidCredential::Missing, NOW + 1)
         .unwrap();
+    // A lost keyring entry is one a reconnect fixes: the connection is Stale
+    // (story:ess-connector-vocabulary-model decision 17).
     assert_eq!(
         describe(&Registry::new(root.path()), &connection, NOW + 1).state,
-        State::ReauthorizationRequired
+        State::Stale
     );
     assert!(registry.dispatch_read(captured, NOW + 1).is_err());
 }
