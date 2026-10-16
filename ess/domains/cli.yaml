@@ -307,6 +307,9 @@ types:
       - {name: profile, type: String}
       - {name: scopes, type: "List<String>"}
       - {name: effect, type: connectors.cli.PrivateOperationEffect}
+      # Present and true only for a write whose answer carries a credential it
+      # created (connectors.mutations.CredentialCustody); absent otherwise.
+      - {name: custody, type: "Optional<Boolean>"}
   - name: connectors.cli.PrivateAdapterBootstrap
     kind: struct
     fields:
