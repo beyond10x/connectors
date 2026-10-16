@@ -64,6 +64,9 @@ pub(super) enum Refused {
     InvalidInput,
     /// `--connector`/`--instance` name no configured instance.
     NotFound,
+    /// They name a listed instance that has no entry: its connector declares
+    /// several profiles and it names none (`Config::awaiting_profile`).
+    ProfileUnnamed,
 }
 
 impl From<Refused> for owner::Error {
@@ -71,6 +74,7 @@ impl From<Refused> for owner::Error {
         match refused {
             Refused::InvalidInput => owner::Code::InvalidInput.into(),
             Refused::NotFound => owner::Code::NotFound.into(),
+            Refused::ProfileUnnamed => owner::Code::InvalidConfiguration.into(),
         }
     }
 }
@@ -79,6 +83,12 @@ fn refusal(refused: Refused) -> HandlerReply {
     match refused {
         Refused::InvalidInput => failure("invalid_input", "arguments", "none", true),
         Refused::NotFound => failure("not_found", "admission", "check_configuration", false),
+        Refused::ProfileUnnamed => failure(
+            "invalid_configuration",
+            "admission",
+            "check_configuration",
+            false,
+        ),
     }
 }
 
@@ -113,7 +123,11 @@ pub(super) fn alias(input: &Value, config: &Config) -> Result<String, Refused> {
                 connector,
                 instance,
             })
-            .ok_or(Refused::NotFound)?,
+            .ok_or(if config.awaiting_profile(connector, instance).is_some() {
+                Refused::ProfileUnnamed
+            } else {
+                Refused::NotFound
+            })?,
         (None, None) => config
             .select(Selector::Default)
             .ok_or(Refused::InvalidInput)?,

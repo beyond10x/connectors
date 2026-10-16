@@ -957,9 +957,9 @@ fn spawn(
     deadline: Instant,
 ) -> Result<(UnixStream, std::process::Child, Launched)> {
     let binary = std::env::current_exe().map_err(|_| Code::Unavailable)?;
-    // The owner runs from a sealed copy; it finds the catalog provider that
-    // derives configured instances beside this CLI, not beside that copy.
-    let installation = binary.parent().map(std::path::Path::to_owned);
+    // The owner runs from a sealed copy; it derives configured instances from
+    // the installation this CLI resolved, so both bind the same executable.
+    let installation = crate::local::config::installation_directory();
     let hash = hex::encode(Sha256::digest(
         std::fs::read(&binary).map_err(|_| Code::Unavailable)?,
     ));
