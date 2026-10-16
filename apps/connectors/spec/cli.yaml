@@ -163,6 +163,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
   - path: [approvals, policy-set]
     aliases: []
     callable: approval-policy-set
@@ -170,6 +174,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
       # ess-cli/1 document carriers require all three sources. The production
@@ -183,6 +191,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: operation
@@ -200,6 +212,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: operation
@@ -221,6 +237,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
   - path: [approvals, key-status]
     aliases: []
     callable: approval-keys-status
@@ -228,6 +248,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
   - path: [approvals, key-init]
     aliases: []
     callable: approval-keys-init
@@ -235,6 +259,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
   - path: [approvals, key-rotate]
@@ -244,6 +272,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
       - field: expected_key
@@ -255,6 +287,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
       - field: candidate
@@ -266,6 +302,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
       - field: expected_key
@@ -277,6 +317,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
       - field: key
@@ -319,6 +363,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
   - path: [adapters, status]
     aliases: []
     callable: adapters-status
@@ -326,6 +374,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
   - path: [adapters, stop]
     aliases: []
     callable: adapters-stop
@@ -333,6 +385,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: expected_revision
         source: {kind: option, long: expected-revision}
       - field: host_incarnation
@@ -346,6 +402,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: limit
         source: {kind: option, long: limit}
       - field: cursor
@@ -357,6 +417,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
   - path: [connections, connect]
@@ -366,6 +430,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: profile
         source: {kind: option, long: profile}
       - field: credential_document
@@ -377,6 +445,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: expected_revision
@@ -390,6 +462,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: acquisition
@@ -401,6 +477,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: expected_revision
@@ -412,6 +492,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: consumer
@@ -425,6 +509,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: expected_revision
@@ -436,6 +524,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: family
         source: {kind: option, long: family}
       - field: limit
@@ -449,6 +541,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: operation
         source: {kind: option, long: operation}
   - path: [operations, invoke]
@@ -458,6 +554,10 @@ commands:
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
+      - field: connector
+        source: {kind: option, long: connector}
+      - field: instance
+        source: {kind: option, long: instance}
       - field: connection
         source: {kind: option, long: connection}
       - field: operation

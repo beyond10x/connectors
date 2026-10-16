@@ -431,7 +431,12 @@ fn c05_business_input_sources() {
     let base = [
         "operations",
         "invoke",
-        "--adapter",
+        // An unmigrated entry is selected by its adapter id and alias
+        // (story:cli-connector-instance-selectors); `--adapter` would add a
+        // `deprecations` member to the exact envelope asserted below.
+        "--connector",
+        "catalog",
+        "--instance",
         "forge",
         "--connection",
         "conn-1",

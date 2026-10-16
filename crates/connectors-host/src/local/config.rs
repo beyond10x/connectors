@@ -20,6 +20,10 @@ pub struct Config {
     pub secret_service_socket: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_adapter: Option<String>,
+    /// `"<connector>/<instance>"`, selected when a command names no instance
+    /// (`connectors-local/5`); never beside `default_adapter`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_instance: Option<String>,
     #[serde(default)]
     pub adapters: BTreeMap<String, Adapter>,
     /// The explicitly selected custody binding (`connectors-local/4` and `/5`);
@@ -47,6 +51,7 @@ struct ConfigInput {
     approval_clock: Option<super::clock::ApprovalClock>,
     secret_service_socket: Option<PathBuf>,
     default_adapter: Option<String>,
+    default_instance: Option<String>,
     custody: Option<Custody>,
     #[serde(default)]
     adapters: BTreeMap<String, Adapter>,
@@ -63,6 +68,7 @@ impl Config {
             secret_service_socket: input.secret_service_socket,
             custody: input.custody,
             default_adapter: input.default_adapter,
+            default_instance: input.default_instance,
             adapters: input.adapters,
             consumers: input.consumers,
             connectors: None,
@@ -451,6 +457,8 @@ struct Written {
     secret_service_socket: Option<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     default_adapter: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_instance: Option<String>,
     adapters: BTreeMap<String, Adapter>,
     #[serde(skip_serializing_if = "Option::is_none")]
     custody: Option<Custody>,
@@ -489,6 +497,7 @@ impl From<Config> for Written {
             approval_clock: config.approval_clock,
             secret_service_socket: config.secret_service_socket,
             default_adapter: config.default_adapter,
+            default_instance: config.default_instance,
             adapters,
             custody: config.custody,
             consumers: config.consumers,
@@ -563,6 +572,117 @@ impl Config {
                 {
                     return Err(Failure::InvalidConfiguration.into());
                 }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// What a command selects its instance by (`contracts/cli/v1alpha1/semantics.md`
+/// §3, "Selecting an instance").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Selector<'a> {
+    /// `--adapter <alias>`, deprecated: an entry by its alias.
+    Alias(&'a str),
+    /// `--connector <connector> --instance <instance>`: an instance name is
+    /// unique within its connector only, so both are needed.
+    Instance {
+        connector: &'a str,
+        instance: &'a str,
+    },
+    /// No selector: `default_instance`, else `default_adapter`.
+    Default,
+}
+
+/// The entry a selector names, and the names it is selected by.
+#[derive(Clone, Copy, Debug)]
+pub struct Selected<'a> {
+    /// Its key in `Config::adapters`: the alias `--adapter` and the JSON
+    /// `adapter` field carry.
+    pub alias: &'a str,
+    pub connector: &'a str,
+    pub instance: &'a str,
+    pub adapter: &'a Adapter,
+}
+
+impl Config {
+    /// The connector and instance names of the entry under `alias`: those of
+    /// the `[connectors]` instance that names the alias or, for a legacy
+    /// `[adapters.<alias>]` entry no instance names, its `adapter_id` and its
+    /// alias. `None` when no entry has the alias.
+    pub fn names(&self, alias: &str) -> Option<(&str, &str)> {
+        let (alias, adapter) = self.adapters.get_key_value(alias)?;
+        let declared = self
+            .connectors
+            .iter()
+            .flatten()
+            .find_map(|(connector, table)| {
+                table
+                    .instances
+                    .iter()
+                    .find(|(_, instance)| instance.alias == *alias)
+                    .map(|(instance, _)| (connector.as_str(), instance.as_str()))
+            });
+        Some(declared.unwrap_or((adapter.adapter_id.as_str(), alias.as_str())))
+    }
+
+    /// The entry `selector` names, `None` when it names none; with no
+    /// selector, also when neither default is configured.
+    pub fn select(&self, selector: Selector<'_>) -> Option<Selected<'_>> {
+        let alias = match selector {
+            Selector::Alias(alias) => alias,
+            Selector::Instance {
+                connector,
+                instance,
+            } => self
+                .adapters
+                .keys()
+                .find(|alias| self.names(alias) == Some((connector, instance)))?,
+            Selector::Default => match (&self.default_instance, &self.default_adapter) {
+                (Some(default), _) => {
+                    let (connector, instance) = default.split_once('/')?;
+                    return self.select(Selector::Instance {
+                        connector,
+                        instance,
+                    });
+                }
+                (None, Some(alias)) => alias,
+                (None, None) => return None,
+            },
+        };
+        let (alias, adapter) = self.adapters.get_key_value(alias)?;
+        let (connector, instance) = self.names(alias)?;
+        Some(Selected {
+            alias,
+            connector,
+            instance,
+            adapter,
+        })
+    }
+
+    /// Every entry has its own connector and instance names, so the two
+    /// selectors name the same entries. `default_instance` is a
+    /// `connectors-local/5` key naming one of them as `<connector>/<instance>`,
+    /// and never beside `default_adapter`.
+    fn check_selectors(&self) -> std::result::Result<(), Refusal> {
+        let mut named = BTreeSet::new();
+        if !self
+            .adapters
+            .keys()
+            .all(|alias| named.insert(self.names(alias)))
+        {
+            return Err(Failure::InvalidConfiguration.into());
+        }
+        if let Some(default) = &self.default_instance {
+            let admitted = default
+                .split_once('/')
+                .is_some_and(|(connector, instance)| selector(connector) && selector(instance));
+            if !admitted
+                || self.default_adapter.is_some()
+                || self.format != "connectors-local/5"
+                || self.select(Selector::Default).is_none()
+            {
+                return Err(Failure::InvalidConfiguration.into());
             }
         }
         Ok(())
@@ -772,6 +892,7 @@ impl Config {
         {
             return Err(Failure::InvalidConfiguration.into());
         }
+        self.check_selectors()?;
         let mut instances = BTreeSet::new();
         for (alias, entry) in &self.adapters {
             if !selector(alias)
@@ -867,6 +988,7 @@ impl Config {
             secret_service_socket: None,
             custody: None,
             default_adapter: None,
+            default_instance: None,
             adapters: BTreeMap::new(),
             consumers: BTreeMap::new(),
             connectors: None,
@@ -1542,6 +1664,180 @@ mod connector_instance_tests {
             .unwrap()
             .selection()
             .read_only()
+        );
+    }
+}
+
+#[cfg(all(test, unix))]
+mod instance_selector_tests {
+    //! story:cli-connector-instance-selectors: `--connector` with `--instance`,
+    //! `--adapter` and `default_instance` resolve to exactly one entry.
+    use super::*;
+
+    const PINS: &str = "configuration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n";
+    const EXECUTABLE: &str = "path='/not-installed/adapter'\nsha256='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\nargs=[]\n";
+
+    /// An instance `<connector>/<instance>` carrying the pins of the legacy alias `alias`.
+    fn instance(connector: &str, instance: &str, alias: &str) -> String {
+        let table = format!("connectors.{connector}.instances.{instance}");
+        format!(
+            "[connectors.{connector}]\nenabled=true\n[{table}]\nalias='{alias}'\ninstance_id='{alias}-id'\nadapter_id='catalog'\n{PINS}[{table}.executable]\n{EXECUTABLE}"
+        )
+    }
+
+    /// A legacy entry no instance names.
+    fn legacy(alias: &str, adapter_id: &str) -> String {
+        format!(
+            "[adapters.{alias}]\ninstance_id='{alias}-id'\nadapter_id='{adapter_id}'\n{PINS}[adapters.{alias}.executable]\n{EXECUTABLE}"
+        )
+    }
+
+    fn read(format: &str, body: &str) -> std::result::Result<Config, Refusal> {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        std::fs::write(
+            &paths.config,
+            format!("format='{format}'\nowner_uid={}\n{body}", fs::uid()),
+        )
+        .unwrap();
+        Config::read(&paths.config)
+    }
+
+    fn alias(config: &Config, selector: Selector<'_>) -> Option<String> {
+        config
+            .select(selector)
+            .map(|selected| selected.alias.to_owned())
+    }
+
+    #[test]
+    fn both_selectors_name_one_entry_and_a_legacy_entry_by_its_adapter_id() {
+        let config = read(
+            "connectors-local/5",
+            &format!(
+                "{}{}",
+                legacy("tools", "mcp"),
+                instance("gmail", "private", "gmail-read")
+            ),
+        )
+        .unwrap();
+        let by_instance = |connector, instance| {
+            alias(
+                &config,
+                Selector::Instance {
+                    connector,
+                    instance,
+                },
+            )
+        };
+        assert_eq!(
+            by_instance("gmail", "private").as_deref(),
+            Some("gmail-read")
+        );
+        assert_eq!(
+            alias(&config, Selector::Alias("gmail-read")).as_deref(),
+            Some("gmail-read")
+        );
+        assert_eq!(config.names("gmail-read"), Some(("gmail", "private")));
+        assert_eq!(by_instance("mcp", "tools").as_deref(), Some("tools"));
+        assert_eq!(config.names("tools"), Some(("mcp", "tools")));
+        // An instance name is unique within its connector only.
+        assert_eq!(by_instance("drive", "private"), None);
+        assert_eq!(by_instance("gmail", "gmail-read"), None);
+        assert_eq!(alias(&config, Selector::Alias("absent")), None);
+        assert_eq!(config.names("absent"), None);
+        // No selector and no default selects nothing.
+        assert_eq!(alias(&config, Selector::Default), None);
+    }
+
+    #[test]
+    fn default_instance_selects_and_counterparts_default_adapter() {
+        let body = instance("gmail", "private", "gmail-read");
+        let config = read(
+            "connectors-local/5",
+            &format!("default_instance='gmail/private'\n{body}"),
+        )
+        .unwrap();
+        assert_eq!(config.default_instance.as_deref(), Some("gmail/private"));
+        let selected = config.select(Selector::Default).unwrap();
+        assert_eq!(
+            (selected.alias, selected.connector, selected.instance),
+            ("gmail-read", "gmail", "private")
+        );
+        let config = read(
+            "connectors-local/5",
+            &format!("default_adapter='gmail-read'\n{body}"),
+        )
+        .unwrap();
+        assert_eq!(
+            alias(&config, Selector::Default).as_deref(),
+            Some("gmail-read")
+        );
+        // Written back as read.
+        let written = toml::to_string(
+            &read(
+                "connectors-local/5",
+                &format!("default_instance='gmail/private'\n{body}"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(
+            written.contains("default_instance = \"gmail/private\""),
+            "{written}"
+        );
+    }
+
+    #[test]
+    fn a_default_instance_that_selects_no_single_entry_refuses_the_file() {
+        let body = instance("gmail", "private", "gmail-read");
+        let refused = Some(Refusal::Failure(Failure::InvalidConfiguration));
+        for default in [
+            "default_instance='gmail/absent'\n",
+            "default_instance='gmail'\n",
+            "default_instance='gmail/private/x'\n",
+            "default_instance='/private'\n",
+            "default_instance='gmail/private'\ndefault_adapter='gmail-read'\n",
+        ] {
+            assert_eq!(
+                read("connectors-local/5", &format!("{default}{body}")).err(),
+                refused,
+                "{default}"
+            );
+        }
+        // A `connectors-local/5` key: refused in an older format, where the
+        // legacy entry would still be named.
+        let legacy = legacy("tools", "mcp");
+        assert!(read("connectors-local/4", &legacy).is_ok());
+        assert_eq!(
+            read(
+                "connectors-local/4",
+                &format!("default_instance='mcp/tools'\n{legacy}")
+            )
+            .err(),
+            refused
+        );
+    }
+
+    #[test]
+    fn two_entries_answering_to_one_connector_and_instance_refuse_the_file() {
+        // The legacy entry `private` of adapter_id `catalog` and the declared
+        // instance `catalog/private` would answer to one pair.
+        let refused = read(
+            "connectors-local/5",
+            &format!(
+                "{}{}",
+                legacy("private", "catalog"),
+                instance("catalog", "private", "gmail-read")
+            ),
+        );
+        assert_eq!(
+            refused.err(),
+            Some(Refusal::Failure(Failure::InvalidConfiguration))
         );
     }
 }
