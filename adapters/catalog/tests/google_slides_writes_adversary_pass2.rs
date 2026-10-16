@@ -3,6 +3,8 @@
 //! effect the guide and the selection's description characterise. Driven
 //! through the engine against a scripted provider and from the guide's own
 //! JSON blocks. No network, no credential.
+mod hand_written;
+
 use connectors_catalog::bundle;
 use connectors_catalog_provider::{Engine, Selection};
 use connectors_core::Result;
@@ -59,15 +61,17 @@ fn response(value: Value) -> HttpResponse {
         body: serde_json::to_vec(&value).unwrap(),
     }
 }
-/// A JSON block of the guide, by a string it contains.
+/// A configuration block the guide showed before connectors were declared
+/// (`hand_written`), the write values included, by a string it contains.
 fn guide_block(marker: &str) -> Value {
-    let guide = guide();
-    let block = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+    let mut blocks = hand_written::blocks("catalog-google-slides.md");
+    blocks.push(hand_written::file(
+        "catalog-google-slides.write-values.json",
+    ));
+    let block = blocks
+        .iter()
         .find(|body| body.contains(marker))
-        .unwrap_or_else(|| panic!("the guide has no JSON block with {marker}"));
+        .unwrap_or_else(|| panic!("no hand-written block with {marker}"));
     serde_json::from_str(block).unwrap()
 }
 
@@ -151,13 +155,23 @@ fn the_documented_write_instance_can_connect_from_the_google_client_file() {
     config["auth"]["minimum_scopes"] = values["auth"]["minimum_scopes"].clone();
     config["auth"]["requested_scopes"] = values["auth"]["requested_scopes"].clone();
     assert!(
-        flat(&guide()).contains("`connections connect` that instance with the Google client file"),
-        "the guide no longer routes the write instance through the Google client file"
+        flat(&guide()).contains("Then connect it with the Google client file"),
+        "the guide no longer routes the instance through the Google client file"
     );
     assert_eq!(
         config["auth"]["authorize_url"], GOOGLE_CLIENT_FILE_AUTH_URI,
         "the write instance's authorize_url differs from the auth_uri of Google's client file, \
          so `connections connect` with that file is refused before consent"
+    );
+    // The one instance the guide now configures uses the declared profile,
+    // which asks for the write scope and keeps the same `authorize_url`.
+    let declared: Value = serde_json::from_slice(
+        &fs::read(root().join("providers/google-slides/connector.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        declared["profiles"][0]["authorize_url"],
+        GOOGLE_CLIENT_FILE_AUTH_URI
     );
 }
 

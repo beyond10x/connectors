@@ -6,8 +6,9 @@ Objects `2026-09` OpenAPI document. Nothing here is HubSpot-specific code: the
 pinned document is compiled into a bundle, a reviewed selection set exposes two
 reads, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection, approval and invocation work exactly as described
-there; this page covers what differs for HubSpot.
+Connection and invocation work as described there; this page configures the
+`hubspot` connector and covers what differs for HubSpot. Connector, instance
+and connection are defined in [the README](../README.md#vocabulary).
 
 ## Source and bundle
 
@@ -91,29 +92,39 @@ token belongs to an account, not a user, so the identity kind is
 `minimum_scopes`: no GET that lists a private-app token's scopes has been
 identified, so connecting does not check a token's scopes.
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "hubspot",
-  "provider": "hubspot",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://api.hubapi.com",
-  "auth": {
-    "profile": "hubspot.private-app",
-    "header": "Authorization",
-    "bearer": true,
-    "label": "Private app access token",
-    "identity": {"path": "account-info/2026-09/details", "kind": "hubspot.portal", "subject_pointer": "/portalId"}
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/hubspot/operations.json"
-}
+The `hubspot` connector declares that one profile and the default endpoint
+`https://api.hubapi.com`
+([`adapters/catalog/providers/hubspot/connector.json`](../adapters/catalog/providers/hubspot/connector.json)),
+so an instance needs only a name. Add to the host configuration
+(`~/.config/connectors/config.toml`, format `connectors-local/5`):
+
+```toml
+[connectors.hubspot]
+enabled = true
+
+[connectors.hubspot.instances.work]
 ```
 
-Connect with the credential document `{"token": "<private app access token>"}`:
+The bundle, both reads, the profile and the provider executable are derived
+from the shipped connector:
+
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"hubspot.work","adapter_id":"catalog","connector":"hubspot","instance":"work","instance_id":"hubspot.work","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
+Connect with the credential document `{"token": "<private app access token>"}`
+in an owner-only file:
 
 ```sh
-target/release/connectors --output json connections connect --adapter hubspot --profile hubspot.private-app --credential-file /owner-only/hubspot.json
+connectors connections connect --connector hubspot --instance work \
+  --profile hubspot.private-app --credential-file ~/private/hubspot.json
 ```
+
+An installation configured before connectors were declared converts its
+entries with `connectors setup migrate`, which keeps each instance id and
+revision; the pinned form it writes is described in
+[the catalog provider guide](local-catalog-provider.md).
 
 ## Limits
 

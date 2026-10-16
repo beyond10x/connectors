@@ -339,20 +339,25 @@ fn guide_cites_each_operation_its_paging_and_its_deltas() {
     }
 }
 
-/// The `auth` profile `profile` of a configuration example in the Zendesk guide,
-/// so the fixture runs the profile the guide tells a reader to write.
+/// The `auth` profile `profile` the `zendesk` connector declares
+/// (`providers/zendesk/connector.json`), with its `token_url` on the origin of
+/// the endpoint the guide's instance names, so the fixture runs the profile
+/// the guide's instance uses.
 fn documented_auth(profile: &str) -> Value {
-    let guide = fs::read_to_string(root().join("../../docs/catalog-zendesk.md")).unwrap();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| {
-            body.contains("\"provider\": \"zendesk\"")
-                && body.contains(&format!("\"profile\": \"{profile}\""))
-        })
-        .expect("the documented Zendesk configuration");
-    serde_json::from_str::<Value>(example).unwrap()["auth"].clone()
+    let declaration: Value =
+        serde_json::from_slice(&fs::read(root().join("providers/zendesk/connector.json")).unwrap())
+            .unwrap();
+    let mut auth = declaration["profiles"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|declared| declared["profile"] == profile)
+        .expect("the declared Zendesk profile")
+        .clone();
+    if let Some(path) = auth["token_url"].as_str().map(str::to_owned) {
+        auth["token_url"] = json!(format!("https://your-subdomain.zendesk.com{path}"));
+    }
+    auth
 }
 
 #[test]

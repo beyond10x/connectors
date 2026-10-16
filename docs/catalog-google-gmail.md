@@ -7,8 +7,9 @@ code: the Discovery document is projected into OpenAPI, the projection is
 compiled into a bundle, a reviewed selection set exposes eight reads and two
 draft writes, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
-Configuration, connection, approval and invocation work as described there; this
-page covers what differs for Gmail. Authentication is the `oauth2_refresh`
+Connection, approval and invocation work as described there; this page
+configures the `gmail` connector and covers what differs for Gmail. Connector,
+instance and connection are defined in [the README](../README.md#vocabulary). Authentication is the `oauth2_refresh`
 profile `google.oauth`, as for [Google Drive](catalog-google-drive.md); see
 [Authentication](#authentication).
 
@@ -166,11 +167,10 @@ then sent by id, so the approval to send binds a message the issuer has read.
 `users.messages.send` is not selected; it would send a message that never
 existed as a draft, bound only by the digest of its own input.
 
-They run on a separate write instance with the compose scope; see
-[Authentication](#authentication). Both are required-approval mutations, like
-every catalog write: select `private_protocol = "connectors-private/2"`, permit
-them in the adapter's operation permissions, name them in the approval policy,
-and invoke each with a proof issued for its exact input, as the
+They run on the same instance as the reads, whose consent requests the compose
+scope; see [Authentication](#authentication). Both are required-approval
+mutations, like every catalog write: name them in the instance's approval
+policy, and invoke each with a proof issued for its exact input, as the
 [guarded merge guide](local-gitlab-merge.md) walks through for GitLab. The
 approval subject carries the digest of the whole input, `body` included, so a
 proof issued for one input is refused for any other. What the issuer is shown
@@ -207,7 +207,7 @@ approval is refused before the provider sends anything.
 
   `messageId` is compared, never sent: the POST body is `body` as given. Read
   the message before approving: `users.messages.get` with that `messageId` and
-  `{"format": "raw"}` on the read instance returns it as one base64url string
+  `{"format": "raw"}` on the same instance returns it as one base64url string
   in `raw`. The pinned document calls a message id immutable, so a draft whose
   content changed carries a different `message.id` under the same draft id.
   **A changed draft sends nothing.** The provider reads the draft once with
@@ -235,81 +235,87 @@ approval is refused before the provider sends anything.
 ## Authentication
 
 Gmail uses Google OAuth: the `oauth2_refresh` scheme under the profile
-`google.oauth`, as described in
-[the catalog provider guide](local-catalog-provider.md). The protected entry is
+`google.oauth`, declared by the `gmail` connector
+([`adapters/catalog/providers/google-gmail/connector.json`](../adapters/catalog/providers/google-gmail/connector.json)).
+The protected entry is
 `{"client_id":"...","client_secret":"...","refresh_token":"..."}` for an
-installed-app OAuth client. The provider exchanges it at `token_url` for an
-access token and sends that as `Authorization: Bearer <access token>`. The
-identity comes from the token answer's `id_token` (`identity.source: id_token`).
-`minimum_scopes` asks for the Gmail read-only scope, which the pinned document
-accepts for all eight reads. `authorize_url` and `requested_scopes` are never
-called by the provider; they are handed to the host for obtaining the entry by
-consent. `authorize_url` is `https://accounts.google.com/o/oauth2/auth`, the
-`auth_uri` Google writes into a downloaded client file, which the client-file
-connect compares byte for byte.
+installed-app OAuth client. The provider exchanges it at
+`https://oauth2.googleapis.com/token` for an access token and sends that as
+`Authorization: Bearer <access token>`. The identity comes from the token
+answer's `id_token` (`identity.source: id_token`). The consent address is
+`https://accounts.google.com/o/oauth2/auth`, the `auth_uri` Google writes into
+a downloaded client file, which the client-file connect compares byte for byte;
+the provider never calls it.
 
-The read-only scope does not cover the writes. The pinned document accepts
-`https://www.googleapis.com/auth/gmail.compose` for both writes, and not
-`gmail.readonly`. It accepts both scopes for `users.drafts.get`, which the
-send's preflight reads, so the compose scope alone covers the whole send.
-Of the eight reads the compose scope covers only
-`users.getProfile`, so the write instance does not read messages,
-attachments, threads, history or labels; read with the read instance. At
-Google the compose scope also permits `users.messages.send`; this provider
-does not expose it. With the write configuration, a stored refresh token that
-was granted only the read-only scope fails validation as insufficient scope.
+One instance per Google account reads and writes. Its consent requests these
+scopes:
 
-Writes use a separate instance. Configure a second instance id,
-`google-gmail-write`: a copy of the configuration below with these values
-changed, as its own adapter entry in the host configuration with the writes in
-its operation permissions and `private_protocol = "connectors-private/2"`:
+| scope | what it covers |
+|---|---|
+| `openid` | the `id_token` that names the account |
+| `https://www.googleapis.com/auth/gmail.readonly` | the eight reads, per the pinned document |
+| `https://www.googleapis.com/auth/gmail.compose` | the two draft writes and `users.drafts.get`, which the send's preflight reads; of the eight reads, only `users.getProfile` |
 
-```json
-{
-  "instance": "google-gmail-write",
-  "auth": {
-    "minimum_scopes": ["https://www.googleapis.com/auth/gmail.compose"],
-    "requested_scopes": ["openid", "https://www.googleapis.com/auth/gmail.compose"]
-  }
-}
+The pinned document accepts the compose scope for both writes, and not
+`gmail.readonly`. At Google the compose scope also permits
+`users.messages.send`; this provider does not expose it. The connection's
+`minimum_scopes` are both Gmail scopes, so a stored refresh token granted only
+one of them fails validation as insufficient scope.
+
+Add to the host configuration (`~/.config/connectors/config.toml`, format
+`connectors-local/5`):
+
+```toml
+[connectors.gmail]
+enabled = true
+
+[connectors.gmail.instances.private]
+description = "personal mailbox"
 ```
 
-Then `connections connect` that instance with the Google client file. An
-existing read-only connection cannot be widened in place:
-`connections repair` cannot add a scope, because the configuration revision and
-the profile, whose `minimum_scopes` the scope changes, are part of the
-connection binding. Changing the scopes of the read instance itself leaves its
-connection bound to the old configuration, and a new connection on that same
-instance is refused while the old one exists.
+The `gmail` connector's default endpoint is `https://gmail.googleapis.com`.
+The bundle, the ten operations, the profile and the provider executable are
+derived from the shipped connector:
 
-```json
-{
-  "format": "connectors-catalog-local/2",
-  "instance": "google-gmail",
-  "provider": "google-gmail",
-  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
-  "api_base": "https://gmail.googleapis.com",
-  "auth": {
-    "profile": "google.oauth",
-    "scheme": "oauth2_refresh",
-    "header": "Authorization",
-    "bearer": true,
-    "label": "Google refresh token",
-    "identity": {"source": "id_token", "kind": "google.user"},
-    "minimum_scopes": ["https://www.googleapis.com/auth/gmail.readonly"],
-    "token_url": "https://oauth2.googleapis.com/token",
-    "authorize_url": "https://accounts.google.com/o/oauth2/auth",
-    "requested_scopes": ["openid", "https://www.googleapis.com/auth/gmail.readonly"]
-  },
-  "operations_file": "/absolute/path/adapters/catalog/providers/google-gmail/operations.json"
-}
+```console
+$ connectors instances list
+{"adapters":[{"adapter":"gmail.private","adapter_id":"catalog","connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
 ```
+
+Then connect it with the Google client file, as
+[the Google OAuth guide](catalog-google-oauth.md) describes:
+
+```sh
+connectors connections connect --connector gmail --instance private \
+  --profile google.oauth --credential-file ~/Downloads/client_secret_1234.json
+```
+
+A second account is a second instance, such as `[connectors.gmail.instances.work]`,
+with a consent of its own. Each instance is its own consent: `gmail.private`
+and `drive.private` are two.
+
+### Moving from read and write entries
+
+An installation configured before connectors were declared may hold two Gmail
+entries, one with the read-only scope and one with the compose scope.
+`connectors setup migrate` keeps each as it is, with its revision, and does not
+merge them: the one instance asks for both scopes, so its configuration differs
+and its connection needs a consent of its own. Add the instance above, connect
+it, move callers to `--connector gmail --instance private`, then revoke the
+connections of the old pair with `connections revoke` and remove their entries.
 
 ## Limits
 
+- The configuration this page shows, one instance whose consent requests
+  both scopes, is checked by derivation only: its configuration revision
+  equals that of a hand-written configuration with the declared fields
+  (`adapters/catalog/tests/connector_declarations.rs`). The reads and
+  writes below ran against the fixture under the hand-written read and
+  write configurations that preceded it, one scope set each
+  (`adapters/catalog/tests/hand_written/`).
 - Verified against a local HTTPS fixture only
-  (`adapters/catalog/tests/google_gmail.rs`): the guide's configuration with the
-  fixture as API and token host, one token exchange, the exact request of each
+  (`adapters/catalog/tests/google_gmail.rs`): the hand-written read
+  configuration with the fixture as API and token host, one token exchange, the exact request of each
   read with the exchanged bearer, the returned body as JSON, a two-page walk of
   `users.messages.list` and `users.threads.list` to a page without
   `nextPageToken` and of `users.history.list` from the profile's `historyId`,
@@ -317,15 +323,16 @@ instance is refused while the old one exists.
   `metadataHeaders` sent as repeated pairs, each message `format`, an
   attachment read by the `attachmentId` a `full` message names, and the
   `maxResults` bounds of the three lists. No live mailbox has been read.
-- The writes are verified against the same fixture on the guide's write
-  instance through the host's prepare/commit exchange: the send's preflight
+- The writes are verified against the same fixture under the hand-written
+  write configuration through the host's prepare/commit exchange: the send's preflight
   read, a changed draft, a missing `messageId` or `body.id`, a send body with
   any key but `id` and a missing draft refused with no POST, and the exact POST
   body of each write. The approval
   binding is verified with the host's approval signer and verifier against a
   subject built from the provider's descriptor, not through the CLI and owner.
-  The write instance's scope check and its separate acquisition are verified
-  through the provider's bootstrap and the host's connection registry. No live
+  The write configuration's scope check and its separate acquisition are
+  verified through the provider's bootstrap and the host's connection
+  registry. No live
   draft has been created or sent. That a changed draft carries a new
   `message.id` is inferred from the pinned document calling message ids
   immutable, and that `users.messages.get` reads a draft's message from Gmail

@@ -19,6 +19,8 @@
 //! verifier against a subject built from the child's descriptor; the signing
 //! key is the public RFC 8032 section 7.1 test vector, never a deployment key.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_catalog::{bundle, discovery};
 use connectors_catalog_provider::{Check, Effect, Engine, Expectation, Selection};
 use connectors_host::local::{
@@ -364,19 +366,23 @@ fn guide_cites_each_operation_the_write_scope_the_response_cap_and_fields() {
         );
     }
     // The write scope, the pinned revision the guard compares, and the route to
-    // a write-capable connection: a separate instance, connected afresh. Repair
-    // cannot add a scope, and the guide must not say it does.
+    // a write-capable connection: the one instance whose consent requests the
+    // write scope. A reconnect cannot add a scope, so an installation holding a
+    // read and a write entry connects it afresh.
     assert!(guide.contains(&format!("`{WRITE_SCOPE}`")));
     assert!(guide.contains("`writeControl.requiredRevisionId`"));
     let flat = guide.split_whitespace().collect::<Vec<_>>().join(" ");
-    assert!(flat.contains("Writes use a separate instance"));
-    assert!(guide.contains("`google-slides-write`"));
-    assert!(flat.contains("`connections connect` that instance"));
-    assert!(flat.contains("`connections repair` cannot add a scope"));
-    assert!(
-        !flat.contains("with `connections repair`"),
-        "the guide still routes the write scope through `connections repair`"
-    );
+    assert!(flat.contains("They run on the same instance as the reads"));
+    assert!(flat.contains("One instance per Google account reads and writes"));
+    assert!(flat.contains("[connectors.slides.instances.private]"));
+    assert!(flat.contains("does not merge them"));
+    for stale in [
+        "Writes use a separate instance",
+        "`google-slides-write`",
+        "connections repair",
+    ] {
+        assert!(!flat.contains(stale), "the guide still says {stale}");
+    }
     // `fields` on `batchUpdate` must keep what the postflight compares, and a
     // view-only preflight's code is explained.
     assert!(flat.contains("must therefore keep `presentationId`"));
@@ -391,16 +397,10 @@ fn guide_cites_each_operation_the_write_scope_the_response_cap_and_fields() {
     assert!(guide.contains("`contentUrl`"));
 }
 
-/// The guide's configuration example for this provider.
+/// The read configuration the guide showed before connectors were declared
+/// (`hand_written`).
 fn documented_config() -> Value {
-    let guide = guide();
-    let example = guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
-        .find(|body| body.contains(&format!("\"provider\": \"{PROVIDER}\"")))
-        .expect("the documented google-slides configuration");
-    serde_json::from_str::<Value>(example).unwrap()
+    serde_json::from_str(&hand_written::blocks("catalog-google-slides.md")[0]).unwrap()
 }
 
 /// The guide configures the bundle's profile as an `oauth2_refresh` profile

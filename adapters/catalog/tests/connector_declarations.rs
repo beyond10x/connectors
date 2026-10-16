@@ -5,6 +5,8 @@
 //! hand-written configuration keeps the revision it had before declarations.
 #![cfg(unix)]
 
+mod hand_written;
+
 use serde_json::{Map, Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -98,7 +100,9 @@ fn declarations() -> BTreeMap<String, Value> {
 }
 
 /// Every native configuration the guides document, as `(page, configuration)`,
-/// with its `/absolute/path/adapters/catalog/` prefix made crate-relative.
+/// with its `/absolute/path/adapters/catalog/` prefix made crate-relative: those
+/// a guide still shows, then those it showed before connectors were declared
+/// (`hand_written`), in the order the guide showed them.
 fn documented() -> Vec<(String, Value)> {
     let mut found = Vec::new();
     let mut pages: Vec<PathBuf> = fs::read_dir(root().join("../../docs"))
@@ -112,11 +116,9 @@ fn documented() -> Vec<(String, Value)> {
         .collect();
     pages.sort();
     for page in pages {
-        let text = fs::read_to_string(&page).unwrap();
-        for body in text
-            .split("```json\n")
-            .skip(1)
-            .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+        let name = page.file_name().unwrap().to_str().unwrap();
+        for body in hand_written::documented_blocks(name)
+            .iter()
             .filter(|body| body.contains("\"format\": \"connectors-catalog-local/2\""))
         {
             let mut config: Value = serde_json::from_str(body).unwrap();
@@ -128,8 +130,7 @@ fn documented() -> Vec<(String, Value)> {
                     config[key] = json!(relative);
                 }
             }
-            let name = page.file_name().unwrap().to_str().unwrap().to_owned();
-            found.push((name, config));
+            found.push((name.to_owned(), config));
         }
     }
     found
