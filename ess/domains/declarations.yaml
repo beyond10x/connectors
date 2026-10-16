@@ -322,10 +322,11 @@ entities:
   # (`mail.personal`), which passes the selector check
   # (crates/connectors-host/src/local/config.rs selector, valid_id admits
   # `.`); a migrated instance keeps its old instance_id (decision 10).
-  # An instance holds at most one non-revoked connection; revoked connections
-  # stay as history (decision-blocker instance-connection-cardinality, option
-  # A; decision 11). AllocateConnection (auth_bindings.yaml) states the
-  # refusal; the host's bound of 1000 connections per instance_id
+  # An instance holds at most one published non-revoked connection; revoked
+  # connections and connections never published stay as history
+  # (decision-blocker instance-connection-cardinality, option A; decision
+  # 11). AllocateConnection (auth_bindings.yaml) states the refusal; the
+  # host's bound of 1000 connections per instance_id
   # (registry/lifecycle.rs:20-22) stays the storage bound for that history.
   - name: connectors.declarations.ServiceConfiguration
     identity:
