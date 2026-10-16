@@ -74,8 +74,48 @@ impl Plugin {
             .map(|s| s.lines().count())
             .unwrap_or(0)
     }
+    /// The plugin's `export -p` listing, one `NAME="value"` line per variable:
+    /// bash prints `declare -x NAME="value"` and dash `export NAME='value'`.
+    /// A value holding a newline spans several lines of the listing; its
+    /// continuation lines are joined back, the newline written as `\n`, so no
+    /// continuation is ever read as a variable of its own.
     fn environment(&self) -> String {
-        fs::read_to_string(self.dir.path().join("env")).unwrap()
+        let raw = fs::read_to_string(self.dir.path().join("env")).unwrap();
+        let mut listing = String::new();
+        let mut record = String::new();
+        let mut quote = None;
+        for line in raw.lines() {
+            if !record.is_empty() {
+                record.push_str("\\n");
+            }
+            record.push_str(line);
+            let mut escaped = false;
+            for c in line.chars() {
+                match quote {
+                    Some('\'') if c == '\'' => quote = None,
+                    Some('\'') => {}
+                    _ if escaped => escaped = false,
+                    _ if c == '\\' => escaped = true,
+                    Some(_) if c == '"' => quote = None,
+                    None if c == '\'' || c == '"' => quote = Some(c),
+                    _ => {}
+                }
+            }
+            if quote.is_none() {
+                let line = record
+                    .strip_prefix("declare -x ")
+                    .or_else(|| record.strip_prefix("export "))
+                    .unwrap_or(&record);
+                match line.split_once("='") {
+                    Some((name, value)) if value.ends_with('\'') => {
+                        listing.push_str(&format!("{name}=\"{}\"\n", &value[..value.len() - 1]));
+                    }
+                    _ => listing.push_str(&format!("{line}\n")),
+                }
+                record.clear();
+            }
+        }
+        listing
     }
 }
 
