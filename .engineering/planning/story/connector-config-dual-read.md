@@ -2,16 +2,20 @@
 format: aep.planning-md/3
 id: story:connector-config-dual-read
 kind: story
-status: draft
+status: active
 title: The host reads connector instances beside adapter entries with equal revisions and selections
 relations:
 - decomposes: epic:connector-vocabulary
 - informed_by: migration-plan:connector-vocabulary
 - depends_on: story:ess-connector-vocabulary-model
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: crates/connectors-host/src/local/config.rs
-revision: 8
+revision: 10
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T12:54:48Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"review_outcome":1}}}
+- {from: "proposed", to: "active", at: "2026-10-16T12:54:49Z", actor: "human:timo", revision: 10, decided_on: {"recorded":{"review_outcome":1}}}
 ---
 ## Context
 

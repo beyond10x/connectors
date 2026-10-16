@@ -2,13 +2,14 @@
 format: aep.planning-md/3
 id: story:cli-connector-instance-selectors
 kind: story
-status: draft
+status: active
 title: Every command selects its target with --connector and --instance; --adapter still works, deprecated
 relations:
 - decomposes: epic:connector-vocabulary
 - depends_on: story:connector-config-dual-read
 - informed_by: migration-plan:connector-vocabulary
 - depends_on: story:ess-connector-vocabulary-model
+- serves: vision:independent-contract-adapters
 scope:
 - confidence: inferred
   path: apps/connectors-cli-contract
@@ -28,7 +29,10 @@ scope:
   path: crates/connectors-host/src/local/config.rs
 - confidence: inferred
   path: ess/domains/cli.yaml
-revision: 10
+revision: 13
+transitions:
+- {from: "draft", to: "proposed", at: "2026-10-16T14:07:00Z", actor: "human:timo", revision: 12, decided_on: {"recorded":{"review_outcome":2}}}
+- {from: "proposed", to: "active", at: "2026-10-16T14:07:00Z", actor: "human:timo", revision: 13, decided_on: {"recorded":{"review_outcome":2}}}
 ---
 ## Context
 
@@ -51,7 +55,12 @@ together.
   `connector` and `instance` beside it, as required `String` fields. The header vocabulary comment is
   story:ess-connector-vocabulary-model's; this story changes fields only.
 - `apps/connectors/spec/cli.yaml`: `--connector` and `--instance` on every command that has
-  `--adapter`; `--adapter` stays and prints exactly one deprecation line on standard error.
+  `--adapter`; `--adapter` stays. Under `--output human` it prints exactly one deprecation line on
+  standard error. Under `--output json` it writes nothing extra to standard error: the result, and
+  the error envelope on failure, gain a `deprecations` array with one entry naming `--adapter` and
+  its replacement. A consumer that parses all of standard error as one JSON error envelope (the
+  llm-gateway `llm-runpod` transport does, `crates/llm-runpod/src/transport/connectors.rs`) keeps
+  reading its error codes.
 - Regenerate `apps/connectors-cli-contract` (`cargo run --locked -p connectors-build -- cli`).
 - `apps/connectors/src/local.rs` and `apps/connectors/src/local/*.rs`: resolve either selector to
   one instance.
@@ -89,7 +98,8 @@ A conformance test runs every command path in `apps/connectors/spec/cli.yaml` th
 `--adapter <its legacy alias>`, validates every JSON result of both runs against the regenerated
 result schema of `apps/connectors-cli-contract` (in which `adapter`, `connector` and `instance` are
 required on every result type that carries a selector), and passes only when every result
-validates and the two runs differ by exactly one deprecation line on standard error in the second.
+validates and the two runs differ only by one `deprecations` entry in the second run's JSON, with
+the second run's standard error empty on success and exactly one JSON envelope on failure.
 
 ## Notes
 
