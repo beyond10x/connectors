@@ -1368,14 +1368,86 @@ fn oauth_invalid_grant_reports_repair() {
         "the refused exchange reached the API"
     );
 
-    // A cached access token the API refuses is the stored credential's too.
+    // A cached access token the API refuses is dropped and the read is sent
+    // once more with a fresh exchange; the API refusing that token too is the
+    // stored credential's.
     provider.set_token(grant(3600));
     success(journey.run(&invoke));
     provider.state.lock().unwrap().api_refuses = true;
     let exchanged = provider.token_requests();
     let refused = OAuthCli::refused(journey.run(&invoke), "invoke with the cached token");
     assert_eq!(refused["next_action"], "repair_connection", "{refused}");
-    assert_eq!(provider.token_requests(), exchanged);
+    assert_eq!(provider.token_requests(), exchanged + 1);
+    journey.assert_no_material();
+}
+
+/// story:connection-stale-state: after the token endpoint refuses the stored
+/// refresh token with `invalid_grant` during an invoke, `connections list`
+/// and `connections describe` report the connection `stale`; a reconnect that
+/// publishes a new credential returns it to `ready`, as the same connection.
+#[test]
+#[ignore = "requires built production CLI and qualified disposable Secret Service"]
+fn oauth_invalid_grant_makes_the_connection_stale_until_a_reconnect() {
+    use super::cli_journey::success;
+    let journey = OAuthCli::new();
+    let provider = &journey.provider;
+    provider.set_token(grant(60));
+    let invoke = journey.connected();
+    success(journey.run(&invoke));
+    let list = || {
+        let listed = success(
+            journey
+                .cli
+                .run(&["connections", "list", "--adapter", "drive"]),
+        )["connections"]
+            .clone();
+        assert_eq!(listed.as_array().map(Vec::len), Some(1), "{listed}");
+        listed[0].clone()
+    };
+    let live = list();
+    assert_eq!(live["state"], "ready", "{live}");
+    let reference = live["connection"].as_str().unwrap().to_owned();
+    let revision = live["revision"].as_str().unwrap().to_owned();
+
+    provider.set_token(invalid_grant());
+    let refused = OAuthCli::refused(journey.run(&invoke), "invoke after revocation");
+    assert_eq!(refused["next_action"], "repair_connection", "{refused}");
+    let stale = list();
+    assert_eq!(stale["state"], "stale", "{stale}");
+    assert_eq!(stale["connection"], reference.as_str());
+    assert_eq!(stale["revision"], revision.as_str());
+    let described = success(journey.cli.run(&[
+        "connections",
+        "describe",
+        "--adapter",
+        "drive",
+        "--connection",
+        &reference,
+    ]))["connection"]
+        .clone();
+    assert_eq!(described["summary"]["state"], "stale", "{described}");
+    // The cached-metadata flag is another fact: the configuration is current.
+    assert_eq!(described["stale"], false, "{described}");
+
+    provider.set_token(grant(3600));
+    let reconnected = success(journey.cli.run(&[
+        "connections",
+        "reconnect",
+        "--adapter",
+        "drive",
+        "--connection",
+        &reference,
+        "--expected-revision",
+        &revision,
+        "--credential-file",
+        journey.credential.to_str().unwrap(),
+    ]))["connection"]
+        .clone();
+    assert_eq!(reconnected["summary"]["state"], "ready", "{reconnected}");
+    let live = list();
+    assert_eq!(live["state"], "ready", "{live}");
+    assert_eq!(live["connection"], reference.as_str());
+    success(journey.run(&invoke));
     journey.assert_no_material();
 }
 

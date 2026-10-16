@@ -6,6 +6,7 @@ pub enum State {
     Ready,
     Pending,
     ReauthorizationRequired,
+    Stale,
     CustodyUnavailable,
     Revoked,
 }
@@ -218,8 +219,13 @@ fn observe(
     now: u64,
     custody_available: bool,
 ) -> Result<ObservedConnection> {
+    // A Stale connection (`lifecycle::mark_stale`) reports so before any
+    // readiness: the provider refused its credential, and only a publication
+    // changes that. Stale is not readiness: a read is still admitted.
     let state = if row.state == "revoked" {
         State::Revoked
+    } else if row.kept.stale {
+        State::Stale
     } else if row.binding.configuration_revision != configured_revision {
         State::Pending
     } else {

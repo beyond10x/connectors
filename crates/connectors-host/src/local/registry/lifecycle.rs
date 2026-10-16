@@ -537,6 +537,27 @@ fn live(row: &ConnectionRow) -> Result<()> {
         Ok(())
     }
 }
+/// `connectors.auth_bindings.MarkConnectionStale`: the provider refused this
+/// connection's active credential, so only a publication (a reconnect, or a
+/// revalidation the provider accepts) returns it to Live (`follow`,
+/// revalidation.rs `finish_revalidation`). The lifecycle moves only Live to
+/// Stale: a revoked or already Stale connection is left as it is. The caller
+/// advances the instance epoch, as for the invalidity it records beside it.
+pub(super) fn mark_stale(tx: &Transaction<'_>, row: &ConnectionRow) -> Result<()> {
+    if row.state == "revoked" || row.kept.stale {
+        return Ok(());
+    }
+    let kept = Kept {
+        stale: true,
+        ..row.kept.clone()
+    };
+    tx.execute(
+        "UPDATE registry_connections SET binding=?2 WHERE connection_ref=?1",
+        params![row.reference, encode_stored(&row.binding, &kept)?],
+    )
+    .map_err(db)?;
+    Ok(())
+}
 pub(super) fn bump(tx: &Transaction<'_>, instance: &str) -> Result<()> {
     tx.execute(
         "UPDATE registry_instances SET epoch=epoch+1 WHERE instance_id=?1",

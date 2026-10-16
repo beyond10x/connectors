@@ -7,7 +7,7 @@ summary: Proposed connection viability, request eligibility and host management 
 types:
   - name: connectors.connection_admission.ConnectionState
     kind: enum
-    variants: [pending, ready, reauthorization_required, custody_unavailable, parent_degraded, disabled, revoked]
+    variants: [pending, ready, reauthorization_required, stale, custody_unavailable, parent_degraded, disabled, revoked]
   - name: connectors.connection_admission.NextAction
     kind: enum
     variants: [reconnect, revalidate]
