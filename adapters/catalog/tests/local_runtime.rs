@@ -835,9 +835,31 @@ fn assert_children_carry_no_basic_material(config: &Path) {
     assert!(!children.is_empty(), "no provider child observed");
     for pid in children {
         let cmdline = fs::read(format!("/proc/{pid}/cmdline")).unwrap();
-        let environ = fs::read(format!("/proc/{pid}/environ")).unwrap();
         assert!(!carries_basic_material(&cmdline), "argv of {pid}");
-        assert!(!carries_basic_material(&environ), "environment of {pid}");
+        assert!(
+            !carries_basic_material(&child_environ(pid)),
+            "environment of {pid}"
+        );
+    }
+}
+/// The environment of child `pid` as this user can read it. A child that marked
+/// itself not dumpable (`core_dumps::forbid`) has its `/proc/<pid>/environ`
+/// owned by root, so no process of the same user reads it at all; that is
+/// asserted and counts as an environment that carries nothing.
+fn child_environ(pid: u32) -> Vec<u8> {
+    use std::os::unix::fs::MetadataExt;
+    let path = format!("/proc/{pid}/environ");
+    match fs::read(&path) {
+        Ok(environ) => environ,
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {
+            assert_eq!(
+                fs::metadata(&path).unwrap().uid(),
+                0,
+                "{path} is unreadable but not hidden by the kernel"
+            );
+            Vec::new()
+        }
+        Err(error) => panic!("{path}: {error}"),
     }
 }
 fn deadline() -> u64 {
