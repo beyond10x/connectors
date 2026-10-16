@@ -836,6 +836,88 @@ impl Config {
     }
 }
 
+/// `setup migrate` (story:setup-migrate-adapter-entries): rewriting legacy
+/// entries as the pinned instances of story:connector-config-dual-read.
+impl Config {
+    /// The aliases of the `[adapters.<alias>]` entries: those no
+    /// `[connectors]` instance names, in alias order.
+    pub fn legacy_aliases(&self) -> Vec<&str> {
+        let named: BTreeSet<&str> = self
+            .connectors
+            .iter()
+            .flatten()
+            .flat_map(|(_, connector)| connector.instances.values())
+            .map(|instance| instance.alias.as_str())
+            .collect();
+        self.adapters
+            .keys()
+            .map(String::as_str)
+            .filter(|alias| !named.contains(alias))
+            .collect()
+    }
+
+    /// Whether `[connectors.<connector>]` can take a new instance named
+    /// `instance`: the table is absent, or enabled and without an instance of
+    /// that name. A disabled table is left as the operator wrote it.
+    pub fn can_hold(&self, connector: &str, instance: &str) -> bool {
+        selector(connector)
+            && selector(instance)
+            && self
+                .connectors
+                .as_ref()
+                .and_then(|connectors| connectors.get(connector))
+                .is_none_or(|table| table.enabled && !table.instances.contains_key(instance))
+    }
+
+    /// This configuration with the legacy entry under each alias of `moved`
+    /// written as the pinned instance `[connectors.<connector>.instances.<alias>]`
+    /// of the connector `moved` maps it to. The instance carries every pin of
+    /// the entry, its alias included, so it reads back as exactly that entry;
+    /// nothing else changes. The format becomes `connectors-local/5` when any
+    /// entry moves. An alias that is no legacy entry, or a connector that
+    /// cannot hold it ([`Config::can_hold`]), is refused.
+    pub fn with_instances(&self, moved: &BTreeMap<String, String>) -> Result<Self> {
+        let mut config = self.clone();
+        if moved.is_empty() {
+            return Ok(config);
+        }
+        let legacy = self.legacy_aliases();
+        for (alias, connector) in moved {
+            if !legacy.contains(&alias.as_str()) || !config.can_hold(connector, alias) {
+                return Err(Failure::InvalidConfiguration);
+            }
+            config
+                .connectors
+                .get_or_insert_with(BTreeMap::new)
+                .entry(connector.clone())
+                .or_insert_with(|| Connector {
+                    enabled: true,
+                    instances: BTreeMap::new(),
+                })
+                .instances
+                .insert(
+                    alias.clone(),
+                    Instance {
+                        description: None,
+                        endpoint: None,
+                        alias: alias.clone(),
+                        derived: false,
+                        profile: None,
+                        awaiting_profile: None,
+                    },
+                );
+        }
+        config.format = "connectors-local/5".into();
+        Ok(config)
+    }
+
+    /// The configuration file's text: what [`Config::parse`] reads back.
+    /// Comments of the file it was read from are not kept.
+    pub fn to_text(&self) -> Result<String> {
+        toml::to_string(self).map_err(|_| Failure::InvalidConfiguration)
+    }
+}
+
 /// An operator-pinned consumer: an executable that `connections launch` starts
 /// with one connection's protected document on descriptor 3. `executable.args`
 /// is the pinned argv prefix; the caller's `--args` follow it.
@@ -1204,6 +1286,38 @@ impl Config {
         path: &Path,
         installation: Option<&Installation>,
     ) -> std::result::Result<Self, Refusal> {
+        Self::parse_with(&Self::text_at(path)?, installation)
+    }
+
+    /// Read like [`Config::read`], with the text the configuration was read
+    /// from: `setup migrate` keeps exactly that text as its backup, and
+    /// replaces the file only while it still holds it.
+    pub fn read_source(path: &Path) -> std::result::Result<(Self, String), Refusal> {
+        let text = Self::text_at(path)?;
+        let config = Self::parse_with(&text, Installation::installed().as_ref())?;
+        Ok((config, text))
+    }
+
+    /// Decode, assemble and check configuration `text` exactly as
+    /// [`Config::read`] does a file's.
+    pub fn parse(text: &str) -> std::result::Result<Self, Refusal> {
+        Self::parse_with(text, Installation::installed().as_ref())
+    }
+
+    fn parse_with(
+        text: &str,
+        installation: Option<&Installation>,
+    ) -> std::result::Result<Self, Refusal> {
+        // Decode the closed envelope without its embedded validation, so the
+        // refusal below can name its rule instead of collapsing into serde's.
+        let input: ConfigInput = toml::from_str(text).map_err(|_| Failure::InvalidConfiguration)?;
+        let config = Self::assemble(input, installation)?;
+        config.check()?;
+        Ok(config)
+    }
+
+    /// The admitted configuration file's text.
+    fn text_at(path: &Path) -> std::result::Result<String, Refusal> {
         let file = fs::private_file(path).map_err(|failure| {
             // Only the rule's name depends on this second look; admission was
             // already refused by the descriptor walk above.
@@ -1218,13 +1332,7 @@ impl Config {
             }
         })?;
         let bytes = fs::read_bounded(file, 1024 * 1024)?;
-        let text = std::str::from_utf8(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
-        // Decode the closed envelope without its embedded validation, so the
-        // refusal below can name its rule instead of collapsing into serde's.
-        let input: ConfigInput = toml::from_str(text).map_err(|_| Failure::InvalidConfiguration)?;
-        let config = Self::assemble(input, installation)?;
-        config.check()?;
-        Ok(config)
+        Ok(String::from_utf8(bytes).map_err(|_| Failure::InvalidConfiguration)?)
     }
 
     pub fn validate(&self) -> Result<()> {
@@ -2873,5 +2981,167 @@ mod instance_selector_tests {
             refused.err(),
             Some(Refusal::Failure(Failure::InvalidConfiguration))
         );
+    }
+}
+
+// The fixtures configure Unix absolute executable paths and the mounted
+// custody binding, which is Linux's.
+#[cfg(all(test, target_os = "linux"))]
+mod migration_tests {
+    //! story:setup-migrate-adapter-entries: a legacy entry rewritten as a
+    //! pinned instance reads back as exactly that entry, and nothing else of
+    //! the file changes.
+    use super::*;
+
+    fn entry(alias: &str, adapter: &str, private_protocol: &str) -> String {
+        format!(
+            "[adapters.{alias}]\ninstance_id='{alias}-local'\nadapter_id='{adapter}'\nconfiguration_revision='cfg-{alias}'\nprotocol='v1alpha1'\n{private_protocol}startup='automatic'\n[adapters.{alias}.executable]\npath='/opt/connectors/bin/{adapter}'\nsha256='{}'\nargs=['--local-config','/etc/connectors/{alias}.json']\n[adapters.{alias}.permissions]\nprofiles=['p.token']\noperations=['item.read']\n",
+            "1".repeat(64)
+        )
+    }
+
+    /// Every top-level key a configuration may carry beside its entries.
+    fn shared() -> String {
+        format!(
+            "default_adapter='mail'\n[approval_clock]\nformat='roughtime-quorum/1'\nquorum=2\nmax_rate_error_ppm=10000\n[[approval_clock.sources]]\naddress='127.0.0.1:9'\npublic_key='{k}'\nversion='roughtime-0x8000000c'\n[[approval_clock.sources]]\naddress='127.0.0.1:10'\npublic_key='{k2}'\nversion='roughtime-0x8000000c'\n[custody]\nbinding='mounted_secret'\ndirectory='/run/connectors/custody'\n[consumers.probe]\npass_env=['EXAMPLE_']\n[consumers.probe.executable]\npath='/opt/connectors/bin/probe'\nsha256='{}'\nargs=['--x']\n[consumers.probe.permissions]\nconnections=['mail']\n",
+            "2".repeat(64),
+            k = base64_key(1),
+            k2 = base64_key(2),
+        )
+    }
+
+    fn base64_key(byte: u8) -> String {
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD.encode([byte; 32])
+    }
+
+    fn read(format: &str, body: &str) -> std::result::Result<(Config, String), Refusal> {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        std::fs::write(
+            &paths.config,
+            format!("format='{format}'\nowner_uid={}\n{body}", fs::uid()),
+        )
+        .unwrap();
+        Config::read_source(&paths.config)
+    }
+
+    fn moved(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
+        pairs
+            .iter()
+            .map(|(alias, connector)| ((*alias).to_owned(), (*connector).to_owned()))
+            .collect()
+    }
+
+    #[test]
+    fn a_rewritten_entry_reads_back_as_the_same_entry_and_nothing_else_changes() {
+        let body = format!(
+            "{}{}{}",
+            shared(),
+            entry(
+                "mail",
+                "catalog",
+                "private_protocol='connectors-private/2'\n"
+            ),
+            entry("tools", "mcp", "private_protocol='connectors-private/1'\n")
+        );
+        let (config, text) = read("connectors-local/4", &body).unwrap();
+        assert!(text.contains("[adapters.mail]"));
+        assert_eq!(config.legacy_aliases(), ["mail", "tools"]);
+        let rewritten = config.with_instances(&moved(&[("mail", "gmail")])).unwrap();
+        let written = rewritten.to_text().unwrap();
+        assert!(
+            written.contains("[connectors.gmail.instances.mail]"),
+            "{written}"
+        );
+        assert!(!written.contains("[adapters.mail]"), "{written}");
+        assert!(written.contains("[adapters.tools]"), "{written}");
+        let after = Config::parse(&written).unwrap();
+        assert_eq!(after.format, "connectors-local/5");
+        assert_eq!(after.legacy_aliases(), ["tools"]);
+        for alias in ["mail", "tools"] {
+            assert_eq!(
+                serde_json::to_value(&after.adapters[alias]).unwrap(),
+                serde_json::to_value(&config.adapters[alias]).unwrap(),
+                "{alias}"
+            );
+            assert_eq!(
+                after.adapters[alias].selection(),
+                config.adapters[alias].selection()
+            );
+        }
+        assert_eq!(after.names("mail"), Some(("gmail", "mail")));
+        assert_eq!(after.names("tools"), Some(("mcp", "tools")));
+        let sha = |config: &Config| {
+            config
+                .approval_clock
+                .as_ref()
+                .unwrap()
+                .configuration()
+                .unwrap()
+                .sha256()
+        };
+        assert_eq!(sha(&after), sha(&config));
+        assert_eq!(after.custody, config.custody);
+        assert_eq!(after.consumers, config.consumers);
+        assert_eq!(after.default_adapter, config.default_adapter);
+        assert_eq!(after.selection(), config.selection());
+        // Nothing moved: the same configuration, format included.
+        let same = config.with_instances(&BTreeMap::new()).unwrap();
+        assert_eq!(same.format, "connectors-local/4");
+    }
+
+    #[test]
+    fn a_connector_that_cannot_hold_the_instance_or_an_alias_that_is_no_legacy_entry_is_refused() {
+        let pinned = "[connectors.gmail]\nenabled=true\n[connectors.gmail.instances.taken]\nalias='pinned'\ninstance_id='pinned-local'\nadapter_id='catalog'\nconfiguration_revision='cfg-pinned'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[connectors.gmail.instances.taken.executable]\npath='/opt/connectors/bin/catalog'\nsha256='3333333333333333333333333333333333333333333333333333333333333333'\nargs=[]\n[connectors.drive]\nenabled=false\n";
+        let body = format!(
+            "{pinned}{}{}",
+            entry(
+                "taken",
+                "catalog",
+                "private_protocol='connectors-private/1'\n"
+            ),
+            entry(
+                "files",
+                "catalog",
+                "private_protocol='connectors-private/1'\n"
+            )
+        );
+        let (config, _) = read("connectors-local/5", &body).unwrap();
+        assert_eq!(config.legacy_aliases(), ["files", "taken"]);
+        assert!(!config.can_hold("gmail", "taken"));
+        assert!(config.can_hold("gmail", "files"));
+        assert!(!config.can_hold("drive", "files"));
+        assert!(config.can_hold("calendar", "files"));
+        assert!(!config.can_hold("bad name", "files"));
+        for refused in [
+            moved(&[("taken", "gmail")]),
+            moved(&[("files", "drive")]),
+            moved(&[("pinned", "calendar")]),
+            moved(&[("absent", "calendar")]),
+        ] {
+            assert_eq!(
+                config.with_instances(&refused).err(),
+                Some(Failure::InvalidConfiguration),
+                "{refused:?}"
+            );
+        }
+        let after = Config::parse(
+            &config
+                .with_instances(&moved(&[("files", "gmail"), ("taken", "calendar")]))
+                .unwrap()
+                .to_text()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(after.names("files"), Some(("gmail", "files")));
+        assert_eq!(after.names("taken"), Some(("calendar", "taken")));
+        assert_eq!(after.names("pinned"), Some(("gmail", "taken")));
+        assert!(after.legacy_aliases().is_empty());
     }
 }

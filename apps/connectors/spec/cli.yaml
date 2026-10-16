@@ -80,6 +80,11 @@ callables:
     input: null
     result: connectors.cli.SetupOwnerStopResult
     errors: {failure: connectors.cli.Failure}
+  setup-migrate:
+    target: {kind: local, owner: connectors.cli, action: setup-migrate}
+    input: connectors.cli.SetupMigrateInput
+    result: connectors.cli.SetupMigrateResult
+    errors: {failure: connectors.cli.Failure}
   adapters-list:
     target: {kind: local, owner: connectors.cli, action: adapters-list}
     input: connectors.cli.AdapterListInput
@@ -347,6 +352,13 @@ commands:
     callable: setup-owner-stop
     about: Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner
     arguments: []
+  - path: [setup, migrate]
+    aliases: []
+    callable: setup-migrate
+    about: Rewrite each adapter entry that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-<UTC timestamp>
+    arguments:
+      - field: mode
+        source: {kind: option, long: mode}
   - path: [instances, list]
     aliases: [[adapters, list]]
     callable: adapters-list
