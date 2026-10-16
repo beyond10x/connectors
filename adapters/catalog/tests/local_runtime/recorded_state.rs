@@ -315,6 +315,11 @@ impl Facts {
                 ] {
                     anchor.insert(target.into(), row.fields[source].clone());
                 }
+                // Optional and omitted when absent, as the host's own decoder
+                // reads it (metadata/er.rs); the owner's write anchor carries it.
+                if let Some(access) = row.fields.get("access") {
+                    anchor.insert("access".into(), access.clone());
+                }
                 for name in [
                     "activity",
                     "request_id",
