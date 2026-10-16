@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-16T21:04:06Z",
+  "actor": "human:timo",
+  "artifact": "story:revalidate-retries-transient-failure",
+  "kind": "story",
+  "revision": 3,
+  "change": {
+    "change": "evidence",
+    "kind": "test_result",
+    "source": "package gates on ca0e082d4e57470c887d5e6938b2b1c8906de3d0 (release 0.52.1): fmt, clippy -D warnings, tests of connectors and connectors-host (678 passed, 1 failed, 39 ignored; the one failure, upgrade_adversary upgrade_refusals_before_sending_are_not_sent, is a port-reuse race older than this change; its binary passed 3 of 3 reruns on the same head), cli --check and docs generate --check clean",
+    "reference": "ca0e082d4e57470c887d5e6938b2b1c8906de3d0"
+  }
+}

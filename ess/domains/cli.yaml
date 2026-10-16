@@ -557,6 +557,19 @@ types:
   - name: connectors.cli.NextAction
     kind: enum
     variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
+  # Which transient class a `connections revalidate` failure at stage dispatch ended on,
+  # after the owner's bounded retries within the revalidation deadline
+  # (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). provider_unavailable:
+  # the adapter's validation answered unavailable (a provider connection refused, reset or
+  # closed, a name that does not resolve; an adapter whose identity or scope probe maps
+  # an HTTP 429 or 5xx to unavailable). provider_timeout: the probe's deadline passed.
+  # provider_rate_limited and provider_internal: an adapter that reports the provider's 429
+  # or internal error itself. provider_capacity: a marked upstream capacity answer.
+  # adapter_exited: the adapter process was no longer running after the failed attempt.
+  # owner_stopping: the owner began to stop during the revalidation.
+  - name: connectors.cli.FailureCause
+    kind: enum
+    variants: [provider_unavailable, provider_timeout, provider_rate_limited, provider_internal, provider_capacity, adapter_exited, owner_stopping]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4]
@@ -656,6 +669,15 @@ types:
       # pinned by tests.
       - {name: clock_refusal, type: "Optional<connectors.clock.Refusal>"}
       - {name: clock_sources, type: "Optional<List<connectors.clock.SourceReport>>"}
+      # ESS-LIMIT: cause and attempts appear only on a `connections revalidate` failure at
+      # stage dispatch that the owner classified as transient (contracts/cli/v1alpha1/semantics.md
+      # §6, "Revalidation retries"): cause names the class of the last attempt, attempts the
+      # number of validations the owner sent (1 to 3), when it sent any. A credential,
+      # permission or scope refusal is never retried and carries neither. As for instance_id
+      # above, ESS declares no invariant on a CLI type, so the presence rule and the range are
+      # enforced by the host and pinned by tests.
+      - {name: cause, type: "Optional<connectors.cli.FailureCause>"}
+      - {name: attempts, type: "Optional<Integer>"}
   # setup check names its prerequisites: configuration, metadata, artifact:<alias>,
   # keyring and persistent_custody_qualification under a platform binding; under the
   # explicitly selected mounted_secret binding, mounted_custody (the configured

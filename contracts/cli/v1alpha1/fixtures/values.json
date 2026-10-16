@@ -961,6 +961,58 @@
       }
     },
     {
+      "id": "revalidation-transient-failure-names-its-cause-and-attempts",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "dispatch",
+        "next_action": "retry_explicitly",
+        "cause": "provider_unavailable",
+        "attempts": 3
+      }
+    },
+    {
+      "id": "revalidation-adapter-exit-names-its-cause",
+      "type": "connectors.cli.Failure",
+      "valid": true,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "dispatch",
+        "next_action": "retry_explicitly",
+        "cause": "adapter_exited",
+        "attempts": 1
+      }
+    },
+    {
+      "id": "revalidation-cause-is-a-closed-enum",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "dispatch",
+        "next_action": "retry_explicitly",
+        "cause": "connection reset by peer",
+        "attempts": 1
+      }
+    },
+    {
+      "id": "revalidation-attempts-is-a-count",
+      "type": "connectors.cli.Failure",
+      "valid": false,
+      "value": {
+        "kind": "operational",
+        "code": "unavailable",
+        "stage": "dispatch",
+        "next_action": "retry_explicitly",
+        "cause": "provider_unavailable",
+        "attempts": "three"
+      }
+    },
+    {
       "id": "clock-refusal-below-quorum-names-each-source",
       "type": "connectors.cli.Failure",
       "valid": true,
