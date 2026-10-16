@@ -332,6 +332,7 @@ mod json_value_tests {
         };
         let requirement = |id: &str, effect| runtime::Requirement {
             operation: id.into(),
+            custody: false,
             profile: "token".into(),
             scopes: BTreeSet::new(),
             effect,

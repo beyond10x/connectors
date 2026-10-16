@@ -1061,6 +1061,7 @@ impl Local {
         };
         let requirement = |operation: &connectors_core::Operation| Requirement {
             operation: operation.id.clone(),
+            custody: engine.declares_custody(&operation.id),
             profile: config.auth.profile.clone(),
             scopes: config.auth.minimum_scopes.clone(),
             effect: match engine.effect(&operation.id) {

@@ -820,7 +820,7 @@ mod tests {
                 fields:vec![EntryField{name:"token".into(),label:"Fictional credential".into(),max_bytes:100}],
                 acquisition:None,
             }],
-            requirements:vec![Requirement{operation:"read".into(),profile:"fixture".into(),scopes:BTreeSet::new(),effect:Effect::Read}],
+            requirements:vec![Requirement{operation:"read".into(),custody:false,profile:"fixture".into(),scopes:BTreeSet::new(),effect:Effect::Read}],
         }
     }
 

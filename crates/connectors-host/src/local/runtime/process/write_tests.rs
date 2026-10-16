@@ -37,6 +37,7 @@ fn bootstrap(write: bool) -> Bootstrap {
         bootstrap.descriptor = descriptor.to_string();
         bootstrap.requirements.push(Requirement {
             operation: "write".into(),
+            custody: false,
             profile: "fixture".into(),
             scopes: BTreeSet::new(),
             effect: Effect::Write,
