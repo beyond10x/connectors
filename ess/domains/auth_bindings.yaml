@@ -162,6 +162,7 @@ entities:
       transitions:
         - {name: publish, from: [Live, Stale], to: Live}
         - {name: mark_stale, from: [Live], to: Stale}
+        - {name: record_candidate, from: [Stale], to: Stale}
         - {name: revoke, from: [Live, Stale], to: Revoked}
     # Live and Stale are both administrative non-revocation; neither is
     # readiness, publication or permission. Stale (operator decision
@@ -171,14 +172,17 @@ entities:
     # succeed. The way out is a reconnect: the same consent or credential entry
     # on the same instance and connection_ref, today `connections repair` (an
     # Acquisition with repair_connection_ref, then PublishBinding), whose
-    # publication of a new credential moves it back to Live. Revocation stays
-    # terminal and is admitted from Live and Stale.
+    # publication of a new credential moves it back to Live. Before that
+    # publication the reconnect records its candidate custody version on the
+    # Stale connection (RecordConnectionCandidate, which keeps it Stale), and a
+    # reconnect that fails after it leaves the connection Stale with the
+    # candidate listed. Revocation stays terminal and is admitted from Live
+    # and Stale.
     # contracts/auth/connection/v1alpha1/semantics.md §4.1-§4.2 name Stale and
     # these transitions (decision 12). Stale is the one provider observation
     # the lifecycle persists; the §4.1 status reduction reports a Stale
-    # connection `reauthorization_required` with next_action `reconnect`
-    # (connection_admission.yaml ConnectionState), so no status variant is
-    # added.
+    # connection with its own status, `stale` (connection_admission.yaml
+    # ConnectionState), ahead of every status but `revoked` and `disabled`.
     # The host code that records the refusal (MarkConnectionStale) and stores
     # Stale is story:connection-stale-state (decision 13).
     # Any allowed PublishBinding leaves Stale: a publication means the provider
@@ -441,6 +445,23 @@ commands:
     outcomes:
       - {name: marked-stale, moves: connectors.auth_bindings.Connection.mark_stale, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionMarkedStale], payload: {connectors.auth_bindings.ConnectionMarkedStale: {connection_ref: input.connection_ref}}}
       - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
+  - name: connectors.auth_bindings.RecordConnectionCandidate
+    # A reconnect of a Stale connection has allocated its candidate custody
+    # version for this connection (registry/lifecycle.rs prepare), which adds
+    # it to superseded_custody_version_refs before the publication that leaves
+    # Stale. The connection stays Stale: the candidate grants no material use
+    # and no publication. A trusted host observation like
+    # RecordAcquisitionCandidate, recorded in the same metadata batch.
+    # On a Live connection the same change is part of the publication's own
+    # update (PublishBinding, Live to Live); on Revoked there is no reconnect.
+    # The host sends it only when the change adds exactly one custody version
+    # and changes nothing else (metadata/er.rs update_command).
+    input:
+      - {name: connection_ref, type: String}
+      - {name: candidate_custody_version_ref, type: String}
+    outcomes:
+      - {name: candidate-recorded, moves: connectors.auth_bindings.Connection.record_candidate, instance: connection_ref, emits: [connectors.auth_bindings.ConnectionCandidateRecorded], payload: {connectors.auth_bindings.ConnectionCandidateRecorded: {connection_ref: input.connection_ref, candidate_custody_version_ref: input.candidate_custody_version_ref}}}
+      - {name: wrong-state, wrong_state: true, error: connectors.auth_bindings.ConnectionStateConflict}
   - name: connectors.auth_bindings.PublishBinding
     # Names an acknowledged host metadata update, not another lifecycle or a
     # substitute for RefreshAttempt's consumed-source/publication protocol.
@@ -683,6 +704,10 @@ events:
     fields: [{name: connection_ref, type: String}]
   - name: connectors.auth_bindings.ConnectionMarkedStale
     fields: [{name: connection_ref, type: String}]
+  - name: connectors.auth_bindings.ConnectionCandidateRecorded
+    fields:
+      - {name: connection_ref, type: String}
+      - {name: candidate_custody_version_ref, type: String}
   - name: connectors.auth_bindings.BindingPublished
     fields: [{name: connection_ref, type: String}]
   - name: connectors.auth_bindings.AcquisitionBegan
@@ -835,6 +860,7 @@ actors:
       - connectors.auth_bindings.MarkConnectionStale
       - connectors.auth_bindings.PublishBinding
       - connectors.auth_bindings.RecordAcquisitionCandidate
+      - connectors.auth_bindings.RecordConnectionCandidate
       - connectors.auth_bindings.RecordCustodyVersion
       - connectors.auth_bindings.RecordProfile
       - connectors.auth_bindings.RetireCustodyVersion
