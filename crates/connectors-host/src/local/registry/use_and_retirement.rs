@@ -80,6 +80,11 @@ impl ReadUse {
 }
 pub struct DispatchedUse {
     id: String,
+    /// The connection, custody version and publication fence the read carried,
+    /// which a provider refusal names even after the use row was swept.
+    connection: String,
+    version: String,
+    fence: String,
 }
 
 #[derive(Clone, Copy)]
@@ -200,7 +205,7 @@ impl Registry {
                 || captured.version!=custody_version(authority,&row.scope_id,&version)? { return Err(Failure::Conflict); }
             if observation::readiness(tx,&row,now,true)?!=State::Ready { return Err(Failure::NotReady); }
             tx.execute("UPDATE registry_uses SET dispatched=1 WHERE use_id=?1", [&captured.id]).map_err(db)?;
-            Ok(DispatchedUse {id:captured.id})
+            Ok(DispatchedUse {id:captured.id,connection:reference,version,fence})
         })
     }
 
@@ -219,25 +224,21 @@ impl Registry {
     /// unauthorized: the use is released and, while that credential is still
     /// the connection's published one, the connection is Stale
     /// (`lifecycle::mark_stale`). A credential a publication has replaced
-    /// since the read was captured says nothing about the current one.
+    /// since the read was captured says nothing about the current one. The
+    /// refusal is about the credential, not the use: a use another capture
+    /// already swept as expired is released as `release_read` releases it.
     pub fn refuse_read(&self, dispatched: DispatchedUse, now: u64) -> Result<()> {
         self.transaction(now, false, |tx, _, _| {
-            let (reference, version, fence): (String, String, String) = tx
-                .query_row(
-                    "SELECT connection_ref,version_id,publication_fence FROM registry_uses WHERE use_id=?1 AND dispatched=1",
-                    [&dispatched.id],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-                )
-                .optional()
-                .map_err(db)?
-                .ok_or(Failure::Conflict)?;
             tx.execute(
-                "UPDATE registry_uses SET released=1 WHERE use_id=?1",
+                "UPDATE registry_uses SET released=1 WHERE use_id=?1 AND dispatched=1",
                 [&dispatched.id],
             )
             .map_err(db)?;
-            let row = Self::connection(tx, &reference)?;
-            if row.material.as_deref() == Some(&version) && row.fence == fence && !row.kept.stale {
+            let row = Self::connection(tx, &dispatched.connection)?;
+            if row.material.as_deref() == Some(dispatched.version.as_str())
+                && row.fence == dispatched.fence
+                && !row.kept.stale
+            {
                 mark_stale(tx, &row)?;
                 bump(tx, &row.binding.instance_id)?;
             }

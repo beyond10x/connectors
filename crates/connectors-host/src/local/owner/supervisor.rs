@@ -1039,11 +1039,12 @@ fn worker(
                     // The provider refused the stored credential as unauthorized
                     // (a refresh token answered `invalid_grant`, a token or basic
                     // entry answered 401): the connection is Stale until a
-                    // publication (story:connection-stale-state, decision 15 of
-                    // story:ess-connector-vocabulary-model). Decision 16 exempts
-                    // a refused cached access token, which this host cannot tell
-                    // apart: the catalog adapter reports it with the same code
-                    // and refreshes only on the next invoke.
+                    // reconnect publishes (story:connection-stale-state, decision
+                    // 15 of story:ess-connector-vocabulary-model). A refused
+                    // cached access token is not one (decision 16): the catalog
+                    // adapter drops it and sends the read once more with a fresh
+                    // exchange, and reports `invalid_credential` only when that
+                    // exchange, or its fresh token, is refused too.
                     match &result {
                         Err(refusal) if refusal.failure == runtime::Failure::InvalidCredential => {
                             registry.refuse_read(dispatched, connectors_sdk::now_ms())?

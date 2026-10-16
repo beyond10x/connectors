@@ -82,6 +82,11 @@ fn a_refused_read_makes_the_connection_stale_until_a_reconnect_publishes() {
     let (root, registry) = fixture();
     let (reference, revision) = connected(&registry);
     assert_eq!(state(root.path(), &reference, NOW), State::Ready);
+    // A second read already in flight when the first refusal lands.
+    let captured = registry
+        .capture_read(&binding(), &reference, &BTreeSet::new(), NOW, NOW + 1000)
+        .unwrap();
+    let in_flight = registry.dispatch_read(captured, NOW).unwrap();
 
     refused_read(&registry, &reference, NOW).unwrap();
     let stale = observe(root.path(), "config-1", &reference, NOW);
@@ -94,8 +99,13 @@ fn a_refused_read_makes_the_connection_stale_until_a_reconnect_publishes() {
         serde_json::to_value(stale.state).unwrap(),
         serde_json::json!("stale")
     );
-    // Another refusal of the same credential leaves it Stale.
-    refused_read(&registry, &reference, NOW).unwrap();
+    // Stale is not ready: no further read is admitted, and the refusal of the
+    // read already in flight leaves it Stale.
+    assert_eq!(
+        refused_read(&registry, &reference, NOW),
+        Err(Failure::NotReady)
+    );
+    registry.refuse_read(in_flight, NOW).unwrap();
     assert_eq!(state(root.path(), &reference, NOW), State::Stale);
 
     // Another identity on the reconnect is refused and changes nothing.
@@ -229,22 +239,49 @@ fn a_missing_credential_on_a_read_makes_the_connection_stale() {
     assert_eq!(state(root.path(), &reference, NOW), State::Stale);
 }
 
-/// Decision 14: a revalidation the provider now accepts publishes, and any
-/// publication leaves Stale.
+/// A Stale connection is not ready, so it admits no revalidation: only a
+/// reconnect's publication returns it to Live (coordinator decision F1 on
+/// this story, contract connection section 4.1 row 3).
 #[test]
-fn a_revalidation_the_provider_accepts_returns_a_stale_connection_to_live() {
+fn a_stale_connection_admits_no_revalidation() {
     let (root, registry) = fixture();
     let (reference, revision) = connected(&registry);
     refused_read(&registry, &reference, NOW).unwrap();
     assert_eq!(state(root.path(), &reference, NOW), State::Stale);
+    assert_eq!(
+        registry.admit_revalidation(&binding(), &reference, &revision, LATER),
+        Err(Failure::NotReady)
+    );
+    assert!(matches!(
+        registry.capture_revalidation(&binding(), &reference, &revision, LATER, LATER + 1000),
+        Err(Failure::NotReady)
+    ));
+    assert_eq!(state(root.path(), &reference, LATER), State::Stale);
+}
+
+/// The provider's refusal is about the credential, not about the use: a use
+/// another capture already swept as expired still makes the connection Stale.
+#[test]
+fn a_refusal_of_a_swept_use_still_makes_the_connection_stale() {
+    let (root, registry) = fixture();
+    let (reference, _) = connected(&registry);
+    let expires = NOW + 1000;
     let captured = registry
-        .capture_revalidation(&binding(), &reference, &revision, LATER, LATER + 1000)
+        .capture_read(&binding(), &reference, &BTreeSet::new(), NOW, expires)
         .unwrap();
-    let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
-    registry
-        .finish_revalidation(dispatched, Ok(validated("one", LATER)), LATER)
+    let dispatched = registry.dispatch_read(captured, NOW).unwrap();
+    let other = registry
+        .capture_read(
+            &binding(),
+            &reference,
+            &BTreeSet::new(),
+            expires,
+            expires + 1000,
+        )
         .unwrap();
-    assert_eq!(state(root.path(), &reference, LATER), State::Ready);
+    registry.cancel_read(other, expires).unwrap();
+    registry.refuse_read(dispatched, expires).unwrap();
+    assert_eq!(state(root.path(), &reference, expires), State::Stale);
 }
 
 /// A revalidation refused under a newer configuration revision records only
@@ -263,16 +300,16 @@ fn a_refused_upgrade_does_not_make_the_connection_stale() {
         .finish_revalidation(dispatched, Err(Some(InvalidCredential::Invalid)), LATER)
         .unwrap();
     assert_eq!(state(root.path(), &reference, LATER), State::Ready);
-    // A Stale connection whose upgrade the new provider refuses stays Stale.
+    // A Stale connection admits no upgrade either: it stays Stale.
     let (root, registry) = fixture();
     let (reference, revision) = connected(&registry);
     refused_read(&registry, &reference, LATER).unwrap();
-    let captured = registry
-        .capture_revalidation(&upgraded, &reference, &revision, LATER, LATER + 1000)
-        .unwrap();
-    let dispatched = registry.dispatch_revalidation(captured, LATER).unwrap();
-    registry
-        .finish_revalidation(dispatched, Err(Some(InvalidCredential::Invalid)), LATER)
-        .unwrap();
+    assert!(matches!(
+        registry.capture_revalidation(&upgraded, &reference, &revision, LATER, LATER + 1000),
+        Err(Failure::NotReady)
+    ));
     assert_eq!(state(root.path(), &reference, LATER), State::Stale);
 }
+
+#[path = "stale_adversary_tests.rs"]
+mod adversary;

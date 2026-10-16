@@ -1296,6 +1296,28 @@ impl OAuthCli {
         .map(str::to_owned)
         .to_vec()
     }
+    /// Reconnects the one connection with the same entry, at its current
+    /// revision, and checks it is `ready` again.
+    fn reconnect(&self) {
+        use super::cli_journey::success;
+        let listed =
+            success(self.cli.run(&["connections", "list", "--adapter", "drive"]))["connections"][0]
+                .clone();
+        let reconnected = success(self.cli.run(&[
+            "connections",
+            "reconnect",
+            "--adapter",
+            "drive",
+            "--connection",
+            listed["connection"].as_str().unwrap(),
+            "--expected-revision",
+            listed["revision"].as_str().unwrap(),
+            "--credential-file",
+            self.credential.to_str().unwrap(),
+        ]))["connection"]
+            .clone();
+        assert_eq!(reconnected["summary"]["state"], "ready", "{reconnected}");
+    }
     fn run(&self, args: &[String]) -> std::process::Output {
         self.cli
             .run(&args.iter().map(String::as_str).collect::<Vec<_>>())
@@ -1344,7 +1366,9 @@ fn invalid_grant() -> TokenAnswer {
 
 /// A stored connection whose refresh token the token host now refuses as
 /// `invalid_grant` is reported with `next_action = repair_connection` on the
-/// next invoke; so is a cached access token the API refuses.
+/// next invoke, and the connection, now Stale, admits no read until a
+/// reconnect; so is a cached access token the API refuses even after a fresh
+/// exchange.
 #[test]
 #[ignore = "requires built production CLI and qualified disposable Secret Service"]
 fn oauth_invalid_grant_reports_repair() {
@@ -1368,10 +1392,28 @@ fn oauth_invalid_grant_reports_repair() {
         "the refused exchange reached the API"
     );
 
+    // The connection is now Stale, which is not ready: even with the token
+    // host answering again, the next invoke is refused before any provider
+    // request, naming the reconnect, until a reconnect publishes.
+    provider.set_token(grant(3600));
+    let (exchanged, authorized) = (provider.token_requests(), provider.api_authorizations());
+    let stale = super::cli_journey::refused_data(journey.run(&invoke));
+    assert_eq!(
+        (&stale["code"], &stale["stage"], &stale["next_action"]),
+        (
+            &json!("not_granted"),
+            &json!("admission"),
+            &json!("repair_connection")
+        ),
+        "{stale}"
+    );
+    assert_eq!(provider.token_requests(), exchanged);
+    assert_eq!(provider.api_authorizations(), authorized);
+    journey.reconnect();
+
     // A cached access token the API refuses is dropped and the read is sent
     // once more with a fresh exchange; the API refusing that token too is the
     // stored credential's.
-    provider.set_token(grant(3600));
     success(journey.run(&invoke));
     provider.state.lock().unwrap().api_refuses = true;
     let exchanged = provider.token_requests();
