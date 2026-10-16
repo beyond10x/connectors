@@ -119,7 +119,7 @@ fn section(command: &mut clap::Command, about: &str) -> String {
 
 /// The CLI reference page.
 pub fn page() -> String {
-    let mut generated = connectors::help::command();
+    let generated = connectors::help::command();
     let mut explicit = connectors::compat::Args::command().bin_name("connectors");
     explicit.build();
     let mut grouped = Vec::new();

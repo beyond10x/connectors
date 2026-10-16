@@ -46,8 +46,11 @@ bindings under the existing [management](./auth/management.md),
 [acquisition](./auth/acquisition.md) and
 [custody](./auth/custody.md) contracts.
 
-The `adapter` CLI selector is a configured entry alias, resolved to exactly one
-`connectors.declarations.ServiceConfiguration.instance_id`; it is not an adapter
+The `connector` and `instance` CLI selectors name one configured instance
+together, and the deprecated `adapter` selector names a configured entry alias;
+each resolves to exactly one
+`connectors.declarations.ServiceConfiguration.instance_id`
+([selecting an instance](#selecting-an-instance)). Neither is an adapter
 implementation identifier or executable path. `connection` is the existing
 owner-qualified `connectors.auth_bindings.Connection.connection_ref`, and
 `acquisition` names its existing acquisition owner/ref. A profile selects the
@@ -76,10 +79,10 @@ select a new write-approval format.
 Every type below is in `connectors.cli`. The presentation binding is authored
 separately as `ess-cli/1`. Process globals `config`, `state-dir` and `output` live
 in its separate Context; none becomes a command payload field. Paths are resolved
-before contacting an owner. Connect/repair inputs are ephemeral local protected
+before contacting an owner. Connect/reconnect inputs are ephemeral local protected
 actions: their `credential_document: String` is acquired through the protected
 source binding and passed only to trusted completion. Their distinct
-`ConnectionCreateRequest` / `ConnectionRepairRequest` management projections
+`ConnectionCreateRequest` / `ConnectionReconnectRequest` management projections
 contain only safe selectors. An ephemeral protected action is never an ordinary
 management wire payload or a persistent record.
 
@@ -94,14 +97,14 @@ management wire payload or a persistent record.
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
 | `approvals prepare` | local subject coordinator | `ApprovalPrepareInput` → `ApprovalPrepareResult` | no / no |
 | `approvals issue` | local issuer coordinator | `ApprovalIssueInput` → `ApprovalIssueResult` | no / no |
-| `adapters list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
-| `adapters describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
-| `adapters status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
-| `adapters stop` | existing lifecycle owner | `AdapterStopInput` → `AdapterStopResult` | no / no |
+| `instances list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
+| `instances describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
+| `instances status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
+| `instances stop` | existing lifecycle owner | `AdapterStopInput` → `AdapterStopResult` | no / no |
 | `connections list` | connection metadata authority | `ConnectionListInput` → `ConnectionListResult` | no / no |
 | `connections describe` | connection metadata authority | `ConnectionDescribeInput` → `ConnectionDescribeResult` | no / no |
 | `connections connect` | acquisition/configuration coordinator | `ConnectionConnectInput` → `ConnectionConnectResult` | yes / yes, after admission |
-| `connections repair` | exact existing connection's coordinator | `ConnectionRepairInput` → `ConnectionRepairResult` | yes / yes, after admission |
+| `connections reconnect` | exact existing connection's coordinator | `ConnectionReconnectInput` → `ConnectionReconnectResult` | yes / yes, after admission |
 | `connections revalidate` | exact existing connection's evidence coordinator | `ConnectionRevalidateInput` → `ConnectionRevalidateResult` | yes / yes, after admission |
 | `connections launch` | exact existing connection's read admission and the owner's custody read | `ConnectionLaunchInput` → the consumer's exit status (consumer launch) | yes / no |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
@@ -172,7 +175,7 @@ page deadline. Configuration alone cannot establish connection state. These
 labels preserve observation provenance; they grant no invocation or publication
 authority. The same cached-is-stale rule covers adapter descriptions, operation
 lists/descriptions and cached connection descriptions.
-`adapters list` reports configured inventory with `source: configuration` only;
+`instances list` reports configured inventory with `source: configuration` only;
 it carries no cached lifecycle or readiness claim. Adapter status and acquisition
 status read their existing owner's observations or report owner unavailability;
 they have no cached-result fallback. Connection status can carry a cached
@@ -207,8 +210,11 @@ consumed or failed acquisition never permits repeating its exchange.
 
 `--output json` emits exactly one UTF-8 `{"ok":true,"result":...}` success envelope
 plus newline to stdout. Failure leaves stdout empty and emits one
-`{"ok":false,"error":{"code":...,"data":...}}` envelope plus newline to stderr;
-application error data is `Failure`, while parser/source/internal errors have
+`{"ok":false,"error":{"code":...,"data":...}}` envelope plus newline to stderr.
+A command selected with the deprecated `--adapter`, or run under a renamed path,
+adds a `deprecations` member to either envelope and nothing else
+([selecting an instance](#selecting-an-instance), [renamed commands](#renamed-commands)).
+Application error data is `Failure`, while parser/source/internal errors have
 stable codes and empty data as defined by `ess-cli/1`. Human mode identifies a
 safe next action through the typed result/error. Progress belongs on stderr; JSON
 mode suppresses ordinary progress so stderr is also machine-readable. Diagnostics
@@ -279,10 +285,15 @@ for `connectors`: a command line whose command word, after any leading
 `--output` selections, is one of them completes that command's own options;
 any other line is completed by the generated function, with the three command
 words added at the root and as the word after a leading `help`.
-Root `--help` or `-h`, alone or after leading process globals, prints the
-generated grouped help (the short form of the long help
-in `apps/connectors-cli-contract/help.txt`), one blank line and then this block,
-which the generated help does not carry:
+Help is the generated grouped tree as `connectors::help` presents it
+(`apps/connectors/src/help.rs`) with what the `ess-cli/1` binding cannot
+declare: each group's summary, a deprecated command path marked `Deprecated` in
+its parent's listing and in its own usage line, and `--adapter` marked
+deprecated. It parses exactly as the generated tree does, and help prints no
+deprecation line on standard error, under an old path or with `--adapter` too.
+Root `--help` or `-h`, alone or after leading process globals, prints that
+help's short form, one blank line and then this block, which the generated help
+does not carry:
 
 ```text
 Explicit service commands (use COMMAND --help for options):
@@ -355,7 +366,8 @@ reserved management-name collisions, bad digests and unresolved default selectio
 refuse the entire configuration before host launch. TOML contains no credential
 bytes, keyring locators or actionable acquisition continuations; a `[custody]`
 directory is an infrastructure binding, not a locator. A default adapter
-must name exactly one entry; connection defaults, if used by a future binding,
+must name exactly one entry, and so must a default instance
+([selecting an instance](#selecting-an-instance)); connection defaults, if used by a future binding,
 must be explicitly recorded and cannot be inferred from last usage. This first
 binding requires an explicit connection for a credentialed operation.
 
@@ -366,8 +378,196 @@ Its `invalid_configuration` refusal names the rule that refused in
 `configuration_rule` (`connectors.cli.ConfigurationRule`), never a path or OS
 text: `config_path_unresolved` (no `--config`, `XDG_CONFIG_HOME` or `HOME`, or an
 inadmissible path), `config_missing` (no file at the resolved path),
-`config_not_private` (the file or a directory above it is not owner-only) or
-`owner_uid_mismatch`.
+`config_not_private` (the file or a directory above it is not owner-only),
+`owner_uid_mismatch` or, from `setup migrate` only, `config_too_large` (the
+rewritten file would be larger than the 1 MiB a read admits; the refusal
+carries its size in `configuration_bytes` and the bound in
+`configuration_limit`).
+
+### Selecting an instance
+
+Every command that selects one configured instance takes `--connector <connector>
+--instance <instance>`; an instance name is unique within its connector only, so
+`--instance` alone selects nothing. `--adapter <alias>` keeps selecting by a
+configured entry's alias for a deprecation window whose length the release plan
+decides. Exactly one of `--adapter` or `--connector` with `--instance` is given;
+both, or either half of the pair alone, is `invalid_input` at `arguments`. With
+neither, the configuration's `default_instance` selects, else its
+`default_adapter`; with neither configured the command is `invalid_input` at
+`arguments`. A pair that names no configured instance is `not_found` at
+`admission` with `next_action` `check_configuration`, as an unknown alias is.
+
+An instance's names are those of the `[connectors.<connector>.instances.<instance>]`
+table that names its alias. An `[adapters.<alias>]` entry that no instance names
+is selected as connector `adapter_id`, instance `<alias>`, until it is migrated. A
+configuration in which two entries would answer to one connector and instance
+pair refuses the whole file, as does `default_instance` that is not
+`"<connector>/<instance>"` naming a configured instance, `default_instance`
+outside `connectors-local/5`, or `default_instance` beside `default_adapter`.
+
+Both selectors reach the same entry and the same records: a result is the same
+whichever selected it. Every result type that carries `adapter` carries
+`connector` and `instance` beside it, all three required. `adapter` is the
+instance's legacy alias for the deprecation window. One shape is exempt: the
+service descriptor that `adapters describe` returns (the object carrying
+`configuration_schema`) keeps its own `adapter`, the implementation it describes
+(such as `catalog`), and its own `instance`, the instance id. Neither is a
+selector there, and the descriptor carries no `connector`. The surrounding result
+carries the selector fields.
+
+`--adapter` says it is deprecated exactly once per command. Under `--output
+human` that is one line on standard error, ahead of any failure text the
+command writes there:
+
+```text
+deprecated: --adapter; select with --connector <connector> --instance <instance>
+```
+
+Under `--output json` nothing is added to standard error. The one envelope the
+command writes, success or failure, parse refusals included, carries a third
+member beside `ok` and `result` or `error`:
+
+```json
+{"ok":true,"result":{},"deprecations":[{"option":"--adapter","replacement":["--connector","--instance"]}]}
+```
+
+A caller that reads all of standard error as one JSON failure envelope keeps
+reading its `error`. Under `--output json`, output that is no envelope (help,
+`completions`, a launched consumer's streams) is unchanged.
+
+### Renamed commands
+
+`connections reconnect` replaces `connections repair`, and the `instances` group
+replaces `adapters`: `instances list`, `instances describe`, `instances status`
+and `instances stop`. The commands address an instance; the process they
+observe and stop is still that instance's adapter. Each old path stays an alias
+of its new one for the deprecation window: the same arguments run the same
+command against the same instance with the same result. These are the
+binding's only path aliases.
+
+An old path says it is deprecated exactly once per command, as `--adapter`
+does. Under `--output human` that is one line on standard error, ahead of any
+other deprecation line and any failure text:
+
+```text
+deprecated: connections repair; use connections reconnect
+```
+
+Under `--output json` the one envelope's `deprecations` member carries the
+entry, ahead of an `--adapter` entry when both apply:
+
+```json
+{"ok":true,"result":{},"deprecations":[{"command":"connections repair","replacement":["connections reconnect"]}]}
+```
+
+The machine-facing `next_action` value `repair_connection` is unchanged; it
+names `connections reconnect`.
+
+### One connection per instance
+
+An instance holds at most one published non-revoked connection
+([connection semantics](./auth/connection.md) §4.2).
+`connections connect` is refused while the selected instance holds a published
+Live or Stale connection, before any credential entry or provider exchange, as
+`lifecycle_conflict` at `admission`. Its `next_action` is the
+step the held connection's own reconnect admits:
+
+| The instance holds | `next_action` |
+|---|---|
+| one connection under the configured binding | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
+| one connection saved under an older configuration revision that a revalidation can follow | `revalidate_connection`, after which it is the instance's connection |
+| one connection that reconnect refuses as changed (`create_connection` on a read), or more than one | `revoke_connection`: `connections revoke` it, then connect |
+
+A connection with another identity (provider authority or profile
+authentication) keeps `check_configuration`, as before. A connect is also
+refused while another connect of the instance is in flight, as
+`lifecycle_conflict` at `admission` with `next_action = retry_status`, so two
+concurrent connects never publish two connections. Revoked connections stay as
+history and do not count, and neither does a connection a connect allocated
+and never published: once that connect failed or its acquisition passed its
+deadline, the next connect is admitted. A second account is a second instance.
+
+An instance that held more than one published non-revoked connection before
+this rule keeps every one of them, references unchanged, and each stays
+usable, reconnectable and revocable. A new connect on it is refused with
+`revoke_connection` until all but one are revoked.
+
+`connections describe`, `reconnect`, `revalidate`, `launch` and `revoke` take
+`--connection` optionally. Without it they select the instance's one published
+non-revoked connection; `--expected-revision`, where the command takes it, is
+still required. An instance that holds none refuses as `not_found` at
+`admission` with `next_action = create_connection`; one that holds more than
+one refuses as `invalid_input` at `arguments`, and `--connection` chooses.
+`connections status` keeps requiring `--connection` or `--acquisition`. Under
+`--output json` each of these refusals is the one failure envelope on standard
+error.
+
+### Migrating adapter entries
+
+`setup migrate --mode dry-run` and `setup migrate --mode apply` move legacy
+`[adapters.<alias>]` entries to connector instances without a new consent,
+revalidation or approval policy publication. `--dry-run` and `--apply` are the
+same two commands. Each entry whose implementation maps to a shipped connector
+declaration becomes `[connectors.<connector>.instances.<alias>]` carrying every
+pin of the entry, its alias included. The instance name is the alias, so the
+instance is selected as `--connector <connector> --instance <alias>`, and
+`--adapter <alias>` keeps selecting it for the deprecation window. Its
+`instance_id`, `configuration_revision`, executable selection digest (an approval
+policy's `executable_selection`) and mounted custody item names
+`<alias>/<profile>` stay byte for byte, so its connections, approval policy and
+custody items stay valid. Platform custody items are keyed by connection, not by
+configuration names. Read and write instance pairs are not merged: merging
+changes scopes and so the revision.
+
+Only a catalog entry maps to a connector today: the connector whose shipped
+declaration names the `provider` of the entry's native configuration as its
+`native_provider` (the declaration file's `catalog_provider` key)
+(`--local-config <file>`, admitted as the provider admits it: owner-only, at
+most 1 MiB), or the shipped connector its `--connector` argument names. Every
+other entry stays where it is, and the result names why in `reason`
+(`connectors.cli.MigrateKeptReason`):
+
+| `reason` | The entry |
+|---|---|
+| `implementation_unmapped` | is not a catalog entry: no declaration maps a credential binary, MCP, SQL or Kubernetes implementation to a connector yet |
+| `connector_undeclared` | names a native provider no shipped declaration carries (Slack ships none) |
+| `gateway_prefix` | states a request prefix its connector's declaration does not produce: an API gateway in front of the provider's API, such as the Atlassian gateway |
+| `native_configuration_unreadable` | names no native configuration, or one that is not owner-only, not readable JSON or names no provider |
+| `instance_conflict` | maps to a connector configured disabled, or one that already has an instance named like the alias |
+| `selection_changes` | would read back with another value of the field `differing_field` names |
+
+The new file is read back with the reading rules above before anything is
+written, its 1 MiB bound included: a rewritten file larger than that is
+refused in both modes as `invalid_configuration` naming `config_too_large`,
+and nothing is written. An entry that reads back with any other value of any
+of its fields is not migrated, naming the first such field. So is one whose
+new instance table reads back differently (`instance`, or the first of
+`description`, `endpoint` and `profile`) or whose connector's pre-existing
+table does (`enabled`, or an existing instance's `description`, `endpoint`
+or `profile`, which keeps every entry moving to that connector); a `format`
+that reads back other than `connectors-local/5` keeps every entry. Moving to `connectors-local/5`
+requires `private_protocol` on every entry, and it enters the executable
+selection digest, so no entry of a `connectors-local/1` file is migrated; each
+candidate names `private_protocol`. Nothing else of the file changes, but its
+comments are not kept.
+
+The result lists every `[adapters.<alias>]` entry of the file it read with its
+`disposition` (`migrated` or `kept`), the `connector` and `instance` that select
+it afterwards and, `before` and `after`, its `instance_id`,
+`configuration_revision`, `executable_selection` and `custody_items`. It carries
+the file in `configuration` and its `format_before` and `format_after`. The
+format moves to `connectors-local/5` only when at least one entry is migrated.
+With nothing to migrate the result is `unchanged` and nothing is written in
+either mode. A dry run that would migrate is `planned` and writes nothing. An
+applied one is `applied`: it publishes the file it read, byte for byte and
+owner-only, as `config.toml.before-migrate-<UTC timestamp>`
+(`YYYYMMDDTHHMMSSZ`) beside the configuration without replacing any existing
+file, names it in `backup_path`, and then replaces the configuration atomically
+and owner-only, only while it still holds the bytes the plan was made from; a
+configuration that changed in between is `revision_conflict` at `publication`.
+Rollback is restoring the backup and running the previous release. Under
+`--output json` a refusal is one failure envelope on standard error, like every
+other command's.
 
 ### Durable open checkpoints on an existing store
 
@@ -643,7 +843,7 @@ Missing material or a locked collection is an explicit failure, never another
 generation or environment credential. Persisted metadata without valid custody
 is not a successful connection.
 
-Repair binds the same connection identity, immutable profile/owner/target and
+`connections reconnect` binds the same connection identity, immutable profile/owner/target and
 expected revision. Same-principal/same-target credential renewal may publish a new
 private generation and advance its private publication fence while preserving
 both connection reference and public semantic revision. Only separately admitted
@@ -678,7 +878,7 @@ quoted carrier string or a double-encoded document. Answers are not carriers:
 `OperationInvokeResult.result` is the provider result as a JSON value, validated
 against the selected operation's output schema, and `OperationDescription`
 answers `input_schema` and `output_schema` as JSON schema objects in
-`operations describe`, in the `adapters describe` descriptor and in the
+`operations describe`, in the `instances describe` descriptor and in the
 compatibility `describe`. A caller decodes the answer once; none of these fields
 is a string holding JSON. The schema digest (`schema`), not the schema document,
 remains the identity an invocation selects. `ServiceDescriptor.configuration_schema`
@@ -712,7 +912,7 @@ never replay a possible write after interruption, timeout or lost response.
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
-| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`) | `lifecycle_conflict` | 1 |
+| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`); `connections connect` on an instance that holds its connection, or while another connect of it is in flight ([one connection per instance](#one-connection-per-instance)) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
 | running owner is a different executable build (`next_action = stop_owner`: run `connectors setup owner-stop`) | `owner_build_mismatch` | 1 |
@@ -849,8 +1049,8 @@ existing connection — an HTTP 401, or an OAuth token endpoint's `invalid_grant
 `invalid_client` for a refresh profile — is `code = service_failure`,
 `service_code = unauthorized` at `stage = dispatch` with
 `next_action = repair_connection`: a retry with the same protected entry cannot
-succeed, and a repair replaces it. A credential refused while a connection is
-made (`connections connect`, `connections repair`) or revalidated is not this
+succeed, and `connections reconnect` replaces it. A credential refused while a connection is
+made (`connections connect`, `connections reconnect`) or revalidated is not this
 case and keeps `next_action = retry_explicitly`.
 A guarded write refused for its stored credential, at its preflight or its
 commit, is not this case either: it reports its `mutation` record with
@@ -869,8 +1069,9 @@ with `next_action = revalidate_connection`. `connections revalidate`
 recollects the evidence from the credential already in custody, with no
 re-entry, and the same invoke is then admitted. The invoke never revalidates
 on its own: a business read runs no implicit identity probe. A connection whose
-credential expired or is known invalid (`reauthorization_required`), and a
-credential below the operation's scopes, keep `code = not_granted` with
+credential the provider refused or is known invalid (`stale`), one whose
+credential expired (`reauthorization_required`), and a credential below the
+operation's scopes, keep `code = not_granted` with
 `next_action = repair_connection`.
 
 A connection saved under another configuration revision of its instance also
@@ -886,8 +1087,10 @@ adapter, provider authority and the profile's authentication, which is the
 profile declaration apart from its evidence lifetime. A configuration that
 changes only `evidence_lifetime_ms` leaves the identity unchanged, but the
 connection stays bound to the declaration it was admitted under, so the next
-action is `create_connection`, and `connections connect` under the same
-instance id admits the new connection; the old one stays revocable. When the
+action is `create_connection`: `connections connect` under the same instance
+id names the old connection's revocation while the instance holds it
+(`revoke_connection`, [one connection per instance](#one-connection-per-instance)),
+then admits the new connection. When the
 provider authority or the profile's authentication changed, the next action is
 `check_configuration`: no command under the same instance id can help, since
 `connections connect` there is refused for the same reason (`lifecycle_conflict`
@@ -900,12 +1103,12 @@ Otherwise it is `create_connection`, a saved connection whose profile id the
 configured adapter no longer declares included (revalidate and repair refuse it
 as a read does, never as `unsupported`); connect under a declared profile
 admits the new connection. A
-`connections repair` of a connection saved under another binding is classified
-the same way, never as `identity_mismatch`: repair refuses a changed binding. A
-`connections revalidate`, `connections connect`, `connections repair`, read or
+`connections reconnect` of a connection saved under another binding is classified
+the same way, never as `identity_mismatch`: reconnect refuses a changed binding. A
+`connections revalidate`, `connections connect`, `connections reconnect`, read or
 write whose adapter process still runs an earlier adapter entry stops that
 process and launches the configured one before it captures anything, so no
-command answers `retry_status` for it until `adapters stop`. Only a credential
+command answers `retry_status` for it until `instances stop`. Only a credential
 validation captured by the earlier process is still refused as
 `lifecycle_conflict`; its `connections connect` starts again with a launch
 that replaces the process. A revalidation the new provider refuses (the
@@ -917,7 +1120,9 @@ own revision, revalidation stays admitted, and a later upgrade that succeeds
 or a repair that replaces the credential removes it. An approval reads the
 wall clock for this classification only, as the read path does, without
 advancing the registry clock. `connections connect` under the configured
-revision is admitted while older connections of the instance stay saved under theirs. The instance's
+revision is admitted once the instance holds no published non-revoked
+connection; an instance from before that rule may still hold older ones saved
+under their own revisions. The instance's
 own recorded configuration revision moves to the configured one only when a
 connection is published under it: a revalidation that upgrades one, or a new
 connection whose publication succeeds while the instance still records the

@@ -1,17 +1,17 @@
 ---
 title: Contracts and guarantees
 sidebar_position: 1
-description: What a Connectors contract promises, how an interaction flows through it, and how contract, wire and adapter versions relate.
-lede: A contract is the shared meaning of an interaction (types, access, lifecycle, limits and failures), and an adapter binds that meaning to one provider.
+description: What a Connectors contract promises, how an interaction flows through it, and how contract, wire and implementation versions relate.
+lede: A contract is the shared meaning of an interaction (types, access, lifecycle, limits and failures), and a connector binds that meaning to one provider.
 source: contracts/README.md, contracts/service/v1alpha1/semantics.md, contracts/service/compatibility.md, ess/system.yaml
 ---
 
 # Contracts and guarantees
 
 A contract describes the shared meaning of an interaction: its types, access requirements,
-lifecycle, limits and failure behaviour. An adapter binds those guarantees to a provider. Shared
+lifecycle, limits and failure behaviour. A connector binds those guarantees to its provider. Shared
 contracts live in the repository's `contracts/` directory and never name a provider; native
-profiles (Kubernetes selectors, LogQL, PostgreSQL's text representation) live with their adapter.
+profiles (Kubernetes selectors, LogQL, PostgreSQL's text representation) live with their connector.
 
 ## Follow an interaction
 
@@ -19,7 +19,7 @@ profiles (Kubernetes selectors, LogQL, PostgreSQL's text representation) live wi
 
 1. **Discover.** The caller reads the service's descriptor: each operation's id, input and output
    schema, the contract family and native profile it implements, and the descriptor's revision.
-   Discovery reports observations; an endpoint a Kubernetes adapter discovers is information, not
+   Discovery reports observations; an endpoint the Kubernetes connector discovers is information, not
    a connection.
 2. **Select access.** A connection binds a selected target and a credential. Selecting it is a
    deliberate act of the host or the operator, never a side effect of discovery.
@@ -50,9 +50,9 @@ Three things carry versions, and none implies another:
 |---|---|---|
 | Contract family | `datasource.records/v1alpha1`, `datasource.feed/v1alpha1` | `contracts/` |
 | Service wire binding | `POST /v1/invoke`, `POST /v1alpha2/invoke` | the [compatibility contract](../reference/contracts/compatibility.md) |
-| Adapter specification and native profile | `kubernetes-list`, `gitlab-merge-requests/1` | the adapter |
+| Implementation specification and native profile | `kubernetes-list`, `gitlab-merge-requests/1` | the connector's implementation under `adapters/` |
 
-A broader adapter specification never implies that its runtime supports every operation it
+A broader implementation specification never implies that its runtime supports every operation it
 describes. Each page in the [contract reference](../reference/contracts/index.md) states its own
 support status.
 

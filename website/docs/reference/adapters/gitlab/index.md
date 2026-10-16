@@ -124,21 +124,30 @@ preflight read and the POST was classified uncertain.
 
 ## Use saved credentials
 
-The local CLI requires Linux x86_64 and the qualified GNOME Keyring Secret Service binding. The
-operator builds the optimized CLI and catalog provider, writes an owner-only provider
-configuration naming the bundle, the API base, the token header and the identity and scope reads,
-and references the shipped selection set. The adapter entry in the CLI's TOML configuration names
-`adapter_id = "catalog"`, the provider's configuration revision, the executable's SHA-256 and the
-selection ids it may serve. `connections connect` then reads the token at a hidden prompt, runs
-the identity and scope reads and refuses a token below the required scopes.
+The `gitlab` connector ships its declaration with the catalog provider
+(`adapters/catalog/providers/gitlab/connector.json`): the endpoint `https://gitlab.com` unless an
+instance names its own host, the auth profile `gitlab.pat` with its token header, and the
+identity and scope reads. An instance of it in the CLI's configuration names only what is yours,
+and the installed `connectors-catalog-provider` beside `connectors` serves it:
+
+```toml
+[connectors.gitlab]
+enabled = true
+
+[connectors.gitlab.instances.work]
+endpoint = "https://gitlab.example.com"
+```
+
+`connections connect --connector gitlab --instance work` then reads the token at a hidden
+prompt, runs the identity and scope reads and refuses a token below the required scope `api`.
 
 The repository's [catalog provider guide](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md)
-has the complete configuration and commands, and the
+has the complete commands, and the
 [guarded merge guide](https://github.com/beyond10x/connectors/blob/main/docs/local-gitlab-merge.md)
 the approval steps for a write. Validation evidence lasts 60 seconds; `connections revalidate`
-renews it without re-entry, `connections repair` replaces an invalid credential and refuses a
-changed identity, and `connections revoke` is local revocation that does not revoke the token at
-GitLab.
+renews it without re-entry, `connections reconnect` replaces the credential of a connection the
+provider refused and refuses a changed identity, and `connections revoke` is local revocation
+that does not revoke the token at GitLab.
 
 ## Limits
 

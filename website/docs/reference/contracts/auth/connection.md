@@ -58,6 +58,7 @@ Status is a connection-wide viability observation, not operation authorization. 
 |---|---|---|
 | `ready` | published binding and fresh required connection-wide checks permit consideration of business use | null |
 | `pending` | a real connection record awaits publication/activation or required baseline revalidation | null during acquisition; `revalidate` when an existing binding needs admitted validation |
+| `stale` | the connection is Stale (§4.2): the provider refused its stored credential, and only a reconnect's publication returns it to Live | `reconnect` |
 | `reauthorization_required` | established credential is positively missing/invalid/revoked, violates the profile minimum, or rotating refresh left it possibly consumed | `reconnect` |
 | `custody_unavailable` | required custody dependency is unavailable/unknown; this does not prove invalid credentials | null |
 | `parent_degraded` | required mediated parent/binding is unavailable, not viable or stale | null |
@@ -94,7 +95,7 @@ Business errors use the existing extended set: `connection_not_ready` for global
 
 ### 4.1 Connection viability and operation eligibility
 
-Read the authoritative metadata under current disclosure admission first. Metadata unavailable gives `unavailable`, not an invented pending/ready/reconnect state. Local revocation differs from provider credential revocation: the first is terminal; the second can be repaired on a non-revoked binding. `enabled` is an administrative fact independent of all evidence. Status is a reduction of these facts, **not a persisted lifecycle that transitions through every provider observation**. The one provider observation the binding persists is `Stale` (§4.2): the provider refused the stored credential, so no retry can succeed and a reconnect is the remedy. A Stale connection reduces to `reauthorization_required` under row 3 until a publication returns it to `Live`.
+Read the authoritative metadata under current disclosure admission first. Metadata unavailable gives `unavailable`, not an invented pending/ready/reconnect state. Local revocation differs from provider credential revocation: the first is terminal; the second can be repaired on a non-revoked binding. `enabled` is an administrative fact independent of all evidence. Status is a reduction of these facts, **not a persisted lifecycle that transitions through every provider observation**. The one provider observation the binding persists is `Stale` (§4.2): the provider refused the stored credential, so no retry can succeed and a reconnect is the remedy. A Stale connection reduces to its own status, `stale`, under row 3 until a publication returns it to `Live`; a reconnect's candidate recorded before that publication, or a reconnect that failed, leaves it `stale`.
 
 Apply the following rows in order, first matching row wins. Every check used for success must match the current applicable F05 material generation or explicit no-child-credential configuration/route binding ([profile §4.2](./profile.md#42-explicit-access-bindings-without-child-credentials)), and be unexpired. The latter publishes a validated binding with applicable checks, not fake material or a provider account; absent credential/custody/scope dependencies supply no failure and no authority. A negative observation from obsolete material does not poison a replacement either. Unknown and unavailable never become positive evidence.
 
@@ -102,11 +103,12 @@ Apply the following rows in order, first matching row wins. Every check used for
 |---|---|---|
 | 1 | local terminal revocation | `revoked` |
 | 2 | connection disabled | `disabled` |
-| 3 | connection Stale (§4.2); established active credential positively missing/invalid/revoked or below mandatory profile minimum; detected identity mismatch; unresolved consumed rotating source | `reauthorization_required` |
-| 4 | required custody unavailable or its availability unknown | `custody_unavailable` |
-| 5 | required parent/binding not currently viable or route stale/unknown | `parent_degraded` |
-| 6 | no validated publication yet, or another required connection-wide check is stale, unknown, not_run or unsatisfied | `pending` |
-| 7 | validated publication and all required global checks current | `ready` |
+| 3 | connection Stale (§4.2) | `stale` |
+| 4 | established active credential positively missing/invalid/revoked or below mandatory profile minimum; detected identity mismatch; unresolved consumed rotating source | `reauthorization_required` |
+| 5 | required custody unavailable or its availability unknown | `custody_unavailable` |
+| 6 | required parent/binding not currently viable or route stale/unknown | `parent_degraded` |
+| 7 | no validated publication yet, or another required connection-wide check is stale, unknown, not_run or unsatisfied | `pending` |
+| 8 | validated publication and all required global checks current | `ready` |
 
 An initial flow with no established material uses pending, not “missing old credential.” A failed independent repair does not overwrite valid old evidence or state; concurrent expiry/revocation/refresh consumption still applies. Parent failures cannot override local revoked/disabled. A profile explicitly lacking a dependency omits that dependency's readiness test; missing material for a credential-requiring profile never selects anonymous access.
 
@@ -133,6 +135,7 @@ The administrative lifecycle has the states `Live`, `Stale` and `Revoked`:
 |---|---|---|
 | Live | Stale | the provider refused the stored credential as unauthorized, for every profile scheme (an OAuth refresh token, a personal access token, a basic or a bearer entry), or a revalidation found it `invalid`, `insufficient` (granted scope below the profile minimum) or `missing` (a lost keyring entry) |
 | Stale | Live | a publication: the provider accepted a credential, through a reconnect or a revalidation it now accepts |
+| Stale | Stale | a reconnect recorded its candidate custody version on the connection, before its publication; the candidate grants no use |
 | Live | Live | a publication |
 | Live, Stale | Revoked | local revocation |
 
@@ -250,7 +253,7 @@ Positive:
 
 - Reauthorize a connection through a fake acquisition flow; ref unchanged; continuation validity follows each cursor/session contract and its current authority, not ref stability alone.
 - Two users connect the same profile on two instances of one connector; two refs; each invocation uses its own credential (fake transport records the header). A second connect on an instance holding a published Live or Stale connection is refused; after that connection is revoked, it succeeds. A connect that failed before publication leaves an unpublished connection that does not block the next one.
-- The provider refuses the stored credential → the connection is Stale and reports `reauthorization_required`; a reconnect publishes and returns it to Live under the same ref.
+- The provider refuses the stored credential → the connection is Stale and reports `stale`; a reconnect records its candidate custody version and the connection stays Stale (a reconnect that fails then leaves it Stale, the candidate still listed among its custody versions); the reconnect's publication returns it to Live under the same ref.
 - Replace the bound token file for a `configured` connection with same-account material; ref and configuration revision may stay unchanged, but the material has a new private generation. The next invocation uses those bytes only after admitted replacement validation and publication; pending old-generation admissions are invalidated. Without validation, invocation refuses.
 - Replace it with another account's token → ordinary replacement refuses; cached identity evidence for the old generation is unusable even within its age bound.
 
@@ -282,7 +285,7 @@ Adversarial (`docs/design.md:985`, repair without identity drift):
 
 | Entity | Notes |
 |---|---|
-| Connection viability and operation eligibility values | Modeled in connection_admission.yaml; the seven-state status is the §4.1 reduction, not an ESS entity lifecycle. Local revocation is terminal and enablement is orthogonal. |
+| Connection viability and operation eligibility values | Modeled in connection_admission.yaml; the eight-state status is the §4.1 reduction, not an ESS entity lifecycle. Local revocation is terminal and enablement is orthogonal. |
 | Persistent `Connection` | `connectors.auth_bindings.Connection`: §4.2's Live/Stale/Revoked lifecycle and instance/profile/optional parent/material references, without deletion ownership over their targets. |
 | `ExternalIdentity` | value embedded in `Connection`; shared typed kind/subject in credentials.yaml, scoped by provider authority |
 | `EvidenceSnapshot` | Existing credential_evidence.yaml value in optional `Connection.baseline_evidence`: one active-generation baseline with at most six distinct applicable checks under §4.2; exact operation evidence remains request-scoped, with no new persisted evidence owner. |
