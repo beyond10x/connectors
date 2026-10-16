@@ -10,7 +10,7 @@ use std::{
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(try_from = "ConfigInput")]
+#[serde(try_from = "ConfigInput", into = "Written")]
 pub struct Config {
     pub format: String,
     pub owner_uid: u32,
@@ -22,13 +22,18 @@ pub struct Config {
     pub default_adapter: Option<String>,
     #[serde(default)]
     pub adapters: BTreeMap<String, Adapter>,
-    /// The explicitly selected custody binding (`connectors-local/4` only);
+    /// The explicitly selected custody binding (`connectors-local/4` and `/5`);
     /// absent, custody is the platform binding.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub custody: Option<Custody>,
-    /// Operator-pinned consumer executables (`connectors-local/3` and `/4`).
+    /// Operator-pinned consumer executables (`connectors-local/3` and later).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub consumers: BTreeMap<String, Consumer>,
+    /// The `[connectors]` table (`connectors-local/5`), `None` when the file
+    /// has none. An instance's entry is in `adapters` under its alias, and
+    /// only there: that entry is what is checked, served and written back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connectors: Option<BTreeMap<String, Connector>>,
 }
 
 // Deserialize the closed envelope before selecting its version. Validation is
@@ -47,10 +52,11 @@ struct ConfigInput {
     adapters: BTreeMap<String, Adapter>,
     #[serde(default)]
     consumers: BTreeMap<String, Consumer>,
+    connectors: Option<BTreeMap<String, ConnectorTable>>,
 }
 impl Config {
-    fn assemble(input: ConfigInput) -> Self {
-        Self {
+    fn assemble(input: ConfigInput) -> std::result::Result<Self, Refusal> {
+        let mut config = Self {
             format: input.format,
             owner_uid: input.owner_uid,
             approval_clock: input.approval_clock,
@@ -59,13 +65,19 @@ impl Config {
             default_adapter: input.default_adapter,
             adapters: input.adapters,
             consumers: input.consumers,
-        }
+            connectors: None,
+        };
+        config.connectors = input
+            .connectors
+            .map(|tables| config.admit_instances(tables))
+            .transpose()?;
+        Ok(config)
     }
 }
 impl TryFrom<ConfigInput> for Config {
     type Error = &'static str;
     fn try_from(input: ConfigInput) -> std::result::Result<Self, Self::Error> {
-        let config = Self::assemble(input);
+        let config = Self::assemble(input).map_err(|_| "invalid local configuration")?;
         config
             .validate()
             .map_err(|_| "invalid local configuration")?;
@@ -314,6 +326,249 @@ impl Adapter {
     }
 }
 
+/// A `[connectors.<connector>]` table (`connectors-local/5`): whether the
+/// connector is enabled, and its instances by name. `enabled` is stated, never
+/// assumed; what a disabled connector's instance means is not decided yet, so
+/// only a connector without instances may be disabled.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Connector {
+    pub enabled: bool,
+    pub instances: BTreeMap<String, Instance>,
+}
+
+/// A `[connectors.<connector>.instances.<instance>]` table, without its pins.
+/// Until the host derives an instance from its installed connector
+/// (story:connector-instance-derived-fields), every instance carries the pins
+/// of a legacy `[adapters.<alias>]` entry, its alias included, and loads to
+/// exactly that entry, which is held in `Config::adapters` under `alias`: the
+/// same instance id, configuration revision, executable selection digest and
+/// mounted-custody item names. The connector name of such an instance is
+/// checked as a name only, against no connector declaration.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Instance {
+    pub description: Option<String>,
+    pub endpoint: Option<String>,
+    pub alias: String,
+}
+
+/// `[connectors.<connector>]` as written.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct ConnectorTable {
+    enabled: bool,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    instances: BTreeMap<String, InstanceTable>,
+}
+
+/// `[connectors.<connector>.instances.<instance>]` as written: the instance's
+/// own keys and the legacy entry's pins.
+#[derive(Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct InstanceTable {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    endpoint: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    alias: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    instance_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    adapter_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    configuration_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    protocol: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(deserialize_with = "private_selection")]
+    private_protocol: Option<super::runtime::PrivateProtocol>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    startup: Option<Startup>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    restart: Option<Restart>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    executable: Option<Executable>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    permissions: Option<Permissions>,
+}
+
+impl InstanceTable {
+    /// The instance and the legacy entry it pins; `None` unless it carries
+    /// every pin the legacy entry requires. `startup`, `restart` and
+    /// `permissions` default as in the legacy entry.
+    fn pinned(self) -> Option<(Instance, Adapter)> {
+        let adapter = Adapter {
+            instance_id: self.instance_id?,
+            adapter_id: self.adapter_id?,
+            configuration_revision: self.configuration_revision?,
+            protocol: self.protocol?,
+            private_protocol: self.private_protocol,
+            startup: self.startup.unwrap_or_default(),
+            restart: self.restart.unwrap_or_default(),
+            executable: self.executable?,
+            permissions: self.permissions.unwrap_or_default(),
+        };
+        let instance = Instance {
+            description: self.description,
+            endpoint: self.endpoint,
+            alias: self.alias?,
+        };
+        Some((instance, adapter))
+    }
+
+    /// The table written for `instance`, its pins taken from `adapter`, the
+    /// entry under its alias: every pin is written, as the legacy entry
+    /// writes them.
+    fn written(instance: Instance, adapter: Adapter) -> Self {
+        Self {
+            description: instance.description,
+            endpoint: instance.endpoint,
+            alias: Some(instance.alias),
+            instance_id: Some(adapter.instance_id),
+            adapter_id: Some(adapter.adapter_id),
+            configuration_revision: Some(adapter.configuration_revision),
+            protocol: Some(adapter.protocol),
+            private_protocol: adapter.private_protocol,
+            startup: Some(adapter.startup),
+            restart: Some(adapter.restart),
+            executable: Some(adapter.executable),
+            permissions: Some(adapter.permissions),
+        }
+    }
+}
+
+/// A configuration as written. `adapters` is the only home of an entry: an
+/// instance's pins are rebuilt from the entry under its alias, an instance
+/// whose entry was removed is not written, and an entry is under
+/// `[adapters]` exactly when no instance names its alias.
+#[derive(Serialize)]
+struct Written {
+    format: String,
+    owner_uid: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    approval_clock: Option<super::clock::ApprovalClock>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    secret_service_socket: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_adapter: Option<String>,
+    adapters: BTreeMap<String, Adapter>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    custody: Option<Custody>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    consumers: BTreeMap<String, Consumer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    connectors: Option<BTreeMap<String, ConnectorTable>>,
+}
+
+impl From<Config> for Written {
+    fn from(config: Config) -> Self {
+        let mut adapters = config.adapters;
+        let connectors = config.connectors.map(|connectors| {
+            connectors
+                .into_iter()
+                .map(|(name, connector)| {
+                    let instances = connector
+                        .instances
+                        .into_iter()
+                        .filter_map(|(name, instance)| {
+                            let adapter = adapters.remove(&instance.alias)?;
+                            Some((name, InstanceTable::written(instance, adapter)))
+                        })
+                        .collect();
+                    let table = ConnectorTable {
+                        enabled: connector.enabled,
+                        instances,
+                    };
+                    (name, table)
+                })
+                .collect()
+        });
+        Self {
+            format: config.format,
+            owner_uid: config.owner_uid,
+            approval_clock: config.approval_clock,
+            secret_service_socket: config.secret_service_socket,
+            default_adapter: config.default_adapter,
+            adapters,
+            custody: config.custody,
+            consumers: config.consumers,
+            connectors,
+        }
+    }
+}
+
+impl Config {
+    /// Add every instance's entry to `adapters` under its alias. An instance
+    /// without every pin, or with an alias already taken by a legacy entry or
+    /// another instance, refuses the file.
+    fn admit_instances(
+        &mut self,
+        tables: BTreeMap<String, ConnectorTable>,
+    ) -> std::result::Result<BTreeMap<String, Connector>, Refusal> {
+        let mut connectors = BTreeMap::new();
+        for (name, table) in tables {
+            let mut instances = BTreeMap::new();
+            for (instance_name, table) in table.instances {
+                let (instance, adapter) = table.pinned().ok_or(Failure::InvalidConfiguration)?;
+                if self
+                    .adapters
+                    .insert(instance.alias.clone(), adapter)
+                    .is_some()
+                {
+                    return Err(Failure::InvalidConfiguration.into());
+                }
+                instances.insert(instance_name, instance);
+            }
+            let connector = Connector {
+                enabled: table.enabled,
+                instances,
+            };
+            connectors.insert(name, connector);
+        }
+        Ok(connectors)
+    }
+
+    /// `[connectors]`, even empty, is a `connectors-local/5` table. Names are
+    /// selectors, a connector with instances is enabled, and no two instances
+    /// name one alias. An instance's pins are its entry in `adapters`, which
+    /// the legacy entry's rules check (instance-id uniqueness among them)
+    /// together with every legacy entry; an instance whose entry is gone from
+    /// `adapters` is removed, and is not written back.
+    fn check_connectors(&self) -> std::result::Result<(), Refusal> {
+        let Some(connectors) = &self.connectors else {
+            return Ok(());
+        };
+        if self.format != "connectors-local/5" || connectors.len() > 64 {
+            return Err(Failure::InvalidConfiguration.into());
+        }
+        let text = |value: &Option<String>, empty: bool, limit: usize, space: bool| {
+            value.as_ref().is_none_or(|value| {
+                (empty || !value.is_empty())
+                    && value.len() <= limit
+                    && !value
+                        .chars()
+                        .any(|c| c.is_control() || (!space && c.is_whitespace()))
+            })
+        };
+        let mut aliases = BTreeSet::new();
+        for (name, connector) in connectors {
+            if !selector(name) || (!connector.enabled && !connector.instances.is_empty()) {
+                return Err(Failure::InvalidConfiguration.into());
+            }
+            for (name, instance) in &connector.instances {
+                if !selector(name)
+                    || !text(&instance.description, true, 1024, true)
+                    || !text(&instance.endpoint, false, 2048, false)
+                    || !aliases.insert(&instance.alias)
+                {
+                    return Err(Failure::InvalidConfiguration.into());
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 /// An operator-pinned consumer: an executable that `connections launch` starts
 /// with one connection's protected document on descriptor 3. `executable.args`
 /// is the pinned argv prefix; the caller's `--args` follow it.
@@ -428,7 +683,7 @@ impl Config {
         // Decode the closed envelope without its embedded validation, so the
         // refusal below can name its rule instead of collapsing into serde's.
         let input: ConfigInput = toml::from_str(text).map_err(|_| Failure::InvalidConfiguration)?;
-        let config = Self::assemble(input);
+        let config = Self::assemble(input)?;
         config.check()?;
         Ok(config)
     }
@@ -450,7 +705,7 @@ impl Config {
         }
     }
 
-    /// `[custody]` is a `connectors-local/4` table. Its binding is one this
+    /// `[custody]` is a `connectors-local/4` and `/5` table. Its binding is one this
     /// build supports: the platform's, or `mounted_secret` on Linux. The
     /// directory is named exactly for `mounted_secret`, which never sits beside
     /// a Secret Service socket.
@@ -465,7 +720,11 @@ impl Config {
                 None,
             ),
         };
-        if self.format != "connectors-local/4" || !supported {
+        if !matches!(
+            self.format.as_str(),
+            "connectors-local/4" | "connectors-local/5"
+        ) || !supported
+        {
             return Err(Failure::InvalidConfiguration.into());
         }
         if let Some(directory) = directory {
@@ -489,6 +748,7 @@ impl Config {
                 | "connectors-local/2"
                 | "connectors-local/3"
                 | "connectors-local/4"
+                | "connectors-local/5"
         ) {
             return Err(Failure::InvalidConfiguration.into());
         }
@@ -498,11 +758,12 @@ impl Config {
         if let Some(custody) = &self.custody {
             self.check_custody(custody)?;
         }
+        self.check_connectors()?;
         if self.adapters.len() > 64
             || self.consumers.len() > 64
             || (!matches!(
                 self.format.as_str(),
-                "connectors-local/3" | "connectors-local/4"
+                "connectors-local/3" | "connectors-local/4" | "connectors-local/5"
             ) && !self.consumers.is_empty())
             || self
                 .default_adapter
@@ -608,6 +869,7 @@ impl Config {
             default_adapter: None,
             adapters: BTreeMap::new(),
             consumers: BTreeMap::new(),
+            connectors: None,
         };
         let text = format!(
             "# Linux Secret Service custody is required; credentials never belong here.\n{}",
@@ -957,5 +1219,329 @@ mod custody_tests {
             let text = toml::to_string(&custody).unwrap();
             assert_eq!(toml::from_str::<Custody>(&text).unwrap(), custody, "{text}");
         }
+    }
+}
+
+// The fixtures configure Unix absolute executable paths.
+#[cfg(all(test, unix))]
+mod connector_instance_tests {
+    //! story:connector-config-dual-read: `connectors-local/5` reads
+    //! `[connectors.<connector>.instances.<instance>]` beside the legacy
+    //! `[adapters.<alias>]`. An instance carrying a legacy entry's pins loads to
+    //! that entry's `Adapter`, under its alias, so the persisted records keyed
+    //! by its instance id, configuration revision, executable selection digest
+    //! and alias stay valid.
+    use super::*;
+
+    /// One adapter kind's legacy entry, and the connector and instance names
+    /// the same pins are written under.
+    struct Kind {
+        alias: &'static str,
+        connector: &'static str,
+        instance: &'static str,
+        scalars: &'static str,
+        executable: &'static str,
+        permissions: &'static str,
+    }
+
+    const KINDS: [Kind; 5] = [
+        Kind {
+            alias: "gmail-read",
+            connector: "gmail",
+            instance: "private",
+            scalars: "instance_id='gmail-read'\nadapter_id='catalog'\nconfiguration_revision='3f1c0a9e5b7d4e2a8c6b0f1e3d5a7c9b2e4f6a8c0d1b3e5f7a9c2d4e6f8a0b1c'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n",
+            executable: "path='/opt/connectors/bin/connectors-catalog'\nsha256='1111111111111111111111111111111111111111111111111111111111111111'\nargs=['--local-config','/etc/connectors/gmail-read.json']\n",
+            permissions: "profiles=['google.oauth']\noperations=['users.messages.list','users.messages.get']\n",
+        },
+        Kind {
+            alias: "slack-bot",
+            connector: "slack",
+            instance: "bot",
+            scalars: "instance_id='slack-bot'\nadapter_id='slack-credentials'\nconfiguration_revision='cfg-7'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\nstartup='automatic'\nrestart='never'\n",
+            executable: "path='/opt/connectors/bin/slack-credentials'\nsha256='2222222222222222222222222222222222222222222222222222222222222222'\nargs=[]\n",
+            permissions: "profiles=['slack.bot']\noperations=['auth.test']\n",
+        },
+        Kind {
+            alias: "docs-mcp",
+            connector: "docs",
+            instance: "local",
+            scalars: "instance_id='docs-mcp'\nadapter_id='mcp'\nconfiguration_revision='mcp-cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n",
+            executable: "path='/opt/connectors/bin/connectors-mcp'\nsha256='3333333333333333333333333333333333333333333333333333333333333333'\nargs=['--server','/opt/mcp/docs-server']\n",
+            permissions: "profiles=['mcp.none']\noperations=['tools.call']\n",
+        },
+        Kind {
+            alias: "warehouse",
+            connector: "postgres",
+            instance: "warehouse",
+            scalars: "instance_id='postgres-local'\nadapter_id='sql'\nconfiguration_revision='sql-cfg-2'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\nstartup='on-demand'\n",
+            executable: "path='/opt/connectors/bin/connectors-sql'\nsha256='4444444444444444444444444444444444444444444444444444444444444444'\nargs=['--local-config','/etc/connectors/postgres.json']\n",
+            permissions: "profiles=['postgres.password']\noperations=['query.read']\n",
+        },
+        Kind {
+            alias: "cluster",
+            connector: "kubernetes",
+            instance: "work",
+            scalars: "instance_id='kubernetes-local'\nadapter_id='kubernetes'\nconfiguration_revision='kube-cfg-3'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\nstartup='on-demand'\nrestart='never'\n",
+            executable: "path='/opt/connectors/bin/connectors-kubernetes'\nsha256='5555555555555555555555555555555555555555555555555555555555555555'\nargs=['--local-config','/etc/connectors/kubernetes.json']\n",
+            permissions: "profiles=['kubernetes.token']\noperations=['resources.list','endpoints.discover']\n",
+        },
+    ];
+
+    impl Kind {
+        fn legacy(&self) -> String {
+            Self::table(&format!("adapters.{}", self.alias), self.scalars, self)
+        }
+
+        /// The same pins as an instance entry, with the legacy alias.
+        fn instance(&self, extra: &str) -> String {
+            format!(
+                "[connectors.{}]\nenabled=true\n{}",
+                self.connector,
+                Self::table(
+                    &format!("connectors.{}.instances.{}", self.connector, self.instance),
+                    &format!("alias='{}'\n{extra}{}", self.alias, self.scalars),
+                    self,
+                )
+            )
+        }
+
+        fn table(table: &str, scalars: &str, kind: &Kind) -> String {
+            format!(
+                "[{table}]\n{scalars}[{table}.executable]\n{}[{table}.permissions]\n{}",
+                kind.executable, kind.permissions
+            )
+        }
+    }
+
+    fn read(format: &str, body: &str) -> std::result::Result<Config, Refusal> {
+        let root = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(
+            Some(&root.path().join("config/config.toml")),
+            Some(&root.path().join("state")),
+        )
+        .unwrap();
+        Config::initialize(&paths).unwrap();
+        std::fs::write(
+            &paths.config,
+            format!("format='{format}'\nowner_uid={}\n{body}", fs::uid()),
+        )
+        .unwrap();
+        Config::read(&paths.config)
+    }
+
+    fn value(adapter: &Adapter) -> serde_json::Value {
+        serde_json::to_value(adapter).unwrap()
+    }
+
+    const INVALID: Option<Refusal> = Some(Refusal::Failure(Failure::InvalidConfiguration));
+
+    #[test]
+    fn a_pinned_instance_reads_as_the_legacy_entry_for_every_adapter_kind() {
+        for kind in &KINDS {
+            let legacy = read("connectors-local/4", &kind.legacy()).unwrap();
+            let legacy = &legacy.adapters[kind.alias];
+            let instance = read(
+                "connectors-local/5",
+                &kind.instance("description='a description'\n"),
+            )
+            .unwrap();
+            assert_eq!(
+                instance.adapters.keys().collect::<Vec<_>>(),
+                [kind.alias],
+                "{}",
+                kind.alias
+            );
+            let instance = &instance.adapters[kind.alias];
+            assert_eq!(instance.instance_id, legacy.instance_id, "{}", kind.alias);
+            assert_eq!(
+                instance.configuration_revision, legacy.configuration_revision,
+                "{}",
+                kind.alias
+            );
+            // The approval policy's `executable_selection`.
+            assert_eq!(instance.selection(), legacy.selection(), "{}", kind.alias);
+            assert_eq!(value(instance), value(legacy), "{}", kind.alias);
+            // The legacy entry still loads in the new format, unchanged.
+            let current = read("connectors-local/5", &kind.legacy()).unwrap();
+            assert_eq!(
+                current.adapters[kind.alias].selection(),
+                legacy.selection(),
+                "{}",
+                kind.alias
+            );
+        }
+    }
+
+    #[test]
+    fn both_tables_load_together_and_every_alias_reaches_its_entry() {
+        let separate: BTreeMap<&str, serde_json::Value> = KINDS
+            .iter()
+            .map(|kind| {
+                let config = read("connectors-local/4", &kind.legacy()).unwrap();
+                (kind.alias, value(&config.adapters[kind.alias]))
+            })
+            .collect();
+        // Two kinds stay legacy entries, three move to instances; an instance
+        // with an endpoint and one of a connector named by no declaration
+        // (`docs`) load all the same.
+        let body = format!(
+            "default_adapter='cluster'\n{}{}{}{}{}[consumers.probe.executable]\npath='/opt/consumer'\nsha256='{}'\n[consumers.probe.permissions]\nconnections=['gmail-read','slack-bot']\n",
+            KINDS[0].legacy(),
+            KINDS[3].legacy(),
+            KINDS[1].instance(""),
+            KINDS[2].instance(""),
+            KINDS[4].instance("endpoint='https://cluster.example.com:6443'\n"),
+            "6".repeat(64),
+        );
+        let config = read("connectors-local/5", &body).unwrap();
+        let loaded: BTreeMap<&str, serde_json::Value> = config
+            .adapters
+            .iter()
+            .map(|(alias, adapter)| (alias.as_str(), value(adapter)))
+            .collect();
+        assert_eq!(loaded, separate);
+        // Serialising keeps each entry in the table it was read from.
+        let text = toml::to_string(&config).unwrap();
+        assert!(
+            text.contains("[adapters.gmail-read]") && !text.contains("[adapters.slack-bot]"),
+            "{text}"
+        );
+        let roundtrip: Config = toml::from_str(&text).unwrap();
+        let reloaded: BTreeMap<&str, serde_json::Value> = roundtrip
+            .adapters
+            .iter()
+            .map(|(alias, adapter)| (alias.as_str(), value(adapter)))
+            .collect();
+        assert_eq!(reloaded, separate, "{text}");
+        assert_eq!(toml::to_string(&roundtrip).unwrap(), text);
+    }
+
+    #[test]
+    fn an_instance_and_an_entry_with_one_instance_id_or_alias_are_refused() {
+        let [catalog, credential, ..] = &KINDS;
+        // The same entry twice, once in each table.
+        let same = format!("{}{}", catalog.legacy(), catalog.instance(""));
+        assert_eq!(read("connectors-local/5", &same).err(), INVALID);
+        // One instance id under two aliases, by the rule that refuses it for
+        // two legacy entries.
+        let id = format!(
+            "{}{}",
+            catalog.legacy(),
+            credential
+                .instance("")
+                .replace("instance_id='slack-bot'", "instance_id='gmail-read'")
+        );
+        assert_eq!(read("connectors-local/5", &id).err(), INVALID);
+        let legacy_pair = format!(
+            "{}{}",
+            catalog.legacy(),
+            credential
+                .legacy()
+                .replace("instance_id='slack-bot'", "instance_id='gmail-read'")
+        );
+        assert_eq!(read("connectors-local/5", &legacy_pair).err(), INVALID);
+        // One alias for two instance ids.
+        let alias = format!(
+            "{}{}",
+            catalog.legacy(),
+            credential
+                .instance("")
+                .replace("alias='slack-bot'", "alias='gmail-read'")
+        );
+        assert_eq!(read("connectors-local/5", &alias).err(), INVALID);
+        // Two instances naming one alias.
+        let twice = format!(
+            "{}{}",
+            catalog.instance(""),
+            credential
+                .instance("")
+                .replace("alias='slack-bot'", "alias='gmail-read'")
+        );
+        assert_eq!(read("connectors-local/5", &twice).err(), INVALID);
+    }
+
+    #[test]
+    fn connector_tables_are_refused_outside_format_five_and_when_malformed() {
+        let kind = &KINDS[4];
+        let valid = kind.instance("");
+        assert!(read("connectors-local/5", &valid).is_ok());
+        for format in [
+            "connectors-local/1",
+            "connectors-local/2",
+            "connectors-local/3",
+            "connectors-local/4",
+        ] {
+            assert_eq!(read(format, &valid).err(), INVALID, "{format}");
+        }
+        let table = "[connectors.kubernetes.instances.work]\n";
+        let mut malformed = vec![
+            // Nothing derives an instance's fields yet: an instance without
+            // every pin the legacy entry requires is refused.
+            "[connectors.kubernetes]\nenabled=true\n[connectors.kubernetes.instances.work]\ndescription='unpinned'\n".to_owned(),
+            valid.replace("enabled=true", "enabled=false"),
+            valid.replace("enabled=true\n", ""),
+            valid.replace("connectors.kubernetes", "connectors.'not a selector'"),
+            valid.replace("instances.work", "instances.'not a selector'"),
+            valid.replace(table, &format!("{table}provider='kubernetes'\n")),
+            valid.replace(table, &format!("{table}endpoint=''\n")),
+            valid.replace(table, &format!("{table}endpoint='https://a b'\n")),
+            valid.replace(table, &format!("{table}description=\"a\\u0007\"\n")),
+            valid.replace(table, &format!("{table}description='{}'\n", "d".repeat(1025))),
+            valid.replace("enabled=true", "enabled=true\nendpoint='https://x'"),
+            // Legacy rules over the instance's pins.
+            valid.replace("alias='cluster'", "alias='invoke'"),
+            valid.replace("protocol='v1alpha1'", "protocol='v2'"),
+            valid.replace("sha256='5555", "sha256='EEEE"),
+        ];
+        for pin in [
+            "alias='cluster'\n",
+            "instance_id='kubernetes-local'\n",
+            "adapter_id='kubernetes'\n",
+            "configuration_revision='kube-cfg-3'\n",
+            "protocol='v1alpha1'\n",
+        ] {
+            malformed.push(valid.replace(pin, ""));
+        }
+        malformed.push(
+            valid.replace(
+                "[connectors.kubernetes.instances.work.executable]\npath='/opt/connectors/bin/connectors-kubernetes'\nsha256='5555555555555555555555555555555555555555555555555555555555555555'\nargs=['--local-config','/etc/connectors/kubernetes.json']\n",
+                "",
+            ),
+        );
+        for body in malformed {
+            assert_eq!(read("connectors-local/5", &body).err(), INVALID, "{body}");
+        }
+        // A disabled connector without instances, and `/5` without any
+        // connector, load.
+        assert!(read("connectors-local/5", "[connectors.gmail]\nenabled=false\n").is_ok());
+        assert!(read("connectors-local/5", "").is_ok());
+    }
+
+    #[test]
+    fn format_five_keeps_the_private_protocol_rule_and_admits_custody() {
+        let kind = &KINDS[4];
+        let bare = kind
+            .instance("")
+            .replace("private_protocol='connectors-private/1'\n", "");
+        assert_eq!(
+            read("connectors-local/5", &bare).err(),
+            Some(Refusal::PrivateProtocolMismatch {
+                format: "connectors-local/5".into(),
+                instance_id: "kubernetes-local".into(),
+            })
+        );
+        #[cfg(target_os = "linux")]
+        assert!(
+            read(
+                "connectors-local/5",
+                &format!(
+                    "[custody]\nbinding='mounted_secret'\ndirectory='/srv/custody'\n{}",
+                    kind.instance("")
+                )
+            )
+            .unwrap()
+            .selection()
+            .read_only()
+        );
     }
 }
