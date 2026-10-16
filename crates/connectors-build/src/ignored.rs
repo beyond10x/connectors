@@ -223,7 +223,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             | "cli_journey::retry_after_cli::a_rate_limited_read_is_waited_for_once_or_states_its_delay_in_the_cli_json"
             | "oauth2_refresh::oauth_invalid_grant_reports_repair"
             | "oauth2_refresh::oauth_connect_refusal_does_not_say_repair"
-            | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart",
+            | "oauth2_refresh_adversary_pass2::adversary2_oauth_cached_bootstrap_round_trips_across_owner_restart"
+            | "derived_instance::a_gmail_instance_configured_by_name_alone_connects_once_and_reads_and_writes_drafts",
         ) => Some((Disposable, vec![CUSTODY, CLI])),
         (
             "connectors-loki",

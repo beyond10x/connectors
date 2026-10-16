@@ -957,6 +957,9 @@ fn spawn(
     deadline: Instant,
 ) -> Result<(UnixStream, std::process::Child, Launched)> {
     let binary = std::env::current_exe().map_err(|_| Code::Unavailable)?;
+    // The owner runs from a sealed copy; it finds the catalog provider that
+    // derives configured instances beside this CLI, not beside that copy.
+    let installation = binary.parent().map(std::path::Path::to_owned);
     let hash = hex::encode(Sha256::digest(
         std::fs::read(&binary).map_err(|_| Code::Unavailable)?,
     ));
@@ -998,6 +1001,9 @@ fn spawn(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    if let Some(directory) = &installation {
+        command.env(crate::local::config::INSTALLATION, directory);
+    }
     // SAFETY: the hook uses only async-signal-safe syscalls and scalar fds. This
     // process intentionally outlives the CLI and starts a separate session.
     unsafe {
