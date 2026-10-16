@@ -27,6 +27,8 @@ pub(super) enum Loss {
 
 pub(super) struct Tether {
     socket: PathBuf,
+    /// The socket file the listener is bound at, as it was right after binding.
+    bound: (u64, u64),
     state: PathBuf,
     identity: (u64, u64),
     parent: Option<Parent>,
@@ -35,16 +37,27 @@ pub(super) struct Tether {
 
 impl Tether {
     /// `directory` is the state directory the owner opened by `state`, and
-    /// `socket` the path its listener is bound at.
+    /// `socket` the path its listener was just bound at.
     pub(super) fn new(directory: &File, state: &Path, socket: &Path) -> Option<Self> {
         let metadata = directory.metadata().ok()?;
         Some(Self {
             socket: socket.to_path_buf(),
+            bound: bound_socket(socket)?,
             state: state.to_path_buf(),
             identity: (metadata.dev(), metadata.ino()),
             parent: Parent::from_environment(),
             next: Instant::now(),
         })
+    }
+
+    /// The listener was just bound again at the socket path (idle
+    /// retirement's relisten): that socket is the owner's, not a replacement.
+    /// If the path holds no socket now, the recorded one stays and the next
+    /// check reports the socket lost.
+    pub(super) fn rebound(&mut self) {
+        if let Some(bound) = bound_socket(&self.socket) {
+            self.bound = bound;
+        }
     }
 
     /// What is gone, looked at no more often than [`EVERY`].
@@ -60,12 +73,14 @@ impl Tether {
     fn lost_now(&self) -> Option<Loss> {
         match std::fs::metadata(&self.state) {
             Ok(metadata) if (metadata.dev(), metadata.ino()) == self.identity => {}
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {}
+            Err(error) if !names_nothing(&error) => {}
             _ => return Some(Loss::Directory),
         }
         match std::fs::symlink_metadata(&self.socket) {
-            Ok(metadata) if metadata.file_type().is_socket() => {}
-            Err(error) if error.kind() != std::io::ErrorKind::NotFound => {}
+            Ok(metadata)
+                if metadata.file_type().is_socket()
+                    && (metadata.dev(), metadata.ino()) == self.bound => {}
+            Err(error) if !names_nothing(&error) => {}
             _ => return Some(Loss::Socket),
         }
         if self.parent.as_ref().is_some_and(Parent::gone) {
@@ -73,6 +88,24 @@ impl Tether {
         }
         None
     }
+}
+
+/// The identity of the socket file at `socket`, if a socket is there.
+fn bound_socket(socket: &Path) -> Option<(u64, u64)> {
+    let metadata = std::fs::symlink_metadata(socket).ok()?;
+    metadata
+        .file_type()
+        .is_socket()
+        .then(|| (metadata.dev(), metadata.ino()))
+}
+
+/// Whether a failed look at a path shows that the path no longer names what
+/// the owner holds (owner.md): nothing is there (ENOENT), a component that was
+/// a directory no longer is one (ENOTDIR) or can no longer be searched
+/// (EACCES). Any other failure may pass and proves nothing.
+fn names_nothing(error: &std::io::Error) -> bool {
+    use std::io::ErrorKind::{NotADirectory, NotFound, PermissionDenied};
+    matches!(error.kind(), NotFound | NotADirectory | PermissionDenied)
 }
 
 /// The process a test build's owner outlives by no more than one check: a
@@ -183,6 +216,82 @@ mod tests {
         assert_eq!(tether.lost_now(), Some(Loss::Directory));
         std::fs::create_dir(&state).unwrap();
         assert_eq!(tether.lost_now(), Some(Loss::Directory));
+    }
+
+    /// An ancestor of the state directory moved away and a file put in its
+    /// place: the state path fails with ENOTDIR and names nothing.
+    #[test]
+    fn a_state_path_through_a_file_is_lost() {
+        let (root, state, directory, socket) = fixture();
+        let tether = Tether::new(&directory, &state, &socket).unwrap();
+        std::fs::rename(&state, root.path().join("moved")).unwrap();
+        std::fs::write(&state, b"file").unwrap();
+        let through = state.join("state");
+        let socket = through.join("owner.sock");
+        let tether = Tether {
+            state: through.clone(),
+            socket,
+            ..tether
+        };
+        assert_eq!(
+            std::fs::metadata(&through).unwrap_err().kind(),
+            std::io::ErrorKind::NotADirectory
+        );
+        assert_eq!(tether.lost_now(), Some(Loss::Directory));
+    }
+
+    /// An ancestor replaced by a directory this user may not search: the state
+    /// path fails with EACCES and names nothing the owner opened.
+    #[test]
+    fn a_state_path_through_an_unsearchable_directory_is_lost() {
+        use std::os::unix::fs::PermissionsExt;
+        // SAFETY: getuid has no preconditions.
+        if unsafe { libc::getuid() } == 0 {
+            return;
+        }
+        let root = tempfile::tempdir().unwrap();
+        let parent = root.path().join("parent");
+        let state = parent.join("state");
+        std::fs::create_dir_all(&state).unwrap();
+        let directory = File::open(&state).unwrap();
+        let socket = state.join("owner.sock");
+        let _listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let tether = Tether::new(&directory, &state, &socket).unwrap();
+        std::fs::rename(&parent, root.path().join("moved")).unwrap();
+        std::fs::create_dir(&parent).unwrap();
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let kind = std::fs::metadata(&state).unwrap_err().kind();
+        let lost = tether.lost_now();
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o700)).unwrap();
+        assert_eq!(kind, std::io::ErrorKind::PermissionDenied);
+        assert_eq!(lost, Some(Loss::Directory));
+    }
+
+    /// Another socket bound at the owner's socket path is not the owner's.
+    #[test]
+    fn a_replaced_socket_is_lost() {
+        let (_root, state, directory, socket) = fixture();
+        let tether = Tether::new(&directory, &state, &socket).unwrap();
+        std::fs::remove_file(&socket).unwrap();
+        let _stand_in = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        assert_eq!(tether.lost_now(), Some(Loss::Socket));
+    }
+
+    /// The owner binding its socket path again, as idle retirement does, keeps
+    /// it tethered to the new socket and to nothing else.
+    #[test]
+    fn a_rebound_socket_is_the_owners() {
+        let (_root, state, directory, socket) = fixture();
+        let mut tether = Tether::new(&directory, &state, &socket).unwrap();
+        std::fs::remove_file(&socket).unwrap();
+        let _again = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        tether.rebound();
+        assert_eq!(tether.lost_now(), None);
+        std::fs::remove_file(&socket).unwrap();
+        tether.rebound();
+        assert_eq!(tether.lost_now(), Some(Loss::Socket));
+        let _stand_in = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        assert_eq!(tether.lost_now(), Some(Loss::Socket));
     }
 
     #[test]
