@@ -141,6 +141,27 @@ A source published only as Swagger 2.0 is ingested through an exact projection t
 
 First slice, chosen to cover each ingest shape once: `alertmanager` (1 GET, vendor OpenAPI 3), `zendesk` (35 operations, vendor spec, POST bodies), `airtable` (4 operations, hand-authored, JSON body envelope), `argocd` (Swagger 2.0). Everything else is inventory until curated (`docs/design.md:1100`).
 
+## 8a. Writes that create a credential
+
+A write whose 2xx answer carries a credential it created, shown once (OpenRouter's `POST /keys`
+answers the new key in `key`), declares `custody` on its selection
+(`connectors_catalog.selection.Custody`): the pointer of the secret and the public members the
+caller receives (`returns`, such as the key's `hash`). The shared outcome is
+`connectors.mutations.CredentialCustody` (`ess/domains/mutations.yaml`); neither model names a
+provider.
+
+| Step | Where | Rule |
+|---|---|---|
+| Extract | provider child (`src/local.rs`, the prepared write) | the answer is read once; the secret goes into a `Zeroizing` buffer; the result is built from `returns` alone; an absent or non-string secret or returned member, or a returned value holding the secret's bytes, is applied but unreadable (`upstream_protocol`) |
+| Carry | private write protocol (`connectors-host` `runtime/writes.rs`) | the `write_result` frame carries the secret in its protected slot, never in the control or the result document; the owner reads that slot only for an operation the configuration names a custody target for, and an unexpected or missing secret is a protocol fault on an applied write |
+| Target | owner configuration, `[adapters.<alias>.permissions.custody]` `<operation> = { adapter = "<alias>", profile = "<profile>" }` | operator-chosen; the target is another configured alias whose permissions grant the profile; absent when unused, so existing configurations keep their bytes |
+| Store | owner (`owner/mutation/execution.rs`), after the native commit and before the ledger settles | the target alias validates the bytes (`Task::Validate`, its own identity probe), then `Registry::begin`, `consume`, `prepare`, `store_and_publish` exactly as a protected-prompt connect; the result becomes `{custody: stored, connection, <returns>}` |
+| Fail | same | any failure of that step, a stop included, settles the attempt applied with `{custody: failed, <returns>}`: the operator revokes the credential at the provider by its public identifier |
+
+A refused or unknown create carries no custody and is never sent again: the attempt ledger
+(`docs/local-mutation-ledger.md`) already fences re-dispatch on retry, restart and recovery. The
+ledger, audit, logs and errors hold the public result only.
+
 ## 9. Deferred
 
 `events` and `channels` (old inbound declarations), `discoveries` inside bundles, `graphs`, `cdp_v1`/`audio_v1`/`sql_v1`/`sip_v1` operations, OCI distribution of bundles, a successor for the published reader crate, model/tool projection of the catalog.
