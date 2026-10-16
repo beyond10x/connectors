@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.52.1 — 2026-10-16
 
 ### Fixed
 
@@ -20,7 +20,8 @@
   `adapter_exited`, `owner_stopping`) and `attempts` in its error data; no other command or
   failure carries them (contracts/cli/v1alpha1/semantics.md §6, "Revalidation retries"). A
   provider that is down for longer than the deadline still fails the revalidation, now after
-  three probes instead of one.
+  three probes instead of one. A provider's Retry-After is not read; a rate-limited probe is
+  re-sent after 200 ms and 1 s.
 
 ## 0.52.0 — 2026-10-15
 
