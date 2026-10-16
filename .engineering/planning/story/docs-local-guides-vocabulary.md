@@ -48,7 +48,7 @@ scope:
   path: docs/local-tavily.md
 - confidence: inferred
   path: docs/running-services.md
-revision: 10
+revision: 11
 ---
 ## Context
 
@@ -109,3 +109,15 @@ file listed under Scope: the 17 files under `docs/` and `adapters/{loki,promethe
 - Not in scope: historical documents (`docs/waves/`, `docs/evidence/`, `docs/plans/`,
   `docs/cli-migration-v1-to-v2.md`) and internal design (`docs/design.md`), where "adapter" is the
   internal term.
+
+## Coordinator additions
+
+## Coordinator additions
+
+- 20 hand-written files still name `connections repair` or `adapters …` as the fix (45 lines;
+  reconnect adversary, 2026-10-16), among them `docs/local-tavily.md:97`, `docs/catalog-google-*.md`,
+  `adapters/{grafana,loki,prometheus}/README.md` and
+  `adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.{md,json}`. Tests in
+  `adapters/catalog/tests/google_*.rs` pin guide text and move with the guides.
+- The generated website reference pages are regenerated once on the wave branch by the
+  coordinator; do not hand-edit them.

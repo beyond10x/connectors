@@ -20,7 +20,7 @@ scope:
   path: docs/catalog-runpod.md
 - confidence: inferred
   path: docs/catalog-zendesk.md
-revision: 7
+revision: 8
 ---
 ## Context
 
@@ -58,3 +58,15 @@ None asserted; definitions are linked from `README.md`.
 
 `connectors-docs vocabulary --no-pins` (story:docs-vocabulary-readme-website) exits 0 over
 `docs/catalog-{confluence,hubspot,jira,opsgenie,runpod,zendesk}.md`.
+
+## Coordinator additions
+
+## Coordinator additions
+
+- 20 hand-written files still name `connections repair` or `adapters …` as the fix (45 lines;
+  reconnect adversary, 2026-10-16), among them `docs/local-tavily.md:97`, `docs/catalog-google-*.md`,
+  `adapters/{grafana,loki,prometheus}/README.md` and
+  `adapters/mcp/contracts/protocol/v1alpha1/discovery-contract.{md,json}`. Tests in
+  `adapters/catalog/tests/google_*.rs` pin guide text and move with the guides.
+- The generated website reference pages are regenerated once on the wave branch by the
+  coordinator; do not hand-edit them.
