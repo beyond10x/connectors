@@ -12,7 +12,7 @@ summary: Selected local CLI presentation values and the existing local configura
 # for a deprecation window. A new instance's instance_id is
 # `<connector>.<instance>` (`mail.personal`); a migrated alias keeps its
 # instance_id (story:ess-connector-vocabulary-model decision 10). An instance
-# holds at most one non-revoked connection (decision 11,
+# holds at most one published non-revoked connection (decision 11,
 # connectors.auth_bindings.AllocateConnection); the `connection` selectors
 # below keep their shape in this pass.
 types:

@@ -1,18 +1,37 @@
-# Ledger expectations only: the trusted owner's read of the instance's Live or
-# Stale connection, inside the allocating transaction, is the
-# held_connection_ref input. See ess/domains/auth_bindings.yaml
-# AllocateConnection.
+# Ledger expectations only: the trusted owner's read of the instance's
+# published Live or Stale connection, inside the allocating transaction, is the
+# held_connection_ref input. A connection allocated and never published (a
+# connect that failed before publication) is not such a connection. See
+# ess/domains/auth_bindings.yaml AllocateConnection.
 type: ess-scenario/1
 domain: connectors.auth_bindings
 scenario: one-non-revoked-connection-per-instance
-summary: 'An instance holding a Live or Stale connection refuses a second allocation; once that connection is revoked, a new one is allocated.'
+summary: 'A published Live or Stale connection blocks a second connect until revoked; an unpublished one does not.'
 arrange:
+- instance: abandoned
+  entity: connectors.auth_bindings.Connection
 - instance: first
   entity: connectors.auth_bindings.Connection
 - instance: second
   entity: connectors.auth_bindings.Connection
 timeline:
 - at: '2026-10-16T10:00:00Z'
+  command: connectors.auth_bindings.AllocateConnection
+  input:
+    decision: allow
+    instance_id: gmail.private
+    profile_record_ref: catalog/google.oauth/r1
+    owner_scope: local
+    access_mode: credential
+    publication_fence: fence-0
+  outcome: allocated
+  events:
+  - event: connectors.auth_bindings.ConnectionAllocated
+  capture:
+    instance: abandoned
+    event: connectors.auth_bindings.ConnectionAllocated
+    field: connection_ref
+- at: '2026-10-16T10:00:01Z'
   command: connectors.auth_bindings.AllocateConnection
   input:
     decision: allow
@@ -28,7 +47,21 @@ timeline:
     instance: first
     event: connectors.auth_bindings.ConnectionAllocated
     field: connection_ref
-- at: '2026-10-16T10:00:01Z'
+- at: '2026-10-16T10:00:02Z'
+  command: connectors.auth_bindings.PublishBinding
+  input:
+    decision: allow
+    connection_ref:
+      $instance: first
+    publication:
+      connection_ref:
+        $instance: first
+      expected_publication_fence: fence-1
+      profile_record_ref: catalog/google.oauth/r1
+  outcome: published
+  events:
+  - event: connectors.auth_bindings.BindingPublished
+- at: '2026-10-16T10:00:03Z'
   command: connectors.auth_bindings.AllocateConnection
   input:
     decision: allow
@@ -44,7 +77,7 @@ timeline:
     name: connectors.auth_bindings.InstanceConnected
   no_events:
   - connectors.auth_bindings.ConnectionAllocated
-- at: '2026-10-16T10:00:02Z'
+- at: '2026-10-16T10:00:04Z'
   command: connectors.auth_bindings.MarkConnectionStale
   input:
     connection_ref:
@@ -52,7 +85,7 @@ timeline:
   outcome: marked-stale
   events:
   - event: connectors.auth_bindings.ConnectionMarkedStale
-- at: '2026-10-16T10:00:03Z'
+- at: '2026-10-16T10:00:05Z'
   command: connectors.auth_bindings.AllocateConnection
   input:
     decision: allow
@@ -68,7 +101,7 @@ timeline:
     name: connectors.auth_bindings.InstanceConnected
   no_events:
   - connectors.auth_bindings.ConnectionAllocated
-- at: '2026-10-16T10:00:04Z'
+- at: '2026-10-16T10:00:06Z'
   command: connectors.auth_bindings.RevokeConnection
   input:
     decision: allow
@@ -77,7 +110,7 @@ timeline:
   outcome: revoked
   events:
   - event: connectors.auth_bindings.ConnectionRevoked
-- at: '2026-10-16T10:00:05Z'
+- at: '2026-10-16T10:00:07Z'
   command: connectors.auth_bindings.AllocateConnection
   input:
     decision: allow
@@ -97,6 +130,12 @@ assert:
 - view: connectors.auth_bindings.Connections
   contains:
     connection_ref:
+      $instance: abandoned
+    instance_id: gmail.private
+    state: Live
+- view: connectors.auth_bindings.Connections
+  contains:
+    connection_ref:
       $instance: first
     instance_id: gmail.private
     state: Revoked
@@ -107,4 +146,4 @@ assert:
     instance_id: gmail.private
     state: Live
 - view: connectors.auth_bindings.Connections
-  counts: {at_most: 2}
+  counts: {at_most: 3}
