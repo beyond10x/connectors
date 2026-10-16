@@ -279,6 +279,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -708,6 +727,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -1095,6 +1133,25 @@
                           "kind": "string"
                         }
                       },
+                      "created": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "map",
+                          "value": {
+                            "kind": "string"
+                          }
+                        }
+                      },
+                      "custody": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "stored",
+                            "failed"
+                          ]
+                        }
+                      },
                       "instance_id": {
                         "kind": "optional",
                         "of": {
@@ -1469,6 +1526,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -1867,6 +1943,25 @@
                           "kind": "string"
                         }
                       },
+                      "created": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "map",
+                          "value": {
+                            "kind": "string"
+                          }
+                        }
+                      },
+                      "custody": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "enum",
+                          "variants": [
+                            "stored",
+                            "failed"
+                          ]
+                        }
+                      },
                       "instance_id": {
                         "kind": "optional",
                         "of": {
@@ -2241,6 +2336,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -2666,6 +2780,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -3076,6 +3209,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -3504,6 +3656,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -3928,6 +4099,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -4356,6 +4546,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -4780,6 +4989,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -5208,6 +5436,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -5626,6 +5873,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -6062,6 +6328,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -6485,6 +6770,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -7093,6 +7397,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -7552,6 +7875,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -7999,6 +8341,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -8391,6 +8752,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -8840,6 +9220,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -9304,6 +9703,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -9754,6 +10172,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -10155,6 +10592,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -10680,6 +11136,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -11100,6 +11575,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {
@@ -11632,6 +12126,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -12069,6 +12582,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -12504,6 +13036,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -12905,6 +13456,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -13292,6 +13862,25 @@
                   "kind": "string"
                 }
               },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
+                }
+              },
               "instance_id": {
                 "kind": "optional",
                 "of": {
@@ -13672,6 +14261,25 @@
                 "kind": "optional",
                 "of": {
                   "kind": "string"
+                }
+              },
+              "created": {
+                "kind": "optional",
+                "of": {
+                  "kind": "map",
+                  "value": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "custody": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "stored",
+                    "failed"
+                  ]
                 }
               },
               "instance_id": {

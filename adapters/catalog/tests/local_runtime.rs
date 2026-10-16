@@ -63,6 +63,17 @@ const BASIC_HEADER: &str =
     "Basic Zml4dHVyZS1hY2NvdW50QGV4YW1wbGUudGVzdDpmaXh0dXJlLWFwaS10b2tlbi1vbmU=";
 const BASIC_PROFILE: &str = "fixture.basic";
 
+/// The group token create route: a write whose answer carries the token it
+/// created, shown once.
+const CREATE_ROUTE: &str = "/api/v4/groups/org/access_tokens";
+/// The token the create route mints: the fixture's second accepted PAT, so a
+/// read through the connection holding it proves which credential it sent.
+const CREATED_TOKEN: &str = "fixture-pat-two";
+/// A token the create route mints in mode `2`, which the fixture refuses.
+const UNACCEPTED_TOKEN: &str = "fixture-minted-unaccepted";
+/// The public identifier the create route answers beside the token.
+const CREATED_HASH: &str = "fixture-hash-one";
+
 /// Route and `Authorization` header of each fixture request.
 type Authorizations = Arc<Mutex<Vec<(String, Option<String>)>>>;
 
@@ -85,6 +96,14 @@ struct Provider {
     merge_effects: Arc<AtomicUsize>,
     merge_held: Arc<AtomicUsize>,
     merge_preflight_merged: Arc<std::sync::atomic::AtomicBool>,
+    /// How the group token create route answers ([`CREATE_ROUTE`]): `0` creates
+    /// and answers [`CREATED_TOKEN`], `1` holds the answer after receipt,
+    /// `2` creates a token this fixture never accepts.
+    create_mode: Arc<AtomicU8>,
+    /// Every create the fixture received.
+    create_effects: Arc<AtomicUsize>,
+    /// The route and `PRIVATE-TOKEN` header of every request; only compared.
+    tokens: Authorizations,
 }
 impl Provider {
     fn new() -> Self {
@@ -138,6 +157,12 @@ impl Provider {
         let held = merge_held.clone();
         let merge_preflight_merged = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let preflight_merged = merge_preflight_merged.clone();
+        let create_mode = Arc::new(AtomicU8::new(0));
+        let create_behavior = create_mode.clone();
+        let create_effects = Arc::new(AtomicUsize::new(0));
+        let created = create_effects.clone();
+        let tokens = Arc::new(Mutex::new(Vec::new()));
+        let observed_tokens = tokens.clone();
         let thread = std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
@@ -206,6 +231,10 @@ impl Provider {
                         .lock()
                         .unwrap()
                         .push((route.to_owned(), authorization.clone()));
+                    observed_tokens
+                        .lock()
+                        .unwrap()
+                        .push((route.to_owned(), credential.clone()));
                     if route == "/api/v4/projects/org%2Fproject/merge_requests/4" {
                         while merge_behavior.load(Ordering::SeqCst) == 4 {
                             tokio::select! { _=&mut stopped=>return, _=tokio::time::sleep(Duration::from_millis(10))=>{} }
@@ -236,6 +265,24 @@ impl Provider {
                         };
                         let body = serde_json::to_vec(&body).unwrap();
                         let header = format!("HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                        let _ = stream.write_all(header.as_bytes()).await;
+                        let _ = stream.write_all(&body).await;
+                        continue;
+                    }
+                    if valid && method == "POST" && route == CREATE_ROUTE {
+                        created.fetch_add(1, Ordering::SeqCst);
+                        let mode = create_behavior.load(Ordering::SeqCst);
+                        if mode == 1 {
+                            // Received, never answered: the caller's deadline passes.
+                            while create_behavior.load(Ordering::SeqCst) == 1 {
+                                tokio::select! { _=&mut stopped=>return, _=tokio::time::sleep(Duration::from_millis(10))=>{} }
+                            }
+                            continue;
+                        }
+                        let token = if mode == 2 { UNACCEPTED_TOKEN } else { CREATED_TOKEN };
+                        let body = serde_json::to_vec(&json!({"id":5,"name":"tenant","scopes":["api"],
+                            "token":token,"hash":CREATED_HASH})).unwrap();
+                        let header = format!("HTTP/1.1 201 fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
                         let _ = stream.write_all(header.as_bytes()).await;
                         let _ = stream.write_all(&body).await;
                         continue;
@@ -453,12 +500,20 @@ impl Provider {
             merge_effects,
             merge_held,
             merge_preflight_merged,
+            create_mode,
+            create_effects,
+            tokens,
         }
     }
     fn selection(&self) -> Adapter {
+        self.selection_of(&self.config, "fixture-gitlab")
+    }
+    /// The adapter entry of the catalog configuration at `config`, whose
+    /// instance is `instance`.
+    fn selection_of(&self, config: &Path, instance: &str) -> Adapter {
         let output = Command::new(env!("CARGO_BIN_EXE_connectors-catalog-provider"))
             .arg("--local-config")
-            .arg(&self.config)
+            .arg(config)
             .arg("--print-local-bootstrap")
             .output()
             .unwrap();
@@ -476,7 +531,7 @@ impl Provider {
         Adapter {
             private_protocol: None,
             permissions: Default::default(),
-            instance_id: "fixture-gitlab".into(),
+            instance_id: instance.into(),
             adapter_id: "catalog".into(),
             configuration_revision: bootstrap.configuration_revision,
             protocol: "v1alpha1".into(),
@@ -485,10 +540,7 @@ impl Provider {
             executable: Executable {
                 sha256: hex::encode(Sha256::digest(fs::read(&binary).unwrap())),
                 path: binary,
-                args: vec![
-                    "--local-config".into(),
-                    self.config.to_str().unwrap().into(),
-                ],
+                args: vec!["--local-config".into(), config.to_str().unwrap().into()],
             },
         }
     }

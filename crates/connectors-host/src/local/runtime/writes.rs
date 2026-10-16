@@ -1,15 +1,35 @@
 //! Version-two mutation exchange. Version-one enums remain closed.
 use super::*;
-use connectors_sdk::WriteOutcome;
+use connectors_sdk::{Secret, WriteOutcome};
 use serde_json::Value;
 use std::time::Instant;
 
 /// Trusted executable composition retains the immutable native request and its
 /// command-local credential. Preparation may read; only consumption may write.
 /// There is no Clone, serialization, replacement input or retry operation.
+/// An applied write's public result and, for a write whose answer carried a
+/// credential it created, those bytes. The bytes cross the private channel only
+/// in the protected slot of the `write_result` frame, never in its result
+/// document. No `Debug`: the secret is never formatted.
+pub struct Created {
+    pub result: Value,
+    pub secret: Option<Secret>,
+}
+
 #[async_trait::async_trait]
 pub trait PreparedWrite: Send {
     async fn execute(self: Box<Self>) -> WriteOutcome<Value>;
+    /// [`PreparedWrite::execute`], and the credential the answer carried when
+    /// the write created one (`connectors.mutations.CredentialCustody`). The
+    /// default holds none.
+    async fn execute_created(self: Box<Self>) -> WriteOutcome<Created> {
+        self.execute().await.try_map(|result| {
+            Ok(Created {
+                result,
+                secret: None,
+            })
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -189,28 +209,39 @@ pub(super) fn serve_write(
             // Ownership moves before any write. Timeout drops the future;
             // neither this exchange nor the host can recreate its authority.
             let outcome = executor.block_on(tokio_timeout(until, pending));
-            let (effect, result) = match outcome {
-                Ok(WriteOutcome::Applied(value)) => {
-                    (WriteEffect::Applied, value.map_err(Failure::from_provider))
+            let (effect, result, secret) = match outcome {
+                Ok(WriteOutcome::Applied(Ok(created))) => {
+                    (WriteEffect::Applied, Ok(created.result), created.secret)
                 }
-                Ok(WriteOutcome::Refused(error)) => {
-                    (WriteEffect::Refused, Err(Failure::from_provider(error)))
-                }
-                Ok(WriteOutcome::Unknown(error)) => {
-                    (WriteEffect::Unknown, Err(Failure::from_provider(error)))
-                }
-                Err(error) => (WriteEffect::Unknown, Err(error)),
+                Ok(WriteOutcome::Applied(Err(error))) => (
+                    WriteEffect::Applied,
+                    Err(Failure::from_provider(error)),
+                    None,
+                ),
+                Ok(WriteOutcome::Refused(error)) => (
+                    WriteEffect::Refused,
+                    Err(Failure::from_provider(error)),
+                    None,
+                ),
+                Ok(WriteOutcome::Unknown(error)) => (
+                    WriteEffect::Unknown,
+                    Err(Failure::from_provider(error)),
+                    None,
+                ),
+                Err(error) => (WriteEffect::Unknown, Err(error), None),
             };
             let result = result.and_then(|value| {
                 connectors_sdk::validate_write_value(&output_schema, &value)
                     .map_err(|_| Failure::Protocol)?;
                 Ok(value)
             });
+            // Created bytes travel only beside a result the host can admit.
+            let secret = secret.filter(|_| result.is_ok());
             let document = encode_result(result)?;
             channel::write(
                 channel,
                 &WriteReply::WriteResult { id, effect },
-                None,
+                secret.as_ref(),
                 &document,
                 until,
             )
@@ -222,8 +253,8 @@ pub(super) fn serve_write(
 async fn tokio_timeout(
     until: Instant,
     pending: Box<dyn PreparedWrite>,
-) -> Result<WriteOutcome<Value>> {
-    tokio::time::timeout_at(until.into(), pending.execute())
+) -> Result<WriteOutcome<Created>> {
+    tokio::time::timeout_at(until.into(), pending.execute_created())
         .await
         .map_err(|_| Failure::Timeout)
 }

@@ -110,6 +110,7 @@ impl Local {
                 .iter()
                 .map(|o| Requirement {
                     operation: o.id.clone(),
+                    custody: false,
                     profile: auth::PROFILE_ID.into(),
                     scopes: BTreeSet::new(),
                     // Each is a read Tavily serves as a POST; see

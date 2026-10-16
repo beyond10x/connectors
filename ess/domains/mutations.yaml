@@ -98,6 +98,15 @@ types:
   # an `unknown` create is never sent again: not by a retry, a restart or a recovery path
   # (the attempt ledger above). The credential bytes are in no result, ledger entry, audit
   # record, log or error; `terminal_result_json` holds this value and the public result only.
+  # A `failed` custody is an error of the invocation, `custody_unavailable`, whose data carries
+  # `custody: failed` and the public result as `created` (connectors.cli.Failure), so the
+  # command exits non-zero although the ledger records the write applied. The target is an
+  # adapter instance other than the writer that itself declares no custody target; the
+  # configuration is refused when it loads otherwise. The adapter declares which of its
+  # operations create a credential; where that declaration and the configuration disagree (a
+  # creating operation with no target, or a target for an operation that creates none), the
+  # write is refused `invalid_configuration` before it is sent (classification
+  # `not_attempted`), so no credential is ever created that no custody can hold.
   # ESS-LIMIT: "the bytes appear nowhere" is a host obligation, held by its fixture tests that
   # search every output and store file for them; ESS 0.59 has no information-flow construct.
   - name: connectors.mutations.CustodyOutcome

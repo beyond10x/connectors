@@ -804,6 +804,7 @@ mod cached_tests {
                 permissions: super::super::config::Permissions {
                     profiles: BTreeSet::new(),
                     operations: BTreeSet::new(),
+                    custody: Default::default(),
                 },
             },
         );

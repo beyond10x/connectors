@@ -1054,6 +1054,8 @@ pub(super) fn in_owner() -> bool {
 
 pub fn serve(paths: Paths) -> Result<()> {
     bound_allocator();
+    // Before any protected input: the owner holds credentials in memory.
+    crate::local::core_dumps::forbid().map_err(|_| Error::from(Code::Unavailable))?;
     IN_OWNER.store(true, Ordering::SeqCst);
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
@@ -1115,7 +1117,7 @@ pub fn serve(paths: Paths) -> Result<()> {
         authority,
         incarnation: incarnation.clone(),
         build,
-        pool: Arc::new(supervisor::Pool::new(paths, incarnation)),
+        pool: supervisor::Pool::shared(paths, incarnation),
         shutdown: AtomicBool::new(false),
         clients: AtomicUsize::new(0),
     });
@@ -2668,7 +2670,7 @@ mod idle_sweep_tests {
                 .to_string(),
             incarnation: incarnation.clone(),
             build: "test",
-            pool: Arc::new(supervisor::Pool::new(paths.clone(), incarnation)),
+            pool: supervisor::Pool::shared(paths.clone(), incarnation),
             shutdown: AtomicBool::new(false),
             clients: AtomicUsize::new(0),
         });
