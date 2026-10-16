@@ -575,6 +575,83 @@ fn an_entry_the_connector_cannot_hold_or_without_a_readable_native_configuration
     assert_eq!(result["disposition"], "unchanged", "{result}");
 }
 
+/// The bound every configuration read admits (`config::CONFIG_LIMIT`).
+const LIMIT: usize = 1024 * 1024;
+
+/// A file the reader admits that grows past its bound when rewritten (the
+/// serializer's spacing and the defaulted keys) is refused in both modes,
+/// naming the rewritten size and the bound, and nothing is written: a
+/// published file every later command refuses is never left behind.
+#[test]
+fn a_rewritten_file_past_the_read_bound_is_refused_naming_size_and_bound() {
+    let (root, head) = configured("connectors-local/4", "", |scratch| {
+        vec![Entry::catalog(
+            scratch,
+            "mail",
+            json!({"provider":"google-gmail"}),
+        )]
+    });
+    // Compact MCP entries with long operation ids, up to just under the bound.
+    let mut text = head;
+    let pad = |index: usize, operations: &[String]| {
+        format!(
+            "[adapters.pad-{index:02}]\ninstance_id='pad-{index:02}-local'\nadapter_id='mcp'\nconfiguration_revision='cfg'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/1'\n[adapters.pad-{index:02}.executable]\npath='{NOT_INSTALLED}/mcp'\nsha256='{}'\n[adapters.pad-{index:02}.permissions]\noperations=[{}]\n",
+            "a".repeat(64),
+            operations.join(",")
+        )
+    };
+    'fill: for index in 0..63 {
+        let mut operations = Vec::new();
+        for op in 0..256 {
+            operations.push(format!("'pad-{index:02}.{op:03}.{}'", "x".repeat(110)));
+            if text.len() + pad(index, &operations).len() > LIMIT - 64 {
+                operations.pop();
+                if !operations.is_empty() {
+                    text.push_str(&pad(index, &operations));
+                }
+                break 'fill;
+            }
+        }
+        text.push_str(&pad(index, &operations));
+    }
+    assert!(
+        text.len() <= LIMIT && text.len() > LIMIT - 64 * 1024,
+        "{}",
+        text.len()
+    );
+    private(&root.path().join("config/config.toml"), &text);
+    success(&command(root.path(), &["instances", "list"]));
+    for mode in ["--dry-run", "--apply"] {
+        let (code, envelope) = refusal(&command(root.path(), &["setup", "migrate", mode]));
+        let data = &envelope["error"]["data"];
+        assert_eq!(code, Some(2), "{envelope}");
+        assert_eq!(
+            (
+                &data["code"],
+                &data["stage"],
+                &data["configuration_rule"],
+                &data["configuration_limit"]
+            ),
+            (
+                &json!("invalid_configuration"),
+                &json!("configuration"),
+                &json!("config_too_large"),
+                &json!(LIMIT)
+            ),
+            "{envelope}"
+        );
+        assert!(
+            data["configuration_bytes"].as_u64().unwrap() > LIMIT as u64,
+            "{envelope}"
+        );
+        assert_eq!(
+            fs::read_to_string(root.path().join("config/config.toml")).unwrap(),
+            text
+        );
+        assert!(backups(root.path()).is_empty());
+    }
+}
+
 /// Under `--output json` a refusal is one envelope on standard error and
 /// nothing else; a missing mode is a parse refusal.
 #[test]

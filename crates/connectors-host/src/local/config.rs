@@ -135,7 +135,13 @@ pub enum Rule {
     /// A clock use's refusal, not the whole configuration's: `[approval_clock]`
     /// is the retired single-source `roughtime-clock/1` table.
     ApprovalClockFormatRetired,
+    /// A configuration text is larger than [`CONFIG_LIMIT`], the most a read
+    /// admits: the text `setup migrate` would write, which it then does not.
+    ConfigTooLarge,
 }
+
+/// The most bytes a configuration read admits.
+pub const CONFIG_LIMIT: usize = 1024 * 1024;
 
 impl Rule {
     pub fn as_str(self) -> &'static str {
@@ -145,6 +151,7 @@ impl Rule {
             Self::ConfigNotPrivate => "config_not_private",
             Self::OwnerUidMismatch => "owner_uid_mismatch",
             Self::ApprovalClockFormatRetired => "approval_clock_format_retired",
+            Self::ConfigTooLarge => "config_too_large",
         }
     }
 }
@@ -1299,8 +1306,11 @@ impl Config {
     }
 
     /// Decode, assemble and check configuration `text` exactly as
-    /// [`Config::read`] does a file's.
+    /// [`Config::read`] does a file's, its [`CONFIG_LIMIT`] included.
     pub fn parse(text: &str) -> std::result::Result<Self, Refusal> {
+        if text.len() > CONFIG_LIMIT {
+            return Err(Refusal::Rule(Rule::ConfigTooLarge));
+        }
         Self::parse_with(text, Installation::installed().as_ref())
     }
 
@@ -1331,7 +1341,7 @@ impl Config {
                 _ => Refusal::Failure(failure),
             }
         })?;
-        let bytes = fs::read_bounded(file, 1024 * 1024)?;
+        let bytes = fs::read_bounded(file, CONFIG_LIMIT)?;
         Ok(String::from_utf8(bytes).map_err(|_| Failure::InvalidConfiguration)?)
     }
 
