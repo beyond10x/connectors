@@ -54,7 +54,14 @@ const PODS: &str = "/v1/pods";
 
 /// The shipped ids, their pinned `operationId`, method, path and effect. A
 /// renamed, dropped or added id fails here.
-const SHIPPED: [(&str, &str, &str, &str, Effect); 3] = [
+const SHIPPED: [(&str, &str, &str, &str, Effect); 4] = [
+    (
+        "billing.pods",
+        "PodBilling",
+        "get",
+        "/v1/billing/pods",
+        Effect::Read,
+    ),
     ("pod.create", "CreatePod", "post", "/v1/pods", Effect::Write),
     (
         "pod.terminate",
@@ -102,7 +109,7 @@ fn committed() -> bundle::Bundle {
 }
 
 #[test]
-fn shipped_runpod_selections_are_exactly_create_list_and_terminate() {
+fn shipped_runpod_selections_are_exactly_create_list_terminate_and_pod_billing() {
     let selections = shipped();
     let bundle = committed();
     assert_eq!(bundle.auth_profile, PROFILE);
@@ -318,6 +325,17 @@ fn pod(id: &str, name: &str) -> Value {
            "ports": ["8000/http"], "env": {"MODE": "fixture"}})
 }
 
+fn billing_records() -> Value {
+    json!([
+        {"amount": 1.38, "diskSpaceBilledGb": 20, "endTime": "2026-10-02T00:00:00Z",
+         "gpuTypeId": "NVIDIA GeForce RTX 4090", "podId": "fixturepod001",
+         "time": "2026-10-01T00:00:00Z", "timePodBilledMs": 7_200_000},
+        {"amount": 0.69, "diskSpaceBilledGb": 20, "endTime": "2026-10-03T00:00:00Z",
+         "gpuTypeId": "NVIDIA GeForce RTX 4090", "podId": "fixturepod001",
+         "time": "2026-10-02T00:00:00Z", "timePodBilledMs": 3_600_000}
+    ])
+}
+
 /// The fixture's answer to one request, decided by what it carries: a create
 /// is answered by its body's `name`, a terminate by its pod id.
 enum Answer {
@@ -336,6 +354,9 @@ fn answer(method: &str, route: &str, query: &str, body: &[u8]) -> Answer {
         ),
         ("GET", PODS) if query == "desiredStatus=RUNNING&name=worker-a" => {
             Answer::Status(200, Some(json!([pod("fixturepod001", "worker-a")])))
+        }
+        ("GET", "/v1/billing/pods") if query == "bucketSize=day&podId=fixturepod001" => {
+            Answer::Status(200, Some(billing_records()))
         }
         ("POST", PODS) => {
             let input: Value = serde_json::from_slice(body).unwrap_or(Value::Null);
@@ -940,5 +961,86 @@ fn the_writes_are_not_reachable_without_an_approval() {
         &json!({"podId": "fixturepod204"}),
     );
     assert!(matches!(outcome, Err(Failure::Unsupported)));
+    assert!(provider.requests().is_empty(), "a request was sent");
+}
+
+/// `billing.pods` is a read with the query parameters the pinned document
+/// declares and no approval; the fixture's billing records come back unchanged.
+#[test]
+fn billing_pods_reads_the_billing_records_unchanged() {
+    let selection = shipped()
+        .into_iter()
+        .find(|s| s.id == "billing.pods")
+        .expect("`billing.pods` is selected");
+    assert_eq!(selection.effect, Effect::Read);
+    assert!(selection.guard.is_none());
+    let engine = Engine::new(&committed(), BASE, &shipped()).unwrap();
+    let reads = engine.declarations(&[Effect::Read]);
+    let billing = reads.iter().find(|o| o.id == "billing.pods").unwrap();
+    let mut names: Vec<&str> = billing.input_schema["properties"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "bucketSize",
+            "endTime",
+            "gpuTypeId",
+            "grouping",
+            "podId",
+            "startTime"
+        ]
+    );
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection(None)).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let output = child
+        .invoke(
+            "billing.pods",
+            &revision,
+            "one",
+            &secret(),
+            &serde_json::to_vec(&json!({"bucketSize": "day", "podId": "fixturepod001"})).unwrap(),
+            deadline(),
+        )
+        .unwrap_or_else(|failure| panic!("`billing.pods` failed: {failure:?}"));
+    let output: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(output["status"], 200);
+    assert_eq!(output["body"], billing_records());
+    assert_eq!(
+        provider.requests(),
+        [(
+            "GET".to_owned(),
+            "/v1/billing/pods?bucketSize=day&podId=fixturepod001".to_owned(),
+            bearer(),
+            Value::Null
+        )]
+    );
+}
+
+/// A query parameter the pinned document does not declare is refused as
+/// invalid input before any request.
+#[test]
+fn billing_pods_refuses_an_undeclared_query_parameter_before_any_request() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection(None)).unwrap();
+    let revision = child.bootstrap().descriptor().unwrap().revision;
+    let outcome = child.invoke(
+        "billing.pods",
+        &revision,
+        "one",
+        &secret(),
+        &serde_json::to_vec(&json!({"podId": "fixturepod001", "region": "EU"})).unwrap(),
+        deadline(),
+    );
+    assert!(
+        matches!(outcome, Err(Failure::InvalidInput)),
+        "an undeclared query parameter: {:?}",
+        outcome.map(|_| ())
+    );
     assert!(provider.requests().is_empty(), "a request was sent");
 }
