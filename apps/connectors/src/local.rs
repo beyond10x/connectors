@@ -15,12 +15,14 @@ mod approvals;
 mod checkpoints;
 mod connections;
 mod cursor;
+mod migrate;
 mod operations;
 mod owner_stop;
 mod select;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
+    let args = migrate::shorthand(args);
     let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
     let mut output = run_selected(args);
@@ -454,6 +456,9 @@ fn execute(call: &Invocation<'_>) -> Result<Value, HandlerReply> {
     }
     if call.callable == "setup-owner-stop" {
         return owner_stop::execute(&paths);
+    }
+    if call.callable == "setup-migrate" {
+        return migrate::execute(call, &paths);
     }
     if call.callable == "setup-init" {
         let initialized = Config::initialize(&paths).map_err(host_failure)?;
