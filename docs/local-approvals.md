@@ -2,23 +2,25 @@
 
 The CLI on current `main` can publish local write policy, prepare an exact approval
 subject and issue a protected proof. Preparing a write or issuing its proof requires an explicitly configured
-`connectors-local/2` adapter using `connectors-private/2`, admitted cached write
+instance served under `connectors-private/2` (every derived catalog instance is; a pinned one states `private_protocol = "connectors-private/2"`), admitted cached write
 metadata, a saved connection, a local signing issuer and a configured bounded
-clock. Policy status can inspect any configured adapter alias. GitLab's public
+clock. Policy status can inspect any configured instance. GitLab's public
 and private-version-one projections retain eleven reads; its explicitly selected
 private-version-two projection adds the [guarded merge](local-gitlab-merge.md).
 Issuance itself performs no provider write.
+
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
 
 After [key initialization](local-approval-keys.md) and
 [clock configuration](local-clock.md), inspect the retained policy:
 
 ```sh
-connectors approvals policy-status --adapter forge --output json
+connectors approvals policy-status --connector gitlab --instance forge --output json
 ```
 
 Status is passive. Before the first publication, the optional policy member is
 absent. Publish a closed JSON file containing `{"operations":["<write-operation>"]}`
-with `approvals policy-set --adapter forge --input-file <file>`. Each operation
+with `approvals policy-set --connector gitlab --instance forge --input-file <file>`. Each operation
 must be an admitted required-approval write allowed by the configured operation
 and credential-profile permissions. Reads and unknown operations are refused.
 Only file input is supported for this management command. The generated binding
@@ -35,7 +37,7 @@ For an admitted write, use exact connection, operation, schema and descriptor
 revision values to prepare the intended input:
 
 ```sh
-connectors approvals prepare --adapter forge \
+connectors approvals prepare --connector gitlab --instance forge \
   --connection "$connection" --operation "$operation" \
   --schema "$schema" --revision "$revision" --input-file request.json \
   --output json
@@ -56,7 +58,7 @@ Issuance reconstructs the subject independently. Use its exact approved digest
 and a new absolute output path inside an existing private directory:
 
 ```sh
-connectors approvals issue --adapter forge \
+connectors approvals issue --connector gitlab --instance forge \
   --connection "$connection" --operation "$operation" \
   --schema "$schema" --revision "$revision" --input-file request.json \
   --approve-subject "$subject_sha256" --proof-output "$new_private_file" \

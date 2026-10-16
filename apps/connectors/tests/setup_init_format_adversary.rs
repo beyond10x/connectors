@@ -36,13 +36,13 @@ fn success(output: &Output) -> Value {
     value["result"].clone()
 }
 
-/// The first ```toml block after the sentence that tells the reader to add an
-/// entry to the configuration created by setup, with its placeholders filled.
+/// The first ```toml block after the sentence that tells the reader to add the
+/// instance to the configuration created by setup, with its placeholders filled.
 fn documented_entry(doc: &str) -> String {
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/").to_owned() + doc;
     let text = fs::read_to_string(&path).unwrap();
     let start = text
-        .find("Add an adapter entry to the configuration created by setup")
+        .find("Add the instance to the configuration created by setup")
         .unwrap_or_else(|| panic!("{doc}: no add-entry step"));
     let rest = &text[start..];
     let open = rest.find("```toml\n").unwrap() + "```toml\n".len();
@@ -65,7 +65,11 @@ fn follow_documented_steps(doc: &str) {
     let root = tempfile::tempdir().unwrap();
     success(&command(&root, &["setup", "init"]));
     let config_path = root.path().join("config/config.toml");
-    let config = fs::read_to_string(&config_path).unwrap() + "\n" + &documented_entry(doc);
+    // The guides say to change the format line: instances are a `connectors-local/5` table.
+    let created = fs::read_to_string(&config_path).unwrap();
+    assert!(created.contains("format = \"connectors-local/2\""));
+    let config =
+        created.replace("connectors-local/2", "connectors-local/5") + "\n" + &documented_entry(doc);
     fs::write(&config_path, config).unwrap();
     let output = command(&root, &["setup", "check"]);
     assert!(

@@ -13,6 +13,8 @@ postflight comparison is best effort: a merge request's recorded head is
 eventually consistent with its source branch, and a live GitLab has answered the
 update PUT with the pinned head while the branch had already moved.
 
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
 The local CLI calls both through the approval, audit and mutation coordinator.
 Dedicated sandbox acceptance is recorded in
 [docs/evidence/gitlab-sandbox-20260913](evidence/gitlab-sandbox-20260913/README.md);
@@ -23,12 +25,15 @@ The merging identity needs more than `api` scope. GitLab answers a merge request
 protected branch, so a permission problem reads as an authentication problem. Check
 the branch's `merge_access_levels` before concluding the credential is wrong.
 
-Start with the [catalog provider guide](local-catalog-provider.md). Select
-`format = "connectors-local/2"` in the host configuration and
-`private_protocol = "connectors-private/2"` on the adapter. Select the exact
-executable hash, permit `merge_request.merge` and `merge_request.update` in the
-adapter's operation permissions and retain `gitlab.pat` in its profile
-permissions. The saved PAT must grant GitLab `api` scope. Use a fresh explicit
+Start with the [catalog provider guide](local-catalog-provider.md). A derived
+instance of the `gitlab` connector (`[connectors.gitlab.instances.forge]` in a
+`connectors-local/5` configuration) is served under `connectors-private/2` and
+permits every operation of the connector, `merge_request.merge` and
+`merge_request.update` included, under the profile `gitlab.pat`. A pinned instance
+selects `private_protocol = "connectors-private/2"` and the exact executable hash,
+permits `merge_request.merge` and `merge_request.update` in
+`permissions.operations` and retains `gitlab.pat` in `permissions.profiles`. The
+saved PAT must grant GitLab `api` scope. Use a fresh explicit
 local selection and an admitted connect to collect its descriptor before
 discovering the new metadata. There is no automatic configuration rewrite,
 credential migration or fallback write path.
@@ -42,7 +47,7 @@ Configure a [bounded authenticated clock](local-clock.md), initialize
 ```
 
 Discover the exact `schema` and descriptor `revision` using
-`connectors operations describe --adapter forge --operation merge_request.merge`.
+`connectors operations describe --connector gitlab --instance forge --operation merge_request.merge`.
 Put the intended business input in `merge.json`: the project path or numeric id,
 the project-local MR IID, the expected successful head pipeline id, and the PUT
 body with the exact lowercase source SHA:
@@ -59,7 +64,7 @@ output contains metadata; the proof stays in the owner-private file.
 Invoke the same target and input:
 
 ```sh
-connectors operations invoke --adapter forge \
+connectors operations invoke --connector gitlab --instance forge \
   --connection "$connection" --operation merge_request.merge \
   --schema "$schema" --revision "$revision" --input-file merge.json \
   --approval-file "$proof_file" --idempotency-key "$business_key" --output json
@@ -103,7 +108,7 @@ Background recovery does not expose an old result or grant a new effect.
 The production CLI journeys that covered applied, refused and lost-response
 settlement, same-key observation through a newly started owner, an owner killed
 after the provider received the PUT, background recovery and post-effect
-revocation ran with the native adapter as the child; their records stay under
+revocation ran with the native GitLab implementation (an internal adapter the catalog provider replaced) as the child; their records stay under
 `docs/evidence/gitlab-*-20260911/`, and the host mechanics they exercised are
 unchanged. They have not been re-run with the catalog provider as the child;
 `story:catalog-cli-journeys` owns that.
