@@ -312,8 +312,9 @@ fn shipped_bundle(provider: &str) -> Result<(bundle::Bundle, String)> {
 /// The native configuration of an instance of a shipped connector: exactly what
 /// an equal hand-written configuration states, without its file paths, which are
 /// not digested. So it has that configuration's revision.
-fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
-    let mut found = None;
+/// The declaration of the shipped connector `connector` and the files beside
+/// it; every declaration before it is checked on the way.
+fn declaration(connector: &str) -> Result<(Declaration, &'static [shipped::File])> {
     for &(directory, text, files) in shipped::CONNECTORS {
         let declaration: Declaration = connectors_core::read_json(text.as_bytes())
             .map_err(|_| Failure::InvalidConfiguration)?;
@@ -325,12 +326,27 @@ fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
         {
             return Err(Failure::InvalidConfiguration);
         }
-        if declaration.connector_id == instance.connector {
-            found = Some((declaration, files));
-            break;
+        if declaration.connector_id == connector {
+            return Ok((declaration, files));
         }
     }
-    let (declaration, files) = found.ok_or(Failure::NotFound)?;
+    Err(Failure::NotFound)
+}
+
+/// The auth profiles the shipped connector `connector` declares, in
+/// declaration order (`--print-profiles`): what an instance of a connector
+/// declaring several names with `--profile`.
+pub fn profiles(connector: &str) -> Result<Vec<String>> {
+    let (declaration, _) = declaration(connector)?;
+    Ok(declaration
+        .profiles
+        .into_iter()
+        .map(|profile| profile.profile)
+        .collect())
+}
+
+fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
+    let (declaration, files) = declaration(instance.connector)?;
     let instance_id = format!("{}.{}", declaration.connector_id, instance.name);
     if !connectors_core::valid_id(instance.name) || !connectors_core::valid_id(&instance_id) {
         return Err(Failure::InvalidInput);
