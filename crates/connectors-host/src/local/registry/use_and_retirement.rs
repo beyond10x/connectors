@@ -1,4 +1,4 @@
-use super::lifecycle::{bump, custody_version};
+use super::lifecycle::{bump, custody_version, mark_stale};
 use super::*;
 
 fn admitted_read(
@@ -215,6 +215,36 @@ impl Registry {
         })
     }
 
+    /// The provider refused the credential this dispatched read carried as
+    /// unauthorized: the use is released and, while that credential is still
+    /// the connection's published one, the connection is Stale
+    /// (`lifecycle::mark_stale`). A credential a publication has replaced
+    /// since the read was captured says nothing about the current one.
+    pub fn refuse_read(&self, dispatched: DispatchedUse, now: u64) -> Result<()> {
+        self.transaction(now, false, |tx, _, _| {
+            let (reference, version, fence): (String, String, String) = tx
+                .query_row(
+                    "SELECT connection_ref,version_id,publication_fence FROM registry_uses WHERE use_id=?1 AND dispatched=1",
+                    [&dispatched.id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                )
+                .optional()
+                .map_err(db)?
+                .ok_or(Failure::Conflict)?;
+            tx.execute(
+                "UPDATE registry_uses SET released=1 WHERE use_id=?1",
+                [&dispatched.id],
+            )
+            .map_err(db)?;
+            let row = Self::connection(tx, &reference)?;
+            if row.material.as_deref() == Some(&version) && row.fence == fence && !row.kept.stale {
+                mark_stale(tx, &row)?;
+                bump(tx, &row.binding.instance_id)?;
+            }
+            Ok(())
+        })
+    }
+
     pub fn cancel_read(&self, captured: ReadUse, now: u64) -> Result<()> {
         self.transaction(now, false, |tx, _, _| {
             tx.execute(
@@ -240,7 +270,7 @@ impl Registry {
             if captured.version!=custody_version(authority,&row.scope_id,&version)? { return Err(Failure::Conflict); }
             tx.execute("UPDATE registry_materials SET invalid_reason=COALESCE(invalid_reason,?2) WHERE version_id=?1", params![version,reason.value()]).map_err(db)?;
             tx.execute("UPDATE registry_uses SET released=1 WHERE version_id=?1 AND dispatched=0", [&version]).map_err(db)?;
-            if row.material.as_deref()==Some(&version) { bump(tx,&row.binding.instance_id)?; }
+            if row.material.as_deref()==Some(&version) { mark_stale(tx,&row)?; bump(tx,&row.binding.instance_id)?; }
             Ok(())
         })
     }

@@ -1760,14 +1760,21 @@ fn connection_row(
     } else {
         None
     };
+    // A Stale connection lists only versions a publication made active: the
+    // Connection lifecycle has no change that keeps it Stale, and a reconnect
+    // allocates its candidate version before the publication that leaves
+    // Stale. A Live or Revoked one lists every other version, as before.
+    let stale = binding.get("lifecycle").is_some();
     let mut statement = connection
         .prepare(
-            "SELECT version_id FROM registry_materials \
-             WHERE connection_ref=?1 AND (?2 IS NULL OR version_id<>?2) ORDER BY version_id",
+            "SELECT m.version_id FROM registry_materials m \
+             LEFT JOIN registry_acquisitions a ON a.acquisition_ref=m.acquisition_ref \
+             WHERE m.connection_ref=?1 AND (?2 IS NULL OR m.version_id<>?2) \
+             AND (?3=0 OR a.state='completed') ORDER BY m.version_id",
         )
         .map_err(unavailable)?;
     let superseded = statement
-        .query_map(rusqlite::params![id, active_material], |record| {
+        .query_map(rusqlite::params![id, active_material, stale], |record| {
             record.get::<_, String>(0)
         })
         .map_err(unavailable)?
@@ -1808,11 +1815,17 @@ fn connection_row(
     ] {
         copy_optional_json_field(binding, fields, kept, kept)?;
     }
+    // The binding column keeps `"lifecycle": "stale"` beside the binding while
+    // the connection is Stale (registry.rs `Kept`); its `state` reads `live`.
     Ok((
         id.to_owned(),
-        match text_field(row, "state")? {
-            "live" => "Live",
-            "revoked" => "Revoked",
+        match (
+            text_field(row, "state")?,
+            binding.get("lifecycle").map(|value| value.as_str()),
+        ) {
+            ("live", None) => "Live",
+            ("live", Some(Some("stale"))) => "Stale",
+            ("revoked", None) => "Revoked",
             _ => return Err(Failure::MetadataUnavailable),
         },
     ))
@@ -3173,15 +3186,23 @@ fn connection_projection(
                 .insert(kept.into(), value.clone());
         }
     }
+    let state = match row.lifecycle_state.as_str() {
+        "Live" => "live",
+        "Stale" => {
+            binding
+                .as_object_mut()
+                .ok_or(Failure::MetadataUnavailable)?
+                .insert("lifecycle".into(), json!("stale"));
+            "live"
+        }
+        "Revoked" => "revoked",
+        _ => return Err(Failure::MetadataUnavailable),
+    };
     put_json_text(raw, "binding", binding)?;
     copy_domain(row, raw, "owner_scope", "scope_id")?;
     copy_domain(row, raw, "semantic_revision", "semantic_revision")?;
     copy_domain(row, raw, "publication_fence", "publication_fence")?;
-    put(
-        raw,
-        "state",
-        json!(row.lifecycle_state.to_ascii_lowercase()),
-    );
+    put(raw, "state", json!(state));
     copy_domain(row, raw, "published", "public")?;
     copy_optional_domain(row, raw, "external_identity", "identity", true)?;
     copy_optional_domain(row, raw, "active_generation_id", "active_generation", false)?;
@@ -4189,10 +4210,15 @@ fn update_command(current: &RowImage, next: &RowImage) -> Result<&'static str> {
         ("connectors.declarations.ServiceConfiguration", ("Declared", "Declared")) => {
             Ok("connectors.declarations.AdvanceRegistryEpoch")
         }
-        ("connectors.auth_bindings.Connection", ("Live", "Live")) => {
+        // Any publication leaves Stale (story:ess-connector-vocabulary-model
+        // decision 14); a Stale connection changes in no other way.
+        ("connectors.auth_bindings.Connection", ("Live" | "Stale", "Live")) => {
             Ok("connectors.auth_bindings.PublishBinding")
         }
-        ("connectors.auth_bindings.Connection", ("Live", "Revoked")) => {
+        ("connectors.auth_bindings.Connection", ("Live", "Stale")) => {
+            Ok("connectors.auth_bindings.MarkConnectionStale")
+        }
+        ("connectors.auth_bindings.Connection", ("Live" | "Stale", "Revoked")) => {
             Ok("connectors.auth_bindings.RevokeConnection")
         }
         ("connectors.auth_bindings.Acquisition", ("Pending", "Completing")) => {
@@ -7657,6 +7683,66 @@ mod tests {
             recorded.fields["publication_fence"],
             published.fields["publication_fence"]
         );
+    }
+
+    // story:connection-stale-state: the host records a refused credential as
+    // `MarkConnectionStale` (Live to Stale), a publication from Stale as
+    // `PublishBinding` (back to Live) and a revocation from Stale as
+    // `RevokeConnection`; a second refusal of a Stale connection is no command
+    // the lifecycle admits (`ess/domains/auth_bindings.yaml`, `mark_stale`).
+    #[test]
+    fn a_connection_moves_through_stale_by_its_declared_commands() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("metadata.sqlite3");
+        let live = live_connection("conn-stale");
+        let (mut authority, _, _) =
+            provision(&path, uuid::Uuid::new_v4(), 8, vec![live.clone()]).unwrap();
+        let step = |authority: &mut ErAuthority, current: &RowImage, state: &str| {
+            let mut next = current.clone();
+            next.revision = current.revision + 1;
+            next.lifecycle_state = state.into();
+            if state == "Live" {
+                next.fields.insert(
+                    "publication_fence".into(),
+                    json!(uuid::Uuid::new_v4().to_string()),
+                );
+            }
+            if state == "Revoked" {
+                next.fields
+                    .insert("revoked_at".into(), json!("2026-09-18T00:00:00Z"));
+            }
+            let command = update_command(current, &next).unwrap();
+            execute_altered(authority, &[&next], current, &next, command, |_| {})
+                .unwrap_or_else(|error| panic!("{command} refused: {error:?}"));
+            resynchronize(authority).unwrap();
+            let recorded = authority
+                .baseline
+                .get(&(next.entity.clone(), next.id.clone()))
+                .unwrap()
+                .clone();
+            assert_eq!(recorded.lifecycle_state, state, "{command}");
+            (command, recorded)
+        };
+        let (command, stale) = step(&mut authority, &live, "Stale");
+        assert_eq!(command, "connectors.auth_bindings.MarkConnectionStale");
+        let mut again = stale.clone();
+        again.revision += 1;
+        assert!(
+            transition(
+                &authority,
+                &stale,
+                &again,
+                "connectors.auth_bindings.MarkConnectionStale"
+            )
+            .is_err(),
+            "a Stale connection was marked Stale again"
+        );
+        assert!(update_command(&stale, &again).is_err());
+        let (command, live) = step(&mut authority, &stale, "Live");
+        assert_eq!(command, "connectors.auth_bindings.PublishBinding");
+        let (_, stale) = step(&mut authority, &live, "Stale");
+        let (command, _) = step(&mut authority, &stale, "Revoked");
+        assert_eq!(command, "connectors.auth_bindings.RevokeConnection");
     }
 
     // `CompleteAcquisition` yields exactly its fixed target

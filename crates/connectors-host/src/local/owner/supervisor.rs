@@ -1036,7 +1036,20 @@ fn worker(
                     let result = active.invoke_explained(
                         &operation, &revision, &partition, &material, &document, deadline,
                     );
-                    registry.release_read(dispatched, connectors_sdk::now_ms())?;
+                    // The provider refused the stored credential as unauthorized
+                    // (a refresh token answered `invalid_grant`, a token or basic
+                    // entry answered 401): the connection is Stale until a
+                    // publication (story:connection-stale-state, decision 15 of
+                    // story:ess-connector-vocabulary-model). Decision 16 exempts
+                    // a refused cached access token, which this host cannot tell
+                    // apart: the catalog adapter reports it with the same code
+                    // and refreshes only on the next invoke.
+                    match &result {
+                        Err(refusal) if refusal.failure == runtime::Failure::InvalidCredential => {
+                            registry.refuse_read(dispatched, connectors_sdk::now_ms())?
+                        }
+                        _ => registry.release_read(dispatched, connectors_sdk::now_ms())?,
+                    }
                     read_answer(&job.alias, &operation, &revision, result?).map(Output::Value)
                 }
             }
