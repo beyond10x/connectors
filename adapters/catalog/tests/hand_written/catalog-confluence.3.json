@@ -1,0 +1,16 @@
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "confluence-cloud",
+  "provider": "confluence",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://api.atlassian.com/ex/confluence/your-cloud-id/wiki",
+  "request_prefix": "/ex/confluence/your-cloud-id",
+  "auth": {
+    "profile": "atlassian.bearer",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "Atlassian access token",
+    "identity": {"path": "rest/api/user/current", "kind": "atlassian.account", "subject_pointer": "/accountId"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/confluence/operations.json"
+}

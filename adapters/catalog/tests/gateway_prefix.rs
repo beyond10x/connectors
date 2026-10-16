@@ -5,9 +5,12 @@
 //! included) goes to the full `api_base`, and a configuration without the
 //! prefix loads to the same bootstrap as before the field existed.
 //!
-//! Each gateway case runs the configuration example the product guide shows,
-//! against a disposable HTTPS fixture. No live credential and no network.
+//! Each gateway case runs the configuration example the product guide showed
+//! (`hand_written`), whose gateway values the guide still shows, against a
+//! disposable HTTPS fixture. No live credential and no network.
 #![cfg(unix)]
+mod hand_written;
+
 use connectors_host::local::{
     config::{Adapter, Executable, Restart, Startup},
     filesystem,
@@ -52,13 +55,11 @@ fn private(path: &Path, bytes: &[u8]) {
 }
 
 /// Every JSON block of a guide that parses as a whole configuration for
-/// `provider`, in document order.
+/// `provider`, in document order, the configurations it showed before
+/// connectors were declared included (`hand_written`).
 fn documented(guide: &str, provider: &str) -> Vec<Value> {
-    let guide = fs::read_to_string(root().join("../../docs").join(guide)).unwrap();
-    guide
-        .split("```json\n")
-        .skip(1)
-        .filter_map(|rest| rest.split_once("\n```").map(|(body, _)| body))
+    hand_written::documented_blocks(guide)
+        .iter()
         .filter_map(|body| serde_json::from_str::<Value>(body).ok())
         .filter(|config| config["provider"] == provider)
         .collect()
