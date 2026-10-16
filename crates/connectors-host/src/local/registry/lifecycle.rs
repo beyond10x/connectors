@@ -18,14 +18,20 @@ impl Registry {
         binding.validate()?;
         self.transaction(now, true, |tx, authority, now| {
             let begun_at = register(tx, binding)?;
-            let per_instance: i64 = tx.query_row("SELECT count(*) FROM registry_connections WHERE instance_id=?1", [&binding.instance_id], |r| r.get(0)).map_err(db)?;
-            let total: i64 = tx.query_row("SELECT count(*) FROM registry_connections", [], |r| r.get(0)).map_err(db)?;
-            if per_instance>=1000 || total>=10_000 { return Err(Failure::Capacity); }
-            let connection = qualified("conn", authority);
-            let fence = new_id();
-            tx.execute("INSERT INTO registry_connections (connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,created_at_ms) VALUES (?1,?2,?3,?4,?5,?6,?7,'live',?8)",
-                params![connection,binding.instance_id,profile_key(binding)?,encode_stored(binding, &Kept { begun_at, ..Kept::default() })?,new_id(),new_id(),fence,timestamp(now)?]).map_err(db)?;
-            create_acquisition(tx, authority, connection, fence, now)
+            admit_allocation(tx, binding, now)?;
+            allocate(tx, authority, binding, begun_at, now)
+        })
+    }
+
+    /// `begin` without the host's own cardinality check: what `begin` admitted
+    /// before the rule, so a test can build an instance that holds two
+    /// connections and reach the model's own refusal.
+    #[cfg(test)]
+    pub(crate) fn begin_unchecked(&self, binding: &Binding, now: u64) -> Result<Acquisition> {
+        binding.validate()?;
+        self.transaction(now, true, |tx, authority, now| {
+            let begun_at = register(tx, binding)?;
+            allocate(tx, authority, binding, begun_at, now)
         })
     }
 
@@ -291,6 +297,21 @@ impl Registry {
         })
     }
 
+    /// The instance's published Live or Stale connections, at most two: a
+    /// command that names no connection selects the one an instance holds
+    /// (story:connect-refused-while-instance-holds-connection), and two say
+    /// only that it must be named.
+    pub fn held(&self, instance: &str, now: u64) -> Result<Vec<String>> {
+        self.transaction_observation(now, |tx, _, _| {
+            tx.prepare("SELECT connection_ref FROM registry_connections WHERE instance_id=?1 AND public=1 AND state!='revoked' ORDER BY connection_ref LIMIT 2")
+                .map_err(db)?
+                .query_map([instance], |r| r.get::<_, String>(0))
+                .map_err(db)?
+                .collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(db)
+        })
+    }
+
     pub fn fail(&self, claim: &Claim, now: u64) -> Result<()> {
         self.transaction(now, false, |tx, _, now| {
             let acquired = acquired(tx, &claim.acquisition.id, &claim.acquisition.owner)?;
@@ -486,6 +507,92 @@ fn qualified(prefix: &str, authority: Uuid) -> String {
         Uuid::new_v4().simple()
     )
 }
+/// An instance holds at most one published non-revoked connection
+/// (contracts/auth/connection/v1alpha1/semantics.md §4.2): a connect is refused
+/// while it holds a published Live or Stale connection (Stale is a live row
+/// whose binding records the lifecycle), and while another connect of it is in
+/// flight, so two concurrent connects cannot both publish. A connection never
+/// published holds nothing once its connect failed or passed its deadline,
+/// whether or not an expiry sweep recorded that yet. The refusal names the
+/// step that clears it, as a repair of the held connection classifies it
+/// (`revalidation::changed`): a reconnect while it is held under the
+/// configured binding, which repair admits; a revalidation when it can follow
+/// the configuration upgrade, after which it is the instance's connection; a
+/// revocation when repair refuses it as changed, or when the instance holds
+/// more than one.
+fn admit_allocation(tx: &Transaction<'_>, binding: &Binding, now: u64) -> Result<()> {
+    let held = tx
+        .prepare("SELECT connection_ref FROM registry_connections WHERE instance_id=?1 AND public=1 AND state!='revoked' ORDER BY connection_ref LIMIT 2")
+        .map_err(db)?
+        .query_map([&binding.instance_id], |r| r.get::<_, String>(0))
+        .map_err(db)?
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .map_err(db)?;
+    match held.as_slice() {
+        [] => {}
+        [reference] => {
+            let row = Registry::connection(tx, reference)?;
+            if row.binding == *binding {
+                return Err(Failure::InstanceConnected);
+            }
+            let usable = || {
+                Ok(row.material.is_some()
+                    && matches!(
+                        super::observation::readiness(tx, &row, now, true)?,
+                        State::Ready | State::Pending
+                    ))
+            };
+            return Err(match super::revalidation::changed(&row, binding, usable)? {
+                Failure::BindingChanged => Failure::InstanceConnectionChanged,
+                other => other,
+            });
+        }
+        _ => return Err(Failure::InstanceConnectionChanged),
+    }
+    let in_flight: bool = tx
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM registry_acquisitions a JOIN registry_connections c ON c.connection_ref=a.connection_ref WHERE c.instance_id=?1 AND c.public=0 AND c.state!='revoked' AND a.state IN ('pending','completing') AND a.expires_at_ms>?2)",
+            params![binding.instance_id, timestamp(now)?],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    if in_flight {
+        return Err(Failure::Conflict);
+    }
+    Ok(())
+}
+
+/// Allocates a private, unpublished connection of the binding and its first
+/// acquisition (`connectors.auth_bindings.AllocateConnection`).
+fn allocate(
+    tx: &Transaction<'_>,
+    authority: Uuid,
+    binding: &Binding,
+    begun_at: Option<String>,
+    now: u64,
+) -> Result<Acquisition> {
+    let per_instance: i64 = tx
+        .query_row(
+            "SELECT count(*) FROM registry_connections WHERE instance_id=?1",
+            [&binding.instance_id],
+            |r| r.get(0),
+        )
+        .map_err(db)?;
+    let total: i64 = tx
+        .query_row("SELECT count(*) FROM registry_connections", [], |r| {
+            r.get(0)
+        })
+        .map_err(db)?;
+    if per_instance >= 1000 || total >= 10_000 {
+        return Err(Failure::Capacity);
+    }
+    let connection = qualified("conn", authority);
+    let fence = new_id();
+    tx.execute("INSERT INTO registry_connections (connection_ref,instance_id,profile_key,binding,scope_id,semantic_revision,publication_fence,state,created_at_ms) VALUES (?1,?2,?3,?4,?5,?6,?7,'live',?8)",
+        params![connection,binding.instance_id,profile_key(binding)?,encode_stored(binding, &Kept { begun_at, ..Kept::default() })?,new_id(),new_id(),fence,timestamp(now)?]).map_err(db)?;
+    create_acquisition(tx, authority, connection, fence, now)
+}
+
 fn create_acquisition(
     tx: &Transaction<'_>,
     authority: Uuid,

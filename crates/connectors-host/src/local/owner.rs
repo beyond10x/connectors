@@ -106,6 +106,16 @@ pub struct Error {
     /// instance id does (`registry::Failure::AuthenticationChanged`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reconfigure: bool,
+    /// The instance holds a published Live or Stale connection, so a connect
+    /// is refused; `connections reconnect` replaces that connection's
+    /// credential (`registry::Failure::InstanceConnected`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub held: bool,
+    /// The instance holds a connection no repair can replace, admitted under
+    /// another binding, or more than one: a connect is refused until it is
+    /// revoked (`registry::Failure::InstanceConnectionChanged`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub revoke: bool,
     /// A `not_granted` read whose connection's validation evidence expired
     /// while its credential is intact; a revalidation helps, not a repair
     /// (`registry::Failure::EvidenceExpired`).
@@ -132,6 +142,8 @@ impl From<Code> for Error {
             origin: Origin::Host,
             reconnect: false,
             reconfigure: false,
+            held: false,
+            revoke: false,
             revalidate: false,
             store_version: None,
             clock_format_retired: false,
@@ -193,7 +205,11 @@ impl From<registry::Failure> for Error {
             F::ConcurrentRevision => Code::RevisionConflict,
             F::OutcomeUnknown => Code::OutcomeUnknown,
             F::NotFound => Code::NotFound,
-            F::Conflict | F::UpgradeRequired | F::AuthenticationChanged => Code::LifecycleConflict,
+            F::Conflict
+            | F::UpgradeRequired
+            | F::AuthenticationChanged
+            | F::InstanceConnected
+            | F::InstanceConnectionChanged => Code::LifecycleConflict,
             F::Revoked => Code::Revoked,
             F::IdentityMismatch | F::UpgradeIdentityMismatch => Code::IdentityMismatch,
             F::Expired => Code::Timeout,
@@ -207,6 +223,10 @@ impl From<registry::Failure> for Error {
         error.reconnect = reconnect;
         // Only a new instance id helps: connect refuses it under this one too.
         error.reconfigure = e == F::AuthenticationChanged;
+        // The instance already holds its connection: reconnect replaces it.
+        error.held = e == F::InstanceConnected;
+        // What it holds no reconnect replaces: only a revocation clears it.
+        error.revoke = e == F::InstanceConnectionChanged;
         // Revalidation helps: it recollects expired evidence, and it follows a
         // configuration upgrade of the connection's instance.
         error.revalidate = matches!(e, F::EvidenceExpired | F::UpgradeRequired);
@@ -270,6 +290,8 @@ impl From<runtime::Failure> for Error {
             origin,
             reconnect: false,
             reconfigure: false,
+            held: false,
+            revoke: false,
             revalidate: false,
             store_version: None,
             clock_format_retired: false,

@@ -403,6 +403,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -839,6 +840,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -1245,6 +1247,7 @@
                           "repair_connection",
                           "revalidate_connection",
                           "create_connection",
+                          "revoke_connection",
                           "refresh_description",
                           "request_permission",
                           "retry_explicitly",
@@ -1625,6 +1628,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -2040,6 +2044,7 @@
                           "repair_connection",
                           "revalidate_connection",
                           "create_connection",
+                          "revoke_connection",
                           "refresh_description",
                           "request_permission",
                           "retry_explicitly",
@@ -2420,6 +2425,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -2865,6 +2871,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -3299,6 +3306,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -3747,6 +3755,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -4195,6 +4204,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -4643,6 +4653,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -5091,6 +5102,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -5539,6 +5551,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -5981,6 +5994,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -6437,6 +6451,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -6884,6 +6899,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -7512,6 +7528,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -7994,6 +8011,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -8130,7 +8148,10 @@
               }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connector": {
               "kind": "optional",
@@ -8464,6 +8485,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -8606,7 +8628,10 @@
               }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connector": {
               "kind": "optional",
@@ -8874,6 +8899,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -9346,6 +9372,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -9482,7 +9509,10 @@
               }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connector": {
               "kind": "optional",
@@ -9831,6 +9861,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -9967,7 +9998,10 @@
               }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connector": {
               "kind": "optional",
@@ -10304,6 +10338,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -10440,7 +10475,10 @@
               }
             },
             "connection": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connector": {
               "kind": "optional",
@@ -10729,6 +10767,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -10926,6 +10965,7 @@
                       "repair_connection",
                       "revalidate_connection",
                       "create_connection",
+                      "revoke_connection",
                       "refresh_description",
                       "request_permission",
                       "retry_explicitly",
@@ -11275,6 +11315,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -11719,6 +11760,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -12271,6 +12313,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -12730,6 +12773,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -12906,6 +12950,7 @@
                       "repair_connection",
                       "revalidate_connection",
                       "create_connection",
+                      "revoke_connection",
                       "refresh_description",
                       "request_permission",
                       "retry_explicitly",
@@ -13166,6 +13211,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -13568,6 +13614,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -13956,6 +14003,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -14465,6 +14513,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",
@@ -14848,6 +14897,7 @@
                   "repair_connection",
                   "revalidate_connection",
                   "create_connection",
+                  "revoke_connection",
                   "refresh_description",
                   "request_permission",
                   "retry_explicitly",

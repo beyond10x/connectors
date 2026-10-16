@@ -88,10 +88,13 @@ impl Handler for LocalHandler {
     /// Every handler reads the selected alias in `adapter`, whichever selector
     /// named it; a result names its connector and instance beside it.
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
-        let (input, config) = match select::resolve(call) {
+        let (mut input, config) = match select::resolve(call) {
             Ok(resolved) => resolved,
             Err(refusal) => return refusal,
         };
+        if let Err(refusal) = connections::select(call, &mut input) {
+            return refusal;
+        }
         let call = &Invocation {
             callable: call.callable,
             target: call.target,
@@ -244,6 +247,10 @@ fn owner_failure(error: owner::Error) -> HandlerReply {
     // under this instance id helps, a new instance id does.
     let action = if error.reconfigure {
         "check_configuration"
+    } else if error.revoke {
+        "revoke_connection"
+    } else if error.held {
+        "repair_connection"
     } else if error.reconnect {
         "create_connection"
     } else if error.revalidate {
@@ -957,6 +964,42 @@ mod tests {
             serde_json::from_value(serde_json::to_value(&keys).unwrap()).unwrap();
         for error in [keys, received] {
             assert_eq!(reply(owner_failure(error)), conflict("create_connection"));
+        }
+    }
+
+    /// story:connect-refused-while-instance-holds-connection: a connect on an
+    /// instance that holds a published Live or Stale connection is
+    /// `lifecycle_conflict` at admission naming the step that clears it,
+    /// `connections reconnect` when it replaces that connection's credential
+    /// and `connections revoke` when no reconnect can, as the owner reports it
+    /// and as the CLI receives it across the transport.
+    #[test]
+    fn a_connect_on_an_instance_holding_its_connection_names_reconnect_or_revoke() {
+        use connectors_host::local::registry;
+        for (failure, action) in [
+            (registry::Failure::InstanceConnected, "repair_connection"),
+            (
+                registry::Failure::InstanceConnectionChanged,
+                "revoke_connection",
+            ),
+        ] {
+            let expected = (
+                json!("lifecycle_conflict"),
+                json!("admission"),
+                json!(action),
+            );
+            let error = owner::Error::from(failure);
+            assert_eq!(error.code, owner::Code::LifecycleConflict, "{failure:?}");
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+            for error in [error, received] {
+                assert_eq!(reply(owner_failure(error)), expected, "{failure:?}");
+            }
+            assert_eq!(
+                reply(connections::registry_failure(failure)),
+                expected,
+                "{failure:?}"
+            );
         }
     }
 }

@@ -3706,12 +3706,18 @@ fn persist_batch(er: &mut ErAuthority, connection: &Connection, mode: PersistMod
         if !reference.contains_key(key) {
             let mut stages = creation_stages(next, admitted_registry_use)?;
             let initial = stages.remove(0);
-            actions.push(create_action(
+            let mut action = create_action(
                 &runtime_registry,
                 &commands,
                 &initial,
                 create_command(next)?,
-            )?);
+            )?;
+            if let (Some(held), BatchAction::Create(request)) =
+                (held_connection(&desired, &initial), &mut action)
+            {
+                request.fields["input"]["held_connection_ref"] = held;
+            }
+            actions.push(action);
             let mut current = initial;
             for mut stage in stages {
                 stage.revision = current.revision + 1;
@@ -4068,6 +4074,32 @@ fn registry_clock_key(key: &(String, String)) -> bool {
 /// when a prepared observation's feed check runs; it never reads them either.
 fn runtime_record_key(key: &(String, String)) -> bool {
     key.0 == "connectors.cli.LocalRuntimeRecord"
+}
+
+/// `AllocateConnection`'s owner-supplied `held_connection_ref`
+/// (`ess/domains/auth_bindings.yaml`): for a new connection, the instance's
+/// published Live or Stale connection in the rows this batch records, which
+/// the model refuses the allocation beside. The batch's own changes run before
+/// its creations, so a connection it revokes is no longer held; one it creates
+/// is unpublished and never held. A connection recorded already published is
+/// no allocation but the record of one an existing store holds (an instance
+/// that held several before the rule keeps them all), so it names nothing.
+/// `None` for every other row.
+fn held_connection(all: &BTreeMap<(String, String), RowImage>, next: &RowImage) -> Option<Value> {
+    const CONNECTION: &str = "connectors.auth_bindings.Connection";
+    if next.entity != CONNECTION || next.fields.get("published") != Some(&json!(false)) {
+        return None;
+    }
+    let instance = next.fields.get("instance_id")?;
+    all.values()
+        .find(|row| {
+            row.entity == CONNECTION
+                && row.id != next.id
+                && matches!(row.lifecycle_state.as_str(), "Live" | "Stale")
+                && row.fields.get("published") == Some(&json!(true))
+                && row.fields.get("instance_id") == Some(instance)
+        })
+        .and_then(|row| row.fields.get("connection_ref").cloned())
 }
 
 fn create_action(
@@ -7423,6 +7455,63 @@ mod tests {
         assert_eq!(command, "connectors.cli.RememberLocalRuntimeBootstrap");
         transition(&authority, &runtime, &remembered, command)
             .unwrap_or_else(|error| panic!("{command} refused: {error:?}"));
+    }
+
+    /// story:connect-refused-while-instance-holds-connection: the host names
+    /// the instance's published Live or Stale connection to
+    /// `AllocateConnection`, and nothing else: not a revoked one, not one
+    /// never published, not another instance's, and nothing for other rows.
+    #[test]
+    fn allocation_names_only_a_published_live_or_stale_connection_of_its_instance() {
+        let next = live_connection("conn-new");
+        let rows = |others: &[RowImage]| {
+            others
+                .iter()
+                .chain([&next])
+                .map(|row| ((row.entity.clone(), row.id.clone()), row.clone()))
+                .collect::<BTreeMap<_, _>>()
+        };
+        let mut published = live_connection("conn-held");
+        published.fields.insert("published".into(), json!(true));
+        let mut stale = published.clone();
+        stale.lifecycle_state = "Stale".into();
+        let mut revoked = published.clone();
+        revoked.lifecycle_state = "Revoked".into();
+        let unpublished = live_connection("conn-held");
+        let mut elsewhere = published.clone();
+        elsewhere
+            .fields
+            .insert("instance_id".into(), json!("other-instance"));
+        for held in [&published, &stale] {
+            assert_eq!(
+                held_connection(&rows(std::slice::from_ref(held)), &next),
+                Some(json!("conn-held")),
+                "{}",
+                held.lifecycle_state
+            );
+        }
+        for other in [&revoked, &unpublished, &elsewhere] {
+            assert_eq!(
+                held_connection(&rows(std::slice::from_ref(other)), &next),
+                None
+            );
+        }
+        assert_eq!(
+            held_connection(&rows(&[published.clone()]), &published),
+            None
+        );
+        // A connection recorded already published is an existing store's
+        // record, not an allocation: two of one instance are both recorded.
+        let mut imported = live_connection("conn-new");
+        imported.fields.insert("published".into(), json!(true));
+        assert_eq!(
+            held_connection(&rows(&[published.clone()]), &imported),
+            None
+        );
+        assert_eq!(
+            held_connection(&rows(&[published.clone()]), &anchored_audit()),
+            None
+        );
     }
 
     fn live_connection(connection_ref: &str) -> RowImage {
