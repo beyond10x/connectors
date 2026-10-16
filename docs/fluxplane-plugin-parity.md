@@ -1,3 +1,4 @@
+> This dated record predates the [connector vocabulary](../README.md#vocabulary) and keeps the terms of its date.
 # fluxplane-plugin parity
 
 **2026-10-07.** Connectors is to replace `fluxplane-plugin` in the operator's Claude Code and
