@@ -127,7 +127,7 @@ impl LocalHandler {
             } else {
                 session.complete(call)
             }
-            .map_err(owner_failure)
+            .map_err(|error| connect_failure(call.callable, error))
         } else if matches!(
             call.callable,
             "approval-policy-status"
@@ -185,6 +185,25 @@ fn invoke_failure(error: owner::Error) -> HandlerReply {
         && data["stage"] == "dispatch"
     {
         data["next_action"] = json!("repair_connection");
+    }
+    reply
+}
+
+/// `connections connect` and `reconnect` as `owner_failure` reports them, with
+/// one rule of their own (story:connect-refused-while-instance-holds-connection):
+/// a reconnect that validated another account's credential is
+/// `identity_mismatch` naming `revoke_connection`. Another account is another
+/// connection, which the instance holds only once its own is revoked, or a
+/// connection of another instance; reconnect again never gets there, and
+/// connect is refused naming that reconnect.
+fn connect_failure(callable: &str, error: owner::Error) -> HandlerReply {
+    let other_account =
+        callable == "connections-reconnect" && error.code == owner::Code::IdentityMismatch;
+    let mut reply = owner_failure(error);
+    if other_account
+        && let HandlerReply::Error { data, .. } | HandlerReply::UsageError { data, .. } = &mut reply
+    {
+        data["next_action"] = json!("revoke_connection");
     }
     reply
 }
@@ -964,6 +983,85 @@ mod tests {
             serde_json::from_value(serde_json::to_value(&keys).unwrap()).unwrap();
         for error in [keys, received] {
             assert_eq!(reply(owner_failure(error)), conflict("create_connection"));
+        }
+    }
+
+    /// story:connect-refused-while-instance-holds-connection: a connect refused
+    /// beside another connect in flight names `retry_status` and that
+    /// connect's acquisition, which `connections status --acquisition`
+    /// follows, also across the transport.
+    #[test]
+    fn a_connect_beside_one_in_flight_names_its_acquisition() {
+        use connectors_host::local::registry;
+        let mut error = owner::Error::from(registry::Failure::Conflict);
+        error.acquisition = Some("acq-in-flight".into());
+        let received: owner::Error =
+            serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+        for error in [error, received] {
+            let HandlerReply::Error { data, .. } = connect_failure("connections-connect", error)
+            else {
+                panic!("not an operational failure");
+            };
+            assert_eq!(
+                (
+                    &data["code"],
+                    &data["stage"],
+                    &data["next_action"],
+                    &data["acquisition"]
+                ),
+                (
+                    &json!("lifecycle_conflict"),
+                    &json!("admission"),
+                    &json!("retry_status"),
+                    &json!("acq-in-flight")
+                ),
+                "{data}"
+            );
+        }
+    }
+
+    /// story:connect-refused-while-instance-holds-connection: a reconnect that
+    /// validated another account's credential names `revoke_connection`,
+    /// whether the registry or the adapter answered the other identity and as
+    /// the CLI receives it across the transport, so connect (refused naming
+    /// the reconnect) and reconnect never send each other round. A connect
+    /// and every other refusal of a reconnect keep `owner_failure`'s action.
+    #[test]
+    fn a_reconnect_to_another_account_names_revocation() {
+        use connectors_host::local::{registry, runtime};
+        let mismatch = (
+            json!("identity_mismatch"),
+            json!("admission"),
+            json!("revoke_connection"),
+        );
+        for error in [
+            owner::Error::from(registry::Failure::IdentityMismatch),
+            owner::Error::from(runtime::Failure::IdentityMismatch),
+        ] {
+            let received: owner::Error =
+                serde_json::from_value(serde_json::to_value(&error).unwrap()).unwrap();
+            for error in [error, received] {
+                assert_eq!(
+                    reply(connect_failure("connections-reconnect", error.clone())),
+                    mismatch
+                );
+                assert_eq!(
+                    reply(connect_failure("connections-connect", error.clone())),
+                    reply(owner_failure(error))
+                );
+            }
+        }
+        for failure in [
+            registry::Failure::Conflict,
+            registry::Failure::BindingChanged,
+            registry::Failure::Revoked,
+        ] {
+            let error = owner::Error::from(failure);
+            assert_eq!(
+                reply(connect_failure("connections-reconnect", error.clone())),
+                reply(owner_failure(error)),
+                "{failure:?}"
+            );
         }
     }
 
