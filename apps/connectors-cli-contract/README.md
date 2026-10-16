@@ -248,6 +248,14 @@ Callable: `setup-init`. Input: `null (inputless)`. Result: `connectors.cli.Setup
 
 Error `failure`: `connectors.cli.Failure`.
 
+### `setup migrate`
+
+Rewrite each adapter entry that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-<UTC timestamp>
+
+Callable: `setup-migrate`. Input: `connectors.cli.SetupMigrateInput`. Result: `connectors.cli.SetupMigrateResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
 ### `setup owner-stop`
 
 Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner
@@ -288,4 +296,5 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:setup-check: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-init: implement the owner-qualified callable and its declared result/error contract
+- handler:setup-migrate: implement the owner-qualified callable and its declared result/error contract
 - handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract

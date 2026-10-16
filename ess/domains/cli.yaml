@@ -875,6 +875,104 @@ types:
       - {name: disposition, type: "connectors.cli.OwnerStopDisposition"}
       - {name: state_path, type: "String"}
       - {name: host_incarnation, type: "Optional<String>"}
+  # `setup migrate` (contracts/cli/v1alpha1/semantics.md §3, "Migrating adapter
+  # entries"; migration-plan:connector-vocabulary step 4) rewrites each
+  # `[adapters.<alias>]` entry whose implementation maps to a shipped connector
+  # declaration as the pinned instance `[connectors.<connector>.instances.<alias>]`,
+  # keeping every pin. Its instance_id, configuration_revision, executable
+  # selection digest and mounted custody item names stay byte for byte, so its
+  # connections (connectors.auth_bindings.Connection), approval policy and
+  # custody items stay valid and nothing is re-consented or revalidated.
+  # ess-cli/1 has no valueless switch source, so the mode is a value
+  # (`--mode dry-run`); the binary also reads `--dry-run` and `--apply` as
+  # exactly those two values.
+  - name: connectors.cli.MigrateMode
+    kind: enum
+    variants: [dry-run, apply]
+  - name: connectors.cli.SetupMigrateInput
+    kind: struct
+    fields:
+      - {name: mode, type: "connectors.cli.MigrateMode"}
+  # planned: a dry run that would rewrite at least one entry. applied: the file
+  # was rewritten and the old one kept at backup_path. unchanged: no entry is
+  # rewritten, and nothing is written in either mode.
+  - name: connectors.cli.MigrateDisposition
+    kind: enum
+    variants: [planned, applied, unchanged]
+  - name: connectors.cli.MigrateEntryDisposition
+    kind: enum
+    variants: [migrated, kept]
+  # Why an entry stays `[adapters.<alias>]`:
+  # - implementation_unmapped: no shipped connector declaration names its
+  #   implementation (connectors.declarations.Connector.adapter_id); only the
+  #   generic HTTP implementation that ships declarations is mapped in this
+  #   pass, every other one is UNMAPPED.
+  # - connector_undeclared: an entry of a mapped implementation whose native
+  #   configuration names a provider no shipped declaration carries as its
+  #   native_provider.
+  # - gateway_prefix: an entry of a mapped implementation whose native
+  #   configuration states a request prefix its connector's declaration does
+  #   not produce, an API gateway in front of the provider; the connector's
+  #   instances cannot state one.
+  # - native_configuration_unreadable: an entry of a mapped implementation
+  #   whose native configuration file is not named, not owner-only, not
+  #   readable or names no provider.
+  # - instance_conflict: the connector is configured disabled, or already has
+  #   an instance named like the alias.
+  # - selection_changes: the rewritten entry would read back with another
+  #   value of a field named in differing_field.
+  - name: connectors.cli.MigrateKeptReason
+    kind: enum
+    variants: [implementation_unmapped, connector_undeclared, gateway_prefix, native_configuration_unreadable, instance_conflict, selection_changes]
+  # A field of an entry, the first in this order in which the rewritten entry
+  # reads back differently. instance_id and configuration_revision key its
+  # connections and approval policy; adapter_id, protocol, private_protocol and
+  # executable enter its executable selection digest (approval policy
+  # executable_selection); permissions name its mounted custody items.
+  # private_protocol: `connectors-local/5` requires it, and it enters the
+  # digest of an entry whose `connectors-local/1` file selects none.
+  - name: connectors.cli.MigrateField
+    kind: enum
+    variants: [instance_id, configuration_revision, adapter_id, protocol, private_protocol, startup, restart, executable, permissions]
+  # What an entry's records are keyed by. custody_items are the mounted-secret
+  # item names `<alias>/<profile>` of its permitted profiles; platform custody
+  # items are keyed by connection, not by configuration names.
+  - name: connectors.cli.MigrateSelection
+    kind: struct
+    fields:
+      - {name: instance_id, type: "String"}
+      - {name: configuration_revision, type: "String"}
+      - {name: executable_selection, type: "String"}
+      - {name: custody_items, type: "List<String>"}
+  # One `[adapters.<alias>]` entry of the file before the migration; entries
+  # already under `[connectors]` are not listed. connector and instance select
+  # it after the migration. reason is present exactly when kept, differing_field
+  # exactly when reason is selection_changes: runtime obligations, as for
+  # AcquisitionObservation.
+  - name: connectors.cli.MigrateEntry
+    kind: struct
+    fields:
+      - {name: adapter, type: "String"}
+      - {name: connector, type: "String"}
+      - {name: instance, type: "String"}
+      - {name: disposition, type: "connectors.cli.MigrateEntryDisposition"}
+      - {name: reason, type: "Optional<connectors.cli.MigrateKeptReason>"}
+      - {name: differing_field, type: "Optional<connectors.cli.MigrateField>"}
+      - {name: before, type: "connectors.cli.MigrateSelection"}
+      - {name: after, type: "connectors.cli.MigrateSelection"}
+  # configuration is the file the migration writes, the unchanged file when
+  # unchanged. backup_path is present exactly when applied.
+  - name: connectors.cli.SetupMigrateResult
+    kind: struct
+    fields:
+      - {name: mode, type: "connectors.cli.MigrateMode"}
+      - {name: disposition, type: "connectors.cli.MigrateDisposition"}
+      - {name: config_path, type: "String"}
+      - {name: format_before, type: "String"}
+      - {name: format_after, type: "String"}
+      - {name: backup_path, type: "Optional<String>"}
+      - {name: configuration, type: "String"}
+      - {name: entries, type: "List<connectors.cli.MigrateEntry>"}
   - name: connectors.cli.AdapterListInput
     kind: struct
     fields:

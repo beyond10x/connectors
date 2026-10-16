@@ -440,6 +440,65 @@ entry, ahead of an `--adapter` entry when both apply:
 The machine-facing `next_action` value `repair_connection` is unchanged; it
 names `connections reconnect`.
 
+### Migrating adapter entries
+
+`setup migrate --mode dry-run` and `setup migrate --mode apply` move legacy
+`[adapters.<alias>]` entries to connector instances without a new consent,
+revalidation or approval policy publication. `--dry-run` and `--apply` are the
+same two commands. Each entry whose implementation maps to a shipped connector
+declaration becomes `[connectors.<connector>.instances.<alias>]` carrying every
+pin of the entry, its alias included. The instance name is the alias, so the
+instance is selected as `--connector <connector> --instance <alias>`, and
+`--adapter <alias>` keeps selecting it for the deprecation window. Its
+`instance_id`, `configuration_revision`, executable selection digest (an approval
+policy's `executable_selection`) and mounted custody item names
+`<alias>/<profile>` stay byte for byte, so its connections, approval policy and
+custody items stay valid. Platform custody items are keyed by connection, not by
+configuration names. Read and write instance pairs are not merged: merging
+changes scopes and so the revision.
+
+Only a catalog entry maps to a connector today: the connector whose shipped
+declaration names the `provider` of the entry's native configuration
+(`--local-config <file>`, admitted as the provider admits it: owner-only, at
+most 1 MiB), or the shipped connector its `--connector` argument names. Every
+other entry stays where it is, and the result names why in `reason`
+(`connectors.cli.MigrateKeptReason`):
+
+| `reason` | The entry |
+|---|---|
+| `implementation_unmapped` | is not a catalog entry: no declaration maps a credential binary, MCP, SQL or Kubernetes implementation to a connector yet |
+| `connector_undeclared` | names a native provider no shipped declaration carries (Slack ships none) |
+| `gateway_prefix` | states a request prefix its connector's declaration does not produce: an API gateway in front of the provider's API, such as the Atlassian gateway |
+| `native_configuration_unreadable` | names no native configuration, or one that is not owner-only, not readable JSON or names no provider |
+| `instance_conflict` | maps to a connector configured disabled, or one that already has an instance named like the alias |
+| `selection_changes` | would read back with another value of the field `differing_field` names |
+
+The new file is read back with the reading rules above before anything is
+written, and an entry that reads back with any other value of any of its fields
+is not migrated, naming the first such field. Moving to `connectors-local/5`
+requires `private_protocol` on every entry, and it enters the executable
+selection digest, so no entry of a `connectors-local/1` file is migrated; each
+candidate names `private_protocol`. Nothing else of the file changes, but its
+comments are not kept.
+
+The result lists every `[adapters.<alias>]` entry of the file it read with its
+`disposition` (`migrated` or `kept`), the `connector` and `instance` that select
+it afterwards and, `before` and `after`, its `instance_id`,
+`configuration_revision`, `executable_selection` and `custody_items`. It carries
+the file in `configuration` and its `format_before` and `format_after`. The
+format moves to `connectors-local/5` only when at least one entry is migrated.
+With nothing to migrate the result is `unchanged` and nothing is written in
+either mode. A dry run that would migrate is `planned` and writes nothing. An
+applied one is `applied`: it publishes the file it read, byte for byte and
+owner-only, as `config.toml.before-migrate-<UTC timestamp>`
+(`YYYYMMDDTHHMMSSZ`) beside the configuration without replacing any existing
+file, names it in `backup_path`, and then replaces the configuration atomically
+and owner-only, only while it still holds the bytes the plan was made from; a
+configuration that changed in between is `revision_conflict` at `publication`.
+Rollback is restoring the backup and running the previous release. Under
+`--output json` a refusal is one failure envelope on standard error, like every
+other command's.
+
 ### Durable open checkpoints on an existing store
 
 `setup checkpoints-enable --confirm one-way` enables Entity Runtime durable open
