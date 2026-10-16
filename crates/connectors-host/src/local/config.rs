@@ -55,7 +55,10 @@ struct ConfigInput {
     connectors: Option<BTreeMap<String, ConnectorTable>>,
 }
 impl Config {
-    fn assemble(input: ConfigInput) -> std::result::Result<Self, Refusal> {
+    fn assemble(
+        input: ConfigInput,
+        installation: Option<&Installation>,
+    ) -> std::result::Result<Self, Refusal> {
         let mut config = Self {
             format: input.format,
             owner_uid: input.owner_uid,
@@ -69,7 +72,7 @@ impl Config {
         };
         config.connectors = input
             .connectors
-            .map(|tables| config.admit_instances(tables))
+            .map(|tables| config.admit_instances(tables, installation))
             .transpose()?;
         Ok(config)
     }
@@ -77,7 +80,8 @@ impl Config {
 impl TryFrom<ConfigInput> for Config {
     type Error = &'static str;
     fn try_from(input: ConfigInput) -> std::result::Result<Self, Self::Error> {
-        let config = Self::assemble(input).map_err(|_| "invalid local configuration")?;
+        let config = Self::assemble(input, Installation::installed().as_ref())
+            .map_err(|_| "invalid local configuration")?;
         config
             .validate()
             .map_err(|_| "invalid local configuration")?;
@@ -337,18 +341,22 @@ pub struct Connector {
 }
 
 /// A `[connectors.<connector>.instances.<instance>]` table, without its pins.
-/// Until the host derives an instance from its installed connector
-/// (story:connector-instance-derived-fields), every instance carries the pins
-/// of a legacy `[adapters.<alias>]` entry, its alias included, and loads to
-/// exactly that entry, which is held in `Config::adapters` under `alias`: the
-/// same instance id, configuration revision, executable selection digest and
-/// mounted-custody item names. The connector name of such an instance is
-/// checked as a name only, against no connector declaration.
+/// An instance that carries the pins of a legacy `[adapters.<alias>]` entry,
+/// its alias included, loads to exactly that entry, which is held in
+/// `Config::adapters` under `alias`: the same instance id, configuration
+/// revision, executable selection digest and mounted-custody item names. The
+/// connector name of such an instance is checked as a name only, against no
+/// connector declaration. An instance that carries no pin at all is
+/// `derived` (story:connector-instance-derived-fields): the installed catalog
+/// provider derives its entry, held under the alias `<connector>.<instance>`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Instance {
     pub description: Option<String>,
     pub endpoint: Option<String>,
     pub alias: String,
+    /// Whether the entry is derived rather than pinned; a derived instance is
+    /// written back without pins.
+    pub derived: bool,
 }
 
 /// `[connectors.<connector>]` as written.
@@ -412,6 +420,7 @@ impl InstanceTable {
             description: self.description,
             endpoint: self.endpoint,
             alias: self.alias?,
+            derived: false,
         };
         Some((instance, adapter))
     }
@@ -433,6 +442,87 @@ impl InstanceTable {
             restart: Some(adapter.restart),
             executable: Some(adapter.executable),
             permissions: Some(adapter.permissions),
+        }
+    }
+
+    /// Whether the table states no pin: only `description` and `endpoint`.
+    fn unpinned(&self) -> bool {
+        self.alias.is_none()
+            && self.instance_id.is_none()
+            && self.adapter_id.is_none()
+            && self.configuration_revision.is_none()
+            && self.protocol.is_none()
+            && self.private_protocol.is_none()
+            && self.startup.is_none()
+            && self.restart.is_none()
+            && self.executable.is_none()
+            && self.permissions.is_none()
+    }
+
+    /// The instance `name` of the catalog connector `connector` and the entry
+    /// the installed catalog provider derives for it: the provider started as
+    /// `--connector <connector> --instance <name> [--endpoint <endpoint>]`,
+    /// its SHA-256 computed here, the instance id and configuration revision
+    /// of the bootstrap it prints for exactly that selection, and the profiles
+    /// and every operation, writes included, of the bootstrap a
+    /// `connectors-private/2` child of that entry reports, which must name the
+    /// same instance and revision. A connector the provider does not ship
+    /// (Slack, the Atlassian gateway, every non-catalog implementation) is
+    /// refused.
+    fn derived(
+        self,
+        connector: &str,
+        name: &str,
+        installation: &Installation,
+    ) -> Result<(Instance, Adapter)> {
+        // `<connector>.<instance>` stays unambiguous: neither name has a `.`.
+        let plain = |value: &str| {
+            !value.is_empty()
+                && value
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        };
+        let endpoint_admitted = self.endpoint.as_deref().is_none_or(|endpoint| {
+            !endpoint.is_empty()
+                && endpoint.len() <= 2048
+                && !endpoint
+                    .chars()
+                    .any(|c| c.is_control() || c.is_whitespace())
+        });
+        if !plain(connector) || !plain(name) || !endpoint_admitted {
+            return Err(Failure::InvalidConfiguration);
+        }
+        let mut args = ["--connector", connector, "--instance", name]
+            .map(str::to_owned)
+            .to_vec();
+        if let Some(endpoint) = &self.endpoint {
+            args.extend(["--endpoint".to_owned(), endpoint.clone()]);
+        }
+        let instance = Instance {
+            description: self.description,
+            endpoint: self.endpoint,
+            alias: format!("{connector}.{name}"),
+            derived: true,
+        };
+        let adapter = installation.derive(&instance.alias, args)?;
+        Ok((instance, adapter))
+    }
+
+    /// The table written for a derived instance: its own keys, no pin.
+    fn bare(instance: Instance) -> Self {
+        Self {
+            description: instance.description,
+            endpoint: instance.endpoint,
+            alias: None,
+            instance_id: None,
+            adapter_id: None,
+            configuration_revision: None,
+            protocol: None,
+            private_protocol: None,
+            startup: None,
+            restart: None,
+            executable: None,
+            permissions: None,
         }
     }
 }
@@ -472,7 +562,12 @@ impl From<Config> for Written {
                         .into_iter()
                         .filter_map(|(name, instance)| {
                             let adapter = adapters.remove(&instance.alias)?;
-                            Some((name, InstanceTable::written(instance, adapter)))
+                            let table = if instance.derived {
+                                InstanceTable::bare(instance)
+                            } else {
+                                InstanceTable::written(instance, adapter)
+                            };
+                            Some((name, table))
                         })
                         .collect();
                     let table = ConnectorTable {
@@ -499,17 +594,28 @@ impl From<Config> for Written {
 
 impl Config {
     /// Add every instance's entry to `adapters` under its alias. An instance
-    /// without every pin, or with an alias already taken by a legacy entry or
-    /// another instance, refuses the file.
+    /// with every pin is that entry; one with no pin is derived from
+    /// `installation`, the installed catalog provider, in a
+    /// `connectors-local/5` file only. An instance with some pins but not all, an unpinned one
+    /// nothing derives, or one whose alias is already taken by a legacy entry
+    /// or another instance, refuses the file.
     fn admit_instances(
         &mut self,
         tables: BTreeMap<String, ConnectorTable>,
+        installation: Option<&Installation>,
     ) -> std::result::Result<BTreeMap<String, Connector>, Refusal> {
         let mut connectors = BTreeMap::new();
         for (name, table) in tables {
             let mut instances = BTreeMap::new();
             for (instance_name, table) in table.instances {
-                let (instance, adapter) = table.pinned().ok_or(Failure::InvalidConfiguration)?;
+                let (instance, adapter) = match installation {
+                    Some(installation)
+                        if table.unpinned() && self.format == "connectors-local/5" =>
+                    {
+                        table.derived(&name, &instance_name, installation)?
+                    }
+                    _ => table.pinned().ok_or(Failure::InvalidConfiguration)?,
+                };
                 if self
                     .adapters
                     .insert(instance.alias.clone(), adapter)
@@ -657,6 +763,166 @@ fn selector(value: &str) -> bool {
     connectors_core::valid_id(value)
 }
 
+/// The environment variable a starting owner receives naming the directory of
+/// the CLI that started it. The owner runs from a sealed copy of that CLI
+/// (Linux: a memory file; macOS: a private launch copy), so its own
+/// executable's directory holds no catalog provider.
+pub const INSTALLATION: &str = "CONNECTORS_INSTALLATION";
+
+/// What unpinned catalog instances are derived from: the installed catalog
+/// provider, and how a `connectors-private/2` child of a derived entry reports
+/// its bootstrap ([`handshake`] outside unit tests).
+pub(crate) struct Installation {
+    pub(crate) provider: PathBuf,
+    pub(crate) handshake: fn(&Adapter) -> Result<super::runtime::Bootstrap>,
+}
+
+impl Installation {
+    fn installed() -> Option<Self> {
+        Some(Self {
+            provider: installed_provider()?,
+            handshake,
+        })
+    }
+
+    /// The entry of the instance `alias`, the provider started with `args`.
+    /// It is remembered for the life of this process per provider file and
+    /// arguments, because an owner loads its configuration for every request:
+    /// a provider file that changed in any way (device, inode, size, mtime,
+    /// ctime) is derived again. A remembered digest that no longer matches the
+    /// file is refused when a child starts, from its sealed snapshot.
+    fn derive(&self, alias: &str, args: Vec<String>) -> Result<Adapter> {
+        use super::runtime::PrivateProtocol;
+        type Key = (PathBuf, Vec<String>, Vec<u64>, usize);
+        static DERIVED: std::sync::OnceLock<std::sync::Mutex<BTreeMap<Key, Adapter>>> =
+            std::sync::OnceLock::new();
+        fs::validate_path(&self.provider)?;
+        let selection = Executable {
+            path: self.provider.clone(),
+            sha256: String::new(),
+            args,
+        };
+        let mut source = selection.source()?;
+        let key = file_identity(&source).map(|identity| {
+            let handshake = self.handshake as usize;
+            (
+                selection.path.clone(),
+                selection.args.clone(),
+                identity,
+                handshake,
+            )
+        });
+        let derived = DERIVED.get_or_init(Default::default);
+        if let Some(key) = &key
+            && let Some(adapter) = derived
+                .lock()
+                .ok()
+                .and_then(|cache| cache.get(key).cloned())
+        {
+            return Ok(adapter);
+        }
+        let executable = Executable {
+            sha256: digest(&mut source)?,
+            ..selection
+        };
+        executable.validate()?;
+        let printed = executable.print_bootstrap()?;
+        if printed.validate().is_err()
+            || printed.instance != alias
+            || printed.adapter != "catalog"
+            || printed.protocol != connectors_core::WIRE_VERSION
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        let mut adapter = Adapter {
+            instance_id: printed.instance,
+            adapter_id: printed.adapter,
+            configuration_revision: printed.configuration_revision,
+            protocol: printed.protocol,
+            private_protocol: Some(PrivateProtocol::V2),
+            startup: Startup::default(),
+            restart: Restart::default(),
+            executable,
+            permissions: Permissions::default(),
+        };
+        // The printed bootstrap is the `connectors-private/1` one, reads only.
+        let reported = (self.handshake)(&adapter)?;
+        if reported.validate_for(PrivateProtocol::V2).is_err()
+            || reported.instance != adapter.instance_id
+            || reported.adapter != adapter.adapter_id
+            || reported.protocol != adapter.protocol
+            || reported.configuration_revision != adapter.configuration_revision
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        adapter.permissions = Permissions {
+            profiles: reported.profiles.into_iter().map(|p| p.id).collect(),
+            operations: reported
+                .requirements
+                .into_iter()
+                .map(|r| r.operation)
+                .collect(),
+        };
+        if let (Some(key), Ok(mut cache)) = (key, derived.lock()) {
+            if cache.len() >= 64 {
+                cache.clear();
+            }
+            cache.insert(key, adapter.clone());
+        }
+        Ok(adapter)
+    }
+}
+
+/// What identifies an admitted file's content without reading it: any write
+/// moves its ctime. `None` remembers nothing.
+#[cfg(unix)]
+fn file_identity(file: &std::fs::File) -> Option<Vec<u64>> {
+    let stat = file.metadata().ok()?;
+    let time = |seconds: i64, nanoseconds: i64| {
+        Some((
+            u64::try_from(seconds).ok()?,
+            u64::try_from(nanoseconds).ok()?,
+        ))
+    };
+    let (mtime, mtime_nsec) = time(stat.mtime(), stat.mtime_nsec())?;
+    let (ctime, ctime_nsec) = time(stat.ctime(), stat.ctime_nsec())?;
+    Some(vec![
+        stat.dev(),
+        stat.ino(),
+        stat.size(),
+        mtime,
+        mtime_nsec,
+        ctime,
+        ctime_nsec,
+    ])
+}
+
+#[cfg(windows)]
+fn file_identity(_: &std::fs::File) -> Option<Vec<u64>> {
+    None
+}
+
+/// The bootstrap a child of `adapter` reports when it starts: the child is
+/// started, admitted exactly as for an invocation, and stopped again.
+fn handshake(adapter: &Adapter) -> Result<super::runtime::Bootstrap> {
+    let child = super::runtime::Child::spawn(adapter).map_err(|_| Failure::InvalidConfiguration)?;
+    Ok(child.bootstrap().clone())
+}
+
+/// The catalog provider installed beside the running CLI: in [`INSTALLATION`]
+/// when the variable is set, otherwise in the running executable's directory.
+/// What it is, is decided when it is admitted and digested, not here.
+pub fn installed_provider() -> Option<PathBuf> {
+    let directory = match std::env::var_os(INSTALLATION) {
+        Some(directory) => PathBuf::from(directory),
+        None => std::env::current_exe().ok()?.parent()?.to_owned(),
+    };
+    Some(directory.join(format!(
+        "connectors-catalog-provider{}",
+        std::env::consts::EXE_SUFFIX
+    )))
+}
+
 impl Config {
     pub fn load(path: &Path) -> Result<Self> {
         Self::read(path).map_err(|refusal| refusal.failure())
@@ -665,6 +931,15 @@ impl Config {
     /// Load like [`Config::load`], keeping which rule refused the file where
     /// that can be named by operator-written coordinates alone.
     pub fn read(path: &Path) -> std::result::Result<Self, Refusal> {
+        Self::read_with(path, Installation::installed().as_ref())
+    }
+
+    /// Read like [`Config::read`], deriving every unpinned catalog instance
+    /// from `installation`; `None` derives none.
+    pub(crate) fn read_with(
+        path: &Path,
+        installation: Option<&Installation>,
+    ) -> std::result::Result<Self, Refusal> {
         let file = fs::private_file(path).map_err(|failure| {
             // Only the rule's name depends on this second look; admission was
             // already refused by the descriptor walk above.
@@ -683,7 +958,7 @@ impl Config {
         // Decode the closed envelope without its embedded validation, so the
         // refusal below can name its rule instead of collapsing into serde's.
         let input: ConfigInput = toml::from_str(text).map_err(|_| Failure::InvalidConfiguration)?;
-        let config = Self::assemble(input)?;
+        let config = Self::assemble(input, installation)?;
         config.check()?;
         Ok(config)
     }
@@ -928,6 +1203,27 @@ impl Initialized {
     }
 }
 
+/// The lowercase SHA-256 of an admitted executable read to its end, at most
+/// 512 MiB.
+fn digest(file: &mut std::fs::File) -> Result<String> {
+    let mut digest = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    let mut remaining: usize = 512 * 1024 * 1024 + 1;
+    loop {
+        let count = file
+            .read(&mut buffer)
+            .map_err(|_| Failure::InvalidConfiguration)?;
+        if count == 0 {
+            break;
+        }
+        remaining = remaining
+            .checked_sub(count)
+            .ok_or(Failure::InvalidConfiguration)?;
+        digest.update(&buffer[..count]);
+    }
+    Ok(hex::encode(digest.finalize()))
+}
+
 impl Executable {
     /// The pinned selection's own form: a lowercase SHA-256 digest, a bounded
     /// argv without NUL and an admissible absolute path.
@@ -958,25 +1254,62 @@ impl Executable {
     /// verifies a sealed snapshot: an inode can still be written in place.
     pub fn open(&self) -> Result<std::fs::File> {
         let mut file = self.source()?;
-        let mut digest = Sha256::new();
-        let mut buffer = [0u8; 65536];
-        let mut remaining: usize = 512 * 1024 * 1024 + 1;
-        loop {
-            let count = file
-                .read(&mut buffer)
-                .map_err(|_| Failure::InvalidConfiguration)?;
-            if count == 0 {
-                break;
-            }
-            remaining = remaining
-                .checked_sub(count)
-                .ok_or(Failure::InvalidConfiguration)?;
-            digest.update(&buffer[..count]);
-        }
-        if hex::encode(digest.finalize()) != self.sha256 {
+        if digest(&mut file)? != self.sha256 {
             return Err(Failure::InvalidConfiguration);
         }
         Ok(file)
+    }
+
+    /// The bootstrap the selected catalog provider prints for its arguments
+    /// (`--print-local-bootstrap`): no private channel and no credential, an
+    /// empty environment, bounded output and at most ten seconds. Its
+    /// configuration revision is checked again when the child starts, against
+    /// the bootstrap the child itself reports.
+    fn print_bootstrap(&self) -> Result<super::runtime::Bootstrap> {
+        use std::process::{Command, Stdio};
+        const LIMIT: u64 = 4 * 1024 * 1024;
+        let mut command = Command::new(&self.path);
+        command
+            .args(&self.args)
+            .arg("--print-local-bootstrap")
+            .env_clear()
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        #[cfg(windows)]
+        if let Some(root) = std::env::var_os("SystemRoot") {
+            command.env("SystemRoot", root);
+        }
+        let mut child = command.spawn().map_err(|_| Failure::InvalidConfiguration)?;
+        let stdout = child.stdout.take().ok_or(Failure::InvalidConfiguration)?;
+        let reader = std::thread::spawn(move || {
+            let mut printed = Vec::new();
+            stdout
+                .take(LIMIT + 1)
+                .read_to_end(&mut printed)
+                .map(|_| printed)
+        });
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let status = loop {
+            match child.try_wait() {
+                Ok(Some(status)) => break Some(status),
+                Ok(None) if std::time::Instant::now() < until => {
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                _ => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break None;
+                }
+            }
+        };
+        let printed = reader.join().map_err(|_| Failure::InvalidConfiguration)?;
+        match (status, printed) {
+            (Some(status), Ok(printed)) if status.success() && printed.len() as u64 <= LIMIT => {
+                serde_json::from_slice(&printed).map_err(|_| Failure::InvalidConfiguration)
+            }
+            _ => Err(Failure::InvalidConfiguration),
+        }
     }
 
     /// Admit the source path and return only a verified sealed snapshot. Hash
@@ -1475,8 +1808,8 @@ mod connector_instance_tests {
         }
         let table = "[connectors.kubernetes.instances.work]\n";
         let mut malformed = vec![
-            // Nothing derives an instance's fields yet: an instance without
-            // every pin the legacy entry requires is refused.
+            // Nothing derives this instance: no catalog provider is installed
+            // beside the test binary, and none ships Kubernetes.
             "[connectors.kubernetes]\nenabled=true\n[connectors.kubernetes.instances.work]\ndescription='unpinned'\n".to_owned(),
             valid.replace("enabled=true", "enabled=false"),
             valid.replace("enabled=true\n", ""),
@@ -1543,5 +1876,356 @@ mod connector_instance_tests {
             .selection()
             .read_only()
         );
+    }
+}
+
+// The fixtures write a POSIX shell provider.
+#[cfg(all(test, unix))]
+mod derived_instance_tests {
+    //! story:connector-instance-derived-fields: an instance of a catalog
+    //! connector that names nothing but itself loads to an entry whose
+    //! executable, arguments, revision and permissions the host derives from
+    //! the installed catalog provider and the bootstrap it prints.
+    use super::*;
+    use crate::local::runtime::{
+        Bootstrap, Effect, EntryField, PrivateProtocol, Profile, Requirement,
+    };
+    use std::os::unix::fs::PermissionsExt as _;
+
+    const INVALID: Option<Refusal> = Some(Refusal::Failure(Failure::InvalidConfiguration));
+    const GMAIL: &str = "[connectors.gmail]\nenabled=true\n[connectors.gmail.instances.private]\n";
+
+    /// The bootstrap of `instance`: the printed one has the read only, the one
+    /// a `connectors-private/2` child reports (`writes`) has the write too.
+    fn bootstrap(instance: &str, writes: bool) -> Bootstrap {
+        let ids: &[&str] = if writes {
+            &["users.messages.list", "users.drafts.create"]
+        } else {
+            &["users.messages.list"]
+        };
+        let operation = |id: &str| {
+            serde_json::json!({"id": id, "description": "Fictional operation",
+                "contract": "fixture/1", "profile": "google.oauth",
+                "input_schema": {"type": "object"}, "output_schema": {"type": "object"}})
+        };
+        Bootstrap {
+            instance: instance.into(),
+            adapter: "catalog".into(),
+            protocol: "v1alpha1".into(),
+            configuration_revision: "derived-revision-1".into(),
+            provider_authority: "fixture-authority".into(),
+            descriptor: serde_json::json!({
+                "version": "v1alpha1", "instance": instance, "adapter": "catalog",
+                "revision": "fixture-descriptor", "configuration_schema": {"type": "object"},
+                "operations": ids.iter().map(|id| operation(id)).collect::<Vec<_>>(),
+            })
+            .to_string(),
+            profiles: vec![Profile {
+                id: "google.oauth".into(),
+                revision: "fixture-profile".into(),
+                purpose: crate::local::registry::Purpose::DelegatedUser,
+                subject: crate::local::registry::Subject::User,
+                scheme: "http_bearer".into(),
+                capability: "http-bearer".into(),
+                minimum_scopes: BTreeSet::new(),
+                evidence_lifetime_ms: 60_000,
+                fields: vec![EntryField {
+                    name: "token".into(),
+                    label: "Fictional credential".into(),
+                    max_bytes: 100,
+                }],
+                acquisition: None,
+            }],
+            requirements: ids
+                .iter()
+                .map(|id| Requirement {
+                    operation: (*id).into(),
+                    profile: "google.oauth".into(),
+                    scopes: BTreeSet::new(),
+                    effect: if id.starts_with("users.drafts.") {
+                        Effect::Write
+                    } else {
+                        Effect::Read
+                    },
+                })
+                .collect(),
+        }
+    }
+
+    /// What a `connectors-private/2` child of `adapter` reports: the write
+    /// besides the read, under the printed instance and revision.
+    fn reported(adapter: &Adapter) -> Result<Bootstrap> {
+        let mut bootstrap = bootstrap(&adapter.instance_id, true);
+        bootstrap.configuration_revision = adapter.configuration_revision.clone();
+        Ok(bootstrap)
+    }
+
+    /// A configuration directory and a stand-in catalog provider that records
+    /// its arguments and prints `printed` (or exits 3 when `None`, as the real
+    /// provider does for a connector it does not ship). A shell script cannot
+    /// be started from a sealed snapshot, so its child's handshake is
+    /// `handshake`.
+    struct Fixture {
+        root: tempfile::TempDir,
+        provider: PathBuf,
+        handshake: fn(&Adapter) -> Result<Bootstrap>,
+    }
+
+    impl Fixture {
+        fn new(printed: Option<&str>) -> Self {
+            let root = tempfile::tempdir().unwrap();
+            let bin = root.path().join("bin");
+            std::fs::create_dir(&bin).unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o700)).unwrap();
+            let provider = bin.join("connectors-catalog-provider");
+            let printed_path = root.path().join("bootstrap.json");
+            let body = match printed {
+                Some(text) => {
+                    std::fs::write(&printed_path, text).unwrap();
+                    format!("cat '{}'", printed_path.display())
+                }
+                None => "exit 3".into(),
+            };
+            std::fs::write(
+                &provider,
+                format!(
+                    "#!/bin/sh\nprintf '%s\\n' \"$@\" >> '{}'\n{body}\n",
+                    root.path().join("args").display()
+                ),
+            )
+            .unwrap();
+            std::fs::set_permissions(&provider, std::fs::Permissions::from_mode(0o700)).unwrap();
+            Self {
+                root,
+                provider,
+                handshake: reported,
+            }
+        }
+
+        fn gmail(instance: &str) -> Self {
+            Self::new(Some(
+                &serde_json::to_string(&bootstrap(instance, false)).unwrap(),
+            ))
+        }
+
+        fn read(&self, body: &str) -> std::result::Result<Config, Refusal> {
+            self.read_from(body, Some(&self.provider))
+        }
+
+        fn read_from(
+            &self,
+            body: &str,
+            provider: Option<&Path>,
+        ) -> std::result::Result<Config, Refusal> {
+            let paths = Paths::resolve(
+                Some(&self.root.path().join("config/config.toml")),
+                Some(&self.root.path().join("state")),
+            )
+            .unwrap();
+            if !paths.config.exists() {
+                Config::initialize(&paths).unwrap();
+            }
+            std::fs::write(
+                &paths.config,
+                format!(
+                    "format='connectors-local/5'\nowner_uid={}\n{body}",
+                    fs::uid()
+                ),
+            )
+            .unwrap();
+            let installation = provider.map(|provider| Installation {
+                provider: provider.to_owned(),
+                handshake: self.handshake,
+            });
+            Config::read_with(&paths.config, installation.as_ref())
+        }
+
+        /// Every argument the provider was started with, one per line.
+        fn args(&self) -> String {
+            std::fs::read_to_string(self.root.path().join("args")).unwrap_or_default()
+        }
+
+        fn sha256(&self) -> String {
+            hex::encode(Sha256::digest(std::fs::read(&self.provider).unwrap()))
+        }
+    }
+
+    #[test]
+    fn an_unpinned_gmail_instance_loads_to_an_entry_derived_from_the_installed_provider() {
+        let fixture = Fixture::gmail("gmail.private");
+        let config = fixture.read(GMAIL).unwrap();
+        assert_eq!(
+            config.adapters.keys().collect::<Vec<_>>(),
+            ["gmail.private"]
+        );
+        let entry = &config.adapters["gmail.private"];
+        assert_eq!(entry.instance_id, "gmail.private");
+        assert_eq!(entry.adapter_id, "catalog");
+        assert_eq!(entry.configuration_revision, "derived-revision-1");
+        assert_eq!(entry.protocol, "v1alpha1");
+        assert_eq!(entry.private_protocol, Some(PrivateProtocol::V2));
+        assert!(matches!(entry.startup, Startup::OnDemand));
+        assert!(matches!(entry.restart, Restart::Never));
+        assert_eq!(
+            entry.executable,
+            Executable {
+                path: fixture.provider.clone(),
+                sha256: fixture.sha256(),
+                args: ["--connector", "gmail", "--instance", "private"]
+                    .map(str::to_owned)
+                    .to_vec(),
+            }
+        );
+        assert_eq!(
+            entry.permissions.profiles,
+            BTreeSet::from(["google.oauth".to_owned()])
+        );
+        assert_eq!(
+            entry.permissions.operations,
+            BTreeSet::from([
+                "users.drafts.create".to_owned(),
+                "users.messages.list".to_owned()
+            ])
+        );
+        // The revision is the provider's own, read from its bootstrap.
+        assert_eq!(
+            fixture.args(),
+            "--connector\ngmail\n--instance\nprivate\n--print-local-bootstrap\n"
+        );
+        let instance = &config.connectors.as_ref().unwrap()["gmail"].instances["private"];
+        assert_eq!(instance.alias, "gmail.private");
+        assert!(instance.derived);
+    }
+
+    /// An owner loads its configuration for every request: the provider is
+    /// asked once per file and arguments, and again once the file changed.
+    #[test]
+    fn a_derivation_is_reused_until_the_provider_file_changes() {
+        let fixture = Fixture::gmail("gmail.private");
+        let first = fixture.read(GMAIL).unwrap().adapters["gmail.private"].clone();
+        let again = fixture.read(GMAIL).unwrap().adapters["gmail.private"].clone();
+        assert_eq!(
+            serde_json::to_value(&again).unwrap(),
+            serde_json::to_value(&first).unwrap()
+        );
+        assert_eq!(fixture.args().matches("--print-local-bootstrap").count(), 1);
+        // Another endpoint is another selection.
+        let body = GMAIL.replace(
+            "instances.private]\n",
+            "instances.private]\nendpoint='https://mail.example.test'\n",
+        );
+        fixture.read(&body).unwrap();
+        assert_eq!(fixture.args().matches("--print-local-bootstrap").count(), 2);
+        // The same path, rewritten: derived again, with the new digest.
+        let script = std::fs::read_to_string(&fixture.provider).unwrap();
+        std::fs::write(&fixture.provider, format!("{script}# rewritten\n")).unwrap();
+        let rewritten = fixture.read(GMAIL).unwrap().adapters["gmail.private"].clone();
+        assert_eq!(fixture.args().matches("--print-local-bootstrap").count(), 3);
+        assert_eq!(rewritten.executable.sha256, fixture.sha256());
+        assert_ne!(rewritten.executable.sha256, first.executable.sha256);
+    }
+
+    #[test]
+    fn an_endpoint_is_passed_to_the_provider_and_digested_by_it() {
+        let fixture = Fixture::gmail("gmail.private");
+        let body = GMAIL.replace(
+            "instances.private]\n",
+            "instances.private]\nendpoint='https://mail.example.test'\ndescription='personal mailbox'\n",
+        );
+        let config = fixture.read(&body).unwrap();
+        assert_eq!(
+            config.adapters["gmail.private"].executable.args,
+            [
+                "--connector",
+                "gmail",
+                "--instance",
+                "private",
+                "--endpoint",
+                "https://mail.example.test"
+            ]
+        );
+    }
+
+    #[test]
+    fn an_unpinned_instance_is_refused_when_nothing_derives_it() {
+        let fixture = Fixture::gmail("gmail.private");
+        // No provider installed.
+        assert_eq!(fixture.read_from(GMAIL, None).err(), INVALID);
+        assert_eq!(
+            fixture
+                .read_from(GMAIL, Some(&fixture.root.path().join("bin/absent")))
+                .err(),
+            INVALID
+        );
+        // A connector the provider does not ship (Slack, Kubernetes, MCP, SQL)
+        // keeps its pins: the provider refuses it, and so does the host.
+        let unshipped = Fixture::new(None);
+        let slack = "[connectors.slack]\nenabled=true\n[connectors.slack.instances.bot]\n";
+        assert_eq!(unshipped.read(slack).err(), INVALID);
+        // A bootstrap for another instance, or not a bootstrap at all.
+        assert_eq!(Fixture::gmail("gmail.work").read(GMAIL).err(), INVALID);
+        assert_eq!(Fixture::new(Some("{}")).read(GMAIL).err(), INVALID);
+        // A child that does not start, or reports another revision or
+        // instance than the provider printed.
+        for handshake in [
+            (|_| Err(Failure::InvalidConfiguration)) as fn(&Adapter) -> Result<Bootstrap>,
+            |adapter| {
+                let mut bootstrap = reported(adapter)?;
+                bootstrap.configuration_revision = "another-revision".into();
+                Ok(bootstrap)
+            },
+            |adapter| reported(adapter).map(|_| bootstrap("gmail.work", true)),
+        ] {
+            let mut refused = Fixture::gmail("gmail.private");
+            refused.handshake = handshake;
+            assert_eq!(refused.read(GMAIL).err(), INVALID);
+        }
+        // A provider whose content or mode the host does not admit.
+        let writable = Fixture::gmail("gmail.private");
+        std::fs::set_permissions(&writable.provider, std::fs::Permissions::from_mode(0o722))
+            .unwrap();
+        assert_eq!(writable.read(GMAIL).err(), INVALID);
+        // The id `<connector>.<instance>` stays unambiguous: neither name
+        // carries a `.`.
+        for body in [
+            GMAIL.replace("instances.private", "instances.'pri.vate'"),
+            GMAIL.replace("connectors.gmail", "connectors.'gm.ail'"),
+        ] {
+            assert_eq!(fixture.read(&body).err(), INVALID, "{body}");
+        }
+        // The derived alias and instance id are taken by a legacy entry.
+        let legacy = "[adapters.'gmail.private']\ninstance_id='other'\nadapter_id='catalog'\nconfiguration_revision='cfg-1'\nprotocol='v1alpha1'\nprivate_protocol='connectors-private/2'\n[adapters.'gmail.private'.executable]\npath='/opt/connectors/bin/connectors-catalog-provider'\nsha256='1111111111111111111111111111111111111111111111111111111111111111'\n";
+        assert_eq!(fixture.read(&format!("{legacy}{GMAIL}")).err(), INVALID);
+        let same_id = legacy
+            .replace("'gmail.private'", "gmail-read")
+            .replace("instance_id='other'", "instance_id='gmail.private'");
+        assert_eq!(fixture.read(&format!("{same_id}{GMAIL}")).err(), INVALID);
+        // Some pins but not all is neither pinned nor derived.
+        let partial = GMAIL.replace(
+            "instances.private]\n",
+            "instances.private]\nadapter_id='catalog'\n",
+        );
+        assert_eq!(fixture.read(&partial).err(), INVALID);
+    }
+
+    #[test]
+    fn a_derived_instance_is_written_back_without_pins() {
+        let fixture = Fixture::gmail("gmail.private");
+        let body = GMAIL.replace(
+            "instances.private]\n",
+            "instances.private]\ndescription='personal mailbox'\n",
+        );
+        let config = fixture.read(&body).unwrap();
+        let text = toml::to_string(&config).unwrap();
+        let written: toml::Value = toml::from_str(&text).unwrap();
+        assert_eq!(
+            written["connectors"]["gmail"]["instances"]["private"],
+            toml::Value::Table(toml::map::Map::from_iter([(
+                "description".to_owned(),
+                toml::Value::String("personal mailbox".into())
+            )])),
+            "{text}"
+        );
+        assert!(written["adapters"].as_table().unwrap().is_empty(), "{text}");
     }
 }
