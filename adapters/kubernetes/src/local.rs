@@ -278,6 +278,7 @@ impl Local {
         let full = adapter.descriptor();
         let requirement = |o: &connectors_core::Operation| Requirement {
             operation: o.id.clone(),
+            custody: false,
             profile: profile_id.into(),
             scopes: BTreeSet::new(),
             effect: match o.id.as_str() {

@@ -187,7 +187,7 @@ pub(in crate::local::owner) fn execute(
         }
         // A created credential that could not be held is foreseeable here,
         // before any provider work.
-        if let Some(target) = super::custody::target(&current.adapter, request.operation) {
+        if let Some(target) = super::custody::expected(&current.adapter.permissions, requirement)? {
             super::custody::admit(paths, target)?;
         }
         let registry = registry::Registry::with_system_clock(&paths.state);
@@ -257,6 +257,10 @@ pub(in crate::local::owner) fn execute(
         let clock = time(&current, until)?;
         let final_current = issuance::resolve(paths, alias, request, until)?;
         unchanged(&current, &final_current)?;
+        // The commit expects created bytes exactly as the configuration it
+        // runs under and the adapter agree, whatever changed since admission.
+        let custody_target =
+            super::custody::expected(&final_current.adapter.permissions, requirement)?.cloned();
         Ok((
             evidence,
             final_current,
@@ -265,33 +269,35 @@ pub(in crate::local::owner) fn execute(
             native,
             audit,
             facts,
+            custody_target,
         ))
     })();
-    let (evidence, current, clock, mut connection_use, native, audit, facts) = match initial {
-        Ok(value) => value,
-        Err(error) => {
-            let observed = observe_as(
-                paths,
-                alias,
-                request,
-                key,
-                until,
-                &request_id,
-                audit_reference.as_ref(),
-            );
-            if let Ok(Some(existing)) = observed {
-                return Ok(existing);
+    let (evidence, current, clock, mut connection_use, native, audit, facts, custody_target) =
+        match initial {
+            Ok(value) => value,
+            Err(error) => {
+                let observed = observe_as(
+                    paths,
+                    alias,
+                    request,
+                    key,
+                    until,
+                    &request_id,
+                    audit_reference.as_ref(),
+                );
+                if let Ok(Some(existing)) = observed {
+                    return Ok(existing);
+                }
+                let mut value = failure(&first, &request_id, Classification::NotAttempted, error);
+                if let Some(reference) = audit_reference {
+                    finish_audit(&audits, reference, &mut value, until);
+                }
+                // Current disclosure may be revoked while native preflight runs.
+                // Complete our admitted audit before propagating that refusal.
+                observed?;
+                return Ok(value);
             }
-            let mut value = failure(&first, &request_id, Classification::NotAttempted, error);
-            if let Some(reference) = audit_reference {
-                finish_audit(&audits, reference, &mut value, until);
-            }
-            // Current disclosure may be revoked while native preflight runs.
-            // Complete our admitted audit before propagating that refusal.
-            observed?;
-            return Ok(value);
-        }
-    };
+        };
     let reference = audit_reference.ok_or(Code::MetadataUnavailable)?;
     let leases: Result<_, Failure> = (|| {
         let ledger = store(paths, ClockRef(&clock))?;
@@ -470,7 +476,6 @@ pub(in crate::local::owner) fn execute(
                 .map(|_| ())
                 .map_err(|_| Code::OutcomeUnknown.into())
         });
-    let custody_target = super::custody::target(&current.adapter, request.operation).cloned();
     let (native_result, created) = if final_check.is_err() {
         let _ = native.cancel();
         (

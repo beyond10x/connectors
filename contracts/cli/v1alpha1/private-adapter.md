@@ -39,7 +39,9 @@ and permission checks. The first generic registry admits only its already
 supported credential-bearing static-entry subset.
 
 Operation declarations bind exact descriptor ids to one selected profile, required
-native scopes and an authored effect classification. Unknown or writing operations
+native scopes and an authored effect classification, and mark a write whose answer
+carries a credential it created (`custody`), which the owner sends only under a
+configured custody target. Unknown or writing operations
 refuse until their approval/audit/dispatch binding is available. Host policy,
 profile minimums, operation scope requirements and native target permission all
 remain separate checks. Business adapters receive a fixed authenticated

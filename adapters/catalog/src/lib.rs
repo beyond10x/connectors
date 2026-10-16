@@ -1442,6 +1442,15 @@ impl Engine {
         declarations
     }
 
+    /// Whether `id` is a write whose selection declares custody: its answer
+    /// carries a credential it created, which the owner holds only under a
+    /// custody target configured for it (design §8a).
+    pub fn declares_custody(&self, id: &str) -> bool {
+        self.exposed
+            .iter()
+            .any(|e| e.selection.id == id && e.selection.custody.is_some())
+    }
+
     pub fn effect(&self, id: &str) -> Option<Effect> {
         if self.feed.is_some() && [feed::CONTAINERS, feed::ITEMS].contains(&id) {
             return Some(Effect::Read);

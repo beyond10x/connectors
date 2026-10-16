@@ -11,12 +11,22 @@ use crate::local::{config::CustodyTarget, keyring::custody, registry, runtime};
 use connectors_sdk::Secret;
 use std::sync::Weak;
 
-/// The custody target the configuration names for `operation`, if any.
-pub(super) fn target<'a>(
-    adapter: &'a crate::local::config::Adapter,
-    operation: &str,
-) -> Option<&'a CustodyTarget> {
-    adapter.permissions.custody.get(operation)
+/// The custody target `requirement`'s write is sent under, decided before any
+/// provider work. The adapter declares whether the operation creates a
+/// credential (`Requirement::custody`); the configuration names its target.
+/// Where they disagree the write is refused `invalid_configuration`, nothing
+/// sent: a created credential with no target could be held nowhere and named
+/// by no hash, and a target for an operation that creates none would fault an
+/// applied write.
+pub(super) fn expected<'a>(
+    permissions: &'a crate::local::config::Permissions,
+    requirement: &runtime::Requirement,
+) -> Result<Option<&'a CustodyTarget>, Error> {
+    let target = permissions.custody.get(&requirement.operation);
+    if target.is_some() != requirement.custody {
+        return Err(Code::InvalidConfiguration.into());
+    }
+    Ok(target)
 }
 
 /// Before any provider work: the target alias is configured, grants the
@@ -201,6 +211,44 @@ mod tests {
         assert!(document.0.capacity() >= document.0.len());
         for refused in [b"".to_vec(), vec![b'a'; 33], vec![0xff]] {
             assert!(super::document(&field, &Secret(refused)).is_err());
+        }
+    }
+
+    fn requirement(custody: bool) -> runtime::Requirement {
+        runtime::Requirement {
+            operation: "key.create".into(),
+            custody,
+            profile: "fixture.management".into(),
+            scopes: Default::default(),
+            effect: runtime::Effect::Write,
+        }
+    }
+
+    /// Design §8a, "Admit": the adapter's custody declaration and the owner's
+    /// custody table agree before anything is sent; either mismatch is
+    /// refused by name as the host's own, so no created credential is lost.
+    #[test]
+    fn a_custody_declaration_and_the_custody_table_must_agree_before_a_write_is_sent() {
+        let target = CustodyTarget {
+            adapter: "minted".into(),
+            profile: "fixture.key".into(),
+        };
+        let mut configured = crate::local::config::Permissions::default();
+        configured
+            .custody
+            .insert("key.create".into(), target.clone());
+        let unconfigured = crate::local::config::Permissions::default();
+
+        assert_eq!(
+            expected(&configured, &requirement(true)).unwrap(),
+            Some(&target)
+        );
+        assert_eq!(expected(&unconfigured, &requirement(false)).unwrap(), None);
+        for (permissions, declared) in [(&unconfigured, true), (&configured, false)] {
+            let refused = expected(permissions, &requirement(declared))
+                .expect_err("a custody mismatch is refused before the write is sent");
+            assert_eq!(refused.code, Code::InvalidConfiguration);
+            assert_eq!(refused.origin, Origin::Host);
         }
     }
 }

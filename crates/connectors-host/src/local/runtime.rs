@@ -511,6 +511,13 @@ pub enum Effect {
 #[serde(deny_unknown_fields)]
 pub struct Requirement {
     pub operation: String,
+    /// The operation is a write whose answer carries a credential it created
+    /// (`connectors.mutations.CredentialCustody`): the owner sends it only
+    /// with a custody target configured for it, and expects the bytes in the
+    /// protected slot of its `write_result`. Omitted when false, so a
+    /// bootstrap without it keeps its bytes.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub custody: bool,
     pub profile: String,
     pub scopes: BTreeSet<String>,
     pub effect: Effect,

@@ -300,6 +300,25 @@ async fn a_custody_write_is_never_sent_through_the_path_that_would_return_its_an
     assert!(sent.lock().unwrap().is_empty());
 }
 
+/// The engine names the operations that create a credential, so the child's
+/// bootstrap can tell the owner, which refuses one with no custody target
+/// before it is sent (design §8a, "Admit").
+#[test]
+fn the_engine_names_exactly_the_operations_that_declare_custody() {
+    let list = selection(json!({"id": "key.list", "operation_id": "listKeys", "effect": "read"}));
+    let engine = engine(&[create(custody()), list]).unwrap();
+    assert!(engine.declares_custody("key.create"));
+    assert!(!engine.declares_custody("key.list"));
+    assert!(!engine.declares_custody("key.absent"));
+    let plain =
+        selection(json!({"id": "key.create", "operation_id": "createKey", "effect": "write"}));
+    assert!(
+        !self::engine(&[plain])
+            .unwrap()
+            .declares_custody("key.create")
+    );
+}
+
 #[tokio::test]
 async fn a_write_without_custody_holds_no_secret() {
     let plain =
