@@ -22,7 +22,7 @@ one GET through a saved connection:
 | `logs.query_metric` | a LogQL metric query, instant or with a step |
 | `logs.labels` | label names, or one label's values |
 
-A connection uses the bearer profile `loki.bearer`. Connect, repair and `connections revalidate`
+A connection uses the bearer profile `loki.bearer`. Connect, reconnect and `connections revalidate`
 prove the token with `GET /loki/api/v1/labels`; Loki names no account, so the identity is the
 configured connection. The configuration is HTTPS-only, with an optional private CA file.
 

@@ -19,6 +19,9 @@
 //!
 //! `provenance` writes `.well-known/b10x-site.json` and the route inventory
 //! `.well-known/b10x-routes.json` into a built site ([`routes`]).
+//!
+//! `vocabulary` checks that the given files speak the connector vocabulary `README.md` defines
+//! ([`vocabulary`]).
 
 mod cli;
 mod crates;
@@ -27,6 +30,7 @@ mod pages;
 mod reference;
 mod routes;
 mod status;
+mod vocabulary;
 
 use std::{
     collections::BTreeMap,
@@ -77,6 +81,23 @@ enum Action {
         /// The full Git revision the site was built from.
         #[arg(long)]
         commit: String,
+    },
+    /// Fail when a file says "adapter" for the configured thing, defines a term outside
+    /// `README.md`, or (README.md, AGENTS.md) does not define or link the vocabulary.
+    Vocabulary {
+        /// Also fail on a pinned value a user would copy by hand: `configuration_revision`,
+        /// `sha256` or `bundle_directory`.
+        #[arg(long)]
+        no_pins: bool,
+        /// Also fail when more than one `[connectors.<c>.instances.<i>]` table is shown.
+        #[arg(long)]
+        one_instance: bool,
+        /// Repository root, whose `README.md` and `AGENTS.md` define and link the terms.
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        /// The files to check.
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
     },
 }
 
@@ -210,6 +231,28 @@ fn main() -> ExitCode {
         }),
         Action::Provenance { site, commit } => write_provenance(&site, &commit)
             .map(|()| println!("{}: bound to {commit}", site.display())),
+        Action::Vocabulary {
+            no_pins,
+            one_instance,
+            root,
+            files,
+        } => {
+            let options = vocabulary::Options {
+                no_pins,
+                one_instance,
+            };
+            vocabulary::check(&root, &files, options).and_then(|problems| {
+                if problems.is_empty() {
+                    println!("{} files: vocabulary checked", files.len());
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "files do not speak the connector vocabulary (README.md#vocabulary):\n  {}",
+                        problems.join("\n  ")
+                    ))
+                }
+            })
+        }
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,

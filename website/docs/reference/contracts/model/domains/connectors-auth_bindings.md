@@ -253,6 +253,7 @@ stateDiagram-v2
     Live --> Live: publish (PublishBinding)
     Stale --> Live: publish (PublishBinding)
     Live --> Stale: mark_stale (MarkConnectionStale)
+    Stale --> Stale: record_candidate (RecordConnectionCandidate)
     Live --> Revoked: revoke (RevokeConnection)
     Stale --> Revoked: revoke (RevokeConnection)
     Revoked --> [*]
@@ -262,6 +263,7 @@ Each move is taken by a declared command outcome, and a move nothing takes is re
 
 - `publish` — taken by `connectors.auth_bindings.PublishBinding` on its `published` outcome
 - `mark_stale` — taken by `connectors.auth_bindings.MarkConnectionStale` on its `marked-stale` outcome
+- `record_candidate` — taken by `connectors.auth_bindings.RecordConnectionCandidate` on its `candidate-recorded` outcome
 - `revoke` — taken by `connectors.auth_bindings.RevokeConnection` on its `revoked` outcome
 
 An instance is brought into existence by `connectors.auth_bindings.AllocateConnection` on its `allocated` outcome.
@@ -739,6 +741,21 @@ It has two outcomes.
 
 **`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.auth_bindings.Acquisition` in `Completed`, `Expired`, `Failed` and `Pending`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.auth_bindings.AcquisitionStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
 
+### `RecordConnectionCandidate`
+
+`connectors.auth_bindings.RecordConnectionCandidate`.
+
+It takes:
+
+- `connection_ref` — `String`
+- `candidate_custody_version_ref` — `String`
+
+It has two outcomes.
+
+**`candidate-recorded`** — The default branch, taken when no other outcome's condition matched. It moves a `connectors.auth_bindings.Connection` from `Stale` to `Stale`, along the declared move `record_candidate`. The instance is the one named by the input field `connection_ref`. It emits `connectors.auth_bindings.ConnectionCandidateRecorded`. A test reaches it by constructing an input that satisfies no other outcome's condition.
+
+**`wrong-state`** — Taken when the subject is resting in a state none of this command's moves start from — a `connectors.auth_bindings.Connection` in `Live` and `Revoked`, which is what is left of the lifecycle once this command's own moves are taken away. The document lists none of it. No entity in this specification changes. It reports `connectors.auth_bindings.ConnectionStateConflict`, carrying `state`. It emits nothing. A test reaches it by driving an instance into one of those states and then issuing the command, because no input selects this branch.
+
 ### `RecordCustodyVersion`
 
 `connectors.auth_bindings.RecordCustodyVersion`.
@@ -912,6 +929,19 @@ Emitted by `connectors.auth_bindings.AllocateConnection` on its `allocated` outc
 
 Nothing in this system reacts to it.
 
+### `ConnectionCandidateRecorded`
+
+`connectors.auth_bindings.ConnectionCandidateRecorded`.
+
+It carries:
+
+- `connection_ref` — `String`
+- `candidate_custody_version_ref` — `String`
+
+Emitted by `connectors.auth_bindings.RecordConnectionCandidate` on its `candidate-recorded` outcome.
+
+Nothing in this system reacts to it.
+
 ### `ConnectionMarkedStale`
 
 `connectors.auth_bindings.ConnectionMarkedStale`.
@@ -1045,6 +1075,8 @@ Reported by `connectors.auth_bindings.MarkConnectionStale` on its `wrong-state` 
 
 Reported by `connectors.auth_bindings.PublishBinding` on its `wrong-state` outcome.
 
+Reported by `connectors.auth_bindings.RecordConnectionCandidate` on its `wrong-state` outcome.
+
 Reported by `connectors.auth_bindings.RevokeConnection` on its `wrong-state` outcome.
 
 ### `CustodyStateConflict`
@@ -1141,9 +1173,9 @@ An actor is who may ask this context for something. Every grant below points at 
 
 `connectors.auth_bindings.LocalHost`.
 
-It may invoke [`AcknowledgeCustodyDeletion`](#acknowledgecustodydeletion), [`AcknowledgeCustodyWrite`](#acknowledgecustodywrite), [`AllocateConnection`](#allocateconnection), [`BeginAcquisition`](#beginacquisition), [`CompleteAcquisition`](#completeacquisition), [`ConsumeAcquisition`](#consumeacquisition), [`ExpireAcquisition`](#expireacquisition), [`FailAcquisition`](#failacquisition), [`InvalidateCustodyVersion`](#invalidatecustodyversion), [`MarkConnectionStale`](#markconnectionstale), [`PublishBinding`](#publishbinding), [`RecordAcquisitionCandidate`](#recordacquisitioncandidate), [`RecordCustodyVersion`](#recordcustodyversion), [`RecordProfile`](#recordprofile), [`RetireCustodyVersion`](#retirecustodyversion) and [`RevokeConnection`](#revokeconnection).
+It may invoke [`AcknowledgeCustodyDeletion`](#acknowledgecustodydeletion), [`AcknowledgeCustodyWrite`](#acknowledgecustodywrite), [`AllocateConnection`](#allocateconnection), [`BeginAcquisition`](#beginacquisition), [`CompleteAcquisition`](#completeacquisition), [`ConsumeAcquisition`](#consumeacquisition), [`ExpireAcquisition`](#expireacquisition), [`FailAcquisition`](#failacquisition), [`InvalidateCustodyVersion`](#invalidatecustodyversion), [`MarkConnectionStale`](#markconnectionstale), [`PublishBinding`](#publishbinding), [`RecordAcquisitionCandidate`](#recordacquisitioncandidate), [`RecordConnectionCandidate`](#recordconnectioncandidate), [`RecordCustodyVersion`](#recordcustodyversion), [`RecordProfile`](#recordprofile), [`RetireCustodyVersion`](#retirecustodyversion) and [`RevokeConnection`](#revokeconnection).
 
 
 ---
 
-Generated from connectors v1 · model digest `1958f0985ef4bf6a6f5c024113d267c487fc9d35de321f315e392b36abad4a0e` · contract digest `slice-sha256/2:77ae766813c8d8ebb0f67dc43ae519756517e4d7cc14e07c74d30e04f89abda1`. Do not edit this file; change the specification and regenerate it with `ess generate`.
+Generated from connectors v1 · model digest `737603f7c453c76dd715857e8e4cfd6267200a83d1c946c880f73ae1a7207a88` · contract digest `slice-sha256/2:74c3d4e7fd47ee3689dc9dcea2dc189e2ea88b3d2c8d9f17c7fb5ecf06e7f438`. Do not edit this file; change the specification and regenerate it with `ess generate`.

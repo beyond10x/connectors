@@ -1,17 +1,21 @@
 ---
 title: Set up the local CLI
 sidebar_position: 2
-description: Create the local CLI's private configuration and metadata store, and check its prerequisites before adding an adapter.
-lede: setup init creates a private configuration and an Entity Runtime metadata store; setup check says whether this machine can hold credentials before anything asks for one.
-source: apps/connectors/tests/local_cli.rs, crates/connectors-host/tests/local_foundation.rs, contracts/cli/v1alpha1/semantics.md, docs/local-mounted-secret-custody.md, docs/local-container.md
+description: Create the local CLI's private configuration and metadata store, check its prerequisites and configure the instances you will connect.
+lede: setup init creates a private configuration and an Entity Runtime metadata store; setup check says whether this machine can hold credentials before anything asks for one, and an instance needs only a name.
+source: apps/connectors/tests/local_cli.rs, apps/connectors/tests/derived_instance.rs, crates/connectors-host/tests/local_foundation.rs, crates/connectors-host/src/local/config.rs, contracts/cli/v1alpha1/semantics.md, docs/local-mounted-secret-custody.md, docs/local-container.md
 ---
 
 # Set up the local CLI
 
-The grouped `connectors` commands (`setup`, `adapters`, `connections`, `operations`, `approvals`)
-work through a local owner process, a private TOML configuration and a metadata store. This guide
-creates both in a scratch directory and checks the machine's prerequisites. It needs no adapter
-and no credential. Run it from `target/try` as in [Getting started](../getting-started.md).
+The grouped `connectors` commands (`setup`, `instances`, `connections`, `operations`,
+`approvals`) work through a local owner process, a private TOML configuration and a metadata
+store. This guide creates both in a scratch directory, checks the machine's prerequisites and
+configures two instances. It needs no credential and contacts no provider. Run it from
+`target/try` as in [Getting started](../getting-started.md), after
+`cargo build --locked -p connectors -p connectors-catalog-provider`. The words connector,
+instance and connection are those of the
+[README vocabulary](https://github.com/beyond10x/connectors#vocabulary).
 
 ## Create the configuration and the store
 
@@ -24,7 +28,7 @@ and no credential. Run it from `target/try` as in [Getting started](../getting-s
 ```
 
 ```json
-{"error":{"code":"failure","data":{"code":"invalid_configuration","kind":"usage","next_action":"check_configuration","stage":"configuration"}},"ok":false}
+{"error":{"code":"failure","data":{"code":"invalid_configuration","configuration_rule":"config_path_unresolved","kind":"usage","next_action":"check_configuration","stage":"configuration"}},"ok":false}
 ```
 
 With absolute paths it creates them. The answer also names both paths; `jq` keeps the rest:
@@ -40,18 +44,6 @@ With absolute paths it creates them. The answer also names both paths; `jq` keep
   "disposition": "created",
   "os": "linux"
 }
-```
-
-```sh
-cat cli/config.toml
-```
-
-```toml
-# Linux Secret Service custody is required; credentials never belong here.
-format = "connectors-local/2"
-owner_uid = 1000
-
-[adapters]
 ```
 
 The configuration names its owner and no credential. The state directory holds the metadata
@@ -84,11 +76,12 @@ the whole store, so an edit that bypasses SQLite is refused by the next command.
 `setup check` authenticates nowhere. `keyring` is the Linux Secret Service that will hold saved
 credentials; a machine without one cannot save a connection, and the check says so before any
 connect asks for a credential. `custody_backend` names the store custody uses, fixed when the
-binary is built: `secret_service` on Linux. The `macos_keychain` and `windows_credential_manager`
-bindings exist, but the CLI does not yet run on macOS or Windows.
+binary is built: `secret_service` on Linux, `macos_keychain` on macOS and
+`windows_credential_manager` on Windows.
 
-A headless host or a container has no Secret Service. There, a `connectors-local/4`
-configuration can select the read-only `mounted_secret` binding with a `[custody]` table: it
+A headless host or a container has no Secret Service. There, a `connectors-local/4` or
+`connectors-local/5` configuration can select the read-only `mounted_secret` binding with a
+`[custody]` table: it
 reads each credential from a read-only mounted directory, such as a Kubernetes Secret volume,
 and writes nothing. It is never chosen on its own; without the table an unusable Secret Service
 still refuses with `custody_unavailable`. Under it `setup check` reports
@@ -98,15 +91,58 @@ describes the binding and its threat model, and
 [running in a container](https://github.com/beyond10x/connectors/blob/main/docs/local-container.md)
 the setup, with a CronJob example.
 
-## Nothing is configured yet
+## Configure instances
+
+`setup init` writes the older `connectors-local/2` format, with an empty legacy table for
+pinned entries. Replace its content with a `connectors-local/5` configuration that enables the
+connectors you use and names an instance of each:
 
 ```sh
-../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
-  --output json adapters list
+cat > cli/config.toml <<EOF
+format = "connectors-local/5"
+owner_uid = $(id -u)
+default_instance = "gitlab/work"
+
+[connectors.gmail]
+enabled = true
+
+[connectors.gmail.instances.private]
+description = "personal mailbox"
+
+[connectors.gitlab]
+enabled = true
+
+[connectors.gitlab.instances.work]
+endpoint = "https://gitlab.example.com"
+EOF
+```
+
+`gmail/private` uses Gmail's default endpoint; `gitlab/work` names a self-hosted GitLab host.
+Neither pins anything else: `connectors` derives each instance from the
+`connectors-catalog-provider` in its own directory and the connector declaration shipped with it,
+which give the executable and its SHA-256, the configuration revision and every operation. A
+connector that declares more than one auth profile (Zendesk) also takes `profile` on the
+instance. `default_instance` selects an instance for a command that names none.
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" instances list
 ```
 
 ```json
-{"ok":true,"result":{"adapters":[],"source":"configuration"}}
+{"adapters":[{"adapter":"gitlab.work","adapter_id":"catalog","connector":"gitlab","instance":"work","instance_id":"gitlab.work","restart":"never","startup":"on-demand"},{"adapter":"gmail.private","adapter_id":"catalog","connector":"gmail","instance":"private","instance_id":"gmail.private","restart":"never","startup":"on-demand"}],"source":"configuration"}
+```
+
+The result also carries each instance's legacy `adapter` alias and its internal `adapter_id`,
+kept for the deprecation window. A command that acts on one instance names it with `--connector`
+and `--instance`; no connection exists yet:
+
+```sh
+../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
+  connections list --connector gitlab --instance work
+```
+
+```json
+{"connections":[],"observed_at_ms":1792181808006,"source":"authority","stale":false,"valid_until_ms":1792182108006}
 ```
 
 `setup init` never overwrites:
@@ -119,6 +155,10 @@ the setup, with a CronJob example.
 ```json
 {"error":{"code":"failure","data":{"code":"configuration_exists","kind":"operational","next_action":"check_configuration","stage":"configuration"}},"ok":false}
 ```
+
+A configuration with legacy pinned entries keeps working, and `setup migrate` moves them to
+instances; the [README](https://github.com/beyond10x/connectors#move-a-legacy-configuration)
+shows it.
 
 ## Binaries of different versions and one state directory
 
@@ -153,29 +193,21 @@ configuration unchanged:
 ```
 
 It then connects in that state directory, passing the same `--state-dir` to `connections connect`
-and to every later command, as the provider guides below show. A connection is recorded in the
-state directory it was made in: connections, list cursors, approvals and cached adapter
+and to every later command, as the connector guides below show. A connection is recorded in the
+state directory it was made in: connections, list cursors, approvals and cached instance
 descriptions in another state directory do not carry over, so the pinned consumer connects once
 more there.
 
 ## After an upgrade
 
-The owner is the background `connectors` process that serves a state directory. An owner the
-previous binary started keeps running after an upgrade, and every command that needs it is
-refused with `next_action` `stop_owner`, here `adapters status` for a configured adapter entry
-`forge`:
-
-```sh
-../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
-  --output json adapters status --adapter forge
-```
-
-```json
-{"error":{"code":"failure","data":{"code":"owner_build_mismatch","kind":"operational","next_action":"stop_owner","stage":"readiness"}},"ok":false}
-```
+The owner is the background `connectors` process that serves a state directory; a connect or an
+invoke starts it. An owner the previous binary started keeps running after an upgrade, and every
+command that needs it is refused with code `owner_build_mismatch` at stage `readiness`, with
+`next_action` `stop_owner` and exit status 1
+(`apps/connectors/tests/local_cli.rs`, `a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running`).
 
 `setup owner-stop` asks that owner, whatever binary started it, to drain and exit, and waits up
-to 30 seconds for it:
+to 30 seconds for it. Here no owner runs, since nothing has connected:
 
 ```sh
 ../debug/connectors --config "$PWD/cli/config.toml" --state-dir "$PWD/cli/state" \
@@ -185,24 +217,23 @@ to 30 seconds for it:
 ```json
 {
   "ok": true,
-  "disposition": "stopped"
+  "disposition": "no_owner"
 }
 ```
 
-The result also names the `host_incarnation` that exited. The next command that needs an owner
-starts one from the current binary. With no owner running, the same command answers
-`"disposition": "no_owner"` and exits 0, and it never starts an owner. It sends the owner's own
-shutdown request over the state directory's socket and never signals a process. An owner that holds
+With no owner running it answers `no_owner`, exits 0 and never starts one. With one, it answers
+`"disposition": "stopped"` and names the `host_incarnation` that exited; the next command that
+needs an owner starts one from the current binary. It sends the owner's own shutdown request over
+the state directory's socket and never signals a process. An owner that holds
 the state directory but does not answer within the 30 seconds is refused as `unavailable`; one
 that is still running at the bound is refused as `timeout`; and a state directory, socket or lock
 file of another user is refused as `forbidden`, each at stage `stop`.
 
 ## Next
 
-An adapter entry under `[adapters]` names its executable, the digest of that executable and the
-configuration revision it serves; `connections connect` then validates a credential and saves it
-in custody. The repository's guides walk through one provider each, with the exact
-configuration:
+`connections connect --connector <connector> --instance <instance>` validates a credential
+through the instance's auth profile and saves it in custody; each instance holds one connection.
+The repository's guides walk through one connector each:
 
 - [GitLab through the catalog provider](https://github.com/beyond10x/connectors/blob/main/docs/local-catalog-provider.md)
 - [Kubernetes through the local CLI](https://github.com/beyond10x/connectors/blob/main/docs/local-kubernetes-cli.md)
