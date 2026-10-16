@@ -3,23 +3,27 @@ title: The catalog provider
 sidebar_position: 3
 description: How one engine serves ordinary HTTP APIs from pinned API documents, with writes guarded by checks declared as data.
 lede: The catalog provider turns a pinned API document and a reviewed selection into operations, with no Rust per endpoint; adding an endpoint changes data, not code.
-source: adapters/catalog/src/lib.rs, adapters/catalog/tests/engine.rs, adapters/catalog/tests/shipped.rs, adapters/catalog/tests/binary_responses.rs, docs/local-catalog-provider.md, contracts/catalog/v1alpha1/semantics.md
+source: adapters/catalog/src/lib.rs, adapters/catalog/providers/gitlab/connector.json, adapters/catalog/tests/engine.rs, adapters/catalog/tests/shipped.rs, adapters/catalog/tests/binary_responses.rs, docs/local-catalog-provider.md, contracts/catalog/v1alpha1/semantics.md
 ---
 
 # The catalog provider
 
-`connectors-catalog-provider` is one executable that serves many HTTP APIs. Three inputs decide
-what it does:
+`connectors-catalog-provider` is one executable that serves the connectors of many HTTP APIs.
+Four inputs decide what it does:
 
 1. **A bundle**, compiled from a pinned API document by `connectors-build catalog`. It carries the
    document's whole operation inventory and its SHA-256, and building it again gives the same
    bytes ([build a catalog bundle](../guides/build-a-catalog-bundle.md)).
-2. **A selection set**, reviewed and shipped per provider under
-   `adapters/catalog/providers/<provider>/operations.json`. Each entry exposes one source
+2. **A selection set**, reviewed and shipped per connector under
+   `adapters/catalog/providers/<catalog provider>/operations.json`. Each entry exposes one source
    operation under a local id (`issues.list`, `merge_request.merge`) with its effect (read or
    write) and, for a write, an optional guard.
-3. **A local configuration** naming the bundle, the API base, the authentication profile and the
-   selection, with every credential kept out of it.
+3. **A connector declaration**, `connector.json` beside the selection: the connector's name, its
+   provider, its default endpoint, the auth profiles it declares and the selection it serves.
+   Every catalog connector but Slack ships one.
+4. **An instance** of that connector in the local configuration: its name and, optionally, its
+   endpoint and description. Every credential is kept out of it
+   ([set up the local CLI](../guides/set-up-the-local-cli.md)).
 
 One engine binds each request from the selection, sends it, and classifies the answer. A read is
 one bound request; a write is one POST, PUT, PATCH or DELETE under the host's approval, audit and
@@ -40,7 +44,7 @@ is sent once as approved; the same input approved and sent again creates a secon
 
 ## What it serves
 
-| Provider | Source | Operations | Verified against |
+| Connectors | Source | Operations | Verified against |
 |---|---|---|---|
 | GitLab | pinned OpenAPI v4 document | reads across projects, repositories, pipelines and merge requests; issue and merge-request writes; the merge-request feed | a live GitLab |
 | Jira Cloud | pinned platform REST v3 | issue search by JQL, one issue, comments, changelogs, transitions, a project's creatable issue types, user search, attachment content; a guarded transition run | a live Jira through the API gateway (search); local fixtures (the rest) |
@@ -51,8 +55,8 @@ is sent once as approved; the same input approved and sent again creates a secon
 | Runpod | pinned REST API v1 | create, list and terminate pods | a local fixture |
 | Slack | Swagger 2.0 projected to OpenAPI 3.1.0 | conversation list, history and replies, users, the workspace, files and their content; message posting, editing and deleting, and direct messages, under approval; message search with a user token | a local fixture |
 
-Each provider's page in the repository gives its configuration, authentication profile and
-limits; [Adapters](../reference/adapters/catalog/index.md) links them.
+Each connector's page in the repository gives its configuration, auth profiles and
+limits; the [catalog reference](../reference/adapters/catalog/index.md) links them.
 
 ## What it does not do
 
@@ -67,4 +71,4 @@ limits; [Adapters](../reference/adapters/catalog/index.md) links them.
 - It never retries a write, and retries a read only once, when the provider's `Retry-After` fits
   the deadline.
 - The catalog index service (listing and locating precompiled bundles) is specified and not
-  implemented; directly configured providers need no index.
+  implemented; configured connectors need no index.
