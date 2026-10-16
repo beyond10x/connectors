@@ -1054,6 +1054,8 @@ pub(super) fn in_owner() -> bool {
 
 pub fn serve(paths: Paths) -> Result<()> {
     bound_allocator();
+    // Before any protected input: the owner holds credentials in memory.
+    crate::local::core_dumps::forbid().map_err(|_| Error::from(Code::Unavailable))?;
     IN_OWNER.store(true, Ordering::SeqCst);
     // Duplicate before opening anything: a direct invocation with missing fds
     // must not mistake newly opened configuration files for inherited authority.
