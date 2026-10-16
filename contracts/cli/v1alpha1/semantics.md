@@ -443,6 +443,45 @@ entry, ahead of an `--adapter` entry when both apply:
 The machine-facing `next_action` value `repair_connection` is unchanged; it
 names `connections reconnect`.
 
+### One connection per instance
+
+An instance holds at most one published non-revoked connection
+([connection semantics](../../auth/connection/v1alpha1/semantics.md) §4.2).
+`connections connect` is refused while the selected instance holds a published
+Live or Stale connection, before any credential entry or provider exchange, as
+`lifecycle_conflict` at `admission`. Its `next_action` is the
+step the held connection's own reconnect admits:
+
+| The instance holds | `next_action` |
+|---|---|
+| one connection under the configured binding | `repair_connection`: `connections reconnect` replaces its credential and keeps its reference |
+| one connection saved under an older configuration revision that a revalidation can follow | `revalidate_connection`, after which it is the instance's connection |
+| one connection that reconnect refuses as changed (`create_connection` on a read), or more than one | `revoke_connection`: `connections revoke` it, then connect |
+
+A connection with another identity (provider authority or profile
+authentication) keeps `check_configuration`, as before. A connect is also
+refused while another connect of the instance is in flight, as
+`lifecycle_conflict` at `admission` with `next_action = retry_status`, so two
+concurrent connects never publish two connections. Revoked connections stay as
+history and do not count, and neither does a connection a connect allocated
+and never published: once that connect failed or its acquisition passed its
+deadline, the next connect is admitted. A second account is a second instance.
+
+An instance that held more than one published non-revoked connection before
+this rule keeps every one of them, references unchanged, and each stays
+usable, reconnectable and revocable. A new connect on it is refused with
+`revoke_connection` until all but one are revoked.
+
+`connections describe`, `reconnect`, `revalidate`, `launch` and `revoke` take
+`--connection` optionally. Without it they select the instance's one published
+non-revoked connection; `--expected-revision`, where the command takes it, is
+still required. An instance that holds none refuses as `not_found` at
+`admission` with `next_action = create_connection`; one that holds more than
+one refuses as `invalid_input` at `arguments`, and `--connection` chooses.
+`connections status` keeps requiring `--connection` or `--acquisition`. Under
+`--output json` each of these refusals is the one failure envelope on standard
+error.
+
 ### Migrating adapter entries
 
 `setup migrate --mode dry-run` and `setup migrate --mode apply` move legacy
@@ -853,7 +892,7 @@ never replay a possible write after interruption, timeout or lost response.
 | a non-guarded metadata write the store changed under (a concurrent commit); nothing was written (`stage = publication`, `next_action = retry_explicitly`). A guarded write keeps the guarded-write rule below: its mutation record, `next_action = retry_status` | `revision_conflict` | 1 |
 | metadata publication acknowledgement uncertain | `outcome_unknown` | 1 |
 | changed principal/account/target during repair | `identity_mismatch` | 1 |
-| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`) | `lifecycle_conflict` | 1 |
+| stale revision, occupied changed configuration; `setup checkpoints-enable` while an owner runs for the state directory (`stage = admission`, `next_action = stop_owner`: run `connectors setup owner-stop`); `connections connect` on an instance that holds its connection, or while another connect of it is in flight ([one connection per instance](#one-connection-per-instance)) | `lifecycle_conflict` | 1 |
 | stale/foreign stop target | `incarnation_mismatch` | 1 |
 | wrong readiness identity/version/revision | `readiness_mismatch` | 1 |
 | running owner is a different executable build (`next_action = stop_owner`: run `connectors setup owner-stop`) | `owner_build_mismatch` | 1 |
@@ -1028,8 +1067,10 @@ adapter, provider authority and the profile's authentication, which is the
 profile declaration apart from its evidence lifetime. A configuration that
 changes only `evidence_lifetime_ms` leaves the identity unchanged, but the
 connection stays bound to the declaration it was admitted under, so the next
-action is `create_connection`, and `connections connect` under the same
-instance id admits the new connection; the old one stays revocable. When the
+action is `create_connection`: `connections connect` under the same instance
+id names the old connection's revocation while the instance holds it
+(`revoke_connection`, [one connection per instance](#one-connection-per-instance)),
+then admits the new connection. When the
 provider authority or the profile's authentication changed, the next action is
 `check_configuration`: no command under the same instance id can help, since
 `connections connect` there is refused for the same reason (`lifecycle_conflict`
@@ -1059,7 +1100,9 @@ own revision, revalidation stays admitted, and a later upgrade that succeeds
 or a repair that replaces the credential removes it. An approval reads the
 wall clock for this classification only, as the read path does, without
 advancing the registry clock. `connections connect` under the configured
-revision is admitted while older connections of the instance stay saved under theirs. The instance's
+revision is admitted once the instance holds no published non-revoked
+connection; an instance from before that rule may still hold older ones saved
+under their own revisions. The instance's
 own recorded configuration revision moves to the configured one only when a
 connection is published under it: a revalidation that upgrades one, or a new
 connection whose publication succeeds while the instance still records the

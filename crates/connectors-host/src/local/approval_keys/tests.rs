@@ -663,7 +663,11 @@ fn a_changed_configuration_refuses_key_status_as_a_changed_binding() {
     );
     let mut configured = fixture_binding("instance");
     configured.configuration_revision = "config-2".into();
-    registry.begin(&configured, 1_788_998_400_001).unwrap();
+    // Beside the first connect, still in flight, which `begin` alone refuses
+    // (story:connect-refused-while-instance-holds-connection).
+    registry
+        .begin_unchecked(&configured, 1_788_998_400_001)
+        .unwrap();
     assert_eq!(
         store("adapter", "config-2").status().unwrap_err(),
         Failure::BindingChanged
