@@ -135,7 +135,7 @@ fn clock_check_uses_current_configured_key_without_metadata_or_service_start() {
     };
     let root = clock_root(&table(8));
     let config_path = root.path().join("config/config.toml");
-    success(&command(&root, &["adapters", "list"]));
+    success(&command(&root, &["instances", "list"]));
     // The command needs configuration only, and cannot accidentally open SQLite.
     let state = root.path().join("state");
     let retired_state = root.path().join("unused-state");
@@ -287,7 +287,7 @@ fn clock_check_legacy_format_refusal() {
         STANDARD.encode(clock_fixture::root_key())
     ));
     // The retired table no longer fails the whole configuration.
-    let listed = success(&command(&root, &["adapters", "list"]));
+    let listed = success(&command(&root, &["instances", "list"]));
     assert_eq!(listed["adapters"][0]["adapter"], "forge", "{listed}");
     let refused = command(&root, &["approvals", "clock-check", "--adapter", "forge"]);
     assert_eq!(refused.status.code(), Some(2));
@@ -313,7 +313,7 @@ fn clock_check_legacy_format_refusal() {
         text.replace("roughtime-clock/1", "roughtime-clock/2"),
     )
     .unwrap();
-    let listed = command(&root, &["adapters", "list"]);
+    let listed = command(&root, &["instances", "list"]);
     assert_eq!(listed.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&listed.stderr).contains("invalid_configuration"));
 }
@@ -326,7 +326,7 @@ fn production_parser_initializes_and_inspects_across_processes() {
         "created"
     );
     assert_eq!(
-        success(&command(&root, &["adapters", "list"]))["adapters"],
+        success(&command(&root, &["instances", "list"]))["adapters"],
         serde_json::json!([])
     );
     let before = fs::read(root.path().join("config/config.toml")).unwrap();
@@ -448,7 +448,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
     ] {
         let root = tempfile::tempdir().unwrap();
         configured_entry(&root, format, private_protocol);
-        let output = command(&root, &["adapters", "list"]);
+        let output = command(&root, &["instances", "list"]);
         assert_eq!(output.status.code(), Some(2), "{format}");
         assert!(output.stdout.is_empty());
         let refusal: Value = serde_json::from_slice(&output.stderr).unwrap();
@@ -469,7 +469,7 @@ fn a_private_protocol_that_contradicts_the_format_is_refused_naming_format_and_e
         "connectors-local/2",
         "private_protocol='connectors-private/2'\nunreviewed='sentinel'\n",
     );
-    let output = command(&root, &["adapters", "list"]);
+    let output = command(&root, &["instances", "list"]);
     assert_eq!(output.status.code(), Some(2));
     let refusal: Value = serde_json::from_slice(&output.stderr).unwrap();
     assert_eq!(
@@ -490,16 +490,16 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
-    let list = success(&command(&root, &["adapters", "list"]));
+    let list = success(&command(&root, &["instances", "list"]));
     assert_eq!(list["adapters"][0]["adapter"], "forge");
     let status = success(&command(
         &root,
-        &["adapters", "status", "--adapter", "forge"],
+        &["instances", "status", "--adapter", "forge"],
     ));
     assert_eq!(status["observation"]["state"], "owner_unavailable");
     let describe = success(&command(
         &root,
-        &["adapters", "describe", "--adapter", "forge"],
+        &["instances", "describe", "--adapter", "forge"],
     ));
     assert_eq!(describe["source"], "configuration");
     assert!(describe.get("descriptor").is_none());
@@ -602,7 +602,7 @@ fn inventory_and_unavailable_status_never_launch_configured_executable() {
     #[cfg(unix)]
     {
         fs::set_permissions(&config_path, fs::Permissions::from_mode(0o644)).unwrap();
-        let output = command(&root, &["adapters", "list"]);
+        let output = command(&root, &["instances", "list"]);
         assert_eq!(output.status.code(), Some(2));
         assert!(!String::from_utf8_lossy(&output.stderr).contains("config.toml"));
     }
@@ -708,7 +708,7 @@ fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
             "a".repeat(64)
         );
     fs::write(&config_path, config).unwrap();
-    let status = ["adapters", "status", "--adapter", "forge"];
+    let status = ["instances", "status", "--adapter", "forge"];
     let started = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
     let mut owner = start_owner(started, &root);
 
@@ -753,7 +753,7 @@ fn a_cli_refuses_an_owner_running_a_different_build_and_leaves_it_running() {
 fn setup_owner_stop_stops_an_owner_another_build_started_and_a_fresh_owner_serves() {
     let root = adversary_owner_root();
     let state = root.path().join("state");
-    let status = ["adapters", "status", "--adapter", "forge"];
+    let status = ["instances", "status", "--adapter", "forge"];
     let older = other_build(&root);
     let mut owner = start_owner(&older, &root);
     let refused = command(&root, &status);
@@ -915,7 +915,7 @@ fn setup_owner_stop_refuses_an_owner_that_does_not_answer_and_never_signals_it()
     );
 }
 
-/// Config with one adapter whose executable is never launched by `adapters status`.
+/// Config with one adapter whose executable is never launched by `instances status`.
 #[cfg(unix)]
 fn adversary_owner_root() -> tempfile::TempDir {
     let root = tempfile::tempdir().unwrap();
@@ -1068,7 +1068,7 @@ fn adversary_a_transient_greeting_refusal_from_the_same_build_is_not_a_build_mis
         }
     });
 
-    let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
+    let output = command(&root, &["instances", "status", "--adapter", "forge"]);
     let code = serde_json::from_slice::<Value>(&output.stderr)
         .ok()
         .map(|error| error["error"]["data"]["code"].clone());
@@ -1189,7 +1189,7 @@ fn a_same_build_owner_at_its_client_limit_answers_capacity_not_another_build() {
     let directory = sockets::Directory::open(&root.path().join("state"));
     // 32 silent clients occupy every slot until the owner's greeting timeout.
     let held = fill_owner(&directory, "owner.sock");
-    let refused = command(&root, &["adapters", "status", "--adapter", "forge"]);
+    let refused = command(&root, &["instances", "status", "--adapter", "forge"]);
     assert_eq!(refused.status.code(), Some(1));
     let error: Value = serde_json::from_slice(&refused.stderr).unwrap();
     assert_eq!(error["error"]["data"]["code"], "capacity", "{error}");
@@ -1324,7 +1324,7 @@ fn adversary2_a_same_build_owner_at_capacity_is_never_another_build_over_100_run
             .arg(root.path().join("config/config.toml"))
             .arg("--state-dir")
             .arg(root.path().join("state"))
-            .args(["adapters", "status", "--adapter", "forge"])
+            .args(["instances", "status", "--adapter", "forge"])
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()
@@ -1361,7 +1361,7 @@ fn adversary2_the_build_probe_against_an_owner_at_capacity_reports_capacity() {
     let directory = sockets::Directory::open(&root.path().join("state"));
     let held = fill_owner(&directory, "real.sock");
     let filled = std::time::Instant::now();
-    let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
+    let output = command(&root, &["instances", "status", "--adapter", "forge"]);
     // A slot frees only when a held client reaches the owner's 10-second
     // greeting deadline; then the probe and the greeting are served and the
     // status answers `ok:not_running`. The elapsed time says which it was.
@@ -1388,7 +1388,7 @@ fn adversary2_the_identification_retry_loop_ends_at_its_deadline_without_floodin
     let mut owner = start_owner(binary, &root);
     let relayed = adversary2_relay(&root, |_, control| control.get("build").is_some());
     let started = std::time::Instant::now();
-    let output = command(&root, &["adapters", "status", "--adapter", "forge"]);
+    let output = command(&root, &["instances", "status", "--adapter", "forge"]);
     let elapsed = started.elapsed();
     let relayed = relayed.load(std::sync::atomic::Ordering::SeqCst);
     eprintln!(
@@ -1420,7 +1420,7 @@ fn adversary2_a_real_pre_handshake_owner_is_refused_by_name_and_the_reverse_is_o
         panic!("set CONNECTORS_ADVERSARY_PRE_HANDSHAKE to a pre-handshake connectors binary");
     };
     let old = std::path::PathBuf::from(old);
-    let status = ["adapters", "status", "--adapter", "forge"];
+    let status = ["instances", "status", "--adapter", "forge"];
     let root = adversary_owner_root();
     let mut owner = start_owner(&old, &root);
     let refused = command(&root, &status);
@@ -1539,7 +1539,7 @@ fn an_idle_owner_exits_and_the_next_start_gets_a_new_owner() {
     let root = adversary_owner_root();
     let state = root.path().join("state");
     let binary = std::path::Path::new(env!("CARGO_BIN_EXE_connectors"));
-    let status = ["adapters", "status", "--adapter", "forge"];
+    let status = ["instances", "status", "--adapter", "forge"];
     let mut owner = start_owner_with(binary, &root, Some(1500));
     let first = success(&command(&root, &status));
     let first_host = first["observation"]["host_incarnation"].clone();
@@ -1583,7 +1583,7 @@ fn a_connected_client_keeps_an_owner_past_its_idle_bound() {
     assert!(state.join("owner.sock").exists());
     success(&command(
         &root,
-        &["adapters", "status", "--adapter", "forge"],
+        &["instances", "status", "--adapter", "forge"],
     ));
     drop(held);
     let exit = owner_exit(&mut owner, std::time::Duration::from_secs(20))

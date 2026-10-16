@@ -121,7 +121,7 @@ fn existing_v1_files_load_and_are_never_rewritten() {
                 .any(|p| p["name"] == "configuration" && p["state"] == "ready"),
             "{check}"
         );
-        let list = success(&command(&root, &["adapters", "list"]));
+        let list = success(&command(&root, &["instances", "list"]));
         assert_eq!(
             list["adapters"].as_array().unwrap().len(),
             with_entry as usize
@@ -129,7 +129,7 @@ fn existing_v1_files_load_and_are_never_rewritten() {
         if with_entry {
             success(&command(
                 &root,
-                &["adapters", "status", "--adapter", "forge"],
+                &["instances", "status", "--adapter", "forge"],
             ));
             success(&command(
                 &root,

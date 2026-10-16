@@ -169,7 +169,7 @@ impl Session {
         let selection = self.selection.as_ref().ok_or(Code::InvalidInput)?;
         if !matches!(
             selection.callable.as_str(),
-            "connections-connect" | "connections-repair"
+            "connections-connect" | "connections-reconnect"
         ) || self.captured.is_some()
         {
             return Err(Code::InvalidInput.into());
@@ -223,7 +223,7 @@ impl Session {
         self.captured = Some((capture, secret));
         Ok(MARKER.into())
     }
-    /// `connections connect` or `repair` with no protected source. Under the
+    /// `connections connect` or `reconnect` with no protected source. Under the
     /// read-only `mounted_secret` binding the owner reads the item
     /// `<adapter alias>/<profile>` itself and no bytes pass through this
     /// process; under a platform binding a source is required.

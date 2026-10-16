@@ -960,7 +960,7 @@ types:
       - {name: adapter, type: "String"}
       - {name: profile, type: "String"}
   # expected_revision is public semantic revision. The existing coordinator reconstructs its own private publication fence; caller revision never substitutes for it.
-  - name: connectors.cli.ConnectionRepairRequest
+  - name: connectors.cli.ConnectionReconnectRequest
     kind: struct
     fields:
       - {name: adapter, type: "String"}
@@ -985,7 +985,7 @@ types:
       - {name: connection, type: "connectors.cli.ConnectionDescription"}
       - {name: acquisition, type: "Optional<String>"}
   # EPHEMERAL LOCAL ACTION ONLY: credential_document bypasses ordinary management projection and reaches separately bound trusted completion.
-  - name: connectors.cli.ConnectionRepairInput
+  - name: connectors.cli.ConnectionReconnectInput
     kind: struct
     fields:
       - {name: adapter, type: "Optional<String>"}
@@ -994,7 +994,7 @@ types:
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
       - {name: credential_document, type: "Optional<String>"}
-  - name: connectors.cli.ConnectionRepairResult
+  - name: connectors.cli.ConnectionReconnectResult
     kind: struct
     fields:
       - {name: connection, type: "connectors.cli.ConnectionDescription"}

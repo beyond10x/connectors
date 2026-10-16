@@ -31,6 +31,9 @@ _connectors() {
             connectors,help)
                 cmd="connectors__subcmd__help"
                 ;;
+            connectors,instances)
+                cmd="connectors__subcmd__instances"
+                ;;
             connectors,operations)
                 cmd="connectors__subcmd__operations"
                 ;;
@@ -154,6 +157,9 @@ _connectors() {
             connectors__subcmd__connections,list)
                 cmd="connectors__subcmd__connections__subcmd__list"
                 ;;
+            connectors__subcmd__connections,reconnect)
+                cmd="connectors__subcmd__connections__subcmd__reconnect"
+                ;;
             connectors__subcmd__connections,repair)
                 cmd="connectors__subcmd__connections__subcmd__repair"
                 ;;
@@ -181,6 +187,9 @@ _connectors() {
             connectors__subcmd__connections__subcmd__help,list)
                 cmd="connectors__subcmd__connections__subcmd__help__subcmd__list"
                 ;;
+            connectors__subcmd__connections__subcmd__help,reconnect)
+                cmd="connectors__subcmd__connections__subcmd__help__subcmd__reconnect"
+                ;;
             connectors__subcmd__connections__subcmd__help,repair)
                 cmd="connectors__subcmd__connections__subcmd__help__subcmd__repair"
                 ;;
@@ -207,6 +216,9 @@ _connectors() {
                 ;;
             connectors__subcmd__help,help)
                 cmd="connectors__subcmd__help__subcmd__help"
+                ;;
+            connectors__subcmd__help,instances)
+                cmd="connectors__subcmd__help__subcmd__instances"
                 ;;
             connectors__subcmd__help,operations)
                 cmd="connectors__subcmd__help__subcmd__operations"
@@ -271,6 +283,9 @@ _connectors() {
             connectors__subcmd__help__subcmd__connections,list)
                 cmd="connectors__subcmd__help__subcmd__connections__subcmd__list"
                 ;;
+            connectors__subcmd__help__subcmd__connections,reconnect)
+                cmd="connectors__subcmd__help__subcmd__connections__subcmd__reconnect"
+                ;;
             connectors__subcmd__help__subcmd__connections,repair)
                 cmd="connectors__subcmd__help__subcmd__connections__subcmd__repair"
                 ;;
@@ -282,6 +297,18 @@ _connectors() {
                 ;;
             connectors__subcmd__help__subcmd__connections,status)
                 cmd="connectors__subcmd__help__subcmd__connections__subcmd__status"
+                ;;
+            connectors__subcmd__help__subcmd__instances,describe)
+                cmd="connectors__subcmd__help__subcmd__instances__subcmd__describe"
+                ;;
+            connectors__subcmd__help__subcmd__instances,list)
+                cmd="connectors__subcmd__help__subcmd__instances__subcmd__list"
+                ;;
+            connectors__subcmd__help__subcmd__instances,status)
+                cmd="connectors__subcmd__help__subcmd__instances__subcmd__status"
+                ;;
+            connectors__subcmd__help__subcmd__instances,stop)
+                cmd="connectors__subcmd__help__subcmd__instances__subcmd__stop"
                 ;;
             connectors__subcmd__help__subcmd__operations,describe)
                 cmd="connectors__subcmd__help__subcmd__operations__subcmd__describe"
@@ -303,6 +330,36 @@ _connectors() {
                 ;;
             connectors__subcmd__help__subcmd__setup,owner-stop)
                 cmd="connectors__subcmd__help__subcmd__setup__subcmd__owner__subcmd__stop"
+                ;;
+            connectors__subcmd__instances,describe)
+                cmd="connectors__subcmd__instances__subcmd__describe"
+                ;;
+            connectors__subcmd__instances,help)
+                cmd="connectors__subcmd__instances__subcmd__help"
+                ;;
+            connectors__subcmd__instances,list)
+                cmd="connectors__subcmd__instances__subcmd__list"
+                ;;
+            connectors__subcmd__instances,status)
+                cmd="connectors__subcmd__instances__subcmd__status"
+                ;;
+            connectors__subcmd__instances,stop)
+                cmd="connectors__subcmd__instances__subcmd__stop"
+                ;;
+            connectors__subcmd__instances__subcmd__help,describe)
+                cmd="connectors__subcmd__instances__subcmd__help__subcmd__describe"
+                ;;
+            connectors__subcmd__instances__subcmd__help,help)
+                cmd="connectors__subcmd__instances__subcmd__help__subcmd__help"
+                ;;
+            connectors__subcmd__instances__subcmd__help,list)
+                cmd="connectors__subcmd__instances__subcmd__help__subcmd__list"
+                ;;
+            connectors__subcmd__instances__subcmd__help,status)
+                cmd="connectors__subcmd__instances__subcmd__help__subcmd__status"
+                ;;
+            connectors__subcmd__instances__subcmd__help,stop)
+                cmd="connectors__subcmd__instances__subcmd__help__subcmd__stop"
                 ;;
             connectors__subcmd__operations,describe)
                 cmd="connectors__subcmd__operations__subcmd__describe"
@@ -365,7 +422,7 @@ _connectors() {
 
     case "${cmd}" in
         connectors)
-            opts="-h --config --state-dir --output --help adapters approvals connections operations setup completions help"
+            opts="-h --config --state-dir --output --help adapters approvals connections instances operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1413,7 +1470,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections)
-            opts="-h --config --state-dir --output --help connect describe launch list repair revalidate revoke status help"
+            opts="-h --config --state-dir --output --help connect describe launch list reconnect repair revalidate revoke status help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1527,7 +1584,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__help)
-            opts="connect describe launch list repair revalidate revoke status help"
+            opts="connect describe launch list reconnect repair revalidate revoke status help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -1597,6 +1654,20 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__help__subcmd__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__connections__subcmd__help__subcmd__reconnect)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1740,6 +1811,56 @@ _connectors() {
                     return 0
                     ;;
                 --cursor)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__connections__subcmd__reconnect)
+            opts="-h --adapter --connector --instance --connection --expected-revision --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connection)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --credential-file)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1951,7 +2072,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help)
-            opts="adapters approvals connections operations setup completions help"
+            opts="adapters approvals connections instances operations setup completions help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2217,7 +2338,7 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help__subcmd__connections)
-            opts="connect describe launch list repair revalidate revoke status"
+            opts="connect describe launch list reconnect repair revalidate revoke status"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -2273,6 +2394,20 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__help__subcmd__connections__subcmd__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__connections__subcmd__reconnect)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -2345,6 +2480,76 @@ _connectors() {
         connectors__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__instances)
+            opts="describe list status stop"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__instances__subcmd__describe)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__instances__subcmd__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__instances__subcmd__status)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__help__subcmd__instances__subcmd__stop)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
@@ -2475,6 +2680,276 @@ _connectors() {
                 return 0
             fi
             case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances)
+            opts="-h --config --state-dir --output --help describe list status stop help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__describe)
+            opts="-h --adapter --connector --instance --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__help)
+            opts="describe list status stop help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__help__subcmd__describe)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__help__subcmd__help)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__help__subcmd__list)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__help__subcmd__status)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__help__subcmd__stop)
+            opts=""
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__list)
+            opts="-h --limit --cursor --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --limit)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --cursor)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__status)
+            opts="-h --adapter --connector --instance --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=()
+                    ;;
+            esac
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+        connectors__subcmd__instances__subcmd__stop)
+            opts="-h --adapter --connector --instance --expected-revision --host-incarnation --child-incarnation --config --state-dir --output --help"
+            if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
+                COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+                return 0
+            fi
+            case "${prev}" in
+                --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --expected-revision)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --host-incarnation)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --child-incarnation)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --config)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --state-dir)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --output)
+                    COMPREPLY=($(compgen -W "human json" -- "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;

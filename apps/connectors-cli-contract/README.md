@@ -6,38 +6,6 @@ This generated package installs an unavailable handler. Application behavior ent
 
 ## Commands
 
-### `adapters describe`
-
-Inspect one configured adapter and cached descriptor
-
-Callable: `adapters-describe`. Input: `connectors.cli.AdapterDescribeInput`. Result: `connectors.cli.AdapterDescribeResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
-### `adapters list`
-
-List configured adapter entries
-
-Callable: `adapters-list`. Input: `connectors.cli.AdapterListInput`. Result: `connectors.cli.AdapterListResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
-### `adapters status`
-
-Observe the existing adapter lifecycle owner
-
-Callable: `adapters-status`. Input: `connectors.cli.AdapterStatusInput`. Result: `connectors.cli.AdapterStatusResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
-### `adapters stop`
-
-Stop only the exact owned adapter incarnation
-
-Callable: `adapters-stop`. Input: `connectors.cli.AdapterStopInput`. Result: `connectors.cli.AdapterStopResult`.
-
-Error `failure`: `connectors.cli.Failure`.
-
 ### `approvals clock-check`
 
 Check the configured authenticated clock without starting services
@@ -158,11 +126,13 @@ Callable: `connections-list`. Input: `connectors.cli.ConnectionListInput`. Resul
 
 Error `failure`: `connectors.cli.Failure`.
 
-### `connections repair`
+### `connections reconnect`
 
-Repair the exact connection without changing its identity
+Publish a new credential on the exact connection without changing its identity; `connections repair` is its deprecated name
 
-Callable: `connections-repair`. Input: `connectors.cli.ConnectionRepairInput`. Result: `connectors.cli.ConnectionRepairResult`.
+Callable: `connections-reconnect`. Input: `connectors.cli.ConnectionReconnectInput`. Result: `connectors.cli.ConnectionReconnectResult`.
+
+Alias: `connections repair`.
 
 Error `failure`: `connectors.cli.Failure`.
 
@@ -187,6 +157,46 @@ Error `failure`: `connectors.cli.Failure`.
 Observe exactly one connection or acquisition
 
 Callable: `connections-status`. Input: `connectors.cli.ConnectionStatusInput`. Result: `connectors.cli.ConnectionStatusResult`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances describe`
+
+Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name
+
+Callable: `adapters-describe`. Input: `connectors.cli.AdapterDescribeInput`. Result: `connectors.cli.AdapterDescribeResult`.
+
+Alias: `adapters describe`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances list`
+
+List configured instances; `adapters list` is its deprecated name
+
+Callable: `adapters-list`. Input: `connectors.cli.AdapterListInput`. Result: `connectors.cli.AdapterListResult`.
+
+Alias: `adapters list`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances status`
+
+Observe the lifecycle owner of one instance's adapter process; `adapters status` is its deprecated name
+
+Callable: `adapters-status`. Input: `connectors.cli.AdapterStatusInput`. Result: `connectors.cli.AdapterStatusResult`.
+
+Alias: `adapters status`.
+
+Error `failure`: `connectors.cli.Failure`.
+
+### `instances stop`
+
+Stop only the exact owned adapter incarnation of one instance; `adapters stop` is its deprecated name
+
+Callable: `adapters-stop`. Input: `connectors.cli.AdapterStopInput`. Result: `connectors.cli.AdapterStopResult`.
+
+Alias: `adapters stop`.
 
 Error `failure`: `connectors.cli.Failure`.
 
@@ -267,7 +277,7 @@ Error `failure`: `connectors.cli.Failure`.
 - handler:connections-describe: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-launch: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-list: implement the owner-qualified callable and its declared result/error contract
-- handler:connections-repair: implement the owner-qualified callable and its declared result/error contract
+- handler:connections-reconnect: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract
 - handler:connections-status: implement the owner-qualified callable and its declared result/error contract

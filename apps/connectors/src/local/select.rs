@@ -9,14 +9,37 @@ use connectors_cli_contract::{ProcessOutput, wire::Shape};
 use connectors_host::local::config::Selector;
 use std::sync::OnceLock;
 
-/// The deprecation entry an `--output json` envelope carries.
-fn entry() -> Value {
-    json!({"option":"--adapter","replacement":["--connector","--instance"]})
+/// A deprecated name the arguments use: the `--adapter` selector, or a
+/// renamed command path (story:connections-reconnect-verb), which is any path
+/// alias the plan declares.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Deprecation {
+    Adapter,
+    Command { old: String, new: String },
 }
 
-/// The one line `--output human` writes to standard error.
-const LINE: &str =
-    "deprecated: --adapter; select with --connector <connector> --instance <instance>\n";
+impl Deprecation {
+    /// The entry an `--output json` envelope carries.
+    fn entry(&self) -> Value {
+        match self {
+            Self::Adapter => {
+                json!({"option":"--adapter","replacement":["--connector","--instance"]})
+            }
+            Self::Command { old, new } => json!({"command":old,"replacement":[new]}),
+        }
+    }
+
+    /// The one line `--output human` writes to standard error.
+    fn line(&self) -> String {
+        match self {
+            Self::Adapter => {
+                "deprecated: --adapter; select with --connector <connector> --instance <instance>\n"
+                    .to_owned()
+            }
+            Self::Command { old, new } => format!("deprecated: {old}; use {new}\n"),
+        }
+    }
+}
 
 fn plan() -> &'static connectors_cli_contract::wire::Plan {
     static PLAN: OnceLock<connectors_cli_contract::wire::Plan> = OnceLock::new();
@@ -213,8 +236,59 @@ fn flags(args: &[OsString]) -> impl Iterator<Item = &str> {
 }
 
 /// Whether the arguments select with the deprecated `--adapter`.
-pub(super) fn deprecated(args: &[OsString]) -> bool {
+fn adapter_selected(args: &[OsString]) -> bool {
     flags(args).any(|arg| arg == "--adapter" || arg.starts_with("--adapter="))
+}
+
+/// The command path the arguments name: the words before any other flag,
+/// skipping the process globals, which the parser takes anywhere.
+fn path(args: &[OsString]) -> Vec<&str> {
+    let globals = &plan().globals;
+    let globals: Vec<String> = [globals.config.as_ref(), Some(&globals.state)]
+        .into_iter()
+        .chain([globals.output.as_ref()])
+        .flatten()
+        .map(|name| format!("--{name}"))
+        .collect();
+    let mut words = Vec::new();
+    let mut rest = flags(args);
+    while let Some(arg) = rest.next() {
+        let global = globals.iter().find(|global| {
+            arg.strip_prefix(global.as_str())
+                .is_some_and(|value| value.is_empty() || value.starts_with('='))
+        });
+        match global {
+            Some(global) if arg == global => {
+                rest.next();
+            }
+            Some(_) => {}
+            None if arg.starts_with('-') => break,
+            None => words.push(arg),
+        }
+    }
+    words
+}
+
+/// The deprecated names the arguments use, in the order their lines and
+/// entries appear: a renamed command path, then `--adapter`. A renamed path is
+/// any path alias of the plan (`apps/connectors/spec/cli.yaml`), answered with
+/// the command's own path.
+pub(super) fn deprecations(args: &[OsString]) -> Vec<Deprecation> {
+    let words = path(args);
+    let renamed = plan().commands.iter().find_map(|command| {
+        command
+            .aliases
+            .iter()
+            .find(|alias| words.starts_with(&alias.iter().map(String::as_str).collect::<Vec<_>>()))
+            .map(|alias| Deprecation::Command {
+                old: alias.join(" "),
+                new: command.path.join(" "),
+            })
+    });
+    renamed
+        .into_iter()
+        .chain(adapter_selected(args).then_some(Deprecation::Adapter))
+        .collect()
 }
 
 /// Whether the arguments select JSON output, as the generated parser decides
@@ -230,21 +304,23 @@ pub(super) fn json_output(args: &[OsString]) -> bool {
     false
 }
 
-/// `--adapter` keeps selecting for the deprecation window and says so once:
-/// under `--output human` one line on standard error; under `--output json`
-/// nothing more on standard error, and the one envelope, success or failure,
-/// carries `deprecations`. Output that is no envelope (help, completions, a
-/// launched consumer's) is left as it is.
-pub(super) fn deprecate(output: &mut ProcessOutput, json: bool) {
+/// A deprecated name keeps working for the deprecation window and says so
+/// once: under `--output human` one line each on standard error; under
+/// `--output json` nothing more on standard error, and the one envelope,
+/// success or failure, carries `deprecations`. Output that is no envelope
+/// (help, completions, a launched consumer's) is left as it is.
+pub(super) fn deprecate(output: &mut ProcessOutput, json: bool, deprecations: &[Deprecation]) {
     if !json {
-        output.stderr.insert_str(0, LINE);
+        let lines: String = deprecations.iter().map(Deprecation::line).collect();
+        output.stderr.insert_str(0, &lines);
         return;
     }
+    let entries: Vec<Value> = deprecations.iter().map(Deprecation::entry).collect();
     for stream in [&mut output.stdout, &mut output.stderr] {
         if let Ok(Value::Object(mut envelope)) = serde_json::from_str::<Value>(stream)
             && envelope.contains_key("ok")
         {
-            envelope.insert("deprecations".into(), json!([entry()]));
+            envelope.insert("deprecations".into(), json!(entries));
             *stream = format!("{}\n", Value::Object(envelope));
         }
     }

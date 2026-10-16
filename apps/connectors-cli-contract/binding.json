@@ -9461,14 +9461,14 @@
         }
       }
     },
-    "connections-repair": {
+    "connections-reconnect": {
       "target": {
         "kind": "local",
         "owner": "connectors.cli",
-        "action": "connections-repair"
+        "action": "connections-reconnect"
       },
       "input": {
-        "type_ref": "connectors.cli.ConnectionRepairInput",
+        "type_ref": "connectors.cli.ConnectionReconnectInput",
         "shape": {
           "kind": "struct",
           "fields": {
@@ -9506,7 +9506,7 @@
         }
       },
       "result": {
-        "type_ref": "connectors.cli.ConnectionRepairResult",
+        "type_ref": "connectors.cli.ConnectionReconnectResult",
         "shape": {
           "kind": "struct",
           "fields": {
@@ -14455,148 +14455,6 @@
   "commands": [
     {
       "path": [
-        "adapters",
-        "describe"
-      ],
-      "aliases": [],
-      "callable": "adapters-describe",
-      "about": "Inspect one configured adapter and cached descriptor",
-      "arguments": [
-        {
-          "field": "adapter",
-          "source": {
-            "kind": "option",
-            "long": "adapter"
-          }
-        },
-        {
-          "field": "connector",
-          "source": {
-            "kind": "option",
-            "long": "connector"
-          }
-        },
-        {
-          "field": "instance",
-          "source": {
-            "kind": "option",
-            "long": "instance"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
-        "adapters",
-        "list"
-      ],
-      "aliases": [],
-      "callable": "adapters-list",
-      "about": "List configured adapter entries",
-      "arguments": [
-        {
-          "field": "limit",
-          "source": {
-            "kind": "option",
-            "long": "limit"
-          }
-        },
-        {
-          "field": "cursor",
-          "source": {
-            "kind": "option",
-            "long": "cursor"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
-        "adapters",
-        "status"
-      ],
-      "aliases": [],
-      "callable": "adapters-status",
-      "about": "Observe the existing adapter lifecycle owner",
-      "arguments": [
-        {
-          "field": "adapter",
-          "source": {
-            "kind": "option",
-            "long": "adapter"
-          }
-        },
-        {
-          "field": "connector",
-          "source": {
-            "kind": "option",
-            "long": "connector"
-          }
-        },
-        {
-          "field": "instance",
-          "source": {
-            "kind": "option",
-            "long": "instance"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
-        "adapters",
-        "stop"
-      ],
-      "aliases": [],
-      "callable": "adapters-stop",
-      "about": "Stop only the exact owned adapter incarnation",
-      "arguments": [
-        {
-          "field": "adapter",
-          "source": {
-            "kind": "option",
-            "long": "adapter"
-          }
-        },
-        {
-          "field": "connector",
-          "source": {
-            "kind": "option",
-            "long": "connector"
-          }
-        },
-        {
-          "field": "instance",
-          "source": {
-            "kind": "option",
-            "long": "instance"
-          }
-        },
-        {
-          "field": "expected_revision",
-          "source": {
-            "kind": "option",
-            "long": "expected-revision"
-          }
-        },
-        {
-          "field": "host_incarnation",
-          "source": {
-            "kind": "option",
-            "long": "host-incarnation"
-          }
-        },
-        {
-          "field": "child_incarnation",
-          "source": {
-            "kind": "option",
-            "long": "child-incarnation"
-          }
-        }
-      ]
-    },
-    {
-      "path": [
         "approvals",
         "clock-check"
       ],
@@ -15301,11 +15159,16 @@
     {
       "path": [
         "connections",
-        "repair"
+        "reconnect"
       ],
-      "aliases": [],
-      "callable": "connections-repair",
-      "about": "Repair the exact connection without changing its identity",
+      "aliases": [
+        [
+          "connections",
+          "repair"
+        ]
+      ],
+      "callable": "connections-reconnect",
+      "about": "Publish a new credential on the exact connection without changing its identity; `connections repair` is its deprecated name",
       "arguments": [
         {
           "field": "adapter",
@@ -15487,6 +15350,168 @@
           "source": {
             "kind": "option",
             "long": "acquisition"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "describe"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "describe"
+        ]
+      ],
+      "callable": "adapters-describe",
+      "about": "Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "list"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "list"
+        ]
+      ],
+      "callable": "adapters-list",
+      "about": "List configured instances; `adapters list` is its deprecated name",
+      "arguments": [
+        {
+          "field": "limit",
+          "source": {
+            "kind": "option",
+            "long": "limit"
+          }
+        },
+        {
+          "field": "cursor",
+          "source": {
+            "kind": "option",
+            "long": "cursor"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "status"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "status"
+        ]
+      ],
+      "callable": "adapters-status",
+      "about": "Observe the lifecycle owner of one instance's adapter process; `adapters status` is its deprecated name",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "instances",
+        "stop"
+      ],
+      "aliases": [
+        [
+          "adapters",
+          "stop"
+        ]
+      ],
+      "callable": "adapters-stop",
+      "about": "Stop only the exact owned adapter incarnation of one instance; `adapters stop` is its deprecated name",
+      "arguments": [
+        {
+          "field": "adapter",
+          "source": {
+            "kind": "option",
+            "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
+          "field": "expected_revision",
+          "source": {
+            "kind": "option",
+            "long": "expected-revision"
+          }
+        },
+        {
+          "field": "host_incarnation",
+          "source": {
+            "kind": "option",
+            "long": "host-incarnation"
+          }
+        },
+        {
+          "field": "child_incarnation",
+          "source": {
+            "kind": "option",
+            "long": "child-incarnation"
           }
         }
       ]
@@ -15735,7 +15760,7 @@
     "handler:connections-describe: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-launch: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-list: implement the owner-qualified callable and its declared result/error contract",
-    "handler:connections-repair: implement the owner-qualified callable and its declared result/error contract",
+    "handler:connections-reconnect: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-revalidate: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-revoke: implement the owner-qualified callable and its declared result/error contract",
     "handler:connections-status: implement the owner-qualified callable and its declared result/error contract",
