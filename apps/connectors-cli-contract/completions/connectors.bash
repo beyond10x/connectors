@@ -417,13 +417,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__adapters__subcmd__describe)
-            opts="-h --adapter --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -565,13 +573,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__adapters__subcmd__status)
-            opts="-h --adapter --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -595,13 +611,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__adapters__subcmd__stop)
-            opts="-h --adapter --expected-revision --host-incarnation --child-incarnation --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --expected-revision --host-incarnation --child-incarnation --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -663,13 +687,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__clock__subcmd__check)
-            opts="-h --adapter --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -875,13 +907,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__issue)
-            opts="-h --adapter --connection --operation --schema --revision --input-json --input-file --input-stdin --approve-subject --proof-output --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --operation --schema --revision --input-json --input-file --input-stdin --approve-subject --proof-output --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -937,13 +977,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__key__subcmd__init)
-            opts="-h --adapter --expected-revision --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --expected-revision --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -971,13 +1019,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__key__subcmd__recover)
-            opts="-h --adapter --expected-revision --candidate --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --expected-revision --candidate --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1009,13 +1065,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__key__subcmd__retire)
-            opts="-h --adapter --expected-revision --key --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --expected-revision --key --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1047,13 +1111,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__key__subcmd__revoke)
-            opts="-h --adapter --expected-revision --expected-key --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --expected-revision --expected-key --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1085,13 +1157,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__key__subcmd__rotate)
-            opts="-h --adapter --expected-revision --expected-key --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --expected-revision --expected-key --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1123,13 +1203,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__key__subcmd__status)
-            opts="-h --adapter --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1153,13 +1241,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__policy__subcmd__set)
-            opts="-h --adapter --expected-revision --input-file --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --expected-revision --input-file --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1191,13 +1287,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__policy__subcmd__status)
-            opts="-h --adapter --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1221,13 +1325,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__approvals__subcmd__prepare)
-            opts="-h --adapter --connection --operation --schema --revision --input-json --input-file --input-stdin --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --operation --schema --revision --input-json --input-file --input-stdin --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1327,13 +1439,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__connect)
-            opts="-h --adapter --profile --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --profile --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1365,13 +1485,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__describe)
-            opts="-h --adapter --connection --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1539,13 +1667,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__launch)
-            opts="-h --adapter --connection --consumer --args --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --consumer --args --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1581,13 +1717,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__list)
-            opts="-h --adapter --limit --cursor --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --limit --cursor --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1619,13 +1763,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__repair)
-            opts="-h --adapter --connection --expected-revision --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --expected-revision --credential-file --credential-stdin --credential-prompt --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1661,13 +1813,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__revalidate)
-            opts="-h --adapter --connection --expected-revision --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --expected-revision --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1699,13 +1859,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__revoke)
-            opts="-h --adapter --connection --expected-revision --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --expected-revision --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -1737,13 +1905,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__connections__subcmd__status)
-            opts="-h --adapter --connection --acquisition --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --acquisition --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -2333,13 +2509,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__operations__subcmd__describe)
-            opts="-h --adapter --operation --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --operation --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -2437,13 +2621,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__operations__subcmd__invoke)
-            opts="-h --adapter --connection --operation --schema --revision --input-json --input-file --input-stdin --approval-file --idempotency-key --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --connection --operation --schema --revision --input-json --input-file --input-stdin --approval-file --idempotency-key --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
@@ -2499,13 +2691,21 @@ _connectors() {
             return 0
             ;;
         connectors__subcmd__operations__subcmd__list)
-            opts="-h --adapter --family --limit --cursor --config --state-dir --output --help"
+            opts="-h --adapter --connector --instance --family --limit --cursor --config --state-dir --output --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
             fi
             case "${prev}" in
                 --adapter)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --connector)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                --instance)
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;

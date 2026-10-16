@@ -31,8 +31,11 @@ bindings under the existing [management](../../auth/management.md),
 [acquisition](../../auth/acquisition/v1alpha1/semantics.md) and
 [custody](../../auth/custody/v1alpha1/semantics.md) contracts.
 
-The `adapter` CLI selector is a configured entry alias, resolved to exactly one
-`connectors.declarations.ServiceConfiguration.instance_id`; it is not an adapter
+The `connector` and `instance` CLI selectors name one configured instance
+together, and the deprecated `adapter` selector names a configured entry alias;
+each resolves to exactly one
+`connectors.declarations.ServiceConfiguration.instance_id`
+([selecting an instance](#selecting-an-instance)). Neither is an adapter
 implementation identifier or executable path. `connection` is the existing
 owner-qualified `connectors.auth_bindings.Connection.connection_ref`, and
 `acquisition` names its existing acquisition owner/ref. A profile selects the
@@ -192,8 +195,10 @@ consumed or failed acquisition never permits repeating its exchange.
 
 `--output json` emits exactly one UTF-8 `{"ok":true,"result":...}` success envelope
 plus newline to stdout. Failure leaves stdout empty and emits one
-`{"ok":false,"error":{"code":...,"data":...}}` envelope plus newline to stderr;
-application error data is `Failure`, while parser/source/internal errors have
+`{"ok":false,"error":{"code":...,"data":...}}` envelope plus newline to stderr.
+A command selected with the deprecated `--adapter` adds a `deprecations` member
+to either envelope and nothing else ([selecting an instance](#selecting-an-instance)).
+Application error data is `Failure`, while parser/source/internal errors have
 stable codes and empty data as defined by `ess-cli/1`. Human mode identifies a
 safe next action through the typed result/error. Progress belongs on stderr; JSON
 mode suppresses ordinary progress so stderr is also machine-readable. Diagnostics
@@ -340,7 +345,8 @@ reserved management-name collisions, bad digests and unresolved default selectio
 refuse the entire configuration before host launch. TOML contains no credential
 bytes, keyring locators or actionable acquisition continuations; a `[custody]`
 directory is an infrastructure binding, not a locator. A default adapter
-must name exactly one entry; connection defaults, if used by a future binding,
+must name exactly one entry, and so must a default instance
+([selecting an instance](#selecting-an-instance)); connection defaults, if used by a future binding,
 must be explicitly recorded and cannot be inferred from last usage. This first
 binding requires an explicit connection for a credentialed operation.
 
@@ -353,6 +359,52 @@ text: `config_path_unresolved` (no `--config`, `XDG_CONFIG_HOME` or `HOME`, or a
 inadmissible path), `config_missing` (no file at the resolved path),
 `config_not_private` (the file or a directory above it is not owner-only) or
 `owner_uid_mismatch`.
+
+### Selecting an instance
+
+Every command that selects one configured instance takes `--connector <connector>
+--instance <instance>`; an instance name is unique within its connector only, so
+`--instance` alone selects nothing. `--adapter <alias>` keeps selecting by a
+configured entry's alias for a deprecation window whose length the release plan
+decides. Exactly one of `--adapter` or `--connector` with `--instance` is given;
+both, or either half of the pair alone, is `invalid_input` at `arguments`. With
+neither, the configuration's `default_instance` selects, else its
+`default_adapter`; with neither configured the command is `invalid_input` at
+`arguments`. A pair that names no configured instance is `not_found` at
+`admission` with `next_action` `check_configuration`, as an unknown alias is.
+
+An instance's names are those of the `[connectors.<connector>.instances.<instance>]`
+table that names its alias. An `[adapters.<alias>]` entry that no instance names
+is selected as connector `adapter_id`, instance `<alias>`, until it is migrated. A
+configuration in which two entries would answer to one connector and instance
+pair refuses the whole file, as does `default_instance` that is not
+`"<connector>/<instance>"` naming a configured instance, `default_instance`
+outside `connectors-local/5`, or `default_instance` beside `default_adapter`.
+
+Both selectors reach the same entry and the same records: a result is the same
+whichever selected it. Every result type that carries `adapter` carries
+`connector` and `instance` beside it, all three required. `adapter` is the
+instance's legacy alias for the deprecation window.
+
+`--adapter` says it is deprecated exactly once per command. Under `--output
+human` that is one line on standard error, ahead of any failure text the
+command writes there:
+
+```text
+deprecated: --adapter; select with --connector <connector> --instance <instance>
+```
+
+Under `--output json` nothing is added to standard error. The one envelope the
+command writes, success or failure, parse refusals included, carries a third
+member beside `ok` and `result` or `error`:
+
+```json
+{"ok":true,"result":{},"deprecations":[{"option":"--adapter","replacement":["--connector","--instance"]}]}
+```
+
+A caller that reads all of standard error as one JSON failure envelope keeps
+reading its `error`. Under `--output json`, output that is no envelope (help,
+`completions`, a launched consumer's streams) is unchanged.
 
 ### Durable open checkpoints on an existing store
 

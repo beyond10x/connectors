@@ -16,6 +16,15 @@ summary: Selected local CLI presentation values and the existing local configura
 # connectors.auth_bindings.AllocateConnection); the `connection` selectors
 # below keep their shape in this pass.
 types:
+  # Instance selectors (contracts/cli/v1alpha1/semantics.md §3, "Selecting an
+  # instance"). Every input below that carries `adapter` carries `connector`
+  # and `instance` too, all three Optional. Exactly one of `adapter` or
+  # `connector`+`instance` selects; with none, the configuration's
+  # default_instance, else its default_adapter. Optional alone does not enforce
+  # that exclusivity, so it is a runtime obligation, as for
+  # ConnectionStatusInput. Every result type that carries `adapter` carries
+  # `connector` and `instance` beside it, all three required; `adapter` is the
+  # selected instance's legacy alias for the deprecation window.
   # Local approval commands project existing policy/subject owners. A preparation
   # is metadata, not a lease or proof; issuance returns no protected proof bytes.
   - name: connectors.cli.ApprovalPolicyView
@@ -31,22 +40,30 @@ types:
   - name: connectors.cli.ApprovalPolicyStatusInput
     kind: struct
     fields:
-      - {name: adapter, type: String}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
   - name: connectors.cli.ApprovalPolicySetInput
     kind: struct
     fields:
-      - {name: adapter, type: String}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: expected_revision, type: "Optional<Integer>"}
       - {name: input_file, type: String}
   - name: connectors.cli.ApprovalPolicyResult
     kind: struct
     fields:
       - {name: adapter, type: String}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: policy, type: "Optional<connectors.cli.ApprovalPolicyView>"}
   - name: connectors.cli.ApprovalPrepareInput
     kind: struct
     fields:
-      - {name: adapter, type: String}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: String}
       - {name: operation, type: String}
       - {name: schema, type: String}
@@ -56,11 +73,15 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: String}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: preparation, type: connectors.delegation.ApprovalPreparation}
   - name: connectors.cli.ApprovalIssueInput
     kind: struct
     fields:
-      - {name: adapter, type: String}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: String}
       - {name: operation, type: String}
       - {name: schema, type: String}
@@ -75,17 +96,23 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: String}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: reference, type: String}
       - {name: subject_sha256, type: String}
       - {name: disposition, type: connectors.cli.ApprovalIssueDisposition}
   - name: connectors.cli.ApprovalClockCheckInput
     kind: struct
     fields:
-      - {name: adapter, type: String}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
   - name: connectors.cli.ApprovalClockCheckResult
     kind: struct
     fields:
       - {name: adapter, type: String}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: observation, type: connectors.clock.Observation}
     # ESS-LIMIT: clock.md:163 orders an observation (upper >= lower). The comparison
     # is writable here, but ESS 0.52 `specify cli` refuses any invariant on a CLI
@@ -110,38 +137,52 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: String}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: issuer, type: "Optional<connectors.cli.ApprovalIssuerView>"}
   - name: connectors.cli.ApprovalKeyStatusInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
   - name: connectors.cli.ApprovalKeyInitInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: expected_revision, type: "Optional<String>"}
   - name: connectors.cli.ApprovalKeyRotateInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
       - {name: expected_key, type: "String"}
   - name: connectors.cli.ApprovalKeyRecoverInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
       - {name: candidate, type: "String"}
   - name: connectors.cli.ApprovalKeyRevokeInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
       - {name: expected_key, type: "String"}
   - name: connectors.cli.ApprovalKeyRetireInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
       - {name: key, type: "String"}
   # Local configuration-owner bindings, not independent identities or grants.
@@ -671,6 +712,8 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: instance_id, type: "String"}
       - {name: adapter_id, type: "String"}
       - {name: startup, type: "connectors.cli.StartupMode"}
@@ -693,6 +736,8 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: configuration_revision, type: "String"}
       - {name: state, type: "connectors.cli.LifecycleState"}
       - {name: host_incarnation, type: "Optional<String>"}
@@ -704,6 +749,8 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: instance_id, type: "String"}
       - {name: connection, type: "String"}
       - {name: profile, type: "String"}
@@ -842,7 +889,9 @@ types:
   - name: connectors.cli.AdapterDescribeInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
   - name: connectors.cli.AdapterDescribeResult
     kind: struct
     fields:
@@ -853,7 +902,9 @@ types:
   - name: connectors.cli.AdapterStatusInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
   - name: connectors.cli.AdapterStatusResult
     kind: struct
     fields:
@@ -861,7 +912,9 @@ types:
   - name: connectors.cli.AdapterStopInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
       - {name: host_incarnation, type: "String"}
       - {name: child_incarnation, type: "String"}
@@ -872,7 +925,9 @@ types:
   - name: connectors.cli.ConnectionListInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: limit, type: "Optional<Integer>"}
       - {name: cursor, type: "Optional<String>"}
   # Page metadata covers every member; cached facts are always stale. A missing
@@ -890,7 +945,9 @@ types:
   - name: connectors.cli.ConnectionDescribeInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "String"}
   - name: connectors.cli.ConnectionDescribeResult
     kind: struct
@@ -917,7 +974,9 @@ types:
   - name: connectors.cli.ConnectionConnectInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: profile, type: "String"}
       - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionConnectResult
@@ -929,7 +988,9 @@ types:
   - name: connectors.cli.ConnectionRepairInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
       - {name: credential_document, type: "Optional<String>"}
@@ -941,7 +1002,9 @@ types:
   - name: connectors.cli.ConnectionRevalidateInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
   - name: connectors.cli.ConnectionRevalidateResult
@@ -958,7 +1021,9 @@ types:
   - name: connectors.cli.ConnectionLaunchInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "String"}
       - {name: consumer, type: "String"}
       - {name: args, type: "Optional<String>"}
@@ -973,7 +1038,9 @@ types:
   - name: connectors.cli.ConnectionStatusInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "Optional<String>"}
       - {name: acquisition, type: "Optional<String>"}
   # Exactly one branch matching the selected target. This is safe observation, not a protected continuation.
@@ -985,13 +1052,17 @@ types:
   - name: connectors.cli.ConnectionRevokeInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "String"}
       - {name: expected_revision, type: "String"}
   - name: connectors.cli.ConnectionRevokeResult
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: connection, type: "String"}
       - {name: revision, type: "String"}
       - {name: local_state, type: "connectors.cli.RevocationState"}
@@ -999,7 +1070,9 @@ types:
   - name: connectors.cli.OperationListInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: family, type: "Optional<String>"}
       - {name: limit, type: "Optional<Integer>"}
       - {name: cursor, type: "Optional<String>"}
@@ -1007,6 +1080,8 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: revision, type: "String"}
       - {name: operations, type: "List<connectors.cli.OperationSummary>"}
       - {name: next_cursor, type: "Optional<String>"}
@@ -1015,12 +1090,16 @@ types:
   - name: connectors.cli.OperationDescribeInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: operation, type: "String"}
   - name: connectors.cli.OperationDescribeResult
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: revision, type: "String"}
       - {name: schema, type: "String"}
       - {name: operation, type: "connectors.cli.OperationDescription"}
@@ -1030,7 +1109,9 @@ types:
   - name: connectors.cli.OperationInvokeInput
     kind: struct
     fields:
-      - {name: adapter, type: "String"}
+      - {name: adapter, type: "Optional<String>"}
+      - {name: connector, type: "Optional<String>"}
+      - {name: instance, type: "Optional<String>"}
       - {name: connection, type: "Optional<String>"}
       - {name: operation, type: "String"}
       - {name: schema, type: "String"}
@@ -1045,6 +1126,8 @@ types:
     kind: struct
     fields:
       - {name: adapter, type: "String"}
+      - {name: connector, type: String}
+      - {name: instance, type: String}
       - {name: operation, type: "String"}
       - {name: revision, type: "String"}
       - {name: result, type: "Json"}
