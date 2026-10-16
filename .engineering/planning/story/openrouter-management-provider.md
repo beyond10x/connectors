@@ -6,7 +6,7 @@ status: active
 title: OpenRouter management keys read and created through the catalog provider, the created key held in custody
 relations:
 - serves: vision:independent-contract-adapters
-revision: 5
+revision: 6
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-16T06:55:07Z", actor: "human:timo", revision: 2}
 - {from: "proposed", to: "active", at: "2026-10-16T06:55:07Z", actor: "human:timo", revision: 3}
@@ -74,21 +74,27 @@ validates with the repository's pinned `ess` and its conformance suite runs gree
 
 ## Status
 
-- Reads shipped on their own: the pinned OpenRouter source (redaction rule `upstream-redaction/3`),
-  the bundle, `key.get`, `workspaces.list` and `keys.list` with their fixture tests, and
-  `docs/catalog-openrouter.md`. The shared ESS models the custody outcome
-  (`CustodyOutcome`, `CredentialCustody`; catalog `Custody`, `CustodyWrite`), and the catalog
-  design §8a describes the custody write.
-- `key.create` ships under the current operator setting `[adapters.<alias>.permissions.custody]`;
-  the connector-vocabulary migration reads that name as a legacy alias during its deprecation
-  window, so it moves with the other settings. It is finished on branch `unit/openrouter-custody`
-  (from 5631f1fa8d: engine `custody` member and `execute_holding`, provider child
-  `execute_created`, host `Created` frame with the protected secret slot, owner
-  `mutation/custody.rs`, config `Permissions.custody`, CLI error data, tests; `custody` and
-  `created` added to `connectors.cli.Failure` in `ess/domains/cli.yaml`, CLI contract
-  regenerated), then the package suites and the three CLI journey cases (stored key,
-  `outcome_unknown` with one create, custody failure), and a security review of the write.
-- Risks found, owed before `key.create` ships:
+- Reads: the pinned OpenRouter source (redaction rule `upstream-redaction/3`), the bundle,
+  `key.get`, `workspaces.list` and `keys.list` with their fixture tests, and
+  `docs/catalog-openrouter.md`.
+- `key.create` under the current operator setting `[adapters.<alias>.permissions.custody]` (the
+  connector-vocabulary migration reads it as a legacy name): the one-time key goes into custody
+  as a new connection; the output is the connection ref and the key hash. `custody` and
+  `created` are members of `connectors.cli.Failure`; the CLI contract is regenerated.
+- Security review of the write, 2026-10-16: two must-fix findings, both fixed. A create whose
+  operation declares custody with no configured target (and a target for an operation that
+  creates nothing) is refused `invalid_configuration`, `not_attempted`, before it is sent
+  (modelled in `ess/domains/mutations.yaml`). The owner and every adapter child set
+  `RLIMIT_CORE` 0 and, on Linux, `PR_SET_DUMPABLE` 0. Checked and not faulted: the config
+  refusals, the pool worker deadlock, the body overwrite and `Secret` wipe, the child's send.
+- The ignored custody CLI journey cases were red locally; the guarded_merge journey with no
+  custody failed the same way on `main`, from a test helper that missed the audit anchor's
+  `access` (fixed in the test, aa1ee3437) and an intermittent `outcome_unknown` whose owner
+  error is not captured (story:owner-errors-are-readable). These journeys run in no CI job
+  (story:ignored-journeys-run-in-ci).
+- Risks accepted for this release, each stated in the release notes:
   - a custody store that answers `outcome_unknown` is reported as custody `failed`, though the
     connection may have been published;
-  - the HTTP client's serde_json buffers that held the answer are not wiped.
+  - the HTTP client's serde_json buffers that held the answer are not wiped;
+  - an owner crash between the provider's applied answer and the settle recovers the attempt as
+    unknown with the key hash recorded nowhere; nothing is re-sent.
