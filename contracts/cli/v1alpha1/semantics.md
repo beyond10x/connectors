@@ -385,7 +385,12 @@ outside `connectors-local/5`, or `default_instance` beside `default_adapter`.
 Both selectors reach the same entry and the same records: a result is the same
 whichever selected it. Every result type that carries `adapter` carries
 `connector` and `instance` beside it, all three required. `adapter` is the
-instance's legacy alias for the deprecation window.
+instance's legacy alias for the deprecation window. One shape is exempt: the
+service descriptor that `adapters describe` returns (the object carrying
+`configuration_schema`) keeps its own `adapter`, the implementation it describes
+(such as `catalog`), and its own `instance`, the instance id. Neither is a
+selector there, and the descriptor carries no `connector`. The surrounding result
+carries the selector fields.
 
 `--adapter` says it is deprecated exactly once per command. Under `--output
 human` that is one line on standard error, ahead of any failure text the
