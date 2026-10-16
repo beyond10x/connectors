@@ -342,7 +342,7 @@ fn a_result_names_the_connector_instance_and_legacy_alias() {
         root.path(),
         "json",
         &[
-            "adapters",
+            "instances",
             "describe",
             "--connector",
             CONNECTOR,
@@ -360,7 +360,7 @@ fn a_result_names_the_connector_instance_and_legacy_alias() {
         (&json!(ALIAS), &json!(CONNECTOR), &json!(INSTANCE)),
         "{summary}"
     );
-    let output = command(root.path(), "json", &["adapters", "list"]);
+    let output = command(root.path(), "json", &["instances", "list"]);
     let listed = envelope(&output)["result"]["adapters"].clone();
     assert_eq!(listed[0]["connector"], CONNECTOR, "{listed}");
     assert_eq!(listed[0]["instance"], INSTANCE, "{listed}");

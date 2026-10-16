@@ -115,10 +115,10 @@ callables:
     input: connectors.cli.ConnectionConnectInput
     result: connectors.cli.ConnectionConnectResult
     errors: {failure: connectors.cli.Failure}
-  connections-repair:
-    target: {kind: local, owner: connectors.cli, action: connections-repair}
-    input: connectors.cli.ConnectionRepairInput
-    result: connectors.cli.ConnectionRepairResult
+  connections-reconnect:
+    target: {kind: local, owner: connectors.cli, action: connections-reconnect}
+    input: connectors.cli.ConnectionReconnectInput
+    result: connectors.cli.ConnectionReconnectResult
     errors: {failure: connectors.cli.Failure}
   connections-status:
     target: {kind: local, owner: connectors.cli, action: connections-status}
@@ -347,19 +347,19 @@ commands:
     callable: setup-owner-stop
     about: Stop this state directory's running owner, of any build, within 30 seconds; run it after an upgrade when a command answers next_action stop_owner
     arguments: []
-  - path: [adapters, list]
-    aliases: []
+  - path: [instances, list]
+    aliases: [[adapters, list]]
     callable: adapters-list
-    about: List configured adapter entries
+    about: List configured instances; `adapters list` is its deprecated name
     arguments:
       - field: limit
         source: {kind: option, long: limit}
       - field: cursor
         source: {kind: option, long: cursor}
-  - path: [adapters, describe]
-    aliases: []
+  - path: [instances, describe]
+    aliases: [[adapters, describe]]
     callable: adapters-describe
-    about: Inspect one configured adapter and cached descriptor
+    about: Inspect one configured instance and its cached descriptor; `adapters describe` is its deprecated name
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
@@ -367,10 +367,10 @@ commands:
         source: {kind: option, long: connector}
       - field: instance
         source: {kind: option, long: instance}
-  - path: [adapters, status]
-    aliases: []
+  - path: [instances, status]
+    aliases: [[adapters, status]]
     callable: adapters-status
-    about: Observe the existing adapter lifecycle owner
+    about: Observe the lifecycle owner of one instance's adapter process; `adapters status` is its deprecated name
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
@@ -378,10 +378,10 @@ commands:
         source: {kind: option, long: connector}
       - field: instance
         source: {kind: option, long: instance}
-  - path: [adapters, stop]
-    aliases: []
+  - path: [instances, stop]
+    aliases: [[adapters, stop]]
     callable: adapters-stop
-    about: Stop only the exact owned adapter incarnation
+    about: Stop only the exact owned adapter incarnation of one instance; `adapters stop` is its deprecated name
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}
@@ -438,10 +438,10 @@ commands:
         source: {kind: option, long: profile}
       - field: credential_document
         source: {kind: protected, file: credential-file, stdin: credential-stdin, hidden_tty: credential-prompt}
-  - path: [connections, repair]
-    aliases: []
-    callable: connections-repair
-    about: Repair the exact connection without changing its identity
+  - path: [connections, reconnect]
+    aliases: [[connections, repair]]
+    callable: connections-reconnect
+    about: Publish a new credential on the exact connection without changing its identity; `connections repair` is its deprecated name
     arguments:
       - field: adapter
         source: {kind: option, long: adapter}

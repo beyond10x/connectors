@@ -62,9 +62,9 @@ fn every_cli_command_refusing_a_mismatched_entry_names_format_and_entry() {
     ];
     let commands: Vec<Vec<&str>> = vec![
         vec!["setup", "check"],
-        vec!["adapters", "list"],
-        vec!["adapters", "describe", "--adapter", "forge"],
-        vec!["adapters", "status", "--adapter", "forge"],
+        vec!["instances", "list"],
+        vec!["instances", "describe", "--adapter", "forge"],
+        vec!["instances", "status", "--adapter", "forge"],
         vec!["connections", "list", "--adapter", "forge"],
         vec!["operations", "list", "--adapter", "forge"],
         vec![
