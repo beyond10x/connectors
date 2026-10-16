@@ -1,0 +1,51 @@
+# Ledger expectations only: a provider refusal observed after local revocation
+# does not move the connection; Revoked stays terminal.
+type: ess-scenario/1
+domain: connectors.auth_bindings
+scenario: revoked-connection-is-never-stale
+summary: 'MarkConnectionStale on a Revoked connection is refused with its state, and the connection stays Revoked.'
+arrange:
+- instance: connection
+  entity: connectors.auth_bindings.Connection
+timeline:
+- at: '2026-10-16T12:00:00Z'
+  command: connectors.auth_bindings.AllocateConnection
+  input:
+    decision: allow
+    instance_id: gitlab.work
+    profile_record_ref: gitlab/gitlab.pat/r1
+    owner_scope: local
+    access_mode: credential
+    publication_fence: fence-1
+  outcome: allocated
+  events:
+  - event: connectors.auth_bindings.ConnectionAllocated
+  capture:
+    instance: connection
+    event: connectors.auth_bindings.ConnectionAllocated
+    field: connection_ref
+- at: '2026-10-16T12:00:01Z'
+  command: connectors.auth_bindings.RevokeConnection
+  input:
+    decision: allow
+    connection_ref:
+      $instance: connection
+  outcome: revoked
+  events:
+  - event: connectors.auth_bindings.ConnectionRevoked
+- at: '2026-10-16T12:00:02Z'
+  command: connectors.auth_bindings.MarkConnectionStale
+  input:
+    connection_ref:
+      $instance: connection
+  outcome: wrong-state
+  error:
+    name: connectors.auth_bindings.ConnectionStateConflict
+  no_events:
+  - connectors.auth_bindings.ConnectionMarkedStale
+assert:
+- view: connectors.auth_bindings.Connections
+  contains:
+    connection_ref:
+      $instance: connection
+    state: Revoked
