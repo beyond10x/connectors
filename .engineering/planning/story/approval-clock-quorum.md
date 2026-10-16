@@ -2,7 +2,7 @@
 format: aep.planning-md/3
 id: story:approval-clock-quorum
 kind: story
-status: active
+status: implemented
 title: The approval clock answers from a quorum of Roughtime sources
 relations:
 - serves: vision:independent-contract-adapters
@@ -91,10 +91,11 @@ scope:
   path: website/docs/reference/contracts/model/domains/connectors-mutations.md
 - confidence: inferred
   path: website/docs/status.md
-revision: 8
+revision: 9
 transitions:
 - {from: "draft", to: "proposed", at: "2026-10-14T18:07:38Z", actor: "human:timo", revision: 6}
 - {from: "proposed", to: "active", at: "2026-10-14T18:07:38Z", actor: "human:timo", revision: 7}
+- {from: "active", to: "implemented", at: "2026-10-16T02:05:07Z", actor: "human:timo", revision: 9, decided_on: {"recorded":{"test_result":1}}}
 ---
 # Story: the approval clock answers from a quorum of Roughtime sources
 
