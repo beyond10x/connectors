@@ -14074,6 +14074,515 @@
         }
       }
     },
+    "setup-migrate": {
+      "target": {
+        "kind": "local",
+        "owner": "connectors.cli",
+        "action": "setup-migrate"
+      },
+      "input": {
+        "type_ref": "connectors.cli.SetupMigrateInput",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "mode": {
+              "kind": "enum",
+              "variants": [
+                "dry-run",
+                "apply"
+              ]
+            }
+          }
+        }
+      },
+      "result": {
+        "type_ref": "connectors.cli.SetupMigrateResult",
+        "shape": {
+          "kind": "struct",
+          "fields": {
+            "backup_path": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "config_path": {
+              "kind": "string"
+            },
+            "configuration": {
+              "kind": "string"
+            },
+            "disposition": {
+              "kind": "enum",
+              "variants": [
+                "planned",
+                "applied",
+                "unchanged"
+              ]
+            },
+            "entries": {
+              "kind": "list",
+              "of": {
+                "kind": "struct",
+                "fields": {
+                  "adapter": {
+                    "kind": "string"
+                  },
+                  "after": {
+                    "kind": "struct",
+                    "fields": {
+                      "configuration_revision": {
+                        "kind": "string"
+                      },
+                      "custody_items": {
+                        "kind": "list",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "executable_selection": {
+                        "kind": "string"
+                      },
+                      "instance_id": {
+                        "kind": "string"
+                      }
+                    }
+                  },
+                  "before": {
+                    "kind": "struct",
+                    "fields": {
+                      "configuration_revision": {
+                        "kind": "string"
+                      },
+                      "custody_items": {
+                        "kind": "list",
+                        "of": {
+                          "kind": "string"
+                        }
+                      },
+                      "executable_selection": {
+                        "kind": "string"
+                      },
+                      "instance_id": {
+                        "kind": "string"
+                      }
+                    }
+                  },
+                  "connector": {
+                    "kind": "string"
+                  },
+                  "differing_field": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "instance_id",
+                        "configuration_revision",
+                        "adapter_id",
+                        "protocol",
+                        "private_protocol",
+                        "startup",
+                        "restart",
+                        "executable",
+                        "permissions"
+                      ]
+                    }
+                  },
+                  "disposition": {
+                    "kind": "enum",
+                    "variants": [
+                      "migrated",
+                      "kept"
+                    ]
+                  },
+                  "instance": {
+                    "kind": "string"
+                  },
+                  "reason": {
+                    "kind": "optional",
+                    "of": {
+                      "kind": "enum",
+                      "variants": [
+                        "implementation_unmapped",
+                        "connector_undeclared",
+                        "gateway_prefix",
+                        "native_configuration_unreadable",
+                        "instance_conflict",
+                        "selection_changes"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "format_after": {
+              "kind": "string"
+            },
+            "format_before": {
+              "kind": "string"
+            },
+            "mode": {
+              "kind": "enum",
+              "variants": [
+                "dry-run",
+                "apply"
+              ]
+            }
+          }
+        }
+      },
+      "errors": {
+        "failure": {
+          "type_ref": "connectors.cli.Failure",
+          "shape": {
+            "kind": "struct",
+            "fields": {
+              "acquisition": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "binary_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "clock_refusal": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "below_quorum",
+                    "split",
+                    "too_imprecise"
+                  ]
+                }
+              },
+              "clock_sources": {
+                "kind": "optional",
+                "of": {
+                  "kind": "list",
+                  "of": {
+                    "kind": "struct",
+                    "fields": {
+                      "address": {
+                        "kind": "string"
+                      },
+                      "index": {
+                        "kind": "integer"
+                      },
+                      "radius_ms": {
+                        "kind": "optional",
+                        "of": {
+                          "kind": "integer"
+                        }
+                      },
+                      "result": {
+                        "kind": "enum",
+                        "variants": [
+                          "agreed",
+                          "outlier",
+                          "verified",
+                          "unreachable",
+                          "unverified"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              "code": {
+                "kind": "enum",
+                "variants": [
+                  "invalid_input",
+                  "invalid_configuration",
+                  "configuration_exists",
+                  "protected_entry_unavailable",
+                  "custody_unavailable",
+                  "custody_read_only",
+                  "metadata_unavailable",
+                  "revision_conflict",
+                  "outcome_unknown",
+                  "identity_mismatch",
+                  "lifecycle_conflict",
+                  "incarnation_mismatch",
+                  "readiness_mismatch",
+                  "description_unavailable",
+                  "stale_description",
+                  "not_found",
+                  "revoked",
+                  "forbidden",
+                  "not_granted",
+                  "unavailable",
+                  "timeout",
+                  "capacity",
+                  "stale_cursor",
+                  "unsupported",
+                  "interrupted",
+                  "service_failure",
+                  "approval_required",
+                  "approval_refused",
+                  "approval_replayed",
+                  "idempotency_conflict",
+                  "owner_build_mismatch",
+                  "confirmation_required",
+                  "metadata_schema_newer"
+                ]
+              },
+              "configuration_format": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "connectors-local/1",
+                    "connectors-local/2",
+                    "connectors-local/3",
+                    "connectors-local/4",
+                    "connectors-local/5"
+                  ]
+                }
+              },
+              "configuration_rule": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "config_path_unresolved",
+                    "config_missing",
+                    "config_not_private",
+                    "owner_uid_mismatch",
+                    "approval_clock_format_retired"
+                  ]
+                }
+              },
+              "connection": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "instance_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "kind": {
+                "kind": "enum",
+                "variants": [
+                  "usage",
+                  "operational",
+                  "interrupted"
+                ]
+              },
+              "mutation": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "attempt": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "id": {
+                            "kind": "string"
+                          },
+                          "instance": {
+                            "kind": "string"
+                          }
+                        }
+                      }
+                    },
+                    "cause": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "struct",
+                        "fields": {
+                          "code": {
+                            "kind": "enum",
+                            "variants": [
+                              "invalid_input",
+                              "unsupported",
+                              "unauthorized",
+                              "forbidden",
+                              "not_found",
+                              "stale_description",
+                              "stale_cursor",
+                              "rate_limited",
+                              "unavailable",
+                              "capacity",
+                              "timeout",
+                              "upstream_protocol",
+                              "internal"
+                            ]
+                          },
+                          "stage": {
+                            "kind": "enum",
+                            "variants": [
+                              "preflight",
+                              "attempt_store",
+                              "approval",
+                              "dispatch",
+                              "response",
+                              "observation",
+                              "audit"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "classification": {
+                      "kind": "enum",
+                      "variants": [
+                        "not_attempted",
+                        "refused",
+                        "applied",
+                        "unknown"
+                      ]
+                    },
+                    "original_request_id": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "replayed": {
+                      "kind": "boolean"
+                    }
+                  }
+                }
+              },
+              "next_action": {
+                "kind": "enum",
+                "variants": [
+                  "check_configuration",
+                  "select_protected_source",
+                  "unlock_keyring",
+                  "retry_status",
+                  "repair_connection",
+                  "revalidate_connection",
+                  "create_connection",
+                  "refresh_description",
+                  "request_permission",
+                  "retry_explicitly",
+                  "stop_owner",
+                  "upgrade",
+                  "choose_clock_source",
+                  "none"
+                ]
+              },
+              "request_id": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "retry_after_seconds": {
+                "kind": "optional",
+                "of": {
+                  "kind": "integer"
+                }
+              },
+              "service_code": {
+                "kind": "optional",
+                "of": {
+                  "kind": "enum",
+                  "variants": [
+                    "invalid_input",
+                    "unsupported",
+                    "unauthorized",
+                    "forbidden",
+                    "not_found",
+                    "stale_description",
+                    "stale_cursor",
+                    "rate_limited",
+                    "unavailable",
+                    "capacity",
+                    "timeout",
+                    "upstream_protocol",
+                    "internal",
+                    "approval_required",
+                    "approval_refused",
+                    "approval_replayed",
+                    "idempotency_conflict",
+                    "outcome_unknown",
+                    "not_granted",
+                    "stale_authority",
+                    "connection_not_ready",
+                    "route_unavailable",
+                    "route_refused",
+                    "insufficient_scope",
+                    "session_not_ready",
+                    "session_lost",
+                    "offer_expired",
+                    "offer_rejected",
+                    "lease_expired",
+                    "revoked"
+                  ]
+                }
+              },
+              "service_reason": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              },
+              "source_audit": {
+                "kind": "optional",
+                "of": {
+                  "kind": "struct",
+                  "fields": {
+                    "audit_ref": {
+                      "kind": "optional",
+                      "of": {
+                        "kind": "string"
+                      }
+                    },
+                    "audit_status": {
+                      "kind": "enum",
+                      "variants": [
+                        "complete",
+                        "incomplete",
+                        "unavailable",
+                        "not_required"
+                      ]
+                    },
+                    "instance": {
+                      "kind": "string"
+                    }
+                  }
+                }
+              },
+              "stage": {
+                "kind": "enum",
+                "variants": [
+                  "arguments",
+                  "configuration",
+                  "protected_entry",
+                  "admission",
+                  "launch",
+                  "readiness",
+                  "custody",
+                  "publication",
+                  "dispatch",
+                  "observation",
+                  "stop"
+                ]
+              },
+              "store_version": {
+                "kind": "optional",
+                "of": {
+                  "kind": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "setup-owner-stop": {
       "target": {
         "kind": "local",
@@ -15738,6 +16247,24 @@
     {
       "path": [
         "setup",
+        "migrate"
+      ],
+      "aliases": [],
+      "callable": "setup-migrate",
+      "about": "Rewrite each adapter entry that maps to a shipped connector as that connector's instance, keeping its instance id, revision and selection; --mode dry-run (or --dry-run) prints the new file, --mode apply (or --apply) writes it and keeps the old one as config.toml.before-migrate-<UTC timestamp>",
+      "arguments": [
+        {
+          "field": "mode",
+          "source": {
+            "kind": "option",
+            "long": "mode"
+          }
+        }
+      ]
+    },
+    {
+      "path": [
+        "setup",
         "owner-stop"
       ],
       "aliases": [],
@@ -15777,6 +16304,7 @@
     "handler:setup-check: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-checkpoints-enable: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-init: implement the owner-qualified callable and its declared result/error contract",
+    "handler:setup-migrate: implement the owner-qualified callable and its declared result/error contract",
     "handler:setup-owner-stop: implement the owner-qualified callable and its declared result/error contract"
   ]
 }
