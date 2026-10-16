@@ -64,10 +64,10 @@ select a new write-approval format.
 Every type below is in `connectors.cli`. The presentation binding is authored
 separately as `ess-cli/1`. Process globals `config`, `state-dir` and `output` live
 in its separate Context; none becomes a command payload field. Paths are resolved
-before contacting an owner. Connect/repair inputs are ephemeral local protected
+before contacting an owner. Connect/reconnect inputs are ephemeral local protected
 actions: their `credential_document: String` is acquired through the protected
 source binding and passed only to trusted completion. Their distinct
-`ConnectionCreateRequest` / `ConnectionRepairRequest` management projections
+`ConnectionCreateRequest` / `ConnectionReconnectRequest` management projections
 contain only safe selectors. An ephemeral protected action is never an ordinary
 management wire payload or a persistent record.
 
@@ -82,14 +82,14 @@ management wire payload or a persistent record.
 | `approvals policy-set` | local policy coordinator | `ApprovalPolicySetInput` → `ApprovalPolicyResult` | no / no |
 | `approvals prepare` | local subject coordinator | `ApprovalPrepareInput` → `ApprovalPrepareResult` | no / no |
 | `approvals issue` | local issuer coordinator | `ApprovalIssueInput` → `ApprovalIssueResult` | no / no |
-| `adapters list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
-| `adapters describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
-| `adapters status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
-| `adapters stop` | existing lifecycle owner | `AdapterStopInput` → `AdapterStopResult` | no / no |
+| `instances list` | configured inventory | `AdapterListInput` → `AdapterListResult` | no / no |
+| `instances describe` | configured inventory and selected cached metadata | `AdapterDescribeInput` → `AdapterDescribeResult` | no / no |
+| `instances status` | existing lifecycle owner observation | `AdapterStatusInput` → `AdapterStatusResult` | no / no |
+| `instances stop` | existing lifecycle owner | `AdapterStopInput` → `AdapterStopResult` | no / no |
 | `connections list` | connection metadata authority | `ConnectionListInput` → `ConnectionListResult` | no / no |
 | `connections describe` | connection metadata authority | `ConnectionDescribeInput` → `ConnectionDescribeResult` | no / no |
 | `connections connect` | acquisition/configuration coordinator | `ConnectionConnectInput` → `ConnectionConnectResult` | yes / yes, after admission |
-| `connections repair` | exact existing connection's coordinator | `ConnectionRepairInput` → `ConnectionRepairResult` | yes / yes, after admission |
+| `connections reconnect` | exact existing connection's coordinator | `ConnectionReconnectInput` → `ConnectionReconnectResult` | yes / yes, after admission |
 | `connections revalidate` | exact existing connection's evidence coordinator | `ConnectionRevalidateInput` → `ConnectionRevalidateResult` | yes / yes, after admission |
 | `connections launch` | exact existing connection's read admission and the owner's custody read | `ConnectionLaunchInput` → the consumer's exit status ([consumer launch](consumer-launch.md)) | yes / no |
 | `connections status` | safe connection/acquisition observation | `ConnectionStatusInput` → `ConnectionStatusResult` | no / no |
@@ -160,7 +160,7 @@ page deadline. Configuration alone cannot establish connection state. These
 labels preserve observation provenance; they grant no invocation or publication
 authority. The same cached-is-stale rule covers adapter descriptions, operation
 lists/descriptions and cached connection descriptions.
-`adapters list` reports configured inventory with `source: configuration` only;
+`instances list` reports configured inventory with `source: configuration` only;
 it carries no cached lifecycle or readiness claim. Adapter status and acquisition
 status read their existing owner's observations or report owner unavailability;
 they have no cached-result fallback. Connection status can carry a cached
@@ -196,8 +196,9 @@ consumed or failed acquisition never permits repeating its exchange.
 `--output json` emits exactly one UTF-8 `{"ok":true,"result":...}` success envelope
 plus newline to stdout. Failure leaves stdout empty and emits one
 `{"ok":false,"error":{"code":...,"data":...}}` envelope plus newline to stderr.
-A command selected with the deprecated `--adapter` adds a `deprecations` member
-to either envelope and nothing else ([selecting an instance](#selecting-an-instance)).
+A command selected with the deprecated `--adapter`, or run under a renamed path,
+adds a `deprecations` member to either envelope and nothing else
+([selecting an instance](#selecting-an-instance), [renamed commands](#renamed-commands)).
 Application error data is `Failure`, while parser/source/internal errors have
 stable codes and empty data as defined by `ess-cli/1`. Human mode identifies a
 safe next action through the typed result/error. Progress belongs on stderr; JSON
@@ -405,6 +406,34 @@ member beside `ok` and `result` or `error`:
 A caller that reads all of standard error as one JSON failure envelope keeps
 reading its `error`. Under `--output json`, output that is no envelope (help,
 `completions`, a launched consumer's streams) is unchanged.
+
+### Renamed commands
+
+`connections reconnect` replaces `connections repair`, and the `instances` group
+replaces `adapters`: `instances list`, `instances describe`, `instances status`
+and `instances stop`. The commands address an instance; the process they
+observe and stop is still that instance's adapter. Each old path stays an alias
+of its new one for the deprecation window: the same arguments run the same
+command against the same instance with the same result. These are the
+binding's only path aliases.
+
+An old path says it is deprecated exactly once per command, as `--adapter`
+does. Under `--output human` that is one line on standard error, ahead of any
+other deprecation line and any failure text:
+
+```text
+deprecated: connections repair; use connections reconnect
+```
+
+Under `--output json` the one envelope's `deprecations` member carries the
+entry, ahead of an `--adapter` entry when both apply:
+
+```json
+{"ok":true,"result":{},"deprecations":[{"command":"connections repair","replacement":["connections reconnect"]}]}
+```
+
+The machine-facing `next_action` value `repair_connection` is unchanged; it
+names `connections reconnect`.
 
 ### Durable open checkpoints on an existing store
 
@@ -680,7 +709,7 @@ Missing material or a locked collection is an explicit failure, never another
 generation or environment credential. Persisted metadata without valid custody
 is not a successful connection.
 
-Repair binds the same connection identity, immutable profile/owner/target and
+`connections reconnect` binds the same connection identity, immutable profile/owner/target and
 expected revision. Same-principal/same-target credential renewal may publish a new
 private generation and advance its private publication fence while preserving
 both connection reference and public semantic revision. Only separately admitted
@@ -715,7 +744,7 @@ quoted carrier string or a double-encoded document. Answers are not carriers:
 `OperationInvokeResult.result` is the provider result as a JSON value, validated
 against the selected operation's output schema, and `OperationDescription`
 answers `input_schema` and `output_schema` as JSON schema objects in
-`operations describe`, in the `adapters describe` descriptor and in the
+`operations describe`, in the `instances describe` descriptor and in the
 compatibility `describe`. A caller decodes the answer once; none of these fields
 is a string holding JSON. The schema digest (`schema`), not the schema document,
 remains the identity an invocation selects. `ServiceDescriptor.configuration_schema`
@@ -886,8 +915,8 @@ existing connection — an HTTP 401, or an OAuth token endpoint's `invalid_grant
 `invalid_client` for a refresh profile — is `code = service_failure`,
 `service_code = unauthorized` at `stage = dispatch` with
 `next_action = repair_connection`: a retry with the same protected entry cannot
-succeed, and a repair replaces it. A credential refused while a connection is
-made (`connections connect`, `connections repair`) or revalidated is not this
+succeed, and `connections reconnect` replaces it. A credential refused while a connection is
+made (`connections connect`, `connections reconnect`) or revalidated is not this
 case and keeps `next_action = retry_explicitly`.
 A guarded write refused for its stored credential, at its preflight or its
 commit, is not this case either: it reports its `mutation` record with
@@ -937,12 +966,12 @@ Otherwise it is `create_connection`, a saved connection whose profile id the
 configured adapter no longer declares included (revalidate and repair refuse it
 as a read does, never as `unsupported`); connect under a declared profile
 admits the new connection. A
-`connections repair` of a connection saved under another binding is classified
-the same way, never as `identity_mismatch`: repair refuses a changed binding. A
-`connections revalidate`, `connections connect`, `connections repair`, read or
+`connections reconnect` of a connection saved under another binding is classified
+the same way, never as `identity_mismatch`: reconnect refuses a changed binding. A
+`connections revalidate`, `connections connect`, `connections reconnect`, read or
 write whose adapter process still runs an earlier adapter entry stops that
 process and launches the configured one before it captures anything, so no
-command answers `retry_status` for it until `adapters stop`. Only a credential
+command answers `retry_status` for it until `instances stop`. Only a credential
 validation captured by the earlier process is still refused as
 `lifecycle_conflict`; its `connections connect` starts again with a launch
 that replaces the process. A revalidation the new provider refuses (the

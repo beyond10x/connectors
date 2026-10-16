@@ -99,14 +99,14 @@ fn the_selected_inventory_has_thirty_grouped_commands_and_explicit_runtime_oblig
         "setup check",
         "setup checkpoints-enable",
         "setup owner-stop",
-        "adapters list",
-        "adapters describe",
-        "adapters status",
-        "adapters stop",
+        "instances list",
+        "instances describe",
+        "instances status",
+        "instances stop",
         "connections list",
         "connections describe",
         "connections connect",
-        "connections repair",
+        "connections reconnect",
         "connections revalidate",
         "connections launch",
         "connections status",
@@ -313,18 +313,18 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         ),
         (&["setup", "init"], "SetupInitResult"),
         (&["setup", "check"], "SetupCheckResult"),
-        (&["adapters", "list", "--limit", "10"], "AdapterListResult"),
+        (&["instances", "list", "--limit", "10"], "AdapterListResult"),
         (
-            &["adapters", "describe", "--adapter", "forge"],
+            &["instances", "describe", "--adapter", "forge"],
             "AdapterDescribeResult",
         ),
         (
-            &["adapters", "status", "--adapter", "forge"],
+            &["instances", "status", "--adapter", "forge"],
             "AdapterStatusResult",
         ),
         (
             &[
-                "adapters",
+                "instances",
                 "stop",
                 "--adapter",
                 "forge",
@@ -367,7 +367,7 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
         (
             &[
                 "connections",
-                "repair",
+                "reconnect",
                 "--adapter",
                 "forge",
                 "--connection",
@@ -376,7 +376,7 @@ fn every_local_action_dispatches_once_with_its_declared_result_type() {
                 "r1",
                 "--credential-stdin",
             ],
-            "ConnectionRepairResult",
+            "ConnectionReconnectResult",
         ),
         (
             &[
@@ -677,7 +677,7 @@ fn describe_and_invoke_answer_json_values_not_json_text() {
             ],
             described,
         ),
-        (&["adapters", "describe", "--adapter", "forge"], adapter),
+        (&["instances", "describe", "--adapter", "forge"], adapter),
     ];
     for (args, result) in cases {
         let mut handler = Recorder::new(result.clone());
@@ -840,7 +840,7 @@ fn a_configuration_refusal_may_name_the_format_and_entry_and_nothing_else() {
         "next_action":"check_configuration","configuration_format":"connectors-local/1",
         "instance_id":"forge-local"});
     let mut sources = InputSources::default();
-    let args = ["adapters", "list", "--output", "json"];
+    let args = ["instances", "list", "--output", "json"];
     let output = refusal(
         &run(
             &args,
@@ -960,5 +960,115 @@ fn every_adapter_command_also_selects_by_connector_and_instance() {
             .map(|pair| (pair[0].trim_start_matches("--").to_owned(), json!(pair[1])))
             .collect();
         assert_eq!(input, Value::Object(expected), "{selector:?}");
+    }
+}
+
+/// story:connections-reconnect-verb: `connections reconnect` replaces
+/// `connections repair` and the `instances` group replaces `adapters`. Each old
+/// path is a path alias of exactly its new one, so the same arguments reach
+/// the same callable with the same input and answer the same output.
+#[test]
+fn every_renamed_path_is_an_alias_of_its_new_name() {
+    let plan = connectors_cli_contract::plan();
+    let aliases: BTreeSet<(String, String)> = plan
+        .commands
+        .iter()
+        .flat_map(|command| {
+            command
+                .aliases
+                .iter()
+                .map(|alias| (alias.join(" "), command.path.join(" ")))
+        })
+        .collect();
+    let renamed = [
+        ("connections repair", "connections reconnect"),
+        ("adapters list", "instances list"),
+        ("adapters describe", "instances describe"),
+        ("adapters status", "instances status"),
+        ("adapters stop", "instances stop"),
+    ];
+    assert_eq!(
+        aliases,
+        renamed
+            .iter()
+            .map(|(old, new)| ((*old).to_owned(), (*new).to_owned()))
+            .collect()
+    );
+    let arguments: &[&str] = &[
+        "--connector",
+        "fixture",
+        "--instance",
+        "main",
+        "--connection",
+        "c1",
+        "--expected-revision",
+        "r1",
+        "--host-incarnation",
+        "h1",
+        "--child-incarnation",
+        "p1",
+        "--credential-stdin",
+    ];
+    for (old, new) in renamed {
+        let declaration = plan
+            .commands
+            .iter()
+            .find(|command| command.path.join(" ") == new)
+            .unwrap();
+        let longs: BTreeSet<String> = declaration
+            .arguments
+            .iter()
+            .flat_map(|argument| match &argument.source {
+                ArgumentSource::Option { long } => vec![format!("--{long}")],
+                ArgumentSource::Protected { stdin, .. } => vec![format!("--{stdin}")],
+                _ => Vec::new(),
+            })
+            .collect();
+        let args: Vec<&str> = arguments
+            .chunks(2)
+            .filter(|pair| pair.len() == 2 && longs.contains(pair[0]))
+            .flatten()
+            .copied()
+            .chain(
+                arguments
+                    .last()
+                    .copied()
+                    .filter(|flag| longs.contains(*flag)),
+            )
+            .collect();
+        let result = fixture(match declaration.callable.as_str() {
+            "connections-reconnect" => "ConnectionReconnectResult",
+            "adapters-list" => "AdapterListResult",
+            "adapters-describe" => "AdapterDescribeResult",
+            "adapters-status" => "AdapterStatusResult",
+            "adapters-stop" => "AdapterStopResult",
+            other => panic!("{other}"),
+        });
+        let answer = |path: &str| {
+            let mut handler = Recorder::new(result.clone());
+            let mut sources = InputSources {
+                value: r#"{"credential":"fictional-credential-sentinel"}"#.into(),
+                ..Default::default()
+            };
+            let output = run(
+                &[
+                    &["--output", "json"][..],
+                    &path.split(' ').collect::<Vec<_>>(),
+                    &args,
+                ]
+                .concat(),
+                &mut sources,
+                &mut handler,
+                None,
+            );
+            assert_eq!(output.exit_code, 0, "{path}: {output:?}");
+            assert_eq!(handler.calls, 1, "{path}");
+            (output, handler.last.unwrap(), sources.calls)
+        };
+        let (by_new, by_old) = (answer(new), answer(old));
+        assert_eq!(by_new.0, by_old.0, "{old} -> {new}");
+        assert_eq!(by_new.1.0, declaration.callable, "{new}");
+        assert_eq!(by_new.1, by_old.1, "{old} -> {new}");
+        assert_eq!(by_new.2, by_old.2, "{old} -> {new}");
     }
 }

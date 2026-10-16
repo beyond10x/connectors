@@ -21,11 +21,11 @@ mod select;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
-    let deprecated = select::deprecated(&args);
+    let deprecations = select::deprecations(&args);
     let json = select::json_output(&args);
     let mut output = run_selected(args);
-    if deprecated {
-        select::deprecate(&mut output, json);
+    if !deprecations.is_empty() {
+        select::deprecate(&mut output, json, &deprecations);
     }
     output
 }
@@ -108,7 +108,10 @@ impl Handler for LocalHandler {
 
 impl LocalHandler {
     fn dispatch(&mut self, call: &Invocation<'_>) -> HandlerReply {
-        let result = if matches!(call.callable, "connections-connect" | "connections-repair") {
+        let result = if matches!(
+            call.callable,
+            "connections-connect" | "connections-reconnect"
+        ) {
             let mut session = self.0.borrow_mut();
             if call
                 .input
