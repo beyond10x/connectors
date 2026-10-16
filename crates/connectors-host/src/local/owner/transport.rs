@@ -998,6 +998,12 @@ fn spawn(
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    // A test build ties the owner to the process a harness names (owner.md);
+    // this one variable is all of the CLI's environment the owner receives.
+    #[cfg(debug_assertions)]
+    if let Some(parent) = std::env::var_os(super::tether::PARENT) {
+        command.env(super::tether::PARENT, parent);
+    }
     // SAFETY: the hook uses only async-signal-safe syscalls and scalar fds. This
     // process intentionally outlives the CLI and starts a separate session.
     unsafe {
@@ -1108,6 +1114,15 @@ pub fn serve(paths: Paths) -> Result<()> {
         std::fs::remove_file(&socket).map_err(|_| Code::Unavailable)?;
     }
     let mut listener = listen(&socket)?;
+    // owner.md: a Unix owner whose socket or state directory is gone, or in a
+    // test build whose named process has ended, exits.
+    #[cfg(unix)]
+    let mut tether =
+        tether::Tether::new(&directory, &paths.state, &socket).ok_or(Code::Unavailable)?;
+    #[cfg(unix)]
+    let lost = move || tether.lost().is_some();
+    #[cfg(windows)]
+    let lost = || false;
     let paths = Arc::new(paths);
     let incarnation = uuid::Uuid::new_v4().to_string();
     let owner = Arc::new(Owner {
@@ -1126,7 +1141,14 @@ pub fn serve(paths: Paths) -> Result<()> {
     let recovery = maintenance::Background::start(owner.paths.clone(), owner.pool.clone())?;
     handle(owner.clone(), startup)?;
     owner.pool.automatic(&config);
-    let (mut result, retired) = accept(&owner, &recovery, &mut listener, &socket, idle_bound());
+    let (mut result, retired) = accept(
+        &owner,
+        &recovery,
+        &mut listener,
+        &socket,
+        idle_bound(),
+        lost,
+    );
     drop(listener);
     if let Err(error) = recovery.stop() {
         result = Err(error);
@@ -1149,14 +1171,17 @@ pub fn serve(paths: Paths) -> Result<()> {
     }
     result
 }
-/// Serves connections until shutdown, a listener failure or idle retirement;
-/// the flag reports retirement, after which the socket is already gone.
+/// Serves connections until shutdown, a listener failure, idle retirement or
+/// `lost` reporting that the owner's socket, state directory or test parent is
+/// gone; the flag reports that the owner leaves its socket path alone: retired,
+/// the socket is already gone, and lost, the path may be another directory's.
 fn accept(
     owner: &Arc<Owner>,
     recovery: &maintenance::Background,
     listener: &mut Listener,
     socket: &std::path::Path,
     bound: Duration,
+    mut lost: impl FnMut() -> bool,
 ) -> (Result<()>, bool) {
     let mut result = Ok(());
     let mut active_at = Instant::now();
@@ -1169,6 +1194,16 @@ fn accept(
                 let _ = handle(owner.clone(), stream);
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                if lost() {
+                    // Accept nothing more; let admitted clients finish, bounded.
+                    let until = Instant::now() + Duration::from_secs(5);
+                    while owner.clients.load(Ordering::SeqCst) > 0 && Instant::now() < until {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    owner.shutdown.store(true, Ordering::SeqCst);
+                    retired = true;
+                    break;
+                }
                 let progress = owner.pool.settled();
                 if working(owner) || progress != settled {
                     settled = progress;
@@ -2682,7 +2717,8 @@ mod idle_sweep_tests {
         let loop_thread = std::thread::spawn(move || {
             // Keeps the descriptor that `socket` names open while the loop uses it.
             let _directory = &directory;
-            let (result, retired) = accept(&serving, &recovery, &mut listener, &socket, bound);
+            let (result, retired) =
+                accept(&serving, &recovery, &mut listener, &socket, bound, || false);
             let _ = done.send(started.elapsed());
             recovery.stop().unwrap();
             (result, retired)
