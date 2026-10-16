@@ -156,4 +156,53 @@ connectors --output json operations invoke --adapter router --connection "$conne
 
 ## Creating a key
 
-Added with `key.create`.
+`key.create` (`createKeys`, `POST /api/v1/keys`) creates an OpenRouter API key with
+the management key. It is a required-approval write. OpenRouter answers the new key
+in `key`, once ("The plaintext `key` is returned only in this response", the pinned
+document); Connectors never returns it. The answer's key goes straight into custody
+as a new connection of a second configured alias, and the caller receives only that
+connection's reference and the key's `hash` (design
+[§8a](../adapters/catalog/design.md#8a-writes-that-create-a-credential),
+[created credentials](local-mutation-ledger.md#created-credentials)).
+
+The body is closed to these keys; any other, such as the partner `external` object
+(which carries a partner-supplied key) or `creator_user_id`, is refused as
+`invalid_input` before any request:
+
+| key | meaning |
+|---|---|
+| `name` | required, a non-empty string |
+| `limit` | the key's spending limit in USD, or `null` |
+| `limit_reset` | `daily`, `weekly`, `monthly` or `null` |
+| `include_byok_in_limit` | a boolean |
+| `expires_at` | an ISO 8601 UTC timestamp with seconds, or `null` |
+| `workspace_id` | the workspace the key belongs to |
+
+### The inference alias
+
+The created key is an ordinary OpenRouter API key. The pinned document declares one
+security scheme for every operation, `apiKey` (`http` `bearer`), and its current-key
+read, `GET /api/v1/key`, answers "the API key associated with the current
+authentication session", whichever key that is. So the alias that holds created
+keys runs the same provider under the same profile, `openrouter.api-key`, with its
+own `instance`; connecting a created key reads its own record and names its own
+`label` as the subject. Grant it only `key.get`: the management reads answer a
+created key `403`.
+
+```json
+{
+  "format": "connectors-catalog-local/2",
+  "instance": "openrouter-inference",
+  "provider": "openrouter",
+  "bundle_directory": "/absolute/path/adapters/catalog/generated/bundles",
+  "api_base": "https://openrouter.ai/api/v1",
+  "auth": {
+    "profile": "openrouter.api-key",
+    "header": "Authorization",
+    "bearer": true,
+    "label": "OpenRouter inference key",
+    "identity": {"path": "key", "kind": "openrouter.key", "subject_pointer": "/data/label"}
+  },
+  "operations_file": "/absolute/path/adapters/catalog/providers/openrouter/operations.json"
+}
+```
