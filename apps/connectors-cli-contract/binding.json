@@ -20,7 +20,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -63,6 +78,12 @@
                       "kind": "string"
                     },
                     "adapter_id": {
+                      "kind": "string"
+                    },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
                       "kind": "string"
                     },
                     "instance_id": {
@@ -542,6 +563,12 @@
                   "adapter_id": {
                     "kind": "string"
                   },
+                  "connector": {
+                    "kind": "string"
+                  },
+                  "instance": {
+                    "kind": "string"
+                  },
                   "instance_id": {
                     "kind": "string"
                   },
@@ -942,7 +969,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -965,6 +1007,9 @@
                   }
                 },
                 "configuration_revision": {
+                  "kind": "string"
+                },
+                "connector": {
                   "kind": "string"
                 },
                 "failure": {
@@ -1321,6 +1366,9 @@
                   "of": {
                     "kind": "string"
                   }
+                },
+                "instance": {
+                  "kind": "string"
                 },
                 "observed_at_ms": {
                   "kind": "integer"
@@ -1707,16 +1755,31 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "child_incarnation": {
               "kind": "string"
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "string"
             },
             "host_incarnation": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -1739,6 +1802,9 @@
                   }
                 },
                 "configuration_revision": {
+                  "kind": "string"
+                },
+                "connector": {
                   "kind": "string"
                 },
                 "failure": {
@@ -2095,6 +2161,9 @@
                   "of": {
                     "kind": "string"
                   }
+                },
+                "instance": {
+                  "kind": "string"
                 },
                 "observed_at_ms": {
                   "kind": "integer"
@@ -2481,7 +2550,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -2492,6 +2576,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "observation": {
@@ -2905,7 +2995,10 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "approve_subject": {
               "kind": "string"
@@ -2913,8 +3006,20 @@
             "connection": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "input": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -2939,11 +3044,17 @@
             "adapter": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "string"
+            },
             "disposition": {
               "kind": "enum",
               "variants": [
                 "published"
               ]
+            },
+            "instance": {
+              "kind": "string"
             },
             "reference": {
               "kind": "string"
@@ -3318,9 +3429,24 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -3335,6 +3461,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -3745,13 +3877,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "candidate": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -3762,6 +3909,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -4172,10 +4325,25 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "key": {
               "kind": "string"
@@ -4189,6 +4357,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -4599,13 +4773,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_key": {
               "kind": "string"
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -4616,6 +4805,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -5026,13 +5221,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_key": {
               "kind": "string"
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -5043,6 +5253,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -5453,7 +5669,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -5464,6 +5695,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "issuer": {
@@ -5874,7 +6111,16 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "expected_revision": {
               "kind": "optional",
@@ -5884,6 +6130,12 @@
             },
             "input_file": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -5894,6 +6146,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "policy": {
@@ -6309,7 +6567,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -6320,6 +6593,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "policy": {
@@ -6735,13 +7014,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "input": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -6761,6 +7055,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "preparation": {
@@ -7342,9 +7642,24 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "credential_document": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -7405,6 +7720,12 @@
                       "kind": "string"
                     },
                     "connection": {
+                      "kind": "string"
+                    },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
                       "kind": "string"
                     },
                     "instance_id": {
@@ -7802,10 +8123,25 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
               "kind": "string"
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -7853,6 +8189,12 @@
                       "kind": "string"
                     },
                     "connection": {
+                      "kind": "string"
+                    },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
                       "kind": "string"
                     },
                     "instance_id": {
@@ -8250,7 +8592,10 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "args": {
               "kind": "optional",
@@ -8261,8 +8606,20 @@
             "connection": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "consumer": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -8645,9 +9002,24 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "cursor": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -8676,6 +9048,12 @@
                     "kind": "string"
                   },
                   "connection": {
+                    "kind": "string"
+                  },
+                  "connector": {
+                    "kind": "string"
+                  },
+                  "instance": {
                     "kind": "string"
                   },
                   "instance_id": {
@@ -9095,10 +9473,19 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
               "kind": "string"
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "credential_document": {
               "kind": "optional",
@@ -9108,6 +9495,12 @@
             },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -9161,6 +9554,12 @@
                       "kind": "string"
                     },
                     "connection": {
+                      "kind": "string"
+                    },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
                       "kind": "string"
                     },
                     "instance_id": {
@@ -9558,13 +9957,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -9612,6 +10026,12 @@
                       "kind": "string"
                     },
                     "connection": {
+                      "kind": "string"
+                    },
+                    "connector": {
+                      "kind": "string"
+                    },
+                    "instance": {
                       "kind": "string"
                     },
                     "instance_id": {
@@ -10009,13 +10429,28 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
               "kind": "string"
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "expected_revision": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             }
           }
         }
@@ -10029,6 +10464,12 @@
               "kind": "string"
             },
             "connection": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "local_state": {
@@ -10419,9 +10860,24 @@
               }
             },
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "connection": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -10539,6 +10995,12 @@
                         "kind": "string"
                       },
                       "connection": {
+                        "kind": "string"
+                      },
+                      "connector": {
+                        "kind": "string"
+                      },
+                      "instance": {
                         "kind": "string"
                       },
                       "instance_id": {
@@ -10937,7 +11399,22 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -10951,6 +11428,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "operation": {
@@ -11362,7 +11845,10 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "approval_file": {
               "kind": "optional",
@@ -11376,6 +11862,12 @@
                 "kind": "string"
               }
             },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
             "idempotency_key": {
               "kind": "optional",
               "of": {
@@ -11384,6 +11876,12 @@
             },
             "input": {
               "kind": "string"
+            },
+            "instance": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "operation": {
               "kind": "string"
@@ -11403,6 +11901,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "mutation": {
@@ -11891,7 +12395,16 @@
           "kind": "struct",
           "fields": {
             "adapter": {
-              "kind": "string"
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "connector": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
             },
             "cursor": {
               "kind": "optional",
@@ -11900,6 +12413,12 @@
               }
             },
             "family": {
+              "kind": "optional",
+              "of": {
+                "kind": "string"
+              }
+            },
+            "instance": {
               "kind": "optional",
               "of": {
                 "kind": "string"
@@ -11920,6 +12439,12 @@
           "kind": "struct",
           "fields": {
             "adapter": {
+              "kind": "string"
+            },
+            "connector": {
+              "kind": "string"
+            },
+            "instance": {
               "kind": "string"
             },
             "next_cursor": {
@@ -13943,6 +14468,20 @@
             "kind": "option",
             "long": "adapter"
           }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
         }
       ]
     },
@@ -13986,6 +14525,20 @@
             "kind": "option",
             "long": "adapter"
           }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
         }
       ]
     },
@@ -14003,6 +14556,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14043,6 +14610,20 @@
             "kind": "option",
             "long": "adapter"
           }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
         }
       ]
     },
@@ -14060,6 +14641,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14132,6 +14727,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "expected_revision",
           "source": {
             "kind": "option",
@@ -14154,6 +14763,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14189,6 +14812,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "expected_revision",
           "source": {
             "kind": "option",
@@ -14218,6 +14855,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14253,6 +14904,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "expected_revision",
           "source": {
             "kind": "option",
@@ -14283,6 +14948,20 @@
             "kind": "option",
             "long": "adapter"
           }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
         }
       ]
     },
@@ -14300,6 +14979,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14333,6 +15026,20 @@
             "kind": "option",
             "long": "adapter"
           }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
         }
       ]
     },
@@ -14350,6 +15057,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14408,6 +15129,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "profile",
           "source": {
             "kind": "option",
@@ -14442,6 +15177,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "connection",
           "source": {
             "kind": "option",
@@ -14464,6 +15213,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14506,6 +15269,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "limit",
           "source": {
             "kind": "option",
@@ -14535,6 +15312,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14579,6 +15370,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "connection",
           "source": {
             "kind": "option",
@@ -14608,6 +15413,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14643,6 +15462,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "connection",
           "source": {
             "kind": "option",
@@ -14675,6 +15508,20 @@
           }
         },
         {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
+          }
+        },
+        {
           "field": "operation",
           "source": {
             "kind": "option",
@@ -14697,6 +15544,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {
@@ -14766,6 +15627,20 @@
           "source": {
             "kind": "option",
             "long": "adapter"
+          }
+        },
+        {
+          "field": "connector",
+          "source": {
+            "kind": "option",
+            "long": "connector"
+          }
+        },
+        {
+          "field": "instance",
+          "source": {
+            "kind": "option",
+            "long": "instance"
           }
         },
         {

@@ -17,9 +17,20 @@ mod connections;
 mod cursor;
 mod operations;
 mod owner_stop;
+mod select;
 mod session;
 
 pub fn run(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
+    let deprecated = select::deprecated(&args);
+    let json = select::json_output(&args);
+    let mut output = run_selected(args);
+    if deprecated {
+        select::deprecate(&mut output, json);
+    }
+    output
+}
+
+fn run_selected(args: Vec<OsString>) -> connectors_cli_contract::ProcessOutput {
     let root_help = is_root_help(&args);
     let session = session::Session::new(&args);
     if let Some(output) = configuration_preflight(&session.borrow()) {
@@ -72,7 +83,31 @@ fn is_root_help(args: &[OsString]) -> bool {
 
 struct LocalHandler(session::Shared);
 impl Handler for LocalHandler {
+    /// Every handler reads the selected alias in `adapter`, whichever selector
+    /// named it; a result names its connector and instance beside it.
     fn call(&mut self, call: &Invocation<'_>) -> HandlerReply {
+        let (input, config) = match select::resolve(call) {
+            Ok(resolved) => resolved,
+            Err(refusal) => return refusal,
+        };
+        let call = &Invocation {
+            callable: call.callable,
+            target: call.target,
+            context: call.context.clone(),
+            input,
+        };
+        match self.dispatch(call) {
+            HandlerReply::Success(mut result) => {
+                select::name(call, &mut result, config);
+                HandlerReply::Success(result)
+            }
+            reply => reply,
+        }
+    }
+}
+
+impl LocalHandler {
+    fn dispatch(&mut self, call: &Invocation<'_>) -> HandlerReply {
         let result = if matches!(call.callable, "connections-connect" | "connections-repair") {
             let mut session = self.0.borrow_mut();
             if call
