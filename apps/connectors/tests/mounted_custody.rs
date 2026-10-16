@@ -120,7 +120,7 @@ fn mounted_selection_is_explicit() {
 /// `connect` takes no protected source under the read-only binding: the owner
 /// reads the item itself, the provider validates those bytes and the
 /// connection's reads use them. A source is `invalid_input`; a second
-/// connection of the profile is `custody_read_only`. Neither the mount nor
+/// connect on the instance is `lifecycle_conflict` naming a reconnect. Neither the mount nor
 /// the state directory gains a copy of the bytes.
 #[test]
 fn mounted_connect_reads_never_writes() {
@@ -159,14 +159,17 @@ fn mounted_connect_reads_never_writes() {
     let read = success(&container.invoke(&connection));
     assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
 
+    // The instance holds its connection: a second connect is refused before
+    // any validation, naming the reconnect that replaces its credential
+    // (story:connect-refused-while-instance-holds-connection).
     let (code, data) = refusal(&container.connect(PROFILE));
     assert_eq!(
         (code, &data["code"], &data["stage"], &data["next_action"]),
         (
             Some(1),
-            &json!("custody_read_only"),
-            &json!("custody"),
-            &json!("check_configuration")
+            &json!("lifecycle_conflict"),
+            &json!("admission"),
+            &json!("repair_connection")
         ),
         "{data}"
     );
@@ -366,10 +369,11 @@ fn configuration_refusal_names_rule() {
 
 /// Security review, story:mounted-secret-custody: one mounted item backs one
 /// connection, also when two `connections connect` for the same alias and
-/// profile run at once. The owner's `holds_profile` check reads only
-/// published connections, outside the transaction that publishes, so two
-/// connects that both pass it before either publishes would each publish a
-/// connection over the same item.
+/// profile run at once. A check that read only published connections,
+/// outside the transaction that publishes, would let two connects that both
+/// pass it before either publishes each publish a connection over the same
+/// item; `begin` refuses a connect beside one in flight, and the publishing
+/// commit refuses a second one.
 #[test]
 fn mounted_concurrent_connects_publish_one_connection() {
     let container = container("connectors-local/4", &Container::mounted());

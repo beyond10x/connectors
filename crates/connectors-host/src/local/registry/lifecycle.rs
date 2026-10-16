@@ -279,22 +279,12 @@ impl Registry {
         self.publish_with(stored, clock(), true)
     }
 
-    /// Whether the binding's instance holds a published, unrevoked connection
-    /// of the binding's profile. Under the read-only binding one item backs one
-    /// connection, so a second one of the same profile is refused.
-    pub fn holds_profile(&self, binding: &Binding, now: u64) -> Result<bool> {
-        binding.validate()?;
-        let key = profile_key(binding)?;
-        self.transaction_observation(now, |tx, _, _| {
-            let held: i64 = tx
-                .query_row(
-                    "SELECT count(*) FROM registry_connections WHERE instance_id=?1 AND profile_key=?2 AND public=1 AND state!='revoked'",
-                    params![binding.instance_id, key],
-                    |r| r.get(0),
-                )
-                .map_err(db)?;
-            Ok(held > 0)
-        })
+    /// The acquisition of the instance's connect in flight, beside which
+    /// `begin` refuses another connect as `Conflict`: what `connections status
+    /// --acquisition` follows until it ends. `None` once it published, failed
+    /// or passed its deadline.
+    pub fn in_flight(&self, instance: &str, now: u64) -> Result<Option<String>> {
+        self.transaction_observation(now, |tx, _, now| in_flight(tx, instance, now))
     }
 
     /// The instance's published Live or Stale connections, at most two: a
@@ -549,17 +539,22 @@ fn admit_allocation(tx: &Transaction<'_>, binding: &Binding, now: u64) -> Result
         }
         _ => return Err(Failure::InstanceConnectionChanged),
     }
-    let in_flight: bool = tx
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM registry_acquisitions a JOIN registry_connections c ON c.connection_ref=a.connection_ref WHERE c.instance_id=?1 AND c.public=0 AND c.state!='revoked' AND a.state IN ('pending','completing') AND a.expires_at_ms>?2)",
-            params![binding.instance_id, timestamp(now)?],
-            |r| r.get(0),
-        )
-        .map_err(db)?;
-    if in_flight {
+    if in_flight(tx, &binding.instance_id, now)?.is_some() {
         return Err(Failure::Conflict);
     }
     Ok(())
+}
+
+/// The acquisition of a connect of the instance that allocated a connection
+/// not yet published and has neither ended nor passed its deadline.
+fn in_flight(tx: &Transaction<'_>, instance: &str, now: u64) -> Result<Option<String>> {
+    tx.query_row(
+        "SELECT a.acquisition_ref FROM registry_acquisitions a JOIN registry_connections c ON c.connection_ref=a.connection_ref WHERE c.instance_id=?1 AND c.public=0 AND c.state!='revoked' AND a.state IN ('pending','completing') AND a.expires_at_ms>?2 ORDER BY a.created_at_ms, a.acquisition_ref LIMIT 1",
+        params![instance, timestamp(now)?],
+        |r| r.get(0),
+    )
+    .optional()
+    .map_err(db)
 }
 
 /// Allocates a private, unpublished connection of the binding and its first
