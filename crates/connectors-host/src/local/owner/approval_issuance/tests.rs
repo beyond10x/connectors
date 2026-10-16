@@ -116,6 +116,7 @@ fn setup(root: &Path, socket: Option<&Path>, clock_addresses: [&str; 2]) -> Targ
         permissions: crate::local::config::Permissions {
             profiles: BTreeSet::from(["token".into()]),
             operations: BTreeSet::from(["item.write".into(), "item.read".into()]),
+            custody: Default::default(),
         },
     };
     config.adapters.insert("fixture".into(), adapter.clone());

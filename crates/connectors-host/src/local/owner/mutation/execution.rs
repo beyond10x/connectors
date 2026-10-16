@@ -10,6 +10,9 @@ pub(in crate::local::owner) struct Control<'a> {
     pub lifecycle: &'a Mutex<super::super::lifecycle::Control>,
     pub epoch: u64,
     pub stopped: &'a AtomicBool,
+    /// The pool this worker belongs to, through which a created credential is
+    /// held on its custody target's own worker, never this one.
+    pub pool: &'a std::sync::Weak<super::super::supervisor::Pool>,
 }
 pub(in crate::local::owner) struct Invocation<'a> {
     pub request: issuance::Request<'a>,
@@ -181,6 +184,11 @@ pub(in crate::local::owner) fn execute(
             .ok_or(Code::NotFound)?;
         if requirement.effect != runtime::Effect::Write {
             return Err(Code::Unsupported.into());
+        }
+        // A created credential that could not be held is foreseeable here,
+        // before any provider work.
+        if let Some(target) = super::custody::target(&current.adapter, request.operation) {
+            super::custody::admit(paths, target)?;
         }
         let registry = registry::Registry::with_system_clock(&paths.state);
         let remaining = until
@@ -462,17 +470,31 @@ pub(in crate::local::owner) fn execute(
                 .map(|_| ())
                 .map_err(|_| Code::OutcomeUnknown.into())
         });
-    let native_result = if final_check.is_ok() {
-        native.commit()
-    } else {
+    let custody_target = super::custody::target(&current.adapter, request.operation).cloned();
+    let (native_result, created) = if final_check.is_err() {
         let _ = native.cancel();
-        runtime::WriteResult {
-            effect: runtime::WriteEffect::Unknown,
-            result: Err(runtime::Failure::Timeout),
-        }
+        (
+            runtime::WriteResult {
+                effect: runtime::WriteEffect::Unknown,
+                result: Err(runtime::Failure::Timeout),
+            },
+            None,
+        )
+    } else if custody_target.is_some() {
+        native.commit_holding()
+    } else {
+        (native.commit(), None)
     };
     drop(control_guard);
     let (classification, outcome) = native_outcome(native_result);
+    // Held before the attempt settles, on the target's own worker. Whatever
+    // befalls custody, the write stays applied.
+    let outcome = match (custody_target, created, outcome) {
+        (Some(target), Some(secret), Ok(value)) if classification == Classification::Applied => {
+            super::custody::hold(paths, control.pool, &target, secret, value, until)
+        }
+        (_, _, outcome) => outcome,
+    };
     let outcome = StoredOutcome::from(outcome);
     let payload = stored_value(&outcome)?;
     let settled = ledger.settle(

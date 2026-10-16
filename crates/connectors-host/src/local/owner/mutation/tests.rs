@@ -82,6 +82,7 @@ fn final_audit_recovery_preserves_every_live_business_result() {
                         service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
                         origin: crate::local::owner::Origin::Host,
                         store_version: None,
+                        created: None,
                     }),
                     Classification::Unknown => Some(Code::OutcomeUnknown.into()),
                     _ => Some(Code::Forbidden.into()),

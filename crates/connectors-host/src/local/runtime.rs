@@ -9,7 +9,7 @@ pub mod state;
 mod writes;
 pub use process::{Child, PreparedInvocation};
 pub use server::{Adapter, serve};
-pub use writes::{PreparedWrite, WriteEffect, WriteResult};
+pub use writes::{Created, PreparedWrite, WriteEffect, WriteResult};
 
 use super::registry;
 use connectors_core::{Descriptor, ErrorCode};
