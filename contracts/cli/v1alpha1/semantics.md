@@ -935,8 +935,9 @@ with `next_action = revalidate_connection`. `connections revalidate`
 recollects the evidence from the credential already in custody, with no
 re-entry, and the same invoke is then admitted. The invoke never revalidates
 on its own: a business read runs no implicit identity probe. A connection whose
-credential expired or is known invalid (`reauthorization_required`), and a
-credential below the operation's scopes, keep `code = not_granted` with
+credential the provider refused or is known invalid (`stale`), one whose
+credential expired (`reauthorization_required`), and a credential below the
+operation's scopes, keep `code = not_granted` with
 `next_action = repair_connection`.
 
 A connection saved under another configuration revision of its instance also
