@@ -19,7 +19,7 @@ use connectors_catalog::{
 };
 use connectors_core::{Error, ErrorCode, Result};
 use connectors_sdk::{
-    AuthenticatedHttp, AuthenticatedWrite, HttpResponse, WriteMethod, WriteOutcome,
+    AuthenticatedHttp, AuthenticatedWrite, HttpResponse, Secret, WriteMethod, WriteOutcome,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -589,6 +589,39 @@ pub struct Selection {
     /// Omitted when empty.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub body_fixed: BTreeMap<String, Value>,
+    /// The credential a write's answer carries that the write created, shown
+    /// once, and the public members the caller receives in its place
+    /// ([`Custody`]). Omitted when absent, so a selection without it keeps its
+    /// bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custody: Option<Custody>,
+}
+
+/// The member of a write selection whose 2xx JSON answer carries a credential
+/// the write created (`connectors_catalog.selection.Custody`, design §8a):
+/// `secret` is the RFC 6901 pointer of that credential, and `returns` names
+/// each public member the caller receives, keyed to its pointer. The engine
+/// reads the secret into protected memory and builds the result from `returns`
+/// alone; the owner holds the secret in custody. When it loads, the engine
+/// refuses custody on a read, beside a guard, on an answer that is not JSON, a
+/// pointer without a leading `/`, no returned member or more than
+/// [`CUSTODY_RETURNS`], a returned name that is no id or is `custody` or
+/// `connection`, and a returned pointer at, inside or around the secret.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Custody {
+    pub secret: String,
+    pub returns: BTreeMap<String, String>,
+}
+/// The most public members a custody write returns.
+pub const CUSTODY_RETURNS: usize = 8;
+
+/// A write's applied result, and the created credential its answer carried
+/// when its selection declares [`Custody`]. No `Debug`: the secret is never
+/// formatted.
+pub struct Held {
+    pub value: Value,
+    pub secret: Option<Secret>,
 }
 
 impl Selection {
@@ -822,6 +855,8 @@ pub struct Prepared {
     instance: String,
     source_revision: String,
     rate_limit_reasons: Vec<String>,
+    /// The created credential the answer carries, when the selection declares it.
+    custody: Option<Custody>,
 }
 
 impl Engine {
@@ -887,6 +922,7 @@ impl Engine {
             }
             check_binary(selection)?;
             check_envelope(selection)?;
+            check_custody(selection)?;
             if let Some(download) = &selection.download {
                 check_download(selection, download)?;
                 downloads.push(Downloaded {
@@ -1337,6 +1373,9 @@ impl Engine {
                 )));
             }
             let mut declaration = declare(selection, &operation);
+            if let Some(custody) = &selection.custody {
+                declaration.output_schema = custody_schema(custody);
+            }
             if selection.binary.is_some() {
                 declaration.output_schema["properties"]["body"] = binary_body_schema();
             }
@@ -1401,6 +1440,15 @@ impl Engine {
             declarations.extend(feed.declarations());
         }
         declarations
+    }
+
+    /// Whether `id` is a write whose selection declares custody: its answer
+    /// carries a credential it created, which the owner holds only under a
+    /// custody target configured for it (design §8a).
+    pub fn declares_custody(&self, id: &str) -> bool {
+        self.exposed
+            .iter()
+            .any(|e| e.selection.id == id && e.selection.custody.is_some())
     }
 
     pub fn effect(&self, id: &str) -> Option<Effect> {
@@ -1874,6 +1922,7 @@ impl Engine {
             instance: instance.to_owned(),
             source_revision: self.source_revision.clone(),
             rate_limit_reasons: exposed.selection.rate_limit_reasons.clone(),
+            custody: exposed.selection.custody.clone(),
         })
     }
 }
@@ -1918,11 +1967,65 @@ impl Prepared {
     }
 
     /// [`Prepared::execute`], with the capability the guard's read after the
-    /// write is issued through, once, after a 2xx.
+    /// write is issued through, once, after a 2xx. A write whose selection
+    /// declares [`Custody`] is refused here with nothing sent: its answer is
+    /// read only by [`Prepared::execute_holding`].
     pub async fn execute_reading(
         self,
         capability: Box<dyn AuthenticatedWrite>,
         reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Value> {
+        if self.custody.is_some() {
+            return WriteOutcome::Refused(Error::new(
+                ErrorCode::Forbidden,
+                "a write that creates a credential is sent only to be held",
+            ));
+        }
+        self.dispatch(capability, reader).await
+    }
+
+    /// [`Prepared::execute_reading`], holding the credential the answer
+    /// carries when the selection declares [`Custody`]: the secret is moved out
+    /// of the answer into protected memory and the result is the declared
+    /// returned members alone. An applied answer without the secret or a
+    /// returned member as a non-empty string, or with a returned value holding
+    /// the secret's bytes, is applied and unreadable (`upstream_protocol`).
+    /// Without custody the result is [`Prepared::execute_reading`]'s and no
+    /// secret is held.
+    pub async fn execute_holding(
+        mut self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Held> {
+        let custody = self.custody.take();
+        let zeroize = custody.is_some();
+        let outcome = self.dispatch_zeroizing(capability, reader, zeroize).await;
+        match custody {
+            None => outcome.try_map(|value| {
+                Ok(Held {
+                    value,
+                    secret: None,
+                })
+            }),
+            Some(custody) => outcome.try_map(|mut value| hold(&custody, &mut value)),
+        }
+    }
+
+    async fn dispatch(
+        self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+    ) -> WriteOutcome<Value> {
+        self.dispatch_zeroizing(capability, reader, false).await
+    }
+
+    /// Send once and classify; with `zeroize`, the answer's bytes are
+    /// overwritten once they are read.
+    async fn dispatch_zeroizing(
+        self,
+        capability: Box<dyn AuthenticatedWrite>,
+        reader: Option<&dyn AuthenticatedHttp>,
+        zeroize: bool,
     ) -> WriteOutcome<Value> {
         let segments: Vec<&str> = self.segments.iter().map(String::as_str).collect();
         let query: Vec<(&str, String)> = self
@@ -1930,7 +2033,7 @@ impl Prepared {
             .iter()
             .map(|(k, v)| (k.as_str(), v.clone()))
             .collect();
-        let response = match capability
+        let mut response = match capability
             .send_json(self.method, &segments, &query, &self.body)
             .await
         {
@@ -1962,7 +2065,12 @@ impl Prepared {
                 "unconfirmed write outcome",
             ));
         }
-        let body = match read_body(&response, false, &[]) {
+        let parsed = read_body(&response, false, &[]);
+        if zeroize {
+            use zeroize::Zeroize;
+            response.body.zeroize();
+        }
+        let body = match parsed {
             Ok(body) => body,
             Err(_) => {
                 return WriteOutcome::Unknown(Error::new(
@@ -2596,6 +2704,121 @@ fn check_envelope(selection: &Selection) -> Result<()> {
         ))),
         None => Ok(()),
     }
+}
+
+/// What a selection's [`Custody`] must be, refused when it loads.
+fn check_custody(selection: &Selection) -> Result<()> {
+    let Some(custody) = &selection.custody else {
+        return Ok(());
+    };
+    // A pointer at, inside or around another: the one would read the other.
+    let overlaps = |a: &str, b: &str| {
+        a == b || a.starts_with(&format!("{b}/")) || b.starts_with(&format!("{a}/"))
+    };
+    let problem = if selection.effect != Effect::Write {
+        Some("on a read")
+    } else if selection.guard.is_some() {
+        Some("beside a guard")
+    } else if selection.download.is_some()
+        || selection.binary.is_some()
+        || matches!(
+            selection.response,
+            Some(ResponseKind::Text | ResponseKind::Binary)
+        )
+    {
+        Some("on an answer that is not JSON")
+    } else if custody.returns.is_empty() || custody.returns.len() > CUSTODY_RETURNS {
+        Some("returning no member or more than eight")
+    } else if custody.returns.keys().any(|name| {
+        !connectors_core::valid_id(name) || ["custody", "connection"].contains(&name.as_str())
+    }) {
+        Some("returning a member that is no id or is named `custody` or `connection`")
+    } else if !custody.secret.starts_with('/')
+        || custody
+            .returns
+            .values()
+            .any(|pointer| !pointer.starts_with('/'))
+    {
+        Some("with a pointer without a leading `/`")
+    } else if custody
+        .returns
+        .values()
+        .any(|pointer| overlaps(pointer, &custody.secret))
+    {
+        Some("returning a member at, inside or around the created credential")
+    } else {
+        None
+    };
+    match problem {
+        Some(problem) => Err(refuse(format!(
+            "selection `{}` declares custody {problem}",
+            selection.id
+        ))),
+        None => Ok(()),
+    }
+}
+
+/// The output schema of a [`Custody`] write: its returned members, and the
+/// owner's `custody` and `connection`, which only the owner adds. Nothing of
+/// the provider's answer schema is declared.
+fn custody_schema(custody: &Custody) -> Value {
+    let mut properties = serde_json::Map::new();
+    properties.insert(
+        "custody".into(),
+        json!({"type": "string", "enum": ["stored"]}),
+    );
+    properties.insert(
+        "connection".into(),
+        json!({"type": "string", "minLength": 1}),
+    );
+    for name in custody.returns.keys() {
+        properties.insert(name.clone(), json!({"type": "string"}));
+    }
+    json!({
+        "type": "object",
+        "properties": properties,
+        "required": custody.returns.keys().collect::<Vec<_>>(),
+        "additionalProperties": false,
+    })
+}
+
+/// Move the created credential out of an applied write's result and build the
+/// result from the declared returned members alone.
+fn hold(custody: &Custody, result: &mut Value) -> Result<Held> {
+    let unreadable = || {
+        Error::new(
+            ErrorCode::UpstreamProtocol,
+            "write applied; its answer does not carry the created credential and the returned members as declared",
+        )
+    };
+    let body = result.get_mut("body").ok_or_else(unreadable)?;
+    // Taken, not copied: the answer keeps no string holding the secret.
+    let secret = match body.pointer_mut(&custody.secret).map(Value::take) {
+        Some(Value::String(text)) => Secret(text.into_bytes()),
+        _ => return Err(unreadable()),
+    };
+    if secret.0.is_empty() {
+        return Err(unreadable());
+    }
+    let mut returned = serde_json::Map::new();
+    for (name, pointer) in &custody.returns {
+        let value = body
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .ok_or_else(unreadable)?;
+        if value
+            .as_bytes()
+            .windows(secret.0.len())
+            .any(|window| window == secret.0.as_slice())
+        {
+            return Err(unreadable());
+        }
+        returned.insert(name.clone(), Value::from(value));
+    }
+    Ok(Held {
+        value: Value::Object(returned),
+        secret: Some(secret),
+    })
 }
 
 /// What a selection's binary members must be, whatever it reads: `binary`

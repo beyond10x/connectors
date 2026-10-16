@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Instant;
 use uuid::Uuid;
+mod custody;
 mod execution;
 mod recovery;
 #[cfg(test)]
@@ -45,6 +46,14 @@ pub struct Failure {
     /// so those entries keep their earlier bytes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub store_version: Option<String>,
+    /// On a write that created a credential whose custody failed only
+    /// (`custody_unavailable`, the effect applied): the public members the
+    /// selection returns, such as a key's hash, naming the credential so the
+    /// operator can revoke it at the provider (`connectors.mutations.CredentialCustody`,
+    /// `custody: failed`). Never the credential. Absent on every other failure,
+    /// so those entries keep their earlier bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created: Option<std::collections::BTreeMap<String, String>>,
 }
 impl Failure {
     /// The stage a write failure reports. The provider's answer is `dispatch`;
@@ -92,6 +101,7 @@ impl From<Error> for Failure {
             service_code: error.service_code,
             origin: error.origin,
             store_version: error.store_version,
+            created: None,
         }
     }
 }
@@ -107,6 +117,7 @@ impl From<ApprovalCode> for Failure {
             service_code: None,
             origin: Origin::Host,
             store_version: None,
+            created: None,
         }
     }
 }
@@ -699,6 +710,7 @@ fn observe_as_original(
                 service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
                 origin: Origin::Host,
                 store_version: None,
+                created: None,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,

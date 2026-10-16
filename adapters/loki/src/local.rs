@@ -156,6 +156,7 @@ impl Local {
                 .iter()
                 .map(|o| Requirement {
                     operation: o.id.clone(),
+                    custody: false,
                     profile: auth::PROFILE_ID.into(),
                     scopes: BTreeSet::new(),
                     effect: match o.id.as_str() {

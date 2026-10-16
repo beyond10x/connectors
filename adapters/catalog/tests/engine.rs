@@ -130,6 +130,7 @@ fn select(id: &str, operation_id: &str, effect: Effect) -> Selection {
         body_required: Vec::new(),
         body_nonempty: Vec::new(),
         body_fixed: BTreeMap::new(),
+        custody: None,
     }
 }
 fn mr_guard(values: &[(&str, &str)], preflight: Vec<Check>, postflight: Vec<Check>) -> Guard {

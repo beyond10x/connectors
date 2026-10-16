@@ -1061,6 +1061,7 @@ impl Local {
         };
         let requirement = |operation: &connectors_core::Operation| Requirement {
             operation: operation.id.clone(),
+            custody: engine.declares_custody(&operation.id),
             profile: config.auth.profile.clone(),
             scopes: config.auth.minimum_scopes.clone(),
             effect: match engine.effect(&operation.id) {
@@ -1550,6 +1551,8 @@ struct Write {
 }
 #[async_trait::async_trait]
 impl runtime::PreparedWrite for Write {
+    /// A write whose selection declares custody is refused here before it is
+    /// sent (`Prepared::execute_reading`): only `execute_created` holds it.
     async fn execute(self: Box<Self>) -> connectors_sdk::WriteOutcome<Value> {
         let Write {
             prepared,
@@ -1565,13 +1568,44 @@ impl runtime::PreparedWrite for Write {
                     .map(|reader| reader as &dyn connectors_sdk::AuthenticatedHttp),
             )
             .await;
-        // A write the provider refused as unauthorized refused the token too.
-        if let (Some((oauth, key)), connectors_sdk::WriteOutcome::Refused(error)) =
-            (&token, &outcome)
-            && error.code == connectors_core::ErrorCode::Unauthorized
-        {
-            oauth.evict(key);
-        }
+        evict_refused_token(token.as_ref(), &outcome);
         outcome
+    }
+    /// The created credential leaves the answer here, into the protected slot
+    /// of the write's result (design §8a).
+    async fn execute_created(self: Box<Self>) -> connectors_sdk::WriteOutcome<runtime::Created> {
+        let Write {
+            prepared,
+            http,
+            reader,
+            token,
+        } = *self;
+        let outcome = prepared
+            .execute_holding(
+                http,
+                reader
+                    .as_ref()
+                    .map(|reader| reader as &dyn connectors_sdk::AuthenticatedHttp),
+            )
+            .await
+            .try_map(|held| {
+                Ok(runtime::Created {
+                    result: held.value,
+                    secret: held.secret,
+                })
+            });
+        evict_refused_token(token.as_ref(), &outcome);
+        outcome
+    }
+}
+/// A write the provider refused as unauthorized refused the token too.
+fn evict_refused_token<T>(
+    token: Option<&(Arc<OAuth>, [u8; 32])>,
+    outcome: &connectors_sdk::WriteOutcome<T>,
+) {
+    if let (Some((oauth, key)), connectors_sdk::WriteOutcome::Refused(error)) = (token, outcome)
+        && error.code == connectors_core::ErrorCode::Unauthorized
+    {
+        oauth.evict(key);
     }
 }

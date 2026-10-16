@@ -12,6 +12,7 @@ pub mod approvals;
 pub mod audit;
 pub mod clock;
 pub mod config;
+pub mod core_dumps;
 pub mod filesystem;
 pub mod keyring;
 pub mod metadata;
