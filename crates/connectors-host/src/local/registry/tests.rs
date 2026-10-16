@@ -864,6 +864,28 @@ pub(super) fn prepared(registry: &Registry, subject: &str, now: u64) -> (Claim, 
     (claim, prepared)
 }
 
+/// Connections of one instance prepared as `begin` admitted them before
+/// story:connect-refused-while-instance-holds-connection: every one is
+/// allocated before any is published, so neither the host's check nor the
+/// model's refuses the next. An instance that held several before the rule
+/// keeps them, so the registry still serves this state.
+pub(super) fn prepared_together(
+    registry: &Registry,
+    subjects: &[&str],
+    now: u64,
+) -> Vec<PreparedCandidate> {
+    subjects
+        .iter()
+        .map(|subject| {
+            let acquisition = registry.begin_unchecked(&binding(), now).unwrap();
+            let claim = registry.consume(acquisition, now).unwrap();
+            registry
+                .prepare(&claim, baseline(subject, now), 12, now)
+                .unwrap()
+        })
+        .collect()
+}
+
 #[test]
 fn repeated_binding_after_reopen_keeps_the_original_profile_declaration() {
     let (root, registry) = fixture();
@@ -881,7 +903,9 @@ fn repeated_binding_after_reopen_keeps_the_original_profile_declaration() {
     drop(metadata);
 
     let reopened = Registry::new(root.path());
-    reopened.begin(&binding(), NOW + 1).unwrap();
+    // The first connect is still in flight: only the profile record is under
+    // test here, not the instance's one connection.
+    reopened.begin_unchecked(&binding(), NOW + 1).unwrap();
     let metadata = Metadata::inspect(root.path()).unwrap();
     let profiles: i64 = metadata
         .connection
@@ -905,11 +929,17 @@ pub(super) fn publish_fixture(
 /// the publishing commit: two connects of one profile that were both begun
 /// and acknowledged before either published yield one connection, and the
 /// second is refused as `CustodyReadOnly`. The platform path is unchanged.
+/// `begin` now refuses the second connect while the first is in flight
+/// (story:connect-refused-while-instance-holds-connection); the publishing
+/// commit still holds the rule for two begun as before that rule.
 #[test]
 fn exclusive_publication_admits_one_connection_per_profile() {
     let (_root, registry) = fixture();
-    let (_, first) = prepared(&registry, "one", NOW);
-    let (_, second) = prepared(&registry, "one", NOW);
+    let [first, second]: [PreparedCandidate; 2] =
+        prepared_together(&registry, &["one", "one"], NOW)
+            .try_into()
+            .ok()
+            .unwrap();
     let receipt = custody::WrittenVersion::fixture(first.version());
     let first = registry.acknowledge(first, receipt, NOW).unwrap();
     let receipt = custody::WrittenVersion::fixture(second.version());
@@ -921,10 +951,9 @@ fn exclusive_publication_admits_one_connection_per_profile() {
     );
 
     let (_root, registry) = fixture();
-    let (_, first) = prepared(&registry, "one", NOW);
-    let (_, second) = prepared(&registry, "one", NOW);
-    publish_fixture(&registry, first, NOW);
-    publish_fixture(&registry, second, NOW);
+    for prepared in prepared_together(&registry, &["one", "one"], NOW) {
+        publish_fixture(&registry, prepared, NOW);
+    }
 }
 
 #[test]
@@ -1256,8 +1285,8 @@ fn terminal_revoke_invalidates_repair_and_dispatch_without_custody() {
 #[test]
 fn cursors_are_scoped_bounded_and_invalidated_by_metadata_change() {
     let (root, registry) = fixture();
-    for subject in ["a", "b", "c"] {
-        let (_, prepared) = prepared(&registry, subject, NOW);
+    // Three connections of one instance, as one held them before the rule.
+    for prepared in prepared_together(&registry, &["a", "b", "c"], NOW) {
         publish_fixture(&registry, prepared, NOW);
     }
     let first = registry
@@ -1337,8 +1366,8 @@ fn cursors_are_scoped_bounded_and_invalidated_by_metadata_change() {
 #[test]
 fn cursors_expire_at_the_original_five_minute_deadline() {
     let (_root, registry) = fixture();
-    for subject in ["a", "b", "c"] {
-        let (_, prepared) = prepared(&registry, subject, NOW);
+    // Three connections of one instance, as one held them before the rule.
+    for prepared in prepared_together(&registry, &["a", "b", "c"], NOW) {
         publish_fixture(&registry, prepared, NOW);
     }
     let page = |cursor: Option<&str>, now: u64| {
@@ -1387,7 +1416,8 @@ fn receipt_identity_and_known_missing_material_cannot_be_substituted() {
         registry.acknowledge(first, custody::WrittenVersion::fixture(wrong), NOW),
         Err(Failure::Conflict)
     ));
-    let (_, second) = prepared(&registry, "two", NOW);
+    // Beside the first connect, still in flight, as before the rule.
+    let second = prepared_together(&registry, &["two"], NOW).remove(0);
     let connection = publish_fixture(&registry, second, NOW);
     let captured = registry
         .capture_read(&binding(), &connection, &BTreeSet::new(), NOW, NOW + 1000)
@@ -1470,7 +1500,8 @@ fn acquisition_deadline_closes_consumption_and_publication_at_expiry() {
     // The registry clock never runs backwards, so the late attempt is checked last.
     let (_root, registry) = fixture();
     let late = registry.begin(&binding(), NOW).unwrap();
-    let acquisition = registry.begin(&binding(), NOW).unwrap();
+    // Beside the one in flight, as an instance from before the rule allowed.
+    let acquisition = registry.begin_unchecked(&binding(), NOW).unwrap();
     let before = NOW + ENTRY_MS - 1;
     let claim = registry.consume(acquisition, before).unwrap();
     let prepared = registry

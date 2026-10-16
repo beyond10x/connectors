@@ -9,6 +9,8 @@ pub use observation::{ObservedAcquisition, ObservedConnection, Page, PageOptions
 pub use revalidation::{Revalidation, RevalidationDispatch};
 pub use use_and_retirement::{DispatchedUse, InvalidCredential, ReadUse, Retirement};
 #[cfg(test)]
+mod cardinality_tests;
+#[cfg(test)]
 mod expiry_batch_tests;
 #[cfg(test)]
 mod stale_tests;
@@ -80,6 +82,17 @@ pub enum Failure {
     /// id can. Public code `lifecycle_conflict`, `next_action =
     /// check_configuration`.
     AuthenticationChanged,
+    /// The instance holds a published Live or Stale connection under the
+    /// configured binding, so a connect that would allocate another is refused
+    /// (`connectors.auth_bindings.AllocateConnection`, `instance-connected`);
+    /// a repair replaces that connection's credential. Public code
+    /// `lifecycle_conflict`, `next_action = repair_connection`.
+    InstanceConnected,
+    /// As `InstanceConnected`, but no repair can replace what the instance
+    /// holds: its one connection was admitted under another binding, or it
+    /// holds more than one from before the rule. Only a revocation clears it.
+    /// Public code `lifecycle_conflict`, `next_action = revoke_connection`.
+    InstanceConnectionChanged,
 }
 pub type Result<T> = std::result::Result<T, Failure>;
 

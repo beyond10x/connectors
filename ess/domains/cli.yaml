@@ -605,7 +605,7 @@ types:
     variants: [arguments, configuration, protected_entry, admission, launch, readiness, custody, publication, dispatch, observation, stop]
   - name: connectors.cli.NextAction
     kind: enum
-    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
+    variants: [check_configuration, select_protected_source, unlock_keyring, retry_status, repair_connection, revalidate_connection, create_connection, revoke_connection, refresh_description, request_permission, retry_explicitly, stop_owner, upgrade, choose_clock_source, none]
   - name: connectors.cli.ConfigurationFormat
     kind: enum
     variants: [connectors-local/1, connectors-local/2, connectors-local/3, connectors-local/4, connectors-local/5]
@@ -1063,7 +1063,7 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
-      - {name: connection, type: "String"}
+      - {name: connection, type: "Optional<String>"}
   - name: connectors.cli.ConnectionDescribeResult
     kind: struct
     fields:
@@ -1106,7 +1106,7 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
-      - {name: connection, type: "String"}
+      - {name: connection, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
       - {name: credential_document, type: "Optional<String>"}
   - name: connectors.cli.ConnectionReconnectResult
@@ -1120,7 +1120,7 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
-      - {name: connection, type: "String"}
+      - {name: connection, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
   - name: connectors.cli.ConnectionRevalidateResult
     kind: struct
@@ -1139,7 +1139,7 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
-      - {name: connection, type: "String"}
+      - {name: connection, type: "Optional<String>"}
       - {name: consumer, type: "String"}
       - {name: args, type: "Optional<String>"}
   # The handler seam's typed result. It is never written: stdout belongs to the consumer and
@@ -1170,7 +1170,7 @@ types:
       - {name: adapter, type: "Optional<String>"}
       - {name: connector, type: "Optional<String>"}
       - {name: instance, type: "Optional<String>"}
-      - {name: connection, type: "String"}
+      - {name: connection, type: "Optional<String>"}
       - {name: expected_revision, type: "String"}
   - name: connectors.cli.ConnectionRevokeResult
     kind: struct
