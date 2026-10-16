@@ -28,6 +28,8 @@ use zeroize::{Zeroize as _, Zeroizing};
 pub const FORMAT: &str = "connectors-catalog-local/2";
 /// A selection set shipped with the repository, referenced by `operations_file`.
 pub const OPERATIONS_FORMAT: &str = "connectors-catalog-operations/1";
+/// A connector declaration, `providers/<name>/connector.json`.
+pub const DECLARATION_FORMAT: &str = "connectors-catalog-connector/1";
 const DOCUMENT_LIMIT: usize = 64 * 1024;
 
 /// Where the subject of a credential comes from.
@@ -220,6 +222,178 @@ struct OperationsFile {
     /// The provider's `datasource.feed/v1alpha1` binding, declared as data.
     #[serde(default)]
     feed: Option<feed::Declaration>,
+}
+fn read_selection(bytes: &[u8], provider: &str) -> Result<OperationsFile> {
+    let selection: OperationsFile =
+        connectors_core::read_json(bytes).map_err(|_| Failure::InvalidConfiguration)?;
+    if selection.format != OPERATIONS_FORMAT || selection.provider != provider {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok(selection)
+}
+
+/// What one catalog connector fixes for every instance of it
+/// (`connectors.declarations.Connector`): the bundle it runs on, its default
+/// endpoint, the selection its operations come from and the auth profiles an
+/// instance may use. `build.rs` compiles every declaration into this binary.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Declaration {
+    format: String,
+    connector_id: String,
+    provider_id: String,
+    adapter_id: String,
+    /// The bundle and selection provider (`google-gmail`), digested as `provider`.
+    catalog_provider: String,
+    /// The endpoint of an instance that states none.
+    #[serde(default)]
+    default_endpoint: Option<String>,
+    /// Appended to the endpoint to form `api_base`, for a connector whose users
+    /// know the host (`https://gitlab.example.com`), not the API under it. An
+    /// absolute path without a trailing `/`; absent, the endpoint is `api_base`.
+    #[serde(default)]
+    api_path: Option<String>,
+    /// The selection file beside the declaration; every operation in it is
+    /// available on every instance.
+    selection: String,
+    /// The profiles an instance may use. A `token_url` that starts with `/` is
+    /// on the instance endpoint's origin.
+    profiles: Vec<AuthConfig>,
+}
+
+/// The declarations, their selections and the bundles they run on, as
+/// `build.rs` found them in the source tree.
+mod shipped {
+    include!(concat!(env!("OUT_DIR"), "/shipped.rs"));
+}
+
+/// What an instance of a shipped connector states; its declaration fixes the rest.
+pub struct Instance<'a> {
+    pub connector: &'a str,
+    /// The user's name for the instance; its id is `<connector>.<name>`.
+    pub name: &'a str,
+    pub endpoint: Option<&'a str>,
+    /// Required when the connector declares more than one profile.
+    pub profile: Option<&'a str>,
+}
+
+/// The bundle and selection a configuration runs on.
+struct Sources {
+    bundle: bundle::Bundle,
+    bundle_sha256: Option<String>,
+    selection: Option<OperationsFile>,
+}
+
+/// A compiled-in bundle, checked against the compiled-in index as
+/// `bundle::load` checks a directory: the index names it, its bytes have the
+/// digest the index recorded, and it names the same provider.
+fn shipped_bundle(provider: &str) -> Result<(bundle::Bundle, String)> {
+    use std::fmt::Write as _;
+    let index: bundle::Index = connectors_core::read_json(shipped::BUNDLE_INDEX)
+        .map_err(|_| Failure::InvalidConfiguration)?;
+    let entry = index.find(provider).ok_or(Failure::InvalidConfiguration)?;
+    let bytes = shipped::BUNDLES
+        .iter()
+        .find(|(name, _)| *name == entry.file_name)
+        .map(|(_, bytes)| *bytes)
+        .ok_or(Failure::InvalidConfiguration)?;
+    let mut digest = String::with_capacity(64);
+    for byte in Sha256::digest(bytes) {
+        write!(digest, "{byte:02x}").map_err(|_| Failure::Protocol)?;
+    }
+    let bundle: bundle::Bundle =
+        connectors_core::read_json(bytes).map_err(|_| Failure::InvalidConfiguration)?;
+    if digest != entry.bundle_sha256 || bundle.provider != entry.provider {
+        return Err(Failure::InvalidConfiguration);
+    }
+    Ok((bundle, digest))
+}
+
+/// The native configuration of an instance of a shipped connector: exactly what
+/// an equal hand-written configuration states, without its file paths, which are
+/// not digested. So it has that configuration's revision.
+fn derived(instance: &Instance<'_>) -> Result<(Configuration, Sources)> {
+    let mut found = None;
+    for &(directory, text, files) in shipped::CONNECTORS {
+        let declaration: Declaration = connectors_core::read_json(text.as_bytes())
+            .map_err(|_| Failure::InvalidConfiguration)?;
+        if declaration.format != DECLARATION_FORMAT
+            || declaration.adapter_id != "catalog"
+            || declaration.catalog_provider != directory
+            || !connectors_core::valid_id(&declaration.connector_id)
+            || !connectors_core::valid_id(&declaration.provider_id)
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        if declaration.connector_id == instance.connector {
+            found = Some((declaration, files));
+            break;
+        }
+    }
+    let (declaration, files) = found.ok_or(Failure::NotFound)?;
+    let instance_id = format!("{}.{}", declaration.connector_id, instance.name);
+    if !connectors_core::valid_id(instance.name) || !connectors_core::valid_id(&instance_id) {
+        return Err(Failure::InvalidInput);
+    }
+    let endpoint = instance
+        .endpoint
+        .or(declaration.default_endpoint.as_deref())
+        .ok_or(Failure::InvalidConfiguration)?
+        .to_owned();
+    // An endpoint that is already the API base is refused, not doubled. A
+    // relative-root install (`https://example.com/gitlab`) serves the API under
+    // its root, which is then a request prefix in front of the bundle's paths.
+    let (api_base, request_prefix) = match declaration.api_path.as_deref() {
+        None => (endpoint.clone(), None),
+        Some(path) => {
+            let host = endpoint.trim_end_matches('/');
+            if !path.starts_with('/') || path.ends_with('/') || host.ends_with(path) {
+                return Err(Failure::InvalidConfiguration);
+            }
+            let root = url_path(host).filter(|root| root != "/");
+            (format!("{host}{path}"), root)
+        }
+    };
+    let mut profiles = declaration.profiles;
+    let mut auth = match instance.profile {
+        Some(id) => profiles
+            .iter()
+            .position(|profile| profile.profile == id)
+            .map(|index| profiles.swap_remove(index)),
+        None if profiles.len() == 1 => profiles.pop(),
+        None => None,
+    }
+    .ok_or(Failure::InvalidInput)?;
+    if let Some(path) = auth.token_url.as_deref().filter(|url| url.starts_with('/')) {
+        let origin =
+            connectors_catalog_provider::origin(&endpoint).ok_or(Failure::InvalidConfiguration)?;
+        auth.token_url = Some(format!("{origin}{path}"));
+    }
+    let selection = files
+        .iter()
+        .find(|(name, _)| *name == declaration.selection)
+        .ok_or(Failure::InvalidConfiguration)?;
+    let selection = read_selection(selection.1, &declaration.catalog_provider)?;
+    let (bundle, bundle_sha256) = shipped_bundle(&declaration.catalog_provider)?;
+    let config = Configuration {
+        format: FORMAT.into(),
+        instance: instance_id,
+        provider: declaration.catalog_provider,
+        bundle_directory: PathBuf::new(),
+        api_base,
+        request_prefix,
+        ca_file: None,
+        hosts: Vec::new(),
+        auth,
+        operations: Vec::new(),
+        operations_file: None,
+    };
+    let sources = Sources {
+        bundle,
+        bundle_sha256: Some(bundle_sha256),
+        selection: Some(selection),
+    };
+    Ok((config, sources))
 }
 
 /// Sensitive input intentionally has no Debug or Serialize implementation.
@@ -684,6 +858,25 @@ impl Local {
         .map_err(|_| Failure::InvalidConfiguration)?;
         let config: Configuration =
             connectors_core::read_json(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
+        if !config.bundle_directory.is_absolute()
+            || config
+                .operations_file
+                .as_ref()
+                .is_some_and(|path| !path.is_absolute())
+        {
+            return Err(Failure::InvalidConfiguration);
+        }
+        Self::configure(config, None)
+    }
+    /// An instance of a connector this binary ships, configured from its
+    /// declaration and the compiled-in bundle and selection; no file is read.
+    pub fn derive(instance: &Instance<'_>) -> Result<Self> {
+        let (config, sources) = derived(instance)?;
+        Self::configure(config, Some(sources))
+    }
+    /// `shipped` carries the compiled-in bundle and selection of a derived
+    /// configuration; without it they are read from the configuration's paths.
+    fn configure(config: Configuration, shipped: Option<Sources>) -> Result<Self> {
         let oauth = config.auth.scheme.is_oauth();
         let identity = &config.auth.identity;
         if config.format != FORMAT
@@ -787,35 +980,54 @@ impl Local {
                     || config.auth.token_ca_file.is_some()
                     || config.auth.authorize_url.is_some()
                     || !config.auth.requested_scopes.is_empty()))
-            || !config.bundle_directory.is_absolute()
-            || config
-                .operations_file
-                .as_ref()
-                .is_some_and(|path| !path.is_absolute())
         {
             return Err(Failure::InvalidConfiguration);
         }
+        let Sources {
+            bundle,
+            bundle_sha256,
+            selection,
+        } = match shipped {
+            Some(sources) => sources,
+            None => {
+                let selection = match &config.operations_file {
+                    // A shipped selection set is ordinary repository content,
+                    // readable by anyone; only the configuration that names it
+                    // must be private.
+                    Some(path) => {
+                        let bytes = std::fs::File::open(path)
+                            .map_err(|_| Failure::InvalidConfiguration)
+                            .and_then(|file| {
+                                filesystem::read_bounded(file, 1024 * 1024)
+                                    .map_err(|_| Failure::InvalidConfiguration)
+                            })?;
+                        Some(read_selection(&bytes, &config.provider)?)
+                    }
+                    None => None,
+                };
+                let bundle = bundle::load(&config.bundle_directory, &config.provider)
+                    .map_err(Failure::from_service)?;
+                let bundle_sha256 =
+                    bundle::read_index(&config.bundle_directory)
+                        .ok()
+                        .and_then(|index| {
+                            index
+                                .find(&config.provider)
+                                .map(|e| e.bundle_sha256.clone())
+                        });
+                Sources {
+                    bundle,
+                    bundle_sha256,
+                    selection,
+                }
+            }
+        };
         let mut operations = config.operations.clone();
         let mut feed = None;
-        if let Some(path) = &config.operations_file {
-            // A shipped selection set is ordinary repository content, readable by
-            // anyone; only the configuration that names it must be private.
-            let bytes = std::fs::File::open(path)
-                .map_err(|_| Failure::InvalidConfiguration)
-                .and_then(|file| {
-                    filesystem::read_bounded(file, 1024 * 1024)
-                        .map_err(|_| Failure::InvalidConfiguration)
-                })?;
-            let shipped: OperationsFile =
-                connectors_core::read_json(&bytes).map_err(|_| Failure::InvalidConfiguration)?;
-            if shipped.format != OPERATIONS_FORMAT || shipped.provider != config.provider {
-                return Err(Failure::InvalidConfiguration);
-            }
-            operations.extend(shipped.operations);
-            feed = shipped.feed;
+        if let Some(selection) = selection {
+            operations.extend(selection.operations);
+            feed = selection.feed;
         }
-        let bundle = bundle::load(&config.bundle_directory, &config.provider)
-            .map_err(Failure::from_service)?;
         let base = connectors_host::http::canonical_base(&config.api_base)
             .map_err(Failure::from_service)?;
         if !base.starts_with("https://") {
@@ -930,9 +1142,7 @@ impl Local {
             "format": config.format,
             "instance": config.instance,
             "provider": config.provider,
-            "bundle_sha256": bundle::read_index(&config.bundle_directory)
-                .ok()
-                .and_then(|index| index.find(&config.provider).map(|e| e.bundle_sha256.clone())),
+            "bundle_sha256": bundle_sha256,
             "source_sha256": bundle.source.source_sha256,
             "api_base": base,
             "ca_digest": ca.as_ref().map(|b| connectors_core::digest(&json!(b))),
@@ -1573,5 +1783,106 @@ impl runtime::PreparedWrite for Write {
             oauth.evict(key);
         }
         outcome
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use runtime::Adapter as _;
+    use std::{fs, os::unix::fs::PermissionsExt as _};
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use tokio_rustls::{
+        TlsAcceptor,
+        rustls::{self, pki_types::PrivatePkcs8KeyDer},
+    };
+
+    /// A derived GitLab instance whose endpoint is a bare host validates by
+    /// `GET /api/v4/user` and `GET /api/v4/personal_access_tokens/self` on that
+    /// host. Everything but the fixture's trust root is derived; a derived
+    /// configuration names no `ca_file` of its own.
+    #[test]
+    fn a_bare_gitlab_host_is_probed_under_its_api_base() {
+        let directory = tempfile::tempdir().unwrap();
+        let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()]).unwrap();
+        let ca = directory.path().join("ca.pem");
+        fs::write(&ca, cert.cert.pem()).unwrap();
+        fs::set_permissions(&ca, fs::Permissions::from_mode(0o600)).unwrap();
+        let tls = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![cert.cert.der().clone()],
+            PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der()).into(),
+        )
+        .unwrap();
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let acceptor = TlsAcceptor::from(Arc::new(tls));
+            let targets = Arc::new(Mutex::new(Vec::<String>::new()));
+            let seen = targets.clone();
+            let server = tokio::spawn(async move {
+                while let Ok((stream, _)) = listener.accept().await {
+                    let Ok(mut stream) = acceptor.accept(stream).await else {
+                        continue;
+                    };
+                    let mut head = Vec::new();
+                    while !head.ends_with(b"\r\n\r\n") && head.len() < 8192 {
+                        match stream.read_u8().await {
+                            Ok(byte) => head.push(byte),
+                            Err(_) => break,
+                        }
+                    }
+                    let head = String::from_utf8_lossy(&head).into_owned();
+                    let target = head.split_whitespace().nth(1).unwrap_or_default();
+                    let target = target.split('?').next().unwrap_or_default();
+                    seen.lock().unwrap().push(target.to_owned());
+                    let (status, body) = match target {
+                        "/api/v4/user" => (200, json!({"id": 7})),
+                        "/api/v4/personal_access_tokens/self" => (200, json!({"scopes": ["api"]})),
+                        _ => (404, json!({"message": "404 Not Found"})),
+                    };
+                    let body = serde_json::to_vec(&body).unwrap();
+                    let reply = format!(
+                        "HTTP/1.1 {status} fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    );
+                    let _ = stream.write_all(reply.as_bytes()).await;
+                    let _ = stream.write_all(&body).await;
+                    let _ = stream.flush().await;
+                }
+            });
+            let endpoint = format!("https://localhost:{port}");
+            let (mut config, sources) = derived(&Instance {
+                connector: "gitlab",
+                name: "work",
+                endpoint: Some(&endpoint),
+                profile: None,
+            })
+            .unwrap();
+            assert_eq!(config.api_base, format!("{endpoint}/api/v4"));
+            config.ca_file = Some(ca.clone());
+            let local = Local::configure(config, Some(sources)).unwrap();
+            let validated = local
+                .validate(
+                    "gitlab.pat",
+                    Secret(br#"{"token":"fixture-gitlab-token"}"#.to_vec()),
+                )
+                .await;
+            server.abort();
+            assert_eq!(
+                *targets.lock().unwrap(),
+                ["/api/v4/user", "/api/v4/personal_access_tokens/self"]
+            );
+            assert!(validated.is_ok(), "{:?}", validated.err());
+        });
     }
 }
