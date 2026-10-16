@@ -82,7 +82,7 @@ Business errors use the existing extended set: `connection_not_ready` for global
 - Separation of facts: implemented, enabled, ready, authorized remain separately answerable (`docs/design.md:350`). `status.state` reports connection-wide viability under §4.1; eligibility and authorization are per invocation.
 - Value freedom: no response, log, or error carries a credential, secret reference, provider base URL of a private deployment, proxy path, or parent resource binding.
 - Route: fixed at creation. One mediated hop. A connection cannot be its own parent. Parent revocation or degradation makes each otherwise enabled, non-revoked child ineligible through `parent_degraded` under §4.1; children never fall back to a direct route (`docs/design/08:146-148` in the old repo: no accidental direct-egress fallback).
-- Multiplicity: one instance holds at most one non-revoked connection, and its revoked connections stay as history (§4.2); one auth profile may back many connections (many users, each on its own instance); one established external identity may back at most one non-revoked connection per instance and profile. Required-null identity in explicit no-child-credential profiles is absence, never one shared provider account or a uniqueness key. Their host-qualified connection refs remain distinct; route kind, parent, fixed target, access mode or host-ownership changes require a new independently admitted connection, with no reassignment flow selected here. Admitted configuration/evidence changes may advance revision only while preserving that fixed binding; tenant-header/policy changes invalidate affected evidence and continuations, never silently repurpose the ref. The named persistence owners and atomic groups are consolidated in design §31.
+- Multiplicity: one instance holds at most one published non-revoked connection, and its revoked connections stay as history (§4.2); one auth profile may back many connections (many users, each on its own instance); one established external identity may back at most one non-revoked connection per instance and profile. Required-null identity in explicit no-child-credential profiles is absence, never one shared provider account or a uniqueness key. Their host-qualified connection refs remain distinct; route kind, parent, fixed target, access mode or host-ownership changes require a new independently admitted connection, with no reassignment flow selected here. Admitted configuration/evidence changes may advance revision only while preserving that fixed binding; tenant-header/policy changes invalidate affected evidence and continuations, never silently repurpose the ref. The named persistence owners and atomic groups are consolidated in design §31.
 - Concurrency: status transitions are serialized per connection; a repair completing while a revoke is in flight yields `revoked` (revocation wins). Publication of a validated generation atomically cuts off old pending dispatch admissions. Unresolved rotating refresh also withholds dispatch on possibly consumed material. Final dispatch admission participates in the same ordering; a pin does not bypass revocation, refresh uncertainty or publication.
 - A new observation or parent credential generation invalidates mediated route evidence, but does not itself change the fixed target. Explicit same-target revalidation may advance the route evidence revision under [mediated route §4.1](../../../discovery/mediated_route/v1alpha1/semantics.md#41-observation-continuity-and-route-revalidation); stale history never authorizes it, and parent/target/mode/owner changes still require a new connection.
 - Revision identity: public connection `revision` records effect-relevant configuration/management meaning. The host also retains a separate private auth publication fence for generation publication, revocation and pending admission ordering. A same-identity refresh/evidence recollection or same-target route revalidation alone advances private evidence/fences as needed, not the semantic revision used by F02/F03 fingerprints; changed target/identity/meaning still requires a new semantic binding/revision under the fixed-connection rules.
@@ -141,11 +141,14 @@ provider refusal of a Stale or Revoked connection changes nothing. Neither Live
 nor Stale means enabled, published, ready or authorized. Local revocation is
 irreversible.
 
-An instance holds at most one non-revoked connection. Allocation is refused
-while the instance holds a Live or Stale connection; revoked connections stay
-as history and do not count. An instance that already held more than one
-non-revoked connection keeps them, and is refused a new one until the extra
-ones are revoked.
+An instance holds at most one published non-revoked connection. Allocation is
+refused while the instance holds a published Live or Stale connection; revoked
+connections stay as history and do not count. Nor does a connection that was
+allocated and never published (a connect that failed before publication): it
+holds no credential and cannot be revoked, so counting it would lock the
+instance. An instance that already held more than one published non-revoked
+connection keeps them, and is refused a new one until the extra ones are
+revoked.
 
 Initial managed creation allocates its stable binding privately before scoped
 custody publication. A pending public Connection is not required. Private allocation
@@ -235,7 +238,7 @@ checks remain binding predicates, not executed schema guarantees.
 | Concern | Rule |
 |---|---|
 | List paging | `connections.list` uses `datasource.records` paging semantics |
-| Bound | maximum connections per instance is configuration (first-profile default 1,000, to be measured) |
+| Bound | at most one published non-revoked connection per instance (§4.2); connections per instance including revoked history and never-published allocations are bounded by configuration as storage (first-profile default 1,000, to be measured) |
 | Status freshness | `status` carries separate since/observation/validity times under §4.1; a describe never triggers a provider call (`docs/design.md:965`, no credential resolution for metadata) |
 
 ## 6. Conformance scenarios
@@ -243,7 +246,7 @@ checks remain binding predicates, not executed schema guarantees.
 Positive:
 
 - Reauthorize a connection through a fake acquisition flow; ref unchanged; continuation validity follows each cursor/session contract and its current authority, not ref stability alone.
-- Two users connect the same profile on two instances of one connector; two refs; each invocation uses its own credential (fake transport records the header). A second connect on an instance holding a Live or Stale connection is refused; after that connection is revoked, it succeeds.
+- Two users connect the same profile on two instances of one connector; two refs; each invocation uses its own credential (fake transport records the header). A second connect on an instance holding a published Live or Stale connection is refused; after that connection is revoked, it succeeds. A connect that failed before publication leaves an unpublished connection that does not block the next one.
 - The provider refuses the stored credential → the connection is Stale and reports `reauthorization_required`; a reconnect publishes and returns it to Live under the same ref.
 - Replace the bound token file for a `configured` connection with same-account material; ref and configuration revision may stay unchanged, but the material has a new private generation. The next invocation uses those bytes only after admitted replacement validation and publication; pending old-generation admissions are invalidated. Without validation, invocation refuses.
 - Replace it with another account's token → ordinary replacement refuses; cached identity evidence for the old generation is unusable even within its age bound.
@@ -288,6 +291,6 @@ Adversarial (`docs/design.md:985`, repair without identity drift):
 |---|---|
 | Owner and transport of `connections.*` | host management dispatched by the coordinator; a selected extended operations envelope is permitted, protected completion is separate; see [management](../../management.md) |
 | External identity disclosure | safe display label plus provider account id; no email unless the provider's id is the email (Atlassian API token: the user half is the email, `../connectors/providers/jira.toml`, `user_env`) — then it is `external_identity.id` and never logged |
-| Maximum connections per instance | one non-revoked (§4.2); 1,000 including revoked history, the storage bound, to be measured |
+| Maximum connections per instance | one published non-revoked (§4.2); 1,000 including revoked history, the storage bound, to be measured |
 
 Persistence ownership is consolidated in [design §31](../../../../docs/design.md#31-host-persistence-ownership-and-atomicity). ConnectionAuthorityPort owns authoritative binding facts; MaterialAdmissionPort and RefreshCoordinatorPort share its required publication/revocation ordering. This inventory does not supply a backend or execute its atomicity predicates.

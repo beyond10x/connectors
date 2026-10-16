@@ -184,10 +184,10 @@ entities:
     # Any allowed PublishBinding leaves Stale: a publication means the provider
     # accepted a credential, through a reconnect or a revalidation the
     # provider now accepts (decision 14).
-    # At most one Live or Stale connection per instance (decision 11):
-    # AllocateConnection refuses while the instance holds one, so a
+    # At most one published Live or Stale connection per instance (decision
+    # 11): AllocateConnection refuses while the instance holds one, so a
     # replacement under the same instance id follows the revocation of the
-    # connection it replaces.
+    # connection it replaces. A connection never published does not count.
     # Optional via carriers mean zero-or-one, as in RefreshAttempt's candidate.
     # baseline_evidence is one current-generation material baseline value, not a
     # history or operation-permission cache: at most six distinct baseline checks
@@ -356,15 +356,20 @@ commands:
       - {name: owner_scope, type: String}
       - {name: access_mode, type: connectors.auth_access.AccessMode}
       - {name: publication_fence, type: String}
-      # The instance's Live or Stale connection the owner found inside the
-      # allocating transaction; absent when it holds none.
+      # The instance's published Live or Stale connection (published true)
+      # the owner found inside the allocating transaction; absent when it
+      # holds none.
       - {name: held_connection_ref, type: "Optional<String>"}
-    # At most one non-revoked connection per instance
+    # At most one published non-revoked connection per instance
     # (decision-blocker instance-connection-cardinality, option A;
     # story:ess-connector-vocabulary-model decision 11): an allocation is
-    # refused while the instance holds a Live or Stale connection, and allowed
-    # again once that connection is Revoked; revoked connections stay as
-    # history. An instance that held more than one non-revoked connection
+    # refused while the instance holds a published Live or Stale connection,
+    # and allowed again once that connection is Revoked; revoked connections
+    # stay as history. A connection allocated and never published (a connect
+    # that failed before publication) does not count: it holds no credential,
+    # the host cannot revoke it, and its own publication checks count only
+    # published non-revoked connections (registry/lifecycle.rs:188, :285).
+    # An instance that held more than one published non-revoked connection
     # before this rule keeps them all (connection refs stay byte for byte) and
     # is refused a new one until the extra ones are revoked. The host's bound
     # of 1000 connections per instance_id (registry/lifecycle.rs:20-22) stays
