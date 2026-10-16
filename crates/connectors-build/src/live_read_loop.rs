@@ -804,9 +804,11 @@ mod tests {
         }
     }
 
-    /// A fake `connectors` executable in `directory`: logs its arguments to `argv.log`,
-    /// answers `operations describe` with schema `s1` at revision `r1`, runs the shell
-    /// command `invoke` for `operations invoke` and exits 3 on anything else.
+    /// A fake `connectors` executable in `directory`, a shell script and so Unix only:
+    /// logs its arguments to `argv.log`, answers `operations describe` with schema `s1`
+    /// at revision `r1`, runs the shell command `invoke` for `operations invoke` and
+    /// exits 3 on anything else.
+    #[cfg(unix)]
     fn fake_binary(directory: &Path, invoke: &str) -> PathBuf {
         use std::os::unix::fs::PermissionsExt;
         let path = directory.join("connectors");
@@ -820,6 +822,7 @@ mod tests {
         path
     }
 
+    #[cfg(unix)]
     fn write_reads(directory: &Path, input: Value) -> PathBuf {
         let path = directory.join("reads.json");
         let body = json!({"format":FORMAT,"reads":[
@@ -828,6 +831,7 @@ mod tests {
         path
     }
 
+    #[cfg(unix)]
     fn options(directory: &Path, reads: PathBuf, report: PathBuf) -> Options {
         Options {
             reads,
@@ -842,6 +846,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn the_process_caller_runs_the_binary_and_times_out() {
         let temp = tempfile::tempdir().unwrap();
         fake_binary(
@@ -887,6 +892,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn run_writes_a_report_outside_the_repository_with_no_secret() {
         let repository = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
@@ -934,6 +940,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn run_fails_on_an_unanswered_read_and_still_writes_the_report() {
         let repository = tempfile::tempdir().unwrap();
         let outside = tempfile::tempdir().unwrap();
