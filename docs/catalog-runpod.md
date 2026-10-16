@@ -1,11 +1,11 @@
 # Runpod pods through the catalog provider
 
-The catalog provider creates, lists and terminates Runpod pods from the pinned
+The catalog provider creates, lists, bills and terminates Runpod pods from the pinned
 Runpod REST API OpenAPI document, with the Runpod API key held in the Connectors
-keyring. A caller that starts GPU pods on demand invokes these three operations
+keyring. A caller that starts GPU pods on demand invokes these four operations
 instead of carrying its own HTTP client for the Runpod REST API and holding the
 account key itself. Nothing here is Runpod-specific code: the pinned document is
-compiled into a bundle, a reviewed selection set exposes one read and two
+compiled into a bundle, a reviewed selection set exposes two reads and two
 writes, and the engine described in
 [the catalog provider guide](local-catalog-provider.md) binds and sends them.
 Configuration, connection, approval and invocation work as described there;
@@ -45,7 +45,7 @@ them is selected.
 ## The shipped selection set
 
 [`adapters/catalog/providers/runpod/operations.json`](../adapters/catalog/providers/runpod/operations.json)
-exposes these three operations and nothing else. `adapters/catalog/tests/runpod.rs`
+exposes these four operations and nothing else. `adapters/catalog/tests/runpod.rs`
 pins this exact id list with each id's `operationId`, method and path in the
 pinned document, so a renamed, dropped or added id, or a source operation that
 moved, fails the gate.
@@ -54,6 +54,7 @@ moved, fails the gate.
 |---|---|---|---|
 | `pod.create` | `CreatePod` | `POST /v1/pods` with a JSON `body` | write, unguarded |
 | `pods.list` | `ListPods` | `GET /v1/pods` | read |
+| `billing.pods` | `PodBilling` | `GET /v1/billing/pods`, filtered by `bucketSize`, `startTime`, `endTime`, `podId`, `gpuTypeId` and `grouping` | read |
 | `pod.terminate` | `DeletePod` | `DELETE /v1/pods/{podId}` | write, unguarded |
 
 `pods.list` takes every query filter the pinned document declares, by name:
@@ -166,7 +167,7 @@ a key of that account.
 Bind it to the local CLI as [the catalog provider guide](local-catalog-provider.md#bind-the-provider-to-the-local-cli)
 describes, with `private_protocol = "connectors-private/2"`,
 `profiles = ["runpod.api-key"]` and
-`operations = ["pod.create", "pods.list", "pod.terminate"]`, here under the
+`operations = ["pod.create", "pods.list", "billing.pods", "pod.terminate"]`, here under the
 adapter alias `gpu`. Connect with the credential document
 `{"token": "<Runpod API key>"}`:
 
@@ -182,6 +183,14 @@ List the running pods with one name:
 connectors operations invoke --adapter gpu --connection "$connection" \
   --operation pods.list --schema "$schema" --revision "$revision" \
   --input-json '{"name":"worker-a","desiredStatus":"RUNNING"}' --output json
+```
+
+Read one pod's daily billing records (`billing.pods` is a read, so it needs no approval):
+
+```sh
+connectors operations invoke --adapter gpu --connection "$connection" \
+  --operation billing.pods --schema "$schema" --revision "$revision" \
+  --input-json '{"bucketSize":"day","podId":"<pod id>"}' --output json
 ```
 
 Create a pod (`create.json`, approved as above):
