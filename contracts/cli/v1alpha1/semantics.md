@@ -358,8 +358,11 @@ Its `invalid_configuration` refusal names the rule that refused in
 `configuration_rule` (`connectors.cli.ConfigurationRule`), never a path or OS
 text: `config_path_unresolved` (no `--config`, `XDG_CONFIG_HOME` or `HOME`, or an
 inadmissible path), `config_missing` (no file at the resolved path),
-`config_not_private` (the file or a directory above it is not owner-only) or
-`owner_uid_mismatch`.
+`config_not_private` (the file or a directory above it is not owner-only),
+`owner_uid_mismatch` or, from `setup migrate` only, `config_too_large` (the
+rewritten file would be larger than the 1 MiB a read admits; the refusal
+carries its size in `configuration_bytes` and the bound in
+`configuration_limit`).
 
 ### Selecting an instance
 
@@ -458,7 +461,8 @@ configuration names. Read and write instance pairs are not merged: merging
 changes scopes and so the revision.
 
 Only a catalog entry maps to a connector today: the connector whose shipped
-declaration names the `provider` of the entry's native configuration
+declaration names the `provider` of the entry's native configuration as its
+`native_provider` (the declaration file's `catalog_provider` key)
 (`--local-config <file>`, admitted as the provider admits it: owner-only, at
 most 1 MiB), or the shipped connector its `--connector` argument names. Every
 other entry stays where it is, and the result names why in `reason`
@@ -474,8 +478,15 @@ other entry stays where it is, and the result names why in `reason`
 | `selection_changes` | would read back with another value of the field `differing_field` names |
 
 The new file is read back with the reading rules above before anything is
-written, and an entry that reads back with any other value of any of its fields
-is not migrated, naming the first such field. Moving to `connectors-local/5`
+written, its 1 MiB bound included: a rewritten file larger than that is
+refused in both modes as `invalid_configuration` naming `config_too_large`,
+and nothing is written. An entry that reads back with any other value of any
+of its fields is not migrated, naming the first such field. So is one whose
+new instance table reads back differently (`instance`, or the first of
+`description`, `endpoint` and `profile`) or whose connector's pre-existing
+table does (`enabled`, or an existing instance's `description`, `endpoint`
+or `profile`, which keeps every entry moving to that connector); a `format`
+that reads back other than `connectors-local/5` keeps every entry. Moving to `connectors-local/5`
 requires `private_protocol` on every entry, and it enters the executable
 selection digest, so no entry of a `connectors-local/1` file is migrated; each
 candidate names `private_protocol`. Nothing else of the file changes, but its

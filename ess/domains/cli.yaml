@@ -616,11 +616,13 @@ types:
   # (owner_uid_mismatch). approval_clock_format_retired is a clock use's refusal, not a
   # whole-configuration one: the [approval_clock] table is the retired single-source
   # roughtime-clock/1 shape, which loads but answers no clock use until it is rewritten
-  # as roughtime-quorum/1 (docs/local-clock.md). It names the rule only, never a path
+  # as roughtime-quorum/1 (docs/local-clock.md). config_too_large: a configuration
+  # text is larger than the most a read admits; `setup migrate` refuses a rewritten
+  # file past that bound and writes nothing. It names the rule only, never a path
   # or OS text.
   - name: connectors.cli.ConfigurationRule
     kind: enum
-    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch, approval_clock_format_retired]
+    variants: [config_path_unresolved, config_missing, config_not_private, owner_uid_mismatch, approval_clock_format_retired, config_too_large]
   - name: connectors.cli.InitDisposition
     kind: enum
     variants: [created, state_initialized]
@@ -674,6 +676,13 @@ types:
       # configuration. As for instance_id above, ESS declares no invariant on a CLI type,
       # so the presence rule is enforced by the host and pinned by tests.
       - {name: configuration_rule, type: "Optional<connectors.cli.ConfigurationRule>"}
+      # ESS-LIMIT: configuration_bytes and configuration_limit appear together, only
+      # beside configuration_rule config_too_large: the size in bytes of the text that
+      # was refused and the most bytes a configuration read admits. As for instance_id
+      # above, ESS declares no invariant on a CLI type, so the presence rule is
+      # enforced by the host and pinned by tests.
+      - {name: configuration_bytes, type: "Optional<Integer>"}
+      - {name: configuration_limit, type: "Optional<Integer>"}
       # ESS-LIMIT: store_version and binary_version appear together, only on
       # metadata_schema_newer (contracts/cli/v1alpha1/semantics.md). binary_version is
       # the refusing binary's release version; store_version is the release version the
@@ -909,7 +918,10 @@ types:
   #   pass, every other one is UNMAPPED.
   # - connector_undeclared: an entry of a mapped implementation whose native
   #   configuration names a provider no shipped declaration carries as its
-  #   native_provider.
+  #   native_provider (connectors.declarations.Connector). A shipped declaration
+  #   file writes that field under its implementation's own key, which the
+  #   adapter boundary keeps out of shared ESS; contracts/cli/v1alpha1/semantics.md
+  #   ("Migrating adapter entries") names it.
   # - gateway_prefix: an entry of a mapped implementation whose native
   #   configuration states a request prefix its connector's declaration does
   #   not produce, an API gateway in front of the provider; the connector's
@@ -930,10 +942,15 @@ types:
   # executable enter its executable selection digest (approval policy
   # executable_selection); permissions name its mounted custody items.
   # private_protocol: `connectors-local/5` requires it, and it enters the
-  # digest of an entry whose `connectors-local/1` file selects none.
+  # digest of an entry whose `connectors-local/1` file selects none. The
+  # `[connectors]` table is read back too: instance names the entry's new
+  # instance table when it is absent or reads back as another instance;
+  # description, endpoint and profile a differing instance key, of the new
+  # table or of an existing instance of its connector; enabled the connector's
+  # table; format the file's format, which keeps every entry.
   - name: connectors.cli.MigrateField
     kind: enum
-    variants: [instance_id, configuration_revision, adapter_id, protocol, private_protocol, startup, restart, executable, permissions]
+    variants: [instance_id, configuration_revision, adapter_id, protocol, private_protocol, startup, restart, executable, permissions, instance, enabled, description, endpoint, profile, format]
   # What an entry's records are keyed by. custody_items are the mounted-secret
   # item names `<alias>/<profile>` of its permitted profiles; platform custody
   # items are keyed by connection, not by configuration names.
