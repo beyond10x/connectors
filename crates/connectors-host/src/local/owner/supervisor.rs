@@ -97,7 +97,7 @@ fn transient(failure: runtime::Failure) -> Option<Cause> {
         F::Timeout | F::ProviderTimeout => Some(Cause::ProviderTimeout),
         F::ProviderRateLimited => Some(Cause::ProviderRateLimited),
         F::ProviderInternal => Some(Cause::ProviderInternal),
-        F::Capacity | F::ProviderCapacity => Some(Cause::ProviderCapacity),
+        F::ProviderCapacity => Some(Cause::ProviderCapacity),
         _ => None,
     }
 }
@@ -149,6 +149,9 @@ fn revalidate_with_retries<T>(
             return (result, attempts, Some(cause));
         }
         pause(wait);
+        if stopping() {
+            return (result, attempts, Some(Cause::OwnerStopping));
+        }
     }
 }
 
@@ -901,6 +904,7 @@ fn worker(
                                 connectors_sdk::now_ms(),
                             )?;
                             let claim = registry.consume(acquired, connectors_sdk::now_ms())?;
+                            let sent = std::cell::Cell::new(0u32);
                             let published = super::publish_mounted(
                                 &paths,
                                 &selection,
@@ -924,6 +928,7 @@ fn worker(
                                         || stopped.load(Ordering::SeqCst),
                                         std::thread::sleep,
                                     );
+                                    sent.set(attempts);
                                     result
                                         .map(runtime::Baseline::into_registry)
                                         .map_err(|failure| retried(failure, attempts, cause))
@@ -937,6 +942,10 @@ fn worker(
                                 },
                             );
                             if let Err(error) = published {
+                                let mut error = error;
+                                if sent.get() > 0 && error.attempts.is_none() {
+                                    error.attempts = Some(sent.get());
+                                }
                                 if error.code != Code::OutcomeUnknown {
                                     registry.fail(&claim, connectors_sdk::now_ms())?;
                                 }
@@ -989,6 +998,10 @@ fn worker(
                             Err(None),
                             connectors_sdk::now_ms(),
                         )?;
+                        let mut error = error;
+                        if attempts > 0 {
+                            error.attempts = Some(attempts);
+                        }
                         return Err(error);
                     }
                     match result {
