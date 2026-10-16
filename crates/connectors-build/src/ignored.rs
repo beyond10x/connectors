@@ -195,6 +195,8 @@ fn classify(suite: &Suite, name: &str) -> Entry {
             "connectors-catalog-provider",
             "local_runtime",
             "cli_journey::lifecycle::catalog_cli_failed_repair_and_busy_stop_preserve_authority"
+            | "cli_journey::owner_guard::a_journey_that_panics_after_its_owner_started_leaves_no_owner_alive"
+            | "cli_journey::owner_guard::a_journey_owner_exits_when_the_process_it_is_tied_to_ends"
             | "cli_journey::guarded_merge::catalog_cli_guarded_merge_applied_refused_and_lost_response_restart"
             | "cli_journey::guarded_merge::catalog_cli_guarded_merge_revocation_finishes_admitted_audit"
             | "cli_journey::guarded_merge::catalog_cli_recovers_abandoned_preparation_only_with_trusted_time"
