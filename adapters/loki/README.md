@@ -1,6 +1,6 @@
 # Loki through the local CLI
 
-The `loki` adapter answers five reads, each one GET against Loki's HTTP API:
+The `loki` connector answers five reads, each one GET against Loki's HTTP API:
 `logs.query_range` (log lines), `logs.query_metric` (an instant or range metric query),
 `logs.labels` (label names, or one label's values), and two reads through profiles the
 operator configures: `logs.profile_lines` (one typed, masked record per line) and
@@ -8,6 +8,8 @@ operator configures: `logs.profile_lines` (one typed, masked record per line) an
 [the Loki profile](contracts/logs/v1alpha1/semantics.md) §§11–12; the connection is §11.4. It
 requires Linux x86_64 and the [qualified Secret Service binding](../../docs/local-secret-service.md),
 like every saved credential.
+
+Connector, instance and connection are the terms of the [vocabulary](../../README.md#vocabulary).
 
 ```sh
 CARGO_BUILD_JOBS=2 cargo build --release --locked -p connectors -p connectors-loki
@@ -41,23 +43,30 @@ target/release/connectors-loki --local-config /absolute/path/loki.json --print-l
 sha256sum target/release/connectors-loki
 ```
 
-Copy `configuration_revision` from that output verbatim, then add an adapter entry to the
-configuration created by setup:
+Copy `configuration_revision` from that output verbatim. Loki is not a catalog connector, so
+the configuration pins its instance. Add the instance to the configuration created by setup:
+change its `format` line to `format = "connectors-local/5"`, which instances need, and add the
+instance `logs` of the connector `loki`:
 
 ```toml
-[adapters.logs]
+[connectors.loki]
+enabled = true
+
+[connectors.loki.instances.logs]
+alias = "logs"
 instance_id = "loki-prod"
 adapter_id = "loki"
 configuration_revision = "REPLACE_FROM_BOOTSTRAP"
 protocol = "v1alpha1"
+private_protocol = "connectors-private/1"
 startup = "on-demand"
 restart = "never"
 
-[adapters.logs.permissions]
+[connectors.loki.instances.logs.permissions]
 profiles = ["loki.bearer"]
 operations = ["logs.query_range", "logs.query_metric", "logs.labels", "logs.profile_lines", "logs.call_trace"]
 
-[adapters.logs.executable]
+[connectors.loki.instances.logs.executable]
 path = "/absolute/path/target/release/connectors-loki"
 sha256 = "REPLACE_WITH_EXECUTABLE_SHA256"
 args = ["--local-config", "/absolute/path/loki.json"]
@@ -66,11 +75,11 @@ args = ["--local-config", "/absolute/path/loki.json"]
 ## Connect and read
 
 ```sh
-target/release/connectors --output json connections connect --adapter logs --profile loki.bearer --credential-prompt
-target/release/connectors --output json operations describe --adapter logs --operation logs.query_range
-target/release/connectors --output json operations invoke --adapter logs --connection CONNECTION --operation logs.query_range --schema SCHEMA --revision REVISION --input-json '{"query":"{app=\"api\"} |= \"error\"","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","limit":100}'
-target/release/connectors --output json operations invoke --adapter logs --connection CONNECTION --operation logs.query_metric --schema SCHEMA --revision REVISION --input-json '{"query":"sum by (app) (count_over_time({app=\"api\"}[1m]))","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","step_seconds":60}'
-target/release/connectors --output json operations invoke --adapter logs --connection CONNECTION --operation logs.labels --schema SCHEMA --revision REVISION --input-json '{"label":"app"}'
+target/release/connectors --output json connections connect --connector loki --instance logs --profile loki.bearer --credential-prompt
+target/release/connectors --output json operations describe --connector loki --instance logs --operation logs.query_range
+target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.query_range --schema SCHEMA --revision REVISION --input-json '{"query":"{app=\"api\"} |= \"error\"","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","limit":100}'
+target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.query_metric --schema SCHEMA --revision REVISION --input-json '{"query":"sum by (app) (count_over_time({app=\"api\"}[1m]))","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","step_seconds":60}'
+target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.labels --schema SCHEMA --revision REVISION --input-json '{"label":"app"}'
 ```
 
 Each operation has its own schema and revision from `operations describe`. For automation,
@@ -110,15 +119,15 @@ keys and numbers below are invented; a deployment's own are written only in its 
 }
 ```
 
-A changed profile changes `configuration_revision`: copy the new one into the adapter entry.
+A changed profile changes `configuration_revision`: copy the new one into the instance.
 A pattern format is `{"kind": "pattern", "value": {"pattern": "fx-cdr <dir> id=<callid>"}}`;
 a call identifier carried in the line is
 `{"kind": "field", "value": {"key": "callid", "format": {"kind": "logfmt"}}}`. Phone numbers
 are masked to their last four characters unless a field declares `"mask": "none"`.
 
 ```sh
-target/release/connectors --output json operations invoke --adapter logs --connection CONNECTION --operation logs.profile_lines --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-cdr","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","match":{"caller":"+15550100001"}}'
-target/release/connectors --output json operations invoke --adapter logs --connection CONNECTION --operation logs.call_trace --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-by-label","call_id":"fx-leg-0001","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000"}'
+target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.profile_lines --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-cdr","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000","match":{"caller":"+15550100001"}}'
+target/release/connectors --output json operations invoke --connector loki --instance logs --connection CONNECTION --operation logs.call_trace --schema SCHEMA --revision REVISION --input-json '{"profile":"fixture-by-label","call_id":"fx-leg-0001","start_unix_ns":"1788822000000000000","end_unix_ns":"1788825600000000000"}'
 ```
 
 The first answers one record per CDR line whose caller is exactly that number, with the
@@ -128,10 +137,10 @@ each naming its source. Neither accepts LogQL from the caller.
 ## What the connection is bound to
 
 **The identity is the configured connection, not a Loki account.** Loki has no user or account
-read. Connect, repair and `connections revalidate` prove the token with
+read. Connect, reconnect and `connections revalidate` prove the token with
 `GET /loki/api/v1/labels`: a `200` admits it, a `401` or `403` refuses it. The identity kind is
 `loki.connection` and its subject is the configuration's `instance`. Any token the deployment
-accepts is the same identity, so a repair cannot detect a token of another tenant. Use one
+accepts is the same identity, so a reconnect cannot detect a token of another tenant. Use one
 `instance` per deployment and tenant.
 
 **A token grants no scopes and exposes no expiry.** The profile requires no scopes;
@@ -157,7 +166,7 @@ path and connect with the Grafana token as the `loki.bearer` token.
 }
 ```
 
-The uid is the `uid` member of the [Grafana adapter's](../grafana/README.md) `datasources.list`
+The uid is the `uid` member of the [Grafana connector's](../grafana/README.md) `datasources.list`
 record whose `type` is `loki` and `access` is `proxy`. The probe and every read then go to
 `<base_url>loki/api/v1/...` with `Authorization: Bearer <Grafana token>`
 (`tests/local_runtime.rs`,
@@ -177,6 +186,6 @@ labels probe. A scheduled caller revalidates before reading.
 
 ## Replacing the executable
 
-The entry pins the executable's SHA-256. After rebuilding `connectors-loki`, update `sha256`,
-stop the running incarnation (`adapters stop`), then `connections revalidate` or repair the
+The instance pins the executable's SHA-256. After rebuilding `connectors-loki`, update `sha256`,
+stop the running incarnation (`instances stop`), then `connections revalidate` or reconnect the
 connection, which performs the admitted launch under the same connection id.

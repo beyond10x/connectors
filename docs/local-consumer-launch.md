@@ -7,6 +7,8 @@ the process that asked for the launch. It requires Linux and the
 [qualified Secret Service binding](local-secret-service.md). The contract is
 [consumer launch](../contracts/cli/v1alpha1/consumer-launch.md).
 
+Connector, instance and connection are the terms of the [vocabulary](../README.md#vocabulary).
+
 A typical consumer is a service that reads a database password from a file: a
 [PostgreSQL connection](local-postgres-cli.md) saved once with
 `connections connect` supplies the password, and the service reads
@@ -14,12 +16,14 @@ A typical consumer is a service that reads a database password from a file: a
 
 ## Pin the consumer
 
-Consumers need configuration format `connectors-local/3`. Change the `format` line of
-an existing `connectors-local/2` file; nothing else in it changes. Then add one
-entry per consumer:
+Consumers need configuration format `connectors-local/3` or later. A file that
+configures instances under `[connectors]`, such as the `warehouse` instance of the
+[PostgreSQL guide](local-postgres-cli.md), is already `connectors-local/5` and needs no
+change; in an existing `connectors-local/2` file, change the `format` line and nothing
+else. Then add one entry per consumer:
 
 ```toml
-format = "connectors-local/3"
+format = "connectors-local/5"
 
 [consumers.store]
 pass_env = ["STORE_"]
@@ -33,7 +37,7 @@ args = ["--password-file", "/proc/self/fd/3"]
 connections = ["warehouse"]
 ```
 
-- `path` and `sha256` pin the exact file, as for an adapter. Replace the digest when
+- `path` and `sha256` pin the exact file, as for a pinned instance. Replace the digest when
   you upgrade the program; until then every launch is refused as
   `invalid_configuration`.
 - `args` is the start of the program's argument list. Every launch begins with it;
@@ -41,14 +45,15 @@ connections = ["warehouse"]
 - `pass_env` lists name prefixes of your environment variables the program gets,
   here every `STORE_…` variable. Without it the program starts with an empty
   environment.
-- `permissions.connections` lists the adapter aliases whose connections this
-  consumer may receive. Without it the consumer receives none.
+- `permissions.connections` lists the aliases of the instances whose connections this
+  consumer may receive: a pinned instance's `alias`, or `<connector>.<instance>` for a
+  derived one. Without it the consumer receives none.
 
 ## Launch
 
 ```sh
 STORE_HOME=/srv/store target/release/connectors connections launch \
-  --adapter warehouse --connection CONNECTION --consumer store \
+  --connector postgres --instance warehouse --connection CONNECTION --consumer store \
   --args '["serve","--port","8080"]'
 ```
 
@@ -63,8 +68,8 @@ status. Pressing Ctrl-C interrupts the program, which decides how to stop;
 `connectors` waits for it.
 
 The credential is the document saved with the connection, byte for byte — for
-PostgreSQL the `{"password":"..."}` JSON document. No adapter starts and no provider
-is contacted for a launch.
+PostgreSQL the `{"password":"..."}` JSON document. No instance process starts and no
+provider is contacted for a launch.
 
 ## When a launch is refused
 
@@ -73,8 +78,8 @@ A refused launch runs nothing and prints the usual `failure` envelope on stderr.
 | `code` | Meaning | What to do |
 |---|---|---|
 | `invalid_input` (stage `arguments`) | `--args` is not a JSON array of strings, or an element holds NUL | fix the value |
-| `not_found` | no such adapter, consumer or connection | check the names |
-| `forbidden` | the consumer does not list this adapter, or the adapter no longer grants the connection's profile | add the alias to `permissions.connections` |
+| `not_found` | no such instance, consumer or connection | check the names |
+| `forbidden` | the consumer does not list this instance, or the instance no longer grants the connection's profile | add the instance's alias to `permissions.connections` |
 | `invalid_configuration` | the program's file no longer matches its `sha256` | update the digest after checking the file |
 | `unavailable` (stage `readiness`) | the connection's evidence has lapsed | `connections revalidate` |
 | `custody_unavailable` | the keyring is locked or unavailable | unlock it |
