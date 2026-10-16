@@ -6,6 +6,8 @@ use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 #[path = "background_recovery.rs"]
 mod background_recovery;
+#[path = "custody_journey.rs"]
+mod custody_journey;
 #[path = "owner_replay.rs"]
 mod owner_replay;
 

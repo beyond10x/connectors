@@ -1115,7 +1115,7 @@ pub fn serve(paths: Paths) -> Result<()> {
         authority,
         incarnation: incarnation.clone(),
         build,
-        pool: Arc::new(supervisor::Pool::new(paths, incarnation)),
+        pool: supervisor::Pool::shared(paths, incarnation),
         shutdown: AtomicBool::new(false),
         clients: AtomicUsize::new(0),
     });
@@ -2668,7 +2668,7 @@ mod idle_sweep_tests {
                 .to_string(),
             incarnation: incarnation.clone(),
             build: "test",
-            pool: Arc::new(supervisor::Pool::new(paths.clone(), incarnation)),
+            pool: supervisor::Pool::shared(paths.clone(), incarnation),
             shutdown: AtomicBool::new(false),
             clients: AtomicUsize::new(0),
         });

@@ -234,6 +234,7 @@ fn project(
                 service_code: Some(connectors_core::ErrorCode::UpstreamProtocol),
                 origin: owner::Origin::Host,
                 store_version: None,
+                created: None,
             });
             value.mutation.cause = Some(Cause {
                 code: connectors_core::ErrorCode::UpstreamProtocol,
@@ -249,6 +250,12 @@ fn project(
         let mut data = json!({"kind":"operational","code":error.code,"stage":error.stage(classification),"next_action":error.next_action(classification)});
         if let Some(code) = &error.service_code {
             data["service_code"] = json!(code);
+        }
+        // A created credential whose custody failed is named by its public
+        // members, so the operator can revoke it at the provider.
+        if let Some(created) = &error.created {
+            data["custody"] = json!("failed");
+            data["created"] = json!(created);
         }
         // The owner's `metadata_schema_newer` names both versions, as the
         // direct path does (semantics.md §3).
