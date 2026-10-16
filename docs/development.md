@@ -1,7 +1,7 @@
 # Build, test and generate
 
 Run these commands from the repository root. For service configuration and invocation,
-see [Run adapter services](running-services.md).
+see [Run connector services](running-services.md).
 
 Rust 1.88.0 remains the checked minimum for independent libraries. The local
 Eventlog-backed CLI/host runtime is checked on Rust 1.91.0. The full

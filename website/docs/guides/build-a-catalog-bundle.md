@@ -81,5 +81,5 @@ so a bundle can only change with its source.
   unchanged, and the bundle records the amendment file's SHA-256.
 
 A bundle alone exposes nothing. A reviewed selection set under
-`adapters/catalog/providers/<provider>/operations.json` names which operations a configured
-provider serves, with each one's effect; see [The catalog provider](../concepts/catalog-provider.md).
+`adapters/catalog/providers/<provider>/operations.json` names which operations a connector
+serves, with each one's effect; see [The catalog provider](../concepts/catalog-provider.md).
