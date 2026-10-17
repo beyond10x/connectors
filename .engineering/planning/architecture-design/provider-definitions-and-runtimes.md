@@ -3,15 +3,15 @@ format: aep.planning-md/3
 id: architecture-design:provider-definitions-and-runtimes
 kind: architecture-design
 status: draft
-title: Provider definitions repository, connectors-provider/1, install, runtime roles and the security floor
+title: Connector definitions repository, lowerers, install, runtime roles and the security floor
 relations:
 - designs: architecture-decision-record:provider-definitions-and-runtimes
 - informed_by: architecture-decision-record:declarative-http-provider-runtime
-revision: 3
+revision: 5
 ---
 ## 1. Purpose
 
-Realizes `architecture-decision-record:provider-definitions-and-runtimes`: declarative provider
+Realizes `architecture-decision-record:provider-definitions-and-runtimes`: declarative connector
 definitions in their own repository, one intermediate representation (IR) that any runtime can
 execute, an explicit install step in `connectors`, profile-driven OAuth, runtime roles proven by
 conformance, a transport binding separate from operation semantics, a page per provider usable with
@@ -57,7 +57,7 @@ README.md               humans: what is here, how to add a provider, link to Con
 AGENTS.md               agents: commands, the no-secrets rule, the gate
 Taskfile.yml            lower, validate, pages, check
 connectors.lock         the released connectors version the gate lowers with, by digest
-providers/<id>.yaml     authored: upstream pin, base URL, auth profiles, selection, overrides
+connectors/<id>.yaml     authored: upstream pin, base URL, auth profiles, selection, overrides
 upstream/<id>.json      url, sha256, bytes; vendor bytes only where the license allows
 ```
 
@@ -205,7 +205,7 @@ New risks from the split, and their answer:
 
 | Area | Proposal |
 |---|---|
-| Public noun | "connector": a provider definition plus the runtime that runs it. "declarative connector" for IR-driven ones, "native connector" for Rust ones. "adapter" stays as the Rust term inside this repository. "catalog provider" is retired as a user-facing name |
+| Public noun | "connector": a connector definition plus the runtime that runs it. "declarative connector" for IR-driven ones, "native connector" for Rust ones. "adapter" stays as the Rust term inside this repository. "catalog provider" is retired as a user-facing name |
 | Overloaded words | "provider" means the upstream vendor only; "owner" means the local supervisor process only; "plugin" means the Kubernetes exec credential plugin only |
 | Duplicated types | shared ESS has 642 named types in 24 domains; `LocalHost` is declared 12 times, `ServiceHost` 3, and `NextAction`, `AttemptReference`, `Provenance`, `Failure`, `ErrorCode` twice each: consolidate |
 | Documentation | README states only what a test holds; support claims come from `crates/connectors-docs` status data |
