@@ -895,7 +895,12 @@ The complete configuration used against the sandbox is
   loads, on every check: the bundle does not record an answer member's type,
   and as text it would hold for a look-alike string where a boolean is meant.
   GitLab's `/resolvable` and `/merge_when_pipeline_succeeds` and Jira's
-  `/transitions/0/isAvailable` are compared with `{"boolean": true}`. The
+  `/transitions/0/isAvailable` are compared with `{"boolean": true}`. A check that
+  differs refuses the write unsent as `forbidden`; a preflight declaring
+  `"mismatch": "conflict"` refuses it as `conflict` instead, the provider's own
+  answer read before the write (`connectors_catalog.guard.MismatchCode`), for a
+  read that proves the target changed since the caller read it, such as
+  Zendesk's ticket `updated_at` against the caller's `updated_stamp`. The
   postflight applies its checks to the write's own response; a difference there leaves the outcome uncertain and
   never refused, because the provider may already have applied the write. No
   corrective request is ever issued. This is the C14 boundary the operator

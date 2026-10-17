@@ -63,14 +63,26 @@ types:
       - {name: operation_id, type: String}
       - {name: values, type: "Map<String, connectors_catalog.guard.Reference>"}
 
+  # The code a preflight refuses with when one of its checks differs. `conflict`: the target
+  # changed since the caller read it, as the provider's own answer read before the write shows;
+  # such as Zendesk's ticket `updated_at` differing from the caller's `updated_stamp`, which
+  # the shared code `conflict` reports, so the caller re-reads the target rather than asking
+  # for a permission it already has.
+  - name: connectors_catalog.guard.MismatchCode
+    kind: enum
+    variants: [conflict]
+
   # A read before the write, whose answer must satisfy every check. A read that answers 404 is a
-  # refusal before dispatch.
+  # refusal before dispatch. A check that differs refuses the write unsent, as `forbidden`, or
+  # with `mismatch` when the preflight declares one. Absent when unused, so a preflight without
+  # it keeps its serialised form.
   - name: connectors_catalog.guard.Preflight
     kind: struct
     fields:
       - {name: operation_id, type: String}
       - {name: values, type: "Map<String, connectors_catalog.guard.Reference>"}
       - {name: checks, type: "List<connectors_catalog.guard.Check>"}
+      - {name: mismatch, type: "Optional<connectors_catalog.guard.MismatchCode>"}
     invariants:
       - checks.count >= 1
 
