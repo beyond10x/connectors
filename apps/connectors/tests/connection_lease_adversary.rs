@@ -114,3 +114,90 @@ fn adversary_a_read_on_current_evidence_is_served_when_its_early_recollection_fa
     let read = success(&output);
     assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
 }
+
+/// contracts/cli/v1alpha1/owner.md: a read's recollection of lapsed evidence
+/// is "this same recollection" a revalidation runs, and "a revalidation that
+/// arrives while one of the same connection, at the same expected semantic
+/// revision, is queued or running on the owner joins it". ess/domains/cli.yaml
+/// names both causes of one `LocalRevalidationAdmission`. A read finds its
+/// evidence lapsed and recollects it with an 18 s probe (the story's live probe
+/// took 24.5 s); a `connections revalidate` arriving meanwhile queues behind
+/// the read's job and then runs a second probe of its own, so it needs about
+/// 36 s and its 30 s deadline passes first.
+#[test]
+fn adversary_a_revalidation_during_a_reads_recollection_joins_it_within_the_bound() {
+    const LIFETIME_MS: u64 = 1_000;
+    const PROBE_MS: u64 = 18_000;
+    let (container, connection, revision) = connected();
+    container.set_knob("evidence_ms", LIFETIME_MS);
+    success(&container.revalidate(&connection, &revision));
+    std::thread::sleep(Duration::from_millis(LIFETIME_MS + 200));
+    container.set_knob("evidence_ms", 60_000);
+    container.set_knob("probe_ms", PROBE_MS);
+    let probes = container.seen("validations").len();
+    let (read, (elapsed, revalidated)) = std::thread::scope(|scope| {
+        let read = scope.spawn(|| container.invoke(&connection));
+        // The read's job is on the worker, probing, when the revalidation arrives.
+        std::thread::sleep(Duration::from_millis(3_000));
+        let started = Instant::now();
+        let revalidated = container.revalidate(&connection, &revision);
+        (read.join().unwrap(), (started.elapsed(), revalidated))
+    });
+    let read = success(&read);
+    assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+    assert!(
+        revalidated.status.success() && elapsed < ADMISSION_BOUND,
+        "a revalidation arriving during a read's recollection answered after \
+         {elapsed:?}: {}",
+        String::from_utf8_lossy(&revalidated.stderr)
+    );
+    let answer = success(&revalidated);
+    assert_eq!(answer["connection"]["summary"]["state"], "ready", "{answer}");
+    assert_eq!(
+        container.seen("validations").len() - probes,
+        1,
+        "the revalidation ran its own probe instead of joining the read's recollection"
+    );
+}
+
+/// contracts/cli/v1alpha1/semantics.md: a recollection run only because
+/// still-current evidence would lapse early "keeps the read admitted on that
+/// evidence: when it fails with anything but such a credential refusal (the
+/// provider or custody briefly unavailable, a timeout), the read is served on
+/// the evidence it was admitted on, for as long as that evidence stays
+/// current". Evidence of 20 s, read 11 s after its revalidation, has about 9 s
+/// left. The provider's identity probe now hangs (40 s). The optional early
+/// recollection is bounded by the read's deadline (at most 30 s), not by the
+/// evidence it was admitted on, so it outlives that evidence and the read,
+/// which a provider serving reads could have answered on its current evidence,
+/// is lost to the probe.
+#[test]
+fn adversary_a_hanging_early_recollection_does_not_cost_a_read_its_current_evidence() {
+    const LIFETIME_MS: u64 = 20_000;
+    let (container, connection, revision) = connected();
+    container.set_knob("evidence_ms", LIFETIME_MS);
+    success(&container.revalidate(&connection, &revision));
+    let revalidated = Instant::now();
+    std::thread::sleep(Duration::from_millis(LIFETIME_MS / 2 + 1_000));
+    container.set_knob("probe_ms", 40_000);
+    let validations = container.seen("validations").len();
+    let invocations = container.seen("invocations").len();
+    let started = Instant::now();
+    let output = container.invoke(&connection);
+    let elapsed = started.elapsed();
+    // The read began with its evidence still current, under half of it left.
+    assert!(started.duration_since(revalidated) < Duration::from_millis(LIFETIME_MS - 4_000));
+    assert!(
+        container.seen("validations").len() > validations,
+        "the read never attempted its early recollection"
+    );
+    assert!(
+        output.status.success(),
+        "a read on still-current evidence was lost to its optional early \
+         recollection after {elapsed:?} (dispatched reads: {}): {}",
+        container.seen("invocations").len() - invocations,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let read = success(&output);
+    assert_eq!(read["result"]["credential"], digest(SECRET), "{read}");
+}
