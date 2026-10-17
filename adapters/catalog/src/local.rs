@@ -1872,7 +1872,9 @@ fn evict_refused_token<T>(
     }
 }
 
-#[cfg(test)]
+// Unix only, as the catalog's other local TLS tests: the trust anchor is
+// written owner-only through `PermissionsExt`.
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use runtime::Adapter as _;
