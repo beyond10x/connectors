@@ -7,15 +7,15 @@ title: Keyless web search through a self-hosted SearXNG adapter behind websearch
 relations:
 - depends_on: story:catalog-github-anonymous-reads
 - depends_on: story:catalog-zendesk-ticket-writes
-revision: 1
+- depends_on: story:websearch-duckduckgo-abstracts
+revision: 3
 ---
 ## Outcome
 
 A consumer runs keyless web search through the Connectors CLI: `websearch.search`
 (contracts/datasources/websearch/v1alpha1) is served by a SearXNG adapter against a configured,
-self-hosted SearXNG base URL through its JSON API (`/search?format=json`), with no API key. An
-optional DuckDuckGo Instant Answer adapter answers the same interface with abstracts, labelled as
-abstracts and never presented as search results.
+self-hosted SearXNG base URL through its JSON API (`/search?format=json`), with no API key. It
+follows story:websearch-duckduckgo-abstracts, which serves abstracts behind the same interface.
 
 ## Spec first
 
@@ -37,7 +37,4 @@ rather than inventing a second exception.
 - No query text in logs, audit records, errors or metrics: a test searches a sentinel string and
   finds it in no log line, record or error the run writes.
 - A SearXNG instance with JSON output disabled (403) is a refusal naming that setting.
-- The DuckDuckGo Instant Answer adapter, if built in this story, returns abstracts marked
-  `kind: abstract` and never fills result fields; a test proves an empty abstract is an empty
-  answer, not a failure.
 - docs: a guide with the config block, the commands for a local install and the limits.
