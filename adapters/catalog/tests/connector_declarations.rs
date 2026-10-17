@@ -21,6 +21,8 @@ const DECLARATION: &str = "connector.json";
 const DECLARATION_FORMAT: &str = "connectors-catalog-connector/1";
 const GMAIL_READONLY: &str = "https://www.googleapis.com/auth/gmail.readonly";
 const GMAIL_COMPOSE: &str = "https://www.googleapis.com/auth/gmail.compose";
+/// The catalog providers that ship no declaration and stay pinned.
+const UNDECLARED: [&str; 2] = ["openrouter", "slack"];
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -182,11 +184,13 @@ fn gmail_derived_from_its_declaration_has_the_reference_revision() {
     assert_eq!(actual["instance"], "gmail.private");
 }
 
-/// Slack holds two selections run as two instances, so it ships no declaration
-/// and stays pinned; every other catalog provider directory ships exactly one,
+/// Slack holds two selections run as two instances, and OpenRouter one selection
+/// run as a management and an inference instance joined by custody, so neither
+/// ships a declaration and both stay pinned; every other catalog provider
+/// directory ships exactly one,
 /// naming its own directory, its own selection and a distinct connector.
 #[test]
-fn every_catalog_provider_but_slack_ships_one_declaration() {
+fn every_catalog_provider_but_slack_and_openrouter_ships_one_declaration() {
     let declarations = declarations();
     let directories: BTreeSet<String> = fs::read_dir(root().join("providers"))
         .unwrap()
@@ -194,7 +198,7 @@ fn every_catalog_provider_but_slack_ships_one_declaration() {
         .collect();
     let expected: BTreeSet<String> = directories
         .iter()
-        .filter(|name| *name != "slack")
+        .filter(|name| !UNDECLARED.contains(&name.as_str()))
         .cloned()
         .collect();
     assert_eq!(
@@ -261,7 +265,10 @@ fn declared_profiles_are_the_documented_ones_with_every_scope() {
         }
         let provider = config["provider"].as_str().unwrap();
         let Some(declaration) = declarations.get(provider) else {
-            assert_eq!(provider, "slack", "{page}: {provider} has no declaration");
+            assert!(
+                UNDECLARED.contains(&provider),
+                "{page}: {provider} has no declaration"
+            );
             continue;
         };
         let id = config["auth"]["profile"].as_str().unwrap();
@@ -735,32 +742,40 @@ fn documented_native_configurations_keep_their_revisions() {
             "402975480d4f1d1bc4721b82216b23a4598298838d1bf38056ca3ae136d733dd",
         ),
         (
-            "15 catalog-opsgenie.md",
+            "15 catalog-openrouter.md",
+            "edc1e2986e61cdce1a2d1dcc59571f483d8c8b4c30f5fa7ac7d694d2a21b7108",
+        ),
+        (
+            "16 catalog-openrouter.md",
+            "88cd4b2b3d83233bed4808105ed0bea68c0e423ee357efab57989e18226e906e",
+        ),
+        (
+            "17 catalog-opsgenie.md",
             "e3bd0d88779169436ac8cede723c60c38ad18ba5f993aee6c240effd84baad4b",
         ),
         (
-            "16 catalog-runpod.md",
-            "98498e07884da3eba8b03a6aac50aae09691ef3de29e8edcf5218969e98c317c",
+            "18 catalog-runpod.md",
+            "4fd4b8d636a48f045765eda600ae2a14897fa7ebaab9c3fdd5c34c5daac3deea",
         ),
         (
-            "17 catalog-slack.md",
+            "19 catalog-slack.md",
             "6fbe53578644a8eeb333f757574665382e333d1a8089ff2f16f3bea056851e40",
         ),
         (
-            "18 catalog-slack.md",
+            "20 catalog-slack.md",
             "3d1e919d77a8426f713915b02bd72df03c0f01f5fb1a2b5850bf7eb1467e6a8c",
         ),
         (
-            "19 catalog-zendesk.md",
+            "21 catalog-zendesk.md",
             "822b41b8f85c1ca4b29eba823ffed0b8d7a76b1fe84be696ee5f61f83fd7fe67",
         ),
         (
-            "20 catalog-zendesk.md",
+            "22 catalog-zendesk.md",
             "11d48e2b051848b334c235a8915e376abab7c18ccff6406b6d552ddd31fe4171",
         ),
         (
-            "21 local-catalog-provider.md",
-            "4579dfff70a4d1d107c2e71f56f96210bbee67243126d65b61dc0e51b3c2bd96",
+            "23 local-catalog-provider.md",
+            "46e04a9d96d0c783771ca07baf47995e159e6d2f3a8dfa461b541f45dd35d9cb",
         ),
     ]
     .into_iter()
