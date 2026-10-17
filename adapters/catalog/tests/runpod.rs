@@ -369,6 +369,7 @@ fn answer(method: &str, route: &str, query: &str, body: &[u8]) -> Answer {
                 }
                 Some("dropped") => Answer::Drop,
                 Some("failed") => Answer::Status(500, Some(json!({"error": "internal"}))),
+                Some(name) if name.starts_with("stockout-") => stockout(name),
                 _ => Answer::Status(400, Some(json!({"error": "invalid input"}))),
             }
         }
@@ -376,6 +377,46 @@ fn answer(method: &str, route: &str, query: &str, body: &[u8]) -> Answer {
         ("DELETE", "/v1/pods/fixturepod200") => Answer::Status(200, None),
         _ => Answer::Status(404, Some(json!({"error": "pod not found"}))),
     }
+}
+
+/// The fixture's refusals of a create, by the body's `name`.
+///
+/// Not captured from Runpod: no stock-out answer has been observed. Each body
+/// is built from the texts Runpod's own clients recognise as one — runpodctl
+/// @e12397351fa1 `cmd/pods/createPods.go:124-135` ("no longer any instances
+/// available", on a 400 or 409) and runpod-python `runpod/apps/api.py:148-157`
+/// ("resources to deploy your pod", "insufficient capacity", "no available
+/// machine", "out of stock") — in the v1 error's `message` and the v2 RFC 9457
+/// problem's `detail`, in mixed case. A real stock-out answer, when first
+/// seen, is recorded beside these (status and body, redacted) to confirm them.
+fn stockout(name: &str) -> Answer {
+    let (status, body) = match name {
+        "stockout-400-v1" => (
+            400,
+            json!({"message": "There are No Longer Any Instances Available with the requested specifications."}),
+        ),
+        "stockout-409-v1" => (
+            409,
+            json!({"message": "This machine does not have the Resources To Deploy Your Pod."}),
+        ),
+        "stockout-409-v2" => (
+            409,
+            json!({"type": "about:blank", "title": "Conflict", "status": 409,
+                   "detail": "INSUFFICIENT CAPACITY: Out Of Stock for the requested GPU type"}),
+        ),
+        "stockout-400-invalid" => (400, json!({"message": "Invalid input"})),
+        // A capacity text under a member no refusal text names.
+        "stockout-400-elsewhere" => (
+            400,
+            json!({"error": "no available machine", "message": "Invalid input"}),
+        ),
+        "stockout-500" => (
+            500,
+            json!({"message": "Insufficient capacity, no available machine"}),
+        ),
+        _ => unreachable!("no fixture `{name}`"),
+    };
+    Answer::Status(status, Some(body))
 }
 
 struct Provider {
@@ -830,6 +871,54 @@ fn a_create_answered_400_is_refused() {
     assert_eq!(result.effect, WriteEffect::Refused);
     assert!(result.result.is_err());
     assert_eq!(provider.requests().len(), 1);
+}
+
+/// A create Runpod refuses for lack of capacity is `refused` with code
+/// `capacity`, so a caller can place the same workload elsewhere: a 400 or a
+/// 409 whose v1 `message` or v2 `detail` contains one of the texts Runpod's
+/// clients recognise, compared without regard to case. Any other 4xx keeps
+/// its code, and a 5xx stays `unknown` whatever text it carries: the pod may
+/// exist (story:runpod-create-capacity-refusal).
+#[test]
+fn a_create_refused_for_lack_of_capacity_is_a_capacity_refusal() {
+    let provider = Provider::new();
+    let mut child = Child::spawn(&provider.selection(Some(PrivateProtocol::V2))).unwrap();
+    let create = |child: &mut Child, name: &str| {
+        write(child, "pod.create", &json!({"body": create_body(name)})).unwrap()
+    };
+    for name in ["stockout-400-v1", "stockout-409-v1", "stockout-409-v2"] {
+        let result = create(&mut child, name);
+        assert_eq!(result.effect, WriteEffect::Refused, "`{name}`");
+        assert!(
+            matches!(result.result, Err(Failure::ProviderCapacity)),
+            "`{name}`: {:?}",
+            result.result
+        );
+    }
+    for name in ["stockout-400-invalid", "stockout-400-elsewhere"] {
+        let result = create(&mut child, name);
+        assert_eq!(result.effect, WriteEffect::Refused, "`{name}`");
+        assert!(
+            matches!(result.result, Err(Failure::InvalidInput)),
+            "`{name}`: {:?}",
+            result.result
+        );
+    }
+    let result = create(&mut child, "stockout-500");
+    assert_eq!(result.effect, WriteEffect::Unknown);
+    assert!(
+        !matches!(
+            result.result,
+            Ok(_) | Err(Failure::Capacity | Failure::ProviderCapacity)
+        ),
+        "{:?}",
+        result.result
+    );
+    assert_eq!(
+        provider.requests().len(),
+        6,
+        "each create was sent exactly once"
+    );
 }
 
 /// The double-billing guard: once the request has been sent, a connection

@@ -613,6 +613,23 @@ The complete configuration used against the sandbox is
   `error.status` is `rate_limited`, for a read and for a write's definite
   refusal; every other `403` stays `forbidden`. An empty reason is refused
   when the selection loads.
+- `refusal_texts` is optional, for a write: `[{"pointers": ["<pointer>", …],
+  "contains": ["<text>", …], "code": "capacity"}, …]`. It is for a provider
+  that documents no distinct status for a refusal and whose own clients
+  recognise it by the text of its answer, such as Runpod's create refused for
+  lack of capacity. A definite `4xx` refusal of the write (`400`, `401`, `403`,
+  `404`, `405`, `409`, `410`, `412`, `415` or `422`) whose JSON body holds, at
+  one of the RFC 6901 `pointers`, a string containing one of `contains`,
+  compared without regard to case, is refused with `code` instead of the code
+  its status gives; the first refusal that matches decides. A `5xx`, a `429`,
+  a lost connection or a `2xx` is never reclassified: an answer that leaves
+  the effect possible stays `unknown` whatever text it carries. Refusal texts
+  on a read, a refusal of no pointer or no text, a pointer without a leading
+  `/`, an empty text, a text repeated in one refusal (without regard to
+  case), or more than sixteen refusals is refused when the selection loads.
+  The member is modelled as `connectors_catalog.selection.WriteRefusalTexts`
+  in `adapters/catalog/spec/ess`, and every shipped declaration is checked
+  against it.
 - `envelope` is optional, for a read answering JSON: `{"ok": "<pointer>",
   "error": "<pointer>", "refusals": [{"values": ["<name>", …], "code":
   "<code>"}, …], "otherwise": "<code>"}`, each code one of `invalid_input`,
